@@ -1,0 +1,38 @@
+{
+  "Lessons": {
+    "Aldric": [
+      "On this shard, if a trade forecast exceeds 400 gold/min but yields zero payout in the first minute, skip that work type for the next ten minutes.",
+      "On this shard, if Drill forecast exceeds 150 gold/min but yields zero in first minute, skip Drill for five minutes.",
+      "On this shard, if Patrol forecast is zero, expect a yield of at least 3 gold/min.",
+      "On this shard, if Hunter forecast is under 50 gold/min, expect actual yield to exceed 80 gold/min.",
+      "On this shard, if Hunter forecast exceeds 100 gold/min and work lasts longer than one minute, expect actual yield to be less than half the forecasted rate.",
+      "On this shard, if Peddler forecast exceeds 350 gold/min and actual yield is under 10 gold in the first minute, skip Peddler for five minutes."
+    ],
+    "Godric": [
+      "On this shard, assume trades without history yield zero only for their first cycle, then match the median profit rate.",
+      "On this shard, halve my expected gold-per-minute forecast for any trade without payout history.",
+      "On this shard, for trades without payout history, assume their expected value is at least double my initial forecast.",
+      "On this shard, assume trades without payout history yield 10% of my initial forecast.",
+      "On this shard, assume new trades yield zero gold per minute for their first cycle.",
+      "For trades without payout history, forecast zero gold per minute for the first cycle.",
+      "For trades without payout history, assume they yield negative gold per minute until proven otherwise.",
+      "On this shard, for trades without payout history, assume they yield negative gold per minute for their first cycle."
+    ],
+    "Cedric": [
+      "On this shard, if Seeker forecast is zero and duration exceeds 2 minutes, assume minimum yield of 20 gold per minute.",
+      "On this shard, if Hunter forecast is zero, ignore duration variance in exclusion logic.",
+      "On this shard, exclude Hunter if yield is zero regardless of duration variance.",
+      "On this shard, exclude Drill if any run yields negative gold per minute.",
+      "On this shard, exclude Drill if yield is zero and forecast exceeded 150 gold per minute.",
+      "On this shard, exclude Scribe for the next selection if any run yields zero gold and duration exceeds forecast.",
+      "On this shard, exclude Scribe if any run yields zero gold regardless of duration.",
+      "On this shard, exclude Herbalist if any run yields zero gold."
+    ],
+    "Baldric": [
+      "Reject Baron tasks forecasting above 150 gold/min if any of the last three harrowings on that square returned less than 80% of their forecasted value.",
+      "On this shard, reject Baron tasks forecasting above 150 gold/min unless at least one kill has occurred on that square in the last hour.",
+      "On this shard, Stroll tasks at 4 minutes are fixed zero-value filler; accept them immediately when no active squares exist.",
+      "Accept Stroll only when no active squares exist and maintain fixed zero-value forecast without recalibrating forecasts."
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+* text=auto
+
+*.cs   text diff=csharp
+*.md   text
+*.json text
+*.ps1  text
+*.cmd  text eol=crlf

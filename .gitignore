@@ -1,0 +1,7 @@
+# Build output — the assemblies are built into the fork's Distribution\Assemblies, never here
+obj/
+bin/
+*.user
+
+# Runtime
+logs/

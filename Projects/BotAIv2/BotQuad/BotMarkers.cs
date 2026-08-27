@@ -1,0 +1,292 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using Server.Logging;
+
+namespace Server.BotAI.V2;
+
+/// <summary>
+/// Writes what the population knows about the island into the client's own world-map pins.
+///
+/// <para>
+/// <b>The one thing on this shard that a person reads without the server telling them anything.</b> Every
+/// other view of this project is a log line or a gump: both require somebody to go and look at the right
+/// place at the right moment. A pin sits on the world map inside the client the whole time, so "which parts
+/// of the island are dangerous" stops being a question anybody has to ask and becomes something they simply
+/// see while doing something else.
+/// </para>
+///
+/// <para>
+/// <b>The client reads this file once, when it opens its map.</b> Nothing here pushes anything to a running
+/// client: the file is rewritten on a slow clock and the map picks it up next time it is opened. That is a
+/// property of ClassicUO and not a choice made here, and it is why the clock is minutes rather than seconds
+/// — writing it faster would cost the same and change nothing anybody can see.
+/// </para>
+///
+/// <para>
+/// <b>Written from the loop rather than from a thread, and measured rather than assumed.</b> The threading
+/// rule in this repository says heavy external I/O belongs off the loop; this is a few tens of kilobytes
+/// written once every few minutes, which is not heavy, and a background writer would need its own snapshot
+/// of a table the loop is mutating. The cost of each write is logged — see <see cref="Spent"/> — so the
+/// assumption is checked by the shard itself rather than by me. If it ever stops being a fraction of a
+/// millisecond, that number is the argument for moving it.
+/// </para>
+/// </summary>
+public static class BotMarkers
+{
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMarkers));
+
+    /// <summary>
+    /// Where the client keeps its pins, relative to the shard's own working directory.
+    ///
+    /// <para>
+    /// The server runs out of <c>Distribution</c> and the client lives beside the fork, so the default walks
+    /// up two and across. It is a setting because that is a fact about one person's disk and not about this
+    /// shard: anybody else's layout differs, and a wrong path here should be a line in a config file rather
+    /// than a rebuild.
+    /// </para>
+    /// </summary>
+    public static string Path { get; set; } = @"..\..\ClassicUO\Data\Client\userMarkers.usr";
+
+    /// <summary>
+    /// How often the pins are rewritten.
+    ///
+    /// A minute, by order. The client only reads the file when a map is opened, so this is not about how
+    /// quickly a change appears on screen — it is about how stale the file is when somebody does open it.
+    /// The write is a fraction of a millisecond and is measured, so a minute costs nothing worth counting.
+    /// </summary>
+    public static int EveryMs { get; set; } = 60000;
+
+    /// <summary>
+    /// Most pins written at once.
+    ///
+    /// <para>
+    /// A guard on the client rather than on the server: every pin is drawn and labelled, and a map carrying
+    /// several thousand of them is a map nobody can read — which is the state the old file was found in, at
+    /// 1383 pins from a version of this project that no longer exists. The worst ground is written first, so
+    /// what a cap loses is always the quiet ground nobody was going to act on.
+    /// </para>
+    /// </summary>
+    public static int Most { get; set; } = 400;
+
+    /// <summary>
+    /// Whether ground nobody has ever stood in is pinned at all.
+    ///
+    /// Off. An unvisited square is not a fact about the island, it is the absence of one, and pinning them
+    /// would bury the squares that mean something under a grid of everywhere a bot happened to walk past.
+    /// </summary>
+    public static bool PinUnknown { get; set; }
+
+    private static long _tick;
+
+    private static bool _started;
+
+    private static bool _complained;
+
+    /// <summary>Pins written the last time round, and what the write cost.</summary>
+    public static int Written { get; private set; }
+
+    public static long Writes { get; private set; }
+
+    public static double Spent { get; private set; }
+
+    /// <summary>Rewrites the file if it is due. Called from the population's own summary clock.</summary>
+    public static void Tick()
+    {
+        var now = Core.TickCount;
+
+        // <b>The first call writes rather than merely starting the clock.</b> Seeding and returning is the
+        // right shape for a counter that measures an interval, and the wrong one here: this is asked from a
+        // five-minute summary, so skipping the first call meant the file did not appear until ten minutes
+        // into a session — and an empty pin file looks exactly like a broken one to whoever opens the map.
+        // The tick is still seeded from a real reading and still compared by subtraction.
+        if (!_started)
+        {
+            _started = true;
+            _tick = now;
+
+            Write();
+
+            return;
+        }
+
+        if (now - _tick < EveryMs)
+        {
+            return;
+        }
+
+        _tick = now;
+
+        Write();
+    }
+
+    /// <summary>Rewrites the file now, whatever the clock says.</summary>
+    public static void Write()
+    {
+        var quads = BotQuad.Worst(0);
+
+        if (quads.Count == 0)
+        {
+            return;
+        }
+
+        var watch = Stopwatch.StartNew();
+
+        // Built whole and written once. A file the client may open at any moment should never be half a file,
+        // and this is small enough that there is nothing to gain by streaming it.
+        var text = new StringBuilder(quads.Count * 64);
+        var written = 0;
+
+        for (var i = 0; i < quads.Count && written < Most; i++)
+        {
+            var quad = quads[i];
+
+            if (!quad.Trodden && !PinUnknown)
+            {
+                continue;
+            }
+
+            var middle = quad.Middle;
+
+            // Nothing in a label may be a comma: the file is comma-separated and the client does not quote.
+            // The middle dot and the semicolon are what the old file used, and they read well in game.
+            text.Append(middle.X).Append(',')
+                .Append(middle.Y).Append(",0,")
+                .Append(Label(quad))
+                .Append(",,")
+                .Append(Colour(quad))
+                .Append(",3\n");
+
+            written++;
+        }
+
+        try
+        {
+            var full = System.IO.Path.GetFullPath(Path);
+            var folder = System.IO.Path.GetDirectoryName(full);
+
+            if (folder == null || !Directory.Exists(folder))
+            {
+                Complain("there is no folder at {Where}", full);
+
+                return;
+            }
+
+            File.WriteAllText(full, text.ToString());
+        }
+        catch (Exception e)
+        {
+            Complain("the file at {Where} could not be written: " + e.Message, Path);
+
+            return;
+        }
+
+        watch.Stop();
+
+        Written = written;
+        Writes++;
+        Spent = watch.Elapsed.TotalMilliseconds;
+        _complained = false;
+
+        logger.Information(
+            "The world map has {Count} pins on it, written in {Spent:F1}ms",
+            written,
+            Spent
+        );
+    }
+
+    /// <summary>
+    /// What the pin says, in the fewest words that still decide something.
+    ///
+    /// The rating first, because it is the one number the rules are written in; then only the counts that
+    /// are not nought, so a quiet square is a short label rather than a row of zeroes.
+    /// </summary>
+    private static string Label(BotQuad.Quad quad)
+    {
+        var text = new StringBuilder(48);
+
+        text.Append(quad.Safety.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+
+        if (quad.Deaths > 0)
+        {
+            text.Append(" · ").Append(quad.Deaths).Append(" dead");
+        }
+
+        if (quad.Blows > 0)
+        {
+            text.Append(" · ").Append(quad.Blows).Append(" hit");
+        }
+
+        if (quad.HarrowedTick != 0)
+        {
+            text.Append(" · harrowed");
+        }
+        else if (quad.Safety <= BotQuad.Dire)
+        {
+            text.Append(" · dire");
+        }
+        else if (quad.Safety > BotQuad.TooQuiet)
+        {
+            text.Append(" · quiet");
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// The pin's colour, which is the whole of what makes the map readable at a glance.
+    ///
+    /// Four states and no more: go here, ordinary, nothing here, never been. A person looking at this map is
+    /// asking one question — where should anybody be sent — and every extra colour makes that question
+    /// harder rather than easier.
+    /// </summary>
+    private static string Colour(BotQuad.Quad quad)
+    {
+        if (!quad.Trodden)
+        {
+            return "purple";
+        }
+
+        if (quad.Safety <= BotQuad.Dire)
+        {
+            return "red";
+        }
+
+        if (quad.Safety <= BotQuad.Wanted)
+        {
+            return "yellow";
+        }
+
+        return quad.Safety > BotQuad.TooQuiet ? "green" : "blue";
+    }
+
+    /// <summary>
+    /// Said once until it works again, because a path that is wrong is wrong every two minutes for ever.
+    /// </summary>
+    private static void Complain(string what, object where)
+    {
+        if (_complained)
+        {
+            return;
+        }
+
+        _complained = true;
+
+        logger.Warning("The world map pins were not written: " + what, where);
+    }
+
+    public static string Describe() =>
+        Writes == 0
+            ? "no world-map pins have been written yet"
+            : $"{Written} pins written {Writes} times, last of them in {Spent:F1}ms, at {Path}";
+
+    public static void Forget()
+    {
+        Written = 0;
+        Writes = 0;
+        Spent = 0.0;
+        _started = false;
+        _complained = false;
+    }
+}

@@ -1,0 +1,95 @@
+using Server.Logging;
+
+namespace Server.BotAI.V2;
+
+/// <summary>
+/// Getting a living out of the ground, as a module: reads its numbers and offers the trade to the decision
+/// layer.
+///
+/// <para>
+/// <see cref="BotPhase.World"/>, because everything it knows is a place. Requires <c>Will</c>, which it
+/// hands a proposer, and <c>Classes</c>, because a gatherer's pickaxe comes from its kit.
+/// </para>
+///
+/// <para>
+/// <b>This is the first module that gives the population something to want</b>, and it is deliberately the
+/// gatherer's chain rather than the fighter's: dig, melt, bank exercises every part of the machinery at
+/// once — stages that survive an interruption, a named skill that only counts when the work finishes, goods
+/// that are worth something before they are sold, and a definition of finished that is somewhere other than
+/// where the work happened. A hunt would have exercised none of the last three.
+/// </para>
+///
+/// <para>
+/// Its switch is worth having for the plainest reason: with it off, the population has nothing to do and
+/// says so in the census. That is the cheapest way to tell "the brain is not choosing" from "there is
+/// nothing to choose".
+/// </para>
+/// </summary>
+public sealed class BotHarvestModule : BotModule
+{
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHarvestModule));
+
+    public override string Name => "Harvest";
+
+    public override BotPhase Phase => BotPhase.World;
+
+    /// <summary>
+    /// <b>Population is here because of one line, and the line was silently doing nothing without it.</b>
+    /// Prospecting the named lode needs to know which facet the population lives on, and that is settled by
+    /// the population's own configuration — which runs in this same phase and, before this was declared, ran
+    /// <em>after</em>. So the sweep was handed a null map, returned nought, and said nothing. A declared
+    /// dependency that cannot be met is a named failure at boot; an undeclared one is a feature that quietly
+    /// is not there, which is exactly what happened.
+    /// </summary>
+    public override string[] Requires => ["Classes", "Will", "Population"];
+
+    public override void Start()
+    {
+        BotHarvestConfig.Load();
+
+        // One sweep of the named lode, so that there is ore on the board somewhere no bot has yet been.
+        // See BotGround.Lode for the closed circle this breaks.
+        BotGround.Prospect(BotPopulation.Home);
+
+        BotWill.Offer(new BotMiner());
+
+        // The other kind of harvest, and the only one that costs nothing at all: the world leaves reagents
+        // lying about and refills them, and the population has been walking over them since it was raised.
+        BotWill.Offer(new BotForager());
+
+        // The sage's trip to the woods. Registered here rather than with the spells because what it produces
+        // is ground goods, and because the one thing it must not become is a second forager: see BotHerbs.
+        BotWill.Offer(new BotHerbalist());
+
+        logger.Information(
+            "Harvest ready: a trip is reckoned at {Expects} a minute over {Minutes} minutes, an ingot at {Ingot} gold; the ground is swept {Reach} tiles around the first bot to ask, at most {Sweeps} times",
+            BotDig.Prior,
+            BotDig.WorkMinutes,
+            BotDig.GoldPerIngot,
+            BotGround.Reach,
+            BotGround.MaxSurveys
+        );
+
+        logger.Information(
+            "Foraging ready: anything the world calls a reagent, picked up from {Reach} tiles away while a pack is under {Full:P0} full, reckoned at {Expects} a minute and put on the board at {Guess}gp a piece",
+            BotForage.Reach,
+            BotForage.FillFraction,
+            BotForage.Prior,
+            BotForage.Guess
+        );
+    }
+
+    /// <summary>
+    /// A world reload is a different world. Every seam, fire and counter on record is a place in the world
+    /// that has just been replaced, and a remembered forge is a bot walking to an empty field.
+    /// </summary>
+    public override void Reset()
+    {
+        logger.Information("Harvest, before the reload: {State}", BotGround.Describe());
+
+        BotGround.Reset();
+        BotMiner.Forget();
+    }
+
+    public static string Summarise() => BotGround.Describe();
+}

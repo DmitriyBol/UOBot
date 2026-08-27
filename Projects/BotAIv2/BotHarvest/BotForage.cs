@@ -1,0 +1,369 @@
+using System;
+using System.Collections.Generic;
+using Server.Items;
+using Server.Logging;
+
+namespace Server.BotAI.V2;
+
+/// <summary>
+/// Picking up the reagents the world leaves lying about, and putting them on the board.
+///
+/// <para>
+/// <b>Free money the population has been walking past since the day it was raised.</b> The world spawns
+/// nightshade, sulphurous ash, garlic and the rest on the ground and refills them on their own clock; every
+/// bot on this shard has stepped over them for a fortnight. It is the cheapest income there is — no fight,
+/// no tool, no material, no skill — and unlike a vein or a shopkeeper it costs nobody anything to take.
+/// </para>
+///
+/// <para>
+/// <b>Asked of the engine as a family, not written out as a list of eight herbs.</b> Everything the world
+/// calls a reagent derives from <c>BaseReagent</c>, so one type check covers all of them and covers any that
+/// are ever added — which is the same reason the armoury reads the craft systems instead of keeping a table
+/// of hauberks. A list of names here would be right today and quietly wrong the first time somebody adds a
+/// herb.
+/// </para>
+///
+/// <para>
+/// <b>And it ends on the board rather than in a pocket.</b> Two of these are worth pennies to the bot that
+/// picked them up and a great deal to the mage two fields away who cannot cast without them — this shard's
+/// scribes and casters buy reagents constantly. A gathering errand that ended at the backpack would be a bot
+/// hoarding somebody else's spellbook.
+/// </para>
+/// </summary>
+public sealed class BotForage : BotDeed
+{
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotForage));
+
+    /// <summary>The ledger's key.</summary>
+    public const string Trade = "forage";
+
+    /// <summary>
+    /// What a gathering trip is reckoned at per minute before experience corrects it.
+    ///
+    /// Modest, and it is meant to be beaten by real work. Reagents are pennies a piece; what makes this worth
+    /// anybody's time is that the walk is short and there is nothing to buy, not that the pile is rich. A
+    /// number that made this compete with hunting would have the whole population combing fields.
+    /// </summary>
+    public static double Prior { get; set; } = 20.0;
+
+    /// <summary>How long a gathering trip is expected to take.</summary>
+    public static double WorkMinutes { get; set; } = 1.0;
+
+    /// <summary>How far a bot will look, and go, for something lying about.</summary>
+    public static int Reach { get; set; } = 18;
+
+    /// <summary>How near it has to be standing to pick a thing up.</summary>
+    public static int Touch { get; set; } = 2;
+
+    /// <summary>How full a pack may be before a bot stops stooping for pennies.</summary>
+    public static double FillFraction { get; set; } = 0.8;
+
+    /// <summary>What one reagent is asked for on the board, before the market has an opinion.</summary>
+    public static int Guess { get; set; } = 5;
+
+    /// <summary>Whether gathered goods go on the market rather than staying in the pack.</summary>
+    public static bool ListGoods { get; set; } = true;
+
+    private readonly Map _map;
+
+    private readonly Point3D _where;
+
+    private readonly List<Item> _taken = [];
+
+    private int _gathered;
+
+    private int _worth;
+
+    public BotForage(Map map, Point3D where)
+    {
+        _map = map;
+        _where = where;
+    }
+
+    public override string Kind => Trade;
+
+    public override Map Map => _map;
+
+    public override Point3D Where => _where;
+
+    public override double Expects => Prior;
+
+    public override double Minutes => WorkMinutes;
+
+    /// <summary>Nothing. Stooping teaches a bot nothing, and claiming otherwise would be a lie to the ledger.</summary>
+    public override SkillName? Trains => null;
+
+    public override int Outlay => 0;
+
+    /// <summary>
+    /// Goods rather than coin, exactly as digging is.
+    ///
+    /// A bot that is short of money should go and earn some instead of filling its pack with herbs it still
+    /// has to sell — which is what this factor is for, and it is the same answer the miner gives.
+    /// </summary>
+    public override double Coin => 0.0;
+
+    public override int Made => _worth;
+
+    public override string Stage =>
+        _gathered > 0 ? $"gathered {_gathered} reagents" : "after reagents lying about";
+
+    public override BotDoing Advance(IBotWilful bot)
+    {
+        var body = bot?.Self;
+
+        if (body == null || _map == null || _map == Map.Internal)
+        {
+            return BotDoing.Failed("no body");
+        }
+
+        var pack = body.Backpack;
+
+        if (pack == null)
+        {
+            return BotDoing.Failed("nowhere to put it");
+        }
+
+        // Stops stooping when the pack is nearly full, so that a handful of herbs never costs a bot the room
+        // for what it is actually out here to carry.
+        if (BotLadder.Load(body) >= BotLadder.Ceiling(body) * FillFraction)
+        {
+            return Finish(bot, body, "the pack is too full to stoop");
+        }
+
+        var lying = Nearest(body, Reach);
+
+        if (lying == null)
+        {
+            return Finish(bot, body, "nothing left lying about");
+        }
+
+        if (!body.InRange(lying.GetWorldLocation(), Touch))
+        {
+            return BotDoing.Walk(_map, lying.GetWorldLocation(), BotArrival.Within(Touch), "after reagents");
+        }
+
+        var amount = Math.Max(1, lying.Amount);
+
+        // <b>Counted before it is picked up, and the order matters.</b> Dropping a stack into a pack merges
+        // it with whatever is already in there, and the object may cease to exist in the same instruction —
+        // so anything wanted about it has to be read first. This is the same shape as a craft that reports
+        // attempts as output.
+        var kind = lying.GetType();
+
+        if (!pack.TryDropItem(body, lying, false))
+        {
+            return Finish(bot, body, "the pack would not take it");
+        }
+
+        _gathered += amount;
+        _worth += amount * BotAuction.Worth(kind, Guess);
+
+        // Held so the errand can put its takings out at the end. The stack may have merged into another, in
+        // which case the object is deleted and is skipped when the time comes.
+        _taken.Add(lying);
+
+        return BotDoing.Work($"gathered {_gathered}");
+    }
+
+    /// <summary>
+    /// The errand is over: what was gathered goes on the board.
+    ///
+    /// <para>
+    /// Listed rather than carried, and the failure to list is not a failure of the errand — a bot that could
+    /// not put its herbs out still has them, which is worth something, and reporting the whole afternoon as
+    /// failed over it would teach the ledger to avoid a field that was perfectly good.
+    /// </para>
+    /// </summary>
+    private BotDoing Finish(IBotWilful bot, Mobile body, string why)
+    {
+        if (_gathered == 0)
+        {
+            return BotDoing.Done(why);
+        }
+
+        var put = 0;
+
+        if (ListGoods)
+        {
+            put = Put(bot, body);
+        }
+
+        _taken.Clear();
+
+        logger.Information(
+            "{Name} gathered {Count} reagents worth about {Worth}gp and put {Put} of them on the board",
+            body.Name,
+            _gathered,
+            _worth,
+            put
+        );
+
+        return BotDoing.Done($"{_gathered} reagents gathered, {put} put out — {why}");
+    }
+
+    /// <summary>
+    /// Puts the reagents in the pack out on the board, by kind rather than by object.
+    ///
+    /// <para>
+    /// <b>Following the objects it picked up put nought of them out, and the reason is one line of the
+    /// engine.</b> Dropping a stack into a pack that already holds the same thing <em>merges</em> it: the
+    /// object that was on the ground is deleted, its amount added to the one already there. So the errand
+    /// held a list of tombstones, checked each against the pack, found every one of them gone, and reported
+    /// "gathered 5 reagents ... put 0 of them on the board" — which is precisely what Joss did at 22:20 on
+    /// 25.08.2026, five herbs into a pocket and nothing to show for it.
+    /// </para>
+    ///
+    /// <para>
+    /// The cure is to stop tracking objects at all. What was gathered is a <em>kind</em> and an amount, and
+    /// what should go out is whatever of that kind is now in the pack — which is the surviving stack, the one
+    /// the merge left behind.
+    /// </para>
+    /// </summary>
+    private int Put(IBotWilful bot, Mobile body)
+    {
+        var pack = body.Backpack;
+
+        if (pack == null)
+        {
+            return 0;
+        }
+
+        var put = 0;
+
+        // A snapshot: listing internalises the stack, which mutates the list being read.
+        List<Item> carried = [.. pack.Items];
+
+        for (var i = 0; i < carried.Count; i++)
+        {
+            var item = carried[i];
+
+            if (item is not BaseReagent { Deleted: false })
+            {
+                continue;
+            }
+
+            var amount = Math.Max(1, item.Amount);
+
+            if (BotAuction.List(bot, item, BotAuction.Worth(item.GetType(), Guess)) != null)
+            {
+                put += amount;
+            }
+        }
+
+        return put;
+    }
+
+    public override void Drop(IBotWilful bot) => _taken.Clear();
+
+    /// <summary>
+    /// The nearest reagent lying loose on the ground, or null.
+    ///
+    /// <para>
+    /// <c>Parent == null</c> is what makes it "on the ground" rather than in a pack or a corpse, and it is
+    /// also what keeps a bot out of the market's own goods: a listed stall internalises its stock, so nothing
+    /// anybody has put out for sale is ever standing on a tile to be found.
+    /// </para>
+    /// </summary>
+    public static Item Nearest(Mobile bot, int range)
+    {
+        var map = bot?.Map;
+
+        if (map == null || map == Map.Internal)
+        {
+            return null;
+        }
+
+        Item best = null;
+        var bestAway = double.MaxValue;
+
+        foreach (var item in map.GetItemsInRange<BaseReagent>(bot.Location, range))
+        {
+            if (item.Deleted || item.Parent != null || !item.Movable)
+            {
+                continue;
+            }
+
+            var away = bot.GetDistanceToSqrt(item.Location);
+
+            if (away < bestAway)
+            {
+                bestAway = away;
+                best = item;
+            }
+        }
+
+        return best;
+    }
+}
+
+/// <summary>
+/// Offers any bot the reagents lying within sight of it.
+///
+/// <para>
+/// <b>Offered to everybody, because stooping is not a trade.</b> Mining wants a pickaxe, forging wants an
+/// anvil, and scribing wants a book — this wants a free hand, so restricting it to one class would be
+/// inventing a guild for picking things up. The auction settles whether it is worth a given bot's minute,
+/// which is exactly the sort of question it exists to answer.
+/// </para>
+/// </summary>
+public sealed class BotForager : IBotProposer
+{
+    public string Name => "Forager";
+
+    public BotStanding Rung => BotStanding.Free;
+
+    public static long Asked { get; private set; }
+
+    public static long Laden { get; private set; }
+
+    public static long Bare { get; private set; }
+
+    public static long Sent { get; private set; }
+
+    public BotDeed Propose(IBotWilful bot)
+    {
+        var body = bot?.Self;
+        var map = body?.Map;
+
+        if (map == null || map == Map.Internal || !body.Alive)
+        {
+            return null;
+        }
+
+        Asked++;
+
+        if (BotLadder.Load(body) >= BotLadder.Ceiling(body) * BotForage.FillFraction)
+        {
+            Laden++;
+
+            return null;
+        }
+
+        var lying = BotForage.Nearest(body, BotForage.Reach);
+
+        if (lying == null)
+        {
+            Bare++;
+
+            return null;
+        }
+
+        Sent++;
+
+        return new BotForage(map, lying.GetWorldLocation());
+    }
+
+    public static string Describe() =>
+        Asked == 0
+            ? "nobody has been offered anything lying about"
+            : $"{Asked} asked: {Sent} sent after reagents on the ground, {Bare} had none in sight, {Laden} were carrying too much to stoop";
+
+    public static void Forget()
+    {
+        Asked = 0;
+        Laden = 0;
+        Bare = 0;
+        Sent = 0;
+    }
+}

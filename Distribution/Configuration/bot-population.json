@@ -1,0 +1,26 @@
+{
+  "Map": "Felucca",
+  "Home": [
+    1440,
+    1470,
+    0
+  ],
+  "Purse": 400,
+  "Run": true,
+  "Roam": 500,
+  "Classes": {
+    "Gatherer": 2,
+    "Crafter": 2,
+    "Brawler": 1,
+    "Warrior": 10,
+    "WarriorMage": 3,
+    "WarriorArcher": 3,
+    "Archer": 3,
+    "Mage": 3,
+    "Healer": 3,
+    "Captain": 1,
+    "Baron": 1,
+    "Architect": 1,
+    "Sage": 1
+  }
+}

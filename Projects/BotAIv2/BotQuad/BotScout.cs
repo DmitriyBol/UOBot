@@ -1,0 +1,584 @@
+using System;
+using System.Collections.Generic;
+using Server.Items;
+using Server.Logging;
+using Server.Mobiles;
+
+namespace Server.BotAI.V2;
+
+/// <summary>
+/// A captain taking a paid party out to ground nobody has ever stood in.
+///
+/// <para>
+/// <b>This is the one errand on the shard whose product is knowledge rather than goods.</b> Everything else
+/// a bot does ends in coin, in a made thing or in a dead monster; this ends in a square on the map changing
+/// from "never stood in" to a reading. The population cannot hunt where it has not been, cannot be sent
+/// where nothing is known, and — because <see cref="BotQuad"/> credits ground for being walked — cannot even
+/// tell safe ground from unvisited ground without somebody going and looking.
+/// </para>
+///
+/// <para>
+/// <b>Paid, and paid out of the captain's own pocket, by order.</b> Fifty gold split between whoever comes.
+/// It is a small sum on purpose: scouting is not meant to compete with hunting on takings, it is meant to be
+/// worth doing when nothing better is going. What the money really buys is a reason for the other bots to
+/// come at all — the auction weighs every want in gold a minute, and an unpaid walk into the unknown scores
+/// exactly nothing against a hunt. The captain is kept from ruining himself by a floor on his own purse: see
+/// <see cref="Solvent"/>.
+/// </para>
+/// </summary>
+public sealed class BotScout : BotDeed
+{
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotScout));
+
+    /// <summary>The ledger's key.</summary>
+    public const string Trade = "scout";
+
+    /// <summary>What the captain pays the party, all told, however many come.</summary>
+    public static int Wage { get; set; } = 50;
+
+    /// <summary>
+    /// What the captain must still have after paying, on pocket and account together.
+    ///
+    /// <para>
+    /// Three hundred, by order, and it is what stops this office from beggaring the bot that holds it. A
+    /// captain earns by teaching and spends on his own kit like anybody else; an errand that pays out
+    /// unconditionally would be a slow leak with no floor, which is the shape of defect this project has
+    /// already found in three other places under the name "a multiplier with no floor".
+    /// </para>
+    /// </summary>
+    public static int Solvent { get; set; } = 300;
+
+    /// <summary>How far a captain will take a party to look at somewhere new.</summary>
+    public static int Range
+    {
+        get => _range > 0 ? _range : BotPopulation.Roam;
+        set => _range = value;
+    }
+
+    private static int _range;
+
+    /// <summary>How near the captain a volunteer has to be to be called on.</summary>
+    public static int Reach { get; set; } = 30;
+
+    /// <summary>Fewest bodies worth going with, the captain included.</summary>
+    public static int Least { get; set; } = 2;
+
+    /// <summary>Longest a party may be out before it turns for home.</summary>
+    public static int CapMs { get; set; } = 600000;
+
+    /// <summary>What scouting is reckoned at per minute before experience corrects it.</summary>
+    public static double Prior { get; set; } = 40.0;
+
+    /// <summary>How long the walk is expected to take.</summary>
+    public static double WorkMinutes { get; set; } = 6.0;
+
+    /// <summary>Parties that actually formed and set out.</summary>
+    public static long Parties { get; private set; }
+
+    /// <summary>Captains who won the errand and could not raise a party for it.</summary>
+    public static long Undermanned { get; private set; }
+
+    /// <summary>Squares actually reached and read.</summary>
+    public static long Surveyed { get; private set; }
+
+    /// <summary>Parties that ran out of time before arriving.</summary>
+    public static long Timedout { get; private set; }
+
+    /// <summary>Gold actually handed over, and to how many.</summary>
+    public static long Wages { get; private set; }
+
+    public static long Paid { get; private set; }
+
+    private readonly Map _map;
+
+    /// <summary>
+    /// The square being walked to now. Not readonly: a Baron's rounds move on to the next one on arrival.
+    ///
+    /// <para>
+    /// <b>One square per errand is what made the Baron look stuck, and it was not a bug in the walking.</b>
+    /// He reached his square, the errand ended, and the next one had to win an auction — which it could not,
+    /// because winning the last one had left him leading a company, and a Baron leading a company is refused
+    /// his rounds before anything is scored. Seven of ten answers in one window were exactly that. Rounds
+    /// are a route rather than a destination, so the route belongs inside one errand.
+    /// </para>
+    /// </summary>
+    private Point3D _where;
+
+    /// <summary>
+    /// What this particular party is worth, all told. Nought for a Baron's own rounds.
+    ///
+    /// <para>
+    /// <b>Held on the deed rather than read off the static, because two offices walk into the unknown for
+    /// different reasons.</b> A captain pays a party because he is buying their time away from work that
+    /// pays; the Baron pays nobody, by order, and goes whether or not anybody follows — walking his ground
+    /// is what the office <em>is</em>. Same errand, same walk, same map entry: only the wage and how few
+    /// bodies will do differ, so they are the two things the caller names.
+    /// </para>
+    /// </summary>
+    private readonly int _wage;
+
+    private readonly int _least;
+
+    /// <summary>How many squares this errand walks before it is finished. One for a paid party.</summary>
+    private readonly int _rounds;
+
+    /// <summary>
+    /// Whether only the caller's own kind may fall in.
+    ///
+    /// <para>
+    /// For the King's Rangers, who are a standing company rather than a party raised on the spot. A captain
+    /// takes whoever is free and that is the point of paying them; a ranger company that swept up a passing
+    /// miner would be walking into unread ground with a body in it that has no armour, no orders and a trade
+    /// to get back to. Their formation is the whole of why five of them survive where one would not.
+    /// </para>
+    /// </summary>
+    private readonly bool _kin;
+
+    /// <summary>Ground this errand will not walk past, or an empty rectangle for anywhere.</summary>
+    private readonly Rectangle2D _bounds;
+
+    /// <summary>How many have been read so far.</summary>
+    private int _read;
+
+    private BotSquad _squad;
+
+    private int _called;
+
+    private long _began;
+
+    public BotScout(Map map, Point3D where) : this(map, where, Wage, Least, 1)
+    {
+    }
+
+    public BotScout(Map map, Point3D where, int wage, int least, int rounds)
+        : this(map, where, wage, least, rounds, false, default)
+    {
+    }
+
+    public BotScout(Map map, Point3D where, int wage, int least, int rounds, bool kin, Rectangle2D bounds)
+    {
+        _map = map;
+        _where = where;
+        _wage = Math.Max(0, wage);
+        _least = Math.Max(1, least);
+        _rounds = Math.Max(1, rounds);
+        _kin = kin;
+        _bounds = bounds;
+        _began = Core.TickCount;
+    }
+
+    public override string Kind => Trade;
+
+    public override Map Map => _map;
+
+    public override Point3D Where => _where;
+
+    public override double Expects => Prior;
+
+    public override double Minutes => WorkMinutes;
+
+    public override SkillName? Trains => null;
+
+    public override int Outlay => _wage;
+
+    public override double Coin => 1.0;
+
+    public override bool Alongside => true;
+
+    public override string Stage =>
+        _squad == null
+            ? $"raising a party for the ground at ({_where.X}, {_where.Y})"
+            : _rounds > 1
+                ? $"scouting ({_where.X}, {_where.Y}) with {_called} of us, {_read} of {_rounds} squares read"
+                : $"scouting ({_where.X}, {_where.Y}) with {_called} of us";
+
+    public override BotDoing Advance(IBotWilful bot)
+    {
+        var body = bot?.Self;
+
+        if (body == null || _map == null || _map == Map.Internal)
+        {
+            return BotDoing.Failed("no body");
+        }
+
+        if (bot is not IBotSquadMember member)
+        {
+            return BotDoing.Failed("not the sort of thing that leads parties");
+        }
+
+        return _squad == null ? Calling(member, body) : Walking(member, body);
+    }
+
+    /// <summary>Calls for volunteers where the captain stands, and sets out if enough came.</summary>
+    private BotDoing Calling(IBotSquadMember member, Mobile body)
+    {
+        var squad = member.Squad;
+
+        // <b>A company already has a leader, and it is not everybody who was offered the errand.</b> Three of
+        // the five rangers won this in the same beat: the first raised the company, the other two joined it,
+        // and then each of them read `member.Squad` back, decided it was *their* company, and set out for a
+        // different square. "Ser Alric is taking 5 of them to (1425, 1425)" and "Fletcher Wyn is taking 5 of
+        // them to (1395, 1455)" in the same second, on the same five bots — three orders on one company, so
+        // it stood still. Falling in behind somebody is not the same as leading, and only the leader walks
+        // the route.
+        if (squad != null && !ReferenceEquals(squad.Leader, member))
+        {
+            return BotDoing.Done("somebody else is leading this company");
+        }
+
+        // <b>A standing company is not raised here, and must not be.</b> The King's Rangers are mustered once
+        // for their whole lives — see BotRangers.Muster — so this errand finds their squad already made,
+        // already charged and already holding all five. Calling one together per sweep is what produced a
+        // company that dissolved after every skirmish and five bots with nothing to do.
+        if (_kin)
+        {
+            if (squad == null)
+            {
+                return BotDoing.Failed("the company has not been mustered");
+            }
+        }
+        else
+        {
+            squad ??= BotSquads.Form(member);
+
+            if (squad == null)
+            {
+                return BotDoing.Failed("could not call a party together");
+            }
+
+            foreach (var mobile in _map.GetMobilesInRange<Mobile>(body.Location, Reach))
+            {
+                if (squad.Count >= squad.Ceiling)
+                {
+                    break;
+                }
+
+                if (mobile == body || mobile is not IBotSquadMember { Squad: null } other)
+                {
+                    continue;
+                }
+
+                if (mobile is not IBotAlly { AbleToFight: true })
+                {
+                    continue;
+                }
+
+                BotSquads.Join(squad, other);
+            }
+        }
+
+        _called = squad.Count;
+
+        if (_called < _least)
+        {
+            Undermanned++;
+
+            BotSquads.Leave(member);
+
+            return BotDoing.Failed($"only {_called} would come to look at ({_where.X}, {_where.Y})");
+        }
+
+        _squad = squad;
+
+        // Without this the party is dissolved on the next squad beat for having nothing to fight — which is
+        // precisely what a scouting party is meant to have. See BotSquad.Charged.
+        squad.Charged = true;
+
+        Parties++;
+
+        // Stamped when the party forms rather than when the deed was built: the auction builds one of these
+        // every time it asks and throws most of them away.
+        _began = Core.TickCount;
+
+        body.Say(_wage > 0 ? "Ground nobody has walked. Who is coming? There is coin in it." : "Ground nobody has walked. I am going to look at it.");
+
+        logger.Information(
+            "{Name} is taking {Count} of them to look at ({X}, {Y}), which nobody has stood in",
+            body.Name,
+            _called,
+            _where.X,
+            _where.Y
+        );
+
+        return BotDoing.Walk(_map, _where, BotArrival.Within(BotQuad.Side / 3), $"scouting ({_where.X}, {_where.Y})");
+    }
+
+    /// <summary>On the road, and paying out when the ground is reached.</summary>
+    private BotDoing Walking(IBotSquadMember member, Mobile body)
+    {
+        var squad = member.Squad;
+
+        if (squad == null || !ReferenceEquals(squad, _squad))
+        {
+            return BotDoing.Done("the party broke up on the road");
+        }
+
+        _called = squad.Count;
+
+        // The crown's surgeon left on his own. See BotRangers.SurgeonAlone: a healer by himself is not a
+        // company, and the round ends rather than walking him into whatever killed the other four.
+        if (_kin && BotRangers.SurgeonAlone())
+        {
+            Disband(member);
+
+            return BotDoing.Done("the company is down to its surgeon; the sweep is over");
+        }
+
+        if (Core.TickCount - _began >= CapMs)
+        {
+            Timedout++;
+
+            Disband(member);
+
+            return BotDoing.Done($"gave up on reaching ({_where.X}, {_where.Y})");
+        }
+
+        // Arrival is judged by where the bodies are and not by what the journey says: the ground is the
+        // point, and a party standing in the square has done the errand whether or not the walk agrees.
+        if (!body.InRange(_where, BotQuad.Side / 2))
+        {
+            return BotDoing.Walk(_map, _where, BotArrival.Within(BotQuad.Side / 3), $"scouting ({_where.X}, {_where.Y})");
+        }
+
+        Surveyed++;
+        _read++;
+
+        // Walking into it is what makes it known — every bot in the party is doing that right now, and
+        // BotMobile.Cross has already told the map about each of them. Said here so the square is marked even
+        // if the party arrived by some route that never crossed a boundary.
+        // A ranger sweep marks the ground read and leaves the reading where it was; anybody else's arrival
+        // is an ordinary first footfall. See BotQuad.Swept for why elite survival proves less, not more.
+        if (_kin)
+        {
+            BotQuad.Swept(_map, body.Location);
+        }
+        else
+        {
+            BotQuad.Seen(_map, body.Location);
+        }
+
+        // <b>On to the next square, for as many as this errand was given.</b> The frontier is asked again
+        // from where the party is standing rather than from where it started, so the route walks outwards
+        // instead of returning to re-plan from home. A round that finds nothing left unknown ends the errand
+        // honestly — the island within reach has been read, which is the errand succeeding, not failing.
+        if (_read < _rounds)
+        {
+            var next = BotQuad.Frontier(
+                _map,
+                body.Location,
+                Range,
+                at => Within(at) && Reachable(_map, body.Location, at)
+            );
+
+            if (next != Point3D.Zero)
+            {
+                _where = next;
+
+                // The clock restarts with the leg. It is there to catch a party that cannot reach the square
+                // in front of it, not to punish one that is walking twenty of them as ordered — measured
+                // across the whole route it would end every round of a Baron's rounds as a failure to arrive.
+                _began = Core.TickCount;
+
+                return BotDoing.Walk(_map, _where, BotArrival.Within(BotQuad.Side / 3), $"scouting ({_where.X}, {_where.Y})");
+            }
+        }
+
+        var paid = _wage > 0 ? Pay(body, squad, _wage) : 0;
+
+        Disband(member);
+
+        return BotDoing.Done(
+            paid > 0
+                ? $"read {_read} squares and paid {paid}gp for it"
+                : $"read {_read} squares, the last at ({_where.X}, {_where.Y})"
+        );
+    }
+
+    /// <summary>
+    /// Splits the wage between whoever came, out of the captain's own money.
+    ///
+    /// <para>
+    /// The captain's share is not taken out and handed back to him — he keeps what is left by not paying it
+    /// away, which is the same thing and cannot go wrong halfway. Coin comes out of the pack first and the
+    /// account second, in that order, because that is the order every other purchase on this shard uses and
+    /// a bot's pocket is what its own errands are paid from.
+    /// </para>
+    /// </summary>
+    private static int Pay(Mobile captain, BotSquad squad, int wage)
+    {
+        var members = squad?.Members;
+
+        if (members == null || captain?.Backpack == null)
+        {
+            return 0;
+        }
+
+        List<Mobile> owed = [];
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            var body = members[i]?.Self;
+
+            if (body != null && body != captain && !body.Deleted && body.Backpack != null)
+            {
+                owed.Add(body);
+            }
+        }
+
+        if (owed.Count == 0)
+        {
+            return 0;
+        }
+
+        var each = Math.Max(1, wage / owed.Count);
+        var total = each * owed.Count;
+
+        if (BotYield.Wealth(captain) - total < Solvent)
+        {
+            return 0;
+        }
+
+        var pack = captain.Backpack;
+        var carried = pack.GetAmount(typeof(Gold));
+        var fromPack = Math.Min(carried, total);
+        var fromBank = total - fromPack;
+
+        if (fromPack > 0 && !pack.ConsumeTotal(typeof(Gold), fromPack))
+        {
+            return 0;
+        }
+
+        if (fromBank > 0 && !Banker.Withdraw(captain, fromBank))
+        {
+            // Put back what was already taken. Any other ordering here is a way to lose a bot's money.
+            if (fromPack > 0)
+            {
+                pack.DropItem(new Gold(fromPack));
+            }
+
+            return 0;
+        }
+
+        for (var i = 0; i < owed.Count; i++)
+        {
+            owed[i].Backpack.DropItem(new Gold(each));
+        }
+
+        Wages += total;
+        Paid += owed.Count;
+
+        logger.Information(
+            "{Name} paid {Total}gp to {Count} of them for walking into the unknown, {Each}gp apiece",
+            captain.Name,
+            total,
+            owed.Count,
+            each
+        );
+
+        return total;
+    }
+
+    /// <summary>
+    /// The square in front cannot be reached. Take the next one instead of failing the whole round.
+    ///
+    /// <para>
+    /// <b>One unwalkable square was ending entire sweeps, and the ground is full of them.</b> The Baron read
+    /// sixteen squares of twenty, met one on a hilltop at height thirty that no route could close on, and
+    /// the round failed — leaving him standing in a field with nothing to do, which from outside is a Baron
+    /// who has simply stopped. A frontier is a list, not a promise: any one square on it may turn out to be
+    /// a cliff, a lake or a walled yard, and the correct answer is the next square rather than going home.
+    /// </para>
+    ///
+    /// <para>
+    /// The square is marked read before moving on. It genuinely is known now — known to be unreachable from
+    /// here — and leaving it unread would offer it again on the next beat, which is the loop this shard has
+    /// paid for under the name "the same square offered for ever".
+    /// </para>
+    /// </summary>
+    public override bool Bend(IBotWilful bot)
+    {
+        var body = bot?.Self;
+
+        if (body == null || _map == null || _squad == null)
+        {
+            return false;
+        }
+
+        BotQuad.Seen(_map, _where);
+        Baulked++;
+
+        if (_read >= _rounds)
+        {
+            return false;
+        }
+
+        var next = BotQuad.Frontier(
+            _map,
+            body.Location,
+            Range,
+            at => Within(at) && Reachable(_map, body.Location, at)
+        );
+
+        if (next == Point3D.Zero || next == _where)
+        {
+            return false;
+        }
+
+        _where = next;
+        _began = Core.TickCount;
+
+        return true;
+    }
+
+    /// <summary>Squares given up on as unreachable and stepped past. A named nought, not a failed round.</summary>
+    public static long Baulked { get; private set; }
+
+    /// <summary>Whether this square is inside the ground this errand was confined to. Anywhere, when it was not.</summary>
+    private bool Within(Point3D at) =>
+        _bounds.Width <= 0 || _bounds.Height <= 0 || _bounds.Contains(new Point2D(at.X, at.Y));
+
+    /// <summary>Whether the ground between here and there is not already known to be closed.</summary>
+    private static bool Reachable(Map map, Point3D from, Point3D at) =>
+        BotReach.Ask(map, from, at, BotArrival.Within(BotQuad.Side / 3)) != BotReachVerdict.Sealed;
+
+    private void Disband(IBotSquadMember member)
+    {
+        // <b>A standing company outlives its errands.</b> The rangers are one unit for their whole lives; the
+        // sweep ending is not the company ending, and taking it apart here is what left them scattered and
+        // idle after every fight. Only a party raised for this errand is let go by it.
+        if (_kin)
+        {
+            _squad = null;
+
+            return;
+        }
+
+        var squad = member?.Squad;
+
+        if (squad != null)
+        {
+            // The charge is what kept the party alive with nothing to fight; dropping it is how it ends,
+            // rather than by dissolving a company out from under bots that may be in a fight by now.
+            squad.Charged = false;
+        }
+
+        BotSquads.Leave(member);
+
+        _squad = null;
+    }
+
+    public static string Describe() =>
+        $"{Parties} scouting parties set out, {Undermanned} could not raise {Least} bodies, {Surveyed} squares read, {Baulked} stepped past as unreachable, "
+        + $"{Timedout} ran out of time; {Wages}gp paid to {Paid} volunteers";
+
+    public static void Forget()
+    {
+        Parties = 0;
+        Undermanned = 0;
+        Surveyed = 0;
+        Baulked = 0;
+        Timedout = 0;
+        Wages = 0;
+        Paid = 0;
+    }
+}
