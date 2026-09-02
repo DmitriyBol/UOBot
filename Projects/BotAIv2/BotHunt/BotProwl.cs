@@ -125,8 +125,18 @@ public sealed class BotProwl : BotDeed
         // Walking on is also the right answer and not merely the quiet one: a bot that has judged itself
         // outnumbered and stays where the numbers are has decided nothing. Crowded lasts two minutes, so the
         // creature gets one more honest hand-over after that if it is still interested.
-        if (picked != null && !BotQuarry.Crowded(picked))
+        // <b>Once, and the first attempt at this was wrong in an instructive way.</b> The condition was
+        // Crowded alone — the mark BotSlay writes when it gives a fight up on the numbers — on the theory
+        // that the loop ran between prowl and a refused rescue. The window of 23:18 to 23:31 on 02.09.2026
+        // refuted it: 345 prowls taken, 189 ending here, and no fight of any kind recorded in between. The
+        // auction was not refusing the fight; it was never being offered one, because it only offers a fight
+        // the bot would choose and something that has chosen the bot is very often not that. A hand-over
+        // with no receiver is a loop. So it is offered once — see BotQuarry.Hand — and after that walking on
+        // is the answer, which is also what a bot nobody will fight for ought to be doing.
+        if (picked != null && !BotQuarry.Crowded(picked) && !BotQuarry.Handed(picked))
         {
+            BotQuarry.Hand(picked);
+
             return BotDoing.Done("something has picked this fight for us");
         }
 

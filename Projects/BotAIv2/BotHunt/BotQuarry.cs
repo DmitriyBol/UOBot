@@ -248,6 +248,62 @@ public static class BotQuarry
     private static readonly Dictionary<Serial, long> _crowded = [];
 
     /// <summary>
+    /// How long a fight stays handed over before a walking bot will stop for it again.
+    ///
+    /// <para>
+    /// Ten seconds, and it is short because it is not a verdict about the creature — it is a note that this
+    /// bot has already offered the auction this fight once and the auction did nothing with it.
+    /// </para>
+    /// </summary>
+    public static int HandMs { get; set; } = 10000;
+
+    private static readonly Dictionary<Serial, long> _handed = [];
+
+    /// <summary>
+    /// A walking bot stopped for this creature so that something else could deal with it.
+    ///
+    /// <para>
+    /// <b>A hand-over with no receiver is a loop, and this is the note that makes it stop after one lap.</b>
+    /// A prowl ends the moment something picks a fight with the bot, on the reasoning that a bot out looking
+    /// for a fight does not get to walk past one. But the auction only offers a fight the bot would
+    /// <em>choose</em>, and something that has chosen the bot is very often not that — so the errand ended,
+    /// nothing took the fight, the auction handed the same errand straight back, and it ended again. On
+    /// 02.09.2026 between 23:18 and 23:31 that came to 345 prowls taken and 189 of them ending this way,
+    /// with no fight recorded in between at all: Edda went round it eight times inside three seconds.
+    /// </para>
+    ///
+    /// <para>
+    /// So the offer is made once. If the same creature is still on the bot when the walk resumes, walking on
+    /// <em>is</em> the answer — a bot nobody will fight for is a bot that should be leaving.
+    /// </para>
+    /// </summary>
+    public static void Hand(Mobile quarry)
+    {
+        if (quarry != null)
+        {
+            _handed[quarry.Serial] = Core.TickCount + HandMs;
+        }
+    }
+
+    /// <summary>Whether this fight has already been offered to the auction and left there.</summary>
+    public static bool Handed(Mobile quarry)
+    {
+        if (quarry == null || !_handed.TryGetValue(quarry.Serial, out var until))
+        {
+            return false;
+        }
+
+        if (Core.TickCount - until < 0)
+        {
+            return true;
+        }
+
+        _handed.Remove(quarry.Serial);
+
+        return false;
+    }
+
+    /// <summary>
     /// One bot walked to it and found the odds against it. Kept away from lone hunters — and from nobody else.
     ///
     /// <para>
