@@ -181,6 +181,11 @@ public sealed class BotDig : BotDeed
     /// <summary>Beats spent walking at the current rock without getting inside swinging reach.</summary>
     private int _approaches;
 
+    /// <summary>The closest this bot has come to the seam on the long walk, and how long since that improved.</summary>
+    private int _nearest = int.MaxValue;
+
+    private int _stalled;
+
     /// <summary>
     /// How many beats a miner will spend closing on one rock before writing it off.
     ///
@@ -188,6 +193,20 @@ public sealed class BotDig : BotDeed
     /// four minutes it used to take somebody watching to notice.
     /// </summary>
     public static int ApproachLimit { get; set; } = 40;
+
+    /// <summary>
+    /// How many beats the long walk to a seam may go without getting any nearer before the seam is struck off.
+    ///
+    /// <para>
+    /// Two hundred, which at a turn every two hundred milliseconds is about forty seconds of not closing the
+    /// distance. Generous on purpose: the walk itself is meant to be long, and the thing being caught is not
+    /// slowness but a destination that cannot be reached at all.
+    /// </para>
+    /// </summary>
+    public static int TrekLimit { get; set; } = 200;
+
+    /// <summary>Seams struck off because nobody could walk to them. See <see cref="TrekLimit"/>.</summary>
+    public static long Unwalkable { get; private set; }
 
     /// <summary>Rocks written off because nothing could get within swinging reach of them.</summary>
     public static long Unreachable { get; private set; }
@@ -332,6 +351,31 @@ public sealed class BotDig : BotDeed
         // the leash below), so the two never really disagreed; this makes it impossible for them to.
         if (_tile == null && !body.InRange(_seam.Where, BotOre.Reach))
         {
+            // <b>And a seam that cannot be walked to is not a seam either.</b> The rock leg below has said so
+            // since the day two gatherers stood four minutes each on "digging ShadowIronOre (0 swings)"; this
+            // leg, the longer walk that comes before it, had no such limit and could ask for the same journey
+            // for ever. On 03.09.2026 Calla the Crafter held mine for ten minutes at 1360,1559, walking to
+            // 1361,1574 for seven of them and never getting nearer than the fifteen tiles it started at, with
+            // not one line in the log the whole time: the journey never fails, so the work never ends, so
+            // nothing is ever written down. Measured as progress rather than as attempts, because the walk
+            // itself is legitimate and long — what is not legitimate is a walk that stops getting closer.
+            var gap = System.Math.Max(System.Math.Abs(body.X - _seam.Where.X), System.Math.Abs(body.Y - _seam.Where.Y));
+
+            if (gap < _nearest)
+            {
+                _nearest = gap;
+                _stalled = 0;
+            }
+            else if (++_stalled >= TrekLimit)
+            {
+                // Struck off for everybody, exactly as an empty one is and for the reason given on Barren:
+                // what one bot proves by standing on the ground is true for all of them.
+                BotGround.Barren(_seam.Where);
+                Unwalkable++;
+
+                return BotDoing.Failed($"no way through to the {_seam.Ore} in {gap} tiles, and the seam is struck off");
+            }
+
             return BotDoing.Walk(_map, _seam.Where, BotArrival.Within(2), $"to the {_seam.Ore}");
         }
 
