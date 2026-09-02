@@ -245,7 +245,24 @@ public static class BotAudit
                 // Where it went is now told by the work question, which is where it belongs.
                 var reached = false;
 
-                if (over)
+                // <b>Not asked of a bot that had nothing two minutes ago, and asking it was an off-by-one in
+                // print.</b> Question one sorts every bot into idle, finished or holding; question two sorted
+                // the same bots into movedOn and four destination cases — but it used only the "did the work
+                // change" test, so a bot that held nothing then and holds nothing now answered "idle" above
+                // and "not going anywhere" below, and a bot that held nothing then and something now was
+                // counted as having ended a piece of work it never had. The two sentences then disagreed by
+                // exactly that many: on 03.09.2026 at 00:17 the roll-call read "Of the 7 still on the same
+                // piece of work ... 0 arrived, 5 short, 2 not going anywhere, 1 chasing", which is eight, and
+                // the same shape appeared at 22:03 the evening before with 24 against 25. A summary whose own
+                // two halves do not add up teaches whoever reads it to trust neither.
+                //
+                // With this, the halves are the same partition twice: finished equals movedOn, and holding
+                // equals the four cases below.
+                if (mark.Kind == "-")
+                {
+                    // It had no work to be going anywhere for. Counted as idle above and nowhere here.
+                }
+                else if (over)
                 {
                     movedOn++;
                 }
@@ -584,8 +601,8 @@ public static class BotAudit
         sb.AppendLine(" held nothing to finish.");
 
         sb.Append("Of the ");
-        sb.Append(arrived + short_ + noGoal);
-        sb.Append(" still on the same piece of work and going to a fixed place, did it get there? ");
+        sb.Append(arrived + short_ + noGoal + chasing);
+        sb.Append(" still on the same piece of work, did it get where it was going? ");
         sb.Append(arrived);
         sb.Append(" arrived, ");
         sb.Append(short_);
