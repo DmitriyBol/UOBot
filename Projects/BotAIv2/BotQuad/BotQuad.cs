@@ -68,8 +68,17 @@ public static class BotQuad
     /// <summary>What those crossings are worth.</summary>
     public static double PassWorth { get; set; } = 0.05;
 
-    /// <summary>How many blows landed on bots here before the square is marked down.</summary>
-    public static int PerBlows { get; set; } = 5;
+    /// <summary>
+    /// How many blows landed on bots here before the square is marked down.
+    ///
+    /// <para>
+    /// Two, by Patrick's order on 02.09.2026, and it was five. The population had just been sent to the worst
+    /// ground the map knew — (2025, 975), the bog between Britain and Minoc — and what is out there is far
+    /// stronger than they are. At five blows a square, the record moved a hundredth at a time while the
+    /// company was being taken apart; at two it says so while there is still somebody to tell.
+    /// </para>
+    /// </summary>
+    public static int PerBlows { get; set; } = 2;
 
     /// <summary>What that many blows costs a square.</summary>
     public static double BlowsWorth { get; set; } = -0.01;
@@ -77,7 +86,7 @@ public static class BotQuad
     /// <summary>
     /// What one death costs a square.
     ///
-    /// A tenth, which is twenty times what five blows cost and is meant to be. Being hit is what happens all
+    /// A tenth, which is ten times what two blows cost and is meant to be. Being hit is what happens all
     /// day to a population that fights for a living. A bot that did not come back is the only unambiguous
     /// evidence that ground is beyond whoever went there — the same reasoning, and very nearly the same
     /// ratio, as <see cref="BotPeril.PerDeath"/>.

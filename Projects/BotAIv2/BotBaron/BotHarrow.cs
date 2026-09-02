@@ -532,10 +532,16 @@ public sealed class BotHarrow : BotDeed
         // started when the call opened would spend a eighth of them standing in a square.
         _began = now;
 
+        // <b>Both numbers, because the rule between them is the one that changed.</b> The Baron now waits for
+        // bodies standing in the square rather than for names on a list — see Assembly — and a line that
+        // printed only one of the two could not show whether he waited or whether nobody was late. On
+        // 02.09.2026 the first march after the change read "6 of them" and told nobody that all six had
+        // spawned on the muster point a second earlier, which is a true sentence about an untested rule.
         logger.Information(
-            "{Name} is marching {Count} of them on ({X}, {Y}), where {Dead} have died, after {Waited:F1} minutes of calling",
+            "{Name} is marching {Count} of the {Called} called on ({X}, {Y}), where {Dead} have died, after {Waited:F1} minutes of calling",
             body.Name,
             _here,
+            _called,
             _square.X,
             _square.Y,
             _dead,
