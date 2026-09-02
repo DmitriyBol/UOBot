@@ -1,4 +1,5 @@
 using System;
+using Server.Items;
 using Server.Logging;
 using Server.Mobiles;
 using Server.Regions;
@@ -70,8 +71,30 @@ public sealed class BotHarrow : BotDeed
     /// </summary>
     public static int Grandmasters { get; set; } = 15;
 
-    /// <summary>The company's fighting power together, below which a damned square is not walked on.</summary>
+    /// <summary>
+    /// The fighting power each of them must have, not the company's between them.
+    ///
+    /// <para>
+    /// Four thousand a head, by Patrick's correction on 02.09.2026: "four thousand per person, that is,
+    /// properly trained and equipped bots, and the mages must have their reagents." Power on this shard is
+    /// health times what a body hits for — see <c>BotThreat.Power</c> — so four thousand is not a figure a
+    /// bot reaches by being handed a sword: it is a bot that has grown and has been outfitted. Which is the
+    /// point. Damned ground is ground the population is not yet good enough for, and it should say so by
+    /// standing empty rather than by swallowing another company.
+    /// </para>
+    /// </summary>
     public static double Might { get; set; } = 4000.0;
+
+    /// <summary>
+    /// Reagents a caster must be carrying to count towards the company.
+    ///
+    /// <para>
+    /// By the same correction. A mage with an empty pack casts nothing from its book — <c>BotStrike.Ready</c>
+    /// refuses the spell — so on damned ground it is a body with a staff, and counting it is how a company
+    /// of fifteen arrives as a company of nine. Anybody carrying a spellbook is asked; everybody else is not.
+    /// </para>
+    /// </summary>
+    public static int Reagents { get; set; } = 10;
 
     /// <summary>The skill at which a bot counts as a grandmaster. The era's own ceiling.</summary>
     public static double GrandmasterAt { get; set; } = 100.0;
@@ -132,6 +155,24 @@ public sealed class BotHarrow : BotDeed
     /// kind of name collision the compiler catches today and a reader trips over for ever.
     /// </summary>
     public static int Station { get; set; } = 2;
+
+    /// <summary>
+    /// How close a volunteer has to be standing to the muster point to count as having turned up.
+    ///
+    /// <para>
+    /// By Patrick's order on 02.09.2026: the Baron gathers the party in the square, waits until everybody has
+    /// come, and only then sets out for the quadrant. Until now the call ended when enough had <em>joined</em>
+    /// — and joining is instant while walking across Britain is not, so the company set off as a list of
+    /// names and reached the ground in single file, which is how six bots get killed one at a time by
+    /// something six of them together could beat.
+    /// </para>
+    ///
+    /// <para>
+    /// The five-minute call is still the backstop: when it runs out he marches with whoever is actually
+    /// standing there, which is the old rule applied to bodies instead of to names.
+    /// </para>
+    /// </summary>
+    public static int Assembly { get; set; } = 8;
 
     /// <summary>Corpses that finish the errand.</summary>
     public static int Quota { get; set; } = 20;
@@ -265,6 +306,9 @@ public sealed class BotHarrow : BotDeed
 
     /// <summary>How many marched, so that a company lost whole can be reported as the size it was.</summary>
     private int _marched;
+
+    /// <summary>How many of the called are standing in the square this moment. See <see cref="Assembly"/>.</summary>
+    private int _here;
 
     /// <summary>
     /// Whether the call has been opened. A flag rather than "is the squad null", because the squad may be
@@ -422,8 +466,9 @@ public sealed class BotHarrow : BotDeed
         }
 
         _called = squad.Count;
+        _here = Gathered(squad);
 
-        var full = _called >= _wanted;
+        var full = _here >= _wanted;
 
         if (!full && now - _musteredTick < MusterMs)
         {
@@ -433,7 +478,7 @@ public sealed class BotHarrow : BotDeed
             return BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"calling for volunteers at ({_muster.X}, {_muster.Y})");
         }
 
-        if (_called < Least)
+        if (_here < Least)
         {
             Undermanned++;
 
@@ -443,7 +488,9 @@ public sealed class BotHarrow : BotDeed
 
             _squad = null;
 
-            return BotDoing.Failed($"only {_called} of the {Least} answered the call for ({_square.X}, {_square.Y})");
+            return BotDoing.Failed(
+                $"only {_here} of the {Least} were standing in the square for ({_square.X}, {_square.Y}), of {_called} called"
+            );
         }
 
         // <b>Damned ground, and who may walk on it.</b> By order: a square that has swallowed thirty is
@@ -451,7 +498,7 @@ public sealed class BotHarrow : BotDeed
         // here rather than at the muster because it is a fact about who turned up, and the call stays open
         // while it is not met — a Baron who cannot raise the company he needs waits for it, and the ground is
         // still on the board either way.
-        if (BotQuad.Damning(_map, _square) && !Fit(squad, out var masters, out var might))
+        if (BotQuad.Damning(_map, _square) && !Fit(squad, out var ready, out var unarmed))
         {
             Unfit++;
 
@@ -465,12 +512,14 @@ public sealed class BotHarrow : BotDeed
             _squad = null;
 
             return BotDoing.Failed(
-                $"({_square.X}, {_square.Y}) is damned ground and {masters} of the {Grandmasters} grandmasters answered, at {might:F0} of the {Might:F0} strength"
+                $"({_square.X}, {_square.Y}) is damned ground and {ready} of the {Grandmasters} answered fit for it,"
+                + $" each needing a skill at {GrandmasterAt:F0} and {Might:F0} of strength"
+                + (unarmed > 0 ? $"; {unarmed} more were casters with fewer than {Reagents} reagents" : "")
             );
         }
 
         _marching = true;
-        _marched = _called;
+        _marched = _here;
 
         Marches++;
 
@@ -486,7 +535,7 @@ public sealed class BotHarrow : BotDeed
         logger.Information(
             "{Name} is marching {Count} of them on ({X}, {Y}), where {Dead} have died, after {Waited:F1} minutes of calling",
             body.Name,
-            _called,
+            _here,
             _square.X,
             _square.Y,
             _dead,
@@ -718,10 +767,10 @@ public sealed class BotHarrow : BotDeed
     /// answered, because that is the thing the ground will be measured against.
     /// </para>
     /// </summary>
-    private static bool Fit(BotSquad squad, out int masters, out double might)
+    private static bool Fit(BotSquad squad, out int ready, out int unarmed)
     {
-        masters = 0;
-        might = 0.0;
+        ready = 0;
+        unarmed = 0;
 
         if (squad == null)
         {
@@ -739,27 +788,92 @@ public sealed class BotHarrow : BotDeed
                 continue;
             }
 
-            might += BotThreat.Power(body);
-
-            var skills = body.Skills;
-
-            if (skills == null)
+            // Each of the three, of the same bot. A company that averages the requirement is a company where
+            // six carry the other nine, and the ground has already shown what it does to those nine.
+            if (!Master(body) || BotThreat.Power(body) < Might)
             {
                 continue;
             }
 
-            for (var s = 0; s < skills.Length; s++)
+            if (BotGrimoire.Book(body) != null && Herbs(body) < Reagents)
             {
-                if (skills[s].Base >= GrandmasterAt)
-                {
-                    masters++;
+                unarmed++;
 
-                    break;
-                }
+                continue;
+            }
+
+            ready++;
+        }
+
+        return ready >= Grandmasters;
+    }
+
+    /// <summary>How many of the company are actually standing in the square. See <see cref="Assembly"/>.</summary>
+    private int Gathered(BotSquad squad)
+    {
+        if (squad == null || _muster == Point3D.Zero)
+        {
+            return 0;
+        }
+
+        var here = 0;
+        var members = squad.Members;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            var body = members[i]?.Self;
+
+            if (body is { Deleted: false, Alive: true } && body.Map == _map && body.InRange(_muster, Assembly))
+            {
+                here++;
             }
         }
 
-        return masters >= Grandmasters && might >= Might;
+        return here;
+    }
+
+    /// <summary>Whether any of this bot's skills stands at the era's ceiling.</summary>
+    private static bool Master(Mobile body)
+    {
+        var skills = body?.Skills;
+
+        if (skills == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < skills.Length; i++)
+        {
+            if (skills[i].Base >= GrandmasterAt)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>How many reagents of any kind are in the pack. One type check covers every herb in the era.</summary>
+    private static int Herbs(Mobile body)
+    {
+        var pack = body?.Backpack;
+
+        if (pack == null)
+        {
+            return 0;
+        }
+
+        var held = 0;
+
+        foreach (var item in pack.Items)
+        {
+            if (item is BaseReagent { Deleted: false } herb)
+            {
+                held += herb.Amount;
+            }
+        }
+
+        return held;
     }
 
     /// <summary>Musters turned away from damned ground for want of grandmasters. See <see cref="Fit"/>.</summary>
