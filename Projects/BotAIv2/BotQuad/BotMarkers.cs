@@ -147,12 +147,22 @@ public static class BotMarkers
                 continue;
             }
 
-            // <b>A square where nothing has ever happened is the absence of a fact, exactly as unstood ground
-            // is.</b> The cap is worst-first and hundreds of squares tie at nought, so on 02.09.2026 the file
+            // <b>A square with nothing to say is the absence of a fact, exactly as unstood ground is.</b> The
+            // cap is worst-first and hundreds of squares sit in the middle band, so on 02.09.2026 the file
             // held 400 pins of which 3 were dire, 9 were worth going to and 388 were blue markers reading
-            // "0.00" — squares stood in, never bled in, and never acted on. The map looked frozen because the
-            // only twelve pins that could change were buried under them, and the twelve are the whole point.
-            if (!PinUnknown && quad.Safety == BotQuad.Fresh && quad.Blows == 0 && quad.Deaths == 0)
+            // "0.00" — squares stood in, never bled in, never acted on. The map looked frozen because the only
+            // twelve pins that could ever change were buried under them, and the twelve are the whole point.
+            //
+            // <b>Said as a band rather than as equality, which is how the first attempt at this failed an hour
+            // later the same evening.</b> A crossing lifts a square by a fraction, so a square walked through
+            // twice reads 0.004 and prints as "0.00" while being nothing like nought — the file came back with
+            // its 388 blues untouched. What is skipped is the square that is neither feared nor proven quiet
+            // and has never had a blow landed in it: no verdict either way, and nothing anybody would act on.
+            if (!PinUnknown
+                && quad.Safety > BotQuad.Wanted
+                && quad.Safety <= BotQuad.TooQuiet
+                && quad.Blows == 0
+                && quad.Deaths == 0)
             {
                 continue;
             }
