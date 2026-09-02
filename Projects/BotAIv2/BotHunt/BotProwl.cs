@@ -60,9 +60,38 @@ public sealed class BotProwl : BotDeed
     /// </summary>
     public static int ArriveWithin { get; set; } = 8;
 
+    /// <summary>
+    /// How many beats the walk may go without getting any nearer before the ground is given up on.
+    ///
+    /// <para>
+    /// <b>Because <see cref="Bend"/> only fires when the road refuses, and a road that never refuses is the
+    /// commoner failure.</b> A walk that is simply never completed says nothing to anybody: on the night of
+    /// 02-03.09.2026 the roll-call found Edda the Brawler holding a prowl for 250 seconds at 1651,1112 and
+    /// Kerrin the Warrior for 324 seconds at 1296,1560, neither arriving, neither finishing, neither leaving
+    /// a patch two tiles across — and the only thing that noticed was the debugger, four minutes late. The
+    /// same silence and the same cure as the long walk to a seam in <c>BotDig</c>: measure the closing of the
+    /// distance rather than the attempts, because the walk is meant to be long and it is stopping to get
+    /// closer that is the fault.
+    /// </para>
+    ///
+    /// <para>
+    /// Two hundred beats, about forty seconds at a turn every two hundred milliseconds, and the same number
+    /// the seam uses for the same reason.
+    /// </para>
+    /// </summary>
+    public static int TrekLimit { get; set; } = 200;
+
+    /// <summary>Prowls given up because the bot stopped getting nearer. See <see cref="TrekLimit"/>.</summary>
+    public static long Baulked { get; private set; }
+
     private readonly Map _map;
 
     private readonly Point3D _where;
+
+    /// <summary>The closest this bot has come, and how many beats since that last improved.</summary>
+    private int _nearest = int.MaxValue;
+
+    private int _stalled;
 
     public BotProwl(Map map, Point3D where)
     {
@@ -150,6 +179,25 @@ public sealed class BotProwl : BotDeed
             // Arrived, and still nothing. Not a failure — the ground was worth a look and now this bot knows
             // it is empty, which is what the ledger is for.
             return BotDoing.Done("nothing here");
+        }
+
+        var gap = System.Math.Max(System.Math.Abs(body.X - _where.X), System.Math.Abs(body.Y - _where.Y));
+
+        if (gap < _nearest)
+        {
+            _nearest = gap;
+            _stalled = 0;
+        }
+        else if (++_stalled >= TrekLimit)
+        {
+            // Said on the map first, exactly as Bend does and for the reason given there: what one bot proves
+            // about ground is true for all of them, and the worst square goes to the front of every prowl's
+            // list. The reading is not touched — the square is as dangerous as it was; what is learned is
+            // that this bot could not get there.
+            BotPeril.Baulked(_map, _where);
+            Baulked++;
+
+            return BotDoing.Failed($"got no nearer than {gap} tiles to ({_where.X}, {_where.Y})");
         }
 
         return BotDoing.Walk(_map, _where, BotArrival.Within(ArriveWithin), "looking for a fight");
