@@ -90,6 +90,24 @@ public sealed class BotHunter : IBotProposer
 
         var quarry = BotQuarry.Best(body, BotQuarry.Reach);
 
+        // <b>Asked before the walk instead of after it.</b> See BotThreat.Overrun: 202 hunts ended on "too
+        // many of them around" over the night of 02-03.09.2026 and 184 of those fired inside the shortest
+        // span the ledger records, so the crowd was standing there when the bot chose rather than gathering
+        // while it walked. Only for quarry worth walking to — something already at arm's length costs no
+        // journey, and the arrival test will settle it on the next beat anyway.
+        if (quarry != null
+            && !Utility.InRange(body.Location, quarry.Location, Near)
+            && BotThreat.Overrun(body, quarry, BotMobile.NoticeRange))
+        {
+            // Crowded rather than shunned, and BotQuarry says why at length: one bot being outnumbered is the
+            // argument for a company, not against the creature. BotQuarry.Best skips it for lone hunters from
+            // here, so the next pick is a different one.
+            BotQuarry.Crowd(quarry);
+            Overrun++;
+
+            quarry = null;
+        }
+
         if (quarry == null)
         {
             Missing(map);
@@ -462,6 +480,12 @@ public sealed class BotHunter : IBotProposer
     /// </summary>
     private const int Samples = 8;
 
+    /// <summary>Close enough that there is no walk to save by weighing the odds first. See the check in Propose.</summary>
+    public static int Near { get; set; } = 5;
+
+    /// <summary>Quarry passed over because the crowd around it was already hopeless. See <c>BotThreat.Overrun</c>.</summary>
+    public static long Overrun { get; private set; }
+
     /// <summary>
     /// How far from home a square the map calls dangerous may be and still be worth setting out for.
     ///
@@ -515,7 +539,7 @@ public sealed class BotHunter : IBotProposer
     public static long Sought { get; private set; }
 
     public static string Describe() =>
-        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet";
+        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overrun} quarry passed over for the crowd already round it";
 
     public static void Forget()
     {
@@ -523,6 +547,7 @@ public sealed class BotHunter : IBotProposer
         Sworn = 0;
         Quiet = 0;
         Stranded = 0;
+        Overrun = 0;
         Sought = 0;
     }
 }

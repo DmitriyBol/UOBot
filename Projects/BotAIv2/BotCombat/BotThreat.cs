@@ -331,6 +331,66 @@ public static class BotThreat
     }
 
     /// <summary>
+    /// The same reckoning of the opposition, taken where the fight would be rather than where the bot is.
+    ///
+    /// <para>
+    /// <b>Because the odds were being learnt by walking into them.</b> A quarry is weighed alone — its own
+    /// power against ours — and the crowd standing round it was found only on arrival, by
+    /// <see cref="Decide"/>, which then called the fight off. Over the night of 02-03.09.2026 that came to
+    /// 202 endings on "too many of them around", and 184 of them fired inside the shortest span the ledger
+    /// can record: the crowd was not gathering while the bot walked, it was standing there when the bot
+    /// chose. What is paid for that is a whole walk, every time, by every bot in turn.
+    /// </para>
+    ///
+    /// <para>
+    /// Ours is still counted around the bot, and that is a forecast rather than a promise: the allies near it
+    /// now are the ones likely to be near it there. The yardstick is deliberately the same <see cref="Tolerance"/>
+    /// the arrival test uses — a pre-check that disagreed with the test it is meant to spare would refuse
+    /// fights the bot would have won, or send it to ones it would drop on arrival, which is the loop again
+    /// with an extra step.
+    /// </para>
+    /// </summary>
+    public static bool Overrun(Mobile bot, IPoint3D where, int range)
+    {
+        var map = bot?.Map;
+
+        if (map == null || map == Map.Internal || where == null)
+        {
+            return false;
+        }
+
+        var total = 0.0;
+        var worst = 0.0;
+
+        foreach (var creature in map.GetMobilesInRange<BaseCreature>(new Point3D(where), range))
+        {
+            if (!Hostile(bot, creature))
+            {
+                continue;
+            }
+
+            var power = Power(creature);
+
+            total += power;
+
+            if (power > worst)
+            {
+                worst = power;
+            }
+        }
+
+        if (worst <= 0.0)
+        {
+            return false;
+        }
+
+        var threat = worst + (total - worst) * SecondaryWeight;
+        var ours = OurPower(bot, range);
+
+        return ours > 0.0 && threat / ours > Tolerance;
+    }
+
+    /// <summary>
     /// How much stronger the opposition is than us. Above <see cref="Tolerance"/> the road wins.
     /// </summary>
     public static double Danger(Mobile bot, int range)
