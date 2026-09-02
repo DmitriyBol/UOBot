@@ -148,6 +148,10 @@ public sealed class BotHunter : IBotProposer
         var bestKnown = -1.0;
         var bestWanted = false;
 
+        // How much of this sample the quietness rule threw away. Counted so that "nowhere to walk" can be
+        // told apart from "nowhere quiet enough to be worth walking to" — see Stranded.
+        var refused = 0;
+
         // The shard's own answers go in first, so that they are always on the list and are beaten only by
         // ground this bot has actually been paid on. See Noisy and Paying.
         //
@@ -264,6 +268,7 @@ public sealed class BotHunter : IBotProposer
             if (safety > BotQuad.TooQuiet)
             {
                 Quiet++;
+                refused++;
 
                 continue;
             }
@@ -291,6 +296,18 @@ public sealed class BotHunter : IBotProposer
                     Sought++;
                 }
             }
+        }
+
+        // <b>The one number that says whether the quietness rule is a preference or a veto.</b> On 02.09.2026
+        // six warriors stood at 1420,1685 in Britain holding 304 to 446 gold while the record said "31
+        // proposers asked, not one of them had anything to offer", and the beat said 15125 hunting grounds
+        // had been passed over as too quiet against 0 picked. Those two facts are consistent with a rule
+        // working as designed and equally consistent with a filter that leaves a hunter with nothing at all,
+        // and nothing on the shard could tell them apart. This can: it counts only the times every last
+        // candidate was thrown away for quietness and the hunter came back empty.
+        if (best == Point3D.Zero && refused > 0)
+        {
+            Stranded++;
         }
 
         return best;
@@ -392,17 +409,21 @@ public sealed class BotHunter : IBotProposer
     /// <summary>Candidates thrown away for being ground the population has found nothing in.</summary>
     public static long Quiet { get; private set; }
 
+    /// <summary>Times a hunter was left with nowhere to walk because every sampled ground was too quiet.</summary>
+    public static long Stranded { get; private set; }
+
     /// <summary>Times a hunting ground was picked because it is ground that has hurt somebody.</summary>
     public static long Sought { get; private set; }
 
     public static string Describe() =>
-        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2})";
+        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet";
 
     public static void Forget()
     {
         _saidNoQuarry = false;
         Sworn = 0;
         Quiet = 0;
+        Stranded = 0;
         Sought = 0;
     }
 }
