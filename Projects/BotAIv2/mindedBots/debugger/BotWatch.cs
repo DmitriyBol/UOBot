@@ -1164,7 +1164,16 @@ public sealed class BotWatch
 
             if (!string.IsNullOrWhiteSpace(Why))
             {
-                sb.Append(" It says it is doing this because: ");
+                // 02.09.2026: Because is written once, at the moment work is taken, and never cleared when
+                // that work ends — so a bot holding nothing at all was printed as "doing this because:
+                // 142/min", which reads as an auction that offered good work to a bot who sat anyway. It is
+                // the finished work's reason, not the present one. Orin sat Free for 2s under a 142/min line
+                // this way. Say which of the two it is.
+                sb.Append(
+                    _kind == "-"
+                        ? " The last work it took, now over, was chosen because: "
+                        : " It says it is doing this because: "
+                );
                 sb.Append(Why);
                 sb.Append(".");
             }

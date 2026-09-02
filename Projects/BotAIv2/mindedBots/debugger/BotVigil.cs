@@ -766,15 +766,38 @@ public static class BotVigil
     public static string Digest() =>
         Census() + "\n" + Measured(Core.TickCount) + "\nTHE LAST ROLL-CALL\n" + BotAudit.Last;
 
-    /// <summary>One bot in full, by name, or the roster if that is not one of them.</summary>
+    /// <summary>
+    /// One bot in full, by name, or the roster if that is not one of them.
+    ///
+    /// <para>
+    /// <b>Takes back the label it hands out.</b> On 02.09.2026 every listing here named a bot as
+    /// "Vance the Archer" — <see cref="Loitering"/> and this very row both print name and class that way —
+    /// and asking "bot Vance the Archer" answered "No bot called". Two of the first three questions put to
+    /// the debugger in that watch were spent on it. An instrument that will not accept its own output back
+    /// costs a round trip on every question, and each round trip here is twelve seconds of the shard's life.
+    /// A leading "- " is dropped for the same reason: rows are printed with it.
+    /// </para>
+    /// </summary>
     public static string Row(string name)
     {
         if (!string.IsNullOrWhiteSpace(name))
         {
+            var asked = name.Trim();
+
+            if (asked.StartsWith("- ", StringComparison.Ordinal))
+            {
+                asked = asked[2..].Trim();
+            }
+
+            // "Vance the Archer" -> "Vance". Bot names on this shard are one word, or a word and a number.
+            var joint = asked.IndexOf(" the ", StringComparison.OrdinalIgnoreCase);
+            var bare = joint > 0 ? asked[..joint].Trim() : asked;
+
             foreach (var (_, watch) in _watch)
             {
                 if (watch.Bot is { Deleted: false }
-                    && string.Equals(watch.Name, name, StringComparison.OrdinalIgnoreCase))
+                    && (string.Equals(watch.Name, asked, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(watch.Name, bare, StringComparison.OrdinalIgnoreCase)))
                 {
                     return watch.Row(Core.TickCount);
                 }
