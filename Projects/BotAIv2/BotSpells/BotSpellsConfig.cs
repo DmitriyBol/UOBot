@@ -20,6 +20,15 @@ public sealed class BotSpellsSettings
     /// <summary>How far below its own Inscribe a scribe keeps its work.</summary>
     public double? Margin { get; set; }
 
+    /// <summary>What a scribe adds to what its materials cost when it prices what it wrote. A fifth by default.</summary>
+    public double? Markup { get; set; }
+
+    /// <summary>How many of each herb a caster keeps back from the pen, to cast with.</summary>
+    public int? Reserve { get; set; }
+
+    /// <summary>What a herb is reckoned at where no shopkeeper within reach sells one.</summary>
+    public int? HerbGuess { get; set; }
+
     /// <summary>How many blank scrolls are bought in one go.</summary>
     public int? Batch { get; set; }
 
@@ -67,6 +76,9 @@ public static class BotSpellsConfig
         }
 
         BotQuill.Margin = settings.Margin ?? BotQuill.Margin;
+        BotQuill.Markup = settings.Markup ?? BotQuill.Markup;
+        BotQuill.Reserve = settings.Reserve ?? BotQuill.Reserve;
+        BotQuill.HerbGuess = settings.HerbGuess ?? BotQuill.HerbGuess;
 
         BotInscribe.Batch = settings.Batch ?? BotInscribe.Batch;
         BotInscribe.SwingMs = settings.SwingMs ?? BotInscribe.SwingMs;

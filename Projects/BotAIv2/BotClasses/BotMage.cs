@@ -73,6 +73,16 @@ public sealed class BotMage : BotClass
         StaffManaTrickle = 2;
         StaffHue = 0x48D;
 
+        // <b>The one thing it burns that it could not go and get.</b> Reagents are shop goods in this era —
+        // nothing grows them — so until 02.09.2026 the only route into a mage's pack was a counter, and a
+        // mage with an empty purse was a mage with no way back: the debugger found Quill, Perri and Rowan
+        // standing on 2, 8 and 24 gold with the only offer any of thirty-one proposers made being another
+        // purchase they could not afford. The Sage has had the woods since it was written and the argument
+        // was never about the Sage: it is that a caster short of herbs should have a day's walk as an
+        // alternative to a shelf. Longer than the Sage's half hour, because the Sage's trip is its trade and
+        // this one is a fallback.
+        HerbIntervalMs = 2700000;
+
         Kit = new BotKit
         {
             // <b>The robe, which is dress and not armour, and that is why it had to be issued here.</b>

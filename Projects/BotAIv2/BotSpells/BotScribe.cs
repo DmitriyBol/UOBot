@@ -64,10 +64,7 @@ public sealed class BotScribe : IBotProposer
             return null;
         }
 
-        if (BotQuill.Choose(body, out _, out _) == null)
-        {
-            return null;
-        }
+        // Asked after the paper is priced, below, so the choice can weigh what a scroll costs to make.
 
         BotShops.Survey(map, body.Location);
 
@@ -90,7 +87,12 @@ public sealed class BotScribe : IBotProposer
 
         var price = BotShops.Price(shop, typeof(BlankScroll));
 
-        return price > 0 ? new BotInscribe(shop, price) : null;
+        if (price <= 0)
+        {
+            return null;
+        }
+
+        return BotQuill.Choose(body, price, out _, out _) == null ? null : new BotInscribe(shop, price);
     }
 
     /// <summary>Lets the complaints be made again after a world reload.</summary>

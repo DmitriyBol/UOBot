@@ -102,6 +102,9 @@ public sealed class BotInscribe : BotDeed
 
     private int _kept;
 
+    /// <summary>How many written scrolls have been dealt with — booked, sold or listed. See <see cref="Made"/>.</summary>
+    private int _placed;
+
     private int _sold;
 
     private int _made;
@@ -141,12 +144,23 @@ public sealed class BotInscribe : BotDeed
     public override double Coin => 0.0;
 
     /// <summary>
-    /// What was produced and <em>not</em> sold: scrolls kept for the book and scrolls left on a stall.
+    /// What was produced and <em>not</em> sold: scrolls kept for the book and scrolls left on a stall, and
+    /// the ones written but not yet placed.
     ///
     /// A scroll that filled a want is paid for in coin the moment it is handed over, and the coin is already
     /// in the takings — counting it here as well would pay the scribe twice for one scroll.
+    ///
+    /// <para>
+    /// <b>The last clause is why a dropped session used to read as a catastrophe.</b> Everything was counted
+    /// in the placing leg, so a scribe whose work the auction chose against mid-page had bought paper, made
+    /// scrolls, and declared nothing for them: on 02.09.2026 Calla 2 settled a dropped inscribe at "-100 in
+    /// 1.3 min (-79/min): -100 coin, 0 made" with four scrolls in its pack, and Cedric at -198/min with
+    /// four more. The scrolls were real and still in hand; the ledger was taught that writing loses money.
+    /// Unplaced work is counted here at the price it will be asked for and taken back out as it is placed,
+    /// so nothing is counted twice.
+    /// </para>
     /// </summary>
-    public override int Made => _made;
+    public override int Made => _made + Math.Max(0, _scrolls - _placed) * _worth;
 
     public override string Stage => _leg switch
     {
@@ -250,7 +264,7 @@ public sealed class BotInscribe : BotDeed
 
         if (_recipe == null)
         {
-            _recipe = BotQuill.Choose(body, out _kind, out _worth);
+            _recipe = BotQuill.Choose(body, _price, out _kind, out _worth);
 
             if (_recipe == null)
             {
@@ -370,6 +384,7 @@ public sealed class BotInscribe : BotDeed
             if (BotGrimoire.Write(body, scroll))
             {
                 _kept++;
+                _placed++;
                 _made += _worth;
 
                 // It wrote the thing it was queueing for. Whatever was standing on the market asking for it
@@ -389,6 +404,7 @@ public sealed class BotInscribe : BotDeed
             if (sold > 0)
             {
                 _sold += sold;
+                _placed += sold;
 
                 if (sold >= left)
                 {
@@ -401,6 +417,7 @@ public sealed class BotInscribe : BotDeed
             if (BotAuction.List(bot, scroll, _worth) != null)
             {
                 _made += left * _worth;
+                _placed += left;
             }
         }
 

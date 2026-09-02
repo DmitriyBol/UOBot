@@ -37,8 +37,113 @@ public static class BotQuill
     /// </summary>
     public static double Margin { get; set; } = 5.0;
 
+    /// <summary>
+    /// What a scribe adds to what its materials cost, as a share of them, when it prices its own work.
+    ///
+    /// <para>
+    /// <b>Nothing here had ever compared the two sides of the trade.</b> A scroll was listed at whatever the
+    /// market last paid for one, or failing that at what a shopkeeper charges for that circle, and the herbs
+    /// and paper it was made of were never in the arithmetic at all. So a scribe could — and on 02.09.2026 a
+    /// population of them did — buy a hundred gold of reagents, write, and list the result for ninety. The
+    /// mages of this shard were the poorest bots on it, and this is the half of the reason that is about
+    /// price rather than about how much they bought.
+    /// </para>
+    ///
+    /// <para>
+    /// A fifth. Patrick's own figure, "fifteen or twenty percent, so the reagents pay for themselves and they
+    /// earn as well" — and it is a floor under the asking price, not a tax on it: where the market already
+    /// pays more than cost and a fifth, the market's number stands and the scribe is simply doing well.
+    /// </para>
+    /// </summary>
+    public static double Markup { get; set; } = 0.20;
+
+    /// <summary>
+    /// How many of each herb a caster keeps back from the pen, whatever it is writing.
+    ///
+    /// <para>
+    /// <b>A mage that writes with its last reagent has disarmed itself.</b> Casting from the book consumes
+    /// herbs — see <c>BotStrike.Ready</c>, which refuses a spell on an empty pack — so a scribe that writes
+    /// until the pack is bare cannot then fight, and fighting is the living it is meant to fall back on. The
+    /// old rule asked only whether one attempt's worth was present, so a mage born with thirty of each herb
+    /// wrote thirty times and walked into the field with nothing to throw.
+    /// </para>
+    /// </summary>
+    public static int Reserve { get; set; } = 10;
+
+    /// <summary>What a herb is reckoned to cost where no shopkeeper within reach sells it.</summary>
+    public static int HerbGuess { get; set; } = 3;
+
     /// <summary>The inscription system, or null before content initialisation has built it.</summary>
     public static CraftSystem System => DefInscription.CraftSystem;
+
+    /// <summary>
+    /// What a counter charges for one of a herb. Remembered, because a shelf price in this era does not move
+    /// and this is asked once per recipe per decision.
+    /// </summary>
+    private static readonly Dictionary<Type, int> _herbage = [];
+
+    /// <summary>What one of this herb costs, from the nearest shelf that has it, or the guess.</summary>
+    public static int Herb(Mobile bot, Type kind)
+    {
+        if (kind == null)
+        {
+            return 0;
+        }
+
+        if (_herbage.TryGetValue(kind, out var known))
+        {
+            return known;
+        }
+
+        var shop = BotShops.Nearest(bot, kind);
+        var price = shop == null ? 0 : BotShops.Price(shop, kind);
+
+        if (price <= 0)
+        {
+            return HerbGuess;
+        }
+
+        _herbage[kind] = price;
+
+        return price;
+    }
+
+    /// <summary>
+    /// What one attempt at this recipe costs in materials: the paper, and every herb it burns.
+    ///
+    /// <para>
+    /// The blank is passed in rather than looked up because the proposer has just priced it at the counter it
+    /// is about to walk to, and that is the price this bot will actually pay.
+    /// </para>
+    /// </summary>
+    public static int Cost(Mobile bot, CraftItem recipe, int paper)
+    {
+        var resources = recipe?.Resources;
+
+        if (resources == null)
+        {
+            return 0;
+        }
+
+        var bill = Math.Max(0, paper);
+
+        for (var i = 0; i < resources.Count; i++)
+        {
+            var res = resources[i];
+
+            if (res.ItemType == null || res.ItemType == typeof(BlankScroll))
+            {
+                continue;
+            }
+
+            bill += Math.Max(1, res.Amount) * Herb(bot, res.ItemType);
+        }
+
+        return bill;
+    }
+
+    /// <summary>The least this may be listed for: what it cost to make, and the markup on top.</summary>
+    public static int Asking(int cost) => cost <= 0 ? 0 : (int)Math.Ceiling(cost * (1.0 + Markup));
 
     /// <summary>The pen this bot writes with, if it is carrying one.</summary>
     public static ScribesPen Pen(Mobile bot) => bot?.Backpack?.FindItemByType<ScribesPen>();
@@ -96,7 +201,9 @@ public static class BotQuill
                 continue;
             }
 
-            if (pack.GetAmount(res.ItemType) < Math.Max(1, res.Amount))
+            // The attempt's own herbs, and the handful kept back to fight with. See Reserve: a scribe that
+            // spends its last ginseng on a scroll it means to sell cannot cast the spell it just wrote.
+            if (pack.GetAmount(res.ItemType) < Math.Max(1, res.Amount) + Math.Max(0, Reserve))
             {
                 return false;
             }
@@ -148,7 +255,14 @@ public static class BotQuill
     /// no second number is needed.
     /// </para>
     /// </summary>
-    public static CraftItem Choose(Mobile bot, out Type scroll, out int worth)
+    public static CraftItem Choose(Mobile bot, out Type scroll, out int worth) =>
+        Choose(bot, 0, out scroll, out worth);
+
+    /// <summary>
+    /// The same choice, with what the paper costs, so that what a scroll is made of can be weighed against
+    /// what it will fetch. See <see cref="Markup"/> — the price out had never been compared to the price in.
+    /// </summary>
+    public static CraftItem Choose(Mobile bot, int paper, out Type scroll, out int worth)
     {
         scroll = null;
         worth = 0;
@@ -234,6 +348,21 @@ public static class BotQuill
             }
 
             var asking = BotAuction.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
+
+            // <b>What it is made of, against what it will fetch.</b> Two rules out of the one comparison and
+            // they are not the same rule: writing at a loss is refused outright, and what is written is
+            // listed at no less than cost and the markup. The first keeps a scribe from turning gold into
+            // scrolls worth less than the gold; the second is where its living comes from. Where the market
+            // already pays more than that, the market's number stands.
+            var cost = Cost(bot, recipe, paper);
+            var revenue = Math.Max(asking, bid);
+
+            if (cost > 0 && revenue < cost)
+            {
+                continue;
+            }
+
+            asking = Math.Max(asking, Asking(cost));
 
             if (bid > 0)
             {
