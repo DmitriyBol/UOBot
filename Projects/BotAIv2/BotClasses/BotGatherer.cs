@@ -50,7 +50,13 @@ public sealed class BotGatherer : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        // <b>The interval that makes the tap a tap, and the trip it gates.</b> The three Forage numbers below
+        // were set here on the day this class was written and were read by nothing: BotHerbs gates its trip
+        // on HerbIntervalMs, which only the Sage had, so the class whose stated point is the forage could not
+        // forage. Both are set now and they say the same quarter of an hour — the interval is the class's own
+        // and the trip is the shard's one way of walking out for herbs.
         ForageIntervalMs = 900000;
+        HerbIntervalMs = 900000;
         ForageYieldMin = 3;
         ForageYieldMax = 6;
 

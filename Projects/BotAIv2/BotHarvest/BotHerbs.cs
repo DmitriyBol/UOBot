@@ -121,13 +121,29 @@ public sealed class BotHerbs : BotDeed
         sage.Herbed = true;
         sage.HerbTick = Core.TickCount;
 
-        var kinds = Utility.RandomMinMax(LeastKinds, MostKinds);
+        var klass = sage.Class;
+
+        // <b>A class may name its own handful, and one did with nothing reading it.</b> BotGatherer sets
+        // ForageIntervalMs, ForageYieldMin and ForageYieldMax, and its own documentation calls the forage
+        // "the point of this class existing — this is the tap. A handful of one kind every quarter of an
+        // hour, deliberately less than the fifteen a caster orders at a time, so the gatherer becomes a
+        // supplier rather than a one-off answer." On 02.09.2026 all three of those numbers were assigned,
+        // bound to configuration, and read by nothing anywhere on the shard: the tap had never been
+        // plumbed in, which is half of why a caster out of reagents had only a counter to go to.
+        //
+        // One kind, in the amount the class asks for. A class that names no amount gets the Sage's trip,
+        // which is what this file was written for and is left exactly as it was.
+        var handful = klass is { ForageYieldMax: > 0 };
+        var kinds = handful ? 1 : Utility.RandomMinMax(LeastKinds, MostKinds);
         var picked = 0;
 
         for (var i = 0; i < kinds; i++)
         {
             var kind = Kinds[Utility.Random(Kinds.Length)];
-            var amount = Utility.RandomMinMax(LeastEach, MostEach);
+
+            var amount = handful
+                ? Utility.RandomMinMax(Math.Max(1, klass.ForageYieldMin), klass.ForageYieldMax)
+                : Utility.RandomMinMax(LeastEach, MostEach);
             var herb = kind.CreateInstance<Item>();
 
             if (herb == null)

@@ -152,6 +152,10 @@ public sealed class BotHunter : IBotProposer
         // told apart from "nowhere quiet enough to be worth walking to" — see Stranded.
         var refused = 0;
 
+        // The least dull of what it threw away, in case it throws away all of it.
+        var quietest = Point3D.Zero;
+        var quietestSafety = 0.0;
+
         // The shard's own answers go in first, so that they are always on the list and are beaten only by
         // ground this bot has actually been paid on. See Noisy and Paying.
         //
@@ -293,6 +297,21 @@ public sealed class BotHunter : IBotProposer
                 Quiet++;
                 refused++;
 
+                // <b>Kept as the answer of last resort, because a filter with nothing behind it is a ban.</b>
+                // This candidate has already passed every other test — it is somewhere else, out of town and
+                // reachable — and is being thrown away only for being dull. That is right while anything
+                // better exists and is a refusal to walk when nothing does: the counter put in on 02.09.2026
+                // to settle the argument came back with 1585 hunters in a single window left with nowhere to
+                // go at all, which is the population's own way of saying that half of it was standing still
+                // because every square it thought of was safe. The quietest ground on the island is still a
+                // walk to somewhere else, which is what a prowl is for and what this shard calls "scored at
+                // almost nothing and the right answer anyway".
+                if (quietest == Point3D.Zero || safety < quietestSafety)
+                {
+                    quietest = where;
+                    quietestSafety = safety;
+                }
+
                 continue;
             }
 
@@ -331,6 +350,10 @@ public sealed class BotHunter : IBotProposer
         if (best == Point3D.Zero && refused > 0)
         {
             Stranded++;
+
+            // Still counted as stranded above, because it is: the count is what says how often the whole
+            // sample was dull, and that stays worth knowing after the bot has somewhere to walk again.
+            return quietest;
         }
 
         return best;
