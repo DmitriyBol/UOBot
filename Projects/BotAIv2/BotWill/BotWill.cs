@@ -788,14 +788,17 @@ public static class BotWill
         BotDeed second = null;
         var secondScore = 0.0;
         var viable = 0;
+        string firstVeto = null;
 
         for (var i = 0; i < _offers.Count; i++)
         {
             var offer = _offers[i];
-            var score = BotAppraisal.Weigh(bot, offer, Share(offer.Kind), out var weigh);
+            var score = BotAppraisal.Weigh(bot, offer, Share(offer.Kind), out var weigh, out var veto);
 
             if (score <= 0.0)
             {
+                firstVeto ??= veto;
+
                 continue;
             }
 
@@ -825,7 +828,7 @@ public static class BotWill
                     now,
                     _offers.Count == 0
                         ? $"{asked} proposers asked, not one of them had anything to offer"
-                        : $"{asked} proposers asked, {_offers.Count} offered work, none of it scored above nothing"
+                        : $"{asked} proposers asked, {_offers.Count} offered work, and it was refused: {firstVeto}"
                 );
             }
 

@@ -139,15 +139,32 @@ public static class BotAppraisal
     /// that needs money. A zero is never a small number here — it is a refusal, and it stops the arithmetic.
     /// </para>
     /// </summary>
-    public static double Weigh(IBotWilful bot, BotDeed deed, double share, out BotWeigh weigh)
+    public static double Weigh(IBotWilful bot, BotDeed deed, double share, out BotWeigh weigh) =>
+        Weigh(bot, deed, share, out weigh, out _);
+
+    /// <summary>
+    /// The same score, and which of the five refusals it was when the answer is nought.
+    ///
+    /// <para>
+    /// <b>Five different facts left this method as the same zero.</b> Another map, cannot afford it, nothing
+    /// expected there, and a product flattened to nought are separate faults with separate repairs, and on
+    /// 02.09.2026 five bots stood at the Britain shops with 350–540gp apiece while the record said only "1
+    /// offered work, none of it scored above nothing". Naming the refusal is the difference between knowing
+    /// that and knowing what to fix.
+    /// </para>
+    /// </summary>
+    public static double Weigh(IBotWilful bot, BotDeed deed, double share, out BotWeigh weigh, out string veto)
     {
         weigh = default;
+        veto = null;
 
         var body = bot?.Self;
         var resolve = bot?.Resolve;
 
         if (body == null || resolve == null || deed == null)
         {
+            veto = "nothing to weigh";
+
             return 0.0;
         }
 
@@ -157,12 +174,16 @@ public static class BotAppraisal
         // the first version produced errands to places that were never reached.
         if (map == null || map == Map.Internal || deed.Map != map)
         {
+            veto = $"{deed.Kind} is on another map";
+
             return 0.0;
         }
 
         // Cannot pay to start. Checked before anything expensive, which is also why it is first.
         if (deed.Outlay > 0 && BotYield.Wealth(body) < deed.Outlay)
         {
+            veto = $"{deed.Kind} costs {deed.Outlay}gp and it has {BotYield.Wealth(body)}gp";
+
             return 0.0;
         }
 
@@ -178,6 +199,8 @@ public static class BotAppraisal
 
         if (estimate <= 0.0)
         {
+            veto = $"{deed.Kind} is expected to pay {estimate:F1}/min here, against a claim of {claim:F1}";
+
             return 0.0;
         }
 
@@ -223,6 +246,9 @@ public static class BotAppraisal
 
         if (product <= 0.0)
         {
+            veto = $"{deed.Kind} weighed out at nothing: near {nearness:F2}, new {novelty:F2}, room {room:F2},"
+                + $" safe {caution:F2}, purse {purse:F2}";
+
             return 0.0;
         }
 
