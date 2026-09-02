@@ -37,6 +37,9 @@ public sealed class BotOrder : BotDeed
 
     private bool _posted;
 
+    /// <summary>What the board actually charged for the want. See <see cref="Made"/>.</summary>
+    private int _paid;
+
     /// <summary>Putting a fresh order on the board.</summary>
     public BotOrder(Map map, Point3D where, IBotWilful buyer, System.Type kind, int offer, int units = 1)
     {
@@ -61,6 +64,25 @@ public sealed class BotOrder : BotDeed
 
     /// <summary>What it costs is the order itself, and the market takes it at the moment of asking.</summary>
     public override int Outlay => _offer * System.Math.Max(1, _units);
+
+    /// <summary>
+    /// Money put down on a want has not been lost, it has become a claim on the goods — word for word the
+    /// reckoning <see cref="BotAcquire.Made"/> makes about the identical act, and this class had simply
+    /// never made it.
+    ///
+    /// <para>
+    /// <b>Declaring nothing for it taught the whole shard that ordering is a catastrophe.</b> The escrow left
+    /// the purse and no takings were declared against it, so the ledger recorded the trade at what the coin
+    /// did on its own: Faron's order of one LeatherBustierArms on 02.09.2026 settled at "-48 in 0.2 min
+    /// (-192/min): -48 coin, 0 made". A negative expectation is a refusal in the auction, and the record is
+    /// per patch, so the refusal spread across the island a patch at a time. By 22:16 that evening the
+    /// debugger could name the price: order expected at -37.7/min at the graveyard, -59.0 by the camp,
+    /// -123.0 in the field, against a claim of 7.5 — and for eight bots holding between 175 and 443 gold it
+    /// was the <em>only</em> offer any of thirty-one proposers had made, so they stood still for up to five
+    /// minutes with the money to buy what they were standing there wanting.
+    /// </para>
+    /// </summary>
+    public override int Made => _paid;
 
     public override string Stage => $"ordering {_units} {_kind.Name}";
 
@@ -88,6 +110,10 @@ public sealed class BotOrder : BotDeed
         {
             return BotDoing.Failed($"the board would not take an order for {_kind.Name}");
         }
+
+        // The bill the board charged, which is units times the want's own offer — see BotAuction.Ask, and
+        // BotAcquire.Asking, which reckons its own escrow the same way for the same reason.
+        _paid = System.Math.Max(1, _units) * want.Offer;
 
         logger.Information(
             "{Name} has asked the population for {Units} {Item} at {Offer}gp each",
