@@ -396,6 +396,53 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     /// and it cannot see them any other way.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Lets go of a creature this bot is nominally fighting and cannot possibly hit.
+    ///
+    /// <para>
+    /// <b>Combat here is a reflex and walking is work, and nothing joins the two.</b> A bot is put into
+    /// combat by being attacked, by a company's focus, or by an undertaking that has since ended — and once
+    /// its combatant is set, nothing ever unsets it. If there is no work in hand there is nothing to close
+    /// the distance either, so the bot stands where it is, in warmode, swinging at something it cannot
+    /// reach, for as long as that creature lives.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Measured 02.09.2026.</b> Lysa the Warrior stood in Britain Graveyard holding no work at all,
+    /// "fighting" a wraith eighteen tiles away with a weapon that reaches one, twenty-four seconds without
+    /// its target's health falling once — and two of the three bots then in a fight anywhere on the shard
+    /// were in the same state. It also blinds the debugger's own roll-call, which excuses anything in a
+    /// fight from the stuck test on the reasonable grounds that a bot trading blows is busy: a phantom fight
+    /// is therefore a bot that cannot be reported as stuck by anything.
+    /// </para>
+    ///
+    /// <para>
+    /// Only with nothing in hand. A bot walking to its quarry is out of reach the whole way, and that is the
+    /// errand working; the deed is what will close the distance, and there is no deed here.
+    /// </para>
+    /// </summary>
+    private void Unfixate()
+    {
+        if (Resolve.Deed != null || Combatant is not Mobile foe)
+        {
+            return;
+        }
+
+        var reach = Math.Max(1, Weapon?.MaxRange ?? 1);
+
+        if (foe is { Deleted: false, Alive: true } && foe.Map == Map && InRange(foe.Location, reach))
+        {
+            return;
+        }
+
+        Combatant = null;
+        Warmode = false;
+        Unfixated++;
+    }
+
+    /// <summary>Fights let go of because nothing could ever have reached them. For the summary.</summary>
+    public static long Unfixated { get; private set; }
+
     public void Beat()
     {
         if (Deleted || !Alive || Map == null || Map == Map.Internal)
@@ -438,7 +485,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         Gasp();
 
-        // The rangers' standing order: see Watch. A no-op for every other class on the shard.
+        Unfixate();
 
         Rank();
 
