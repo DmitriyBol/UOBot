@@ -1011,6 +1011,25 @@ public static class BotWill
         resolve.Sent = default;
         resolve.Aside = false;
 
+        // <b>And the road it was on, which nothing else was going to put down.</b> A journey is completed by
+        // the walker, and the walker is only asked while a bot is walking — so an undertaking that ends any
+        // other way (done on the spot, failed, dropped for something better) leaves its errand standing in
+        // the queue for ever. For a bot that immediately takes new work this is invisible: the next walk
+        // rebases the journey over it. For a bot that takes nothing it is a lie that never expires.
+        //
+        // Measured 02.09.2026: Joss the Warrior, holding no work at all for four minutes and motionless for
+        // three of them, reported as "walking to 1440,1470, 15 tiles off, set out 5m ago" — an errand from a
+        // walk home that had finished five minutes earlier. Six bots beside it were in the same state. Every
+        // instrument on this shard read them as travelling, which is exactly the sort of quiet wrong number
+        // that costs an evening to unpick.
+        //
+        // Only when there is nothing left to do: a deed that ended by handing over to another leg of its own
+        // queue still owns the rest of it, and Finish would throw that away.
+        if (bot.Journey is { Active: true } road && resolve.Deed == null)
+        {
+            road.Finish();
+        }
+
         // Due to look again at once. A bot that has just finished a job should not stand about waiting for a
         // review it does not need: there is nothing to change its mind about. A flag rather than a zeroed
         // stamp, because a tick count of zero is a legitimate reading on this shard's hosts.
