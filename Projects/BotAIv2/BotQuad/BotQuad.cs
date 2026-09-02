@@ -228,6 +228,102 @@ public static class BotQuad
     /// <summary>Every square the population has anything to say about.</summary>
     public static IReadOnlyCollection<Quad> All => _quads.Values;
 
+    /// <summary>The squares that have hurt somebody, worst first. Rebuilt on demand, rarely. See <see cref="WorstNear"/>.</summary>
+    private static readonly List<Quad> _feared = [];
+
+    private static long _fearedTick;
+
+    private static bool _fearedEver;
+
+    /// <summary>How long the short list of feared squares stands before it is built again.</summary>
+    public static int FearedRefreshMs { get; set; } = 15000;
+
+    /// <summary>Most feared squares kept on that list.</summary>
+    public static int MostFeared { get; set; } = 16;
+
+    /// <summary>
+    /// The worst square the population knows of within reach of somewhere, or nought if it knows of none.
+    ///
+    /// <para>
+    /// <b>This map was answering only half the question it was built for.</b> Until 02.09.2026 a hunter asked
+    /// it one thing — "is this square I happened to think of too quiet" — and it was consulted nowhere else,
+    /// so a map that knew twelve squares had hurt somebody and three were dire could not send anybody to one
+    /// of them. The beat said it in a number every window and nobody had the second half to compare it to:
+    /// "15125 hunting grounds passed over as too quiet, <b>0 picked for having hurt somebody</b>". The squares
+    /// were found by throwing eight darts into a box around home and were then judged; the ones that mattered
+    /// were never on the list to be judged.
+    /// </para>
+    ///
+    /// <para>
+    /// Patrick's reading of it, which is the reason this exists: "they take too small a distance — nearer the
+    /// swamps between Britain and Minoc there is a great deal that is dangerous, and they only walk the safe
+    /// ground and hang about there. We brought in the quadrants for exactly this, so they would move from the
+    /// safe towards the dangerous and gather into companies."
+    /// </para>
+    ///
+    /// <para>
+    /// The short list is rebuilt at most every <see cref="FearedRefreshMs"/> — the full record is thousands of
+    /// squares and this is asked on the population's own beat, once per hunter per decision.
+    /// </para>
+    /// </summary>
+    public static Point2D WorstNear(Map map, Point3D from, int within)
+    {
+        if (map == null || map == Map.Internal)
+        {
+            return Point2D.Zero;
+        }
+
+        var now = Core.TickCount;
+
+        if (!_fearedEver || now - _fearedTick >= FearedRefreshMs)
+        {
+            _fearedEver = true;
+            _fearedTick = now;
+            _feared.Clear();
+
+            foreach (var quad in _quads.Values)
+            {
+                if (quad.Safety <= Wanted)
+                {
+                    _feared.Add(quad);
+                }
+            }
+
+            _feared.Sort(static (a, b) => a.Safety.CompareTo(b.Safety));
+
+            if (_feared.Count > MostFeared)
+            {
+                _feared.RemoveRange(MostFeared, _feared.Count - MostFeared);
+            }
+        }
+
+        for (var i = 0; i < _feared.Count; i++)
+        {
+            var quad = _feared[i];
+
+            if (quad.Map != map)
+            {
+                continue;
+            }
+
+            var middle = quad.Middle;
+
+            // Worst first, so the first one near enough is the answer. Distance is measured from wherever the
+            // caller reckons its ground from, which for a hunter is the population's home rather than its own
+            // feet: a company that walks out together starts from the same place.
+            //
+            // The height is deliberately not returned. A square's middle is two numbers and the third has to
+            // come from the map itself — see BotStep.Settle, and the evening this project spent walking bots
+            // to a Z somebody had worked out with arithmetic.
+            if (Math.Abs(middle.X - from.X) <= within && Math.Abs(middle.Y - from.Y) <= within)
+            {
+                return middle;
+            }
+        }
+
+        return Point2D.Zero;
+    }
+
     public static int Count => _quads.Count;
 
     // ---- What has happened, for the summary. ------------------------------------------------------

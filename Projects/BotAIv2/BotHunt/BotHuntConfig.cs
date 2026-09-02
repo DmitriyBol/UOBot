@@ -43,6 +43,9 @@ public sealed class BotHuntSettings
     /// <summary>The share of health needed before setting out for one.</summary>
     public double? FitAt { get; set; }
 
+    /// <summary>How far from home a square the map calls dangerous may be and still be worth setting out for.</summary>
+    public int? FearedReach { get; set; }
+
     /// <summary>What a fight is reckoned at per minute before experience corrects it.</summary>
     public double? Expects { get; set; }
 
@@ -101,6 +104,7 @@ public static class BotHuntConfig
         BotSlay.FillFraction = settings.FillFraction ?? BotSlay.FillFraction;
 
         BotHunter.FitAt = settings.FitAt ?? BotHunter.FitAt;
+        BotHunter.FearedReach = settings.FearedReach ?? BotHunter.FearedReach;
 
         BotProwl.ArriveWithin = settings.ProwlArriveWithin ?? BotProwl.ArriveWithin;
 

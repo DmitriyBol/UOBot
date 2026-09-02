@@ -147,6 +147,16 @@ public static class BotMarkers
                 continue;
             }
 
+            // <b>A square where nothing has ever happened is the absence of a fact, exactly as unstood ground
+            // is.</b> The cap is worst-first and hundreds of squares tie at nought, so on 02.09.2026 the file
+            // held 400 pins of which 3 were dire, 9 were worth going to and 388 were blue markers reading
+            // "0.00" — squares stood in, never bled in, and never acted on. The map looked frozen because the
+            // only twelve pins that could change were buried under them, and the twelve are the whole point.
+            if (!PinUnknown && quad.Safety == BotQuad.Fresh && quad.Blows == 0 && quad.Deaths == 0)
+            {
+                continue;
+            }
+
             var middle = quad.Middle;
 
             // Nothing in a label may be a comma: the file is comma-separated and the client does not quote.

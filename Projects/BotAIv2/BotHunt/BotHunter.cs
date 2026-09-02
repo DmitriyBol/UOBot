@@ -165,7 +165,21 @@ public sealed class BotHunter : IBotProposer
         var noisy = Noisy(body, map, roam);
         var paying = Paying(body, map, roam);
 
-        for (var tries = 0; tries <= Samples + 1; tries++)
+        // <b>And the map's own answer, which it had never been asked for.</b> Noisy is where blood is being
+        // spilt now and forgets in twenty minutes; Paying is where this trade has come to something. Neither
+        // is the quadrant record, which is the one thing on this shard that remembers for good which ground
+        // has hurt people — and it was consulted only to veto a square somebody else had thought of. The beat
+        // printed the consequence every window without a second number to compare it to: 15125 grounds passed
+        // over as too quiet against 0 picked for having hurt somebody.
+        //
+        // At the whole roam rather than half of it, and that is the other half of the complaint. The halving
+        // above is an argument about darts thrown into terrain nobody has seen — a walk that ends in being
+        // rescued is worse than a shorter walk. It is not an argument about a square the population has stood
+        // in and bled in: that is a known place, and on 02.09.2026 the known dangerous ones sat between
+        // Britain and Minoc, about four hundred and ninety tiles from home, with the darts reaching 250.
+        var feared = Feared(body, map);
+
+        for (var tries = 0; tries <= Samples + 2; tries++)
         {
             Point3D where;
 
@@ -186,6 +200,15 @@ public sealed class BotHunter : IBotProposer
                 }
 
                 where = paying;
+            }
+            else if (tries == 2)
+            {
+                if (feared == Point3D.Zero)
+                {
+                    continue;
+                }
+
+                where = feared;
             }
             else
             {
@@ -347,6 +370,38 @@ public sealed class BotHunter : IBotProposer
     }
 
     /// <summary>
+    /// The worst ground the quadrant map knows of, if this bot could get to it.
+    ///
+    /// <para>
+    /// A candidate on the same terms as the other two named ones — never an answer, so a hunter with real
+    /// experience of its own still prefers its own ground. Reckoned from the population's home rather than
+    /// from the bot's feet, exactly as the random darts are, so that a company setting out is setting out to
+    /// the same place.
+    /// </para>
+    /// </summary>
+    private static Point3D Feared(Mobile body, Map map)
+    {
+        var middle = BotQuad.WorstNear(map, BotPopulation.Where, FearedReach);
+
+        if (middle == Point2D.Zero || !BotStep.Settle(map, middle.X, middle.Y, out var z))
+        {
+            return Point3D.Zero;
+        }
+
+        var where = new Point3D(middle.X, middle.Y, z);
+
+        // The same two tests every candidate has to pass: somewhere else, and reachable.
+        if (Utility.InRange(body.Location, where, BotQuarry.Reach))
+        {
+            return Point3D.Zero;
+        }
+
+        return BotReach.Ask(map, body.Location, where, BotArrival.Within(BotQuarry.Reach)) == BotReachVerdict.Sealed
+            ? Point3D.Zero
+            : where;
+    }
+
+    /// <summary>
     /// The square the shard has been bleeding in lately, if it is somewhere this bot could go.
     ///
     /// <para>
@@ -383,6 +438,27 @@ public sealed class BotHunter : IBotProposer
     /// cheap; finding nowhere is not a failure, and the bot asks again in a few seconds.
     /// </summary>
     private const int Samples = 8;
+
+    /// <summary>
+    /// How far from home a square the map calls dangerous may be and still be worth setting out for.
+    ///
+    /// <para>
+    /// <b>Its own number, because the roam is an argument about somewhere else.</b> The roam bounds ground the
+    /// population may want things on, and the hunt halves it again for random darts, on the grounds that a
+    /// walk into unseen terrain can end in being carried home. Neither argument is about a square the
+    /// population has already stood in and bled in.
+    /// </para>
+    ///
+    /// <para>
+    /// Eight hundred, and the figure comes from the island itself. On 02.09.2026 the worst square the map knew
+    /// was (2025, 975) at -0.60 on 28 blows and one death — the swamps between Britain and Minoc, which is
+    /// where Patrick said the danger was — and home is (1440, 1470), five hundred and eighty-five tiles off.
+    /// The roam was five hundred and the darts reached two hundred and fifty, so the one square everybody
+    /// should have been walking to was outside both, and the beat recorded it plainly: 12 squares worth going
+    /// to, 0 ever picked, and 1585 hunters in a single window left with nowhere to walk at all.
+    /// </para>
+    /// </summary>
+    public static int FearedReach { get; set; } = 800;
 
     private static void Missing(Map map)
     {
