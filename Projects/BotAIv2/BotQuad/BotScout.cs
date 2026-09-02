@@ -317,13 +317,6 @@ public sealed class BotScout : BotDeed
 
         // The crown's surgeon left on his own. See BotRangers.SurgeonAlone: a healer by himself is not a
         // company, and the round ends rather than walking him into whatever killed the other four.
-        if (_kin && BotRangers.SurgeonAlone())
-        {
-            Disband(member);
-
-            return BotDoing.Done("the company is down to its surgeon; the sweep is over");
-        }
-
         if (Core.TickCount - _began >= CapMs)
         {
             Timedout++;

@@ -245,18 +245,6 @@ public static class BotPopulation
             return false;
         }
 
-        // <b>The crown's rangers do not get up, by order.</b> Everybody else on this shard is a townsman who
-        // is carried home and patched; a ranger who falls is gone, and the company he was in goes on without
-        // him until it is destroyed and a fresh one is raised two hours later. Deleted rather than left as a
-        // ghost, because a ghost is still in the population, still counted, still on the beat, and would sit
-        // in every summary as a ranger who is somehow neither alive nor replaced.
-        if (bot.Class is BotRanger)
-        {
-            bot.Delete();
-
-            return false;
-        }
-
         if (Core.TickCount - bot.FellTick < ReviveMs)
         {
             return false;

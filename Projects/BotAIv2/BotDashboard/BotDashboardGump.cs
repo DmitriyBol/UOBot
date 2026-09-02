@@ -162,16 +162,6 @@ public sealed class BotDashboardGump : DynamicGump
             _pages = 1;
             _page = 0;
 
-            var rangers = BotRangers.Company;
-
-            for (var i = 0; i < rangers.Count; i++)
-            {
-                if (rangers[i] is { Deleted: false } ranger)
-                {
-                    _bots.Add(ranger);
-                }
-            }
-
             return;
         }
 
@@ -440,45 +430,6 @@ public sealed class BotDashboardGump : DynamicGump
     /// </summary>
     private void QuadPage(ref DynamicGumpBuilder builder)
     {
-        // <b>The crown's company across the top, because it is the one thing on this page a person acts on
-        // directly.</b> Every other row here is ground; this is five bots who can be walked to. The button
-        // reuses the population tab's own visit range — see Visit — so a ranger is reached the same way any
-        // other bot is, and there is one list of buttons to be wrong about rather than two.
-        builder.AddLabel(14, 44, Head, "the King's Rangers");
-        builder.AddLabelCropped(180, 44, 520, 20, Ink, BotRangers.Describe());
-
-        var rangers = BotRangers.Company;
-        var at = 14;
-
-        for (var i = 0; i < rangers.Count && i < 5; i++)
-        {
-            var ranger = rangers[i];
-
-            if (ranger is not { Deleted: false })
-            {
-                continue;
-            }
-
-            // Numbered off the same table Visit reads, so the button and the bot cannot drift apart.
-            var row = _bots.IndexOf(ranger);
-
-            if (row >= 0)
-            {
-                builder.AddButton(at, 66, 4005, 4007, 100 + row);
-            }
-
-            builder.AddLabelCropped(at + 22, 66, 130, 20, ranger.Alive ? Ink : Bad, ranger.Name);
-
-            at += 170;
-        }
-
-        if (rangers.Count == 0)
-        {
-            builder.AddLabel(14, 66, Bad, "No company is in the field");
-        }
-
-        builder.AddImageTiled(14, 92, Width - 28, 1, 9274);
-
         builder.AddLabel(14, 100, Head, "quadrant");
         builder.AddLabel(160, 100, Head, "safety");
         builder.AddLabel(240, 100, Head, "standing");

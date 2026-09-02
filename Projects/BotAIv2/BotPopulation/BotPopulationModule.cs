@@ -98,9 +98,6 @@ public sealed class BotPopulationModule : BotModule
     /// </summary>
     public override void Reset()
     {
-        BotRangers.Forget();
-        BotQuartermaster.Forget();
-
         // <b>The island is no longer cleared here, and that is the point of saving it.</b> This used to drop
         // every quadrant on a reload, on the reasoning that the records name a Map and a Map from the world
         // being replaced is a deleted object. The facets themselves are not replaced — Map.Maps outlives any

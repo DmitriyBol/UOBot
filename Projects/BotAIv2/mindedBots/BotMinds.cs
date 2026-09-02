@@ -117,7 +117,11 @@ public static class BotMinds
         _minds.Add(new BotMind(ArchitectName, "architect"));
         _minds.Add(new BotMind(SageName, "sage"));
 
-        // <b>The Baron is not raised this session, by instruction, and the code for him is left standing.</b>
+        // <b>Back on the shard from 02.09.2026, by instruction.</b> He was stood down for a day while the
+        // debugger took his slot; the code was left standing precisely so that bringing him back would be
+        // this line and one entry in bot-population.json, and it was.
+        //
+        // Kept from before:
         // He was the fourth mind and the only one that is not a supplement to something the arithmetic
         // already does well: the other three choose among trades the shard would have offered anyway and are
         // judged on choosing better, while he is offered two things written for him alone and is paid
@@ -127,7 +131,7 @@ public static class BotMinds
         // him out again. What took his slot is the debugger — see the debugger folder — which is not a mind
         // at all: it takes no work, joins no auction and only watches.
         //
-        // _minds.Add(new BotMind(BaronName, "baron"));
+        _minds.Add(new BotMind(BaronName, "baron"));
 
         Load();
         Claim();

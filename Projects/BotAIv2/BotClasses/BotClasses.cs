@@ -35,15 +35,7 @@ public static class BotClasses
         new BotMage(),
         new BotHealer(),
         new BotCrafter(),
-        new BotGatherer(),
-
-        // The crown's own company. Registered like everything else so that Reset fills their numbers in and
-        // configuration can move them — a class outside this table is a class whose Defaults never run, which
-        // is a bot raised with no skills at all and the shard saying so in its own birth line.
-        new BotRangerWarrior(),
-        new BotRangerArcher(),
-        new BotRangerMage(),
-        new BotRangerHealer()
+        new BotGatherer()
     ];
 
     private static readonly Dictionary<string, BotClass> _byName =

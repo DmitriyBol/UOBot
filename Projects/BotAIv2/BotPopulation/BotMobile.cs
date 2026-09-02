@@ -439,7 +439,6 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         Gasp();
 
         // The rangers' standing order: see Watch. A no-op for every other class on the shard.
-        Watch();
 
         Rank();
 
@@ -690,7 +689,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         // The same blow against the island's standing reputation rather than against this minute's danger.
         // See BotQuad: the two maps answer different questions and are both fed from here, because this hook
         // and the death hook below are the only two places on this shard that know a bot was hurt.
-        BotQuad.Struck(Map, Location, Class is BotRanger);
+        BotQuad.Struck(Map, Location, false);
 
         // And this crossing is no longer a free one. See _quadClean.
         _quadClean = false;
@@ -729,17 +728,6 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         // Everything below this line is <em>choosing</em> a fight, which is a decision. Hitting back at
         // whatever is already hitting you is above it, and always happens.
         // <b>The King's Rangers never do any of this, and that is the whole of their doctrine.</b> They do
-        // not decide whether a fight is winnable, do not walk on while something chews on them, and do not
-        // run: they turn and kill what is in front of them, and there are five of them so that this is a
-        // sound rule rather than a suicidal one. Every branch below is a bot weighing whether to fight, and
-        // weighing is exactly what produced a ranger jogging through a crowd being beaten the whole way.
-        if (Class is BotRanger)
-        {
-            Engage(BotThreat.Strongest(this, BotRangers.Sight) ?? from);
-
-            return;
-        }
-
         if (BotLadder.Failing(this))
         {
             return;
@@ -859,46 +847,6 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     /// <summary>The two layers a weapon, a shield or a staff can occupy. What the engine calls a full pair of hands.</summary>
     private static readonly Layer[] TwoHands = [Layer.OneHanded, Layer.TwoHanded];
 
-    private void Watch()
-    {
-        if (Class is not BotRanger || Deleted || !Alive || Map == null || Map == Map.Internal)
-        {
-            return;
-        }
-
-        // <b>Held until it is dead, however far that goes, by order.</b> No leash on the chase and no giving
-        // up when it leaves the quadrant: a ranger that breaks off has left something alive behind it in
-        // ground it is supposed to be reporting on. Nothing here re-targets while the current quarry lives,
-        // which is also what stops a company re-deciding every beat and spreading itself across a field.
-        if (Combatant is Mobile { Deleted: false, Alive: true } held && held.Map == Map)
-        {
-            return;
-        }
-
-        // The strongest rather than the nearest, and the squad's own note says why: a graveyard's nearest
-        // resident is a skeleton, and companies that commit to the skeleton get killed by the lich behind it.
-        var foe = BotThreat.Strongest(this, BotRangers.Sight);
-
-        if (foe == null)
-        {
-            return;
-        }
-
-        // <b>The whole company takes the target, not the bot that saw it.</b> A squad's focus is what its
-        // formation is built around — see BotFormation.PressRingFor: the warriors close to contact, the bow
-        // holds five tiles, the staff and the surgeon hold seven. Engaging privately would put whoever
-        // happened to look up into contact on his own while the other four went on walking, which is the
-        // company strung out across a field that this reflex exists to prevent.
-        // <b>Both, and the second is not redundant.</b> The squad's engage sets the company's focus, which is
-        // what the formation is built around — but it does not make any individual bot swing, and for every
-        // other class on this shard the decision layer is what does that. These five have no decision layer,
-        // so three rangers stood in contact with a zombie whose "health has not moved" while the company
-        // dutifully held formation around it. The company agrees on the target; this bot attacks it.
-        Squad?.Engage(foe, this);
-
-        Engage(foe);
-    }
-
     /// <summary>
     /// It died. The bond decides what it keeps, the decision layer counts what the work came to, and the
     /// squad stops counting it as help.
@@ -913,7 +861,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         // Everything the bind does not cover is in there: the tools, the herbs, the bandages and the purse.
         // Nothing to go back for when the crown takes the body away. See the ranger branch below.
-        Remains = Class is BotRanger ? null : c as Corpse;
+        Remains = c as Corpse;
 
         // Said plainly, every time.
         //
@@ -943,29 +891,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         // the best-armed thing this population can field and is sent to bad ground on purpose; ground that
         // killed him will kill anybody, and BotQuad.BaronWorth is sized so one such death is enough on its
         // own to make a square dire and raise a great hunt for it immediately.
-        if (Class is BotRanger)
-        {
-            // <b>The body goes with them.</b> A ranger is armed and armoured by the crown at nobody's
-            // expense; a corpse in gold plate lying in a field is a free suit for whoever walks past, and
-            // this shard has thirty bots that walk past everything. Their gear is bound and returns with
-            // them anyway, so the corpse holds nothing they need and everything somebody else would want.
-            if (c is Corpse body)
-            {
-                // Deferred by a tick rather than deleted under the engine's feet: this runs inside OnDeath,
-                // which is still holding the container it just built. Zero delay is the loop's next pass.
-                Timer.DelayCall(TimeSpan.Zero, () => body.Delete());
-            }
+        BotQuad.Fell(Map, Location, Class is BotBaron ? BotQuad.BaronWorth : BotQuad.DeathWorth);
 
-            // <b>Whether this was the last of them is asked here, while the body is still on the ground.</b>
-            // The company is pruned on the population's own clock, which is a beat later and somewhere else,
-            // so asking afterwards would mean asking about a square this bot is no longer standing in. One
-            // left standing means one is about to die too; none means this death completed the wipe.
-            BotQuad.FellRanger(Map, Location, BotRangers.Standing <= 1);
-        }
-        else
-        {
-            BotQuad.Fell(Map, Location, Class is BotBaron ? BotQuad.BaronWorth : BotQuad.DeathWorth);
-        }
 
         Journey.Finish();
 

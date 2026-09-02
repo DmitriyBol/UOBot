@@ -151,8 +151,6 @@ public static class BotBeat
         // is a tab nobody has open at four in the morning.
         logger.Information("The island: {What}; {Hunting}", BotQuad.Describe(), BotHunter.Describe());
 
-        logger.Information("The crown's rangers: {What}; {Stores}", BotRangers.Describe(), BotQuartermaster.Describe());
-
         logger.Information("At death's door: {What}; {Supplies}", BotMobile.DescribeGasps(), BotShopper.Describe());
 
         logger.Information("Standing still: {What}", BotStall.Describe());
@@ -197,10 +195,6 @@ public static class BotBeat
 
         Summarise(now);
 
-        // The crown's company: raised when there is none and the mourning is over. Its own slow question,
-        // asked on the one clock the population already has rather than on a timer of its own.
-        BotRangers.Tick();
-
         // <b>The pins, on the population's fast beat rather than on its five-minute summary.</b> They were
         // asked from Summarise, which meant "rewrite every minute" could never mean anything of the sort —
         // the soonest it could fire was five. BotMarkers keeps its own throttle, so this costs a subtraction
@@ -222,10 +216,6 @@ public static class BotBeat
             }
 
             bot.Scheduled = true;
-
-            // The crown's stores, for the classes it keeps. Throttled per bot inside, so this is a dictionary
-            // lookup for everybody else — see BotQuartermaster on why it hangs off this clock and not its own.
-            BotQuartermaster.Keep(bot);
 
             // Whether this bot is getting anywhere at all. See BotStall: standing still is this shard's most
             // expensive defect and the only one that never wrote a line of its own.

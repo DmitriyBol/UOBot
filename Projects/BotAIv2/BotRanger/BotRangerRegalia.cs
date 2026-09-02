@@ -1,3 +1,18 @@
+// <b>All that is left of the King's Rangers, and it is left on purpose.</b>
+//
+// The company was cut from the shard on 02.09.2026 by instruction: they were five bots outside the
+// population's own economy, raised apart, never revived, walking their own ground on their own clock, and
+// they turned up in every measurement as five bots doing something nobody else did.
+//
+// Their gear could not go with them. A type whose name is in the world save cannot simply stop existing:
+// GenericEntityPersistence reads the save's type table before it reads a single object, and a name it
+// cannot resolve makes it ask the console "Delete all of those types? (y/n)" — a question a headless shard
+// cannot answer, so it hangs at boot with no error. Measured that evening: nineteen ranger item types in
+// Items.idx and ZERO objects of any of them. Nothing was being kept alive but the names.
+//
+// So the names stay and the company does not. Nothing constructs any of these any more; they exist so that
+// the world still loads, and they cost the shard one line in a type table.
+
 using ModernUO.Serialization;
 using Server.Items;
 
