@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Server.Logging;
+using Server.Mobiles;
 using Server.Text;
 
 namespace Server.BotAI.V2;
@@ -335,6 +336,9 @@ public static class BotWill
     /// journey itself — it is the one that knows what arriving means for its own stage.
     /// </para>
     /// </summary>
+    /// <summary>Creatures deferred because the road to them was refused. See <see cref="Note"/>.</summary>
+    public static long Unreachable { get; private set; }
+
     public static void Note(IBotWilful bot, BotWalkResult result)
     {
         if (!Deciding || result is not (BotWalkResult.Refused or BotWalkResult.GaveUp))
@@ -403,6 +407,24 @@ public static class BotWill
             : refused.Where == Point3D.Zero
                 ? "no way through to what it was following, which is gone"
                 : $"no way through to {refused.Where}";
+
+        // <b>And the creature is deferred, because no way through is no way through for anybody.</b> The same
+        // ruling BotSlay already makes about a quarry it cannot see from the tile beside it: "as true for the
+        // next bot along as for this one, which is precisely what the shared list means". A refused road was
+        // not making it. On the night of 02-03.09.2026, in two hours and three quarters, 88 of the 830
+        // hunts that ended did so on "no way through to" — a rat, a crow, a cat: creatures inside buildings
+        // in Britain that every passing bot walked to in turn and none could reach. The mark lapses in two
+        // minutes, so this defers them rather than writing them off, and a creature that wanders back out is
+        // hunted again.
+        //
+        // Creatures only. A mend that cannot reach the bot it was going to bandage is a fact about the road
+        // and about a friend, and the quarry list is not where either belongs — and the compiler settles that
+        // for us, since a bot is a PlayerMobile and can never be a BaseCreature.
+        if (refused.Follow is BaseCreature)
+        {
+            BotQuarry.Shun(refused.Follow);
+            Unreachable++;
+        }
 
         Settle(bot, BotEnding.Failed, where);
     }
