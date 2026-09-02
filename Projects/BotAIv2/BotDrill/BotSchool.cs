@@ -158,11 +158,22 @@ public static class BotSchool
     /// </para>
     ///
     /// <para>
-    /// Held in memory and therefore per run of the shard, which on this shard is a good deal shorter than a
-    /// day. That is the intended reading: not "once per calendar day" but "once, and then get back to work".
+    /// <b>Twenty minutes, and it was a day for one hour on 02.09.2026 — long enough to prove the point.</b>
+    /// A day is not a rest, it is a ban: the shard is restarted far oftener than that, so every bot got
+    /// exactly one lesson per run and then never again. And a lesson is by a wide margin the fastest thing
+    /// on this shard — 3.6 points a go against 0.24 for a rescue and 0.07 for a hunt — so banning it is
+    /// banning the levelling. Measured that evening: 54 skill points across 38 bots in 31 minutes, which
+    /// against targets of 100 is about six days of running.
+    /// </para>
+    ///
+    /// <para>
+    /// What was actually asked for was that the captain stop living off fees, and the fee is what answers
+    /// that: it came down from 150+55 a point to 60+20, which is under half the income at the same number of
+    /// lessons. The rest is here to stop one rich bot chaining lessons all afternoon, and twenty minutes
+    /// does that while still letting a bot learn two or three times an hour.
     /// </para>
     /// </summary>
-    public static int RestMs { get; set; } = 86400000;
+    public static int RestMs { get; set; } = 1200000;
 
     private static readonly Dictionary<Serial, long> _taught = [];
 

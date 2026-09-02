@@ -46,6 +46,26 @@ public sealed class BotHomeward : BotDeed
     public static int Arrived { get; set; } = 20;
 
     /// <summary>
+    /// How long a bot must have had nothing worth doing before the walk home is offered at all.
+    ///
+    /// <para>
+    /// <b>Half a minute, and it was nought for the first hour — which made this an errand that mostly
+    /// interrupted itself.</b> Offered on the very first barren review, the walk was taken the instant a bot
+    /// ran out of work, and real work turned up a few seconds later and took the bot straight back off it.
+    /// Measured 02.09.2026 over five minutes: 43 walks home begun, 28 of them dropped and 15 finished. Two
+    /// thirds were bots that had not actually run out of anything; they had simply not been offered it yet.
+    /// </para>
+    ///
+    /// <para>
+    /// The cure is not to make the walk worth more — it must go on losing to everything — but to ask it
+    /// later. A bot that has had nothing for thirty seconds has been offered every trade on the shard
+    /// twice over and been refused by all of them, and that is a bot with nothing to do rather than a bot
+    /// between jobs. The shard already keeps that clock: see BotUrges.BarrenMinutes.
+    /// </para>
+    /// </summary>
+    public static double BarrenFor { get; set; } = 0.5;
+
+    /// <summary>
     /// What this is worth a minute. Deliberately tiny.
     ///
     /// <para>
@@ -133,6 +153,9 @@ public sealed class BotHomer : IBotProposer
 
     public static long Near { get; private set; }
 
+    /// <summary>Far from home, but not yet out of work for long enough to be worth fetching.</summary>
+    public static long Busy { get; private set; }
+
     public static long Sent { get; private set; }
 
     public string Name => "Homeward";
@@ -158,6 +181,15 @@ public sealed class BotHomer : IBotProposer
             return null;
         }
 
+        // Not on the first empty review. See BotHomeward.BarrenFor: offered at once, this errand spent two
+        // thirds of its life being dropped for work that was about to be offered anyway.
+        if (bot.Resolve?.Urges?.BarrenMinutes(Core.TickCount) < BotHomeward.BarrenFor)
+        {
+            Busy++;
+
+            return null;
+        }
+
         Sent++;
 
         return new BotHomeward(home, BotPopulation.Where);
@@ -167,10 +199,12 @@ public sealed class BotHomer : IBotProposer
     {
         Asked = 0;
         Near = 0;
+        Busy = 0;
         Sent = 0;
     }
 
     /// <summary>One line, every case named, no branch called other.</summary>
     public static string Describe() =>
-        $"{Asked} asked whether to go home: {Near} were already within {BotHomeward.Away} tiles of it, {Sent} were sent back";
+        $"{Asked} asked whether to go home: {Near} were already within {BotHomeward.Away} tiles of it, "
+        + $"{Busy} were far but had not been out of work for {BotHomeward.BarrenFor:F1} minutes yet, {Sent} were sent back";
 }
