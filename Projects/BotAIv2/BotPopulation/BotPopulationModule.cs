@@ -49,6 +49,13 @@ public sealed class BotPopulationModule : BotModule
         // whether that is about to stop it walking, is the population's business rather than any trade's.
         BotWill.Offer(new BotPorter());
 
+        // Coming back when there is nothing worth doing out there. It lives here because where the
+        // population lives is the population's own fact, and because it is the only errand on the shard
+        // whose subject is the camp rather than anything in the world. See BotHomeward: six casters stood
+        // together 350 tiles south of it on 02.09.2026 with no money and no work, and not one of the
+        // thirty-four proposers had an answer that amounted to "then go home".
+        BotWill.Offer(new BotHomer());
+
 
         var purged = BotPopulation.PurgeSaved();
 
