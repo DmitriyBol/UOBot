@@ -112,7 +112,20 @@ public sealed class BotProwl : BotDeed
         // wrong for being chosen. An orc that has settled on a mage is not a candidate the mage is weighing:
         // it is coming either way, and the only question left is whether the mage spends the next minute
         // running in front of it. Cedric spent it running.
-        if (BotThreat.Hunter(body, BotMobile.NoticeRange) != null)
+        var picked = BotThreat.Hunter(body, BotMobile.NoticeRange);
+
+        // <b>Unless it is a fight this bot has already been refused, in which case handing over is a circle.</b>
+        // BotSlay gives a fight up on the numbers standing round the quarry and marks the creature crowded —
+        // one bot cannot have it. But the creature is still on this bot, so this test fired again, the errand
+        // finished again, the auction offered the fight again, and it was refused again. On 02.09.2026 between
+        // 22:46 and 22:56 that came to 123 prowls taken, 97 ended, 51 of those ended here, against 50 refusals
+        // for "too many of them around" — Joss went round it 25 times and Orin 17, and each lap wrote another
+        // nought per minute against the very ground the crown had just started sending companies to.
+        //
+        // Walking on is also the right answer and not merely the quiet one: a bot that has judged itself
+        // outnumbered and stays where the numbers are has decided nothing. Crowded lasts two minutes, so the
+        // creature gets one more honest hand-over after that if it is still interested.
+        if (picked != null && !BotQuarry.Crowded(picked))
         {
             return BotDoing.Done("something has picked this fight for us");
         }
