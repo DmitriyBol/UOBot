@@ -179,6 +179,20 @@ public sealed class BotResolve
     /// <summary>Why it is doing what it is doing, in words and in numbers. For the log and for a gump.</summary>
     public string Because { get; internal set; }
 
+    /// <summary>
+    /// Why it is doing <em>nothing</em>, in the same two numbers: how many proposers answered, and how much
+    /// of what they offered was worth anything.
+    ///
+    /// <para>
+    /// <b>Kept apart from <see cref="Because"/> on purpose.</b> Because is written once, when work is taken,
+    /// and a barren bot still carries the reason of the work it finished — read as the reason it is sitting.
+    /// On 02.09.2026 fifteen bots stood in the camp with 300gp apiece and the only record of it was a
+    /// boolean: barren, yes. Whether nobody offered them anything or everything offered scored nought are
+    /// different faults with different repairs, and the boolean could not tell them apart.
+    /// </para>
+    /// </summary>
+    public string Empty { get; internal set; }
+
     public override string ToString() =>
         Deed == null
             ? $"nothing on, {Urges}"

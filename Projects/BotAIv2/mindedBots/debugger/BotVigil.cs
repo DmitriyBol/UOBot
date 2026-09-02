@@ -868,7 +868,18 @@ public static class BotVigil
                 sb.Append(watch.Worth);
                 sb.Append("gp, trade at ");
                 sb.Append(watch.Progress * 100.0, "F0");
-                sb.AppendLine("%.");
+                sb.Append("%.");
+
+                // 02.09.2026: this list could say fifteen bots held nothing and never say why, so every
+                // reading of it cost a second question per bot at twelve seconds a turn. The auction knows.
+                if (!string.IsNullOrWhiteSpace(watch.Empty))
+                {
+                    sb.Append(" ");
+                    sb.Append(watch.Empty);
+                    sb.Append(".");
+                }
+
+                sb.AppendLine("");
             }
 
             return sb.ToString();

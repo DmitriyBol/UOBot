@@ -770,7 +770,7 @@ public static class BotWill
             // contented population.
             if (rung == BotStanding.Free && held == null)
             {
-                Nothing(resolve, now);
+                Nothing(resolve, now, "nobody answers this rung at all");
             }
 
             Unserved(rung);
@@ -820,7 +820,13 @@ public static class BotWill
         {
             if (held == null && rung == BotStanding.Free)
             {
-                Nothing(resolve, now);
+                Nothing(
+                    resolve,
+                    now,
+                    _offers.Count == 0
+                        ? $"{asked} proposers asked, not one of them had anything to offer"
+                        : $"{asked} proposers asked, {_offers.Count} offered work, none of it scored above nothing"
+                );
             }
 
             return false;
@@ -892,6 +898,9 @@ public static class BotWill
         // seconds, each at 0/min, and went from 400gp to 8gp; not one of those lines said whether anything
         // else had been offered at all, and the answer changes what the finding is.
         resolve.Because = $"{weigh.Describe()}; {viable} of {table} offers worth anything";
+
+        // Cleared here for the same reason Because is written here: a stale one reads as the present one.
+        resolve.Empty = null;
         resolve.Urges.Fruitful();
 
         Count(deed.Kind, 1);
@@ -1106,13 +1115,25 @@ public static class BotWill
     /// Counted once per drought rather than once per look, so the figure means "this many times a bot ran out
     /// of things worth doing" and not "this many beats went by while it had nothing".
     /// </summary>
-    private static void Nothing(BotResolve resolve, long now)
+    /// <summary>
+    /// Nothing was taken, and the two numbers that say why.
+    ///
+    /// <para>
+    /// <b>The count alone sent whoever read it back to the raw log.</b> Until 02.09.2026 this recorded a
+    /// boolean and a tally, so fifteen idle bots in the camp — 300gp each, two minutes apiece — could be
+    /// seen but not explained: an empty table and a table nobody would pay for read identically. The words
+    /// are kept on the resolve rather than logged, because a barren bot is barren every tick and a line per
+    /// tick per bot is not a measurement, it is a flood.
+    /// </para>
+    /// </summary>
+    private static void Nothing(BotResolve resolve, long now, string why)
     {
         if (!resolve.Urges.IsBarren)
         {
             Barren++;
         }
 
+        resolve.Empty = why;
         resolve.Urges.Barren(now);
     }
 

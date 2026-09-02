@@ -456,6 +456,9 @@ public sealed class BotWatch
 
     public string Why { get; private set; }
 
+    /// <summary>Why it holds nothing, in the auction's own two numbers. Null while it holds work.</summary>
+    public string Empty { get; private set; }
+
     /// <summary>What its work last asked of it: walk, work, done, failed.</summary>
     public string Asked { get; private set; } = "-";
 
@@ -496,6 +499,7 @@ public sealed class BotWatch
 
         Standing = resolve?.Standing.ToString() ?? "-";
         Why = resolve?.Because;
+        Empty = resolve?.Empty;
         Refusals = bot.Refusals;
 
         if (!bot.Alive)
@@ -1161,6 +1165,13 @@ public sealed class BotWatch
             sb.Append("%. Contentment ");
             sb.Append(Mood, "F2");
             sb.Append(".");
+
+            if (_kind == "-" && !string.IsNullOrWhiteSpace(Empty))
+            {
+                sb.Append(" It holds nothing because: ");
+                sb.Append(Empty);
+                sb.Append(".");
+            }
 
             if (!string.IsNullOrWhiteSpace(Why))
             {
