@@ -30,14 +30,14 @@ public sealed class BotWarrior : BotClass
 
         Skills =
         [
-            (SkillName.Tactics, 70.0),
-            (SkillName.Anatomy, 60.0),
-            (SkillName.Healing, 60.0)
+            (SkillName.Tactics, 100.0),
+            (SkillName.Anatomy, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         Kit = new BotKit
         {
-            Melee = BotArsenal.Melee(75.0)
+            Melee = BotArsenal.Melee(100.0)
         };
     }
 }

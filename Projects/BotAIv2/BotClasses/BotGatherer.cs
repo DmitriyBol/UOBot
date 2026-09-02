@@ -44,10 +44,10 @@ public sealed class BotGatherer : BotClass
 
         Skills =
         [
-            (SkillName.Mining, 80.0),
-            (SkillName.Lumberjacking, 75.0),
-            (SkillName.Tactics, 40.0),
-            (SkillName.Healing, 40.0)
+            (SkillName.Mining, 100.0),
+            (SkillName.Lumberjacking, 100.0),
+            (SkillName.Tactics, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         ForageIntervalMs = 900000;
@@ -56,7 +56,7 @@ public sealed class BotGatherer : BotClass
 
         Kit = new BotKit
         {
-            Melee = BotArsenal.Melee(40.0),
+            Melee = BotArsenal.Melee(100.0),
             Tools = [typeof(Server.Items.Pickaxe), typeof(Server.Items.Hatchet)]
         };
     }

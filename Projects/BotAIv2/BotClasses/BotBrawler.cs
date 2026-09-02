@@ -49,10 +49,10 @@ public sealed class BotBrawler : BotClass
         // era they are not support skills for a puncher, they are half of the damage.
         Skills =
         [
-            (SkillName.Wrestling, 85.0),
-            (SkillName.Tactics, 80.0),
-            (SkillName.Anatomy, 75.0),
-            (SkillName.Healing, 60.0)
+            (SkillName.Wrestling, 100.0),
+            (SkillName.Tactics, 100.0),
+            (SkillName.Anatomy, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         HandsAlwaysFree = true;

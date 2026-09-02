@@ -61,11 +61,11 @@ public sealed class BotMage : BotClass
         // named after rather than to the trade it works at.
         Skills =
         [
-            (SkillName.Magery, 80.0),
-            (SkillName.Inscribe, 80.0),
-            (SkillName.Meditation, 65.0),
-            (SkillName.Alchemy, 40.0),
-            (SkillName.Wrestling, 30.0)
+            (SkillName.Magery, 100.0),
+            (SkillName.Inscribe, 100.0),
+            (SkillName.Meditation, 100.0),
+            (SkillName.Alchemy, 100.0),
+            (SkillName.Wrestling, 100.0)
         ];
 
         NeedsMeditation = true;

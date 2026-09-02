@@ -35,8 +35,17 @@ public static class BotRangers
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRangers));
 
-    /// <summary>Whether the crown keeps a company of rangers at all.</summary>
-    public static bool Enabled { get; set; } = true;
+    /// <summary>
+    /// Whether the crown keeps a company of rangers at all.
+    ///
+    /// <para>
+    /// <b>Off since 02.09.2026, by instruction.</b> They were five bots outside the population's own
+    /// economy — raised apart, never revived, walking their own ground on their own clock — and they showed
+    /// up in every measurement of the shard as five bots doing something nobody else did. The code is left
+    /// standing and this line is the whole of the switch.
+    /// </para>
+    /// </summary>
+    public static bool Enabled { get; set; }
 
     /// <summary>
     /// How long after the last of them falls before the next company is raised.

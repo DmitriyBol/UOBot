@@ -95,6 +95,9 @@ public sealed class BotShopper : IBotProposer
     /// <summary>Wanted something nobody sells and could not afford to have one made either.</summary>
     public static long Broke { get; private set; }
 
+    /// <summary>Wanted something nobody sells, could afford one made, and still got no order onto the board.</summary>
+    public static long Unboarded { get; private set; }
+
     /// <summary>The fattest purse among those. See <c>BotStable.Richest</c> for why this is kept.</summary>
     public static long Richest { get; private set; }
 
@@ -144,7 +147,7 @@ public sealed class BotShopper : IBotProposer
 
         if (counter <= 0)
         {
-            Missing(wanted, map);
+            Missing(wanted, map, body);
 
             var order = Board(bot, body, map, wanted, amount);
 
@@ -154,13 +157,28 @@ public sealed class BotShopper : IBotProposer
             }
             else
             {
-                Broke++;
-
+                // <b>Counted by what actually happened, not by the branch it fell into.</b> Board returns
+                // null for several reasons — nobody can make the thing, an order is already out for it, the
+                // bot cannot afford the deposit — and every one of them used to be tallied under a figure
+                // the summary calls "could not afford one made". A counter that names one cause and catches
+                // all of them is this shard's most-repeated defect, and on 02.09.2026 it printed
+                // "0 could not afford one made (the fattest purse among them held 0gp)" — a nought beside an
+                // unset maximum, read as a destitute population.
                 var wealth = BotYield.Wealth(body);
 
-                if (wealth > Richest)
+                // The same sum Board itself refuses on, read from the same place — see Board below.
+                if (wealth - BotAuction.Worth(wanted, Guess) * amount <= Reserve)
                 {
-                    Richest = wealth;
+                    Broke++;
+
+                    if (wealth > Richest)
+                    {
+                        Richest = wealth;
+                    }
+                }
+                else
+                {
+                    Unboarded++;
                 }
             }
 
@@ -410,7 +428,7 @@ public sealed class BotShopper : IBotProposer
         return new BotOrder(map, body.Location, bot, wanted, offer, amount);
     }
 
-    private static void Missing(Type wanted, Map map)
+    private static void Missing(Type wanted, Map map, Mobile body)
     {
         if (_saidNoShops)
         {
@@ -419,10 +437,18 @@ public sealed class BotShopper : IBotProposer
 
         _saidNoShops = true;
 
-        // Once, by name. A population quietly failing to restock looks exactly like a population that does
-        // not feel like restocking.
+        // <b>Said of the bot that asked, because that is all this knows.</b> The answer above came from a
+        // search made from ONE bot's position within ITS reach; the sentence used to promote that into a
+        // claim about the map and the whole population — "nobody will restock it" — at error level. Its
+        // sister line in BotTailor did the same and was measured wrong on 02.09.2026: "no shopkeeper sells
+        // cloth, so nobody will sew" was printed four times in a session during which thirty-six bots
+        // finished sewing and cloth was bought from two named vendors. A per-bot fact reported as a
+        // population-wide one is this shard's most-repeated defect, and here it was in the shard's own
+        // diagnostics, sending anybody who read the log after the wrong thing entirely.
         logger.Error(
-            "No shopkeeper within reach of the bots on {Map} sells {Item}; nobody will restock it",
+            "{Name} at {Where} on {Map} found no shopkeeper selling {Item} within its own reach; it cannot restock from a counter here",
+            body?.Name ?? "a bot",
+            body?.Location ?? Point3D.Zero,
             map,
             wanted.Name
         );

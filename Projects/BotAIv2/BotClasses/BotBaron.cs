@@ -124,11 +124,11 @@ public sealed class BotBaron : BotClass
         // and there is nowhere for them to drift apart to: the second one is the first one's source.
         Skills =
         [
-            (SkillName.Swords, 95.0),
-            (SkillName.Tactics, 95.0),
-            (SkillName.Anatomy, 95.0),
-            (SkillName.MagicResist, 95.0),
-            (SkillName.Healing, 95.0)
+            (SkillName.Swords, 100.0),
+            (SkillName.Tactics, 100.0),
+            (SkillName.Anatomy, 100.0),
+            (SkillName.MagicResist, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         Kit = new BotKit

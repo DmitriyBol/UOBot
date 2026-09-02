@@ -117,13 +117,17 @@ public static class BotMinds
         _minds.Add(new BotMind(ArchitectName, "architect"));
         _minds.Add(new BotMind(SageName, "sage"));
 
-        // <b>The fourth, and it is the first mind here that is not a supplement to something the arithmetic
-        // already does well.</b> The other three choose among trades the shard would have offered anyway and
-        // are judged on choosing better. The Baron is offered two things, both of them written for him, and
-        // neither is chosen by the arithmetic for a reason the arithmetic can state — he is paid nothing, so
-        // there is no wage to compare. What is being asked of this one is a judgement: go now with whoever is
-        // standing here, or walk and be asked again. See BotMindSight.Calling.
-        _minds.Add(new BotMind(BaronName, "baron"));
+        // <b>The Baron is not raised this session, by instruction, and the code for him is left standing.</b>
+        // He was the fourth mind and the only one that is not a supplement to something the arithmetic
+        // already does well: the other three choose among trades the shard would have offered anyway and are
+        // judged on choosing better, while he is offered two things written for him alone and is paid
+        // nothing, so there is no wage to compare and the judgement is the whole of it. His class, his
+        // harrowings, his stipend and the paragraph in BotMindSight.Calling are all still here and still
+        // correct; putting this line back and adding "Baron" to bot-population.json is the whole of bringing
+        // him out again. What took his slot is the debugger — see the debugger folder — which is not a mind
+        // at all: it takes no work, joins no auction and only watches.
+        //
+        // _minds.Add(new BotMind(BaronName, "baron"));
 
         Load();
         Claim();

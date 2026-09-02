@@ -28,9 +28,9 @@ public sealed class BotWarriorArcher : BotClass
 
         Skills =
         [
-            (SkillName.Tactics, 65.0),
-            (SkillName.Anatomy, 55.0),
-            (SkillName.Healing, 50.0)
+            (SkillName.Tactics, 100.0),
+            (SkillName.Anatomy, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         Kit = new BotKit

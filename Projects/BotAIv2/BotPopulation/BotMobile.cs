@@ -1372,7 +1372,9 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
             // allowed to say this.
             if (klass.Seasoned)
             {
-                Skills[skill].Base = target;
+                // Its share of the target rather than the target itself. See BotClass.Seasoning: born
+                // finished leaves a bot nothing to do, and the whole point of a target is that it is ahead.
+                Skills[skill].Base = Math.Clamp(target * klass.Seasoning, 0.0, target);
 
                 continue;
             }
@@ -1409,8 +1411,11 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         // rather than from the class's list. Setting it in one place and not the other is how a captain
         // would have ended up an Expert swordsman carrying a bow it could barely draw — which is the exact
         // shape of the defect this whole method was written to cure.
-        Skills[chosen.Skill].Base = Class is { Seasoned: true }
-            ? chosen.Target
+        // Its seasoning share, exactly as the list above gets it. Left at the bare target, a captain came
+        // out of the gate on 02.09.2026 with Archery 100 beside Swordsmanship 78 — grandmaster in the one
+        // skill it can never improve again, which is the idling this change was made to end.
+        Skills[chosen.Skill].Base = Class is { Seasoned: true } klass
+            ? Math.Clamp(chosen.Target * klass.Seasoning, 0.0, chosen.Target)
             : Math.Min(chosen.Target, StartingAllowance[0]);
     }
 

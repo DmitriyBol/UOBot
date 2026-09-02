@@ -108,6 +108,48 @@ public sealed class BotForage : BotDeed
     public override string Stage =>
         _gathered > 0 ? $"gathered {_gathered} reagents" : "after reagents lying about";
 
+    /// <summary>
+    /// The way to the herbs turned out not to exist. Written down — and for want of this one line the whole
+    /// population spent its mornings walking at a balcony.
+    ///
+    /// <para>
+    /// <b>Every other trade that walks somewhere already does this and foraging was the one that did not.</b>
+    /// <see cref="BotDig"/> marks a seam, <c>BotForge</c> marks a smithy, <c>BotSew</c> marks a shop; the
+    /// auction reads that mark for any deed at all — <c>BotAppraisal</c> multiplies an offer by
+    /// <c>Suspicion</c> when the ledger is cautious about its <c>Kind</c>, <c>Map</c> and <c>Where</c>. So
+    /// the machinery to break this loop was already built, already general, and simply never called from
+    /// here.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Measured, 02.09.2026:</b> 281 of the 317 roads refused across a ninety-minute session were one
+    /// tile — reagents lying at (1456, 1641, 20), which is a floor above the ground and has no way up. The
+    /// errand failed in twelve seconds, the proposer scored the same nearest pile again, and it was offered
+    /// again on the next beat: Yarrow failed at it eight times in thirteen seconds. Nine bots at once were
+    /// walking somewhere they had not got a tile nearer to in eleven minutes.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>The mark goes on <see cref="Where"/> and nowhere else, which is the part that is easy to get
+    /// wrong.</b> The tempting key is the herb's own tile — the place that actually refused — but the
+    /// appraisal reads <c>deed.Where</c>, so a mark written against the herb would be a note nobody ever
+    /// reads, and the loop would run on with a tidy-looking fix in the file. The ledger bands places 64
+    /// tiles wide, so the patch is the right grain in any case.
+    /// </para>
+    ///
+    /// <para>
+    /// Returns false: there is nowhere else for this errand to bend to — the proposer chose the patch and
+    /// picking again from here would pick the same one. The errand ends, and the next decision is made by a
+    /// bot that now knows something.
+    /// </para>
+    /// </summary>
+    public override bool Bend(IBotWilful bot)
+    {
+        bot?.Resolve?.Ledger?.Beware(Trade, _map, _where);
+
+        return false;
+    }
+
     public override BotDoing Advance(IBotWilful bot)
     {
         var body = bot?.Self;

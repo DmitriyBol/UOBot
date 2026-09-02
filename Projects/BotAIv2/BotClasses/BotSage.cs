@@ -50,6 +50,9 @@ public sealed class BotSage : BotClass
     /// <summary>Born holding its trade. It cannot teach what it does not have.</summary>
     public override bool Seasoned => true;
 
+    /// <summary>Born strong and still with somewhere to go. See BotClass.Seasoning.</summary>
+    public override double Seasoning => 0.78;
+
     /// <summary>Opens a class for casters, as a captain does for fighters. The one class that may.</summary>
     public override bool Tutors => true;
 
@@ -65,11 +68,11 @@ public sealed class BotSage : BotClass
 
         Skills =
         [
-            (SkillName.Magery, 82.0),
-            (SkillName.EvalInt, 78.0),
-            (SkillName.Inscribe, 78.0),
-            (SkillName.Alchemy, 75.0),
-            (SkillName.Meditation, 75.0)
+            (SkillName.Magery, 100.0),
+            (SkillName.EvalInt, 100.0),
+            (SkillName.Inscribe, 100.0),
+            (SkillName.Alchemy, 100.0),
+            (SkillName.Meditation, 100.0)
         ];
 
         // <b>The best staff on the shard, and it is not decoration.</b> A caster's staff pays back the one

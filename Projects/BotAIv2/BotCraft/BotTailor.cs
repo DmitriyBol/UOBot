@@ -115,7 +115,18 @@ public sealed class BotTailor : IBotProposer
             {
                 _saidNoCloth = true;
 
-                logger.Error("No shopkeeper within reach of the bots on {Map} sells cloth, so nobody will sew", map);
+                // <b>Said of this bot, not of the shard.</b> BotShops.Nearest searches from ONE bot's
+                // position within ITS reach, and a null from it means that bot has nowhere to buy — not that
+                // the map has no cloth. Measured 02.09.2026: this line fired four times in a session during
+                // which 36 sewing jobs finished and cloth was bought from Melina and from Phyllis. It is an
+                // error-level sentence that was simply untrue, and it is the sort a debugger reads and
+                // believes. Same correction as its sister in BotShopper.Missing.
+                logger.Error(
+                    "{Name} at {Where} on {Map} found no shopkeeper selling cloth within its own reach; it cannot sew from bought cloth here",
+                    body?.Name ?? "a bot",
+                    body?.Location ?? Point3D.Zero,
+                    map
+                );
             }
 
             return null;

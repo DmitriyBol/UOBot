@@ -52,6 +52,9 @@ public sealed class BotCaptain : BotClass
     /// <summary>Born holding its trade rather than starting it. The one class that does.</summary>
     public override bool Seasoned => true;
 
+    /// <summary>Born strong and still with somewhere to go. See BotClass.Seasoning.</summary>
+    public override double Seasoning => 0.78;
+
     /// <summary>Draws steel rather than giving ground. The one class that does.</summary>
     public override bool Closes => true;
 
@@ -70,16 +73,16 @@ public sealed class BotCaptain : BotClass
         // title over its head, is the one it is known for.
         Skills =
         [
-            (SkillName.Archery, 78.0),
-            (SkillName.Swords, 77.0),
-            (SkillName.Tactics, 78.0),
-            (SkillName.Anatomy, 74.0),
-            (SkillName.Healing, 72.0)
+            (SkillName.Archery, 100.0),
+            (SkillName.Swords, 100.0),
+            (SkillName.Tactics, 100.0),
+            (SkillName.Anatomy, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         Kit = new BotKit
         {
-            Ranged = BotArsenal.Bow(78.0),
+            Ranged = BotArsenal.Bow(100.0),
 
             // A broadsword rather than a dagger, at the bow's own standing. This is the line that separates
             // the captain from the hybrid archer.

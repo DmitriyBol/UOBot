@@ -111,7 +111,17 @@ public static class BotSchool
     /// and the money has to be real, because the captain living off fees is the loop that was asked for.
     /// </para>
     /// </summary>
-    public static int Fee { get; set; } = 150;
+    /// <para>
+    /// <b>Lowered from 150 to 60 on 02.09.2026, and the cooldown below is what makes that safe.</b> The
+    /// paragraph above is right that a cheap lesson the whole population can take all day is a subsidy
+    /// rather than a price. The cure it chose was an expensive lesson; the cheaper and truer one is a lesson
+    /// nobody may take twice in a day. With <see cref="RestMs"/> in place the price no longer has to do the
+    /// rationing, so it can go back to being what a bot can actually afford out of an afternoon's work —
+    /// measured that day, the captain was drawing 1687 gold from a handful of lessons in half an hour while
+    /// every other trade on the shard earned in the hundreds.
+    /// </para>
+    /// </summary>
+    public static int Fee { get; set; } = 60;
 
     /// <summary>
     /// What each point of the student's existing skill adds to the bill.
@@ -125,7 +135,7 @@ public static class BotSchool
     /// makes the captain's income real too.
     /// </para>
     /// </summary>
-    public static int FeePerPoint { get; set; } = 55;
+    public static int FeePerPoint { get; set; } = 20;
 
     /// <summary>
     /// What a lesson in magic costs as a multiple of the same lesson in arms. See <see cref="Bill"/>.
@@ -135,6 +145,46 @@ public static class BotSchool
     /// school it can attend.
     /// </summary>
     public static double MagicFee { get; set; } = 1.5;
+
+    /// <summary>
+    /// How long a student must wait before it may be taught again. A day.
+    ///
+    /// <para>
+    /// <b>A cooldown rather than a price, because a price only rations the poor.</b> A bot that can afford
+    /// the fee could take a lesson every time the field opened, and the ones with money did: the captain's
+    /// income was the largest single flow on the shard and it came out of the same few pockets over and
+    /// over. One lesson a day makes teaching a thing that happens to a bot rather than a thing a bot does
+    /// for a living, and it lets the fee come down to something an ordinary afternoon pays for.
+    /// </para>
+    ///
+    /// <para>
+    /// Held in memory and therefore per run of the shard, which on this shard is a good deal shorter than a
+    /// day. That is the intended reading: not "once per calendar day" but "once, and then get back to work".
+    /// </para>
+    /// </summary>
+    public static int RestMs { get; set; } = 86400000;
+
+    private static readonly Dictionary<Serial, long> _taught = [];
+
+    /// <summary>Whether this student may be taught at all yet. Asked before a lesson is ever offered.</summary>
+    public static bool Rested(BotMobile student) =>
+        student == null
+        || !_taught.TryGetValue(student.Serial, out var when)
+        // By subtraction, never by comparison: on some hosts the tick counter is the machine's uptime and
+        // can wrap. See dev-docs/tick-counts.md.
+        || Core.TickCount - when >= RestMs;
+
+    /// <summary>This student has had its lesson. Called where the fee is actually paid, not where it is offered.</summary>
+    public static void Learned(BotMobile student)
+    {
+        if (student != null)
+        {
+            _taught[student.Serial] = Core.TickCount;
+        }
+    }
+
+    /// <summary>Students turned away because they had already been taught today.</summary>
+    public static long Rested_Away { get; internal set; }
 
     /// <summary>Sessions opened, students taught, points handed out and fees taken.</summary>
     public static long Sessions { get; private set; }

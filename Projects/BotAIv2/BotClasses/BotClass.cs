@@ -134,6 +134,20 @@ public abstract class BotClass
     public virtual bool Seasoned => false;
 
     /// <summary>
+    /// What share of its targets a seasoned class is actually born with. One means "born finished".
+    ///
+    /// <para>
+    /// <b>It exists because raising the targets without it would have changed nothing at all.</b> A seasoned
+    /// bot is given its declared target outright — see <c>BotMobile.Learn</c> — so on 02.09.2026, when every
+    /// class's targets went to 100 to give the population somewhere to grow, the three seasoned classes
+    /// would have been born at 100 and stood idle from their first second, which is the exact problem the
+    /// change was making. Born strong and still with somewhere to go is the thing that was wanted, and it
+    /// takes two numbers to say: what it aims at, and how much of that it starts with.
+    /// </para>
+    /// </summary>
+    public virtual double Seasoning => 1.0;
+
+    /// <summary>
     /// Whether this class may call a company together for a place rather than for a quarry, and keep it out.
     ///
     /// <para>

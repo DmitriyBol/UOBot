@@ -36,11 +36,11 @@ public sealed class BotHealer : BotClass
 
         Skills =
         [
-            (SkillName.Healing, 80.0),
-            (SkillName.Anatomy, 70.0),
-            (SkillName.Magery, 60.0),
-            (SkillName.Meditation, 60.0),
-            (SkillName.Alchemy, 50.0)
+            (SkillName.Healing, 100.0),
+            (SkillName.Anatomy, 100.0),
+            (SkillName.Magery, 100.0),
+            (SkillName.Meditation, 100.0),
+            (SkillName.Alchemy, 100.0)
         ];
 
         NeedsMeditation = true;

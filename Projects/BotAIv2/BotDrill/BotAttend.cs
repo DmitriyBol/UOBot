@@ -164,6 +164,11 @@ public sealed class BotAttend : BotDeed
 
                 BotSchool.Paid(_bill);
 
+                // Booked here and nowhere else: a lesson that was offered, walked to and never paid for is
+                // not a lesson, and charging the cooldown for one would quietly bar a bot for a day over an
+                // errand that failed.
+                BotSchool.Learned(body);
+
                 // Teaching pays the captain in coin, and coin is what its contentment is short of when it
                 // has spent the morning patrolling for nothing.
                 master.Resolve.Urges.Paid(_bill);

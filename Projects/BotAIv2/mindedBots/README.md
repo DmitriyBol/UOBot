@@ -1,6 +1,18 @@
 # BotMindAI
 
-Two of the fifteen bots have a mind: a local language model chooses what they do next.
+Three of the population have a mind: a local language model chooses what they do next. A fourth thinking
+thing lives in this assembly and is not one of them — see **`debugger/`** below.
+
+**The Baron is not raised at the moment.** He was the fourth mind and is the only one whose subject is the
+island rather than a trade; the line that creates him is commented out in `BotMinds.Start` and `Baron` has
+been taken out of `bot-population.json`. Everything else about him — the class, the harrowings, the stipend,
+the paragraph in `BotMindSight.Calling` — is untouched and still correct. Putting the line back and adding
+the class to the population file is the whole of bringing him out again.
+
+**`debugger/` is a different kind of thing entirely** and shares only the transport. It is one invisible bot
+that watches the others and writes down what is wrong with them: no work, no wage, no mood, no class, and it
+never enters the auction. It has its own module, its own configuration file and its own log. Read
+`debugger/README.md`; nothing below this line applies to it.
 
 It is a **separate assembly on purpose**. `BotMindAI` references `BotAIv2`; nothing in `BotAIv2`
 references this. Delete `"BotMindAI.dll"` from `Distribution/Data/assemblies.json` and the shard is

@@ -42,6 +42,9 @@ public sealed class BotArchitect : BotClass
     /// <summary>Born holding both trades. See the class note for why this one is allowed to.</summary>
     public override bool Seasoned => true;
 
+    /// <summary>Born strong and still with somewhere to go. See BotClass.Seasoning.</summary>
+    public override double Seasoning => 0.78;
+
     /// <summary>A hundredth of every sale, out of the seller's share. The one class that takes one.</summary>
     public override bool Levies => true;
 
@@ -68,19 +71,19 @@ public sealed class BotArchitect : BotClass
 
         Skills =
         [
-            (SkillName.Mining, 82.0),
-            (SkillName.Blacksmith, 80.0),
-            (SkillName.Tailoring, 72.0),
-            (SkillName.Tinkering, 70.0),
-            (SkillName.Tactics, 45.0),
-            (SkillName.Healing, 45.0)
+            (SkillName.Mining, 100.0),
+            (SkillName.Blacksmith, 100.0),
+            (SkillName.Tailoring, 100.0),
+            (SkillName.Tinkering, 100.0),
+            (SkillName.Tactics, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         Kit = new BotKit
         {
             // Carried because everything on this island does, and trained where a crafter's is: it goes to
             // the forge, not to the graveyard.
-            Melee = BotArsenal.Melee(45.0),
+            Melee = BotArsenal.Melee(100.0),
 
             Tools = [typeof(SmithHammer), typeof(Pickaxe), typeof(SewingKit), typeof(TinkerTools)],
 

@@ -36,10 +36,10 @@ public sealed class BotWarriorMage : BotClass
 
         Skills =
         [
-            (SkillName.Magery, 65.0),
-            (SkillName.Tactics, 60.0),
-            (SkillName.Anatomy, 50.0),
-            (SkillName.Healing, 50.0)
+            (SkillName.Magery, 100.0),
+            (SkillName.Tactics, 100.0),
+            (SkillName.Anatomy, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         // Explicit rather than left at the default, because this is the one class for which the answer

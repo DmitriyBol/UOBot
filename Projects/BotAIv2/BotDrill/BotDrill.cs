@@ -274,6 +274,15 @@ public sealed class BotStudent : IBotProposer
             return null;
         }
 
+        // Once a day and no oftener. Asked before the purse is, so a bot that has already been taught is
+        // never offered a lesson it would only be refused at the gate.
+        if (!BotSchool.Rested(student))
+        {
+            BotSchool.Rested_Away++;
+
+            return null;
+        }
+
         var bill = BotSchool.Bill(student);
         var wealth = BotYield.Wealth(student);
 

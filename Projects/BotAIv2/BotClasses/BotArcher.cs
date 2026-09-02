@@ -37,9 +37,9 @@ public sealed class BotArcher : BotClass
 
         Skills =
         [
-            (SkillName.Tactics, 70.0),
-            (SkillName.Anatomy, 60.0),
-            (SkillName.Healing, 50.0)
+            (SkillName.Tactics, 100.0),
+            (SkillName.Anatomy, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         // A thousandth per point: 3% at the thirty a novice starts with, 10% at a hundred.
@@ -48,7 +48,7 @@ public sealed class BotArcher : BotClass
 
         Kit = new BotKit
         {
-            Ranged = BotArsenal.Bow(80.0)
+            Ranged = BotArsenal.Bow(100.0)
         };
     }
 }

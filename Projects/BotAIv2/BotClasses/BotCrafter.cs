@@ -38,12 +38,12 @@ public sealed class BotCrafter : BotClass
 
         Skills =
         [
-            (SkillName.Mining, 75.0),
-            (SkillName.Blacksmith, 70.0),
-            (SkillName.Tailoring, 60.0),
-            (SkillName.Tinkering, 50.0),
-            (SkillName.Tactics, 40.0),
-            (SkillName.Healing, 40.0)
+            (SkillName.Mining, 100.0),
+            (SkillName.Blacksmith, 100.0),
+            (SkillName.Tailoring, 100.0),
+            (SkillName.Tinkering, 100.0),
+            (SkillName.Tactics, 100.0),
+            (SkillName.Healing, 100.0)
         ];
 
         FreeCraftIntervalMs = 3600000;
@@ -52,7 +52,7 @@ public sealed class BotCrafter : BotClass
         {
             // Trained low: it carries a blade because everything on this island does, not because it
             // intends to use one. Every point above this would come out of the trade.
-            Melee = BotArsenal.Melee(40.0),
+            Melee = BotArsenal.Melee(100.0),
 
             // The hammer is the trade. Without one a smith is a bot with an opinion about metal — it
             // cannot forge, cannot take commissions, and quietly spends its life hitting skeletons like

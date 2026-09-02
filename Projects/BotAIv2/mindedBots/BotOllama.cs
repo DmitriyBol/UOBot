@@ -57,13 +57,24 @@ public static class BotOllama
     /// </summary>
     public static string KeepAlive { get; set; } = "30m";
 
-    /// <summary>How long one question may take before it is abandoned. Generous: a cold load is half of it.</summary>
+    /// <summary>
+    /// How long one question may take before it is abandoned. Generous: a cold load is half of it.
+    ///
+    /// <para>
+    /// <b>Enforced per request, and it used to be enforced nowhere.</b> The figure was handed to the
+    /// <see cref="HttpClient"/> in its field initialiser — which runs once, before any configuration file is
+    /// read — so <c>Configuration/bot-mind.json</c> could name any timeout it liked and the transport went on
+    /// using two minutes. A setting that appears to have been read and silently does nothing is this shard's
+    /// most-repeated defect, and here it was in the one file that talks to the outside. The client is now
+    /// given a bound it will never reach and each request carries its own.
+    /// </para>
+    /// </summary>
     public static int TimeoutMs { get; set; } = 120000;
 
     /// <summary>How many questions may be in flight at once. Two minds, one graphics card, one question.</summary>
     public static int MostInFlight { get; set; } = 1;
 
-    private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromMilliseconds(TimeoutMs) };
+    private static readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
 
     private static int _inFlight;
 
@@ -103,7 +114,16 @@ public static class BotOllama
     /// more.
     /// </para>
     /// </summary>
-    public static void Ask(string system, string user, string schema, bool think, Action<string, long> then)
+    public static void Ask(
+        string system,
+        string user,
+        string schema,
+        bool think,
+        Action<string, long> then,
+        string model = null,
+        string keepAlive = null,
+        int timeoutMs = 0
+    )
     {
         if (then == null)
         {
@@ -120,12 +140,12 @@ public static class BotOllama
         _inFlight++;
         Asked++;
 
-        var body = Body(system, user, schema, think);
+        var body = Body(system, user, schema, think, model ?? Model, keepAlive ?? KeepAlive);
 
-        _ = Run(body, think, then);
+        _ = Run(body, think, then, timeoutMs > 0 ? timeoutMs : TimeoutMs);
     }
 
-    private static async Task Run(string body, bool think, Action<string, long> then)
+    private static async Task Run(string body, bool think, Action<string, long> then, int timeoutMs)
     {
         string answer = null;
         var clock = Stopwatch.StartNew();
@@ -133,9 +153,10 @@ public static class BotOllama
         try
         {
             using var content = new StringContent(body, Encoding.UTF8, "application/json");
+            using var giveUp = new CancellationTokenSource(TimeSpan.FromMilliseconds(Math.Max(1000, timeoutMs)));
 
             using var response = await _http
-                .PostAsync($"{Endpoint}/api/chat", content, CancellationToken.None)
+                .PostAsync($"{Endpoint}/api/chat", content, giveUp.Token)
                 .ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
@@ -220,16 +241,16 @@ public static class BotOllama
     /// newlines, quotes and whatever a creature happens to be called, and a hand-built JSON string is a
     /// defect waiting for the first monster with an apostrophe in its name.
     /// </summary>
-    private static string Body(string system, string user, string schema, bool think)
+    private static string Body(string system, string user, string schema, bool think, string model, string keepAlive)
     {
         var buffer = new System.IO.MemoryStream();
 
         using (var writer = new Utf8JsonWriter(buffer))
         {
             writer.WriteStartObject();
-            writer.WriteString("model", Model);
+            writer.WriteString("model", model);
             writer.WriteBoolean("stream", false);
-            writer.WriteString("keep_alive", KeepAlive);
+            writer.WriteString("keep_alive", keepAlive);
             writer.WriteBoolean("think", think);
 
             writer.WriteStartArray("messages");
