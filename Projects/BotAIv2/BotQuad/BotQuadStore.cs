@@ -34,7 +34,7 @@ public sealed class BotQuadStore : GenericPersistence
     /// carried forward. See <c>BotProgress.Shape</c>, which carries the note about why dropping on every
     /// bump was the wrong rule and what it cost — a stopped shard on a console prompt nobody could answer.
     /// </summary>
-    private const int Shape = 1;
+    private const int Shape = 2;
 
     private const int Oldest = 1;
 
@@ -75,6 +75,11 @@ public sealed class BotQuadStore : GenericPersistence
             // next process — on some hosts it is the machine's uptime — and what anybody reads off this is
             // "has a great hunt been through here", which is a yes or a no.
             writer.Write(quad.HarrowedTick != 0);
+
+            // Shape 2, 02.09.2026: what the crown owes this square. A levy that did not survive the night
+            // would restart the ladder at six every morning, and the ground it is about does not forget.
+            writer.WriteEncodedInt(quad.Levied);
+            writer.WriteEncodedInt(quad.Wipes);
         }
     }
 
@@ -110,7 +115,26 @@ public sealed class BotQuadStore : GenericPersistence
             var swept = reader.ReadBool();
             var harrowed = reader.ReadBool();
 
-            BotQuad.Restore(facet, x, y, safety, passes, blows, deaths, rangers, trodden, swept, harrowed);
+            // Read only where it was written. Shape 1 is still a readable island; it simply owes nobody a
+            // levy yet, which is the truth about a save written before the ladder existed.
+            var levied = shape >= 2 ? reader.ReadEncodedInt() : 0;
+            var wipes = shape >= 2 ? reader.ReadEncodedInt() : 0;
+
+            BotQuad.Restore(
+                facet,
+                x,
+                y,
+                safety,
+                passes,
+                blows,
+                deaths,
+                rangers,
+                trodden,
+                swept,
+                harrowed,
+                levied,
+                wipes
+            );
         }
 
         Restored = count;

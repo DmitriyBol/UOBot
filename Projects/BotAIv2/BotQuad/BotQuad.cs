@@ -157,6 +157,95 @@ public static class BotQuad
     /// <summary>Below this the Baron raises a great hunt for it. See <c>BotHarrow</c>.</summary>
     public static double Dire { get; set; } = -0.3;
 
+    /// <summary>
+    /// How many more the crown sends after a company is lost whole in a square.
+    ///
+    /// <para>
+    /// Five, by Patrick's order on 02.09.2026: the Baron calls fighters into a quadrant, and if they all die
+    /// he may call five more than that, and again, until the victory is won. A square that eats a company is
+    /// not a square to send the same company back to.
+    /// </para>
+    /// </summary>
+    public static int Reinforcement { get; set; } = 5;
+
+    /// <summary>
+    /// A loss this size damns the ground outright: the square is set to <see cref="Bleakest"/> and nothing
+    /// but a company of grandmasters may be sent to it afterwards. Thirty, by the same order.
+    /// </summary>
+    public static int DireLoss { get; set; } = 30;
+
+    /// <summary>What that ground reads at, and it is the floor of the scale rather than a step down it.</summary>
+    public static double Damned { get; set; } = Bleakest;
+
+    /// <summary>How many the crown should send against this square: the ordinary company, or what it has earned.</summary>
+    public static int Levy(Map map, Point3D where, int ordinary)
+    {
+        var quad = Known(map, where);
+
+        return quad == null ? ordinary : Math.Max(ordinary, quad.Levied);
+    }
+
+    /// <summary>Whether this ground may be walked only by a company of grandmasters. See <see cref="DireLoss"/>.</summary>
+    public static bool Damning(Map map, Point3D where) => Safety(map, where) <= Damned;
+
+    /// <summary>
+    /// A company of the crown was lost whole in this square, and what the crown does about it.
+    ///
+    /// <para>
+    /// Two answers, and they are different sizes of the same one. The next levy is what was lost plus
+    /// <see cref="Reinforcement"/>, so the ladder climbs by itself until something comes back alive. And a
+    /// loss of <see cref="DireLoss"/> or more damns the ground to <see cref="Damned"/>, from where nothing
+    /// but grandmasters may be sent — a square that swallowed thirty is not a square anybody learns about
+    /// by sending thirty-five.
+    /// </para>
+    /// </summary>
+    public static void LostCompany(Map map, Point3D where, int lost)
+    {
+        if (map == null || map == Map.Internal || lost <= 0)
+        {
+            return;
+        }
+
+        var quad = At(map, where);
+
+        if (quad == null)
+        {
+            return;
+        }
+
+        quad.Wipes++;
+        quad.Levied = Math.Max(quad.Levied, lost) + Reinforcement;
+        quad.Tick = Core.TickCount;
+
+        Wiped++;
+
+        if (lost >= DireLoss)
+        {
+            quad.Safety = Damned;
+
+            logger.Warning(
+                "A company of {Lost} was lost whole around ({X}, {Y}); the ground is damned at {Safety:F2} and only grandmasters may be sent to it",
+                lost,
+                quad.Middle.X,
+                quad.Middle.Y,
+                quad.Safety
+            );
+
+            return;
+        }
+
+        quad.Safety = Math.Clamp(quad.Safety + WipedWorth, Bleakest, Safest);
+
+        logger.Warning(
+            "A company of {Lost} was lost whole around ({X}, {Y}); the ground now reads {Safety:F2} and the next levy is {Levy}",
+            lost,
+            quad.Middle.X,
+            quad.Middle.Y,
+            quad.Safety,
+            quad.Levied
+        );
+    }
+
     /// <summary>What a square reads after a great hunt has been through it: neither trusted nor feared.</summary>
     public static double Harrowed { get; set; } = 0.0;
 
@@ -185,6 +274,19 @@ public static class BotQuad
 
         /// <summary>Crossings that came to nothing, all told.</summary>
         public int Passes;
+
+        /// <summary>
+        /// How many the crown should send against this square next time, or nought for the ordinary company.
+        ///
+        /// <para>
+        /// By Patrick's order on 02.09.2026: "the Baron calls fighters into a quadrant; if they all die he
+        /// may call five more than that, and again, until the victory is won."
+        /// </para>
+        /// </summary>
+        public int Levied;
+
+        /// <summary>Companies of the crown lost whole in this square.</summary>
+        public int Wipes;
 
         /// <summary>Crossings counted towards the next step up. Reset each time one is awarded.</summary>
         public int Towards;
@@ -948,7 +1050,9 @@ public static class BotQuad
         int rangersLost,
         bool trodden,
         bool swept,
-        bool harrowed
+        bool harrowed,
+        int levied = 0,
+        int wipes = 0
     )
     {
         var map = Map.Maps is { Length: > 0 } && facet >= 0 && facet < Map.Maps.Length ? Map.Maps[facet] : null;
@@ -970,6 +1074,8 @@ public static class BotQuad
             RangersLost = rangersLost,
             Trodden = trodden,
             Swept = swept,
+            Levied = levied,
+            Wipes = wipes,
 
             // Stamped with a real reading rather than with the one from the last process: these counters can
             // be the machine's uptime, so a tick from yesterday is not a smaller number, it is a nonsense one.

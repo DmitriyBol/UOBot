@@ -66,9 +66,13 @@ public static class BotMarkers
     /// several thousand of them is a map nobody can read — which is the state the old file was found in, at
     /// 1383 pins from a version of this project that no longer exists. The worst ground is written first, so
     /// what a cap loses is always the quiet ground nobody was going to act on.
+    ///
+    /// A thousand, by Patrick's order on 02.09.2026, and the number changed because what fills it did: the
+    /// file no longer spends its room on squares with no verdict, so a bigger cap buys more ground worth
+    /// looking at rather than more markers reading "0.00".
     /// </para>
     /// </summary>
-    public static int Most { get; set; } = 400;
+    public static int Most { get; set; } = 1000;
 
     /// <summary>
     /// Whether ground nobody has ever stood in is pinned at all.

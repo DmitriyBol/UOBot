@@ -54,8 +54,27 @@ public sealed class BotHarrow : BotDeed
     /// </summary>
     public static int Side { get; set; } = 75;
 
-    /// <summary>How many bodies march, the Baron included.</summary>
+    /// <summary>How many bodies march, the Baron included. The floor: a square that has eaten a company asks
+    /// for more. See <see cref="BotQuad.Levy"/>.</summary>
     public static int Company { get; set; } = 6;
+
+    /// <summary>
+    /// How many grandmasters a damned square asks for before anybody marches on it.
+    ///
+    /// <para>
+    /// Fifteen, by Patrick's order on 02.09.2026: ground that has swallowed thirty may be gathered against
+    /// "only from fifteen grandmasters and from four thousand of strength". It is a different kind of rule
+    /// from the levy above — that one is about how many, this one is about who — and a square earns it by
+    /// killing a company whole rather than by any amount of ordinary bad luck.
+    /// </para>
+    /// </summary>
+    public static int Grandmasters { get; set; } = 15;
+
+    /// <summary>The company's fighting power together, below which a damned square is not walked on.</summary>
+    public static double Might { get; set; } = 4000.0;
+
+    /// <summary>The skill at which a bot counts as a grandmaster. The era's own ceiling.</summary>
+    public static double GrandmasterAt { get; set; } = 100.0;
 
     /// <summary>
     /// Fewest worth setting out with once the muster has run its course.
@@ -238,6 +257,15 @@ public sealed class BotHarrow : BotDeed
     /// <summary>Whether the company has been raised and is on its way. Never "is the squad null".</summary>
     private bool _marching;
 
+    /// <summary>How many this square asks for. See <see cref="BotQuad.Levy"/> — nought until the muster sets it.</summary>
+    private int _wanted;
+
+    /// <summary>The levy, or the ordinary company before the muster has asked the map.</summary>
+    private int Wanted => _wanted > 0 ? _wanted : Company;
+
+    /// <summary>How many marched, so that a company lost whole can be reported as the size it was.</summary>
+    private int _marched;
+
     /// <summary>
     /// Whether the call has been opened. A flag rather than "is the squad null", because the squad may be
     /// replaced underneath this errand and the call has still been running the whole time — which is the
@@ -359,7 +387,11 @@ public sealed class BotHarrow : BotDeed
             _won = squad.Won;
         }
 
-        squad.Ceiling = Company;
+        // What this square asks for, which is the ordinary company until one has been lost here. The ladder
+        // is the square's own and it is kept by the map, so it survives a night and a restart.
+        _wanted = BotQuad.Levy(_map, _square, Company);
+
+        squad.Ceiling = _wanted;
         squad.Charged = true;
 
         if (!_mustering)
@@ -391,7 +423,7 @@ public sealed class BotHarrow : BotDeed
 
         _called = squad.Count;
 
-        var full = _called >= Company;
+        var full = _called >= _wanted;
 
         if (!full && now - _musteredTick < MusterMs)
         {
@@ -414,7 +446,31 @@ public sealed class BotHarrow : BotDeed
             return BotDoing.Failed($"only {_called} of the {Least} answered the call for ({_square.X}, {_square.Y})");
         }
 
+        // <b>Damned ground, and who may walk on it.</b> By order: a square that has swallowed thirty is
+        // gathered against only by fifteen grandmasters and four thousand of strength between them. Checked
+        // here rather than at the muster because it is a fact about who turned up, and the call stays open
+        // while it is not met — a Baron who cannot raise the company he needs waits for it, and the ground is
+        // still on the board either way.
+        if (BotQuad.Damning(_map, _square) && !Fit(squad, out var masters, out var might))
+        {
+            Unfit++;
+
+            if (now - _musteredTick < MusterMs)
+            {
+                return BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"calling for grandmasters at ({_muster.X}, {_muster.Y})");
+            }
+
+            BotSquads.Leave(member);
+
+            _squad = null;
+
+            return BotDoing.Failed(
+                $"({_square.X}, {_square.Y}) is damned ground and {masters} of the {Grandmasters} grandmasters answered, at {might:F0} of the {Might:F0} strength"
+            );
+        }
+
         _marching = true;
+        _marched = _called;
 
         Marches++;
 
@@ -453,6 +509,15 @@ public sealed class BotHarrow : BotDeed
 
         if (_called < 2)
         {
+            // <b>Lost whole, and the map is told the size of what it took.</b> The next levy climbs by
+            // BotQuad.Reinforcement and a loss of BotQuad.DireLoss damns the ground outright — Patrick's
+            // order of 02.09.2026, that the crown keeps calling five more until the victory is won. Counted
+            // from what marched rather than from what is standing, because what is standing is the point.
+            if (_marched > 0)
+            {
+                BotQuad.LostCompany(_map, _square, _marched);
+            }
+
             return Finish(squad, "there was nobody left to harrow with", cleared: false);
         }
 
@@ -604,7 +669,7 @@ public sealed class BotHarrow : BotDeed
     /// </summary>
     private void Levy(BotSquad squad, Mobile body)
     {
-        if (squad.Count >= Company)
+        if (squad.Count >= Wanted)
         {
             return;
         }
@@ -640,15 +705,72 @@ public sealed class BotHarrow : BotDeed
         Take(squad, BotRole.Melee, Melee);
         Take(squad, BotRole.Ranged, Ranged);
         Take(squad, BotRole.Medic, Medics);
-        Take(squad, null, Company);
+        Take(squad, null, Wanted);
     }
+
+    /// <summary>
+    /// Whether this company may walk on ground the map has damned: grandmasters enough, and strength enough.
+    ///
+    /// <para>
+    /// A grandmaster is a bot with any skill at the era's own ceiling, which is what the word means on this
+    /// shard and is not a number this file gets to invent. Strength is the population's own reckoning of
+    /// fighting power — see <c>BotThreat.Power</c>, health times what it hits for — added up across whoever
+    /// answered, because that is the thing the ground will be measured against.
+    /// </para>
+    /// </summary>
+    private static bool Fit(BotSquad squad, out int masters, out double might)
+    {
+        masters = 0;
+        might = 0.0;
+
+        if (squad == null)
+        {
+            return false;
+        }
+
+        var members = squad.Members;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            var body = members[i]?.Self;
+
+            if (body is not { Deleted: false, Alive: true })
+            {
+                continue;
+            }
+
+            might += BotThreat.Power(body);
+
+            var skills = body.Skills;
+
+            if (skills == null)
+            {
+                continue;
+            }
+
+            for (var s = 0; s < skills.Length; s++)
+            {
+                if (skills[s].Base >= GrandmasterAt)
+                {
+                    masters++;
+
+                    break;
+                }
+            }
+        }
+
+        return masters >= Grandmasters && might >= Might;
+    }
+
+    /// <summary>Musters turned away from damned ground for want of grandmasters. See <see cref="Fit"/>.</summary>
+    public static long Unfit { get; private set; }
 
     /// <summary>Fills up to <paramref name="most"/> places from the gathered list, nearest first.</summary>
     private void Take(BotSquad squad, BotRole? role, int most)
     {
         var taken = 0;
 
-        for (var i = 0; i < _called0.Count && taken < most && squad.Count < Company; i++)
+        for (var i = 0; i < _called0.Count && taken < most && squad.Count < Wanted; i++)
         {
             var other = _called0[i];
 
