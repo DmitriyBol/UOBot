@@ -83,6 +83,15 @@ public sealed class BotMage : BotClass
         // this one is a fallback.
         HerbIntervalMs = 2700000;
 
+        // <b>A handful, not a haul.</b> Given the woods on 02.09.2026 and no amount of its own, a mage took
+        // the Sage's trip — which is that class's trade and pays 2 to 5 kinds at 5 to 20 each: Rowan came
+        // back with 65 herbs at 23:36 and Perri with 34. A caster that fills its pack in one walk has no
+        // reason to buy, order or pay anybody, which quietly undoes the supplier the Gatherer is meant to be
+        // and the market Patrick asked for. Five to twelve of one kind, three quarters of an hour apart, is a
+        // supplement to the counter rather than a replacement for it.
+        ForageYieldMin = 5;
+        ForageYieldMax = 12;
+
         Kit = new BotKit
         {
             // <b>The robe, which is dress and not armour, and that is why it had to be issued here.</b>
