@@ -787,6 +787,7 @@ public static class BotWill
         var bestWeigh = default(BotWeigh);
         BotDeed second = null;
         var secondScore = 0.0;
+        var viable = 0;
 
         for (var i = 0; i < _offers.Count; i++)
         {
@@ -797,6 +798,8 @@ public static class BotWill
             {
                 continue;
             }
+
+            viable++;
 
             if (score > bestScore)
             {
@@ -847,7 +850,7 @@ public static class BotWill
             }
         }
 
-        Commit(bot, resolve, rung, best, bestWeigh, second, secondScore, now);
+        Commit(bot, resolve, rung, best, bestWeigh, second, secondScore, now, _offers.Count, viable);
 
         return true;
     }
@@ -860,7 +863,9 @@ public static class BotWill
         BotWeigh weigh,
         BotDeed instead,
         double insteadScore,
-        long now
+        long now,
+        int table,
+        int viable
     )
     {
         var dropped = resolve.Deed;
@@ -881,7 +886,12 @@ public static class BotWill
         resolve.Due = false;
         resolve.Aside = false;
         resolve.Sent = default;
-        resolve.Because = weigh.Describe();
+        // <b>How many were on the table, because absence of a runner-up read as a rich choice.</b> The take
+        // line named a second place only when one existed, so "chosen over five better ideas" and "the only
+        // thing anybody offered" printed identically. On 02.09.2026 Quill took acquire twelve times inside two
+        // seconds, each at 0/min, and went from 400gp to 8gp; not one of those lines said whether anything
+        // else had been offered at all, and the answer changes what the finding is.
+        resolve.Because = $"{weigh.Describe()}; {viable} of {table} offers worth anything";
         resolve.Urges.Fruitful();
 
         Count(deed.Kind, 1);
