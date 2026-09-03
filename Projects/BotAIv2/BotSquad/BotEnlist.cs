@@ -187,6 +187,9 @@ public sealed class BotEnlister : IBotProposer
 
     public static long None { get; private set; }
 
+    /// <summary>Companies passed over because there is no way through to where they are fighting.</summary>
+    public static long Walled { get; private set; }
+
     public static long Sent { get; private set; }
 
     public BotDeed Propose(IBotWilful bot)
@@ -253,6 +256,19 @@ public sealed class BotEnlister : IBotProposer
                 continue;
             }
 
+            // <b>Near is not the same as reachable, and a company fighting on a roof is both.</b> A fight
+            // anchors wherever the fight is; this picked the nearest one by the crow's flight, so a company
+            // dealing with something one storey up was the best offer going for everybody underneath it. The
+            // reach ledger already knew — 33 enlist errands ended "no way through to (1361, 1483, 30)" in
+            // ninety minutes on 03.09.2026, one tile from a pocket of 63 filed at (1362, 1482, 30) — and it
+            // was being asked by the walker after the errand had been taken instead of by the chooser before.
+            if (BotReach.Ask(map, body.Location, anchor, BotArrival.Within(BotEnlist.Reach)) == BotReachVerdict.Sealed)
+            {
+                Walled++;
+
+                continue;
+            }
+
             var away = body.GetDistanceToSqrt(anchor);
 
             if (away < bestAway)
@@ -268,11 +284,12 @@ public sealed class BotEnlister : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a place in a company"
-            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it";
+            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it";
 
     public static void Forget()
     {
         Asked = 0;
+        Walled = 0;
         Held = 0;
         Unfit = 0;
         None = 0;

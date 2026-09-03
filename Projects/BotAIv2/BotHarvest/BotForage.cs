@@ -64,6 +64,17 @@ public sealed class BotForage : BotDeed
     /// <summary>Whether gathered goods go on the market rather than staying in the pack.</summary>
     public static bool ListGoods { get; set; } = true;
 
+    /// <summary>
+    /// Reagents passed over because the ground they lie on is already known to be shut off.
+    ///
+    /// Kept on this class rather than on the proposer because Nearest is here and a counter belongs beside
+    /// the line that moves it. Read and reset by BotForager, the way BotScoutmaster reads BotScout.Baulked.
+    /// </summary>
+    public static long Unreachable { get; private set; }
+
+    /// <summary>Forgets what only the summary was keeping. Called by the proposer's own Forget.</summary>
+    public static void ForgetGround() => Unreachable = 0;
+
     private readonly Map _map;
 
     private readonly Point3D _where;
@@ -346,6 +357,22 @@ public sealed class BotForage : BotDeed
                 continue;
             }
 
+            // <b>Reagents lie where they lie, and some of them lie on a roof.</b> This picks the nearest by
+            // the crow's flight and nothing here asked whether a body could walk to it, so a bunch of garlic
+            // one storey up is the nearest thing on offer for as long as it sits there. The reach ledger had
+            // already filed that ground and was already refusing the road for nothing — 23 forage errands
+            // ended "no way through to (1456, 1641, 20)" in ninety minutes on 03.09.2026, against a pocket of
+            // 77 tiles filed at that exact point — but the answer was being read one step too late, by the
+            // walker rather than by whatever chose the destination.
+            //
+            // The same free question BotGround.Nearest asks of every forge and counter it considers.
+            if (BotReach.Ask(map, bot.Location, item.Location, BotArrival.Beside) == BotReachVerdict.Sealed)
+            {
+                Unreachable++;
+
+                continue;
+            }
+
             var away = bot.GetDistanceToSqrt(item.Location);
 
             if (away < bestAway)
@@ -419,11 +446,12 @@ public sealed class BotForager : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered anything lying about"
-            : $"{Asked} asked: {Sent} sent after reagents on the ground, {Bare} had none in sight, {Laden} were carrying too much to stoop";
+            : $"{Asked} asked: {Sent} sent after reagents on the ground, {Bare} had none in sight, {Laden} were carrying too much to stoop, {BotForage.Unreachable} were lying somewhere already known to be shut off";
 
     public static void Forget()
     {
         Asked = 0;
+        BotForage.ForgetGround();
         Laden = 0;
         Bare = 0;
         Sent = 0;
