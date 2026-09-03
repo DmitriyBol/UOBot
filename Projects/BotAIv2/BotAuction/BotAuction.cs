@@ -1588,7 +1588,11 @@ public static class BotAuction
                 continue;
             }
 
-            if (now - stall.TouchedTick < StaleMs || !stall.Cut(CutStep, LeastMultiple))
+            // <b>Since the last sale, not since the last touch.</b> A seller adding to its own pitch counts
+            // as touching it — see BotListing.DealtTick — so the stall that most needs a markdown, restocked
+            // every few minutes and bought from never, was the one this clock could never reach. Two and
+            // three quarter hours on 03.09.2026: 1902 things listed at 13066gp, 18 prices raised, none cut.
+            if (now - stall.DealtTick < StaleMs || !stall.Cut(CutStep, LeastMultiple))
             {
                 continue;
             }

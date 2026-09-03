@@ -43,6 +43,7 @@ public sealed class BotListing
         Hue = first.Hue;
         Price = Math.Max(1, price);
         Anchor = Price;
+        DealtTick = Core.TickCount;
         ListedTick = Core.TickCount;
         TouchedTick = Core.TickCount;
     }
@@ -78,6 +79,20 @@ public sealed class BotListing
 
     /// <summary>Whether anything has ever sold here, and when the last one did.</summary>
     public bool Traded { get; private set; }
+
+    /// <summary>
+    /// When somebody last bought from this stall, or when it was opened if nobody ever has.
+    ///
+    /// <para>
+    /// <b>Kept apart from <see cref="TouchedTick"/> because the market was reading the wrong one.</b> Touched
+    /// moves when the seller adds to its own pitch, which is what a bot does every time it comes back from a
+    /// hunt — so a stall nobody buys from, restocked every few minutes by its owner, reads as fresh for ever
+    /// and never falls due for a markdown. On 03.09.2026 a run of two and three quarter hours ended with
+    /// 1902 things listed at 13066gp, 18 prices raised and <em>nought</em> cut, which is the shape of a
+    /// market that cannot lower a price it set wrong.
+    /// </para>
+    /// </summary>
+    public long DealtTick { get; private set; }
 
     public long SoldTick { get; private set; }
 
@@ -275,6 +290,7 @@ public sealed class BotListing
         var brisk = Traded && now - SoldTick < briskMs;
 
         Sold += units;
+        DealtTick = Core.TickCount;
         Earned += gold;
         Traded = true;
         SoldTick = now;
