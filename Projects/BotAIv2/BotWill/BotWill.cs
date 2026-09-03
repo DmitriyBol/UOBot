@@ -1020,7 +1020,19 @@ public static class BotWill
         // in its own source. See BotCommons.Corrected.
         BotCommons.Claimed(deed.Kind, deed.Expects, takings.PerMinute, told);
 
-        if (ending is BotEnding.Failed or BotEnding.Died)
+        // <b>Wary of a place that paid, which is the opposite of what caution is for.</b>
+        //
+        // Beware exists to stop a bot going back to somewhere the work does not happen. A great many
+        // undertakings end as failures having nonetheless done the work: a tool wears through - the engine
+        // gives one 25 to 75 uses and destroys it at zero - a seam empties, a shelf runs out, the light goes.
+        // On the night of 03.09.2026 the scribes ended 89 errands with "nothing to write with" and those 89
+        // endings carried 15358 gold of scrolls between them, at rates up to 730 a minute. Every one of them
+        // taught the bot to be wary of the shop it had just earned that in.
+        //
+        // The takings are the test and they are already in hand a few lines above. Nothing was produced is
+        // what "this place was no good" means; a death says it regardless, because coming back from one with
+        // a full pack does not make the ground safe.
+        if (ending == BotEnding.Died || (ending == BotEnding.Failed && takings.Worth <= 0))
         {
             resolve.Ledger.Beware(deed.Kind, deed.Map, deed.Where);
         }

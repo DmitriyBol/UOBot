@@ -137,10 +137,11 @@ public static class BotWalk
         Improvised = 0;
         GaveUp = 0;
         Dropped = 0;
+        Boxed = 0;
     }
 
     public static string Describe() =>
-        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good";
+        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions";
 
     /// <summary>How long the caller should wait before asking again.</summary>
     public static int StepDelayMs(bool run) => run ? RunStepMs : WalkStepMs;
@@ -476,9 +477,21 @@ public static class BotWalk
     /// <summary>
     /// The plan will not walk. Ask the engine what will.
     ///
-    /// One step off the intended line to either side, then two. A wider arc than that is not going round an
-    /// obstacle, it is going somewhere else — and the plan that gets drawn from wherever this lands will
-    /// find the real way round anyway.
+    /// <para>
+    /// One step off the intended line to either side, then two, and only then the three that face away.
+    /// The order is the whole of the reasoning: a wider arc is not going round an obstacle, it is going
+    /// somewhere else, so it is tried last and never instead.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>It stopped at two, and a bot whose only way out is behind it never tried the way out.</b> Ulla the
+    /// WarriorArcher stood on a ledge at (1598, 1774, 32) for six and a half minutes on 03.09.2026 with
+    /// nobody within two tiles of it, its own tile allowing steps by the planner's reckoning and every one of
+    /// the five this offered refused by the engine. Three of the eight were never asked. Standing still for
+    /// six minutes to avoid walking the wrong way is the trade this file exists to refuse: a bot that can get
+    /// somewhere is worth more than a bot that is correct about being unable to get where it meant to go, and
+    /// the plan drawn from wherever it lands will find the real way round.
+    /// </para>
     /// </summary>
     private static BotWalkResult Improvise(Mobile bot, BotJourney journey, Point3D next, bool run)
     {
@@ -493,7 +506,7 @@ public static class BotWalk
         // The offsets exist to go round something the plan already failed against, so retrying the failed
         // direction would be wasted. But when the plan had nowhere to walk at all, nothing has been refused
         // — and skipping the straight direction there means never attempting the most obvious move.
-        ReadOnlySpan<int> offsets = [0, 1, -1, 2, -2];
+        ReadOnlySpan<int> offsets = [0, 1, -1, 2, -2, 3, -3, 4];
 
         for (var i = nothingTried ? 0 : 1; i < offsets.Length; i++)
         {
@@ -524,8 +537,19 @@ public static class BotWalk
             return BotWalkResult.Improvised;
         }
 
+        Boxed++;
+
         return BotWalkResult.Blocked;
     }
+
+    /// <summary>
+    /// Times the engine refused every one of the eight directions.
+    ///
+    /// The strongest statement the walker can make about a tile, and the one it could not make before: with
+    /// five of eight tried, "blocked" meant "not that way" and this means "not any way". A bot here is not
+    /// getting out by walking, whatever any plan says.
+    /// </summary>
+    public static long Boxed { get; private set; }
 
     /// <summary>
     /// Whether somebody alive is on that tile, and if any of them is a bot, asks it to move.

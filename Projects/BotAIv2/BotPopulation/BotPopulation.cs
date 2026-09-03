@@ -355,6 +355,16 @@ public static class BotPopulation
         // rescued out of it.
         var trap = BotPath.Enclose(bot.Map, from, BotArrival.Exactly, urgent: true);
 
+        // <b>And what the tile itself says, because "could get nowhere at all" named no cause and there are
+        // three quite different ones.</b> A walk mask of nought is a tile the planner agrees is closed. A
+        // mask with bits in it, against an engine that refuses every step, is the planner and the engine
+        // disagreeing — which is the fault this whole subsystem exists to catch. And a floor that is not the
+        // height the bot believes it is standing at is the oldest of them: a Z that came out of arithmetic
+        // rather than out of Settle, working on the flat and failing on a hill.
+        var footing = (sbyte)Math.Clamp(from.Z, sbyte.MinValue, sbyte.MaxValue);
+        var allowed = BotStep.Mask(bot.Map, from.X, from.Y, footing).WalkMask;
+        var floor = BotStep.Settle(bot.Map, from.X, from.Y, out var under) ? under.ToString() : "no floor at all";
+
         if (!TryPlace(bot))
         {
             return false;
@@ -365,12 +375,15 @@ public static class BotPopulation
         Rescued++;
 
         logger.Error(
-            "{Name} the {Class} could get nowhere at all from {From} and has been carried home to {Where}; the ground it was on is {Trap}",
+            "{Name} the {Class} could get nowhere at all from {From} and has been carried home to {Where}; the ground it was on is {Trap}, its tile allows {Allowed:X2} of the eight directions and the floor there is {Floor} against the {Z} it thought it stood at",
             bot.Name,
             bot.Class?.Name,
             from,
             bot.Location,
-            trap
+            trap,
+            allowed,
+            floor,
+            from.Z
         );
 
         return true;
