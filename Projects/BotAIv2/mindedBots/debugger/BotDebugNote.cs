@@ -220,7 +220,10 @@ public sealed class BotDebugNote
                 Watch = Word(root, "watch") ?? "-"
             };
         }
-        catch (JsonException)
+        // Any failure to read an answer is not an answer. See BotMindChoice.Read: a narrow catch here let a
+        // missing ru-RU resource assembly, thrown while a JsonException was being built, reach the event loop
+        // and take the shard down on 03.09.2026.
+        catch (Exception)
         {
             return null;
         }
@@ -331,7 +334,10 @@ public sealed class BotDebugThought
                 Confidence = BotDebugNote.Sure(root)
             };
         }
-        catch (JsonException)
+        // Any failure to read an answer is not an answer. See BotMindChoice.Read: a narrow catch here let a
+        // missing ru-RU resource assembly, thrown while a JsonException was being built, reach the event loop
+        // and take the shard down on 03.09.2026.
+        catch (Exception)
         {
             return null;
         }
@@ -366,7 +372,10 @@ public sealed class BotDebugThought
 
             return string.IsNullOrWhiteSpace(evidence) ? answer : $"{answer}\n  evidence: {evidence}";
         }
-        catch (JsonException)
+        // Any failure to read an answer is not an answer. See BotMindChoice.Read: a narrow catch here let a
+        // missing ru-RU resource assembly, thrown while a JsonException was being built, reach the event loop
+        // and take the shard down on 03.09.2026.
+        catch (Exception)
         {
             return null;
         }

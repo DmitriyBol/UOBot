@@ -227,7 +227,10 @@ public static class BotOllama
                 return string.IsNullOrWhiteSpace(text) ? null : text;
             }
         }
-        catch (JsonException)
+        // Any failure to read an answer is not an answer. See BotMindChoice.Read: a narrow catch here let a
+        // missing ru-RU resource assembly, thrown while a JsonException was being built, reach the event loop
+        // and take the shard down on 03.09.2026.
+        catch (Exception)
         {
             // Falls through to null. A daemon that answers with something other than its own protocol is a
             // daemon this code has no business guessing about.

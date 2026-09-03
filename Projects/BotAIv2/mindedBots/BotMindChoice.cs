@@ -146,7 +146,17 @@ public sealed class BotMindChoice
                 Say = root.TryGetProperty("say", out var say) ? say.GetString() : null
             };
         }
-        catch (JsonException)
+        // <b>Anything at all, and the word JsonException was not wide enough to keep a promise made three
+        // lines above this method's name.</b> A malformed answer makes System.Text.Json build a
+        // JsonReaderException — and building its message asks the framework for a localised string, which on
+        // a Russian-locale machine means loading System.Text.Json.resources for ru-RU, which is not deployed.
+        // The FileNotFoundException from that is thrown while the JsonException is being constructed, so it
+        // is not a JsonException and nothing here caught it. It went all the way to the event loop and took
+        // the shard down at 07:15:32 on 03.09.2026, after seven hours up, on one bad answer from the model.
+        //
+        // What comes back from a language model is untrusted input. Any failure to read it means the same
+        // thing — this is not an answer — and the caller is entitled to that and nothing else.
+        catch (Exception)
         {
             return null;
         }
@@ -170,7 +180,8 @@ public sealed class BotMindChoice
 
             return (string.IsNullOrWhiteSpace(lesson) ? null : lesson.Trim(), keep);
         }
-        catch (JsonException)
+        // The same reasoning as Read above: any failure to read an answer is not an answer.
+        catch (Exception)
         {
             return (null, false);
         }
