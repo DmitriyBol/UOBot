@@ -526,6 +526,59 @@ public sealed class BotScout : BotDeed
     /// <summary>Squares given up on as unreachable and stepped past. A named nought, not a failed round.</summary>
     public static long Baulked { get; private set; }
 
+    /// <summary>Squares the party never stood in, marked read as the errand ended however it ended.</summary>
+    public static long Unreached { get; private set; }
+
+    /// <summary>
+    /// The errand is over, whichever way it ended, and the square in front was never stood in.
+    ///
+    /// <para>
+    /// <b>Two exits from the same situation, and until now only one of them wrote the lesson down.</b>
+    /// <see cref="Bend"/> marks a square read before stepping past it, and says why: leaving it unread offers
+    /// it again on the next beat. But a round that runs out of <see cref="CapMs"/>, and a round taken off the
+    /// bot by <c>BotStall</c> for having stopped getting anywhere, end the same errand at the same square and
+    /// went through neither. The log says what that costs. Aldric the Captain took a party of six to
+    /// (1605, 2115) at 09:40 on 03.09.2026, gave up after seven minutes, took the same party to the same
+    /// square at 09:58, gave up again, and took it a third time one minute after the shard was restarted —
+    /// because the square was still the nearest ground nobody had stood in, and nothing anywhere recorded
+    /// that six bots had spent a quarter of an hour failing to get to it.
+    /// </para>
+    ///
+    /// <para>
+    /// Marking it read is the same small lie <see cref="Bend"/> already tells, for the same reason: the square
+    /// genuinely is known now — known to be unreachable from where the population lives — and that is the fact
+    /// worth keeping. It costs the square nothing else. <c>BotQuad.Seen</c> sets a flag and a timestamp and
+    /// does not touch the danger reading, so a square retired this way is taken off the frontier without being
+    /// called safe.
+    /// </para>
+    /// </summary>
+    public override void Drop(IBotWilful bot)
+    {
+        var body = bot?.Self;
+
+        // No party was ever raised, so nobody tried to walk anywhere and there is nothing to conclude.
+        if (body == null || _map == null || _squad == null)
+        {
+            return;
+        }
+
+        // Arrival is judged the way Walking judges it: by where the bodies are, not by what the journey says.
+        if (body.InRange(_where, BotQuad.Side / 2))
+        {
+            return;
+        }
+
+        BotQuad.Seen(_map, _where);
+        Unreached++;
+
+        logger.Information(
+            "{Name} never stood in ({X}, {Y}) and it has been marked read, so it will not be offered again",
+            body.Name,
+            _where.X,
+            _where.Y
+        );
+    }
+
     /// <summary>Whether this square is inside the ground this errand was confined to. Anywhere, when it was not.</summary>
     private bool Within(Point3D at) =>
         _bounds.Width <= 0 || _bounds.Height <= 0 || _bounds.Contains(new Point2D(at.X, at.Y));
@@ -562,7 +615,7 @@ public sealed class BotScout : BotDeed
 
     public static string Describe() =>
         $"{Parties} scouting parties set out, {Undermanned} could not raise {Least} bodies, {Surveyed} squares read, {Baulked} stepped past as unreachable, "
-        + $"{Timedout} ran out of time; {Wages}gp paid to {Paid} volunteers";
+        + $"{Unreached} never stood in and retired off the frontier, {Timedout} ran out of time; {Wages}gp paid to {Paid} volunteers";
 
     public static void Forget()
     {
@@ -570,6 +623,7 @@ public sealed class BotScout : BotDeed
         Undermanned = 0;
         Surveyed = 0;
         Baulked = 0;
+        Unreached = 0;
         Timedout = 0;
         Wages = 0;
         Paid = 0;
