@@ -153,7 +153,7 @@ public static class BotBeat
 
         logger.Information("At death's door: {What}; {Supplies}", BotMobile.DescribeGasps(), BotShopper.Describe());
 
-        logger.Information("Standing still: {What}", BotStall.Describe());
+        logger.Information("Standing still: {What}; {Home}", BotStall.Describe(), BotHomer.Describe());
 
 
 

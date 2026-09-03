@@ -559,12 +559,16 @@ public sealed class BotScout : BotDeed
         // No party was ever raised, so nobody tried to walk anywhere and there is nothing to conclude.
         if (body == null || _map == null || _squad == null)
         {
+            LetGo(bot);
+
             return;
         }
 
         // Arrival is judged the way Walking judges it: by where the bodies are, not by what the journey says.
         if (body.InRange(_where, BotQuad.Side / 2))
         {
+            LetGo(bot);
+
             return;
         }
 
@@ -577,6 +581,35 @@ public sealed class BotScout : BotDeed
             _where.X,
             _where.Y
         );
+
+        LetGo(bot);
+    }
+
+    /// <summary>
+    /// The party, which is the largest thing this errand holds and was the one thing it never let go of.
+    ///
+    /// <para>
+    /// <b>A raised party is exactly what Drop's summary means by "whatever was being held for it", and it
+    /// outlived every ending but two.</b> Disband was called when the round finished and when it ran out of
+    /// CapMs, and not when BotStall took the errand off the bot for having stopped getting anywhere - so a
+    /// captain whose scout was abandoned went on leading a company, and a bot in a company sits on the Bound
+    /// rung with the auction switched off. Six bots with no work of their own, per abandoned round, until
+    /// something else happened to them.
+    /// </para>
+    ///
+    /// <para>
+    /// The shard was saying so all day and in the plainest terms: "3 squads standing holding 15 bots" in
+    /// every window on 03.09.2026, which is 44 per cent of the population, against 4 formed and 1 disbanded.
+    /// Aldric the Captain stood at (1240, 2003) for ten minutes with its errand reading "nothing", five
+    /// hundred and fifty tiles from home, until the rescue carried it back.
+    /// </para>
+    /// </summary>
+    private void LetGo(IBotWilful bot)
+    {
+        if (_squad != null && bot is IBotSquadMember member)
+        {
+            Disband(member);
+        }
     }
 
     /// <summary>Whether this square is inside the ground this errand was confined to. Anywhere, when it was not.</summary>
