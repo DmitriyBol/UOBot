@@ -246,6 +246,16 @@ public static class BotStall
         // knot was the finding and the instrument hid it from itself.
         var crowd = Elbows(bot);
 
+        // <b>Two facts that decide between the three reasons a bot stands still with no errand, and neither
+        // was in the line.</b> A bot in a company sits on the Bound rung with the auction switched off, so it
+        // is not offered work and its barren clock never starts — which is also why BotHomer never sends it
+        // home, since that is offered on the Free rung and measured by that clock. A bot not in a company
+        // whose clock reads four minutes is a different fault entirely: the auction is running and finding
+        // nothing. Four bots stood at (1297-1299, 1081-1085) on 03.09.2026 reading "nothing" for four
+        // minutes, and the line could not tell those two apart.
+        var company = bot is IBotSquadMember { Squad: not null };
+        var barren = bot.Resolve?.Urges?.BarrenMinutes(now) ?? 0.0;
+
         if (Pocket(stalledAt))
         {
             if (BotPopulation.Rescue(bot))
@@ -261,7 +271,7 @@ public static class BotStall
         // stuck in a way no subsystem above it can see or fix. "Full pack" errands stalling three at a time
         // is exactly what that looks like.
         logger.Error(
-            "{Name} the {Class} has not moved or changed what it is doing for {Held} minutes: \"{Doing}\" at {Where}, carrying {Load} of {Ceiling} stones with {Stam} stamina, with {Crowd} of ours within {Elbow} tiles",
+            "{Name} the {Class} has not moved or changed what it is doing for {Held} minutes: \"{Doing}\" at {Where}, carrying {Load} of {Ceiling} stones with {Stam} stamina, with {Crowd} of ours within {Elbow} tiles, {Company} and out of work for {Barren:F1} minutes by its own clock",
             bot.Name,
             bot.Class?.Name,
             held / 60000,
@@ -271,7 +281,9 @@ public static class BotStall
             BotLadder.Ceiling(bot),
             bot.Stam,
             crowd,
-            Elbow
+            Elbow,
+            company ? "in a company" : "on its own",
+            barren
         );
     }
 
