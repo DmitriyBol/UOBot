@@ -138,10 +138,11 @@ public static class BotWalk
         GaveUp = 0;
         Dropped = 0;
         Boxed = 0;
+        Knots = 0;
     }
 
     public static string Describe() =>
-        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions";
+        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions, {Knots} stepped aside from somebody who would not";
 
     /// <summary>How long the caller should wait before asking again.</summary>
     public static int StepDelayMs(bool run) => run ? RunStepMs : WalkStepMs;
@@ -455,7 +456,7 @@ public static class BotWalk
 
         // Something alive. It will move — or can be asked to — so the thing to do is go round it, and never
         // to conclude anything about the ground.
-        if (AskAsideAt(bot, map, next))
+        if (AskAsideAt(bot, map, next, out var freed))
         {
             // Once is not evidence. Most things in the way are already leaving, and redrawing the route for a
             // skeleton walking past spends a search to avoid a tile that will be empty before the plan ends.
@@ -466,6 +467,23 @@ public static class BotWalk
                 journey.AvoidTile(next);
                 journey.Discard();
                 Detours++;
+
+                // <b>Asked twice and it did not move, so stop treating the asking as an answer.</b>
+                //
+                // IBotAside.StepAsideFor says in its own summary that it returns whether the tile was
+                // actually freed, and this discarded that and reported WentRound regardless — which is not a
+                // refusal, so nothing below here ever ran. Four bots met west of Britain at (1344-1345,
+                // 877-879) on 03.09.2026, each standing on another's next tile, each asking, none moving, and
+                // all four stood there until the stall watch carried three of them home four minutes later.
+                // Their tiles allowed all eight directions and the floor was exactly where each thought it
+                // was: nothing whatever was wrong with the ground, and nothing in the walker was willing to
+                // take a step that was not the planned one.
+                if (!freed)
+                {
+                    Knots++;
+
+                    return Improvise(bot, journey, next, run);
+                }
             }
 
             return BotWalkResult.WentRound;
@@ -552,6 +570,14 @@ public static class BotWalk
     public static long Boxed { get; private set; }
 
     /// <summary>
+    /// Times somebody in the way was asked twice, did not move, and the bot stepped somewhere else instead.
+    ///
+    /// The measure of knots. It should be small and it should not be nought — nought would mean asking is
+    /// always answered, which is what the walker used to assume without ever checking.
+    /// </summary>
+    public static long Knots { get; private set; }
+
+    /// <summary>
     /// Whether somebody alive is on that tile, and if any of them is a bot, asks it to move.
     ///
     /// <para>
@@ -567,9 +593,16 @@ public static class BotWalk
     /// somehow on it, the next refusal asks that one.
     /// </para>
     /// </summary>
-    private static bool AskAsideAt(Mobile bot, Map map, Point3D tile)
+    /// <param name="freed">
+    /// Whether the tile is now clear. Only somebody askable can free it, and only by actually going: a
+    /// creature that merely proves the tile taken frees nothing, and neither does a bot with nowhere of its
+    /// own to step.
+    /// </param>
+    private static bool AskAsideAt(Mobile bot, Map map, Point3D tile, out bool freed)
     {
         Mobile occupant = null;
+
+        freed = false;
 
         foreach (var mobile in map.GetMobilesAt(tile.X, tile.Y))
         {
@@ -595,7 +628,7 @@ public static class BotWalk
 
         if (occupant is IBotAside aside)
         {
-            aside.StepAsideFor(bot);
+            freed = aside.StepAsideFor(bot);
         }
 
         return true;

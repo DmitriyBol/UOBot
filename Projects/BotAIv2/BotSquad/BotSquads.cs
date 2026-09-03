@@ -275,10 +275,18 @@ public static class BotSquads
         // step on the shard being refused by the engine (11028 of 33015 in one window) and four bots at a
         // time reported stuck by the stall watch, none of them overloaded and none of them lost.
         //
-        // The one standing still yields to the one who is going somewhere. That is the whole rule, it cannot
-        // deadlock — two bots both walking are both moving, and a bot that is not walking has nothing to
-        // lose by a step — and it is what a person would do in a doorway.
-        if (body is BotMobile { Journey.Walking: true })
+        // The one standing still yields to the one who is going somewhere. That is the whole rule and it is
+        // what a person would do in a doorway. It cannot deadlock only because the test below is motion
+        // rather than intent: a bot that has not moved lately has nothing to lose by a step, and two that
+        // have are not in each other's way for long.
+        // <b>Moving, not Walking, and the difference is the whole of whether this rule can deadlock.</b>
+        // Walking asks whether the bot holds a plan with tiles left in it, which a bot whose every step is
+        // refused does for as long as it stands there. So the rule that reads "the one standing still yields
+        // to the one who is going somewhere" was in fact "nobody with a plan yields to anybody", and four
+        // bots with plans through each other's tiles held that position for four minutes at (1344, 878) on
+        // 03.09.2026. Moving asks whether a step has actually been taken lately, which is what the rule
+        // always meant and what makes its own argument true: two bots both moving are both moving.
+        if (body is BotMobile { Journey.Moving: true })
         {
             return false;
         }

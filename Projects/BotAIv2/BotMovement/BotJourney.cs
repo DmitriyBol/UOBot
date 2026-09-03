@@ -143,6 +143,11 @@ public sealed class BotJourney
 
     private int _step;
 
+    /// <summary>When a step was last actually taken. See <see cref="Moving"/>.</summary>
+    private long _steppedTick;
+
+    private bool _stepped;
+
     /// <summary>Which errand this plan was drawn for, so resuming an older one always redraws.</summary>
     private BotErrand _planErrand;
 
@@ -223,6 +228,31 @@ public sealed class BotJourney
 
     /// <summary>Whether a plan is being walked. An errand without one is not judged for progress.</summary>
     public bool Walking => _plan.Count > 0 && _step < _plan.Count;
+
+    /// <summary>
+    /// Whether the bot has actually taken a step lately, as against merely holding a plan.
+    ///
+    /// <para>
+    /// <b>The distinction <see cref="Walking"/> does not make, and something load-bearing was reading
+    /// Walking as though it did.</b> A plan with tiles left in it is not motion: a bot whose every step is
+    /// refused holds one for as long as it stands there. BotSquads.ShouldYield used Walking to decide who
+    /// gives way in a doorway — the one standing still yields to the one who is going somewhere — and its
+    /// own comment argued the rule could not deadlock because "two bots both walking are both moving". They
+    /// are not. Four bots met west of Britain at (1344-1345, 877-879) on 03.09.2026, each holding a plan
+    /// through a tile another was standing on, so all four were Walking, all four refused to give way, and
+    /// all four were still there four minutes later.
+    /// </para>
+    /// </summary>
+    public bool Moving => _stepped && Core.TickCount - _steppedTick < MovingMs;
+
+    /// <summary>
+    /// How recently a step has to have been taken to count as moving.
+    ///
+    /// Two seconds, which is several steps at either pace and long enough to cover a bot going round
+    /// something. Shorter and a bot gives way while it is mid-detour; longer and a knot takes longer to
+    /// come apart than the stall watch takes to notice it.
+    /// </summary>
+    public static int MovingMs { get; set; } = 2000;
 
     /// <summary>True when the last plan led as close as the world allows rather than to the goal.</summary>
     public bool Partial { get; private set; }
@@ -658,6 +688,9 @@ public sealed class BotJourney
     /// <summary>A step was taken. The only place progress is recorded.</summary>
     public void Stepped(Point3D at)
     {
+        _steppedTick = Core.TickCount;
+        _stepped = true;
+
         Catch(at);
 
         var remaining = Remaining;

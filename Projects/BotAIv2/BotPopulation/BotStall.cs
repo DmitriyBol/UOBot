@@ -240,6 +240,12 @@ public static class BotStall
         // counter, and neither had anything to do with it. The place a bot stalled in is the whole finding.
         var stalledAt = bot.Location;
 
+        // The crowd, for the same reason and it was the same bug one line further down. Three of the four
+        // bots knotted together at (1344, 878) on 03.09.2026 reported "0 of ours within 2 tiles" because they
+        // had been carried home before this was counted, and the one that was not rescued reported four. The
+        // knot was the finding and the instrument hid it from itself.
+        var crowd = Elbows(bot);
+
         if (Pocket(stalledAt))
         {
             if (BotPopulation.Rescue(bot))
@@ -264,7 +270,7 @@ public static class BotStall
             BotLadder.Load(bot),
             BotLadder.Ceiling(bot),
             bot.Stam,
-            Elbows(bot),
+            crowd,
             Elbow
         );
     }
