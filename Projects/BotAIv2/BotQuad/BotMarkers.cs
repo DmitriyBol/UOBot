@@ -71,8 +71,16 @@ public static class BotMarkers
     /// file no longer spends its room on squares with no verdict, so a bigger cap buys more ground worth
     /// looking at rather than more markers reading "0.00".
     /// </para>
+    ///
+    /// <para>
+    /// Ten thousand, by Patrick's order on 03.09.2026, and the same reasoning has carried it there: the
+    /// island is being walked far wider than it was — 3265 quadrants stood in that evening against 1475 that
+    /// morning — so a cap of a thousand had started to throw away ground that had a verdict on it rather
+    /// than only the quiet. The readability argument still holds and is still the only argument here; it is
+    /// now the client's own zoom that decides it rather than the file.
+    /// </para>
     /// </summary>
-    public static int Most { get; set; } = 1000;
+    public static int Most { get; set; } = 10000;
 
     /// <summary>
     /// Whether ground nobody has ever stood in is pinned at all.
