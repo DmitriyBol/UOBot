@@ -63,6 +63,11 @@ public static class BotStall
         public long Said;
 
         public bool Stuck;
+
+        /// <summary>How many times this bot has been reported stalled without having left the spot.</summary>
+        public int Stalls;
+
+        public Point3D Stood;
     }
 
     private static readonly Dictionary<Serial, Watch> _watched = [];
@@ -74,6 +79,9 @@ public static class BotStall
 
     /// <summary>Stalls that were also a piece of work taken off a bot that could not finish it.</summary>
     public static long Freed { get; private set; }
+
+    /// <summary>Bots carried out of a pocket they kept stalling in. See the escalation in Report.</summary>
+    public static long Carried { get; private set; }
 
     /// <summary>The worst one seen: name, what it was doing, and for how long.</summary>
     public static string Worst { get; private set; }
@@ -161,6 +169,30 @@ public static class BotStall
             BotWill.Abandon(bot, "it had stopped getting anywhere");
             Freed++;
         }
+
+        // <b>And if taking the work away did not move it, the place is the fault and the bot is carried out
+        // of it.</b> BotPopulation.Rescue exists for exactly this and fires on a dozen refused roads with no
+        // step in between — which is the trapped bot that stands still. It is not the trapped bot that
+        // paces: a step of any kind clears that count, so a bot walking circles inside a pocket it cannot
+        // leave never reaches the limit. On 03.09.2026 one pocket at 1755-1757, 970-976 caught Merrick,
+        // Torvin, Kerrin, Perri, Edda 2, Bryn, Ilsa, Calla and Doran in turn, each for four minutes, each
+        // having its errand taken away and each still there afterwards; the elbow count ruled out their
+        // blocking one another, at one or two of ours nearby rather than a knot.
+        //
+        // Second report from the same spot, so the first is still a stall and only the second is a trap.
+        if (watch.Stalls > 0 && Utility.InRange(bot.Location, watch.Stood, Elbow))
+        {
+            if (BotPopulation.Rescue(bot))
+            {
+                Carried++;
+                watch.Stalls = 0;
+            }
+        }
+        else
+        {
+            watch.Stalls = 1;
+            watch.Stood = bot.Location;
+        }
         Worst = $"{bot.Name} the {bot.Class?.Name}, {held / 60000} minutes on \"{doing}\" at {bot.Location}";
 
         // The load is in the line because it is the first thing worth ruling out: the engine charges stamina
@@ -194,7 +226,7 @@ public static class BotStall
     public static string Describe() =>
         Reported == 0
             ? $"nobody has stood still for {PatienceMs / 60000} minutes"
-            : $"{Stuck} bots are stuck right now, {Reported} stalls reported and {Freed} errands taken off them; worst: {Worst}";
+            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of a spot they stalled in twice; worst: {Worst}";
 
     public static void Forget()
     {
@@ -202,6 +234,7 @@ public static class BotStall
         Stuck = 0;
         Reported = 0;
         Freed = 0;
+        Carried = 0;
         Worst = null;
     }
 
