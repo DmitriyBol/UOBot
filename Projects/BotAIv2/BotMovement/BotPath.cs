@@ -32,6 +32,25 @@ public enum BotPathOutcome
     Reached
 }
 
+/// <summary>What asking about the far side of a journey concluded.</summary>
+public enum BotEnclosure
+{
+    /// <summary>The ground around the destination was walked to its edges. It is a pocket, and it is now filed.</summary>
+    Enclosed,
+
+    /// <summary>The ground around the destination kept going past what is worth calling a pocket. Nothing learned.</summary>
+    TooBig,
+
+    /// <summary>The probe ran out of its allowance. Nothing learned, and nothing concluded either.</summary>
+    NoTime,
+
+    /// <summary>Nothing at or beside the destination will take a body. Nobody can ever arrive, whatever the road.</summary>
+    NoFooting,
+
+    /// <summary>Not asked: the population has asked recently enough. Ask again later.</summary>
+    Deferred
+}
+
 /// <summary>
 /// Tile-by-tile A* over the engine's own step masks, bounded by a clock.
 ///
@@ -114,6 +133,36 @@ public static class BotPath
     public static double CeilingMs { get; set; } = 60.0;
 
     /// <summary>
+    /// The largest pocket worth proving from the far side, in standing cells.
+    ///
+    /// <para>
+    /// <b>This is the bound, and it replaces geometry with a count on purpose.</b> A box around the
+    /// destination would have to be guessed at, and guessing it small makes every probe clip while guessing
+    /// it large makes every failed probe expensive. A count is the thing actually being asked about: a
+    /// walled yard is dozens of tiles, a crypt is hundreds, a ledge behind a rock is a handful — and ground
+    /// that keeps going past fifteen hundred is not a pocket, it is the world. So a probe that finds the
+    /// world stops the moment it has enough tiles to know that, which is the cheapest a wrong guess can be.
+    /// </para>
+    /// </summary>
+    public static int EnclosureCells { get; set; } = 2500;
+
+    /// <summary>
+    /// What one look at the far side may cost. Small, because <see cref="EnclosureCells"/> already bounds
+    /// the work: the measured price is about forty microseconds an expansion on cold ground, and eight expansions discover up to eight cells apiece, and this
+    /// is only here so that a pathological surface cannot make it otherwise.
+    /// </summary>
+    public static double EnclosureCeilingMs { get; set; } = 30.0;
+
+    /// <summary>
+    /// The shortest gap between two looks at the far side, across the whole population.
+    ///
+    /// A governor rather than a correctness bound. Each look is cheap and each one can buy a refusal that
+    /// lasts the life of the shard, so this is deliberately loose — it exists only so that thirty bots all
+    /// deciding at once cannot put a spike in a frame.
+    /// </summary>
+    public static int EnclosureGapMs { get; set; } = 250;
+
+    /// <summary>
     /// The smallest search worth running, for when the population's allowance is spent. Below this a bot
     /// cannot see round anything, and it is better to creep than to stop.
     /// </summary>
@@ -170,6 +219,9 @@ public static class BotPath
     /// <summary>A scratch path, for callers who only want a yes or no.</summary>
     private static readonly List<Point3D> _scratch = [];
 
+    /// <summary>The flood's frontier, as node indices. Order does not matter: it is exhausting, not aiming.</summary>
+    private static readonly List<int> _frontier = [];
+
     // ---- The population's allowance.
 
     private static long _windowEnds;
@@ -208,6 +260,46 @@ public static class BotPath
 
     public static double WorstMs { get; private set; }
 
+    // ---- What asking about the far side has cost, and bought.
+
+    /// <summary>Looks at the far side of a journey that actually ran.</summary>
+    public static long Probes { get; private set; }
+
+    /// <summary>Looks that ended in a pocket being filed.</summary>
+    public static long Enclosed { get; private set; }
+
+    /// <summary>Looks that ran out of ground worth calling a pocket. The ordinary answer, and a cheap one.</summary>
+    public static long ProbedTooBig { get; private set; }
+
+    /// <summary>Looks that ran out of clock. Should be rare; if it is not, the cell bound is doing nothing.</summary>
+    public static long ProbedNoTime { get; private set; }
+
+    /// <summary>
+    /// Destinations with nowhere to stand at or beside them.
+    ///
+    /// Its own kind of hopeless, and until now an invisible one: no road can end at a tile that will not
+    /// take a body, so a bot sent to one walks perfectly well for ever and never arrives.
+    /// </summary>
+    public static long ProbedNoFooting { get; private set; }
+
+    public static double ProbeMs { get; private set; }
+
+    public static long ProbeTiles { get; private set; }
+
+    /// <summary>
+    /// Ground the looks found, in standing cells.
+    ///
+    /// Kept apart from <see cref="ProbeTiles"/> because the two answer different questions and the wrong one
+    /// was reported first. Tiles are nodes taken off the frontier; cells are ground discovered, and it is
+    /// cells that <see cref="EnclosureCells"/> is measured in — one expansion discovers up to eight of them,
+    /// so a look can settle "this is the world" having popped two hundred nodes.
+    /// </summary>
+    public static long ProbeCells { get; private set; }
+
+    private static long _probedAt;
+
+    private static bool _probeStarted;
+
     public static void Reset()
     {
         Searches = 0;
@@ -222,6 +314,15 @@ public static class BotPath
         SealedRuns = 0;
         TotalMs = 0.0;
         WorstMs = 0.0;
+        Probes = 0;
+        Enclosed = 0;
+        ProbedTooBig = 0;
+        ProbedNoTime = 0;
+        ProbedNoFooting = 0;
+        ProbeMs = 0.0;
+        ProbeTiles = 0;
+        ProbeCells = 0;
+        _probeStarted = false;
         _spentThisWindow = 0.0;
         _windowStarted = false;
     }
@@ -229,7 +330,7 @@ public static class BotPath
     public static string Describe() =>
         Searches == 0
             ? "no searches yet"
-            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one";
+            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand";
 
     /// <summary>
     /// Whether there is a way at all, without keeping the path. For vetting a candidate before committing
@@ -557,7 +658,7 @@ public static class BotPath
             // Recording it would seal every building on the shard against everybody outside it.
             if (!doorsShut && _lookup.Count >= MinPocket)
             {
-                BotReach.Record(map, _lookup.Keys);
+                BotReach.Record(map, _lookup.Keys, from);
             }
 
             SealedRuns++;
@@ -574,6 +675,298 @@ public static class BotPath
 
         return BotPathOutcome.Partial;
     }
+
+    /// <summary>
+    /// Whether the destination sits in a pocket of ground, asked <b>from the destination's side</b>.
+    ///
+    /// <para>
+    /// <b>Why the question has to be turned round, and why no clock could have answered it the other way.</b>
+    /// A search refuses a journey only when its open set empties with nothing clipped — which is to say when
+    /// it has enumerated the whole pocket it started in. Started from the bot, that pocket is the mainland.
+    /// The box is two hundred and fifty-six tiles beyond the line to the goal, open ground carries on past
+    /// it, so a neighbour falls outside the box and <c>clipped</c> is set long before the open set can empty.
+    /// The clock happens to run out first today, which is why every lost proof was filed against it; give the
+    /// search six times the clock and the same proofs are lost to the box instead. Neither is the reason.
+    /// <b>The reason is that the bot is standing on the wrong side of the wall to prove anything about it.</b>
+    /// On the morning of 03.09.2026 that showed as 3564 proofs lost, 0 kept, in a ten-minute window — and it
+    /// would have shown the same in any window, at any ceiling, for the life of the shard.
+    /// </para>
+    ///
+    /// <para>
+    /// From the destination it is a different question and a cheap one. The ledge behind the rock, the walled
+    /// yard, the islet, the crypt: each is a few dozen to a few hundred tiles, so the flood either runs out of
+    /// ground almost at once — which is the proof, bought for everybody for the life of the shard — or it runs
+    /// past <see cref="EnclosureCells"/> and stops, which costs a few milliseconds and settles
+    /// that this destination is simply far away rather than walled off.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>What it actually proves, said plainly.</b> The flood follows steps the engine would allow, outwards
+    /// from the destination, so what it establishes is that <em>nothing standing there can get out</em>.
+    /// Stepping in might still be possible where the world allows a drop it will not allow back up. That is
+    /// not a hole in the reasoning, it is the answer: somewhere a bot could fall into and never leave is
+    /// somewhere it should not be sent, and this whole subsystem exists because bots were being sent to places
+    /// they never arrived at.
+    /// </para>
+    /// </summary>
+    public static BotEnclosure Enclose(Map map, Point3D goal, BotArrival arrival, bool urgent = false)
+    {
+        if (map == null || map == Map.Internal)
+        {
+            return BotEnclosure.Deferred;
+        }
+
+        var now = Core.TickCount;
+
+        // The gap is there to stop thirty bots asking at once about thirty different destinations. It is not
+        // there to stop the one question that is asked on proof rather than on suspicion: a bot with a dozen
+        // roads refused in a row is standing in the pocket, and that is the cheapest and surest look there is.
+        if (!urgent && _probeStarted && now - _probedAt < EnclosureGapMs)
+        {
+            return BotEnclosure.Deferred;
+        }
+
+        _probeStarted = true;
+        _probedAt = now;
+
+        Probes++;
+
+        // Somewhere at the destination that would take a body. The Z a caller hands in is where something is
+        // standing or floating, not necessarily a floor, and a flood begun at a height with no ground under it
+        // maps nothing and would file the emptiness as a pocket.
+        if (!Footing(map, goal, arrival, out var start))
+        {
+            ProbedNoFooting++;
+
+            return BotEnclosure.NoFooting;
+        }
+
+        var started = Stopwatch.GetTimestamp();
+
+        // <b>Its own clock, and deliberately not the population's.</b>
+        //
+        // The first hour of this running had four looks in five minutes and two of them came back having run
+        // out of time after two hundred tiles. They had been handed <see cref="FloorMs"/>: Allowance divides
+        // what is left of the window, the window was drained, and it was drained by exactly the failing
+        // searches this look exists to stop. An instrument paid for out of the waste it ends cannot run when
+        // the waste is worst, which is the only time it is wanted.
+        //
+        // What keeps it bounded instead is <see cref="EnclosureGapMs"/>, and that bound is a harder one: four
+        // looks a second at twenty-five milliseconds apiece is a hundred milliseconds a second in the very
+        // worst case, no matter what else the population is doing. The cost is still handed to Spend, because
+        // it is real and belongs in the window's accounting — it simply is not gated by it.
+        var deadline = started + (long)(EnclosureCeilingMs * Stopwatch.Frequency / 1000.0);
+
+        StepCache.Instance.BeginFindGeneration();
+
+        _lookup.Clear();
+        _blockedByItems.Clear();
+        _frontier.Clear();
+        _nodeCount = 0;
+
+        var startZ = (sbyte)Math.Clamp(start.Z, sbyte.MinValue, sbyte.MaxValue);
+        var root = AddNode(start.X, start.Y, startZ, 0, -1);
+
+        _lookup[BotStep.Cell(start.X, start.Y, startZ)] = root;
+        _frontier.Add(root);
+
+        var expansions = 0;
+        var outcome = BotEnclosure.Enclosed;
+
+        while (_frontier.Count > 0)
+        {
+            if ((expansions & (ClockEvery - 1)) == 0 && Stopwatch.GetTimestamp() >= deadline)
+            {
+                outcome = BotEnclosure.NoTime;
+
+                break;
+            }
+
+            // The bound, and the only one. Ground that keeps going past this is the world, not a pocket, and
+            // the cheapest way to find that out is to stop counting as soon as the count settles it.
+            if (_lookup.Count > EnclosureCells)
+            {
+                outcome = BotEnclosure.TooBig;
+
+                break;
+            }
+
+            var current = _frontier[^1];
+
+            _frontier.RemoveAt(_frontier.Count - 1);
+            expansions++;
+
+            var cx = _nodeX[current];
+            var cy = _nodeY[current];
+            var cz = _nodeZ[current];
+
+            var mask = BotStep.Mask(map, cx, cy, cz);
+            var walk = mask.WalkMask;
+
+            if (walk == 0)
+            {
+                continue;
+            }
+
+            for (var d = 0; d < 8; d++)
+            {
+                if ((walk & (1 << d)) == 0)
+                {
+                    continue;
+                }
+
+                // The same two-part diagonal rule the planner uses, and here it is a safety property rather
+                // than an efficiency one. A flood stricter than the engine sees a smaller pocket than there is
+                // and would file ground that is genuinely open — the one mistake in this file that is silent,
+                // permanent, and worse than the problem it solves.
+                if ((d & 1) == 1)
+                {
+                    var left = (d + 7) & 7;
+                    var right = (d + 1) & 7;
+
+                    if ((walk & (1 << left)) == 0 || (walk & (1 << right)) == 0)
+                    {
+                        continue;
+                    }
+
+                    if (FlankBlocked(map, cx, cy, left, mask, doorsShut: false)
+                        || FlankBlocked(map, cx, cy, right, mask, doorsShut: false))
+                    {
+                        continue;
+                    }
+                }
+
+                var nx = cx;
+                var ny = cy;
+
+                CalcMoves.Offset((Direction)d, ref nx, ref ny);
+
+                // The edge of the map is a wall the world itself puts there, so a pocket that ends against it
+                // has genuinely ended. No box of our own: EnclosureCells is the bound.
+                if (nx < 0 || ny < 0 || nx >= map.Width || ny >= map.Height)
+                {
+                    continue;
+                }
+
+                var nz = mask.GetWalkZ((Direction)d);
+
+                if (Blocked(map, nx, ny, nz, doorsShut: false))
+                {
+                    continue;
+                }
+
+                var cell = BotStep.Cell(nx, ny, nz);
+
+                if (_lookup.ContainsKey(cell))
+                {
+                    continue;
+                }
+
+                var node = AddNode(nx, ny, nz, 0, current);
+
+                _lookup[cell] = node;
+                _frontier.Add(node);
+            }
+        }
+
+        var elapsedMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+
+        Spend(elapsedMs);
+
+        ProbeMs += elapsedMs;
+        ProbeTiles += expansions;
+        ProbeCells += _lookup.Count;
+
+        if (outcome == BotEnclosure.TooBig)
+        {
+            ProbedTooBig++;
+
+            return outcome;
+        }
+
+        if (outcome == BotEnclosure.NoTime)
+        {
+            ProbedNoTime++;
+
+            return outcome;
+        }
+
+        if (_lookup.Count < MinPocket)
+        {
+            // One tile. Never knowledge worth having, and the shape an invalid footing takes.
+            ProbedTooBig++;
+
+            return BotEnclosure.TooBig;
+        }
+
+        BotReach.Record(map, _lookup.Keys, start);
+        Enclosed++;
+
+        return BotEnclosure.Enclosed;
+    }
+
+    /// <summary>
+    /// Ground at or beside the destination that would take a body, and the height it would stand at.
+    ///
+    /// <para>
+    /// The destination's own height is preferred whenever a body could stand there, because that is the one
+    /// height known to belong to the thing being walked to. Only when it will not does this settle for the
+    /// surface underneath, and then only if that surface is within a person's height of what was asked for —
+    /// a destination on a bridge whose settled ground is the riverbed twenty units below is not the same
+    /// place, and flooding the riverbed would file a pocket that has nothing to do with the journey.
+    /// </para>
+    /// </summary>
+    private static bool Footing(Map map, Point3D goal, BotArrival arrival, out Point3D at)
+    {
+        var goalZ = (sbyte)Math.Clamp(goal.Z, sbyte.MinValue, sbyte.MaxValue);
+
+        if (BotStep.Mask(map, goal.X, goal.Y, goalZ).WalkMask != 0)
+        {
+            at = new Point3D(goal.X, goal.Y, goalZ);
+
+            return true;
+        }
+
+        if (BotStep.Settle(map, goal.X, goal.Y, out var z) && Math.Abs(z - goal.Z) <= BotArrival.PersonHeight)
+        {
+            at = new Point3D(goal.X, goal.Y, z);
+
+            return true;
+        }
+
+        // Nowhere on the tile itself. The arrival tolerance says where else would have counted as arriving,
+        // so those tiles are the rest of the destination and are asked about in rings, nearest first.
+        var reach = Math.Min(arrival.Tiles, MaxFootingSweep);
+
+        for (var r = 1; r <= reach; r++)
+        {
+            for (var dx = -r; dx <= r; dx++)
+            {
+                for (var dy = -r; dy <= r; dy++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r)
+                    {
+                        continue;
+                    }
+
+                    if (BotStep.Settle(map, goal.X + dx, goal.Y + dy, out var rz)
+                        && Math.Abs(rz - goal.Z) <= BotArrival.PersonHeight)
+                    {
+                        at = new Point3D(goal.X + dx, goal.Y + dy, rz);
+
+                        return true;
+                    }
+                }
+            }
+        }
+
+        at = Point3D.Zero;
+
+        return false;
+    }
+
+    /// <summary>How far out of the destination to look for footing. Matches the reach ledger's own sweep.</summary>
+    private const int MaxFootingSweep = 2;
 
     /// <summary>
     /// What this search is allowed, given what the population has already spent this second.

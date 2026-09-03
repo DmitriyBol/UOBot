@@ -44,6 +44,18 @@ public sealed class BotMovementSettings
 
     /// <summary>How long ground that nearly killed a bot stays out of its plans.</summary>
     public int? DangerAvoidMs { get; set; }
+
+    /// <summary>The largest pocket, in tiles, worth proving from the destination's side.</summary>
+    public int? EnclosureCells { get; set; }
+
+    /// <summary>Milliseconds one look at the far side of a journey may cost.</summary>
+    public double? EnclosureCeilingMs { get; set; }
+
+    /// <summary>The shortest gap between two such looks, across the whole population.</summary>
+    public int? EnclosureGapMs { get; set; }
+
+    /// <summary>Plans in a row that get no closer before the far side is asked about.</summary>
+    public int? PlansBeforeAskingTheFarSide { get; set; }
 }
 
 /// <summary>Reads the movement file and moves the numbers it names.</summary>
@@ -80,5 +92,10 @@ public static class BotMovementConfig
         BotJourney.MaxEmptyPlans = settings.MaxEmptyPlans ?? BotJourney.MaxEmptyPlans;
         BotJourney.MaxPlansWithoutCloser = settings.MaxPlansWithoutCloser ?? BotJourney.MaxPlansWithoutCloser;
         BotJourney.DangerAvoidMs = settings.DangerAvoidMs ?? BotJourney.DangerAvoidMs;
+        BotPath.EnclosureCells = settings.EnclosureCells ?? BotPath.EnclosureCells;
+        BotPath.EnclosureCeilingMs = settings.EnclosureCeilingMs ?? BotPath.EnclosureCeilingMs;
+        BotPath.EnclosureGapMs = settings.EnclosureGapMs ?? BotPath.EnclosureGapMs;
+        BotWalk.PlansBeforeAskingTheFarSide =
+            settings.PlansBeforeAskingTheFarSide ?? BotWalk.PlansBeforeAskingTheFarSide;
     }
 }

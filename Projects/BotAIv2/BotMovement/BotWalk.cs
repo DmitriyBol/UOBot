@@ -125,6 +125,9 @@ public static class BotWalk
 
     public static long GaveUp { get; private set; }
 
+    /// <summary>Errands ended because the destination itself was proved no good, rather than the road to it.</summary>
+    public static long Dropped { get; private set; }
+
     public static void Reset()
     {
         Steps = 0;
@@ -133,10 +136,11 @@ public static class BotWalk
         Detours = 0;
         Improvised = 0;
         GaveUp = 0;
+        Dropped = 0;
     }
 
     public static string Describe() =>
-        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up";
+        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good";
 
     /// <summary>How long the caller should wait before asking again.</summary>
     public static int StepDelayMs(bool run) => run ? RunStepMs : WalkStepMs;
@@ -306,6 +310,20 @@ public static class BotWalk
     private static BotWalkResult Ended(bool interruption) =>
         interruption ? BotWalkResult.Blocked : BotWalkResult.GaveUp;
 
+    /// <summary>
+    /// How many plans in a row may come back short of the destination, without the destination ever getting
+    /// nearer, before the far side of it is asked about.
+    ///
+    /// <para>
+    /// Two, and the number is a discriminator rather than a patience setting. A bot walking a long road
+    /// legitimately gets a short plan every time — but each one starts further along, so its best distance
+    /// keeps improving and this never reaches two. What does reach two is a bot whose road ends at the
+    /// same place however often it is redrawn, which is the signature of something in the way rather than
+    /// something far off. Costing the far-side look at that signature is what keeps it off the hot path.
+    /// </para>
+    /// </summary>
+    public static int PlansBeforeAskingTheFarSide { get; set; } = 2;
+
     /// <summary>Draws a plan. Returns false only when the destination is provably unreachable.</summary>
     private static bool Plan(Mobile bot, BotJourney journey, Map map)
     {
@@ -318,28 +336,78 @@ public static class BotWalk
             journey.Avoid(bot.Location)
         );
 
+        // A statement about the world, and therefore worth acting on at once. The first version spent
+        // twenty-five seconds of a bot's life to reach this same conclusion, and then only sometimes.
         if (outcome == BotPathOutcome.Sealed)
         {
-            // A statement about the world, and therefore worth acting on at once. The first version spent
-            // twenty-five seconds of a bot's life to reach this same conclusion, and then only sometimes.
-            logger.Information(
-                "{Name} has no way to {Where} from here and has dropped it ({Reason})",
-                bot.Name,
-                journey.Target,
-                journey.Reason
-            );
-
-            // Only this errand. Whatever it was covering is still worth doing — a road proved impossible does
-            // not make the market it led to uninteresting, and clearing the queue would throw away the very
-            // thing the queue exists to keep.
-            journey.Complete();
-
-            return false;
+            return Drop(bot, journey, "there is no way from here");
         }
 
         journey.Planned(outcome, _path, bot.Location);
 
+        // Everything below is the other question, and it is asked from the other end.
+        //
+        // <b>This is the whole of what a bot standing here can and cannot find out.</b> "How do I get there"
+        // has now failed three times running without the destination coming any nearer, and asking it a third
+        // time buys nothing: a search begun at the bot has to enumerate the mainland before it may conclude
+        // anything, which no clock on any shard will pay for. "Is there anything there to get to" is a
+        // different question, it is cheap from the destination's side, and the answer is a fact about the
+        // world that every bot on the shard gets to keep.
+        if (outcome != BotPathOutcome.Partial || journey.Probed || journey.PlansSinceCloser < PlansBeforeAskingTheFarSide)
+        {
+            return true;
+        }
+
+        var far = BotPath.Enclose(map, journey.Target, journey.Arrival);
+
+        // The population has looked at somebody else's far side too recently. Not an answer, so the errand is
+        // not marked as having had one — the next plan asks again.
+        if (far == BotEnclosure.Deferred)
+        {
+            return true;
+        }
+
+        journey.Probed = true;
+
+        // No road can end at a tile that will not take a body. Nothing in the walker could see this before:
+        // the plan is drawn, the steps are legal, the bot walks them perfectly and simply never arrives.
+        if (far == BotEnclosure.NoFooting)
+        {
+            return Drop(bot, journey, "there is nowhere there to stand");
+        }
+
+        // A pocket has been filed and it belongs to everybody now. Whether it refuses *this* journey is the
+        // ledger's own question, because the bot may be standing inside the pocket itself.
+        if (far == BotEnclosure.Enclosed
+            && BotReach.Ask(map, bot.Location, journey.Target, journey.Arrival, tally: false) == BotReachVerdict.Sealed)
+        {
+            return Drop(bot, journey, "it is shut in and this bot is outside it");
+        }
+
         return true;
+    }
+
+    /// <summary>
+    /// Ends the errand because the destination is provably no good, and says which proof it was.
+    ///
+    /// Only this errand. Whatever it was covering is still worth doing — a road proved impossible does not
+    /// make the market it led to uninteresting, and clearing the queue would throw away the very thing the
+    /// queue exists to keep.
+    /// </summary>
+    private static bool Drop(Mobile bot, BotJourney journey, string why)
+    {
+        logger.Information(
+            "{Name} has dropped {Where} because {Why} ({Reason})",
+            bot.Name,
+            journey.Target,
+            why,
+            journey.Reason
+        );
+
+        journey.Complete();
+        Dropped++;
+
+        return false;
     }
 
     /// <summary>Works out why a step was refused, and does whatever that calls for.</summary>

@@ -35,13 +35,20 @@ public sealed class BotMovementModule : BotModule
 
         BotWalk.Walking = true;
 
+        // Every number that decides behaviour is in this line, because the config file silently wins over the
+        // code and a threshold nobody can read is a threshold nobody can argue with.
         logger.Information(
-            "Movement ready: one search may cost {Ceiling}ms, the population {Window}ms a second, floor {Floor}ms; a plan is trusted {Stale}ms and a journey is given up after {Stall} fruitless attempts at stepping",
+            "Movement ready: one search may cost {Ceiling}ms, the population {Window}ms a second, floor {Floor}ms; a plan is trusted {Stale}ms and a journey is given up after {Stall} fruitless attempts at stepping or {NoCloser} plans that get no closer; after {FarSide} of those the far side of the destination is looked at, at most every {Gap}ms, for a pocket of up to {Cells} tiles costing at most {Look}ms",
             BotPath.CeilingMs,
             BotPath.WindowMs,
             BotPath.FloorMs,
             BotJourney.PlanStaleMs,
-            BotJourney.StallAttempts
+            BotJourney.StallAttempts,
+            BotJourney.MaxPlansWithoutCloser,
+            BotWalk.PlansBeforeAskingTheFarSide,
+            BotPath.EnclosureGapMs,
+            BotPath.EnclosureCells,
+            BotPath.EnclosureCeilingMs
         );
     }
 

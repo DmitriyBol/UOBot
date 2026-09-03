@@ -236,6 +236,23 @@ public sealed class BotJourney
     /// </summary>
     public bool Hopeless => _emptyPlans >= MaxEmptyPlans || _plansSinceCloser >= MaxPlansWithoutCloser;
 
+    /// <summary>
+    /// Plans in a row that have not got this errand any closer than it has already been.
+    ///
+    /// <see cref="Hopeless"/> is what this eventually becomes; exposed on its own because there is something
+    /// worth doing well before then. A journey that is not closing is the one situation in which asking about
+    /// the far side of it is worth the tiles.
+    /// </summary>
+    public int PlansSinceCloser => _plansSinceCloser;
+
+    /// <summary>
+    /// Whether the far side of this errand has already been looked at.
+    ///
+    /// Once per errand, not once per plan. What the look finds is a fact about the world, filed where the
+    /// whole population reads it, so asking again about the same destination would buy nothing and pay twice.
+    /// </summary>
+    public bool Probed { get; set; }
+
     /// <summary>The tiles left to walk on the current plan, in order.</summary>
     public IReadOnlyList<Point3D> Plan => _plan;
 
@@ -513,6 +530,7 @@ public sealed class BotJourney
             _awayErrand = Current;
             _bestAway = int.MaxValue;
             _plansSinceCloser = 0;
+            Probed = false;
         }
 
         if (away < _bestAway)

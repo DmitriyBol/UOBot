@@ -345,6 +345,16 @@ public static class BotPopulation
             return false;
         }
 
+        // Before it is moved: what has just been proved about this ground, written where everybody reads it.
+        //
+        // A dozen roads refused in a row from one tile is the strongest evidence of a pocket the shard ever
+        // produces, and until now the whole of it was spent carrying one bot home. The same ground goes on
+        // catching the next bot, and the log for the night says so — (1757, 976) took three, (1623, 1179) took
+        // three, (1651, 1112) took two. A look from where the bot is standing costs a couple of milliseconds
+        // and files the trap for the life of the shard, so the next bot is refused the road in rather than
+        // rescued out of it.
+        var trap = BotPath.Enclose(bot.Map, from, BotArrival.Exactly, urgent: true);
+
         if (!TryPlace(bot))
         {
             return false;
@@ -355,11 +365,12 @@ public static class BotPopulation
         Rescued++;
 
         logger.Error(
-            "{Name} the {Class} could get nowhere at all from {From} and has been carried home to {Where}",
+            "{Name} the {Class} could get nowhere at all from {From} and has been carried home to {Where}; the ground it was on is {Trap}",
             bot.Name,
             bot.Class?.Name,
             from,
-            bot.Location
+            bot.Location,
+            trap
         );
 
         return true;

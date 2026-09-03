@@ -67,7 +67,13 @@ public static class BotReach
     /// <summary>Pockets known. One line in the summary, and the only measure of what this is saving.</summary>
     public static int Pockets { get; private set; }
 
-    /// <summary>Journeys refused outright, without a search.</summary>
+    /// <summary>
+    /// Journeys refused outright, without a search.
+    ///
+    /// Only those. The walker also asks this question straight after a look at the far side has filed a new
+    /// pocket, and that one had a search — so it asks with the tally off. A saving that counts the searches it
+    /// did not save is not a measurement.
+    /// </summary>
     public static long Refused { get; private set; }
 
     /// <summary>Times two pockets turned out to be one because a bot walked between them.</summary>
@@ -87,7 +93,7 @@ public static class BotReach
     /// emptied its open set with nothing clipped. Anything less and this seals off ground that is
     /// perfectly reachable — the one failure here that would be worse than the problem it solves.
     /// </summary>
-    public static void Record(Map map, ICollection<int> cells)
+    public static void Record(Map map, ICollection<int> cells, Point3D where)
     {
         if (map == null || cells == null || cells.Count == 0)
         {
@@ -114,10 +120,14 @@ public static class BotReach
         _size[pocket] = cells.Count;
         Pockets++;
 
+        // The place is in the line, and it is not decoration. A wrongly filed pocket is silent and permanent
+        // — bots simply stop going somewhere and nothing says so — so every entry has to be auditable against
+        // the map by somebody reading the log afterwards.
         logger.Information(
-            "A pocket of {Count} tiles on {Map} has been walked to its edges; nothing outside it will be attempted from inside again",
+            "A pocket of {Count} tiles on {Map} around {Where} has been walked to its edges; journeys in or out of it will be refused without a search",
             cells.Count,
-            map
+            map,
+            where
         );
     }
 
@@ -131,7 +141,7 @@ public static class BotReach
     /// the ordinary case is a rounding error against a search.
     /// </para>
     /// </summary>
-    public static BotReachVerdict Ask(Map map, Point3D from, Point3D goal, BotArrival arrival)
+    public static BotReachVerdict Ask(Map map, Point3D from, Point3D goal, BotArrival arrival, bool tally = true)
     {
         if (map == null || _pocketOf.Count == 0)
         {
@@ -194,7 +204,10 @@ public static class BotReach
                 if (!hasHere)
                 {
                     // The far side is sealed and the near side is not in it. Nothing can get in.
-                    Refused++;
+                    if (tally)
+                    {
+                        Refused++;
+                    }
 
                     return BotReachVerdict.Sealed;
                 }
@@ -206,7 +219,10 @@ public static class BotReach
             return BotReachVerdict.Unknown;
         }
 
-        Refused++;
+        if (tally)
+        {
+            Refused++;
+        }
 
         return BotReachVerdict.Sealed;
     }
