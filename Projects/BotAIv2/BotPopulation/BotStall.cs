@@ -64,10 +64,6 @@ public static class BotStall
 
         public bool Stuck;
 
-        /// <summary>How many times this bot has been reported stalled without having left the spot.</summary>
-        public int Stalls;
-
-        public Point3D Stood;
     }
 
     private static readonly Dictionary<Serial, Watch> _watched = [];
@@ -80,8 +76,48 @@ public static class BotStall
     /// <summary>Stalls that were also a piece of work taken off a bot that could not finish it.</summary>
     public static long Freed { get; private set; }
 
-    /// <summary>Bots carried out of a pocket they kept stalling in. See the escalation in Report.</summary>
+    /// <summary>Bots carried out of a pocket that had already stalled somebody. See the escalation in Report.</summary>
     public static long Carried { get; private set; }
+
+    /// <summary>How long a spot is remembered as having stalled somebody.</summary>
+    public static int PocketMs { get; set; } = 1800000;
+
+    private static readonly List<(Point3D Where, long Until)> _pockets = [];
+
+    /// <summary>
+    /// Whether this spot has already stalled somebody, and records it if it has not.
+    ///
+    /// Half an hour, and within <see cref="Elbow"/> tiles: a pocket is a place a bot can walk into and not
+    /// out of, and those do not move. The list is short by construction — a shard with many of them has a
+    /// different problem and this will say so by growing.
+    /// </summary>
+    private static bool Pocket(Point3D where)
+    {
+        var now = Core.TickCount;
+
+        for (var i = _pockets.Count - 1; i >= 0; i--)
+        {
+            var (at, until) = _pockets[i];
+
+            if (now - until >= 0)
+            {
+                _pockets.RemoveAt(i);
+
+                continue;
+            }
+
+            if (Utility.InRange(where, at, Elbow))
+            {
+                _pockets[i] = (at, now + PocketMs);
+
+                return true;
+            }
+        }
+
+        _pockets.Add((where, now + PocketMs));
+
+        return false;
+    }
 
     /// <summary>The worst one seen: name, what it was doing, and for how long.</summary>
     public static string Worst { get; private set; }
@@ -170,28 +206,28 @@ public static class BotStall
             Freed++;
         }
 
-        // <b>And if taking the work away did not move it, the place is the fault and the bot is carried out
-        // of it.</b> BotPopulation.Rescue exists for exactly this and fires on a dozen refused roads with no
-        // step in between — which is the trapped bot that stands still. It is not the trapped bot that
-        // paces: a step of any kind clears that count, so a bot walking circles inside a pocket it cannot
-        // leave never reaches the limit. On 03.09.2026 one pocket at 1755-1757, 970-976 caught Merrick,
-        // Torvin, Kerrin, Perri, Edda 2, Bryn, Ilsa, Calla and Doran in turn, each for four minutes, each
-        // having its errand taken away and each still there afterwards; the elbow count ruled out their
-        // blocking one another, at one or two of ours nearby rather than a knot.
+        // <b>And if the ground itself has done this before, the bot is carried out of it.</b>
+        // BotPopulation.Rescue exists for exactly this and fires on a dozen refused roads with no step in
+        // between — which is the trapped bot that stands still. It is not the trapped bot that paces: a step
+        // of any kind clears that count, so a bot walking circles inside a pocket it cannot leave never
+        // reaches the limit.
         //
-        // Second report from the same spot, so the first is still a stall and only the second is a trap.
-        if (watch.Stalls > 0 && Utility.InRange(bot.Location, watch.Stood, Elbow))
+        // <b>Kept against the place rather than against the bot, and the first attempt at this was kept
+        // against the bot and never fired once.</b> It waited for one bot to be reported twice in the same
+        // spot; what actually happens is a queue of different bots each reported once. On 03.09.2026 the
+        // pocket at 1755-1758, 970-977 took Merrick, Torvin, Kerrin, Perri, Edda 2, Bryn, Ilsa, Calla,
+        // Doran and four more in eighteen minutes, one report apiece, with 0 carried out. Their
+        // destinations differed and the elbow count showed one or two of ours nearby rather than a knot, so
+        // the only thing they had in common was the ground — which is the rule this project has now written
+        // down four times: what one bot proves about a place is true for the next one along.
+        //
+        // The first bot to stall somewhere still just loses its errand. The second one there is lifted out.
+        if (Pocket(bot.Location))
         {
             if (BotPopulation.Rescue(bot))
             {
                 Carried++;
-                watch.Stalls = 0;
             }
-        }
-        else
-        {
-            watch.Stalls = 1;
-            watch.Stood = bot.Location;
         }
         Worst = $"{bot.Name} the {bot.Class?.Name}, {held / 60000} minutes on \"{doing}\" at {bot.Location}";
 
