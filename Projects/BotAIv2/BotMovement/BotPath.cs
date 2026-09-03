@@ -188,6 +188,20 @@ public static class BotPath
 
     public static long PartialRuns { get; private set; }
 
+    /// <summary>Proofs of a pocket thrown away, by the condition that threw them. See the note in the search.</summary>
+    public static long LostToClock { get; private set; }
+
+    public static long LostToBox { get; private set; }
+
+    public static long LostToAvoiding { get; private set; }
+
+    public static long LostToDoors { get; private set; }
+
+    public static long LostToSize { get; private set; }
+
+    /// <summary>Whether the goal was found. Named so the veto tally above reads as prose.</summary>
+    private static bool Reached2(int reached) => reached >= 0;
+
     public static long SealedRuns { get; private set; }
 
     public static double TotalMs { get; private set; }
@@ -200,6 +214,11 @@ public static class BotPath
         TilesExamined = 0;
         Reached = 0;
         PartialRuns = 0;
+        LostToClock = 0;
+        LostToBox = 0;
+        LostToAvoiding = 0;
+        LostToDoors = 0;
+        LostToSize = 0;
         SealedRuns = 0;
         TotalMs = 0.0;
         WorstMs = 0.0;
@@ -210,7 +229,7 @@ public static class BotPath
     public static string Describe() =>
         Searches == 0
             ? "no searches yet"
-            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright";
+            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one";
 
     /// <summary>
     /// Whether there is a way at all, without keeping the path. For vetting a candidate before committing
@@ -498,6 +517,36 @@ public static class BotPath
             Reached++;
 
             return BotPathOutcome.Reached;
+        }
+
+        // <b>Why a proof was thrown away, named rather than counted as one number.</b> A search that empties
+        // its open set has enumerated a pocket and can hand BotReach the most expensive fact on the shard
+        // for nothing — but four different conditions veto that, and until 03.09.2026 all four looked
+        // identical from outside: "0 refused outright", every window, all night. Widening the box turned a
+        // quarter of searches reaching their goal into more than half and still left that nought, so the box
+        // was not the only veto. These say which one it is, in the same sentence as the count they explain.
+        if (!Reached2(reached))
+        {
+            if (outOfTime)
+            {
+                LostToClock++;
+            }
+            else if (clipped)
+            {
+                LostToBox++;
+            }
+            else if (!avoid.Empty)
+            {
+                LostToAvoiding++;
+            }
+            else if (doorsShut)
+            {
+                LostToDoors++;
+            }
+            else if (_lookup.Count < MinPocket)
+            {
+                LostToSize++;
+            }
         }
 
         // Ground genuinely exhausted: the open set emptied, the clock had time left, the box never got in
