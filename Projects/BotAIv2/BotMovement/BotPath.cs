@@ -440,8 +440,8 @@ public static class BotPath
     /// Whether there is a way at all, without keeping the path. For vetting a candidate before committing
     /// to it — a place to wander to, a rally point, a spot to retreat onto.
     /// </summary>
-    public static bool CanReach(Map map, Point3D from, Point3D to, BotArrival arrival) =>
-        Find(map, from, to, arrival, _scratch) == BotPathOutcome.Reached;
+    public static bool CanReach(Map map, Point3D from, Point3D to, BotArrival arrival, double ceilingMs = 0.0) =>
+        Find(map, from, to, arrival, _scratch, ceilingMs: ceilingMs) == BotPathOutcome.Reached;
 
     /// <summary>
     /// Whether there is a way there <em>without going through a door</em> — which is how "is that spot out
@@ -1127,7 +1127,13 @@ public static class BotPath
             return FloorMs;
         }
 
-        return Math.Clamp(Math.Min(requested, left), FloorMs, CeilingMs);
+        // <b>A caller that names its own ceiling is asking for more than the ordinary one, and clamping it
+        // back down to the ordinary one made the request a lie.</b> BotScoutmaster asks for three hundred
+        // milliseconds before it commits six bots to a five-hundred-tile walk; clamped to sixty it would
+        // refuse every honest journey of that length. The population's window still binds — nobody gets more
+        // than is left of the second — and Starved says so when it bites, which is how a caller knows its
+        // answer was cut short rather than concluded.
+        return Math.Clamp(Math.Min(requested, left), FloorMs, Math.Max(CeilingMs, requested));
     }
 
     private static void Spend(double ms) => _spentThisWindow += ms;

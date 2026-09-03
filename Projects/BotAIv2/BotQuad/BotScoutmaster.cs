@@ -57,6 +57,18 @@ public sealed class BotScoutmaster : IBotProposer
 
     public static long Offered { get; private set; }
 
+    /// <summary>
+    /// What one look before committing a party may cost.
+    ///
+    /// Five times an ordinary search, because the journey being vetted is five hundred tiles long and an
+    /// ordinary ceiling would refuse every honest one of them. Asked about twice a minute across the whole
+    /// population, so a third of a second is a rounding error against the walk it is deciding.
+    /// </summary>
+    public static double VetMs { get; set; } = 300.0;
+
+    /// <summary>Looks that were handed less clock than they asked for, and so concluded nothing.</summary>
+    public static long Cramped { get; private set; }
+
     public BotDeed Propose(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -129,6 +141,44 @@ public sealed class BotScoutmaster : IBotProposer
             return null;
         }
 
+        // <b>One real search before six bots are committed to a five-minute walk, and it is the only place on
+        // this shard where that trade is obviously worth making.</b>
+        //
+        // Reachable above is a dictionary lookup against pockets somebody has already proved closed, and it
+        // cannot see the thing that actually stops a scouting party: water. The frontier offers the nearest
+        // ground nobody has stood in, the population has by now walked out to its own coast, so the nearest
+        // unknown ground is across it. Aldric took a party to (885, 2205), to (1005, 1185), to (975, 1185);
+        // Baldric to (1845, 975) and (1065, 1095); every one of them ended with the party standing a hundred
+        // and fifty tiles short and the errand taken off them by the stall watch. Six bots, five minutes,
+        // each time, and the members are Bound throughout so none of them has work of its own.
+        //
+        // The cost is one search of a few hundred milliseconds against thirty bot-minutes, asked about twice
+        // a minute across the whole population. See BotBolt.Retreat for the same reasoning in the same words:
+        // it is for nobody to offer running to somebody who cannot run.
+        //
+        // Snapshotted so a starved search cannot be mistaken for an answer. If the population's second was
+        // already spent the look got FloorMs, which proves nothing about the island, and striking a square off
+        // the frontier is permanent.
+        var cramped = BotPath.Starved;
+
+        if (!BotPath.CanReach(map, body.Location, where, BotArrival.Within(BotQuad.Side / 3), VetMs))
+        {
+            if (BotPath.Starved != cramped)
+            {
+                Cramped++;
+
+                return null;
+            }
+
+            // Marked read, exactly as BotScout.Bend marks a square it steps past, and for the same reason: it
+            // genuinely is known now — known to be out of reach of where the population lives — and leaving it
+            // unread offers it again on the next beat, which is the loop this whole file exists to end.
+            BotQuad.Seen(map, where);
+            Sealed++;
+
+            return null;
+        }
+
         Offered++;
 
         return new BotScout(map, where);
@@ -180,7 +230,7 @@ public sealed class BotScoutmaster : IBotProposer
             ? $"no captain has ever been offered a scouting party ({NotACaptain} answers went to bots that are not captains)"
             : $"{Asked} times a captain was asked to scout: {Offered} were offered unknown ground, {Held} were already in a company, "
               + $"{Unfit} were too hurt, {Poor} could not pay {BotScout.Wage}gp and keep {BotScout.Solvent} (the fattest purse among them held {Richest}gp), "
-              + $"{Charted} found everything within {BotScout.Range} tiles already walked, {Sealed} found no way through to it, "
+              + $"{Charted} found everything within {BotScout.Range} tiles already walked, {Sealed} found no way through to it and were struck off the frontier, {Cramped} could not be looked at for want of clock, "
               + $"{TooFewNear} had too few free bots near; {BotScout.Describe()}";
 
     public static void Forget()
@@ -193,6 +243,7 @@ public sealed class BotScoutmaster : IBotProposer
         Richest = 0;
         Charted = 0;
         Sealed = 0;
+        Cramped = 0;
         TooFewNear = 0;
         Offered = 0;
 
