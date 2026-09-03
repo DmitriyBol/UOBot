@@ -365,12 +365,7 @@ public sealed class BotScout : BotDeed
         // honestly — the island within reach has been read, which is the errand succeeding, not failing.
         if (_read < _rounds)
         {
-            var next = BotQuad.Frontier(
-                _map,
-                body.Location,
-                Range,
-                at => Within(at) && Reachable(_map, body.Location, at)
-            );
+            var next = NextSquare(body);
 
             if (next != Point3D.Zero)
             {
@@ -514,12 +509,7 @@ public sealed class BotScout : BotDeed
             return false;
         }
 
-        var next = BotQuad.Frontier(
-            _map,
-            body.Location,
-            Range,
-            at => Within(at) && Reachable(_map, body.Location, at)
-        );
+        var next = NextSquare(body);
 
         if (next == Point3D.Zero || next == _where)
         {
@@ -628,6 +618,69 @@ public sealed class BotScout : BotDeed
     /// <summary>Whether the ground between here and there is not already known to be closed.</summary>
     private static bool Reachable(Map map, Point3D from, Point3D at) =>
         BotReach.Ask(map, from, at, BotArrival.Within(BotQuad.Side / 3)) != BotReachVerdict.Sealed;
+
+    /// <summary>
+    /// The next square on the frontier that this party could actually walk to.
+    ///
+    /// <para>
+    /// <b>BotScoutmaster looks for a way before it commits a party; this is the same question asked again
+    /// every time the route moves on, and it was not being asked at all.</b> A Baron's rounds walk twenty
+    /// squares and pick each one here, so the vet at the gate covers the first and none of the other
+    /// nineteen. Baldric stood at (1108, 806) for four minutes on the first square of a round on 03.09.2026
+    /// and at (1190, 750) for nine on the seventh, and two of the nine stalls in that three-quarters of an
+    /// hour were his rounds alone.
+    /// </para>
+    ///
+    /// <para>
+    /// A square with no way to it is marked read before the next is asked for, so the frontier advances
+    /// instead of handing back the same answer — the loop this file has now been fixed against three times.
+    /// A search handed less clock than it asked for concludes nothing and the square is left alone: striking
+    /// one off is permanent, and a starved search has not looked at the island.
+    /// </para>
+    /// </summary>
+    private Point3D NextSquare(Mobile body)
+    {
+        for (var tries = 0; tries < Vets; tries++)
+        {
+            var next = BotQuad.Frontier(
+                _map,
+                body.Location,
+                Range,
+                at => Within(at) && Reachable(_map, body.Location, at)
+            );
+
+            if (next == Point3D.Zero)
+            {
+                return Point3D.Zero;
+            }
+
+            var cramped = BotPath.Starved;
+
+            if (BotPath.CanReach(_map, body.Location, next, BotArrival.Within(BotQuad.Side / 3), BotScoutmaster.VetMs))
+            {
+                return next;
+            }
+
+            if (BotPath.Starved != cramped)
+            {
+                return Point3D.Zero;
+            }
+
+            BotQuad.Seen(_map, next);
+            Unreached++;
+        }
+
+        return Point3D.Zero;
+    }
+
+    /// <summary>
+    /// How many squares to look for a way to before giving this beat up.
+    ///
+    /// Three, because each one costs a real search and the round comes back in a few seconds anyway. The
+    /// ones struck off stay struck off, so a coast of unreachable squares is worked through a few at a time
+    /// rather than all at once inside a single tick.
+    /// </summary>
+    public static int Vets { get; set; } = 3;
 
     private void Disband(IBotSquadMember member)
     {
