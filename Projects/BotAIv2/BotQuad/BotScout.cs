@@ -632,13 +632,21 @@ public sealed class BotScout : BotDeed
             return;
         }
 
-        var squad = member?.Squad;
+        // <b>The whole party, and it used to be the leader alone.</b> Dropping the charge was meant to let
+        // the company end itself on its next beat, and it cannot: a company dissolves at nought members or at
+        // one uncharged, and this leaves five. They inherit a leader with no errand and sit on the Bound rung,
+        // where the auction is switched off, so not one of them has any work of its own to walk away to.
+        // Every bot the stall watch caught standing still on 03.09.2026 was "in a company"; the captain
+        // beside them was "on its own", having been the one bot Leave took out.
+        //
+        // Update's own rule is that whoever charged a company owns ending it. This errand charged it.
+        var squad = _squad ?? member?.Squad;
 
         if (squad != null)
         {
-            // The charge is what kept the party alive with nothing to fight; dropping it is how it ends,
-            // rather than by dissolving a company out from under bots that may be in a fight by now.
             squad.Charged = false;
+
+            BotSquads.Disband(squad, "the errand that raised it is over");
         }
 
         BotSquads.Leave(member);

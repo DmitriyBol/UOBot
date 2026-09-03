@@ -401,6 +401,28 @@ public static class BotSquads
         }
     }
 
+    /// <summary>
+    /// Takes a whole company apart, for whoever raised it.
+    ///
+    /// <para>
+    /// <b>Update's own rule is that whoever set the charge owns ending the company, and there was no way for
+    /// an owner to do it.</b> BotScout.Disband says in its summary that it lets the party go, and what it had
+    /// was Leave, which detaches one bot — the leader. The other five inherited a new leader with no errand
+    /// and stood there: a company only dissolves itself at nought members or at one uncharged, and five bots
+    /// on the Bound rung have no work of their own to walk away to. On 03.09.2026 every bot the stall watch
+    /// caught standing still was reported "in a company", and the captain beside them "on its own".
+    /// </para>
+    /// </summary>
+    public static void Disband(BotSquad squad, string why)
+    {
+        if (squad == null || !_squads.Contains(squad))
+        {
+            return;
+        }
+
+        Dissolve(squad, why);
+    }
+
     private static void Dissolve(BotSquad squad, string why)
     {
         var members = squad.Members;
