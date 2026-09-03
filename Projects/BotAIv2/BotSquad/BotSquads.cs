@@ -86,8 +86,30 @@ public static class BotSquads
         BotSpoils.Reset();
     }
 
-    public static string Describe() =>
-        $"{Count} squads standing, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them; {BotSpoils.Describe()}";
+    /// <summary>
+    /// The companies in a sentence, and how many bots they are holding.
+    ///
+    /// <para>
+    /// <b>The count of bots bound to a company was the one figure this line did not carry, and it is the one
+    /// with a consequence.</b> A bound bot does not take part in the auction at all — the ladder answers for
+    /// it — so a company standing about is not merely idle, it is a hole in the population's working time
+    /// that nothing else on the shard reports. On 03.09.2026 at 08:13 the stall watch caught Faron 2 the
+    /// Healer four minutes into "fell in with company 3", and answering how common that was meant grepping
+    /// an hour of log for the phrase. Squads standing, formed and disbanded were all here; how many bots
+    /// were inside them was not.
+    /// </para>
+    /// </summary>
+    public static string Describe()
+    {
+        var bound = 0;
+
+        for (var i = 0; i < _squads.Count; i++)
+        {
+            bound += _squads[i]?.Count ?? 0;
+        }
+
+        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them; {BotSpoils.Describe()}";
+    }
 
     /// <summary>
     /// Calls a squad together. Whoever calls it leads it.
