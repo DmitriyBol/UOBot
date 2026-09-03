@@ -333,6 +333,13 @@ public static class BotWalk
         // planner has. The signal that tells them apart is already here — a journey that has drawn a plan and
         // got no closer — so the cheap search goes first and the whole ceiling is bought only where the cheap
         // one has been shown to fail.
+        //
+        // <b>Two of them, not one, and the first setting was one.</b> A single plan that fails to better the
+        // errand's best distance is ordinary noise - a chase whose quarry stepped away, a road whose leg ended
+        // slightly wide - and buying the whole ceiling for it put a third of all searches back on sixty
+        // milliseconds, which was most of the bill this change exists to cut. Two in a row is the same
+        // threshold the far side is asked at, and for the same reason: it is the point at which "far off" and
+        // "shut in" stop looking alike.
         var outcome = BotPath.Find(
             map,
             bot.Location,
@@ -340,7 +347,7 @@ public static class BotWalk
             journey.Arrival,
             _path,
             journey.Avoid(bot.Location),
-            journey.PlansSinceCloser > 0 ? BotPath.CeilingMs : 0.0
+            journey.PlansSinceCloser >= PlansBeforeAskingTheFarSide ? BotPath.CeilingMs : 0.0
         );
 
         // A statement about the world, and therefore worth acting on at once. The first version spent

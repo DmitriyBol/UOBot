@@ -346,6 +346,15 @@ public static class BotPath
     /// <summary>How far the partials were going, added up, so the average can be printed.</summary>
     public static long PartialSpan { get; private set; }
 
+    /// <summary>
+    /// Partials that never began: the bot's own tile forbids all eight directions.
+    ///
+    /// Counted apart because it is the one partial that is not about the destination at all, and because it
+    /// leaves the other three counters — a search that returns before the loop adds nothing to them, so
+    /// without this the breakdown quietly fails to add up and the difference is invisible.
+    /// </summary>
+    public static long PartialUnfooted { get; private set; }
+
     /// <summary>What counts as near enough that a full search of the box is not what was wanted.</summary>
     public const int Near = 32;
 
@@ -408,6 +417,7 @@ public static class BotPath
         PartialNear = 0;
         PartialStill = 0;
         PartialSpan = 0;
+        PartialUnfooted = 0;
         Probes = 0;
         Enclosed = 0;
         ProbedTooBig = 0;
@@ -424,7 +434,7 @@ public static class BotPath
     public static string Describe() =>
         Searches == 0
             ? "no searches yet"
-            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; {Starved} were handed less clock than they asked for and {Lengthened} asked for the whole ceiling because they were not closing; of the partials {PartialNear} were going somewhere within {Near} tiles and {PartialStill} ended no nearer than they started, the average one {(PartialRuns > 0 ? PartialSpan / PartialRuns : 0)} tiles out; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand";
+            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; {Starved} were handed less clock than they asked for and {Lengthened} asked for the whole ceiling because they were not closing; of the partials {PartialNear} were going somewhere within {Near} tiles and {PartialStill} ended no nearer than they started and {PartialUnfooted} never began because the bot's own tile forbids every direction, the average one {(PartialRuns > PartialUnfooted ? PartialSpan / (PartialRuns - PartialUnfooted) : 0)} tiles out; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand";
 
     /// <summary>
     /// Whether there is a way at all, without keeping the path. For vetting a candidate before committing
@@ -545,6 +555,7 @@ public static class BotPath
         if (BotStep.Mask(map, from.X, from.Y, startZ).WalkMask == 0)
         {
             PartialRuns++;
+            PartialUnfooted++;
 
             return BotPathOutcome.Partial;
         }

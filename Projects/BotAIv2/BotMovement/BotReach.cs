@@ -167,6 +167,7 @@ public static class BotReach
         // as long as it will put up with getting nowhere. The pocket was already paid for. It should
         // answer.
         var reach = Math.Min(arrival.Tiles, MaxSweep);
+        var goalZ = (sbyte)Math.Clamp(goal.Z, sbyte.MinValue, sbyte.MaxValue);
 
         for (var dx = -reach; dx <= reach; dx++)
         {
@@ -177,39 +178,41 @@ public static class BotReach
 
                 Probes++;
 
-                if (!BotStep.Settle(map, x, y, out var z))
+                // <b>Two heights, and asking about only one of them made this ledger unable to answer for
+                // the pockets it had just filed itself.</b> The goal's own Z is where the thing being walked
+                // to actually is - a skeleton on a crypt roof at thirty - and it is the height BotPath.Enclose
+                // floods from, so it is the height the pocket gets written at. Settle finds the ground under
+                // that roof, at zero, which is a different cell in a different band and is not in any pocket.
+                // So the question came back Unknown, the search ran the full ceiling, the look at the far
+                // side flooded the same roof again and BotReach.Record threw it away as already known - six
+                // times out of ten on 03.09.2026 at 11:34, with three refusals to show for four pockets.
+                //
+                // Both are asked and neither is dropped: the goal's own height for somewhere a body is
+                // standing, the settled height for a goal whose Z is a market stall or a creature in flight.
+                var settled = BotStep.Settle(map, x, y, out var z);
+                var verdict = Look(map, BotStep.Cell(x, y, goalZ), hasHere, here, tally);
+
+                if (verdict != BotReachVerdict.Unknown)
                 {
-                    continue;
+                    return verdict;
                 }
 
-                if (!_pocketOf.TryGetValue(Fold(map, BotStep.Cell(x, y, z)), out var there))
+                if (settled && z != goalZ)
                 {
-                    // Somewhere near the goal is ground nobody has filed. Whatever else is true, this
-                    // journey is not provably impossible.
-                    if (!hasHere)
+                    verdict = Look(map, BotStep.Cell(x, y, z), hasHere, here, tally);
+
+                    if (verdict != BotReachVerdict.Unknown)
                     {
-                        return BotReachVerdict.Unknown;
+                        return verdict;
                     }
-
-                    continue;
                 }
 
-                there = Root(there);
-
-                if (hasHere && there == here)
+                // Somewhere near the goal is ground nobody has filed. Whatever else is true, this journey is
+                // not provably impossible. Only said when there was ground to speak of: a height with no
+                // floor under it is not evidence that the way is open.
+                if (!hasHere && settled)
                 {
-                    return BotReachVerdict.Connected;
-                }
-
-                if (!hasHere)
-                {
-                    // The far side is sealed and the near side is not in it. Nothing can get in.
-                    if (tally)
-                    {
-                        Refused++;
-                    }
-
-                    return BotReachVerdict.Sealed;
+                    return BotReachVerdict.Unknown;
                 }
             }
         }
@@ -219,6 +222,35 @@ public static class BotReach
             return BotReachVerdict.Unknown;
         }
 
+        if (tally)
+        {
+            Refused++;
+        }
+
+        return BotReachVerdict.Sealed;
+    }
+
+    /// <summary>
+    /// What one filed cell says about this journey, or Unknown when it says nothing.
+    ///
+    /// Unknown carries two different meanings here and the caller separates them: the cell is in no pocket at
+    /// all, or it is in one that neither confirms nor refuses this journey. Both mean "keep looking".
+    /// </summary>
+    private static BotReachVerdict Look(Map map, int cell, bool hasHere, int here, bool tally)
+    {
+        if (!_pocketOf.TryGetValue(Fold(map, cell), out var there))
+        {
+            return BotReachVerdict.Unknown;
+        }
+
+        there = Root(there);
+
+        if (hasHere)
+        {
+            return there == here ? BotReachVerdict.Connected : BotReachVerdict.Unknown;
+        }
+
+        // The far side is sealed and the near side is not in it. Nothing can get in.
         if (tally)
         {
             Refused++;
