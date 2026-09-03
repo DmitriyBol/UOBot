@@ -321,6 +321,15 @@ public sealed class BotScout : BotDeed
         {
             Timedout++;
 
+            // <b>Marked here rather than in Drop, because Disband clears the squad on the line below and
+            // Drop's first test is that the squad exists.</b> So the one ending that reliably reaches this
+            // errand's own time limit was the one ending that recorded nothing, and Baldric was offered
+            // (1065, 1095) at 14:32, gave up on it at 14:42, and would have been offered it again. The square
+            // is known now — known to be further than a party can walk in the time it is given — which is the
+            // same fact Bend records about a square it steps past.
+            BotQuad.Seen(_map, _where);
+            Unreached++;
+
             Disband(member);
 
             return BotDoing.Done($"gave up on reaching ({_where.X}, {_where.Y})");
