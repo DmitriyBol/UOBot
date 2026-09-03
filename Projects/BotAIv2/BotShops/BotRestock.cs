@@ -172,7 +172,8 @@ public sealed class BotRestock : BotDeed
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
             // The distance the work itself asks for, on the line above. See BotArrival.Beside.
-            return BotDoing.Walk(_shop.Map, _shop.Location, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name}");
+            // Followed rather than aimed at: a shopkeeper wanders. See BotPeddle for the whole reason.
+            return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name}");
         }
 
         _bought = BotShops.Buy(bot, _shop, _wanted, _amount, out var refused);

@@ -141,7 +141,16 @@ public sealed class BotPeddle : BotDeed
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
             // The distance the work itself asks for, on the line above. See BotArrival.Beside.
-            return BotDoing.Walk(_shop.Map, _shop.Location, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} with {_label}");
+            // <b>Followed rather than aimed at, because a shopkeeper wanders.</b> A walk order to a point is
+            // matched by that point, so a vendor that shuffles one tile behind its counter makes every beat a
+            // fresh order: the journey is replaced, and with it every counter that would have said this was
+            // going nowhere — MaxEmptyPlans, MaxPlansWithoutCloser and StallAttempts all reset before any of
+            // them can fire. That is why a stuck errand of this kind is silent. On 03.09.2026 at 04:16 the
+            // roll-call had Doran the Crafter on peddle for 210 seconds and Calla for 182, neither arriving,
+            // neither failing, and nothing in the log at all. BotDoing.Walk's follow form matches on the
+            // mobile itself, so the order stands still while the shopkeeper does not. Every errand that walks
+            // to a counter is changed with it — sew, restock, acquire and inscribe have the same shape.
+            return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} with {_label}");
         }
 
         // The goods stay in the market until the bot is standing at the counter, and that is not tidiness. A

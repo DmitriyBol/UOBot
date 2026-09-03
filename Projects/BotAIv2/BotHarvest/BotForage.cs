@@ -74,6 +74,9 @@ public sealed class BotForage : BotDeed
 
     private int _worth;
 
+    /// <summary>The pile this trip is walking to, held until it is picked up or lost. See the note in Advance.</summary>
+    private Item _lying;
+
     public BotForage(Map map, Point3D where)
     {
         _map = map;
@@ -173,7 +176,22 @@ public sealed class BotForage : BotDeed
             return Finish(bot, body, "the pack is too full to stoop");
         }
 
-        var lying = Nearest(body, Reach);
+        // <b>Held for the length of the approach, and not held was why this errand could stall in silence.</b>
+        // The nearest pile was chosen afresh on every beat, so two piles at much the same distance swapped
+        // places as the bot moved a tile and each swap was a different walk order. A journey replaced is a
+        // journey whose counters start again — MaxEmptyPlans, MaxPlansWithoutCloser and StallAttempts all of
+        // them — so the three backstops the movement layer keeps for exactly this could never reach their
+        // limits. On the night of 02-03.09.2026 that showed as three different bots stuck at one place:
+        // Lysa the Warrior held forage for 922 seconds at 1424,1632, Nessa for 360 and Edda 2 for 228, none
+        // of them arriving, none failing, and not a line in the log about any of it.
+        //
+        // Re-chosen only when the held one is gone — picked up by somebody else, or now out of reach.
+        if (_lying is not { Deleted: false, Movable: true } || !body.InRange(_lying.GetWorldLocation(), Reach))
+        {
+            _lying = Nearest(body, Reach);
+        }
+
+        var lying = _lying;
 
         if (lying == null)
         {
@@ -184,6 +202,8 @@ public sealed class BotForage : BotDeed
         {
             return BotDoing.Walk(_map, lying.GetWorldLocation(), BotArrival.Within(Touch), "after reagents");
         }
+
+        _lying = null;
 
         var amount = Math.Max(1, lying.Amount);
 

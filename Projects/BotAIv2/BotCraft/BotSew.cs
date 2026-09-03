@@ -401,7 +401,8 @@ public sealed class BotSew : BotDeed
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
             // The distance the work itself asks for, on the line above. See BotArrival.Beside.
-            return BotDoing.Walk(_shop.Map, _shop.Location, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for {_stuff.Name}");
+            // Followed rather than aimed at: a shopkeeper wanders. See BotPeddle for the whole reason.
+            return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for {_stuff.Name}");
         }
 
         if (BotShops.Buy(bot, _shop, _stuff, _take, out var refused) <= 0)
