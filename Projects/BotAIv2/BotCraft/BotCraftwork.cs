@@ -45,7 +45,26 @@ public static class BotCraftwork
     /// cannot finish is a swing that produces a message nobody reads.
     /// </para>
     /// </summary>
-    public static CraftItem Choose(Mobile bot, CraftSystem system, SkillName skill, Type material)
+    /// <param name="stock">
+    /// How much of the material the bot can actually put on the anvil, or nought when the caller does not
+    /// know.
+    ///
+    /// <para>
+    /// <b>Without it this picks the hardest thing the skill allows and never asks whether the pack can pay
+    /// for it, and that is a defect of the shape this project has now found five times: two thresholds on
+    /// one shelf.</b> BotSmith offers forge work to anybody holding six ingots; this chose plate legs, which
+    /// eat far more; the bot walked to the forge and reported "out of metal" a quarter of a minute later.
+    /// Godric the architect did that four times in four minutes on 03.09.2026, and would have gone on doing
+    /// it, because the refusal happens at the anvil and the offer is made in a field.
+    /// </para>
+    ///
+    /// <para>
+    /// Choosing a lesser piece is the right answer rather than a compromise: a smith with eight ingots
+    /// making a ring mail sleeve has made something, gained skill and put a thing on the market, and will be
+    /// offered the plate legs on the day it has the metal for them.
+    /// </para>
+    /// </param>
+    public static CraftItem Choose(Mobile bot, CraftSystem system, SkillName skill, Type material, int stock = 0)
     {
         if (bot == null || system == null || material == null)
         {
@@ -70,6 +89,11 @@ public static class BotCraftwork
             var needs = Requirement(recipe, skill);
 
             if (needs > able - Margin || needs <= bestNeeds)
+            {
+                continue;
+            }
+
+            if (stock > 0 && Cost(recipe) > stock)
             {
                 continue;
             }

@@ -116,6 +116,12 @@ public static class BotThread
         var skill = bot.Skills[SkillName.Tailoring].Value;
         var recipes = system.CraftItems;
 
+        // What the pack can actually pay for. The smith's twin of this had the same hole and it showed as a
+        // bot walking to a forge and reporting "out of metal" four times in four minutes: the offer is made
+        // on a floor of a few units and the recipe is chosen for difficulty, so the two numbers never had to
+        // agree. See BotCraftwork.Choose.
+        var held = bot.Backpack?.GetAmount(material) ?? 0;
+
         CraftItem best = null;
         var bestNeeds = -1.0;
 
@@ -134,6 +140,11 @@ public static class BotThread
             var needs = Requirement(recipe);
 
             if (needs > skill - Margin)
+            {
+                continue;
+            }
+
+            if (BotCraftwork.Cost(recipe) > held)
             {
                 continue;
             }

@@ -142,7 +142,51 @@ public static class BotAnvil
     }
 
     /// <summary>The hardest thing this bot can still reliably beat out of iron, or null.</summary>
-    public static CraftItem Choose(Mobile bot) => BotCraftwork.Choose(bot, System, Skill, Metal);
+    /// <summary>
+    /// The most of any one metal this smith could actually swing with.
+    ///
+    /// <para>
+    /// A recipe is paid for out of a single metal — <see cref="Best"/> picks which — so what decides whether
+    /// a piece can be made is the largest single pile, not the total. A bot holding eight iron and eight
+    /// bronze can make an eight-ingot piece and not a sixteen-ingot one, and adding them up would say
+    /// otherwise.
+    /// </para>
+    /// </summary>
+    public static int Stock(Mobile bot)
+    {
+        var system = System;
+        var pack = bot?.Backpack;
+
+        if (system == null || pack == null)
+        {
+            return 0;
+        }
+
+        var able = bot.Skills[Skill].Value;
+        var metals = system.CraftSubRes;
+        var most = pack.GetAmount(Metal);
+
+        for (var i = 0; i < metals.Count; i++)
+        {
+            var metal = metals.GetAt(i);
+
+            if (metal?.ItemType == null || metal.RequiredSkill > able)
+            {
+                continue;
+            }
+
+            var held = pack.GetAmount(metal.ItemType);
+
+            if (held > most)
+            {
+                most = held;
+            }
+        }
+
+        return most;
+    }
+
+    public static CraftItem Choose(Mobile bot) => BotCraftwork.Choose(bot, System, Skill, Metal, Stock(bot));
 
     /// <summary>The recipe for exactly this thing, if this bot could make one. For orders off the board.</summary>
     public static CraftItem Recipe(Mobile bot, Type wanted) =>

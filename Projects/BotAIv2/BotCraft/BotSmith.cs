@@ -47,6 +47,9 @@ public sealed class BotSmith : IBotProposer
     /// <summary>Orders passed over for want of iron rather than for want of skill. Counted apart on purpose.</summary>
     public static long ShortOfMetal { get; private set; }
 
+    /// <summary>Smiths past the metal floor whose pack could still not fill any recipe their skill allows.</summary>
+    public static long NothingAffordable { get; private set; }
+
     public static long OnSpec { get; private set; }
 
     public string Name => "Smith";
@@ -124,9 +127,19 @@ public sealed class BotSmith : IBotProposer
             return new BotForge(map, smithy, order);
         }
 
+        // Nothing the pack can pay for. A named nought rather than a silent return: this is the branch that
+        // now catches what used to walk to the forge and report "out of metal" there, so if it ever reads
+        // high next to a healthy NoMetal the two floors have drifted apart again.
+        if (BotAnvil.Choose(body) == null)
+        {
+            NothingAffordable++;
+
+            return null;
+        }
+
         OnSpec++;
 
-        return BotAnvil.Choose(body) == null ? null : new BotForge(map, smithy);
+        return new BotForge(map, smithy);
     }
 
     /// <summary>
@@ -207,7 +220,7 @@ public sealed class BotSmith : IBotProposer
         Asked == 0
             ? "nobody with a hammer has been asked to forge"
             : $"{Asked} asked: {ToOrder} took an order off the board, {ShortOfMetal} passed one over for want of iron, {OnSpec} forged on spec, "
-              + $"{NoMetal} short of metal, {NoForge} with no forge in reach";
+              + $"{NoMetal} short of metal, {NothingAffordable} with metal but not enough for any recipe they can work, {NoForge} with no forge in reach";
 
     public static void Forget()
     {
@@ -220,6 +233,7 @@ public sealed class BotSmith : IBotProposer
         NoForge = 0;
         ToOrder = 0;
         ShortOfMetal = 0;
+        NothingAffordable = 0;
         OnSpec = 0;
     }
 }
