@@ -230,6 +230,9 @@ public sealed class BotForage : BotDeed
         }
 
         _gathered += amount;
+
+        // Ground that paid while a bot stooped on it. See BotQuad.Harvested.
+        BotQuad.Harvested(body.Map, body.Location);
         _worth += amount * BotAuction.Worth(kind, Guess);
 
         // Held so the errand can put its takings out at the end. The stack may have merged into another, in

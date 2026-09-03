@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Server.Logging;
+using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
@@ -63,7 +64,7 @@ public static class BotQuad
     /// Three, by order, and counted rather than timed: a crossing is a bot going in and coming out with
     /// nothing having happened to it, which is evidence about the ground. Time passing is not.
     /// </summary>
-    public static int PerPass { get; set; } = 3;
+    public static int PerPass { get; set; } = 25;
 
     /// <summary>What those crossings are worth.</summary>
     public static double PassWorth { get; set; } = 0.05;
@@ -78,10 +79,55 @@ public static class BotQuad
     /// company was being taken apart; at two it says so while there is still somebody to tell.
     /// </para>
     /// </summary>
-    public static int PerBlows { get; set; } = 2;
+    public static int PerBlows { get; set; } = 5;
 
     /// <summary>What that many blows costs a square.</summary>
     public static double BlowsWorth { get; set; } = -0.01;
+
+    /// <summary>
+    /// How many undisturbed harvests it takes to earn a square a little credit.
+    ///
+    /// <para>
+    /// Fifty, by Patrick's order of 03.09.2026, and it is a second kind of evidence rather than more of the
+    /// first. A crossing says a bot walked through and nothing happened; a harvest says a bot <em>stood
+    /// still</em> here for a minute with its back to the field and nothing happened, which is a stronger
+    /// claim about the ground and rarer, so it is worth a fifth as much and asked for twenty times as often.
+    /// </para>
+    /// </summary>
+    public static int PerHarvest { get; set; } = 50;
+
+    /// <summary>What that many undisturbed harvests are worth.</summary>
+    public static double HarvestWorth { get; set; } = 0.01;
+
+    /// <summary>
+    /// What one aggressive creature living in a square costs it.
+    ///
+    /// <para>
+    /// <b>The only term here that is about the present rather than the past.</b> Crossings, blows and deaths
+    /// are history and stay in the record; this is a count of what is standing in the square now, so it is
+    /// held apart from the earned reading and applied when the reading is asked for. Ground the population
+    /// has walked a hundred times is still ground with four ogres on it, and the record alone could not say
+    /// so — the old map's worst square on the whole island read minus nought point one six.
+    /// </para>
+    ///
+    /// <para>
+    /// A tenth each, so two of them cancel every crossing credit a square can hold and ten make it as
+    /// dangerous as the map can say.
+    /// </para>
+    /// </summary>
+    public static double MobWorth { get; set; } = -0.1;
+
+    /// <summary>
+    /// The reading at or below which a bot has to think about whether it is strong enough to go.
+    ///
+    /// <para>
+    /// Above it there is nothing to weigh: a square this quiet is walked without a thought, which is what
+    /// "bots are not afraid of anything above 0.05" means. At or below it the answer comes from
+    /// <see cref="Muscle"/>, and it is a wall rather than a discount — a bot that cannot meet it does not go
+    /// alone, whatever the work there is worth.
+    /// </para>
+    /// </summary>
+    public static double Fearless { get; set; } = 0.05;
 
     /// <summary>
     /// What one death costs a square.
@@ -91,7 +137,7 @@ public static class BotQuad
     /// evidence that ground is beyond whoever went there — the same reasoning, and very nearly the same
     /// ratio, as <see cref="BotPeril.PerDeath"/>.
     /// </summary>
-    public static double DeathWorth { get; set; } = -0.1;
+    public static double DeathWorth { get; set; } = -0.05;
 
     /// <summary>
     /// What the death of a Baron costs a square.
@@ -371,6 +417,27 @@ public static class BotQuad
         /// <summary>Blows counted towards the next step down.</summary>
         public int Bruising;
 
+        /// <summary>Harvests this square has seen finished on it.</summary>
+        public int Harvests;
+
+        /// <summary>How many of those since the last credit, or since the last blow landed here.</summary>
+        public int Reaping;
+
+        /// <summary>
+        /// Aggressive creatures counted in this square the last time anybody looked.
+        ///
+        /// <para>
+        /// Not history and never added up: it is replaced by each look, because what is wanted is how many
+        /// things are living here now. Unique by the count itself — one sweep of the square cannot see the
+        /// same creature twice — which is what "each unique enemy is written into the square's count" asks
+        /// for without a set of serials per square and the bookkeeping that would need.
+        /// </para>
+        /// </summary>
+        public int Mobs;
+
+        /// <summary>When that count was taken, so a stale one can be let go of.</summary>
+        public long Sighted;
+
         /// <summary>Blows landed on the crown's rangers here, counted towards their own coarser step.</summary>
         public int RangerBruising;
 
@@ -579,8 +646,245 @@ public static class BotQuad
     public static Quad Known(Map map, Point3D where) =>
         map == null || map == Map.Internal ? null : _quads.GetValueOrDefault(Key(map, where));
 
-    /// <summary>What this ground reads, or <see cref="Fresh"/> where nothing is known.</summary>
-    public static double Safety(Map map, Point3D where) => Known(map, where)?.Safety ?? Fresh;
+    /// <summary>
+    /// What this ground reads, or <see cref="Fresh"/> where nothing is known.
+    ///
+    /// <para>
+    /// <b>Two things added together, and they are kept apart on purpose.</b> The earned reading is history —
+    /// crossings, harvests, blows, deaths — and belongs in the record. What is standing in the square right
+    /// now is not history and must not be written into it, or a square would carry the ghosts of every ogre
+    /// that ever walked through. So the creatures are counted separately, kept only as long as the count is
+    /// fresh, and applied here.
+    /// </para>
+    /// </summary>
+    public static double Safety(Map map, Point3D where)
+    {
+        var quad = Known(map, where);
+
+        if (quad == null)
+        {
+            return Fresh;
+        }
+
+        return Math.Clamp(quad.Safety + MobWorth * Living(quad), Bleakest, Safest);
+    }
+
+    /// <summary>
+    /// How long a count of creatures stands before the square is treated as empty again.
+    ///
+    /// Five minutes. Creatures wander and die; a count nobody has refreshed since before that is a statement
+    /// about a square that has since had time to empty, and holding it would be the same mistake as writing
+    /// the creatures into the record.
+    /// </summary>
+    public static int SightMs { get; set; } = 300000;
+
+    /// <summary>What was counted in this square, if anybody has looked lately.</summary>
+    private static int Living(Quad quad) =>
+        quad.Mobs > 0 && Core.TickCount - quad.Sighted < SightMs ? quad.Mobs : 0;
+
+    /// <summary>What the record alone says, with nothing living counted. For the summary and the pins.</summary>
+    public static double Earned(Map map, Point3D where) => Known(map, where)?.Safety ?? Fresh;
+
+    /// <summary>
+    /// How many aggressive creatures are standing in this square, as somebody has just counted them.
+    ///
+    /// <para>
+    /// Replaces rather than adds. One sweep cannot see the same creature twice, so the count it hands over
+    /// is already unique, and two sweeps of the same square are two answers to one question rather than two
+    /// halves of it.
+    /// </para>
+    /// </summary>
+    public static void Sighted(Map map, Point3D where, int mobs)
+    {
+        var quad = At(map, where);
+
+        if (quad == null)
+        {
+            return;
+        }
+
+        quad.Mobs = Math.Max(0, mobs);
+        quad.Sighted = Core.TickCount;
+
+        Counted++;
+    }
+
+    /// <summary>Squares whose creatures have been counted. For the summary.</summary>
+    public static long Counted { get; private set; }
+
+    /// <summary>
+    /// How often one bot counts what is standing in its own square.
+    ///
+    /// Ten seconds. Creatures move at a walk, so a count this old is still about the same square-full of
+    /// them, and thirty-four bots at this rate is three sweeps a second across the whole shard — against a
+    /// spatial query of fifteen tiles, which is what every bot does several times a second anyway to decide
+    /// what to fight.
+    /// </summary>
+    public static int LookEveryMs { get; set; } = 10000;
+
+    /// <summary>Sweeps made. A denominator for <see cref="Counted"/>.</summary>
+    public static long Looks { get; private set; }
+
+    /// <summary>
+    /// Counts the aggressive creatures standing in this bot's square and writes the number down.
+    ///
+    /// <para>
+    /// <b>The one term in the reading that is about now rather than about what happened.</b> Everything else
+    /// here is earned over hundreds of crossings; this says what is living in the square at this moment, and
+    /// it is what lets the map distinguish ground that has been quiet because nothing lives there from
+    /// ground that has been quiet because nobody has been back since the ogres moved in.
+    /// </para>
+    ///
+    /// <para>
+    /// Unique by construction: one spatial query cannot return the same creature twice, so the count it
+    /// hands over needs no set of serials and no bookkeeping to keep one honest. Hostility is asked of
+    /// BotThreat, which is the same question every fight on this shard is decided by.
+    /// </para>
+    /// </summary>
+    public static void Look(Mobile body)
+    {
+        if (body is not { Deleted: false, Alive: true } || body.Map == null || body.Map == Map.Internal)
+        {
+            return;
+        }
+
+        var quad = At(body.Map, body.Location);
+
+        if (quad == null || Core.TickCount - quad.Sighted < LookEveryMs)
+        {
+            return;
+        }
+
+        var mobs = 0;
+
+        foreach (var creature in body.Map.GetMobilesInRange<BaseCreature>(body.Location, Side / 2))
+        {
+            if (creature is { Deleted: false, Alive: true } && BotThreat.Hostile(body, creature))
+            {
+                mobs++;
+            }
+        }
+
+        Looks++;
+
+        Sighted(body.Map, body.Location, mobs);
+    }
+
+    /// <summary>
+    /// How much strength a square asks of whoever walks into it.
+    ///
+    /// <para>
+    /// Patrick's table of 03.09.2026, in the units <c>BotThreat.Power</c> already speaks: a thousand at
+    /// minus a hundredth, three thousand at minus a twentieth, four and a half at minus a tenth, and five
+    /// hundred more for every further twentieth. Above <see cref="Fearless"/> it asks nothing at all.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>The band between the two is not in the table and is charged nothing.</b> From 0.05 down to just
+    /// above -0.01 the order says only that fear begins somewhere in it, and inventing a number to fill a
+    /// gap in an instruction is how a shard ends up with thresholds nobody can account for. It reads as
+    /// free, and it is the one number here worth telling Patrick about rather than guessing at.
+    /// </para>
+    /// </summary>
+    public static double Muscle(double safety)
+    {
+        if (safety > Fearless)
+        {
+            return 0.0;
+        }
+
+        if (safety > -0.01)
+        {
+            return 0.0;
+        }
+
+        if (safety > -0.05)
+        {
+            return 1000.0;
+        }
+
+        if (safety > -0.10)
+        {
+            return 3000.0;
+        }
+
+        // Every further twentieth of danger asks another five hundred. Floored rather than rounded so that a
+        // square exactly on a step is charged that step and not the next one.
+        var steps = (int)Math.Floor((-safety - 0.10) / 0.05 + 1e-9);
+
+        return 4500.0 + steps * 500.0;
+    }
+
+    /// <summary>What this ground asks of whoever walks into it, in strength.</summary>
+    public static double Muscle(Map map, Point3D where) => Muscle(Safety(map, where));
+
+    /// <summary>
+    /// What is going: this bot, or the whole company it is in.
+    ///
+    /// <para>
+    /// "Of one or more participants", by the order, so a company's strength is its members added together
+    /// and a bot on its own is a company of one. Only members that can still fight are counted — a corpse
+    /// and a bot on two hits of health are both worth nothing to whoever is deciding whether to walk into an
+    /// ogre, and counting them is how a company of five arrives as a company of two.
+    /// </para>
+    /// </summary>
+    public static double Strength(Mobile body)
+    {
+        if (body is not { Deleted: false, Alive: true })
+        {
+            return 0.0;
+        }
+
+        if (body is not IBotSquadMember { Squad: not null } member)
+        {
+            return BotThreat.Power(body);
+        }
+
+        var members = member.Squad.Members;
+        var strength = 0.0;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            if (members[i] is IBotAlly { AbleToFight: true } && members[i].Self is { Deleted: false, Alive: true } self)
+            {
+                strength += BotThreat.Power(self);
+            }
+        }
+
+        return strength;
+    }
+
+    /// <summary>Squares refused to somebody not strong enough for them. For the summary.</summary>
+    public static long Feared { get; private set; }
+
+    /// <summary>
+    /// Whether whoever is going is strong enough for this ground.
+    ///
+    /// <para>
+    /// <b>A wall, not a discount.</b> Everything else on this map is a number the auction weighs against
+    /// other numbers, and this one is not: a bot below the threshold does not go, whatever the work there is
+    /// worth, and the only way past it is to be stronger or to bring people. That is the whole of Patrick's
+    /// order of 03.09.2026 and it is the reason this returns a yes or a no rather than a factor.
+    /// </para>
+    /// </summary>
+    public static bool Dares(Mobile body, Map map, Point3D where)
+    {
+        var asked = Muscle(map, where);
+
+        if (asked <= 0.0)
+        {
+            return true;
+        }
+
+        if (Strength(body) >= asked)
+        {
+            return true;
+        }
+
+        Feared++;
+
+        return false;
+    }
 
     /// <summary>Whether a bot has ever actually stood in the square this tile is in.</summary>
     public static bool Trodden(Map map, Point3D where) => Known(map, where)?.Trodden == true;
@@ -628,6 +932,49 @@ public static class BotQuad
         Raise(quad, PassWorth);
         Credited++;
     }
+
+    /// <summary>
+    /// Something was taken out of the ground here and nothing interrupted it.
+    ///
+    /// <para>
+    /// <b>A different kind of evidence from a crossing, and the reason it is worth having separately.</b> A
+    /// bot walking through a square is exposed for a few seconds and is looking where it is going. A bot
+    /// harvesting stands in one place for a minute with a pickaxe in its hands, and comes away untouched —
+    /// which is a far stronger thing to be able to say about ground, and far rarer, so it earns a fifth as
+    /// much and is asked for twenty times as often. See <see cref="PerHarvest"/>.
+    /// </para>
+    ///
+    /// <para>
+    /// Counted where the bot is standing rather than where the rock is: the square that was safe is the one
+    /// the body was in.
+    /// </para>
+    /// </summary>
+    public static void Harvested(Map map, Point3D where)
+    {
+        var quad = Known(map, where);
+
+        if (quad == null)
+        {
+            return;
+        }
+
+        quad.Harvests++;
+        quad.Reaping++;
+        quad.Tick = Core.TickCount;
+
+        if (quad.Reaping < PerHarvest)
+        {
+            return;
+        }
+
+        quad.Reaping = 0;
+
+        Raise(quad, HarvestWorth);
+        Reaped++;
+    }
+
+    /// <summary>Squares credited for undisturbed harvests. For the summary.</summary>
+    public static long Reaped { get; private set; }
 
     /// <summary>
     /// A bot is standing here, and that is all this says.
@@ -685,6 +1032,12 @@ public static class BotQuad
 
             return;
         }
+
+        // <b>"Twenty-five crossings without blows", and until now the two counters never spoke.</b> A square
+        // could bank a crossing credit out of runs interrupted by every kind of violence, because nothing
+        // here reset the run. Both quiet runs end when something lands a blow, which is what makes them runs.
+        quad.Towards = 0;
+        quad.Reaping = 0;
 
         quad.Bruising++;
 
@@ -1147,7 +1500,7 @@ public static class BotQuad
             + $"({Hushed} shut and {Roused} reopened since the shard came up, which is the direction rather than the level) "
                + $"(above {TooQuiet:F2}), {wanted} worth going to (at or below {Wanted:F2}), {dire} dire (at or below {Dire:F2}); "
                + $"worst is {worst}; {Discovered} first set foot in, {Credited} raised for crossings, "
-               + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Baulked} rested because nobody could get near them";
+               + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough";
     }
 
     /// <summary>
@@ -1215,6 +1568,10 @@ public static class BotQuad
         Mourned = 0;
         Discovered = 0;
         Cleansed = 0;
+        Reaped = 0;
+        Counted = 0;
+        Looks = 0;
+        Feared = 0;
         Baulked = 0;
         Sweeps = 0;
         Wiped = 0;

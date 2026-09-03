@@ -522,7 +522,18 @@ public sealed class BotDig : BotDeed
         _swungTick = Core.TickCount;
         _swings++;
 
+        // Counted before and after, because a swing is not a take: the engine declines most of them, and the
+        // square is being credited for ground that actually paid while a bot stood still on it. See
+        // BotQuad.Harvested. Carried walks the pack, and swings are throttled to one every SwingMs, so this
+        // is two walks of a backpack every few seconds.
+        var had = BotOre.Carried(body);
+
         BotOre.Swing(body, tool, _system, _tile);
+
+        if (BotOre.Carried(body) > had)
+        {
+            BotQuad.Harvested(_map, body.Location);
+        }
 
         // <b>What came out of this hillside, written down for everybody.</b> The seam list already says what
         // a vein asks of a miner; this says what it has actually paid, which is the fact a miner would want

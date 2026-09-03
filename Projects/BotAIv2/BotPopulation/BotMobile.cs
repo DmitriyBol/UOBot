@@ -963,6 +963,11 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
             return;
         }
 
+        // What is living in this square, counted on its own clock rather than on the crossing. A bot that
+        // settles in one square to mine for ten minutes crosses no boundary at all, and that is exactly the
+        // square whose creatures are worth knowing about.
+        BotQuad.Look(this);
+
         var now = BotQuad.Key(Map, Location);
 
         if (!_quadSeen)

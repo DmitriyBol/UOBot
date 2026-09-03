@@ -161,6 +161,9 @@ public sealed class BotHerbs : BotDeed
             }
 
             picked += amount;
+
+            // Ground that paid while a bot stood still on it. See BotQuad.Harvested.
+            BotQuad.Harvested(body.Map, body.Location);
         }
 
         _found = picked;

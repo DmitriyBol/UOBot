@@ -275,6 +275,18 @@ public sealed class BotHunter : IBotProposer
                 continue;
             }
 
+            // <b>And whether whoever is going is strong enough for it, which is a wall and not a price.</b>
+            // Patrick's order of 03.09.2026: below the threshold a bot does not go, whatever the ground is
+            // worth. A bot in a company brings the company's strength, so the same square that refuses one
+            // brawler accepts the four of them — which is the whole point of the rule and the reason it is
+            // asked here, where the ground is chosen, rather than at the moment of stepping into it.
+            if (!BotQuad.Dares(body, map, where))
+            {
+                Overmatched++;
+
+                continue;
+            }
+
             // Of the places that pass, the one this bot has actually been paid at.
             //
             // <b>A prowl to a random point is a walk that usually finds nothing, and it showed.</b> Forty-six
@@ -535,11 +547,14 @@ public sealed class BotHunter : IBotProposer
     /// <summary>Times a hunter was left with nowhere to walk because every sampled ground was too quiet.</summary>
     public static long Stranded { get; private set; }
 
+    /// <summary>Grounds passed over because whoever asked was not strong enough for them.</summary>
+    public static long Overmatched { get; private set; }
+
     /// <summary>Times a hunting ground was picked because it is ground that has hurt somebody.</summary>
     public static long Sought { get; private set; }
 
     public static string Describe() =>
-        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overrun} quarry passed over for the crowd already round it, {BotProwl.Baulked} prowls given up for getting no nearer";
+        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overmatched} grounds passed over for asking more strength than whoever looked had, {Overrun} quarry passed over for the crowd already round it, {BotProwl.Baulked} prowls given up for getting no nearer";
 
     public static void Forget()
     {
@@ -547,6 +562,7 @@ public sealed class BotHunter : IBotProposer
         Sworn = 0;
         Quiet = 0;
         Stranded = 0;
+        Overmatched = 0;
         Overrun = 0;
         Sought = 0;
     }
