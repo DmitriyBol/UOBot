@@ -346,6 +346,21 @@ public static class BotGround
 
         var where = new Point3D(x, y, map.GetAverageZ(x, y));
 
+        // <b>Nobody digs inside the walls, and that is a property of the tile rather than an opinion about
+        // the moment.</b> The rule was enforced where a seam is chosen, so every miner asked it of every
+        // guarded seam on every beat, for the life of the shard: 120 277 region lookups in ninety minutes on
+        // 03.09.2026, about twenty-two a second, all of them arriving at the answer they arrived at the first
+        // time. Asked once here instead, and such rock never enters the list — which also keeps the list
+        // short, since the castle is built into a hillside and the survey sees a great deal of it.
+        //
+        // Kept as a counter under the same name so the line still says how much rock the walls are holding.
+        if (Region.Find(where, map)?.IsPartOf<GuardedRegion>() == true)
+        {
+            Townbound++;
+
+            return false;
+        }
+
         for (var i = 0; i < _seams.Count; i++)
         {
             if (_seams[i].Map == map && Utility.InRange(_seams[i].Where, where, SeamSpacing))
@@ -550,18 +565,6 @@ public static class BotGround
                 continue;
             }
 
-            // <b>Nobody digs inside the walls, by order.</b> A town has rock in it — the castle is built into
-            // a hillside and the survey records it like any other — and it is always the nearest rock there
-            // is, so with distance in the scoring below it wins against everything a miner could reach on
-            // foot. The whole trade collected in one courtyard on 27.08.2026 trying to get at a vein behind a
-            // wall. Refused outright rather than discounted: a discount is a number somebody has to keep
-            // getting right, and what is wanted here is a rule.
-            if (Region.Find(seam.Where, map)?.IsPartOf<GuardedRegion>() == true)
-            {
-                Townbound++;
-
-                continue;
-            }
 
             if (ledger != null && ledger.Cautious(BotDig.Trade, map, seam.Where))
             {

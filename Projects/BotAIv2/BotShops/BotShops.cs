@@ -52,6 +52,9 @@ public static class BotShops
     /// <summary>Gold this population has brought into the world over a counter. The only faucet there is.</summary>
     public static long Earned { get; private set; }
 
+    /// <summary>Shopkeepers passed over because the shard has already proved there is no way through to them.</summary>
+    public static long Walled { get; private set; }
+
     /// <summary>Whether this patch of the world has already been swept for shopkeepers.</summary>
     public static bool Swept(Map map, Point3D around)
     {
@@ -189,6 +192,16 @@ public static class BotShops
                 continue;
             }
 
+            // The caution above is this bot's own and forgets in five minutes. This is the shard's, it costs
+            // a dictionary lookup, and it does not forget: no way through is no way through for anybody. See
+            // the twin of this line in the overload below for what it was costing.
+            if (BotReach.Ask(map, body.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
+            {
+                Walled++;
+
+                continue;
+            }
+
             var away = body.GetDistanceToSqrt(vendor.Location);
 
             if (away >= bestAway)
@@ -227,6 +240,23 @@ public static class BotShops
 
             if (!Sells(vendor, wanted, out _))
             {
+                continue;
+            }
+
+            // <b>A shopkeeper behind something is still the nearest shopkeeper.</b> This ranks by the crow's
+            // flight and asked nothing about the road, so a counter on an upper floor or across water was
+            // chosen by everybody underneath it — and the deed that took it walked, failed and was offered
+            // the same shop again. Thirty-one peddling errands ended "no way through" in ninety minutes on
+            // 03.09.2026, and the same chooser answers for restocking, acquiring, inscribing and sewing.
+            //
+            // The overload above already declines a shop this bot has lately failed to reach; that is a
+            // private opinion with a five-minute memory. This is the shard's own, it costs a dictionary
+            // lookup, and no way through is no way through for anybody. See BotGround.Nearest, which has
+            // asked exactly this of every forge and counter for a fortnight.
+            if (BotReach.Ask(map, bot.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
+            {
+                Walled++;
+
                 continue;
             }
 
@@ -647,11 +677,12 @@ public static class BotShops
         _swept.Clear();
 
         Bought = 0;
+        Walled = 0;
         Spent = 0;
         Sold = 0;
         Earned = 0;
     }
 
     public static string Describe() =>
-        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp";
+        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp, {Walled} counters passed over for having no way through to them";
 }
