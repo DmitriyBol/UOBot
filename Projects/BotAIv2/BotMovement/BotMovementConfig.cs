@@ -21,6 +21,12 @@ public sealed class BotMovementSettings
     /// <summary>Milliseconds a search still gets when the population's allowance for the second is spent.</summary>
     public double? FloorMs { get; set; }
 
+    /// <summary>Milliseconds of clock a tile of distance is worth.</summary>
+    public double? MsPerTile { get; set; }
+
+    /// <summary>Milliseconds the shortest journey still gets.</summary>
+    public double? ShortMs { get; set; }
+
     /// <summary>Milliseconds the whole population may spend searching per second.</summary>
     public double? WindowMs { get; set; }
 
@@ -84,6 +90,8 @@ public static class BotMovementConfig
 
         BotPath.CeilingMs = settings.CeilingMs ?? BotPath.CeilingMs;
         BotPath.FloorMs = settings.FloorMs ?? BotPath.FloorMs;
+        BotPath.MsPerTile = settings.MsPerTile ?? BotPath.MsPerTile;
+        BotPath.ShortMs = settings.ShortMs ?? BotPath.ShortMs;
         BotPath.WindowMs = settings.WindowMs ?? BotPath.WindowMs;
         BotPath.MinMargin = settings.MinMargin ?? BotPath.MinMargin;
         BotPath.MaxMargin = settings.MaxMargin ?? BotPath.MaxMargin;

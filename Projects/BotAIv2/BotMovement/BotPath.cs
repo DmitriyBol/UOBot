@@ -169,6 +169,33 @@ public static class BotPath
     public static double FloorMs { get; set; } = 1.0;
 
     /// <summary>
+    /// What a tile of distance is worth in clock.
+    ///
+    /// <para>
+    /// <b>The ceiling is what a journey across the island may cost, and it was being charged to a chase
+    /// three tiles long.</b> A search that reaches its goal is nearly free — it runs almost straight at it —
+    /// so the whole bill is the searches that fail, and a failing search spends every millisecond it is
+    /// given. With one flat ceiling that is sixty milliseconds whether the goal is over the hill or across
+    /// the continent. Measured on 03.09.2026 at 11:05: 69 per cent of searches partial, two thirds of those
+    /// going somewhere within thirty-two tiles, half of them ending no nearer than they started, and 469ms a
+    /// second against an allowance of five hundred — with 28 per cent of all searches handed less clock than
+    /// they asked for, and a starved search gets <see cref="FloorMs"/> and is partial by construction. The
+    /// shard was manufacturing its own failures.
+    /// </para>
+    ///
+    /// <para>
+    /// Budget the thing that was promised, which is this file's own rule and was being kept only for tiles.
+    /// A quarter of a millisecond a tile makes a chase cost four and an island crossing cost sixty, and the
+    /// journeys that genuinely need the long search get it back through <see cref="BotWalk.Plan"/>: one that
+    /// is not closing asks for the whole ceiling by name.
+    /// </para>
+    /// </summary>
+    public static double MsPerTile { get; set; } = 0.25;
+
+    /// <summary>The least any search gets, however short the journey. Enough to see round a tree.</summary>
+    public static double ShortMs { get; set; } = 4.0;
+
+    /// <summary>
     /// What the whole population may spend on searching, per second.
     ///
     /// Not a correctness bound — a governor, and a generous one: the first version measured 215 ms of
@@ -260,6 +287,45 @@ public static class BotPath
 
     public static double WorstMs { get; private set; }
 
+    // ---- What the partials actually are. Four numbers, because "84 per cent partial" is a symptom that has
+    // ---- two completely different causes and tuning the wrong one is how a governor gets raised for ever.
+
+    /// <summary>
+    /// Searches handed less clock than they asked for, because the population's second was already spent.
+    ///
+    /// The number that says whether the governor is a ceiling nobody touches or a wall everybody is against.
+    /// A starved search gets <see cref="FloorMs"/>, which buys a few hundred tiles, which comes back partial —
+    /// so once this starts climbing the shard is making its own partials.
+    /// </summary>
+    public static long Starved { get; private set; }
+
+    /// <summary>
+    /// Searches given the whole ceiling by name, because the journey asking had stopped closing.
+    ///
+    /// The other half of charging by distance. A goal twenty tiles off whose road runs four hundred tiles
+    /// round a lake is a short journey by every measure this file has, and it is exactly the one that needs
+    /// the long search — so the cheap search is tried first and the expensive one is bought only where the
+    /// cheap one has already been shown to fail.
+    /// </summary>
+    public static long Lengthened { get; private set; }
+
+    /// <summary>Partial searches to somewhere inside <see cref="Near"/> tiles. A chase, not a journey.</summary>
+    public static long PartialNear { get; private set; }
+
+    /// <summary>
+    /// Partial searches that ended no nearer the goal than they began.
+    ///
+    /// The signature of something in the way rather than something far off: A* aims at the goal, so a search
+    /// that cannot better its own starting distance has been stopped, not slowed.
+    /// </summary>
+    public static long PartialStill { get; private set; }
+
+    /// <summary>How far the partials were going, added up, so the average can be printed.</summary>
+    public static long PartialSpan { get; private set; }
+
+    /// <summary>What counts as near enough that a full search of the box is not what was wanted.</summary>
+    public const int Near = 32;
+
     // ---- What asking about the far side has cost, and bought.
 
     /// <summary>Looks at the far side of a journey that actually ran.</summary>
@@ -314,6 +380,11 @@ public static class BotPath
         SealedRuns = 0;
         TotalMs = 0.0;
         WorstMs = 0.0;
+        Starved = 0;
+        Lengthened = 0;
+        PartialNear = 0;
+        PartialStill = 0;
+        PartialSpan = 0;
         Probes = 0;
         Enclosed = 0;
         ProbedTooBig = 0;
@@ -330,7 +401,7 @@ public static class BotPath
     public static string Describe() =>
         Searches == 0
             ? "no searches yet"
-            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand";
+            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; {Starved} were handed less clock than they asked for and {Lengthened} asked for the whole ceiling because they were not closing; of the partials {PartialNear} were going somewhere within {Near} tiles and {PartialStill} ended no nearer than they started, the average one {(PartialRuns > 0 ? PartialSpan / PartialRuns : 0)} tiles out; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand";
 
     /// <summary>
     /// Whether there is a way at all, without keeping the path. For vetting a candidate before committing
@@ -408,10 +479,23 @@ public static class BotPath
         Searches++;
 
         var started = Stopwatch.GetTimestamp();
-        var allowanceMs = Allowance(ceilingMs > 0.0 ? ceilingMs : CeilingMs);
-        var deadline = started + (long)(allowanceMs * Stopwatch.Frequency / 1000.0);
 
         var span = Math.Max(Math.Abs(to.X - from.X), Math.Abs(to.Y - from.Y));
+
+        if (ceilingMs > 0.0)
+        {
+            Lengthened++;
+        }
+
+        var wanted = ceilingMs > 0.0 ? ceilingMs : Math.Clamp(span * MsPerTile, ShortMs, CeilingMs);
+        var allowanceMs = Allowance(wanted);
+        var deadline = started + (long)(allowanceMs * Stopwatch.Frequency / 1000.0);
+
+        if (allowanceMs < wanted)
+        {
+            Starved++;
+        }
+
         var margin = Math.Clamp(span / 2, MinMargin, MaxMargin);
 
         var minX = Math.Max(0, Math.Min(from.X, to.X) - margin);
@@ -672,6 +756,19 @@ public static class BotPath
         }
 
         PartialRuns++;
+        PartialSpan += span;
+
+        if (span <= Near)
+        {
+            PartialNear++;
+        }
+
+        // Measured against where it began rather than against the goal: the start's own estimate is the
+        // number to beat, and beating it by nothing is the whole finding.
+        if (nearest < 0 || nearestScore >= Heuristic(from.X, from.Y, to))
+        {
+            PartialStill++;
+        }
 
         return BotPathOutcome.Partial;
     }

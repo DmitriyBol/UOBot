@@ -327,13 +327,20 @@ public static class BotWalk
     /// <summary>Draws a plan. Returns false only when the destination is provably unreachable.</summary>
     private static bool Plan(Mobile bot, BotJourney journey, Map map)
     {
+        // A search is charged by how far it is going, so a chase costs a few milliseconds and an island
+        // crossing costs sixty. That is right for almost everything and wrong for one case: a goal twenty
+        // tiles off whose road runs four hundred tiles round a lake is a short journey by every measure the
+        // planner has. The signal that tells them apart is already here — a journey that has drawn a plan and
+        // got no closer — so the cheap search goes first and the whole ceiling is bought only where the cheap
+        // one has been shown to fail.
         var outcome = BotPath.Find(
             map,
             bot.Location,
             journey.Target,
             journey.Arrival,
             _path,
-            journey.Avoid(bot.Location)
+            journey.Avoid(bot.Location),
+            journey.PlansSinceCloser > 0 ? BotPath.CeilingMs : 0.0
         );
 
         // A statement about the world, and therefore worth acting on at once. The first version spent
