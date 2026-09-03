@@ -259,6 +259,65 @@ public static class BotQuad
     public static double Harrowed { get; set; } = 0.0;
 
     /// <summary>
+    /// How long a square nobody could get near is left off the hunting list, per proof.
+    ///
+    /// <para>
+    /// Multiplied by how many times it has been proved, so a square that beats one bot is rested and a square
+    /// that beats five is effectively retired. That is the whole of the tuning here: the first baulk is
+    /// ambiguous — a bot may simply have been interrupted — and the fifth is a fact about the island.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Ten minutes is what BotPeril uses for the same idea and it is far too short for this one.</b> A
+    /// trek to the far edge of the roam takes several minutes, so within one such window the whole population
+    /// sets out, walks three hundred tiles, and gives up one after another. On 03.09.2026 between 12:54 and
+    /// 13:15 the quadrant record answered (1005, 1335) to every hunter that asked, because it answers from
+    /// the population's home rather than from the bot's own feet, and 119 prowls ended "got no nearer than
+    /// 156 tiles" to that one square. Hunting finished 158 times in the previous run of the shard and 52 in
+    /// that one.
+    /// </para>
+    /// </summary>
+    public static int BaulkMs { get; set; } = 600000;
+
+    /// <summary>The most that multiplies to, so nothing is retired for ever on evidence that can go stale.</summary>
+    public static int MostBaulks { get; set; } = 12;
+
+    /// <summary>Squares rested because nobody could get near them. For the summary.</summary>
+    public static long Baulked { get; private set; }
+
+    /// <summary>
+    /// Somebody set out for this square and could not get near it.
+    ///
+    /// <para>
+    /// The reading is <b>not</b> touched, exactly as BotPeril.Baulked does not touch its own: the square is
+    /// as dangerous as it was, and saying otherwise would be a lie told to every bot that reads this map.
+    /// What is learned is that the road there does not work, which is a different fact and belongs in a
+    /// different field.
+    /// </para>
+    /// </summary>
+    public static void Baulk(Map map, Point3D where)
+    {
+        var quad = At(map, where);
+
+        if (quad == null)
+        {
+            return;
+        }
+
+        if (quad.Baulks < MostBaulks)
+        {
+            quad.Baulks++;
+        }
+
+        quad.BaulkedTick = Core.TickCount;
+        Baulked++;
+    }
+
+    /// <summary>Whether this square is resting after somebody failed to reach it.</summary>
+    private static bool Resting(Quad quad, long now) =>
+        quad.Baulks > 0 && now - quad.BaulkedTick < (long)BaulkMs * quad.Baulks;
+
+    /// <summary>
     /// Most squares remembered at once.
     ///
     /// Felucca is 6144 by 4096, which is 205 by 137 quadrants — twenty-eight thousand of them, and a
@@ -302,6 +361,12 @@ public static class BotQuad
 
         /// <summary>Blows landed on bots here, all told.</summary>
         public int Blows;
+
+        /// <summary>How many times somebody set out for this square and could not get near it.</summary>
+        public int Baulks;
+
+        /// <summary>When the last of those was.</summary>
+        public long BaulkedTick;
 
         /// <summary>Blows counted towards the next step down.</summary>
         public int Bruising;
@@ -413,6 +478,15 @@ public static class BotQuad
             var quad = _feared[i];
 
             if (quad.Map != map)
+            {
+                continue;
+            }
+
+            // Somebody has already walked at this one and could not get near it. The list is answered from
+            // the population's home rather than from any one bot's feet, so without this every hunter on the
+            // shard is handed the same unreachable square, one after another, for as long as it stays the
+            // worst thing on the map.
+            if (Resting(quad, now))
             {
                 continue;
             }
@@ -1073,7 +1147,7 @@ public static class BotQuad
             + $"({Hushed} shut and {Roused} reopened since the shard came up, which is the direction rather than the level) "
                + $"(above {TooQuiet:F2}), {wanted} worth going to (at or below {Wanted:F2}), {dire} dire (at or below {Dire:F2}); "
                + $"worst is {worst}; {Discovered} first set foot in, {Credited} raised for crossings, "
-               + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company";
+               + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Baulked} rested because nobody could get near them";
     }
 
     /// <summary>
@@ -1141,6 +1215,7 @@ public static class BotQuad
         Mourned = 0;
         Discovered = 0;
         Cleansed = 0;
+        Baulked = 0;
         Sweeps = 0;
         Wiped = 0;
         Hushed = 0;

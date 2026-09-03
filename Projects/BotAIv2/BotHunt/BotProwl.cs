@@ -195,6 +195,14 @@ public sealed class BotProwl : BotDeed
             // list. The reading is not touched — the square is as dangerous as it was; what is learned is
             // that this bot could not get there.
             BotPeril.Baulked(_map, _where);
+
+            // <b>And to the quadrant record, which is the other map this ground can be chosen from and the
+            // one that was never told.</b> BotHunter.Feared asks BotQuad.WorstNear; the baulk above goes to
+            // BotPeril; so a square the quadrant record thinks is the worst on the island went on being
+            // handed to every hunter that asked, however many of them had already failed to reach it. On
+            // 03.09.2026, 119 prowls ended at this same line against one square, (1005, 1335), and hunting
+            // finished a third as often as in the run before.
+            BotQuad.Baulk(_map, _where);
             Baulked++;
 
             return BotDoing.Failed($"got no nearer than {gap} tiles to ({_where.X}, {_where.Y})");
@@ -225,6 +233,7 @@ public sealed class BotProwl : BotDeed
     public override bool Bend(IBotWilful bot)
     {
         BotPeril.Baulked(_map, _where);
+        BotQuad.Baulk(_map, _where);
 
         return false;
     }
