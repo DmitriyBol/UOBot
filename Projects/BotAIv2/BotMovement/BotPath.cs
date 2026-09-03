@@ -163,6 +163,29 @@ public static class BotPath
     public static int EnclosureGapMs { get; set; } = 250;
 
     /// <summary>
+    /// The largest pocket worth proving when the bot is standing in it and has been proved stranded.
+    ///
+    /// <para>
+    /// Ten times the ordinary bound, because it is a different question asked on far better evidence. The
+    /// ordinary look is a suspicion about somewhere the bot has never been, asked several times a minute, and
+    /// it has to be cheap. This one is asked when a dozen roads in a row have been refused from one tile, at
+    /// most a few dozen times a night, and what it buys is that no bot is ever sent into that ground again.
+    /// </para>
+    ///
+    /// <para>
+    /// It was set at the ordinary bound for an hour and the log says what that cost. Orin the Warrior was
+    /// carried out of (1757, 976, 0) on 03.09.2026 at 11:14 and the look reported TooBig — the same ground
+    /// that had taken Merrick, Torvin, Kerrin, Perri, Edda 2, Bryn, Ilsa, Calla, Doran and four more in
+    /// eighteen minutes that morning. A trap that catches fourteen bots is worth a hundred and fifty
+    /// milliseconds once.
+    /// </para>
+    /// </summary>
+    public static int StrandedCells { get; set; } = 25000;
+
+    /// <summary>What that look may cost. Once per rescue, so a tenth of a second is affordable and a night of rescues is not.</summary>
+    public static double StrandedCeilingMs { get; set; } = 150.0;
+
+    /// <summary>
     /// The smallest search worth running, for when the population's allowance is spent. Below this a bot
     /// cannot see round anything, and it is better to creep than to stop.
     /// </summary>
@@ -852,7 +875,9 @@ public static class BotPath
         // looks a second at twenty-five milliseconds apiece is a hundred milliseconds a second in the very
         // worst case, no matter what else the population is doing. The cost is still handed to Spend, because
         // it is real and belongs in the window's accounting — it simply is not gated by it.
-        var deadline = started + (long)(EnclosureCeilingMs * Stopwatch.Frequency / 1000.0);
+        var ceiling = urgent ? StrandedCeilingMs : EnclosureCeilingMs;
+        var cells = urgent ? StrandedCells : EnclosureCells;
+        var deadline = started + (long)(ceiling * Stopwatch.Frequency / 1000.0);
 
         StepCache.Instance.BeginFindGeneration();
 
@@ -881,7 +906,7 @@ public static class BotPath
 
             // The bound, and the only one. Ground that keeps going past this is the world, not a pocket, and
             // the cheapest way to find that out is to stop counting as soon as the count settles it.
-            if (_lookup.Count > EnclosureCells)
+            if (_lookup.Count > cells)
             {
                 outcome = BotEnclosure.TooBig;
 

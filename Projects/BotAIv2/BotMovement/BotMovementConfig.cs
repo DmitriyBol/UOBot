@@ -60,6 +60,12 @@ public sealed class BotMovementSettings
     /// <summary>The shortest gap between two such looks, across the whole population.</summary>
     public int? EnclosureGapMs { get; set; }
 
+    /// <summary>The largest pocket worth proving around a bot that has been proved stranded.</summary>
+    public int? StrandedCells { get; set; }
+
+    /// <summary>Milliseconds that one look may cost.</summary>
+    public double? StrandedCeilingMs { get; set; }
+
     /// <summary>Plans in a row that get no closer before the far side is asked about.</summary>
     public int? PlansBeforeAskingTheFarSide { get; set; }
 }
@@ -103,6 +109,8 @@ public static class BotMovementConfig
         BotPath.EnclosureCells = settings.EnclosureCells ?? BotPath.EnclosureCells;
         BotPath.EnclosureCeilingMs = settings.EnclosureCeilingMs ?? BotPath.EnclosureCeilingMs;
         BotPath.EnclosureGapMs = settings.EnclosureGapMs ?? BotPath.EnclosureGapMs;
+        BotPath.StrandedCells = settings.StrandedCells ?? BotPath.StrandedCells;
+        BotPath.StrandedCeilingMs = settings.StrandedCeilingMs ?? BotPath.StrandedCeilingMs;
         BotWalk.PlansBeforeAskingTheFarSide =
             settings.PlansBeforeAskingTheFarSide ?? BotWalk.PlansBeforeAskingTheFarSide;
     }

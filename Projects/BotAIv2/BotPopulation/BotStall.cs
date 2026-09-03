@@ -232,14 +232,23 @@ public static class BotStall
         // down four times: what one bot proves about a place is true for the next one along.
         //
         // The first bot to stall somewhere still just loses its errand. The second one there is lifted out.
-        if (Pocket(bot.Location))
+        // <b>Read before the rescue, because the rescue moves the bot.</b> Every line below used
+        // bot.Location, and Rescue had already carried the bot home by the time they read it — so a bot
+        // that spent six minutes trapped at (1757, 976) was reported as standing still at the population's
+        // own doorstep. On 03.09.2026 that sent an hour of this session looking at the wrong subsystem: the
+        // errand named was "taking a full pack to the counter", the place named was three tiles from the
+        // counter, and neither had anything to do with it. The place a bot stalled in is the whole finding.
+        var stalledAt = bot.Location;
+
+        if (Pocket(stalledAt))
         {
             if (BotPopulation.Rescue(bot))
             {
                 Carried++;
             }
         }
-        Worst = $"{bot.Name} the {bot.Class?.Name}, {held / 60000} minutes on \"{doing}\" at {bot.Location}";
+
+        Worst = $"{bot.Name} the {bot.Class?.Name}, {held / 60000} minutes on \"{doing}\" at {stalledAt}";
 
         // The load is in the line because it is the first thing worth ruling out: the engine charges stamina
         // for every step over the ceiling and refuses the step outright at nought, so an overloaded bot is
@@ -251,7 +260,7 @@ public static class BotStall
             bot.Class?.Name,
             held / 60000,
             doing,
-            bot.Location,
+            stalledAt,
             BotLadder.Load(bot),
             BotLadder.Ceiling(bot),
             bot.Stam,
