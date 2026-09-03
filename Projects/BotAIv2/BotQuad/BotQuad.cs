@@ -765,8 +765,45 @@ public static class BotQuad
         );
     }
 
-    private static void Raise(Quad quad, double by) =>
+    /// <summary>
+    /// Moves a square's reading, and counts the moment it stops being ground anybody may hunt on.
+    ///
+    /// <para>
+    /// <b>The level was reported and the drift was not, and the drift is the thing.</b> The island's line has
+    /// always said how many squares read too quiet, which is a stock; what it could not say is whether that
+    /// number is going anywhere. On the night of 02-03.09.2026 it was: in one five-minute beat 1129 squares
+    /// were raised for crossings against 96 marked down for blows, a ratchet of nearly twelve to one, and the
+    /// share of the island closed to hunting had reached 364 of 1226. A square earns credit every time a bot
+    /// walks through it without incident, and bots walk everywhere; blows are rarer than walking by
+    /// construction. Whether that balance is right is a question for whoever sets the numbers — this only
+    /// makes the direction visible, which it was not.
+    /// </para>
+    /// </summary>
+    private static void Raise(Quad quad, double by)
+    {
+        var was = quad.Safety;
+
         quad.Safety = Math.Clamp(quad.Safety + by, Bleakest, Safest);
+
+        if (was <= TooQuiet && quad.Safety > TooQuiet)
+        {
+            Hushed++;
+        }
+        else if (was > TooQuiet && quad.Safety <= TooQuiet)
+        {
+            Roused++;
+        }
+    }
+
+    /// <summary>
+    /// Squares that crossed above <see cref="TooQuiet"/> since the shard came up, and back below it.
+    ///
+    /// Counted the same way as every other tally on this line — from the world load, not per report — so
+    /// that the two are read against each other rather than against a window nobody can see.
+    /// </summary>
+    public static long Hushed { get; private set; }
+
+    public static long Roused { get; private set; }
 
     /// <summary>
     /// The squares that read worst, worst first. For the board and for whoever is deciding where to send
@@ -1033,6 +1070,7 @@ public static class BotQuad
         }
 
         return $"{_quads.Count} quadrants of {Side} tiles, {trodden} of them stood in: {quiet} too quiet to hunt "
+            + $"({Hushed} shut and {Roused} reopened since the shard came up, which is the direction rather than the level) "
                + $"(above {TooQuiet:F2}), {wanted} worth going to (at or below {Wanted:F2}), {dire} dire (at or below {Dire:F2}); "
                + $"worst is {worst}; {Discovered} first set foot in, {Credited} raised for crossings, "
                + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company";
@@ -1105,5 +1143,7 @@ public static class BotQuad
         Cleansed = 0;
         Sweeps = 0;
         Wiped = 0;
+        Hushed = 0;
+        Roused = 0;
     }
 }
