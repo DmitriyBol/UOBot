@@ -92,6 +92,7 @@ public static class BotSquads
         Rescues = 0;
         Yields = 0;
         Buried = 0;
+        BotSquad.Forget();
 
         BotSpoils.Reset();
     }
@@ -118,7 +119,7 @@ public static class BotSquads
             bound += _squads[i]?.Count ?? 0;
         }
 
-        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed; {BotSpoils.Describe()}";
+        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing; {BotSpoils.Describe()}";
     }
 
     /// <summary>

@@ -612,6 +612,7 @@ public sealed class BotSquad
     internal string Update()
     {
         Prune();
+        Release();
 
         // <b>A company of one is nothing, unless somebody is standing in a square calling for the second.</b>
         // Every company on this shard is born at one — <c>BotSquads.Form</c> makes a squad out of its leader
@@ -802,6 +803,102 @@ public sealed class BotSquad
 
         return Core.TickCount - _quietTick < IdleCapMs;
     }
+
+    /// <summary>
+    /// How long a company may go without a fight before it stops holding members who are doing nothing for it.
+    ///
+    /// <para>
+    /// Half a minute, which is well short of the four the stall watch waits and well past any gap between two
+    /// undertakings, so a bot is let go before anybody reports it standing still and not for merely being
+    /// between jobs.
+    /// </para>
+    /// </summary>
+    public static int RestCapMs { get; set; } = 30000;
+
+    /// <summary>Members let go for doing nothing for a company that was doing nothing. For the summary.</summary>
+    public static long Released { get; private set; }
+
+    public static void Forget() => Released = 0;
+
+    /// <summary>
+    /// Lets go of anybody who is neither doing something of its own nor going anywhere for the company.
+    ///
+    /// <para>
+    /// <b>An uncharged company already dies of this in eight seconds — see <see cref="IdleCapMs"/> — and a
+    /// charged one never does, by design and rightly: whoever set the charge owns ending it.</b> But the
+    /// charge was also holding everybody else. A bot in a company sits on the Bound rung, and
+    /// <c>BotWill</c> skips the auction entirely for Bound — so a member of a captain's party that is walking
+    /// somewhere five hundred tiles away, and has no station to walk to and nothing of its own in hand, is
+    /// offered nothing at all. Not even the way home: <c>BotHomer</c> is a Free-rung errand.
+    /// </para>
+    ///
+    /// <para>
+    /// Patrick's decision of 03.09.2026, put as "release the bound from an idle company" — the other way
+    /// round would have been to exempt the way home from the rung, which fixes the symptom and leaves the
+    /// bot bound to something that has no use for it.
+    /// </para>
+    ///
+    /// <para>
+    /// Three guards, and each of them is what keeps this from breaking a working company. A company in a
+    /// fight lets nobody go, and the clock is torn up the moment it engages. A member that has moved in the
+    /// last two seconds is walking to a station and is doing exactly what the company asked. A member
+    /// holding an undertaking of its own is not idle whatever it looks like — an <c>Alongside</c> errand is
+    /// allowed to run while Bound. And the leader is never let go of, because a company without one is a
+    /// separate rule two screens up.
+    /// </para>
+    /// </summary>
+    private void Release()
+    {
+        if (Stance == BotSquadStance.Fighting)
+        {
+            _resting = false;
+
+            return;
+        }
+
+        if (!_resting)
+        {
+            _resting = true;
+            _restTick = Core.TickCount;
+
+            return;
+        }
+
+        if (Core.TickCount - _restTick < RestCapMs)
+        {
+            return;
+        }
+
+        for (var i = _members.Count - 1; i >= 0; i--)
+        {
+            var member = _members[i];
+
+            if (ReferenceEquals(member, Leader) || member.Self is not BotMobile bot)
+            {
+                continue;
+            }
+
+            if (bot.Journey is { Moving: true } || bot.Resolve?.Deed != null)
+            {
+                continue;
+            }
+
+            _members.RemoveAt(i);
+            member.Squad = null;
+            Released++;
+
+            logger.Information(
+                "Squad {Id} let {Name} go: it had nothing of its own and nowhere of ours to walk to",
+                Id,
+                bot.Name
+            );
+        }
+    }
+
+    /// <summary>When this company last had a fight to be in. See <see cref="Release"/>.</summary>
+    private long _restTick;
+
+    private bool _resting;
 
     /// <summary>Members who are gone, dead, or somewhere else entirely.</summary>
     private void Prune()
