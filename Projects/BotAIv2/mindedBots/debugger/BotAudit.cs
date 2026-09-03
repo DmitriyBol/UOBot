@@ -61,6 +61,9 @@ public static class BotAudit
     {
         public string Kind;
 
+        /// <summary>Which piece of work it was, not what it was called. See <see cref="BotWatch.Takes"/>.</summary>
+        public long Takes;
+
         public Point3D Where;
 
         public Point3D Goal;
@@ -220,7 +223,12 @@ public static class BotAudit
 
                 // 1. It took something on. Did it finish it? Asked first, because the answer decides
                 // whether the next question means anything at all.
-                var over = !string.Equals(mark.Kind, watch.Kind, StringComparison.Ordinal);
+                // <b>The same piece of work, not the same name for one.</b> Comparing kinds says a bot that
+                // finished an unload and took another unload never finished anything — and this file acts on
+                // that answer: it throws routes away and ends work as failed. On 03.09.2026 at 05:56 it
+                // reminded Lysa the Warrior about a walk it had been on for 26 seconds, because the unload
+                // before it had the same name. Takes counts the pieces themselves.
+                var over = mark.Takes != watch.Takes;
 
                 if (mark.Kind == "-")
                 {
@@ -639,6 +647,7 @@ public static class BotAudit
         new()
         {
             Kind = watch.Kind,
+            Takes = watch.Takes,
             Where = watch.Where,
             Goal = watch.Wants,
             Going = watch.WantsAway > 0,

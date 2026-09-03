@@ -297,6 +297,18 @@ public sealed class BotWatch
     /// <summary>Undertakings seen begin, and how many of them ended inside <see cref="QuickMs"/>.</summary>
     public int Deeds { get; private set; }
 
+    /// <summary>
+    /// How many separate pieces of work this bot has taken on, ever.
+    ///
+    /// <para>
+    /// <b>Kept because the name of the work cannot answer "is this the same one".</b> A bot that finishes an
+    /// unload and takes another unload has the same Kind in both samples, so anything comparing kinds reads
+    /// it as never having finished. See BotAudit, which drew exactly that conclusion and threw a route away
+    /// over it on 03.09.2026 at 05:56, about a bot 26 seconds into its work.
+    /// </para>
+    /// </summary>
+    public long Takes { get; private set; }
+
     public int Quick { get; private set; }
 
     /// <summary>Roads the shard has refused it, as the bot itself counts them.</summary>
@@ -576,6 +588,7 @@ public sealed class BotWatch
         if (!_seen)
         {
             _seen = true;
+            Takes++;
             _kind = kind;
             _kindSince = now;
             _kindWorth = Worth;
@@ -596,6 +609,7 @@ public sealed class BotWatch
                 trade.Learned += Skill - _kindSkill;
 
                 Deeds++;
+                Takes++;
 
                 if (held < QuickMs)
                 {
