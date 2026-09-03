@@ -116,7 +116,10 @@ public sealed class BotSurgeon : IBotProposer
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(bot.Location, Reach))
         {
-            if (mobile == bot || mobile is not IBotAlly || !BotMend.Wants(mobile))
+            // Being unreachable does not make anybody less hurt, which is why the worst-hurt rule kept
+            // handing back the same patient after every refused road. See BotMend.Beyond — the note lapses in
+            // ten seconds, so this is a pause rather than an abandonment.
+            if (mobile == bot || mobile is not IBotAlly || !BotMend.Wants(mobile) || BotMend.OutOfReach(mobile))
             {
                 continue;
             }

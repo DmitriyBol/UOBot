@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Server.Items;
 using Server.Spells;
 
@@ -25,6 +26,61 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotMend
 {
+    /// <summary>
+    /// How long a patient nobody could walk to is left out of the picking.
+    ///
+    /// <para>
+    /// Ten seconds, and it is not a verdict about the patient: it is a note that the road there was refused
+    /// a moment ago, and roads change as both of them move.
+    /// </para>
+    /// </summary>
+    public static int BeyondMs { get; set; } = 10000;
+
+    private static readonly Dictionary<Serial, long> _beyond = [];
+
+    /// <summary>
+    /// The way to this patient was refused. Written where every healer reads it, not in one bot's memory.
+    ///
+    /// <para>
+    /// <b>A healer with no memory of the last attempt walks the same refused road again on the next beat.</b>
+    /// Over the night of 02-03.09.2026, 209 of the 230 refused roads on the shard were a mend — Ulla went to
+    /// Joss six times inside one minute and five times in the minute before, Edda to Rowan five times in a
+    /// minute, and every one of those ended in "no way through" from the same place as the last. The patient
+    /// is chosen by who is worst hurt, and being unreachable does not make anybody less hurt, so the same
+    /// answer came back every time.
+    /// </para>
+    ///
+    /// <para>
+    /// Shared rather than private, for the reason this project has settled twice already: what one bot proves
+    /// about a road is true for the next one along. Short, because both ends of this walk are moving.
+    /// </para>
+    /// </summary>
+    public static void Beyond(Mobile patient)
+    {
+        if (patient != null)
+        {
+            _beyond[patient.Serial] = Core.TickCount + BeyondMs;
+        }
+    }
+
+    /// <summary>Whether a healer should leave this one alone for the moment. See <see cref="Beyond"/>.</summary>
+    public static bool OutOfReach(Mobile patient)
+    {
+        if (patient == null || !_beyond.TryGetValue(patient.Serial, out var until))
+        {
+            return false;
+        }
+
+        if (Core.TickCount - until < 0)
+        {
+            return true;
+        }
+
+        _beyond.Remove(patient.Serial);
+
+        return false;
+    }
+
     /// <summary>
     /// Mana a circle costs, read off the same ladder the scribe pays to write one.
     ///

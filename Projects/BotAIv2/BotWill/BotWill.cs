@@ -425,6 +425,14 @@ public static class BotWill
             BotQuarry.Shun(refused.Follow);
             Unreachable++;
         }
+        else if (refused.Follow != null)
+        {
+            // The same note about one of ours, kept on its own list because a patient is not quarry. See
+            // BotMend.Beyond: 209 of the 230 refused roads of that night were a healer walking to somebody
+            // it could not reach, and the picker had no way to know it had just tried.
+            BotMend.Beyond(refused.Follow);
+            Unreachable++;
+        }
 
         Settle(bot, BotEnding.Failed, where);
     }
