@@ -380,10 +380,19 @@ public sealed class BotDig : BotDeed
             {
                 // Struck off for everybody, exactly as an empty one is and for the reason given on Barren:
                 // what one bot proves by standing on the ground is true for all of them.
-                BotGround.Barren(_seam.Where);
-                Unwalkable++;
+                var struck = BotGround.Barren(_seam.Where);
 
-                return BotDoing.Failed($"no way through to the {_seam.Ore} in {gap} tiles, and the seam is struck off");
+                if (struck)
+                {
+                    Unwalkable++;
+                }
+
+                // The same distinction as the rock leg below: struck off by this bot, or found already gone.
+                return BotDoing.Failed(
+                    struck
+                        ? $"no way through to the {_seam.Ore} in {gap} tiles, and the seam is struck off"
+                        : $"no way through to the {_seam.Ore} in {gap} tiles; somebody had already struck it off"
+                );
             }
 
             return BotDoing.Walk(_map, _seam.Where, BotArrival.Within(2), $"to the {_seam.Ore}");
@@ -450,10 +459,24 @@ public sealed class BotDig : BotDeed
             // something, and the way to find that out is not to try eight rocks behind the same something.
             if (++_walled >= WalledLimit)
             {
-                BotGround.Barren(_seam.Where);
-                Unwalkable++;
+                // <b>Says which of the two happened, because they read as one and are not.</b> Barren answers
+                // false when somebody else has already taken the seam off the list, and on 03.09.2026 that
+                // was most of them: 151 of these lines in 37 minutes against 15 seams actually removed, on a
+                // list of 502. A message that claims the removal every time turns a healthy rate into what
+                // looks like the ore map being stripped, and it cost a good ten minutes of exactly that
+                // worry before the ground's own tally settled it.
+                var struck = BotGround.Barren(_seam.Where);
 
-                return BotDoing.Failed($"{_walled} rocks of the {_seam.Ore} could not be reached, and the seam is struck off");
+                if (struck)
+                {
+                    Unwalkable++;
+                }
+
+                return BotDoing.Failed(
+                    struck
+                        ? $"{_walled} rocks of the {_seam.Ore} could not be reached, and the seam is struck off"
+                        : $"{_walled} rocks of the {_seam.Ore} could not be reached; somebody had already struck the seam off"
+                );
             }
 
             return default;
