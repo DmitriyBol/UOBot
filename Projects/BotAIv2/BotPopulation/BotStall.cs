@@ -88,8 +88,18 @@ public static class BotStall
     /// Whether this spot has already stalled somebody, and records it if it has not.
     ///
     /// Half an hour, and within <see cref="Elbow"/> tiles: a pocket is a place a bot can walk into and not
-    /// out of, and those do not move. The list is short by construction — a shard with many of them has a
-    /// different problem and this will say so by growing.
+    /// out of, and those do not move.
+    ///
+    /// <para>
+    /// <b>How many of them there are is reported, because the count is the question this answers next.</b>
+    /// On 03.09.2026 the rule fired as designed in its first window — 5 bots carried out in nineteen
+    /// minutes, one of them Doran from 1757,976, the very spot that had held nine bots in turn — and that
+    /// rate is fifteen an hour, not the handful a night the change predicted. Carrying them out is a cure
+    /// for the symptom; a population that keeps walking into ground it cannot walk out of is the illness,
+    /// and it became visible only once the roam was doubled to a thousand tiles on 02.09.2026 and the bots
+    /// began reaching terrain the pathing had never been asked about. The size of this list is the measure
+    /// of that, and it belongs beside the count of rescues rather than inside a comment.
+    /// </para>
     /// </summary>
     private static bool Pocket(Point3D where)
     {
@@ -262,7 +272,7 @@ public static class BotStall
     public static string Describe() =>
         Reported == 0
             ? $"nobody has stood still for {PatienceMs / 60000} minutes"
-            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of a spot they stalled in twice; worst: {Worst}";
+            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of {_pockets.Count} known pockets; worst: {Worst}";
 
     public static void Forget()
     {
