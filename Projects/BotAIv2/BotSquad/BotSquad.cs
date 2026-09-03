@@ -302,6 +302,31 @@ public sealed class BotSquad
     public BotSquadStance Stance { get; private set; }
 
     /// <summary>
+    /// Whether this company has been taken apart. A dead company is not a company anybody may join.
+    ///
+    /// <para>
+    /// <b>Nothing marked one, and a dissolved company is still a live object with a live leader.</b>
+    /// BotSquads.Dissolve clears the Squad of everybody in it and drops it out of the list the squad timer
+    /// walks — so it is never thought about again, and therefore can never disband again. Join looked at the
+    /// count, the ceiling and the map, all of which a dead company still answers perfectly well, and
+    /// attached new members to it. They sit on the Bound rung with the auction switched off, in a company
+    /// that no longer exists and so can never let them go.
+    /// </para>
+    ///
+    /// <para>
+    /// The log says it in two lines one second apart on 03.09.2026: "Squad 20 is no more: it went a while
+    /// with nothing to fight and nobody holding it together" at 17:41:35, and "Doran 2 fell in with company
+    /// 20, now 4 strong" at 17:41:35. Doran 2 was still standing there with its errand reading "nothing"
+    /// forty-five minutes later, its own barren clock reading nought the whole time because a Bound bot is
+    /// never asked what it wants to do.
+    /// </para>
+    /// </summary>
+    public bool Disbanded { get; private set; }
+
+    /// <summary>Marks this company dead. Called only by <c>BotSquads.Dissolve</c>, which owns the list.</summary>
+    internal void Bury() => Disbanded = true;
+
+    /// <summary>
     /// Whether this company is out on a standing charge and is therefore not disbanded for being quiet.
     ///
     /// <para>

@@ -47,6 +47,15 @@ public static class BotSquads
 
     public static long Yields { get; private set; }
 
+    /// <summary>
+    /// Bots turned away from a company that had already been taken apart.
+    ///
+    /// A named nought that should stay small rather than nought: companies really do dissolve in the same
+    /// beat somebody decides to join one, and the whole point is that the answer is now "no" instead of a bot
+    /// spending the rest of the shard's life in a company that does not exist.
+    /// </summary>
+    public static long Buried { get; private set; }
+
     public static bool Running => _timer != null;
 
     public static void Start()
@@ -82,6 +91,7 @@ public static class BotSquads
         Disbanded = 0;
         Rescues = 0;
         Yields = 0;
+        Buried = 0;
 
         BotSpoils.Reset();
     }
@@ -108,7 +118,7 @@ public static class BotSquads
             bound += _squads[i]?.Count ?? 0;
         }
 
-        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them; {BotSpoils.Describe()}";
+        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed; {BotSpoils.Describe()}";
     }
 
     /// <summary>
@@ -154,6 +164,19 @@ public static class BotSquads
     {
         if (squad == null || member?.Self is not { Deleted: false, Alive: true })
         {
+            return false;
+        }
+
+        // <b>A company that has been taken apart is not a company, and every other test here passes for
+        // one.</b> Dissolve drops the squad out of the list the timer walks and clears the Squad of everybody
+        // in it, but the object goes on answering Count, Ceiling and Map exactly as before — through a leader
+        // whose own Squad is now null. So a bot could fall in with a company that had ceased to exist one
+        // second earlier, and then never get out of it, because nothing thinks about a squad that is not in
+        // the list. See BotSquad.Disbanded for the two log lines that say so.
+        if (squad.Disbanded)
+        {
+            Buried++;
+
             return false;
         }
 
@@ -432,6 +455,9 @@ public static class BotSquads
 
     private static void Dissolve(BotSquad squad, string why)
     {
+        // First, so that a Join arriving in the same beat is refused rather than attaching to a corpse.
+        squad.Bury();
+
         var members = squad.Members;
 
         for (var i = members.Count - 1; i >= 0; i--)
