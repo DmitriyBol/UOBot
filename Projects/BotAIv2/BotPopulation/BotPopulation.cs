@@ -396,6 +396,7 @@ public static class BotPopulation
     public static void Forget(BotMobile bot)
     {
         BotStall.Forget(bot);
+        BotGround.Forget(bot);
 
         if (bot == null)
         {

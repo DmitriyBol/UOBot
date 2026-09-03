@@ -37,6 +37,9 @@ public sealed class BotHarvestSettings
 
     public int? MaxSeams { get; set; }
 
+    /// <summary>Milliseconds a bot's answer to "which seam" stands before the list is walked for it again.</summary>
+    public int? SeamAskEveryMs { get; set; }
+
     public int? MaxPlaces { get; set; }
 
     /// <summary>How many sweeps the population may run in one world.</summary>
@@ -113,6 +116,7 @@ public static class BotHarvestConfig
         BotGround.PlaceSpacing = settings.PlaceSpacing ?? BotGround.PlaceSpacing;
         BotGround.AnvilReach = settings.AnvilReach ?? BotGround.AnvilReach;
         BotGround.MaxSeams = settings.MaxSeams ?? BotGround.MaxSeams;
+        BotGround.AskEveryMs = settings.SeamAskEveryMs ?? BotGround.AskEveryMs;
         BotGround.MaxPlaces = settings.MaxPlaces ?? BotGround.MaxPlaces;
         BotGround.MaxSurveys = settings.MaxSurveys ?? BotGround.MaxSurveys;
 

@@ -532,6 +532,68 @@ public static class BotGround
     public static BotSeam Seam(IBotWilful bot) => Seam(bot, Point3D.Zero);
 
     /// <summary>
+    /// How long a bot's answer to "which seam" stands before the list is walked for it again.
+    ///
+    /// <para>
+    /// <b>Patrick's order of 03.09.2026: put a cooldown on asking, two or three seconds, so they stop
+    /// spamming it a hundred and twenty thousand times.</b> The scan is not one lookup — it is every
+    /// remembered seam, each one asked whether somebody else is on it, whether the ledger is wary of it,
+    /// whether there is a way through, and what the population has been paid out of that hillside. There are
+    /// four hundred of them and thirty-four bots asking on their own beats.
+    /// </para>
+    ///
+    /// <para>
+    /// Nothing is lost by the delay. Seams move on the timescale of a mining trip, not of a beat, and the
+    /// two things that do change quickly — somebody claiming a seam, and a road being proved shut — are both
+    /// re-checked by the errand itself when it gets there. A bot that just finished a vein waits at most
+    /// this long to be told where the next one is, and it is already walking home with a full pack.
+    /// </para>
+    /// </summary>
+    public static int AskEveryMs { get; set; } = 2500;
+
+    /// <summary>What each bot was last told, and when. Keyed by serial, pruned with the bot.</summary>
+    private static readonly Dictionary<Serial, (long Tick, Point3D Except, BotSeam Seam)> _told = [];
+
+    /// <summary>Scans of the seam list that were answered out of the last one instead.</summary>
+    public static long Spared { get; private set; }
+
+    /// <summary>A bot that is gone should not be remembered, or the table grows for the life of the shard.</summary>
+    public static void Forget(Mobile bot)
+    {
+        if (bot != null)
+        {
+            _told.Remove(bot.Serial);
+        }
+    }
+
+    /// <summary>
+    /// Whether this bot has been told lately, and what it was told.
+    ///
+    /// The exception is part of the key rather than ignored: an errand that has just proved one seam
+    /// unreachable is asking a different question from the one asked a second ago, and answering it out of
+    /// the cache would hand back the very seam it is trying to get away from.
+    /// </summary>
+    private static bool Told(Mobile body, Point3D except, out BotSeam seam)
+    {
+        seam = default;
+
+        if (!_told.TryGetValue(body.Serial, out var last) || last.Except != except)
+        {
+            return false;
+        }
+
+        if (Core.TickCount - last.Tick >= AskEveryMs)
+        {
+            return false;
+        }
+
+        seam = last.Seam;
+        Spared++;
+
+        return true;
+    }
+
+    /// <summary>
     /// The same, ignoring one seam. For an undertaking whose way to a seam turned out not to exist: without
     /// the exception it would be handed the same seam and walk into the same wall.
     /// </summary>
@@ -543,6 +605,12 @@ public static class BotGround
         if (map == null || map == Map.Internal)
         {
             return default;
+        }
+
+        // Answered out of the last scan while it is still warm. See AskEveryMs.
+        if (Told(body, except, out var lately))
+        {
+            return lately;
         }
 
         var ledger = bot.Resolve?.Ledger;
@@ -615,6 +683,8 @@ public static class BotGround
             best = seam;
             bestScore = score;
         }
+
+        _told[body.Serial] = (Core.TickCount, except, best);
 
         return best;
     }
@@ -839,10 +909,12 @@ public static class BotGround
         _counters.Clear();
         _surveyed.Clear();
         _digging.Clear();
+        _told.Clear();
+        Spared = 0;
 
         _saidCapped = false;
     }
 
     public static string Describe() =>
-        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_counters.Count} counters; {Walled} seams passed over with no way through, {Townbound} for being inside the walls, {Emptied} struck off as barren, {BotDig.Unwalkable} struck off for nobody getting nearer to them, patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y})";
+        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_counters.Count} counters; {Walled} seams passed over with no way through, {Townbound} for being inside the walls, {Emptied} struck off as barren, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {Spared} asks answered out of the last scan, patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y})";
 }
