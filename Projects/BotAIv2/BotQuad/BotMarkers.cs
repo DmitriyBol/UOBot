@@ -170,9 +170,16 @@ public static class BotMarkers
             // twice reads 0.004 and prints as "0.00" while being nothing like nought — the file came back with
             // its 388 blues untouched. What is skipped is the square that is neither feared nor proven quiet
             // and has never had a blow landed in it: no verdict either way, and nothing anybody would act on.
+            // <b>Read whole, creatures included, which is the half this test was missing.</b> It looked at
+            // the earned record alone, so a square whose record is nought and which has four hostiles
+            // standing in it right now — reading minus four tenths, the worst kind of ground there is —
+            // scored as "neutral, nothing to say" and was left off the map. That is exactly the square
+            // somebody opening the map needs to see.
+            var reading = BotQuad.Reading(quad);
+
             if (!PinUnknown
-                && quad.Safety > BotQuad.Wanted
-                && quad.Safety <= BotQuad.TooQuiet
+                && reading > BotQuad.Unsafe
+                && reading < BotQuad.Safest
                 && quad.Blows == 0
                 && quad.Deaths == 0)
             {
@@ -185,9 +192,9 @@ public static class BotMarkers
             // The middle dot and the semicolon are what the old file used, and they read well in game.
             text.Append(middle.X).Append(',')
                 .Append(middle.Y).Append(",0,")
-                .Append(Label(quad))
+                .Append(Label(quad, reading))
                 .Append(",,")
-                .Append(Colour(quad))
+                .Append(Colour(quad, reading))
                 .Append(",3\n");
 
             written++;
@@ -234,11 +241,30 @@ public static class BotMarkers
     /// The rating first, because it is the one number the rules are written in; then only the counts that
     /// are not nought, so a quiet square is a short label rather than a row of zeroes.
     /// </summary>
-    private static string Label(BotQuad.Quad quad)
+    private static string Label(BotQuad.Quad quad, double reading)
     {
-        var text = new StringBuilder(48);
+        var text = new StringBuilder(64);
 
-        text.Append(quad.Safety.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+        // The number, then the word for it. The number is what the rules are written in; the word is what
+        // somebody looking at a map full of pins actually reads.
+        text.Append(reading.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+        text.Append(' ').Append(BotQuad.Band(reading));
+
+        // What is living here, which is the one part of the reading that is about this moment — and the part
+        // the pins did not show at all until 03.09.2026, because they printed the earned record alone.
+        if (quad.Mobs > 0)
+        {
+            text.Append(" · ").Append(quad.Mobs).Append(" hostile");
+        }
+
+        // What it asks of whoever goes, where it asks anything. A person looking at the map is deciding who
+        // to send, and this is the number that decides it.
+        var muscle = BotQuad.Muscle(reading);
+
+        if (muscle > 0.0)
+        {
+            text.Append(" · needs ").Append(muscle.ToString("F0", System.Globalization.CultureInfo.InvariantCulture));
+        }
 
         if (quad.Deaths > 0)
         {
@@ -254,14 +280,6 @@ public static class BotMarkers
         {
             text.Append(" · harrowed");
         }
-        else if (quad.Safety <= BotQuad.Dire)
-        {
-            text.Append(" · dire");
-        }
-        else if (quad.Safety > BotQuad.TooQuiet)
-        {
-            text.Append(" · quiet");
-        }
 
         return text.ToString();
     }
@@ -273,24 +291,33 @@ public static class BotMarkers
     /// asking one question — where should anybody be sent — and every extra colour makes that question
     /// harder rather than easier.
     /// </summary>
-    private static string Colour(BotQuad.Quad quad)
+    private static string Colour(BotQuad.Quad quad, double reading)
     {
         if (!quad.Trodden)
         {
             return "purple";
         }
 
-        if (quad.Safety <= BotQuad.Dire)
+        // <b>The bands, and nothing else.</b> The colours used to be drawn off three thresholds that belong
+        // to hunting rather than to safety — too quiet to bother with, worth going to, dire — so the map was
+        // answering "where is there a fight" while its labels answered "how safe is this". One question per
+        // map: Patrick's table of 03.09.2026 is the question, and these are its five answers.
+        if (reading <= BotQuad.Bleakest)
         {
             return "red";
         }
 
-        if (quad.Safety <= BotQuad.Wanted)
+        if (reading <= BotQuad.Unsafe)
         {
             return "yellow";
         }
 
-        return quad.Safety > BotQuad.TooQuiet ? "green" : "blue";
+        if (reading >= BotQuad.Safest)
+        {
+            return "green";
+        }
+
+        return reading >= BotQuad.Positive ? "blue" : "white";
     }
 
     /// <summary>

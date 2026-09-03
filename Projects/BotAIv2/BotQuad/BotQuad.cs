@@ -59,6 +59,36 @@ public static class BotQuad
     public const double Fresh = 0.0;
 
     /// <summary>
+    /// The five bands the reading is spoken in, by Patrick's table of 03.09.2026.
+    ///
+    /// <para>
+    ///   <c>1.00</c> safe · <c>0.01</c> positive · <c>0.00</c> neutral · <c>-0.01</c> unsafe · <c>-1.00</c>
+    ///   dangerous.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>It also settles where fear begins, which the strength table on its own did not.</b> That table
+    /// starts at minus a hundredth and the order that came with it said bots do not fear anything above five
+    /// hundredths, leaving the band between charged nothing and named nothing. Here it has a name: it is
+    /// positive ground, and positive ground asks nobody for anything. Fear starts exactly where the word
+    /// "unsafe" does.
+    /// </para>
+    /// </summary>
+    public const double Positive = 0.01;
+
+    public const double Neutral = 0.0;
+
+    public const double Unsafe = -0.01;
+
+    /// <summary>What to call a reading, in one word, for anybody reading a map or a log line.</summary>
+    public static string Band(double safety) =>
+        safety >= Safest ? "safe"
+        : safety >= Positive ? "positive"
+        : safety > Unsafe ? "neutral"
+        : safety > Bleakest ? "unsafe"
+        : "dangerous";
+
+    /// <summary>
     /// How many uneventful crossings it takes to earn a square a little credit.
     ///
     /// Three, by order, and counted rather than timed: a crossing is a bot going in and coming out with
@@ -127,7 +157,7 @@ public static class BotQuad
     /// alone, whatever the work there is worth.
     /// </para>
     /// </summary>
-    public static double Fearless { get; set; } = 0.05;
+    public static double Fearless { get; set; } = Neutral;
 
     /// <summary>
     /// What one death costs a square.
@@ -677,6 +707,15 @@ public static class BotQuad
     /// the creatures into the record.
     /// </summary>
     public static int SightMs { get; set; } = 300000;
+
+    /// <summary>
+    /// What one square reads, creatures and all. For anybody holding the square already.
+    ///
+    /// The pins had been printing the earned reading alone, so the one term that says a square has four
+    /// ogres living in it was the one term the map did not show.
+    /// </summary>
+    public static double Reading(Quad quad) =>
+        quad == null ? Fresh : Math.Clamp(quad.Safety + MobWorth * Living(quad), Bleakest, Safest);
 
     /// <summary>What was counted in this square, if anybody has looked lately.</summary>
     private static int Living(Quad quad) =>
