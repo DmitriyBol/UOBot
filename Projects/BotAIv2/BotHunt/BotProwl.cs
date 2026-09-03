@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Server.Regions;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -26,6 +28,8 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotProwl : BotDeed
 {
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotProwl));
+
     /// <summary>The ledger's key.</summary>
     public const string Trade = "prowl";
 
@@ -93,11 +97,51 @@ public sealed class BotProwl : BotDeed
 
     private int _stalled;
 
-    public BotProwl(Map map, Point3D where)
+    public BotProwl(Map map, Point3D where) : this(map, where, false)
+    {
+    }
+
+    /// <param name="company">
+    /// Whether this ground asks more strength than the bot has on its own. When it does, the first beat
+    /// raises a company out of whoever is standing there and the errand fails honestly if it cannot — the
+    /// obligation in Patrick's order of 03.09.2026: pass the threshold, or bring people who together do.
+    /// </param>
+    public BotProwl(Map map, Point3D where, bool company)
     {
         _map = map;
         _where = where;
+        _company = company;
     }
+
+    /// <summary>Whether this ground was accepted on the strength of a company that does not exist yet.</summary>
+    private readonly bool _company;
+
+    private bool _raised;
+
+    /// <summary>Companies raised because the ground asked more than one bot could bring.</summary>
+    public static long Raised { get; private set; }
+
+    /// <summary>Errands given up because the company could not be raised after all.</summary>
+    public static long Unraised { get; private set; }
+
+    /// <summary>
+    /// How long one bot's claim on a square holds off everybody else's company.
+    ///
+    /// Long enough for the company to form and set out, and short enough that a claim by a bot which then
+    /// died or was outbid does not fence the square off. A minute.
+    /// </summary>
+    public static int ClaimMs { get; set; } = 60000;
+
+    private static readonly Dictionary<(int Map, int X, int Y), long> _raising = [];
+
+    public static bool Raising(Map map, Point3D where)
+    {
+        var key = BotQuad.Key(map, where);
+
+        return _raising.TryGetValue(key, out var when) && Core.TickCount - when < ClaimMs;
+    }
+
+    private static void Claim(Map map, Point3D where) => _raising[BotQuad.Key(map, where)] = Core.TickCount;
 
     public override string Kind => Trade;
 
@@ -127,6 +171,61 @@ public sealed class BotProwl : BotDeed
         if (body == null || _map == null || _map == Map.Internal)
         {
             return BotDoing.Failed("no body");
+        }
+
+        // <b>The obligation, discharged before a step is taken.</b> This ground was accepted only because the
+        // bots standing here would clear its threshold together, so the company is raised now, out of whoever
+        // is still standing here — which may be fewer than when it was weighed, and if it is, the errand ends
+        // rather than walking one bot into ground that was refused to one bot.
+        if (_company && !_raised)
+        {
+            _raised = true;
+
+            Claim(_map, _where);
+
+            if (bot is IBotSquadMember { Squad: null } member && BotSquads.Running)
+            {
+                var squad = BotSquads.Form(member);
+
+                if (squad != null)
+                {
+                    foreach (var mobile in _map.GetMobilesInRange<Mobile>(body.Location, BotMuster.Reach))
+                    {
+                        if (squad.Count >= squad.Ceiling)
+                        {
+                            break;
+                        }
+
+                        if (mobile != body && mobile is IBotSquadMember { Squad: null } other
+                            && mobile is IBotAlly { AbleToFight: true })
+                        {
+                            BotSquads.Join(squad, other);
+                        }
+                    }
+
+                    // Held together for the walk, exactly as a scouting party is: a company with nothing to
+                    // fight yet is dissolved on its next beat otherwise, and there is nothing to fight until
+                    // it arrives. See BotSquad.Charged.
+                    squad.Charged = true;
+                }
+            }
+
+            if (!BotQuad.Dares(body, _map, _where))
+            {
+                Unraised++;
+
+                return BotDoing.Failed($"could not raise enough strength for ({_where.X}, {_where.Y})");
+            }
+
+            Raised++;
+
+            logger.Information(
+                "{Name} raised a company for ({X}, {Y}), which asks {Muscle:F0} of strength",
+                body.Name,
+                _where.X,
+                _where.Y,
+                BotQuad.Muscle(_map, _where)
+            );
         }
 
         // The errand's whole purpose, met. Finished rather than pressed on with: the hunt is worth ten times

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Server.Logging;
 using Server.Mobiles;
+using Server.Regions;
 
 namespace Server.BotAI.V2;
 
@@ -468,6 +469,15 @@ public static class BotQuad
         /// <summary>When that count was taken, so a stale one can be let go of.</summary>
         public long Sighted;
 
+        /// <summary>
+        /// Whether this square is inside the walls, decided once when it was first written down.
+        ///
+        /// Nothing may be fought here and nothing may be learned here, so it is born safe and born trodden.
+        /// Kept as a flag rather than asked again, because a region does not move and asking cost this shard
+        /// 120277 lookups in ninety minutes the last time the same question was decided at the point of use.
+        /// </summary>
+        public bool Townbound;
+
         /// <summary>Blows landed on the crown's rangers here, counted towards their own coarser step.</summary>
         public int RangerBruising;
 
@@ -667,9 +677,62 @@ public static class BotQuad
             Tick = Core.TickCount
         };
 
+        Settle(quad, map);
+
         _quads[key] = quad;
 
         return quad;
+    }
+
+    /// <summary>Squares born safe because they are inside the walls. For the summary.</summary>
+    public static long Walled { get; private set; }
+
+    /// <summary>
+    /// What a square already knows about itself before anybody has been in it.
+    ///
+    /// <para>
+    /// <b>Inside the walls is safe, by Patrick's order of 03.09.2026, and it is settled once at birth.</b>
+    /// A guarded region is ground where nothing can be fought, so there is nothing there to learn and
+    /// nothing there to fear — and it was costing the population twice for the silence. The scouting
+    /// frontier offers the nearest ground nobody has stood in, and the inside of the castle is very near and
+    /// has never been stood in, so parties were being raised to walk into (1365, 1665). And the hunt asked
+    /// its own separate question of every candidate on every beat, which is the same rule kept in a second
+    /// place.
+    /// </para>
+    ///
+    /// <para>
+    /// Born safe and born trodden: safe because it is, and trodden because "nobody has been here" is what
+    /// the frontier means by unknown, and this ground is not unknown — there is simply nothing in it worth
+    /// knowing. That takes it off the frontier, out of the hunt's candidates and onto the map as green,
+    /// which is what a person looking at the map should see there.
+    /// </para>
+    /// </summary>
+    private static void Settle(Quad quad, Map map)
+    {
+        if (quad == null || map == null || map == Map.Internal)
+        {
+            return;
+        }
+
+        var x = quad.X * Side + Side / 2;
+        var y = quad.Y * Side + Side / 2;
+
+        // <b>The height matters and nought is not one.</b> Region.Find is asked about a point, and a point
+        // at Z nought inside a castle is under its floor — so the first version of this rule fired once in
+        // five minutes on a shard whose bots were walking into the castle. The ground's own height is what
+        // the region is drawn around.
+        var middle = new Point3D(x, y, map.GetAverageZ(x, y));
+
+        if (Region.Find(middle, map)?.IsPartOf<GuardedRegion>() != true)
+        {
+            return;
+        }
+
+        quad.Safety = Safest;
+        quad.Trodden = true;
+        quad.Townbound = true;
+
+        Walled++;
     }
 
     /// <summary>The square this tile is in, or nothing when the population has never touched it.</summary>
@@ -906,6 +969,49 @@ public static class BotQuad
     /// order of 03.09.2026 and it is the reason this returns a yes or a no rather than a factor.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Whether this bot and whoever is standing near it would clear the ground together.
+    ///
+    /// <para>
+    /// The second half of Patrick's order: a bot too weak for a square must either be stronger or bring
+    /// people. This is the "or bring people" — asked before anything is committed to, out of who is actually
+    /// standing there, so it is the same arithmetic the company would really have. Nothing is formed here:
+    /// a proposer weighs, and only an undertaking may act.
+    /// </para>
+    /// </summary>
+    public static bool Together(Mobile body, Map map, Point3D where, int within)
+    {
+        var asked = Muscle(map, where);
+
+        if (asked <= 0.0)
+        {
+            return true;
+        }
+
+        var strength = Strength(body);
+        var facet = body?.Map;
+
+        if (facet == null || facet == Map.Internal)
+        {
+            return false;
+        }
+
+        foreach (var mobile in facet.GetMobilesInRange<Mobile>(body.Location, within))
+        {
+            if (mobile == body || mobile is not IBotSquadMember { Squad: null })
+            {
+                continue;
+            }
+
+            if (mobile is IBotAlly { AbleToFight: true } && mobile is { Deleted: false, Alive: true })
+            {
+                strength += BotThreat.Power(mobile);
+            }
+        }
+
+        return strength >= asked;
+    }
+
     public static bool Dares(Mobile body, Map map, Point3D where)
     {
         var asked = Muscle(map, where);
@@ -1338,6 +1444,8 @@ public static class BotQuad
                     Tick = Core.TickCount
                 };
 
+                Settle(near, quad.Map);
+
                 _quads[key] = near;
                 found.Add(near);
             }
@@ -1539,7 +1647,7 @@ public static class BotQuad
             + $"({Hushed} shut and {Roused} reopened since the shard came up, which is the direction rather than the level) "
                + $"(above {TooQuiet:F2}), {wanted} worth going to (at or below {Wanted:F2}), {dire} dire (at or below {Dire:F2}); "
                + $"worst is {worst}; {Discovered} first set foot in, {Credited} raised for crossings, "
-               + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough";
+               + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough, {Walled} born safe inside the walls";
     }
 
     /// <summary>
@@ -1611,6 +1719,7 @@ public static class BotQuad
         Counted = 0;
         Looks = 0;
         Feared = 0;
+        Walled = 0;
         Baulked = 0;
         Sweeps = 0;
         Wiped = 0;

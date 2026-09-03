@@ -367,6 +367,21 @@ public static class BotFormation
 
             var candidate = new Point3D(cx, cy, z);
 
+            // <b>What the shard has already proved, asked before a search is paid for.</b> A station on a
+            // crypt roof is a station nobody can walk to, and the formation was handing one out every beat:
+            // the member dropped it, the next beat computed the same tile, and the company stood there. On
+            // 03.09.2026 that read in the log as "Alden 2 has dropped (1370, 1467, 30) because it is shut in
+            // and this bot is outside it (station)" while the Baron's party sat still after a kill — three
+            // roofs in that cluster had been filed as pockets an hour earlier.
+            //
+            // Free, and it does not disagree with the search below: a pocket is only filed when a search
+            // walked ground to its edges. It simply knows sooner, and it goes on knowing after the tile that
+            // was reachable when the station was chosen has been proved otherwise.
+            if (BotReach.Ask(map, member.Self.Location, candidate, BotArrival.Exactly) == BotReachVerdict.Sealed)
+            {
+                continue;
+            }
+
             if (BotPath.CanReach(map, member.Self.Location, candidate, BotArrival.Exactly))
             {
                 return candidate;

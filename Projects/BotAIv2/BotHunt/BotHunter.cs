@@ -83,9 +83,9 @@ public sealed class BotHunter : IBotProposer
         // nothing and is the right answer anyway: it is a walk to somewhere else.
         if (BotThreat.Decide(body, BotMobile.NoticeRange) == BotStand.Outmatched)
         {
-            var elsewhere = Hunting(bot, body, map);
+            var elsewhere = Hunting(bot, body, map, out var outmatched);
 
-            return elsewhere == Point3D.Zero ? null : new BotProwl(map, elsewhere);
+            return elsewhere == Point3D.Zero ? null : new BotProwl(map, elsewhere, outmatched);
         }
 
         var quarry = BotQuarry.Best(body, BotQuarry.Reach);
@@ -115,9 +115,9 @@ public sealed class BotHunter : IBotProposer
             // Nothing here. Offer to go and look instead — worth almost nothing, so it wins only when the
             // auction has nothing else at all, which is exactly when a fighter should be out walking rather
             // than standing in a square.
-            var ground = Hunting(bot, body, map);
+            var ground = Hunting(bot, body, map, out var company);
 
-            return ground == Point3D.Zero ? null : new BotProwl(map, ground);
+            return ground == Point3D.Zero ? null : new BotProwl(map, ground, company);
         }
 
         // Claimed the moment it is offered, not when the first blow lands.
@@ -152,8 +152,15 @@ public sealed class BotHunter : IBotProposer
     /// never pays stops being chosen without anybody keeping a list of bad places.
     /// </para>
     /// </summary>
-    private static Point3D Hunting(IBotWilful bot, Mobile body, Map map)
+    /// <param name="company">
+    /// Whether the ground that came back is ground this bot cannot take alone. True means the strength gate
+    /// refused it and the bots standing nearby would clear it together — so whatever walks there is obliged
+    /// to raise a company first. See BotQuad.Together.
+    /// </param>
+    private static Point3D Hunting(IBotWilful bot, Mobile body, Map map, out bool company)
     {
+        company = false;
+
         var ledger = bot?.Resolve?.Ledger;
         var home = BotPopulation.Where;
         // Half the ground the population may want things on, and not because a prowl is less entitled to it.
@@ -169,6 +176,11 @@ public sealed class BotHunter : IBotProposer
         // How much of this sample the quietness rule threw away. Counted so that "nowhere to walk" can be
         // told apart from "nowhere quiet enough to be worth walking to" — see Stranded.
         var refused = 0;
+
+        // Whether the ground that wins will need a company raised for it. Held beside the winner rather than
+        // recomputed, because the answer belongs to the square that was chosen and not to the last one looked at.
+        var needsCompany = false;
+        var bestNeedsCompany = false;
 
         // The least dull of what it threw away, in case it throws away all of it.
         var quietest = Point3D.Zero;
@@ -204,6 +216,9 @@ public sealed class BotHunter : IBotProposer
         for (var tries = 0; tries <= Samples + 2; tries++)
         {
             Point3D where;
+
+            // Per candidate, or the first square that wanted a company would mark every square after it.
+            needsCompany = false;
 
             if (tries == 0)
             {
@@ -282,9 +297,30 @@ public sealed class BotHunter : IBotProposer
             // asked here, where the ground is chosen, rather than at the moment of stepping into it.
             if (!BotQuad.Dares(body, map, where))
             {
-                Overmatched++;
+                // <b>Or bring people, which is the other half of the order.</b> Ground this bot cannot take
+                // alone is still ground it may take with the bots standing beside it, and refusing it here
+                // would leave the population permanently unable to work anywhere worth working. Nothing is
+                // formed at this point — a proposer weighs and an undertaking acts — so the ground is
+                // accepted and the company is raised by the prowl itself on its first beat.
+                if (!BotQuad.Together(body, map, where, BotMuster.Reach))
+                {
+                    Overmatched++;
 
-                continue;
+                    continue;
+                }
+
+                // <b>Somebody is already raising one for this square, so this bot is not.</b> Refused here
+                // rather than by the errand, and that distinction is the whole of it: a proposer that skips
+                // a candidate costs nothing, while an errand that fails on its first beat is taken again on
+                // the next — 1728 of those inside five minutes when this same test lived one layer down.
+                if (BotProwl.Raising(map, where))
+                {
+                    Claimed++;
+
+                    continue;
+                }
+
+                needsCompany = true;
             }
 
             // Of the places that pass, the one this bot has actually been paid at.
@@ -362,6 +398,8 @@ public sealed class BotHunter : IBotProposer
                 bestPaid = paid;
                 bestKnown = known;
                 bestWanted = wanted;
+                bestNeedsCompany = needsCompany;
+                company = needsCompany;
 
                 if (wanted)
                 {
@@ -550,11 +588,14 @@ public sealed class BotHunter : IBotProposer
     /// <summary>Grounds passed over because whoever asked was not strong enough for them.</summary>
     public static long Overmatched { get; private set; }
 
+    /// <summary>Grounds passed over because another bot is already raising a company for them.</summary>
+    public static long Claimed { get; private set; }
+
     /// <summary>Times a hunting ground was picked because it is ground that has hurt somebody.</summary>
     public static long Sought { get; private set; }
 
     public static string Describe() =>
-        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overmatched} grounds passed over for asking more strength than whoever looked had, {Overrun} quarry passed over for the crowd already round it, {BotProwl.Baulked} prowls given up for getting no nearer";
+        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overmatched} grounds passed over for asking more strength than whoever looked had, {Claimed} for somebody already raising a company for them, {Overrun} quarry passed over for the crowd already round it, {BotProwl.Baulked} prowls given up for getting no nearer, {BotProwl.Raised} companies raised for ground one bot could not take, {BotProwl.Unraised} given up for not raising one";
 
     public static void Forget()
     {
@@ -563,6 +604,7 @@ public sealed class BotHunter : IBotProposer
         Quiet = 0;
         Stranded = 0;
         Overmatched = 0;
+        Claimed = 0;
         Overrun = 0;
         Sought = 0;
     }
