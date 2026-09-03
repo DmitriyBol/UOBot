@@ -186,6 +186,9 @@ public sealed class BotDig : BotDeed
 
     private int _stalled;
 
+    /// <summary>Rocks written off in a row for being unreachable. See <see cref="WalledLimit"/>.</summary>
+    private int _walled;
+
     /// <summary>
     /// How many beats a miner will spend closing on one rock before writing it off.
     ///
@@ -204,6 +207,13 @@ public sealed class BotDig : BotDeed
     /// </para>
     /// </summary>
     public static int TrekLimit { get; set; } = 200;
+
+    /// <summary>
+    /// How many rocks in a row may be found unreachable before the seam itself is struck off.
+    ///
+    /// Three. One is bad luck, two is a coincidence, and three of them behind the same wall is the wall.
+    /// </summary>
+    public static int WalledLimit { get; set; } = 3;
 
     /// <summary>Seams struck off because nobody could walk to them. See <see cref="TrekLimit"/>.</summary>
     public static long Unwalkable { get; private set; }
@@ -431,10 +441,26 @@ public sealed class BotDig : BotDeed
             _approaches = 0;
             Unreachable++;
 
+            // <b>Three rocks in a row that cannot be walked to are a fact about the seam, not about the
+            // rocks.</b> Written off one at a time, this costs ApproachLimit beats each and MaxSpent of them
+            // before the seam is given up — which on 03.09.2026 at 06:17 was Godric the Architect and Alden
+            // the Gatherer standing three minutes apiece at 1361,1559, fifteen tiles from a seam at
+            // 1361,1574, treading a patch two tiles across and changing tile 49 times inside it. Calla the
+            // Crafter had spent ten minutes at the same coordinates six hours earlier. The seam is behind
+            // something, and the way to find that out is not to try eight rocks behind the same something.
+            if (++_walled >= WalledLimit)
+            {
+                BotGround.Barren(_seam.Where);
+                Unwalkable++;
+
+                return BotDoing.Failed($"{_walled} rocks of the {_seam.Ore} could not be reached, and the seam is struck off");
+            }
+
             return default;
         }
 
         _approaches = 0;
+        _walled = 0;
 
         // What the last swing produced, judged before the next one is taken.
         if (carried > _seen)
