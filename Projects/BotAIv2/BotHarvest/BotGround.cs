@@ -841,5 +841,5 @@ public static class BotGround
     }
 
     public static string Describe() =>
-        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_counters.Count} counters; {Walled} seams passed over with no way through, {Townbound} for being inside the walls, {Emptied} struck off as barren, patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y})";
+        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_counters.Count} counters; {Walled} seams passed over with no way through, {Townbound} for being inside the walls, {Emptied} struck off as barren, {BotDig.Unwalkable} struck off for nobody getting nearer to them, patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y})";
 }
