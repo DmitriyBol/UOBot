@@ -334,12 +334,18 @@ public static class BotWalk
         // got no closer — so the cheap search goes first and the whole ceiling is bought only where the cheap
         // one has been shown to fail.
         //
-        // <b>Two of them, not one, and the first setting was one.</b> A single plan that fails to better the
-        // errand's best distance is ordinary noise - a chase whose quarry stepped away, a road whose leg ended
-        // slightly wide - and buying the whole ceiling for it put a third of all searches back on sixty
-        // milliseconds, which was most of the bill this change exists to cut. Two in a row is the same
-        // threshold the far side is asked at, and for the same reason: it is the point at which "far off" and
-        // "shut in" stop looking alike.
+        // <b>One plan, not two, and it was tried at two and measured.</b> A single plan that fails to better
+        // the errand's best distance looks like ordinary noise, and raising the bar to two - the same
+        // threshold the far side is asked at - did exactly what it was meant to: searches asking for the whole
+        // ceiling fell from a third of all of them to under three per cent, and the price of a search from
+        // 20.45ms to 8.68. It also cost the population eleven per cent of its work. Jobs finished in minutes
+        // five to ten of a run, which is the only number here that is an outcome rather than a cost: 208 and
+        // 210 with the bar at one, 187 with it at two. The cheap search was not finding the way and the bots
+        // were walking further to get anywhere.
+        //
+        // So the escalation stays eager, and what pays for it is that it is still bounded by the governor:
+        // 181 to 212ms a second of an allowance of five hundred, against 469 before searches were charged by
+        // distance at all.
         var outcome = BotPath.Find(
             map,
             bot.Location,
@@ -347,7 +353,7 @@ public static class BotWalk
             journey.Arrival,
             _path,
             journey.Avoid(bot.Location),
-            journey.PlansSinceCloser >= PlansBeforeAskingTheFarSide ? BotPath.CeilingMs : 0.0
+            journey.PlansSinceCloser > 0 ? BotPath.CeilingMs : 0.0
         );
 
         // A statement about the world, and therefore worth acting on at once. The first version spent
