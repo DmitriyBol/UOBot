@@ -377,7 +377,11 @@ public static class BotFormation
             // Free, and it does not disagree with the search below: a pocket is only filed when a search
             // walked ground to its edges. It simply knows sooner, and it goes on knowing after the tile that
             // was reachable when the station was chosen has been proved otherwise.
-            if (BotReach.Ask(map, member.Self.Location, candidate, BotArrival.Exactly) == BotReachVerdict.Sealed)
+            // <b>Asked at the width the ledger actually files at, not at the tile.</b> With Exactly the sweep
+            // is nought cells wide, so a station two tiles from a filed roof came back Unknown here and
+            // Sealed to the walker a second later — the same question, two tolerances, two answers, and the
+            // company standing between them. Within(2) is BotReach's own MaxSweep.
+            if (BotReach.Ask(map, member.Self.Location, candidate, BotArrival.Within(2)) == BotReachVerdict.Sealed)
             {
                 continue;
             }

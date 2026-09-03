@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Server.Logging;
+using Server.Regions;
 
 namespace Server.BotAI.V2;
 
@@ -67,6 +68,90 @@ public static class BotPopulation
     /// </summary>
     public static bool Within(Map map, Point3D where) =>
         Home == null || map == Home && Utility.InRange(Where, where, Roam);
+
+    /// <summary>
+    /// How far out the walk looks for the edge of the guarded ground, and how coarsely.
+    ///
+    /// Britain's wall is a hundred-odd tiles from where the population lives, so four hundred is generous
+    /// and eight-tile strides find the edge to within eight — which is the right grain for a place to stand
+    /// and wait, and turns a walk of four hundred lookups into fifty.
+    /// </summary>
+    public static int GateReach { get; set; } = 400;
+
+    public static int GateStride { get; set; } = 8;
+
+    /// <summary>Gates found. A named nought: if this stays at nought nobody is gathering anywhere new.</summary>
+    public static long Gates { get; private set; }
+
+    /// <summary>
+    /// The edge of the guarded ground, in the direction of somewhere worth going.
+    ///
+    /// <para>
+    /// <b>Patrick's order of 03.09.2026: a company gathers at the edge of the town rather than inside it,
+    /// so the march out is shorter.</b> Bots live and bank and buy in the middle of Britain, so that is
+    /// where one of them is standing when it decides it needs help — and the company it raises then walks
+    /// the whole width of the town before it has gone anywhere at all. The edge in the right direction is
+    /// the shortest honest place to meet, and it is also where more of the population passes by than
+    /// anywhere inside the walls.
+    /// </para>
+    ///
+    /// <para>
+    /// Found by walking rather than by geometry: guarded regions are drawn as whatever shape somebody drew
+    /// them, so the only reliable way to find their edge is to ask the engine at points along the line. The
+    /// first point outside is the answer, stepped back onto ground a body can stand on.
+    /// </para>
+    ///
+    /// <para>
+    /// Returns <see cref="Point3D.Zero"/> when there is no edge to find — the bot is not in a town, or the
+    /// line leaves the map — and every caller treats that as "gather where you stand", which is what it did
+    /// before this existed.
+    /// </para>
+    /// </summary>
+    public static Point3D Gate(Map map, Point3D from, Point3D toward)
+    {
+        if (map == null || map == Map.Internal || Region.Find(from, map)?.IsPartOf<GuardedRegion>() != true)
+        {
+            return Point3D.Zero;
+        }
+
+        var dx = toward.X - from.X;
+        var dy = toward.Y - from.Y;
+        var span = Math.Max(Math.Abs(dx), Math.Abs(dy));
+
+        if (span <= 0)
+        {
+            return Point3D.Zero;
+        }
+
+        for (var out_ = GateStride; out_ <= GateReach; out_ += GateStride)
+        {
+            var x = from.X + dx * out_ / span;
+            var y = from.Y + dy * out_ / span;
+
+            if (x < 0 || y < 0 || x >= map.Width || y >= map.Height)
+            {
+                return Point3D.Zero;
+            }
+
+            if (!BotStep.Settle(map, x, y, out var z))
+            {
+                continue;
+            }
+
+            var here = new Point3D(x, y, z);
+
+            if (Region.Find(here, map)?.IsPartOf<GuardedRegion>() == true)
+            {
+                continue;
+            }
+
+            Gates++;
+
+            return here;
+        }
+
+        return Point3D.Zero;
+    }
 
     /// <summary>How long a dead bot lies there before it is put back on its feet.</summary>
     public static int ReviveMs { get; set; } = 60000;

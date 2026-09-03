@@ -687,6 +687,18 @@ public sealed class BotHarrow : BotDeed
     /// </summary>
     private Point3D Rally(Mobile body)
     {
+        // <b>The edge of the town in the direction of the ground, before the town square.</b> Patrick's
+        // order of 03.09.2026, and the reason is the march: calling the levy on Britain's square puts six
+        // bots in the middle of a town they must then cross before they have gone anywhere. The gate on the
+        // right side is the shortest honest place to meet, and more of the population passes it. Outside a
+        // town Gate answers with nothing and the named square stands, exactly as it did.
+        var gate = BotPopulation.Gate(_map, body.Location, _square);
+
+        if (gate != Point3D.Zero)
+        {
+            return gate;
+        }
+
         var named = Square != Point3D.Zero ? Square : BotPopulation.Where;
 
         if (BotStep.Settle(_map, named.X, named.Y, out var z))

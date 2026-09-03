@@ -118,6 +118,13 @@ public sealed class BotProwl : BotDeed
 
     private bool _raised;
 
+    private bool _gated;
+
+    private Point3D _gate;
+
+    /// <summary>How near the gate counts as being at it. A place to meet, not a tile to stand on.</summary>
+    public static int GatherWithin { get; set; } = 3;
+
     /// <summary>Companies raised because the ground asked more than one bot could bring.</summary>
     public static long Raised { get; private set; }
 
@@ -179,9 +186,29 @@ public sealed class BotProwl : BotDeed
         // rather than walking one bot into ground that was refused to one bot.
         if (_company && !_raised)
         {
-            _raised = true;
+            // <b>Gathered at the edge of the town rather than in the middle of it.</b> Patrick's order of
+            // 03.09.2026: bots live and bank and buy in the middle of Britain, so that is where one of them
+            // is standing when it decides it needs help — and the company it raises there walks the whole
+            // width of the town before it has gone anywhere at all. The edge in the right direction is the
+            // shortest honest place to meet, and more of the population passes it than passes anywhere
+            // inside the walls. Outside a town Gate answers with nothing and the company forms where it
+            // stands, which is what it did before.
+            if (!_gated)
+            {
+                _gated = true;
+                _gate = BotPopulation.Gate(_map, body.Location, _where);
 
-            Claim(_map, _where);
+                // Claimed as soon as it commits to gathering rather than on arrival, or every other bot in
+                // town decides on the same square while this one is still walking to the gate.
+                Claim(_map, _where);
+            }
+
+            if (_gate != Point3D.Zero && !body.InRange(_gate, GatherWithin))
+            {
+                return BotDoing.Walk(_map, _gate, BotArrival.Within(GatherWithin), "to the edge of town to gather");
+            }
+
+            _raised = true;
 
             if (bot is IBotSquadMember { Squad: null } member && BotSquads.Running)
             {
