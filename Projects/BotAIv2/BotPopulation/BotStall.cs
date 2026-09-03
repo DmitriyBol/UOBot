@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Server.Logging;
+using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
@@ -167,7 +168,7 @@ public static class BotStall
         // stuck in a way no subsystem above it can see or fix. "Full pack" errands stalling three at a time
         // is exactly what that looks like.
         logger.Error(
-            "{Name} the {Class} has not moved or changed what it is doing for {Held} minutes: \"{Doing}\" at {Where}, carrying {Load} of {Ceiling} stones with {Stam} stamina",
+            "{Name} the {Class} has not moved or changed what it is doing for {Held} minutes: \"{Doing}\" at {Where}, carrying {Load} of {Ceiling} stones with {Stam} stamina, with {Crowd} of ours within {Elbow} tiles",
             bot.Name,
             bot.Class?.Name,
             held / 60000,
@@ -175,7 +176,9 @@ public static class BotStall
             bot.Location,
             BotLadder.Load(bot),
             BotLadder.Ceiling(bot),
-            bot.Stam
+            bot.Stam,
+            Elbows(bot),
+            Elbow
         );
     }
 
@@ -201,4 +204,42 @@ public static class BotStall
         Freed = 0;
         Worst = null;
     }
+
+    /// <summary>How close another of ours has to be to be in this one's way. Two tiles: a doorway is one.</summary>
+    public static int Elbow { get; set; } = 2;
+
+    /// <summary>
+    /// How many of ours are standing within <see cref="Elbow"/> of this one.
+    ///
+    /// <para>
+    /// <b>The other thing worth ruling out, and it was not in the line.</b> On 03.09.2026 four bots stalled
+    /// together at 1756-1758, 973-974, all on "taking a full pack to the counter", and the load and stamina
+    /// printed beside them were 30 of 219 stones at 25 to 45 stamina — nothing wrong with either, so the
+    /// message pointed away from the one fact all four had in common. Bots do not walk through one another;
+    /// a knot of them in a doorway is a different fault from a bot too heavy to lift its feet, and without
+    /// this the two read identically.
+    /// </para>
+    /// </summary>
+    private static int Elbows(BotMobile bot)
+    {
+        var map = bot?.Map;
+
+        if (map == null || map == Map.Internal)
+        {
+            return 0;
+        }
+
+        var near = 0;
+
+        foreach (var mobile in map.GetMobilesInRange<Mobile>(bot.Location, Elbow))
+        {
+            if (mobile != bot && mobile is BotMobile { Deleted: false, Alive: true })
+            {
+                near++;
+            }
+        }
+
+        return near;
+    }
+
 }
