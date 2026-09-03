@@ -65,8 +65,27 @@ public static class BotPath
     /// How far outside the straight line between start and goal the search may look. Wide enough to walk
     /// right round a walled graveyard rather than merely to sidestep a tree, because going the wrong way
     /// first is exactly what leaving an enclosure requires.
+    ///
+    /// <para>
+    /// <b>Raised to the same width as <see cref="MaxMargin"/> on 03.09.2026, by Patrick's order that the
+    /// bots be able to cross the whole island and be given knowledge of the rock they cannot pass.</b> The
+    /// two are the same request. BotReach learns a pocket only from a search whose ground ran out without
+    /// the box ever getting in the way — and the box grew with the length of the journey, so a short one
+    /// got twenty-eight tiles. "Behind that rock" is a short journey. The box was smaller than the pocket,
+    /// every such search was clipped, and the proof was thrown away every time: on the morning of
+    /// 03.09.2026 the shard reported 9013 searches, 6796 of them partial and <b>0 refused outright</b>,
+    /// which is to say BotReach had not learned one pocket in a night of running. Bots walked at the same
+    /// cliff for hours because nothing on the shard was able to find out that it was a cliff.
+    /// </para>
+    ///
+    /// <para>
+    /// The cost is bounded elsewhere and was not the constraint: searches were averaging 5.43ms against a
+    /// ceiling of twenty, and the population was spending about 101ms a second of an allowance of 250. A
+    /// wider box does not make a search slower — it makes the time already granted buy a better answer, and
+    /// where the answer is "there is no way", buys it once for everybody for the life of the shard.
+    /// </para>
     /// </summary>
-    public static int MinMargin { get; set; } = 28;
+    public static int MinMargin { get; set; } = 256;
 
     /// <summary>
     /// The widest that box may get, on a long journey.
@@ -84,8 +103,15 @@ public static class BotPath
 
     /// <summary>
     /// What one search may cost. The number asked for, and now the number that is actually enforced.
+    ///
+    /// <para>
+    /// Sixty from twenty on 03.09.2026, and by the same order: "their path search works for the whole
+    /// island, even if it takes longer to build; they have reflexes to defend themselves on the way". A
+    /// search that runs out of clock records nothing, exactly as a clipped one records nothing, so widening
+    /// the box without lengthening the clock would only have traded one silent failure for another.
+    /// </para>
     /// </summary>
-    public static double CeilingMs { get; set; } = 20.0;
+    public static double CeilingMs { get; set; } = 60.0;
 
     /// <summary>
     /// The smallest search worth running, for when the population's allowance is spent. Below this a bot
@@ -102,7 +128,7 @@ public static class BotPath
     /// <see cref="FloorMs"/> and come back <see cref="BotPathOutcome.Partial"/> more often, so the
     /// population walks in shorter hops instead of the world stuttering.
     /// </summary>
-    public static double WindowMs { get; set; } = 250.0;
+    public static double WindowMs { get; set; } = 500.0;
 
     private const int WindowLengthMs = 1000;
 
