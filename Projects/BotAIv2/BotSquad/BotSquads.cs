@@ -256,7 +256,14 @@ public static class BotSquads
 
         // Inside one company the formation decides, because there the tiles mean something: a shield wall
         // that reshuffles itself every time somebody wants past is not a wall.
-        if (holder.Squad != null && ReferenceEquals(holder.Squad, member.Squad))
+        //
+        // <b>While it is a shield wall.</b> A company that is not fighting holds no wall — its stations are
+        // only where everybody happens to be standing — so the rank rule there protects nothing and is four
+        // bots refusing each other in a field. Edda, Faron, Gerda and Calla stood at (1298-1303, 1070-1073)
+        // for eight minutes on 03.09.2026, every one of them reported "in a company", every one holding an
+        // errand of its own that the company had no opinion about, and none outranking any other. In a fight
+        // this branch still runs and rank still decides, exactly as before.
+        if (holder.Squad is { Stance: BotSquadStance.Fighting } && ReferenceEquals(holder.Squad, member.Squad))
         {
             if (!BotFormation.OutranksFor(member, holder))
             {
