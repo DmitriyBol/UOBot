@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Server.Engines.Craft;
 using Server.Items;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -334,6 +335,10 @@ public static class BotFlask
 
     private static IReadOnlyList<Type> _needs;
 
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFlask));
+
+    private static bool _saidNeeds;
+
     private static IReadOnlyList<Type> Wanted()
     {
         List<Type> want = [];
@@ -370,6 +375,27 @@ public static class BotFlask
                 break;
             }
         }
+
+        // <b>Said once, and here rather than at boot, because at boot it is a lie.</b> The first version of
+        // this line logged from BotCraftModule.Initialize and reported "0 reagents: nothing" every start —
+        // DefAlchemy.CraftSystem is an ordinary property filled during content initialisation, not a lazy
+        // one, so there is no table to read at that moment and the line said nothing about what the shard
+        // does. Said on the first real resolution instead, which is the only moment the answer is true.
+        //
+        // A derived list that comes back empty is a feature that silently does nothing, and this trade has
+        // already been exactly that once today.
+        if (!_saidNeeds && want.Count > 0)
+        {
+            _saidNeeds = true;
+
+            logger.Information(
+                "A brewer is sent after {Count} reagents, {Herbs} of each, read off the recipes: {Names}",
+                want.Count,
+                Herbs,
+                string.Join(", ", want.ConvertAll(t => t.Name))
+            );
+        }
+
 
         return want;
     }
