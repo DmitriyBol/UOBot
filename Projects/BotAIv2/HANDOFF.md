@@ -81,6 +81,24 @@ Worth keeping about *how* that was found: two confident diagnoses came first and
 second was written and deployed before the line failed to move. What settled it in two minutes was making the
 message name which of its four ways it had failed.
 
+**Where the island's supply money went.** Herb picking reached the market and 1986 reagents went onto stalls
+at five gold, against a herbalist's three — and `BotShopper` takes whichever of stall and counter is cheaper,
+so every caster walked past the population's whole supply and paid the world. `173 sent to a shopkeeper, 41
+to a cheaper stall` became `1 sent to a shopkeeper, 311 to a cheaper stall`. Opening prices are now measured
+off the engine through `BotShops.Shelf` rather than guessed. The other five openings were audited against
+what actually sits unsold and left alone.
+
+**A keep-back that blocks a paid order is a hoard.** The woodcutter held twenty logs for its own fletching
+while a fletcher's funded order for exactly twenty stood unfilled — most cutters are gatherers and carry no
+fletcher's tools. Both the wood and the herb keep-backs now ask whether *this* bot can use the thing, which
+is what `BotOven.Spares` has always asked about the cook's meat. `0 logs to an order and 0 onto a stall`
+became `15 to an order and 45 onto a stall`, and the fletcher's `could not find wood` went from 133 of 212
+to nought.
+
+**The brewer's herbs were nobody's errand.** `BotShopper` buys reagents for a build whose *kit* declares
+them — every caster, no crafter — so the one bot carrying a mortar was never sent for the half of its trade
+it cannot gather. The tool decides now. Moved 57 → 41 in the first five minutes, which is too early to read.
+
 ---
 
 ## What is open
@@ -90,6 +108,18 @@ every session on record, and the reason is that nobody wants arrows: `BotArms.Qu
 and has read nought every session, because archers are born with arrows, buy them, and pick roughly four in
 ten back out of whatever they shot. So the trade can only ever sell on spec, and the board path has never
 been exercised — which is worth remembering the day something makes archers spend faster than they recover.
+
+**Fletching is now blocked entirely on feathers.** Wood is solved — `could not find wood` went from 133 of
+212 to nought — and the whole trade moved onto the other half: `43 asked to fletch, 43 had no feathers`, with
+no bird killed in the window and the keep-back never firing. Not urgent, because arrows have no demand (see
+above), and **not** the glass mistake either: two feather orders were raised and both were filled, so nothing
+is freezing escrow. It is simply a trade with no supply and no customer.
+
+**Being watched: whether a funded order steers a hunt.** `BotQuarry` chooses a kill by what the carcass
+carries, and there is now a paid want for ribs. `60 kills were chosen because the board wanted what the
+carcass carries` over 35 minutes before any meat order existed, against 4 over 6 minutes after — the same
+rate inside the noise, on windows too different to compare. Six meat wants were filled. If that rate does not
+climb over a long session, the ask is not reaching the hunter.
 
 **The market moves one way.** `StaleMs` marks a seller's price down on a timer and never moves a buyer's bid
 up: of 191 price cuts in one window, one moved towards an actual bid and none moved up, with
