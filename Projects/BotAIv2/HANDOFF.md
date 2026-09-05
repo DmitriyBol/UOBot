@@ -386,6 +386,11 @@ That is where the scattered strandings point.
 **The crowding lead below is therefore only about the six at the camp.** It was written first and as the
 lead; it is not.
 
+**But the two are linked, and the link is the rescue.** The at-home messages cluster in time with the
+strandings: Calla and Bryn got theirs in the same two minutes that a dozen bots were carried in. Field
+stranding → rescue → a crowded camp → stranding at the camp. Fixing the scattered half would drain the other
+one, and fixing the camp without it would only move the queue.
+
 **The at-home subset.** Four of the errors are a different sentence: *can reach nothing from
 (x, y), and it is standing at home*. Six distinct bots — Alden, Aldric, Cedric, Neriah, Oswin, Talia — and
 the coordinates cluster in `1434–1446 × 1465–1476`, which is the camp. Neriah was carried home to
