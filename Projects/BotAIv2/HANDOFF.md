@@ -431,6 +431,30 @@ grep -oE "Will: [0-9]+ taken on, [0-9]+ finished, [0-9]+ failed" $L | sed -E 's/
 Cumulative totals hide it completely: read as a running figure the fail rate looks like a slow drift to 56%,
 and the halving of output does not appear at all.
 
+### The movement defect reaches the economy, and it looks like bots going broke
+
+Purses fell five windows running (15928 -> 13702gp) and a bot reached 0gp. **No money left the world.** It
+moved into escrow on the wants board, and the board's prices are climbing:
+
+```
+things wanted    gp down    gp/thing
+        507        12193        24.0
+        454        14381        31.7
+        364        14647        40.2
+        289        18062        62.5
+```
+
+**Fewer goods wanted, at 2.6x the price, with more money locked against them.** Purses plus escrow is flat
+(13702 + 18062 = 31764 against 31376 ninety minutes earlier), so the drop in purses is not a leak.
+
+The mechanism is the ledger doing its job on top of a broken one: work fails, measured yield falls, the price
+per unit has to rise before anyone will take the work, and the money to back it comes out of purses. It is a
+feedback loop from the movement defect into the economy, and it will read as poverty to anyone watching
+purses alone.
+
+**Do not treat rising want prices as a market to fix.** They are a symptom with the same root as everything
+above.
+
 ## The largest single loss in the shard: twelve hearths, several unreachable, never struck off
 
 **Found 05.09 late, by asking what the recent failures actually say. It is bigger than everything else on
