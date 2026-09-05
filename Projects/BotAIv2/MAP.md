@@ -709,6 +709,14 @@ matters is exposed: the other twelve in this assembly ask for a concrete tool, w
 skillet. Audited on 05.09.2026; only the spellbook was exposed, and it was **not** the cause of the scroll
 losses above — that theory was wrong, and the line above it is what actually did it.
 
+**A counter that stops dead is a mechanism with no input.** Not a quiet mechanism — a disconnected one.
+`BotQuarry` pays a bounty when a carcass carries what the board is asking for, and its count read
+`4 18 45 45 45 45`: three windows of growth and then a flat line, while 68 orders for ribs were being filled
+and 209 hunts taken. Meat was simply not in the list it checked. The same file already carried a note about
+the identical freeze on feathers three weeks earlier — `122 for three half-hourly readings` against 179
+standing arrow orders — which is what makes the shape worth naming rather than fixing twice. Read cumulative
+counters as a series, not as a value: growth that stops while demand continues is the tell.
+
 **Instrument before you fix.** Both of the entries above were first diagnosed wrong, on theories that were
 plausible and had the shape of defects this project has really had. What settled them was making the sentence
 in the log say which of its four ways it had failed. A guess costs a rebuild and a restart; a named counter
