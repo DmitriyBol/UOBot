@@ -301,6 +301,79 @@ public static class BotFlask
     public static (Type Reagent, int Units, int Glass) Costs(CraftItem recipe) =>
         Twofold(recipe, out var reagent, out var units, out var glass) ? (reagent, units, glass) : (null, 0, 0);
 
+    /// <summary>
+    /// The reagents this trade actually consumes, asked of the recipes rather than listed here.
+    ///
+    /// <para>
+    /// <b>A brewer wants two of the eight, and telling it to want all eight is telling it to shop for forty
+    /// minutes before it reaches either.</b> There are two draught families on this shard — heal and cure —
+    /// and between them they burn ginseng and garlic. The shopper's reagent list is in casting order, ash and
+    /// pearl first, and it buys one kind per errand at roughly two errands a bot in twenty minutes. So a
+    /// brewer sent after "reagents" spent its first four trips on ash and black pearl it can never use, and
+    /// the summary read "had the glass but no herbs" on a rising share the whole time — 35% of new asks in
+    /// one window, 58% in the next.
+    /// </para>
+    ///
+    /// <para>
+    /// Read from <c>Costs</c>, so adding a third draught family adds its reagent here and nowhere else. Built
+    /// once: the recipe table does not change while the shard is up.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<Type> Needs
+    {
+        get
+        {
+            if (_needs is { Count: > 0 })
+            {
+                return _needs;
+            }
+
+            return _needs = Wanted();
+        }
+    }
+
+    private static IReadOnlyList<Type> _needs;
+
+    private static IReadOnlyList<Type> Wanted()
+    {
+        List<Type> want = [];
+        var families = BotArsenal.Draughts;
+
+        var system = System;
+        var recipes = system?.CraftItems;
+
+        if (recipes == null)
+        {
+            // Before content initialisation there is no table to read. Not cached in that case — see Needs,
+            // which asks again next time rather than remembering an empty answer for the life of the shard.
+            return want;
+        }
+
+        for (var i = 0; i < families.Count; i++)
+        {
+            var kind = BotArsenal.Potion(families[i]);
+
+            for (var j = 0; j < recipes.Count; j++)
+            {
+                // Asked of the table and not of a bot: this is what the trade consumes, not what one bot's
+                // skill will carry today.
+                if (recipes[j].ItemType != kind || !Twofold(recipes[j], out var reagent, out _, out _))
+                {
+                    continue;
+                }
+
+                if (!want.Contains(reagent))
+                {
+                    want.Add(reagent);
+                }
+
+                break;
+            }
+        }
+
+        return want;
+    }
+
     /// <summary>How much skill a recipe asks for. Its minimum, which is what the engine rolls against.</summary>
     public static double Requirement(CraftItem recipe)
     {

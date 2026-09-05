@@ -343,14 +343,11 @@ public sealed class BotShopper : IBotProposer
         // read "had the glass but no herbs" 57 times in five minutes while 1936 of them sat on stalls it was
         // never sent to. The tool decides, which is the rule the cook and the smith are already offered work
         // by — a bot that picks up a pestle tomorrow is a brewer tomorrow.
-        var brews = BotFlask.Kit(body) != null ? BotFlask.Herbs : 0;
-        var reagents = Math.Max(kit.Reagents, brews);
-
-        if (reagents > 0)
+        if (kit.Reagents > 0)
         {
             for (var i = 0; i < Reagents.Length; i++)
             {
-                if (!Lacking(pack, Reagents[i], reagents, out amount))
+                if (!Lacking(pack, Reagents[i], kit.Reagents, out amount))
                 {
                     continue;
                 }
@@ -359,6 +356,34 @@ public sealed class BotShopper : IBotProposer
 
                 return true;
             }
+        }
+
+        // <b>And the brewer's two, which are not the caster's eight.</b> Asking for the whole list was the
+        // first cut of this and it was worse than useless: the list is in casting order — ash and pearl
+        // first — the shopper buys one kind an errand at about two errands a bot in twenty minutes, and the
+        // only draughts on this shard are heal and cure. So a brewer spent its first four trips on reagents
+        // it can never use while the summary read "had the glass but no herbs" on a rising share, 35% of new
+        // asks in one window and 58% in the next. BotFlask.Needs reads the recipe table, so a third draught
+        // family adds its reagent there and nowhere else.
+        if (BotFlask.Kit(body) == null)
+        {
+            wanted = null;
+
+            return false;
+        }
+
+        var brewing = BotFlask.Needs;
+
+        for (var i = 0; i < brewing.Count; i++)
+        {
+            if (!Lacking(pack, brewing[i], BotFlask.Herbs, out amount))
+            {
+                continue;
+            }
+
+            wanted = brewing[i];
+
+            return true;
         }
 
         wanted = null;
