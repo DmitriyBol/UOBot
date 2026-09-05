@@ -433,6 +433,21 @@ last 10 windows         2263     4979     69%
 **Finished work halves and failures multiply by twenty.** Not a plateau, not a step: a climb across the whole
 run. Every other finding on this page is a contributor to this line or is noise beside it.
 
+**And count is the wrong unit — use time.** A failure is one deed won at auction, begun, and ended without
+its result; the bot takes new work immediately. 97% of them earn nothing at all (0 coin, 0 made, 0 skill),
+and they are *short*: 0.27 min against 0.48 for a finished one. So the count ratio flatters the failures into
+looking more numerous than they are costly. Measured as working time:
+
+```
+first 25 min    1322 bot-min working    215 failing    14% of the time produces nothing
+last 11 min      121 bot-min working    273 failing    69%
+whole run       3914 bot-min working   3617 failing    48%
+```
+
+**Half the population's working time produces nothing, and two thirds of it by the end.** That is the number
+to quote. The count-based figures below are correct but read worse than the truth in the early windows and
+better in the late ones.
+
 **Take the aggregate, not the last window.** Individual windows swing hard — the last ten read
 `68 72 74 77 79 45 82 82 76 53` — and an earlier draft of this note quoted "77-82%" off two consecutive bad
 ones. Every number in it was true and the impression it left was not. The honest current figure is 69%.
