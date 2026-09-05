@@ -146,6 +146,31 @@ carcass carries` over 35 minutes before any meat order existed, against 4 over 6
 rate inside the noise, on windows too different to compare. Six meat wants were filled. If that rate does not
 climb over a long session, the ask is not reaching the hunter.
 
+**Open, with numbers and no conclusion: is the meat bounty costing the shard its ore?** Letting a funded
+order steer a hunt works — the top quarry over the same twenty-two minutes went from ettin 16, mongbat 11,
+cougar 10 to grizzly 10, troll 9, ettin 8, horse 7, black bear 6, and the steering count went from a plateau
+at 45 to 128 / 341 / 575 / 1219. In the same comparison smithing collapsed:
+
+| | before | after |
+|---|---|---|
+| forge stints taken | 7 | 1 |
+| mine stints taken | 47 | 25 |
+| `short of metal` | 70 | 149 |
+| ground swept | 11 sweeps, 512 seams | 3 sweeps, 319 seams |
+
+The smith is **not** outbid — `0 with metal but not enough for any recipe`, and forge appeared as the
+runner-up four times in a whole run. It has nothing to work. The seam map is built by bots walking and is
+never saved, so less walking is less ore, and the obvious story is that meat-bearing quarry grazes nearer the
+towns than undead and giants do.
+
+**That story does not fit the rest of the evidence.** Path searches fell (12852 → 9737) while tiles examined
+rose (347M → 416M): the population is walking *less often and further*, not closer. One run against one run,
+on a quantity already known to vary with wherever bots happened to wander.
+
+Measure over a long run before touching anything. And if it holds, the lever is not the bounty — it is that
+the ore map is a by-product of somebody else's route. A trade whose supply depends on where a different trade
+wandered is the weak joint here, with or without meat.
+
 **The market moves one way.** `StaleMs` marks a seller's price down on a timer and never moves a buyer's bid
 up: of 191 price cuts in one window, one moved towards an actual bid and none moved up, with
 `15410 stalls had no bid to move towards`. One dial doing two opposite jobs. **Left deliberately for
