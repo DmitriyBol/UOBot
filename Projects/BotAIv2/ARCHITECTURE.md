@@ -8,6 +8,7 @@ Read this file once and the rest of the project becomes navigable. Every subsyst
 reasoning behind its own decisions; this file is the map, the vocabulary, and the handful of rules that hold
 across all of them.
 
+- **Where a file, a number or a log line lives** → `MAP.md`
 - **State of the work** → `HANDOFF.md`
 - **How to build and what the boot log should say** → `BUILD.md`
 - **Why any individual decision is the way it is** → that subsystem's `README.md`

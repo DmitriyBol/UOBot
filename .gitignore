@@ -5,3 +5,11 @@ bin/
 
 # Runtime
 logs/
+
+# Runtime state, not configuration — the observer's accumulated beliefs from one machine
+Distribution/Configuration/bot-debugger-memory.json
+
+# Engine configuration that is ModernUO's, not this project's. Only bot-*.json belongs here.
+Distribution/Configuration/*.json
+!Distribution/Configuration/bot-*.json
+Distribution/Configuration/bot-*-before-*.json
