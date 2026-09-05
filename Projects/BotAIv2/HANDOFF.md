@@ -367,8 +367,19 @@ roads in a row are refused — when in fourteen of the twenty cases its own tile
 (`FF`)? The code's neighbouring message says the same thing in its own words: *this is not bad ground, look
 at what is refusing the roads.*
 
-Distances from home: min 14, median 127, max 547. So it is scattered across the map rather than one bad
-place, which is what 03.09 had. Not touched: this is `BotMovement`, which `ARCHITECTURE.md` calls the part
+Distances from home: min 14, median 127, max 547 — scattered across the map rather than the one bad place
+03.09 had.
+
+**The lead worth following first.** Four of the errors are a different sentence: *can reach nothing from
+(x, y), and it is standing at home*. Six distinct bots — Alden, Aldric, Cedric, Neriah, Oswin, Talia — and
+the coordinates cluster in `1434–1446 × 1465–1476`, which is the camp. Neriah was carried home to
+(1434, 1476) at 20:51 and two minutes later could reach nothing *from that spot*. Home is where fifty-three
+bodies congregate, and the code's own message beside it says what to suspect: *this is not bad ground, look
+at what is refusing the roads*. Bots refusing each other's roads fits every part of it, including why a
+rescue drops a bot somewhere it cannot leave.
+
+**How to test it:** count our own bodies within a few tiles when the message fires. If crowding is the
+answer, the rescue destination is the bug — carrying a stranded bot into the one place guaranteed to be full. Not touched: this is `BotMovement`, which `ARCHITECTURE.md` calls the part
 that accumulated more measured defects than everything else together.
 
 ---
