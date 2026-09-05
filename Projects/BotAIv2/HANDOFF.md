@@ -528,11 +528,27 @@ A guard that has refused nothing in 2h50m, while 173 walks to a counter fail in 
 shared by counters, forges and hearths, so this is one defect wearing three coats — and the code's own
 comment already said so for counters and forges, with a date on it.
 
-**What this does not prove.** The 1947 coordinate failures are not shown to come through `Nearest`; herbs and
-prowl aim at ground the survey never recorded, so they reach their targets by another road. They fail with
-the same words, which is suggestive and no more. Establishing whether they share a mechanism is the first
-thing to measure next, and it is worth doing before any fix: if they do, one repair covers 2197 failures a
-window; if they do not, repairing `Nearest` covers about 250 of them and the larger number is untouched.
+**Measured, and the answer is the inconvenient one: they are two defects, not one.** The discriminator is
+free — a place taken off a list repeats, a place chosen fresh does not:
+
+```
+trade    failures   distinct targets   repeats   worst single target
+cook         2817                 12    234.8x   270 attempts
+herbs        1577               1556      1.0x     3
+prowl        3251               2920      1.1x   192
+```
+
+**Cook is twelve places struck at 235 times each. Herbs and prowl are fifteen hundred and three thousand
+fresh places, struck at once.** So repairing `Nearest` covers cook, counters and forges — the bad-list defect
+— and leaves the larger number entirely alone. The two need separate work:
+
+1. **A bad list.** `Nearest` offers known places nothing can reach and neither guard can fire. Cook alone is
+   2817 failures a run.
+2. **A bad walk.** Herbs and prowl are refused at thousands of *distinct* destinations, one attempt each.
+   Nothing is choosing badly here — the walk itself fails at fresh ground all over the island, and this is
+   the half that ties to `TooBig` and to raised ground.
+
+Do not let the first repair's numbers be read as progress against the second.
 
 ### Confirmed on a second, longer run — and the two populations turn out to be one
 
