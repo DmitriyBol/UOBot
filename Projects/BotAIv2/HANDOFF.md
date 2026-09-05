@@ -406,6 +406,19 @@ This project already carries the note for what raised ground does: an invented Z
 on, working on the flat and failing on a hill. That is where the scattered strandings point, and it is no
 longer a guess.
 
+## The danger map does reopen, once in fourteen
+
+Left on Patrick's list since 03.09 as a possible one-way ratchet: the island line reads
+`N shut and 0 reopened since the shard came up` for hours on end, and quadrants shut for being too quiet
+never seemed to come back.
+
+**They do.** At 3h25m into the 05.09 run the line turned over to `14 shut and 1 reopened`. So the mechanism
+is not missing and the question changes shape: not "why never", but "why once in fourteen, and only after
+three hours". Those are different defects and they want different measurements — a missing path versus a
+threshold set too far out.
+
+Worth knowing before anyone spends an evening looking for a reopen that was there all along.
+
 ## Read this number first: the population's work rate halves over a run
 
 **The single most important measurement of 05.09, and it was taken last because nothing on this page was
