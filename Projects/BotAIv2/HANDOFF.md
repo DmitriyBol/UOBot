@@ -390,6 +390,31 @@ This project already carries the note for what raised ground does: an invented Z
 on, working on the flat and failing on a hill. That is where the scattered strandings point, and it is no
 longer a guess.
 
+### Confirmed on a second, longer run — and the two populations turn out to be one
+
+A 90-minute run (`session-2026-09-05_19-44`) reproduces the baseline exactly and sharpens both figures.
+The denominator is **successful work only** — `finished ... near (x, y, z)`, the places bots stand when the
+day goes right:
+
+```
+baseline, work that succeeded    808 flat   59 raised    6.8% raised
+stranded (could get nowhere)      21 flat   22 raised     51% raised   n=43   7.5x its share
+frozen  (has not moved)             5 flat   13 raised     72% raised   n=18  10.6x its share
+```
+
+**The frozen bots are more concentrated on raised ground than the stranded ones, not less.** The note above
+splits them into "two different populations that want different answers" on the strength of the crowding
+reading. That split does not survive the larger sample: both failures live on the same 6.8% of the ground,
+and the frozen one lives there harder. Treat them as one defect with two endings — the search gives up and
+carries the bot home, or the bot holds an order it can never arrive at and stops.
+
+**A trap worth writing down, because it cost a measurement mid-check.** Taking the denominator from *all*
+non-error lines gives 22.5% raised, and against that the excess looks like a forgettable 2x. That population
+is poisoned: it is mostly failure lines (`no way through to`, `made no progress towards`), which are
+themselves 32.9% raised because failures are what raised ground produces. Measuring the excess against a
+denominator already made of the thing being measured is how a 7x defect reads as noise. The baseline has to
+come from **successes**.
+
 **The crowding lead below is therefore only about the six at the camp.** It was written first and as the
 lead; it is not.
 
