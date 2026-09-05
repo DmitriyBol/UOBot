@@ -401,6 +401,36 @@ This project already carries the note for what raised ground does: an invented Z
 on, working on the flat and failing on a hill. That is where the scattered strandings point, and it is no
 longer a guess.
 
+## Read this number first: the population's work rate halves over a run
+
+**The single most important measurement of 05.09, and it was taken last because nothing on this page was
+pointing at it.** Per five-minute window, over 2h50m:
+
+```
+window     finished   failed   fail%
+  2-4          ~330      ~22     5-9%
+  7-9          ~205     ~114   31-38%
+ 13-15         ~190     ~325   51-70%
+ 22-24         ~145     ~495   77-78%
+ 32-34         ~135     ~515   77-82%
+```
+
+**Finished work halves and failures multiply by twenty.** Not a plateau, not a step: a climb across the whole
+run. Every other finding on this page is a contributor to this line or is noise beside it.
+
+**Two things it settles.** The climb starts at window 5-7, and the hearth defect starts at window 10 — so the
+hearths are a large contributor but **something is already degrading before them**. And "cooking output is
+flat" — true of `BotCook.Offered`, which holds near 350 — must not be read as the population being flat. It
+is not.
+
+**How to take it, in one line:**
+```bash
+grep -oE "Will: [0-9]+ taken on, [0-9]+ finished, [0-9]+ failed" $L | sed -E 's/[^0-9]+([0-9]+)[^0-9]+([0-9]+)[^0-9]+([0-9]+)/  /' | awk 'NR>1{dd=$2-pd; df=$3-pf; if(dd+df>0) printf "%d %d %.0f%%
+", dd, df, df*100/(dd+df)} {pd=$2;pf=$3}'
+```
+Cumulative totals hide it completely: read as a running figure the fail rate looks like a slow drift to 56%,
+and the halving of output does not appear at all.
+
 ## The largest single loss in the shard: twelve hearths, several unreachable, never struck off
 
 **Found 05.09 late, by asking what the recent failures actually say. It is bigger than everything else on
