@@ -137,8 +137,14 @@ public sealed class BotAlchemist : IBotProposer
                 return Glassware(bot, body, map);
             }
 
-            NoHerbs++;
-
+            // <b>A bot with five of everything is not a bot short of herbs, and calling it one cost most of a
+            // day.</b> The split above was written to find out which of three grounds held 85% of every ask,
+            // window after window — and the answer was that every single one of them was at its cap. There
+            // was never a shortage there at all: it is the settled state of a trade that has made what the
+            // population will hold, working exactly as the cap was ordered to. A steady share is the tell —
+            // no real shortage sits at 85% for eight windows running.
+            //
+            // So it is counted where it belongs rather than under a name that sent two people hunting supply.
             switch (BotFlask.Why)
             {
                 case BotFlask.Refusal.Unskilled:
@@ -152,6 +158,7 @@ public sealed class BotAlchemist : IBotProposer
                     break;
 
                 default:
+                    NoHerbs++;
                     Reagentless++;
 
                     break;
@@ -310,7 +317,7 @@ public sealed class BotAlchemist : IBotProposer
         Asked == 0
             ? $"nobody has been offered the mortar ({NoKit} answers went to bots with no pestle)"
             : $"{Asked} asked to brew: {ToOrder} took an order off the board, {OnSpec} brewed on spec, "
-              + $"{NoHerbs} had the glass but no herbs ({Unskilled} of them cannot carry a single recipe yet, {Reagentless} have the skill and not the reagent, {Stocked} are at the cap on everything), {Bare} had neither, {AtCap} were at the cap of {BotFlask.Cap} on everything they can make ({BotFlask.Capped} draughts passed over for it, {BotFlask.Rests} stood off for {BotFlask.RestMs / 60000} minutes), "
+              + $"{NoHerbs} had the glass and not the reagent, {Stocked} had both and every draught already at its cap, {Unskilled} could not carry a single recipe yet, {Bare} had neither, {AtCap} were at the cap of {BotFlask.Cap} on everything they can make ({BotFlask.Capped} draughts passed over for it, {BotFlask.Rests} stood off for {BotFlask.RestMs / 60000} minutes), "
               + $"{NoGlass} had the herbs but no glass ({Sent} sent to buy some, {NoShop} found no counter with one in stock "
               + $"within reach, {NoPrice} found a counter that named no price)";
 
