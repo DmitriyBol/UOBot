@@ -42,6 +42,24 @@ public static class BotFlask
     /// <summary>The tool. Handed out with the skill; see <see cref="BotOutfit.ToolsFor"/>.</summary>
     public static BaseTool Kit(Mobile bot) => bot?.Backpack?.FindItemByType<MortarPestle>();
 
+    /// <summary>
+    /// How many of each herb a brewer keeps on hand.
+    ///
+    /// <para>
+    /// <b>A brewer's reagents were nobody's errand.</b> <c>BotShopper</c> buys them only for a build whose kit
+    /// declares reagents, which is every caster and no crafter — so the bot carrying the mortar was never sent
+    /// for the one half of its trade it cannot gather. It read "had the glass but no herbs" 57 times in a
+    /// five-minute window with 1936 herbs on the population's own stalls.
+    /// </para>
+    ///
+    /// <para>
+    /// Five, which is one draught of each of the eight and no hoard. Bought rather than ordered by the armful:
+    /// the shopper takes a stall before a counter and only asks the board when neither has any, so this cannot
+    /// repeat what ordering glass did to this shard's trade. See <c>BotStores</c> for that.
+    /// </para>
+    /// </summary>
+    public static int Herbs { get; set; } = 5;
+
     /// <summary>How far below its own skill a bot keeps its work. The needle's figure, for the needle's reason.</summary>
     public static double Margin { get; set; } = 5.0;
 

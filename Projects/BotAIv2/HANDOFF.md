@@ -57,29 +57,54 @@ exactly one piece's worth of metal missed twice and walked home. `BotAnvil.Tries
 the recipe choice and the metal choice, and the shape changed from three stints in ten producing something to
 eight in ten.
 
-**Woodcutting and herb picking had no ending at all.** They swung, counted, and stopped, so the goods rode
-home in a pack: `133 of 212 fletchers could not find wood` while woodcutters walked past carrying it, and
-`herbs` was the second commonest thing anybody did while the brewer read `607 had the glass but no herbs`.
-Neither trade was broken — there was no edge between them. `BotAuction.Offer` is the shared ending now
-(a funded order first, a stall second), and both gathering trades keep a working handful back for themselves.
-**Deployed at 14:00; not yet measured.**
+**Woodcutting and herb picking had no ending at all.** They swung, counted and stopped, so the goods rode
+home in a pack: `133 of 212 fletchers could not find wood` while woodcutters walked past them carrying it, and
+`herbs` was the second commonest thing anybody did beside a brewer reading `607 had the glass but no herbs`.
+Neither trade was broken — there was no edge between them. `BotAuction.Offer` is the shared ending now: a
+funded order first, a stall second, and a working handful kept back. First window after it, against nought
+before: 2327 reagents onto stalls.
+
+Then the other half of the same trade: those reagents opened at five where a herbalist sells garlic at three,
+and `BotShopper` takes whichever of stall and counter is cheaper — so every caster that wanted one walked
+past 1986 bot-owned reagents and paid a shopkeeper. Picked reagents now open at the shelf price, measured off
+the engine rather than declared. The other five opening prices were audited against what actually sits unsold
+and are correct: potions open at fourteen under a shelf of fifteen and fall to six because supply outruns a
+demand capped at five a bot, which is the market working rather than failing.
+
+**233 of 430 scroll purchases were successes filed as failures.** `BotSeeker` buys a scroll to write into a
+book and `BotArmoury` buys one to throw; both built the same undertaking, which tried to put every scroll into
+a book. Warriors stocking magic arrows exactly as designed were recorded as having failed, and the ledger
+priced the trade off those reports. Split by `BotAcquire.Purpose`. Underneath it was a real refusal running
+the other way: a caster that knew a spell could never buy a scroll of it to throw.
+
+Worth keeping about *how* that was found: two confident diagnoses came first and both were wrong, and the
+second was written and deployed before the line failed to move. What settled it in two minutes was making the
+message name which of its four ways it had failed.
 
 ---
 
 ## What is open
 
-**Fletching takes no orders, ever.** `0 took an order off the board` in every session on record. That is
-probably correct rather than broken — nobody wants arrows, because `0 found with an empty quiver` — but it has
-never been confirmed, and if archers ever do run dry the path has not been exercised once.
+**Fletching takes no orders, and that is answered rather than open.** `0 took an order off the board` in
+every session on record, and the reason is that nobody wants arrows: `BotArms.Quiver` counts empty quivers
+and has read nought every session, because archers are born with arrows, buy them, and pick roughly four in
+ten back out of whatever they shot. So the trade can only ever sell on spec, and the board path has never
+been exercised — which is worth remembering the day something makes archers spend faster than they recover.
 
 **The market moves one way.** `StaleMs` marks a seller's price down on a timer and never moves a buyer's bid
 up: of 191 price cuts in one window, one moved towards an actual bid and none moved up, with
 `15410 stalls had no bid to move towards`. One dial doing two opposite jobs. **Left deliberately for
 Patrick.**
 
-**Cooking supply is thin.** 94% of asks answer "no meat worth cooking". The keep-back works — 112 stacks in a
-session, and only 3 sold past the cap — so the shortage is in what the population kills, not in what it does
-with it. Unmeasured: how many kills are actually animals.
+**Cooking supply is thin, and the reason is the island rather than the trade.** 94% of asks answer "no meat
+worth cooking", and the keep-back works — 112 stacks in a session, only 3 sold past the cap. Counted since:
+about half of what gets hunted carves into nothing. The commonest quarry in one session was zombie 15,
+skeleton 15, troll 13, ettin 7, ogre 6 against boar 6, bear 5, wolf 4, sheep 4, hind 4.
+
+What to watch now that a funded want for ribs exists: `BotQuarry` already steers a kill by what the carcass
+carries — `14 kills were chosen because the board wanted what the carcass carries` before there was ever a
+meat order on the board. If that number does not climb, the ask is not reaching the hunter and the two are
+not meeting.
 
 **The smith's new threshold costs something.** `BotAnvil.Tries` turned 82 potential rounds into
 `with metal but not enough for any recipe they can work`. Success went from 29% to 86% and pieces made went

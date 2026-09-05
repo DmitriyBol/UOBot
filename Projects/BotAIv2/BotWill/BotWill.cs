@@ -748,10 +748,16 @@ public static class BotWill
                     {
                         Trudges++;
 
+                        // <b>Said differently from BotProwl's own give-up on purpose.</b> That one reads
+                        // "got no nearer than N tiles to (x, y)" and this one used to read the same sentence
+                        // with one extra word, so a grep for either found both and a count of one was a count
+                        // of two trades' worth of quite different problems. This is the watchdog above every
+                        // undertaking — the walk stopped closing, whatever the work was — and the trade's own
+                        // give-up is a decision that trade made about its own ground.
                         Settle(
                             bot,
                             BotEnding.Failed,
-                            $"it got no nearer than {away} tiles to ({doing.Where.X}, {doing.Where.Y})"
+                            $"the walk stopped closing {away} tiles short of ({doing.Where.X}, {doing.Where.Y}) after {TrekLimit} beats"
                         );
                     }
                 }

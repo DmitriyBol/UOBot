@@ -336,11 +336,21 @@ public sealed class BotShopper : IBotProposer
 
         // Anybody whose build includes magic at all, not only those called mages: a healer's cures are spells
         // too. The class's own kit is the test, so this follows the build without being told about it.
-        if (kit.Reagents > 0)
+        //
+        // <b>And anybody holding a mortar, whose build says nothing about magic at all.</b> A brewer needs the
+        // same eight herbs and its kit declares none of them, so its reagents were nobody's errand: the
+        // gatherer picked them, the market held them, and the one bot that could turn them into something
+        // read "had the glass but no herbs" 57 times in five minutes while 1936 of them sat on stalls it was
+        // never sent to. The tool decides, which is the rule the cook and the smith are already offered work
+        // by — a bot that picks up a pestle tomorrow is a brewer tomorrow.
+        var brews = BotFlask.Kit(body) != null ? BotFlask.Herbs : 0;
+        var reagents = Math.Max(kit.Reagents, brews);
+
+        if (reagents > 0)
         {
             for (var i = 0; i < Reagents.Length; i++)
             {
-                if (!Lacking(pack, Reagents[i], kit.Reagents, out amount))
+                if (!Lacking(pack, Reagents[i], reagents, out amount))
                 {
                     continue;
                 }
