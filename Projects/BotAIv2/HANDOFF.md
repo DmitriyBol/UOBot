@@ -275,12 +275,26 @@ with mining perfectly healthy at 106 stints and the seam map fully built at 512 
 forge asks 340/min when it does ask, against hunting's 223, and appears as runner-up seven times in a whole
 run. It has nothing to work with.
 
-The shard says the shape out loud in its own error log:
-`No shopkeeper within reach buys Bronze Ingot, and no bot wants it either; it will sit on the market`.
-The likely cause is the one the meat orders had — a want names one kind and the supply is another. Every
-recipe says iron and `BotAnvil.Best` exists precisely because none of them means it, so an order for
-`IronIngot` filled by neither copper nor bronze would produce exactly this. **Unverified**: the wants' own
-kinds have not been read yet, and that is the first thing to check.
+**Narrowed as far as reading allows, and the first thing found is that the line itself is false.**
+`BotBullion` increments `Ordered` *before* it builds the errand, so "36 put the order to the population"
+counts intentions rather than wants. Not one want for an ingot was raised in the whole run — 460 fills, none
+for metal, and no `wants N Ingot` line anywhere. It is the counter-that-names-one-cause-and-catches-all
+again, in a file this project has already corrected twice for it.
+
+`BotOrder.For` refuses only when the wants board is full, and it was at 96 of 512. So the errand is built and
+then never appears in the auction, as winner or as runner-up, while leather orders from `BotUpkeep` at the
+same price are taken twenty-six times each.
+
+**Two candidates, neither accepted:**
+
+1. The metal errand loses every auction. It asks about 5/min like the leather ones, but leather orders are
+   raised by bots with nothing better to do while metal is wanted by crafters who also hunt and mine.
+2. Something drops it before the auction, and nothing in the log shows that.
+
+**How to tell them apart, and it is one instrument:** make `BotBullion` count wants actually *raised* rather
+than errands returned, and give the refusal its own bucket. Everything else here is guesswork until that
+line tells the truth — and the shard's own error log already says the consequence out loud:
+`No shopkeeper buys Bronze Ingot, and no bot wants it either; it will sit on the market`.
 
 **The market moves one way.** `StaleMs` marks a seller's price down on a timer and never moves a buyer's bid
 up: of 191 price cuts in one window, one moved towards an actual bid and none moved up, with
