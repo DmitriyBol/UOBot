@@ -167,9 +167,23 @@ towns than undead and giants do.
 rose (347M → 416M): the population is walking *less often and further*, not closer. One run against one run,
 on a quantity already known to vary with wherever bots happened to wander.
 
-Measure over a long run before touching anything. And if it holds, the lever is not the bounty — it is that
-the ore map is a by-product of somebody else's route. A trade whose supply depends on where a different trade
-wandered is the weak joint here, with or without meat.
+**Half an hour later the same run answers most of it, and the answer is warm-up.** Sweeping resumed —
+`3 sweeps: 319 seams` stood for five summaries and then went to `6 sweeps: 371 seams` — mining recovered from
+25 stints to 61, forge from 1 to 3, and the shortage itself is decelerating. Read as a series, which is the
+only way a cumulative counter can be read:
+
+```
+short of metal:  48  91  129  149  171  184
+     added:        +43 +38  +20  +22  +13
+```
+
+So the collapse was a young shard with an empty seam map rather than a price paid for the bounty. Still worth
+a long run before it is called settled.
+
+And the weak joint it exposed stands whatever the answer: **the ore map is a by-product of somebody else's
+route.** It is built by bots walking, never saved, and a trade whose supply depends on where a different trade
+happened to wander will keep producing this shape — a craft that looks broken on a young shard and cures
+itself an hour later, with nothing anywhere saying which it is doing.
 
 **The market moves one way.** `StaleMs` marks a seller's price down on a timer and never moves a buyer's bid
 up: of 191 price cuts in one window, one moved towards an actual bid and none moved up, with
