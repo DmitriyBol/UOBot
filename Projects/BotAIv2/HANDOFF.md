@@ -239,6 +239,25 @@ It is only visible as a pair.
 Counter buying fell thirty-twofold, and the turnover fell with it because a bot no longer buys twice — the
 first purchase used to be the wrong kind.
 
+**And the volume behind it, now that composition is out of the way — the island supplies about a ninth of its
+own reagents by construction.** Herb picking is gated per bot by `BotClass.HerbIntervalMs`:
+
+| class | interval | of 53 |
+|---|---|---|
+| `Gatherer` | 15 min | 2 |
+| `Sage` | 30 min | 1 |
+| `Mage`, `WarriorMage` | 45 min | 12 |
+
+Fifteen bots may pick at all, and at those intervals that is `2×4 + 1×2 + 12×1.33 ≈ 26` trips an hour, about
+9 herbs a trip, so roughly **230 reagents an hour against a demand near 2700**. Not a defect and not
+something code fixes: it is two settings — the intervals and the class mix — and both are Patrick's.
+
+**A warning that goes with those numbers.** Every one of the fifteen is free at boot, so a fresh shard makes
+its whole first hour's worth of trips in the first four minutes and then goes quiet for fifteen to forty-five.
+Read at twenty minutes that looks exactly like gathering having stopped, and it was read that way here before
+the intervals were checked. The counter series says it plainly — `trips offered: 158 158 158 170` — and the
+170 is the two Gatherers coming round.
+
 **Why the stalls and not the shortage tally.** `BotShopper` counts what bots have been short of and was the
 obvious source; it is cumulative for the life of the shard, so a reagent that ran dry an hour ago still reads
 as the scarcest thing on the island and the gatherers would have chased it for ever. Stock on the stalls is a
