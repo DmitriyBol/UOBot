@@ -370,7 +370,23 @@ at what is refusing the roads.*
 Distances from home: min 14, median 127, max 547 — scattered across the map rather than the one bad place
 03.09 had.
 
-**The lead worth following first.** Four of the errors are a different sentence: *can reach nothing from
+**Two different populations, and they want different answers — one measurement separated them.**
+
+```
+stranded at Z=0:   16        "has not moved": 11 cases,
+stranded above:    13            every one of them with 0 of ours within 2 tiles
+   Z = 4, 10, 34, 36, 40
+```
+
+Nearly half the strandings are on raised ground, and **not one** of the frozen bots had another bot beside
+it. So crowding cannot be the answer for the scattered cases, and this project already has the note for what
+raised ground does: an invented Z is a place nothing can stand on — it works on the flat and fails on a hill.
+That is where the scattered strandings point.
+
+**The crowding lead below is therefore only about the six at the camp.** It was written first and as the
+lead; it is not.
+
+**The at-home subset.** Four of the errors are a different sentence: *can reach nothing from
 (x, y), and it is standing at home*. Six distinct bots — Alden, Aldric, Cedric, Neriah, Oswin, Talia — and
 the coordinates cluster in `1434–1446 × 1465–1476`, which is the camp. Neriah was carried home to
 (1434, 1476) at 20:51 and two minutes later could reach nothing *from that spot*. Home is where fifty-three
