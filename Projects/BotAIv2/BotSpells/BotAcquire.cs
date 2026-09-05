@@ -81,10 +81,41 @@ public sealed class BotAcquire : BotDeed
 
     private bool _learned;
 
+    /// <summary>
+    /// What the scroll is being bought for, which is two entirely different errands wearing one name.
+    ///
+    /// <para>
+    /// <b>A scroll bought to learn goes into a book; a scroll bought to cast stays in the pack.</b>
+    /// <c>BotSeeker</c> fills a caster's book, <c>BotArmoury</c> stocks whatever a bot can throw — and both
+    /// were building the same undertaking, which then tried to write every scroll into a book. What that
+    /// produced was 233 of 430 rounds in a session reporting "the book would not take it" about warriors who
+    /// had no book, had never wanted one, and had in fact got exactly what they set out for. A round that
+    /// succeeded, filed as a failure, 233 times, with the ledger pricing the trade off it.
+    /// </para>
+    ///
+    /// <para>
+    /// And underneath the mislabelling, a real refusal: the round gives up early when the book already holds
+    /// the spell, which is right for learning and backwards for stocking. A mage that knew Magic Arrow could
+    /// never buy a Magic Arrow scroll to throw.
+    /// </para>
+    /// </summary>
+    private enum Purpose
+    {
+        /// <summary>Into the book. See BotSeeker.</summary>
+        Learn,
+
+        /// <summary>Into the pack, to be thrown. See BotArmoury.</summary>
+        Stock
+    }
+
+    private readonly Purpose _purpose;
+
     private BotAcquire(
-        Route route, Type kind, int spell, Map map, Point3D where, int price, BaseVendor shop, BotListing stall
+        Route route, Type kind, int spell, Map map, Point3D where, int price, BaseVendor shop, BotListing stall,
+        Purpose purpose = Purpose.Learn
     )
     {
+        _purpose = purpose;
         _route = route;
         _kind = kind;
         _spell = spell;
@@ -96,16 +127,19 @@ public sealed class BotAcquire : BotDeed
     }
 
     /// <summary>Collecting what a standing want has already been filled with.</summary>
-    public static BotAcquire Delivery(Type kind, int spell, Map map, Point3D where) =>
-        new(Route.Delivered, kind, spell, map, where, 1, null, null);
+    public static BotAcquire Delivery(Type kind, int spell, Map map, Point3D where, bool toCast = false) =>
+        new(Route.Delivered, kind, spell, map, where, 1, null, null, Bought(toCast));
+
+    /// <summary>Which of the two errands this is. Named so the four factories all say it the same way.</summary>
+    private static Purpose Bought(bool toCast) => toCast ? Purpose.Stock : Purpose.Learn;
 
     /// <summary>Off a shopkeeper's shelf.</summary>
-    public static BotAcquire Counter(Type kind, int spell, BaseVendor shop, int price) =>
-        new(Route.Counter, kind, spell, shop?.Map, shop?.Location ?? Point3D.Zero, price, shop, null);
+    public static BotAcquire Counter(Type kind, int spell, BaseVendor shop, int price, bool toCast = false) =>
+        new(Route.Counter, kind, spell, shop?.Map, shop?.Location ?? Point3D.Zero, price, shop, null, Bought(toCast));
 
     /// <summary>Off another bot's stall. No walk: the market holds its goods out of the world.</summary>
-    public static BotAcquire Stalled(Type kind, int spell, BotListing stall, Map map, Point3D where) =>
-        new(Route.Stall, kind, spell, map, where, stall?.Price ?? 1, null, stall);
+    public static BotAcquire Stalled(Type kind, int spell, BotListing stall, Map map, Point3D where, bool toCast = false) =>
+        new(Route.Stall, kind, spell, map, where, stall?.Price ?? 1, null, stall, Bought(toCast));
 
     /// <summary>By asking the population, with the money down.</summary>
     /// <summary>
@@ -120,8 +154,8 @@ public sealed class BotAcquire : BotDeed
     /// the next.
     /// </para>
     /// </summary>
-    public static BotAcquire Board(Type kind, int spell, Map map, Point3D where, int offer) =>
-        BotAuction.Full ? null : new BotAcquire(Route.Board, kind, spell, map, where, offer, null, null);
+    public static BotAcquire Board(Type kind, int spell, Map map, Point3D where, int offer, bool toCast = false) =>
+        BotAuction.Full ? null : new BotAcquire(Route.Board, kind, spell, map, where, offer, null, null, Bought(toCast));
 
     public override string Kind => Trade;
 
@@ -208,7 +242,9 @@ public sealed class BotAcquire : BotDeed
             return BotDoing.Failed("no such spell");
         }
 
-        if (BotGrimoire.Holds(body, _spell))
+        // Only when the errand was to learn it. A bot stocking scrolls to throw wants them whether or not
+        // the spell is also written in a book it may not even carry — see Purpose.
+        if (_purpose == Purpose.Learn && BotGrimoire.Holds(body, _spell))
         {
             // Somebody else's delivery, a corpse, or a scroll bought a moment ago: whatever the reason, the
             // book has it now and there is nothing left to do.
@@ -318,10 +354,28 @@ public sealed class BotAcquire : BotDeed
     {
         var scrolls = BotQuill.Gather(body, _kind);
 
+        // Stocking is over the moment the scroll is in the pack: that is where a scroll to be thrown lives.
+        if (_purpose == Purpose.Stock)
+        {
+            if (scrolls.Count == 0)
+            {
+                return BotDoing.Failed($"paid for {_kind.Name} and it is not in the pack");
+            }
+
+            _learned = true;
+            BotAuction.Withdrawn(bot, _kind);
+
+            return BotDoing.Done($"stocked {_kind.Name} for {_paid}gp");
+        }
+
+        string refused = null;
+
         for (var i = 0; i < scrolls.Count; i++)
         {
-            if (!BotGrimoire.Write(body, scrolls[i]))
+            if (!BotGrimoire.Write(body, scrolls[i], out var why))
             {
+                refused ??= why;
+
                 continue;
             }
 
@@ -337,6 +391,10 @@ public sealed class BotAcquire : BotDeed
 
         // It is in the pack and the book would not take it. Not a failure worth a caution on the place: the
         // scroll is real, it is worth money, and the population has one more of them than it did.
-        return BotDoing.Done($"has {_kind.Name} but the book would not take it");
+        return BotDoing.Done(
+            scrolls.Count == 0
+                ? $"paid for {_kind.Name} and it is not in the pack"
+                : $"has {_kind.Name} but the book would not take it: {refused ?? "no reason given"}"
+        );
     }
 }

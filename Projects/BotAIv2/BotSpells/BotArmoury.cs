@@ -151,7 +151,7 @@ public sealed class BotArmoury : IBotProposer
 
         if (want is { Waiting: > 0 })
         {
-            return BotAcquire.Delivery(kind, spell, map, body.Location);
+            return BotAcquire.Delivery(kind, spell, map, body.Location, toCast: true);
         }
 
         BotShops.Survey(map, body.Location);
@@ -170,12 +170,12 @@ public sealed class BotArmoury : IBotProposer
         // from. So an equal price is a reason to buy from the scribe who wrote it rather than from the shelf.
         if (stall != null && (counter <= 0 || stall.Price <= counter))
         {
-            return BotAcquire.Stalled(kind, spell, stall, map, body.Location);
+            return BotAcquire.Stalled(kind, spell, stall, map, body.Location, toCast: true);
         }
 
         if (counter > 0)
         {
-            return BotAcquire.Counter(kind, spell, shop, counter);
+            return BotAcquire.Counter(kind, spell, shop, counter, toCast: true);
         }
 
         if (want != null)
@@ -187,7 +187,7 @@ public sealed class BotArmoury : IBotProposer
         // for, and it is the signal a scribe reads to decide what to write next.
         var offer = BotAuction.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
 
-        return BotAcquire.Board(kind, spell, map, body.Location, offer);
+        return BotAcquire.Board(kind, spell, map, body.Location, offer, toCast: true);
     }
 
     private static void Once(Mobile body)

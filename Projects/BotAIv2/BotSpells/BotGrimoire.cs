@@ -149,16 +149,44 @@ public static class BotGrimoire
     /// </summary>
     public static Spellbook Book(Mobile bot)
     {
-        var pack = bot?.Backpack;
-
-        if (pack == null)
+        if (bot == null)
         {
             return null;
         }
 
-        var book = pack.FindItemByType<Spellbook>();
+        // <b>The first spellbook in the pack is not necessarily this bot's spellbook.</b>
+        // FindItemByType returns whichever it meets first, and this population goes through every corpse it
+        // makes — so one looted necromancer's book, sitting anywhere in the pack, would answer this question
+        // for ever after and the caster behind it would stop having a book at all, by every test that asks.
+        //
+        // <b>This was not the cause of anything, and that is worth saying.</b> It was written while chasing
+        // 233 of 430 scroll purchases ending "the book would not take it", on a theory that turned out to be
+        // wrong — the real answer was that most of those bots were warriors stocking scrolls to throw and had
+        // never wanted a book at all. See BotAcquire.Purpose. Kept because the hazard is real and costs one
+        // loop to close; recorded as not-the-cause because a comment claiming a defect it did not fix is how
+        // the next person gets sent down the same road.
+        //
+        // Every spellbook is looked at, and the bot's own is the Regular one.
+        var pack = bot.Backpack;
 
-        return book?.SpellbookType == SpellbookType.Regular ? book : null;
+        if (pack != null)
+        {
+            foreach (var book in pack.FindItemsByType<Spellbook>())
+            {
+                if (book is { Deleted: false, SpellbookType: SpellbookType.Regular })
+                {
+                    return book;
+                }
+            }
+        }
+
+        // And in a hand, because a tool that the bot itself put on stops being in the pack — the rule the
+        // axe taught this project, kept here so it never has to be learned twice.
+        return bot.FindItemOnLayer(Layer.OneHanded) as Spellbook is { SpellbookType: SpellbookType.Regular } held
+            ? held
+            : bot.FindItemOnLayer(Layer.TwoHanded) as Spellbook is { SpellbookType: SpellbookType.Regular } other
+                ? other
+                : null;
     }
 
     /// <summary>Whether this bot's book already has that spell.</summary>
@@ -218,12 +246,37 @@ public static class BotGrimoire
     /// So the book is asked afterwards instead. That is the only reliable question, and it costs one bit test.
     /// </para>
     /// </summary>
-    public static bool Write(Mobile bot, SpellScroll scroll)
+    public static bool Write(Mobile bot, SpellScroll scroll) => Write(bot, scroll, out _);
+
+    /// <summary>
+    /// The same, saying which of the four ways it can fail actually happened.
+    ///
+    /// <para>
+    /// <b>Written because 233 of 430 scroll purchases in one session ended "the book would not take it" and
+    /// nothing anywhere said why.</b> Every one of the reasons below is a silent refusal — three of them are
+    /// this method's own and the fourth is <c>Spellbook.OnDragDrop</c>, which answers a scroll of the wrong
+    /// book's school, or an id outside the book's range, by returning false and sending a line to a screen
+    /// the bot has not got. Half the money a caster spends was going somewhere unaccounted for, and the only
+    /// way to find out which way was to make the sentence say it.
+    /// </para>
+    /// </summary>
+    public static bool Write(Mobile bot, SpellScroll scroll, out string why)
     {
+        why = null;
+
         var book = Book(bot);
 
-        if (book == null || scroll == null || scroll.Deleted)
+        if (book == null)
         {
+            why = "it is not carrying a spellbook";
+
+            return false;
+        }
+
+        if (scroll is not { Deleted: false })
+        {
+            why = "the scroll went";
+
             return false;
         }
 
@@ -231,12 +284,25 @@ public static class BotGrimoire
 
         if (book.HasSpell(id))
         {
+            why = "the book already had it";
+
             return false;
         }
 
         book.OnDragDrop(bot, scroll);
 
-        return book.HasSpell(id);
+        if (book.HasSpell(id))
+        {
+            return true;
+        }
+
+        // The engine's two refusals, told apart here because they want opposite answers: a scroll of another
+        // school is a buying mistake, and an id outside the book is a mapping mistake.
+        why = Spellbook.GetTypeForSpell(id) != book.SpellbookType
+            ? $"spell {id} belongs to a {Spellbook.GetTypeForSpell(id)} book, not this one"
+            : $"the engine refused spell {id} for a {book.SpellbookType} book";
+
+        return false;
     }
 
     /// <summary>Everything forgotten. The map is about types and survives a world reload; the count is not.</summary>
