@@ -209,12 +209,40 @@ net loss of 2140 things. Demand outruns supply, the stalls empty, and the rest o
 over a counter, which is money leaving the world. Purses fall while turnover rises, which is the same fact
 seen from the other end.
 
-**The supply is two bots.** Herbs are gathered by the `Gatherer` class alone — `BotHerbalist` answers "this
-bot may not" to everyone else — and `bot-population.json` raises two of them against fifty-three consumers.
+**That was not it either, and the real answer is composition rather than capacity.** Two distributions, laid
+side by side for the first time — what the population buys over a counter, against what its own gatherers put
+on stalls:
 
-So this is a decision about what the island should be, not a defect to fix: the lever is the class mix, and
-it belongs to Patrick. The arithmetic for how many gatherers would balance listings against purchases falls
-straight out of the numbers above.
+| | bought at a counter | listed by gatherers |
+|---|---|---|
+| SulfurousAsh | **1320** | 301 |
+| Bloodmoss | 393 | 135 |
+| Nightshade | 314 | 215 |
+| Ginseng | 243 | 191 |
+| Garlic | 61 | **259** |
+| BlackPearl | 16 | **257** |
+
+Demand is lopsided fourfold; supply was perfectly flat, because the pick was
+`Kinds[Utility.Random(Kinds.Length)]` — an eighth of each. So the ash, over half of everything wanted, ran
+dry at once and was bought over a counter, while the garlic and pearl nobody wanted made up the thousand
+unsold. Neither number says anything alone: the stalls are full, sales are brisk, the gatherers are working.
+It is only visible as a pair.
+
+`BotHerbs` now picks the kind with least on the stalls. Measured on the first fifteen minutes of each run:
+
+| | before | after |
+|---|---|---|
+| bought off stalls | 1051 | 538 |
+| bought at a counter | **798** | **25** |
+| reagent demand met by the population | 57% | **96%** |
+
+Counter buying fell thirty-twofold, and the turnover fell with it because a bot no longer buys twice — the
+first purchase used to be the wrong kind.
+
+**Why the stalls and not the shortage tally.** `BotShopper` counts what bots have been short of and was the
+obvious source; it is cumulative for the life of the shard, so a reagent that ran dry an hour ago still reads
+as the scarcest thing on the island and the gatherers would have chased it for ever. Stock on the stalls is a
+fact about now and puts itself out.
 
 **The market moves one way.** `StaleMs` marks a seller's price down on a timer and never moves a buyer's bid
 up: of 191 price cuts in one window, one moved towards an actual bid and none moved up, with
