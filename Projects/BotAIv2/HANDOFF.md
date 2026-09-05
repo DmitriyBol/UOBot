@@ -103,11 +103,26 @@ brewer's, noted immediately below.
 
 **The brewer's herbs were nobody's errand.** `BotShopper` buys reagents for a build whose *kit* declares
 them — every caster, no crafter — so the one bot carrying a mortar was never sent for the half of its trade
-it cannot gather. The tool decides now. **Not yet measured.** The 57 → 41 that looked like movement was two different runs at
-two different ages, which the note above makes meaningless. Within one run it has gone 61 → 167 against a
-denominator growing 554 → 857 — a rising share, and the wrong direction — but the run is eighteen minutes old
-and a brewer has to be looked at, sent, and come back before anything can change. It wants a long session
-before anything is claimed either way.
+it cannot gather. The tool decides now, and the reagents come from `BotFlask.Needs` — the two the draughts actually burn rather
+than the caster's eight, which at one kind an errand would have been forty minutes of shopping before the
+brewer reached either of its own.
+
+**Both were built on a reading that turned out to be wrong, and neither was the cause of anything.** The
+number that prompted them — "had the glass but no herbs", steady at 82–86% of new asks across eight
+consecutive windows — was measured properly once the bucket was split, and it came back **79 of 79 at the
+cap**. Not one lacked a reagent. Not one lacked the skill. A brewer holding five heal and five cure across
+its pack and its own stall has made everything the population will take and is standing off for ten minutes,
+which is what the cap was ordered to do. The steadiness was the tell and it was read as its opposite: no real
+shortage sits at 85% for eight windows.
+
+Both changes are kept — a brewer wanting what it burns is right on its own terms, and reaching it by its tool
+rather than its class name is the rule the rest of the assembly follows — and the commits say plainly that
+they fixed nothing.
+
+**What the brewer is actually short of is glass**, exactly as its own file has said all along, and glass is
+the one material with no producer: it trickles back a bottle at a time from whoever drinks a potion, and
+ordering it by the armful was tried on 04.09 and took four fifths off the shard's trade in half an hour. The
+line now reads `0 had the glass and not the reagent`, which is the whole answer.
 
 ---
 
