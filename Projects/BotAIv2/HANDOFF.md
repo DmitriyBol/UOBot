@@ -95,9 +95,19 @@ is what `BotOven.Spares` has always asked about the cook's meat. `0 logs to an o
 became `15 to an order and 45 onto a stall`, and the fletcher's `could not find wood` went from 133 of 212
 to nought.
 
+**Read the summary as running totals.** Every counter in it is cumulative since boot — the `Forget()` that
+would reset it runs only on a world reload. Proved on three consecutive summaries of one run: brew asks
+293 / 554 / 857. Rates are differences between summaries; two runs compare only at the same age. This was
+assumed the other way round while reading today's measurements, and the one conclusion it weakened is the
+brewer's, noted immediately below.
+
 **The brewer's herbs were nobody's errand.** `BotShopper` buys reagents for a build whose *kit* declares
 them — every caster, no crafter — so the one bot carrying a mortar was never sent for the half of its trade
-it cannot gather. The tool decides now. Moved 57 → 41 in the first five minutes, which is too early to read.
+it cannot gather. The tool decides now. **Not yet measured.** The 57 → 41 that looked like movement was two different runs at
+two different ages, which the note above makes meaningless. Within one run it has gone 61 → 167 against a
+denominator growing 554 → 857 — a rising share, and the wrong direction — but the run is eighteen minutes old
+and a brewer has to be looked at, sent, and come back before anything can change. It wants a long session
+before anything is claimed either way.
 
 ---
 

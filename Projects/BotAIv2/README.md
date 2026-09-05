@@ -255,6 +255,10 @@ cap; 2 meals eaten, 332 looks found a bot still fed from the last one
 Every number there is a static counter on one class, and `MAP.md` §1 maps each line prefix to the file that
 assembles it. A hard zero next to a healthy denominator is the shape most defects here take.
 
+**They are running totals since the shard started, not figures for the last five minutes** — the `Forget()`
+that would reset them runs only on a world reload. So a rate is the difference between two summaries over the
+time between them, the same value twice means nothing happened, and two runs compare only at the same age.
+
 **Per-bot lines.** `took on`, `finished`, `failed at`, `dropped` — with the reason in the deed's own words.
 Comparing `finished X` against `failed at X` per trade is the fastest audit there is:
 

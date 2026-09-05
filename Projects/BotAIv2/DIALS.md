@@ -221,6 +221,7 @@ changed without a rebuild.
 | `BotCraftwork` | `Margin` | `5.0` | *code only* |
 | `BotFlask` | `Batch` | `20` | *code only* |
 | `BotFlask` | `Cap` | `5` | *code only* |
+| `BotFlask` | `Herbs` | `5` | *code only* |
 | `BotFlask` | `LeastBottles` | `5` | *code only* |
 | `BotFlask` | `Margin` | `5.0` | *code only* |
 | `BotFlask` | `RestMs` | `600000` | *code only* |

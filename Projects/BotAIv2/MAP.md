@@ -54,9 +54,26 @@ measurement about exhaustion impossible for the first two or three hours. Never 
 ## 1. Reading a summary line
 
 Every five minutes (`BotBeat.SummaryMs`, `BotSquads.SayEveryMs`, both 300000) the population writes one block
-of lines. Each line is assembled from `Describe()` on the classes that own the counters, and each is reset by
-the matching `Forget()`. **A number in the summary is always a static counter on one class**, so the line
-prefix is the fastest route into the code there is.
+of lines. Each line is assembled from `Describe()` on the classes that own the counters. **A number in the
+summary is always a static counter on one class**, so the line prefix is the fastest route into the code
+there is.
+
+> **Every number is cumulative since the shard started, not a figure for the last five minutes.** The
+> matching `Forget()` exists but is called from each module's `Reset()`, which runs on a *world reload* and
+> nothing else. The naming invites the opposite reading and it is worth being certain about, so here is the
+> proof — three consecutive summaries of one run:
+>
+> ```
+> asked to brew:  293   554   857
+> asked to cook: 1207  2354  3592
+> market sales:    46    79   120
+> ```
+>
+> **What follows from it.** Two readings of the same counter with the same value mean nothing happened in
+> between, not that it happened twice. A rate has to be taken as a difference between summaries and divided
+> by the interval. And two runs can only be compared at the same age: a first summary against a first
+> summary. Comparing a five-minute-old shard's total against a forty-minute-old one's is comparing a rate
+> against nothing at all — which is a mistake that has been made in this project's own notes.
 
 | line begins | assembled in | fed by |
 |---|---|---|
