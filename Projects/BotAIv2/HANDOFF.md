@@ -381,6 +381,11 @@ Against a 6.8% baseline every band is between six and ten times its share. The t
 sight of home are not a separate at-home defect — they are the same one, on the raised ground that happens
 to be near home.
 
+**At five-tile resolution there is no trap either: the densest bin on the island holds four errors in three
+hours**, and the runners-up hold three. Whatever took fourteen bots at (1757, 976) in eighteen minutes on
+03.09 is simply not present. Both resolutions say the same thing, and it is the central claim for the larger
+half of the defect: **the walk fails, the places are innocent.**
+
 **Two different populations, and they want different answers — one measurement separated them.**
 
 ```
