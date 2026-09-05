@@ -161,9 +161,11 @@ carries — `14 kills were chosen because the board wanted what the carcass carr
 meat order on the board. If that number does not climb, the ask is not reaching the hunter and the two are
 not meeting.
 
-**The smith's new threshold costs something.** `BotAnvil.Tries` turned 82 potential rounds into
-`with metal but not enough for any recipe they can work`. Success went from 29% to 86% and pieces made went
-up, so the trade is ahead — but the number has not been tuned, only chosen.
+**The smith's new threshold costs less than it first looked.** `BotAnvil.Tries` moves rounds into
+`with metal but not enough for any recipe they can work`, a bucket that used to read nought. First reading
+was 82 of 428 asks; measured again on a settled shard it is **13 of 194**, under 7%. Against that, stints
+producing something went from three in ten to eight in ten. The number has still only been chosen and never
+tuned, and the pair to watch while tuning it is that bucket against `stints … with N pieces beaten out`.
 
 **Twenty of sixty `Forget()` methods are unreachable from any module's `Reset()`.** Their counters never go
 back to nought — not even on a world reload, which is the one event that resets the other forty.
