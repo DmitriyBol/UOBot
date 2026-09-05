@@ -166,7 +166,10 @@ public sealed class BotPeddle : BotDeed
 
         var goods = Gather(body, _kind);
 
-        _earned = BotShops.Sell(bot, _shop, goods);
+        // <b>What is handed over is the stall's stock and the pack's together, so the stall's share is not
+        // the denominator of the price.</b> Reporting `taken` here made a four-gold ingot read as seventy-nine.
+        // See BotShops.Sell, which counts the units as it builds the order.
+        _earned = BotShops.Sell(bot, _shop, goods, out var units);
 
         if (_earned <= 0)
         {
@@ -180,9 +183,9 @@ public sealed class BotPeddle : BotDeed
             return BotDoing.Failed("the shopkeeper would not buy it after all");
         }
 
-        _sold = taken;
+        _sold = units;
 
-        return BotDoing.Done($"{taken} {_label} for {_earned}gp");
+        return BotDoing.Done($"{units} {_label} for {_earned}gp");
     }
 
     /// <summary>Everything of that kind in the pack, as objects, so the counter can be shown all of it.</summary>

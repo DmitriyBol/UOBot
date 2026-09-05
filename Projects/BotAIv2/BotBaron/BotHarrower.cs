@@ -1,4 +1,4 @@
-using Server.Logging;
+﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -88,6 +88,12 @@ public sealed class BotHarrower : IBotProposer
     /// </summary>
     public static long Unfooted { get; private set; }
 
+    /// <summary>Asks where at least one damned square was passed over for want of grandmasters.</summary>
+    public static long Unready { get; private set; }
+
+    /// <summary>Asks passed over because a muster of this Baron's had just come to nothing.</summary>
+    public static long Resting { get; private set; }
+
     public static long Offered { get; private set; }
 
     private static bool _said;
@@ -112,6 +118,17 @@ public sealed class BotHarrower : IBotProposer
         }
 
         Asked++;
+
+        // <b>A muster that came to nothing is left alone for a while before it is posted again.</b> Patrick's
+        // order of 05.09.2026: the levy takes bots off their work whether they volunteered or not, so a Baron
+        // who re-posts a failed call on the next beat is a standing tax on the population. See
+        // BotHarrow.RestMs; the rest itself is kept there, beside the muster it belongs to.
+        if (BotHarrow.Resting(body))
+        {
+            Resting++;
+
+            return null;
+        }
 
         if (!BotSquads.Running)
         {
@@ -144,7 +161,37 @@ public sealed class BotHarrower : IBotProposer
         // killed nobody but has ground people down for an hour never rises on it, and a square that had one
         // bad night an hour ago quietly falls off it. BotQuad is a standing reputation that does not decay,
         // so "dire" means the island itself has been found wanting, which is what a great hunt answers.
-        var quad = BotQuad.Direst(map, body.Location, Range, at => Reachable(map, body.Location, at));
+        // <b>Damned ground the island cannot yet walk on is filtered out of the choice, not refused after
+        // it has been chosen.</b> The first version of this check returned null on the direst square when
+        // the population had no grandmasters — which is correct about that square and wrong about the
+        // evening: one unwalkable cell then stopped every harrowing on the island, because Direst answers
+        // with the worst and this threw the answer away instead of asking for the next one. The reach
+        // ledger is already filtered here for exactly this reason; this is the same shape of fact about the
+        // same candidate. Counted once per ask rather than per candidate: it walks the population.
+        var ready = BotHarrow.Musterable();
+        var unready = 0;
+
+        var quad = BotQuad.Direst(
+            map,
+            body.Location,
+            Range,
+            at =>
+            {
+                if (BotQuad.Damning(map, at) && ready < BotHarrow.Grandmasters)
+                {
+                    unready++;
+
+                    return false;
+                }
+
+                return Reachable(map, body.Location, at);
+            }
+        );
+
+        if (unready > 0)
+        {
+            Unready++;
+        }
 
         if (quad == null)
         {
@@ -208,7 +255,7 @@ public sealed class BotHarrower : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"no Baron has ever been offered a harrowing ({NotABaron} answers went to bots that are not Barons)"
-            : $"{Asked} times a Baron was asked: {Offered} were offered ground, {Held} were already leading a company, {Unfit} were too hurt, {Quiet} found nowhere reading at or below {BotQuad.Dire:F2}, {Sealed} found the worst of it behind something, {Unfooted} found nowhere in it to stand; {BotHarrow.Describe()}";
+            : $"{Asked} times a Baron was asked: {Offered} were offered ground, {Held} were already leading a company, {Unfit} were too hurt, {Quiet} found nowhere reading at or below {BotQuad.Dire:F2}, {Sealed} found the worst of it behind something, {Unfooted} found nowhere in it to stand, {Resting} came too soon after a muster that failed, {Unready} passed over damned ground the island cannot yet raise a company for; {BotHarrow.Describe()}";
 
     public static void Forget()
     {
@@ -221,6 +268,8 @@ public sealed class BotHarrower : IBotProposer
         Sealed = 0;
         Unfooted = 0;
         Offered = 0;
+        Resting = 0;
+        Unready = 0;
 
         BotHarrow.Forget();
     }

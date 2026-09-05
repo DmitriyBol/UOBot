@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Server.Items;
 using Server.Logging;
 
@@ -138,7 +138,15 @@ public sealed class BotShopper : IBotProposer
         // Whichever is cheaper, and that ordering is where a crafter's living comes from: a fighter's gold
         // came off a monster, and it goes to a smith rather than out of the world whenever the smith asks
         // less than the shelf. A shopkeeper is the ceiling, never the preference.
-        if (stall != null && (counter <= 0 || stall.Price < counter))
+        //
+        // <b>And a tie goes to one of ours.</b> This read a strict less-than while BotSeeker, which asks the
+        // identical question about scrolls, reads at-most and says why in as many words: the two prices being
+        // equal does not make the two purchases equal, because coin paid to a bot stays in the population and
+        // comes round again while coin paid across a counter leaves the world. This side answers for every
+        // consumable there is — bandages, reagents, arrows, potions, tools — and it was handing every tie to
+        // the shelf. Arrows are the case that shows it: a fletcher opens at what the provisioner asks, by
+        // design, so under a strict less-than an arrow made on this island could never be sold on it.
+        if (stall != null && (counter <= 0 || stall.Price <= counter))
         {
             ToStall++;
 
@@ -212,7 +220,7 @@ public sealed class BotShopper : IBotProposer
         Looks == 0
             ? "nobody has been looked at for supplies"
             : $"{Looks} looks for supplies: {Stocked} were short of nothing, {ToCounter} sent to a shopkeeper, "
-              + $"{ToStall} to a cheaper stall, {ToBoard} put an order on the board, "
+              + $"{ToStall} to a cheaper stall, {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
               + $"{Broke} wanted something nobody sells and could not afford one made (the fattest purse among them held {Richest}gp); "
               + $"most often short of {Commonest()}";
 
@@ -223,6 +231,7 @@ public sealed class BotShopper : IBotProposer
         ToCounter = 0;
         ToStall = 0;
         ToBoard = 0;
+        Unmakeable = 0;
         Broke = 0;
         Richest = 0;
         _short.Clear();
@@ -407,10 +416,94 @@ public sealed class BotShopper : IBotProposer
     /// asking again would turn one order into nine.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Whether any craft system on this shard can make the thing at all.
+    ///
+    /// <para>
+    /// <b>The caller's own comment has always said Board refuses when nobody can make the thing, and Board
+    /// never asked.</b> An order for something only a shopkeeper produces cannot be filled by anybody, ever:
+    /// it holds escrow, raises its own offer every StaleMs and charges the buyer more for it each time, and
+    /// the goods it is waiting for do not exist. Patrick rolled back exactly this for glass on 04.09.2026 —
+    /// see the note in that day's handover — and bandages walked into the same hole from the other side:
+    /// nothing in Engines/Craft makes a Bandage, so when the healer's shelf ran dry at 08:00 on 05.09.2026
+    /// the shopper put the shortage on the board instead, and the board raised it from five gold to
+    /// forty-eight while 7,752 bots stood hurt with nothing to bind a wound with. Twenty-six thousand gold
+    /// of escrow against thirteen thousand in every purse on the island.
+    /// </para>
+    ///
+    /// <para>
+    /// Asked of the shard's own craft systems rather than of a list kept here, for the reason every other
+    /// file in this assembly gives for the same choice: a list is a second copy of the truth and it drifts.
+    /// Cached by type, because the answer cannot change while the server is up.
+    /// </para>
+    /// </summary>
+    public static bool Makeable(Type wanted)
+    {
+        if (wanted == null)
+        {
+            return false;
+        }
+
+        if (_makeable.TryGetValue(wanted, out var known))
+        {
+            return known;
+        }
+
+        var systems = new[]
+        {
+            BotAnvil.System, BotThread.System, BotFlask.System, BotFletching.System, BotQuill.System
+        };
+
+        var made = false;
+
+        for (var i = 0; i < systems.Length && !made; i++)
+        {
+            var recipes = systems[i]?.CraftItems;
+
+            if (recipes == null)
+            {
+                continue;
+            }
+
+            for (var r = 0; r < recipes.Count; r++)
+            {
+                if (recipes[r]?.ItemType == wanted)
+                {
+                    made = true;
+
+                    break;
+                }
+            }
+        }
+
+        // Only cached once the systems exist. Content initialisation builds them, and an answer of "nobody
+        // can make anything" taken before that would be remembered for the life of the shard.
+        if (systems[0] != null)
+        {
+            _makeable[wanted] = made;
+        }
+
+        return made;
+    }
+
+    private static readonly System.Collections.Generic.Dictionary<Type, bool> _makeable = [];
+
+    /// <summary>Shortages left off the board because nothing on this shard can make the thing.</summary>
+    public static long Unmakeable { get; private set; }
+
     private static BotDeed Board(IBotWilful bot, Mobile body, Map map, Type wanted, int amount)
     {
         if (BotAuction.Wanted(bot, wanted) != null)
         {
+            return null;
+        }
+
+        // An order nobody can fill is worse than an empty board: it freezes the buyer's money and teaches
+        // every seeker that orders are not worth walking to. See Makeable.
+        if (!Makeable(wanted))
+        {
+            Unmakeable++;
+
             return null;
         }
 
@@ -425,7 +518,7 @@ public sealed class BotShopper : IBotProposer
 
         Asked++;
 
-        return new BotOrder(map, body.Location, bot, wanted, offer, amount);
+        return BotOrder.For(map, body.Location, bot, wanted, offer, amount);
     }
 
     private static void Missing(Type wanted, Map map, Mobile body)

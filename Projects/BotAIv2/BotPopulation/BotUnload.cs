@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Mobiles;
@@ -150,10 +150,35 @@ public sealed class BotUnload : BotDeed
             return BotDoing.Failed("nowhere known to put it");
         }
 
-        if (!body.InRange(_counter, Reach))
+        // <b>Past the line the walk cannot happen, so the goods go on the market from where the bot is
+        // standing.</b> This file's own opening says it: "the cure for a full pack is a walk to the bank, and
+        // a full pack is exactly what stops the walk". Heavy starts the journey at seven tenths so it should
+        // never come to this — and it does. Calla the Crafter sat at 293 of 222 stones from 00:36 to 00:42 on
+        // 05.09.2026, taking this errand and failing it over and over: "no way through", "it got no nearer
+        // than 212 tiles", "it had stopped getting anywhere", then the same errand again a quarter of a
+        // minute later. An errand that is offered because the bot cannot move and then requires the bot to
+        // move is a treadmill, and this one had no way off it.
+        //
+        // Listing needs no counter. A stall holds its goods out of the world, which is why BotFletch buys
+        // from one wherever it stands — so the market is the one place an immobilised bot can still reach.
+        // Only the coin needs the counter, and coin is not what is holding it down.
+        var stuck = BotLadder.Load(body) > BotLadder.Ceiling(body);
+
+        if (!stuck && !body.InRange(_counter, Reach))
         {
             // The distance the work itself asks for, on the line above. See BotArrival.Beside.
             return BotDoing.Walk(_map, _counter, BotArrival.Within(Reach), "to the counter with a full pack");
+        }
+
+        if (stuck && !body.InRange(_counter, Reach))
+        {
+            var shed = Sell(bot, body, out _, out _, out _);
+
+            Shed += shed;
+
+            return shed > 0
+                ? BotDoing.Done($"{shed} things put on the market from where it stood, too heavy to walk")
+                : BotDoing.Failed("too heavy to walk and nothing on it the market would take");
         }
 
         var carried = body.Backpack?.Items.Count ?? 0;
@@ -235,6 +260,121 @@ public sealed class BotUnload : BotDeed
     /// anyway. Dropping it would be throwing away somebody else's materials.
     /// </para>
     /// </summary>
+    /// <summary>Things handed straight to a standing order rather than listed. For the summary.</summary>
+    public static long Filled { get; private set; }
+
+    /// <summary>Trips to a counter offered because the board wanted something in the pack. For the summary.</summary>
+    public static long Bespoken { get; private set; }
+
+    /// <summary>Things listed on the spot by a bot too heavy to walk to a counter. For the summary.</summary>
+    public static long Shed { get; private set; }
+
+    /// <summary>How long the list of what the board is asking for is held before it is read again.</summary>
+    public static int BoardMs { get; set; } = 2000;
+
+    /// <summary>The kinds anybody has money down for, read at most once every <see cref="BoardMs"/>.</summary>
+    private static readonly HashSet<Type> _bespoke = [];
+
+    private static long _read;
+
+    private static bool _everRead;
+
+    /// <summary>
+    /// Whether the pack holds a surplus of something somebody has money down for on the board.
+    ///
+    /// <para>
+    /// <b>The third reason to walk to a counter, and its absence was a whole trade standing still.</b> Weight
+    /// and coin were the only two, and both are facts about the bot rather than about the shard. So a
+    /// woodsman cut wood to <c>BotTimber.Worthwhile</c> — twenty logs, forty stones, nowhere near the weight
+    /// gate — stopped, and held them. Twenty logs is also the number at which the woodsman refuses to cut any
+    /// more, so it parks exactly between "enough to stop" and "heavy enough to sell" and stays there. At
+    /// 20:09 on 04.09.2026 the woodsman's own line read "476 were carrying enough already" while the
+    /// fletcher's read "243 could not find wood", with open orders for logs on the board the entire time.
+    /// Two numbers on one shelf again, and nothing in the world crossing the gap between them.
+    /// </para>
+    ///
+    /// <para>
+    /// The rule is the same one <see cref="Purse"/> already argues for coin — "money in a pocket is money the
+    /// market cannot see" — said about goods, which was always the half that mattered more. Nothing is given
+    /// away: the trip lists the surplus on a stall or hands it to the standing order at the order's own
+    /// price, exactly as a heavy pack's trip does.
+    /// </para>
+    /// </summary>
+    public static bool Wanted(IBotWilful bot, Mobile body)
+    {
+        var pack = body?.Backpack;
+
+        if (pack == null || bot == null)
+        {
+            return false;
+        }
+
+        // Built at most every couple of seconds and shared by the whole population, because this is asked of
+        // every bot on every beat and the board is one list for all of them.
+        var now = Core.TickCount;
+
+        if (!_everRead || now - _read >= BoardMs)
+        {
+            _everRead = true;
+            _read = now;
+            _bespoke.Clear();
+
+            var wants = BotAuction.Wants;
+
+            for (var i = 0; i < wants.Count; i++)
+            {
+                var want = wants[i];
+
+                if (want.IsOpen)
+                {
+                    _bespoke.Add(want.Kind);
+                }
+            }
+        }
+
+        if (_bespoke.Count == 0)
+        {
+            return false;
+        }
+
+        // Built only once something in the pack has actually been asked for, so the ordinary answer — a bot
+        // carrying nothing anybody wants — costs a hash lookup per item and no allocation at all.
+        Dictionary<Type, int> keep = null;
+
+        for (var i = 0; i < pack.Items.Count; i++)
+        {
+            var item = pack.Items[i];
+
+            if (item == null || item.Deleted || !item.Movable || item is Gold)
+            {
+                continue;
+            }
+
+            var kind = item.GetType();
+
+            if (!_bespoke.Contains(kind) || BotBinding.IsBound(item, bot.Bond))
+            {
+                continue;
+            }
+
+            keep ??= Needed(bot);
+
+            // Only the part above what the trade keeps for itself is merchandise, which is the same reading
+            // Sell and Sellable make. A fletcher's own twenty logs are stock and stay where they are.
+            if (keep.TryGetValue(kind, out var allowed) && item.Amount <= allowed)
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Notes one such trip. The porter is the only thing that may begin one.</summary>
+    internal static void Bespeak() => Bespoken++;
+
     private static int Sell(IBotWilful bot, Mobile body, out int kept, out int refused, out int skipped)
     {
         kept = 0;
@@ -250,6 +390,7 @@ public sealed class BotUnload : BotDeed
 
         var keep = Needed(bot);
         var listed = 0;
+        var filled = 0;
 
         // A snapshot: listing takes things out of the pack, which mutates the list being read.
         List<Item> carried = [.. pack.Items];
@@ -270,11 +411,53 @@ public sealed class BotUnload : BotDeed
 
             // The kit is never merchandise, and the engine agrees: bound things are marked so that a
             // shopkeeper refuses them outright.
-            if (BotBinding.IsBound(item, bot.Bond) || keep.Contains(item.GetType()))
+            if (BotBinding.IsBound(item, bot.Bond))
             {
                 kept++;
 
                 continue;
+            }
+
+            // <b>Supplies are kept by the armful the class asks for, and the surplus is merchandise.</b> The
+            // list this reads used to hold types and not numbers, so a bot kept every reagent it ever touched
+            // for ever, without limit and whatever its trade. A warrior with no spellbook hoarded sulphurous
+            // ash off a corpse until it died; a sage came back from the woods with sixty and kept all sixty.
+            // Reagents were 25,770gp of the population's 48,685gp of spending in the four hours to 09:26 on
+            // 04.09.2026 — fifty-three pence in every pound, every coin of it across a counter and out of the
+            // world — while the same reagents sat in packs that had no use for them. Bot-to-bot trade over
+            // those four hours came to 2,890gp against 85,482gp earned from shopkeepers: three per cent.
+            //
+            // The kit already says how many: Kit.Reagents is thirty for a mage, sixty for a sage and nought
+            // for everybody else, and Kit.Bandages the same. Keeping to that number and listing the rest is
+            // the whole of the difference between a population of hoarders and a market.
+            if (keep.TryGetValue(item.GetType(), out var allowed))
+            {
+                if (item.Amount <= allowed)
+                {
+                    kept++;
+
+                    continue;
+                }
+
+                if (allowed > 0)
+                {
+                    // The engine's own way of taking part of a stack: this one becomes the surplus and the
+                    // remainder is put back in the pack beside it. Written the other way round it would sell
+                    // the bot's own supplies and keep the spare.
+                    //
+                    // <b>The null is not a formality.</b> LiftItemDupe needs a parameterless constructor and
+                    // hands back nothing when the type has none — leaving the stack whole and untouched. A
+                    // caller that ignored that would carry on and list the lot, which is a caster's entire
+                    // supply of reagents sold out from under it by a failed split.
+                    if (Mobile.LiftItemDupe(item, item.Amount - allowed) == null)
+                    {
+                        kept++;
+
+                        continue;
+                    }
+
+                    kept++;
+                }
             }
 
             // Priced at what a shopkeeper would pay rather than at a flat coin — the same correction the
@@ -282,6 +465,31 @@ public sealed class BotUnload : BotDeed
             // moment anybody has traded the kind; until then it hands back the caller's guess, and a guess of
             // one gold for everything is what made leather worthless and would do the same to glass.
             var floor = BotShops.Buyer(body, item, out var offered) != null ? offered : 1;
+
+            // <b>Somebody's standing order before the open market, and its absence was the hole in every
+            // chain that starts with a corpse.</b> A want on the board has money already down against it —
+            // <c>BotAuction.Ask</c> takes the payment when it is raised — so filling one is a sale that has
+            // already happened, at a price the buyer chose, with no waiting and no stall fee. Until now only
+            // a crafter's own finished work ever looked: the tailor and the smith both fill a want before
+            // listing, and the bot walking in from a field with a pack full of what somebody asked for did
+            // not. So an archer could put "arrows" on the board, a fletcher could stand ready, and the
+            // feathers to make them sat in a hunter's pack going to a shopkeeper for a copper.
+            //
+            // This is the line that makes a Need reach the whole population rather than the crafters: what
+            // anybody is carrying, anybody may be asked for.
+            var held = Math.Max(1, item.Amount);
+            var want = BotAuction.Demand(bot, item.GetType());
+            var sold = want == null ? 0 : BotAuction.Fill(bot, want, item);
+
+            if (sold > 0)
+            {
+                filled += sold;
+
+                if (sold >= held)
+                {
+                    continue;
+                }
+            }
 
             if (BotAuction.List(bot, item, BotAuction.Worth(item.GetType(), Math.Max(1, floor))) != null)
             {
@@ -293,7 +501,12 @@ public sealed class BotUnload : BotDeed
             }
         }
 
-        return listed;
+        Filled += filled;
+
+        // Counted with what was listed, because to the porter they are the same act — the pack is lighter
+        // either way — and counted apart in the summary, because to the shard they are not: one is a sale
+        // that somebody was waiting for and the other is goods put on a shelf to see if anybody wants them.
+        return listed + filled;
     }
 
     /// <summary>
@@ -338,7 +551,15 @@ public sealed class BotUnload : BotDeed
                 continue;
             }
 
-            if (BotBinding.IsBound(item, bot.Bond) || keep.Contains(item.GetType()))
+            // The same reading the sale itself makes, and it has to be the same reading or the porter sets
+            // out for a counter with nothing to put down: a stack over the kit's number is merchandise here
+            // too, and only the part above the number counts.
+            if (BotBinding.IsBound(item, bot.Bond))
+            {
+                continue;
+            }
+
+            if (keep.TryGetValue(item.GetType(), out var allowed) && item.Amount <= allowed)
             {
                 continue;
             }
@@ -379,14 +600,32 @@ public sealed class BotUnload : BotDeed
     /// the point at which guessing has to stop and the nought has to be named.
     /// </para>
     /// </summary>
-    private static HashSet<Type> Needed(IBotWilful bot)
+    private static Dictionary<Type, int> Needed(IBotWilful bot)
     {
-        HashSet<Type> keep =
-        [
-            typeof(Bandage), typeof(BlankScroll),
-            typeof(SulfurousAsh), typeof(BlackPearl), typeof(Garlic), typeof(Ginseng),
-            typeof(SpidersSilk), typeof(Nightshade), typeof(Bloodmoss), typeof(MandrakeRoot)
-        ];
+        var body = bot.Self;
+        var kit = bot.Class?.Kit;
+
+        // How many of each, and not merely which. A cap of nought means the bot has no use for the thing at
+        // all and every one of them is merchandise; anything left uncapped below is kept whole as before.
+        var reagents = kit?.Reagents ?? 0;
+
+        Dictionary<Type, int> keep = new()
+        {
+            [typeof(Bandage)] = kit?.Bandages ?? 0,
+            [typeof(SulfurousAsh)] = reagents,
+            [typeof(BlackPearl)] = reagents,
+            [typeof(Garlic)] = reagents,
+            [typeof(Ginseng)] = reagents,
+            [typeof(SpidersSilk)] = reagents,
+            [typeof(Nightshade)] = reagents,
+            [typeof(Bloodmoss)] = reagents,
+            [typeof(MandrakeRoot)] = reagents
+        };
+
+        // Paper is left uncapped on purpose: a scribe's stock is the one supply here whose right quantity is
+        // "as much as it can write", the kit names no number for it, and a guess would be a threshold nobody
+        // could defend. It is cheap and it is on a shelf.
+        keep[typeof(BlankScroll)] = int.MaxValue;
 
         // <b>Glass is stock to an alchemist and rubbish to everybody else, and it was kept by everybody.</b>
         // A potion leaves its bottle behind, so a bot that drinks all day accumulates empties it will never
@@ -395,28 +634,66 @@ public sealed class BotUnload : BotDeed
         // of glass buying more while fifteen packs hold it is the market failing at the one thing it is for.
         if (BotOutfit.Brews(bot.Class))
         {
-            keep.Add(typeof(Bottle));
+            keep[typeof(Bottle)] = int.MaxValue;
         }
 
+        // <b>A crafter's raw material is stock, not merchandise, and it was being sold out from under every
+        // one of them.</b> This list held supplies and tools and knew nothing about what a trade eats, so a
+        // smith walked to a counter and put its own iron on a stall, a fletcher its own wood and feathers, a
+        // tailor its own hide. The market's own counters named it and nobody was reading them: at 13:31 on
+        // 04.09.2026 the smith's ordering line read "157 have their own out on a stall" — a hundred and
+        // fifty-seven refusals to order iron because the bot was already selling iron it needed — and the
+        // materials board read "153 have their own out on a stall" beside it.
+        //
+        // Kept to a working quantity and no further, exactly as the supplies above are: what is over a
+        // batch is genuinely surplus and belongs on the market, which is where another crafter will find it.
+        // Asked of the tool in the pack, so a bot that takes up a trade tomorrow keeps its stock tomorrow.
+        if (BotFletching.Kit(body) != null)
+        {
+            keep[typeof(Feather)] = BotFletching.LeastArrows;
+            keep[typeof(Log)] = BotFletching.LeastArrows;
+            keep[typeof(Shaft)] = BotFletching.LeastArrows;
+        }
+
+        if (BotThread.Kit(body) != null)
+        {
+            keep[typeof(Leather)] = BotSew.Bolt;
+        }
+
+        if (BotAnvil.Kit(body) != null)
+        {
+            // Every metal the smith could work, not iron alone — see BotAnvil.Keep for why the two lists had
+            // to become one before BotSmith was allowed to fetch its own stock back.
+            BotAnvil.Keep(body, keep, BotBullion.Enough);
+        }
+
+        if (BotFlask.Kit(body) != null)
+        {
+            keep[typeof(Bottle)] = int.MaxValue;
+        }
+
+        // A tool is not a supply and is not sold at any count. One wears through in twenty-five to seventy-five
+        // uses and a crafter with none has no trade at all — see BotShopper.Wanting, which calls that the whole
+        // of what stands between "tools wear out" and "trades quietly end".
         var tools = BotOutfit.ToolsFor(bot.Class);
 
         for (var i = 0; i < tools.Count; i++)
         {
-            keep.Add(tools[i]);
+            keep[tools[i]] = int.MaxValue;
         }
 
         var bottles = BotOutfit.PotionsFor(bot.Class);
 
         for (var i = 0; i < bottles.Count; i++)
         {
-            keep.Add(bottles[i].Kind);
+            keep[bottles[i].Kind] = int.MaxValue;
         }
 
         var ammunition = bot.Bond?.Weapon?.Ammunition;
 
         if (ammunition != null)
         {
-            keep.Add(ammunition);
+            keep[ammunition] = int.MaxValue;
         }
 
         return keep;
@@ -456,7 +733,13 @@ public sealed class BotPorter : IBotProposer
         var laden = BotLadder.Load(body) >= BotLadder.Ceiling(body) * BotUnload.Heavy;
         var flush = (body.Backpack?.TotalGold ?? 0) >= BotUnload.Purse;
 
-        if (!laden && !flush)
+        // <b>And a third, which is a fact about the shard rather than about the bot.</b> Both of the reasons
+        // above ask whether the bot is uncomfortable; neither asks whether anybody wants what it is carrying.
+        // A woodsman that stops cutting at twenty logs is neither heavy nor rich and never comes, while a
+        // fletcher two fields away has money on the board for exactly those logs. See BotUnload.Wanted.
+        var bespoken = !laden && !flush && BotUnload.Wanted(bot, body);
+
+        if (!laden && !flush && !bespoken)
         {
             return null;
         }
@@ -471,6 +754,16 @@ public sealed class BotPorter : IBotProposer
 
         var counter = BotGround.Counter(bot, body.Location);
 
-        return counter == Point3D.Zero ? null : new BotUnload(map, counter, worth);
+        if (counter == Point3D.Zero)
+        {
+            return null;
+        }
+
+        if (bespoken)
+        {
+            BotUnload.Bespeak();
+        }
+
+        return new BotUnload(map, counter, worth);
     }
 }

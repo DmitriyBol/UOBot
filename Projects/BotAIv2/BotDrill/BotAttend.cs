@@ -108,6 +108,18 @@ public sealed class BotAttend : BotDeed
 
     public override bool Alongside => true;
 
+    /// <summary>
+    /// Standing in one place is what this work is — <b>once it has got there</b>. See <see cref="BotDeed.Still"/>.
+    ///
+    /// <para>
+    /// Not simply <c>true</c>, and the difference is the whole reason the exemption is safe. Before it is
+    /// enrolled this errand is an ordinary walk across Britain with a fee in its pocket, and a walk that
+    /// stops is exactly what the stall watch is for. Blanketing the errand would have bought three cancelled
+    /// lessons at the price of a student able to stand in a doorway for ever with nothing watching.
+    /// </para>
+    /// </summary>
+    public override bool Still => _enrolled;
+
     public override string Stage =>
         !_enrolled
             ? $"going to the training field, {_bill}gp in hand"

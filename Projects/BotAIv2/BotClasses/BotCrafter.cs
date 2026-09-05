@@ -42,6 +42,17 @@ public sealed class BotCrafter : BotClass
             (SkillName.Blacksmith, 100.0),
             (SkillName.Tailoring, 100.0),
             (SkillName.Tinkering, 100.0),
+
+            // <b>Fletching, added 04.09.2026, and it is a supply line rather than a skill.</b> Arrows were
+            // the one consumable on this island with no source: nobody could make one, the provisioner keeps
+            // twenty, and thirteen shooters spend them. Fletching tops out at 40 for everything in the arrow
+            // chain, so a hundred here is generous by a wide margin and costs the trade nothing.
+            (SkillName.Fletching, 100.0),
+
+            // And the axe that feeds it. Patrick's chain says the crafters go and cut the wood themselves
+            // rather than wait on a carpenter's shelf, and a trade whose raw material can only be bought is
+            // a trade that stops when the shop's stock does.
+            (SkillName.Lumberjacking, 100.0),
             (SkillName.Tactics, 100.0),
             (SkillName.Healing, 100.0)
         ];
@@ -60,7 +71,14 @@ public sealed class BotCrafter : BotClass
             //
             // Leatherwork needs no third tool: in this era the sewing kit makes leather armour as well
             // as cloth, so "tailoring and leather" is one skill and one implement.
-            Tools = [typeof(Server.Items.SmithHammer), typeof(Server.Items.Pickaxe), typeof(Server.Items.SewingKit)]
+            Tools =
+            [
+                typeof(Server.Items.SmithHammer),
+                typeof(Server.Items.Pickaxe),
+                typeof(Server.Items.SewingKit),
+                typeof(Server.Items.FletcherTools),
+                typeof(Server.Items.Hatchet)
+            ]
         };
     }
 }

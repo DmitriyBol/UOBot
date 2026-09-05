@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using Server.Json;
 using Server.Logging;
 
@@ -49,6 +49,9 @@ public sealed class BotWillSettings
 
     /// <summary>How long fresh work is safe from being swapped out whatever the numbers say.</summary>
     public int? DwellMs { get; set; }
+
+    /// <summary>The most fresh work may be safe for, however long it reckons itself.</summary>
+    public int? DwellCapMs { get; set; }
 
     /// <summary>How long work may sit set aside before its reason is presumed stale.</summary>
     public int? AsideCapMs { get; set; }
@@ -155,6 +158,7 @@ public static class BotWillConfig
         BotWill.ReviewMs = settings.ReviewMs ?? BotWill.ReviewMs;
         BotWill.IdleMs = settings.IdleMs ?? BotWill.IdleMs;
         BotWill.DwellMs = settings.DwellMs ?? BotWill.DwellMs;
+        BotWill.DwellCapMs = settings.DwellCapMs ?? BotWill.DwellCapMs;
         BotWill.AsideCapMs = settings.AsideCapMs ?? BotWill.AsideCapMs;
         BotWill.SwitchMargin = settings.SwitchMargin ?? BotWill.SwitchMargin;
         BotWill.CensusMs = settings.CensusMs ?? BotWill.CensusMs;

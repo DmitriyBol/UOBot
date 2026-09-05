@@ -70,8 +70,49 @@ public static class BotWill
     /// The floor under the margin, and it is there for a specific pathology: two pieces of work whose scores
     /// keep crossing produce a bot that alternates between them and finishes neither. Half a minute is
     /// enough to get somewhere and find out.
+    ///
+    /// <para>
+    /// <b>A floor now rather than the whole rule, because as the whole rule it was half a minute against a
+    /// six-minute job.</b> See <see cref="Dwell"/>.
+    /// </para>
     /// </summary>
     public static int DwellMs { get; set; } = 30000;
+
+    /// <summary>
+    /// The most a fresh undertaking may be safe for, however long it reckons itself.
+    ///
+    /// <para>
+    /// Two minutes, and the number is chosen against <c>BotStall.PatienceMs</c> rather than against any
+    /// work: the stall detector calls a bot stuck at four minutes, so nothing here may be protected long
+    /// enough to hide from it. The cap is not tidiness — without one, an eight-minute errand that has gone
+    /// wrong is immune for eight minutes, which is the frozen-work family this project has paid for more
+    /// than once.
+    /// </para>
+    /// </summary>
+    public static int DwellCapMs { get; set; } = 120000;
+
+    /// <summary>
+    /// How long this particular undertaking is safe from being swapped out: its own reckoning, floored by
+    /// <see cref="DwellMs"/> and capped by <see cref="DwellCapMs"/>.
+    ///
+    /// <para>
+    /// <b>The smith could not finish a single thing, and this is why.</b> Work is reconsidered every
+    /// <see cref="ReviewMs"/> against what it has produced so far, and a craft that yields nothing until the
+    /// item is done reads as nought a minute for as long as it takes. Mining and foraging are spared because
+    /// they yield continuously; forging is not. On 04.09.2026 Calla dropped "beating out Cutlass (2 attempts,
+    /// 0 made)" at exactly 0.5 minutes — the instant the flat dwell expired — and over that session the smith
+    /// took five errands, dropped four and finished one, against 29 sewn and 37 brewed. The ledger then
+    /// marked the trade down for failures it had itself caused: the base fell 55 → 37 → 28 across three
+    /// readings, so forging lost every later auction as well.
+    /// </para>
+    ///
+    /// <para>
+    /// Two numbers on one shelf, and the cure is the usual one — stop having the second number.
+    /// <see cref="BotDeed.Minutes"/> is already on the deed and already means "how long this takes".
+    /// </para>
+    /// </summary>
+    private static int Dwell(BotDeed deed) =>
+        Math.Clamp((int)Math.Round((deed?.Minutes ?? 0.0) * 60000.0), DwellMs, DwellCapMs);
 
     /// <summary>
     /// How long an undertaking may sit set aside — the bot dead, overloaded, dying, in a squad — before its
@@ -82,6 +123,25 @@ public static class BotWill
     /// bot that comes back to it after an hour is acting on a fact from an hour ago.
     /// </summary>
     public static int AsideCapMs { get; set; } = 600000;
+
+    /// <summary>
+    /// How many beats an undertaking may hold one unchanged walk order without ever beating its own best
+    /// distance to the place, before it is given up.
+    ///
+    /// <para>
+    /// Six hundred, which is two minutes at a turn every two hundred milliseconds, and deliberately three
+    /// times what <c>BotDig</c> and <c>BotProwl</c> allow themselves. Those two measure a walk to a known
+    /// seam or a known square; this measures every walk on the shard, including a trip across Britain that
+    /// has to go round a wall, and the counter only moves on a beat where the bot failed to beat its own
+    /// record — so an honest walk resets it constantly and can never meet this at all. It sits well inside
+    /// the stall watch's four minutes on purpose: the errand should end itself and teach its own ledger,
+    /// rather than be cancelled from outside with nothing learned.
+    /// </para>
+    /// </summary>
+    public static int TrekLimit { get; set; } = 600;
+
+    /// <summary>Undertakings given up for a walk that stopped closing. For the summary.</summary>
+    public static long Trudges { get; private set; }
 
     /// <summary>
     /// How long an undertaking may answer "working" without ever answering anything else before it is taken
@@ -640,6 +700,8 @@ public static class BotWill
                     }
 
                     resolve.Sent = doing;
+                    resolve.Nearest = int.MaxValue;
+                    resolve.Trudged = 0;
 
                     // <b>Inside the rebase, not beside it, and the difference is a bot standing still for
                     // twenty minutes.</b> The labour clock was reset on every walk answer, on the reasoning
@@ -653,6 +715,45 @@ public static class BotWill
                     // a new place to be, a new stage, a new leg. The longest honest journey on this shard is
                     // a couple of minutes, so nothing that is really walking can age out.
                     resolve.StirredTick = Core.TickCount;
+
+                    return;
+                }
+
+                // <b>The same order, beat after beat, with the bot no nearer than it was — and until now
+                // nothing anywhere counted that.</b> Two errands out of a dozen wrote this rule for
+                // themselves — <c>BotDig</c> and <c>BotProwl</c>, both after a night of it — and the ones
+                // that did not were left to the stall watch, which is four minutes away and cures the
+                // symptom by cancelling the work. On 04.09.2026 the whole of what was left of standing
+                // still was that: Kelda four minutes into "taking 1 Katana to Aislinn", Merrick into
+                // "taking 10 Leather to Abra", Rowan into "taking 10 Raw Ribs to Iman", none of them a
+                // company, none of them a fight, all of them a walk to a shopkeeper that had stopped
+                // closing. Written here so it is one rule rather than a twelfth copy.
+                //
+                // <b>Only a fixed place, never a follow.</b> Work that walks after something moving points
+                // at the target's own tile every beat, so "no nearer than it was" is true of it while it is
+                // winning — that is this project's oldest false alarm and it is fenced out by construction.
+                if (doing.Follow == null && bot.Self is { Deleted: false } walker && walker.Map == doing.Map)
+                {
+                    var away = Math.Max(
+                        Math.Abs(walker.Location.X - doing.Where.X),
+                        Math.Abs(walker.Location.Y - doing.Where.Y)
+                    );
+
+                    if (away < resolve.Nearest)
+                    {
+                        resolve.Nearest = away;
+                        resolve.Trudged = 0;
+                    }
+                    else if (++resolve.Trudged >= TrekLimit)
+                    {
+                        Trudges++;
+
+                        Settle(
+                            bot,
+                            BotEnding.Failed,
+                            $"it got no nearer than {away} tiles to ({doing.Where.X}, {doing.Where.Y})"
+                        );
+                    }
                 }
 
                 return;
@@ -717,7 +818,7 @@ public static class BotWill
         // simply not asked about for half a minute, and a bot that is not asked walks past. So the offers are
         // collected either way and the floor is applied at the end, where the one thing that can lift it —
         // <see cref="BotDeed.Pressing"/> — is known.
-        var fresh = held != null && rung == BotStanding.Free && now - resolve.SinceTick < DwellMs;
+        var fresh = held != null && rung == BotStanding.Free && now - resolve.SinceTick < Dwell(held);
 
         resolve.ReviewedTick = now;
         resolve.Due = false;
@@ -982,6 +1083,22 @@ public static class BotWill
     /// Ended as a failure rather than quietly dropped, so the ledger learns the place was no good and the
     /// bot is less inclined to take the same errand to the same spot again. That is the same treatment any
     /// other unreachable destination gets, and it is what stops this from being a loop with a longer period.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>"The ledger learns the place was no good" means <c>Ledger.Note</c> here and not
+    /// <see cref="BotDeed.Bend"/>, and that distinction was worth a reverted change to find out.</b> Note
+    /// folds a nought-a-minute reading into the band; Bend writes the outright caution that
+    /// <c>Ledger.Cautious</c> reads, and it is reached only from
+    /// <see cref="Note(IBotWilful,BotWalkResult)"/> — the walker's own refusal. A journey that
+    /// <em>follows</em> a mobile never refuses, so a shopkeeper nobody can reach is followed until this
+    /// method takes the errand away, and the shop is never cautioned. Calling Bend from here looks like the
+    /// missing line and is not: this island has four fires and <b>two counters</b>, so cautioning one on a
+    /// single stall takes half of a bot's counters away for the span, and "can reach nothing from here, and
+    /// it is standing at home" went from one to three in the matched window on 05.09.2026 while nothing got
+    /// better. The claimed benefit was not there either — no bot repeats a vendor even without it, because
+    /// the queue at an unreachable shopkeeper is a different bot each time and a per-bot ledger cannot see
+    /// that. Whatever the cure for a followed mobile is, it is not a stronger mark in one bot's own book.
     /// </para>
     /// </summary>
     public static void Abandon(IBotWilful bot, string why)
@@ -1263,7 +1380,7 @@ public static class BotWill
         using var line = ValueStringBuilder.Create(256);
 
         line.Append(
-            $"{Taken} taken on, {Finished} finished, {Failed} failed, {Dropped} dropped, {Deaths} died doing it; {Barren} times nothing was worth doing, {Unsworn} offers withheld from classes sworn elsewhere; holding now:"
+            $"{Taken} taken on, {Finished} finished, {Failed} failed, {Dropped} dropped, {Deaths} died doing it; {Barren} times nothing was worth doing, {Unsworn} offers withheld from classes sworn elsewhere, {Trudges} given up for a walk that stopped closing; holding now:"
         );
 
         var kinds = 0;
@@ -1314,5 +1431,6 @@ public static class BotWill
         Deaths = 0;
         Barren = 0;
         Unsworn = 0;
+        Trudges = 0;
     }
 }

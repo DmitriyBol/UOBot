@@ -41,15 +41,18 @@ public sealed class BotSquadModule : BotModule
         BotWill.Offer(new BotEnlister());
 
         logger.Information(
-            "Squads ready: up to {Max} to a squad beating every {Beat}ms; knots of {Knot} at {Spread} tiles while sweeping; a fight is broken off after {Stall}ms without the target's health falling, and capped at {Cap}ms; a company with nothing to fight looks for one every {Look}ms and disbands after {Idle}ms of finding nothing",
+            "Squads ready: up to {Max} to a squad beating every {Beat}ms; knots of {Knot} at {Spread} tiles while sweeping; a fight is broken off after {Stall}ms without the target's health falling, after {Blind}ms of everybody who has arrived being unable to land one at all, after {Close}ms of nobody arriving at all, and capped at {Cap}ms; a company with nothing to fight looks for one every {Look}ms and disbands after {Idle}ms of finding nothing, and lets go of anybody idle in it after {Rest}ms",
             BotSquad.MaxSize,
             BotSquads.BeatMs,
             BotScatter.KnotSize,
             BotScatter.Spread,
             BotSquad.NoProgressMs,
+            BotSquad.BlindMs,
+            BotSquad.CloseMs,
             BotSquad.FightCapMs,
             BotSquad.HuntEveryMs,
-            BotSquad.IdleCapMs
+            BotSquad.IdleCapMs,
+            BotSquad.RestCapMs
         );
 
         logger.Information(

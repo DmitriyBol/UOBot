@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Server.BotAI.V2;
@@ -548,6 +548,8 @@ public static class BotVigil
                    + BotAudit.Last
                    + "\nWhat the roll-calls have done all session: "
                    + BotAudit.Describe()
+                   + ".\nWhat your own hands have done all session: "
+                   + BotHand.Describe()
                    + ".";
 
         var report = BotDebugSight.Report(
@@ -608,6 +610,11 @@ public static class BotVigil
                 _wanted = note.Watch;
             }
 
+            // A clean bill of health is allowed a hand too, and it is the most honest use of one: looking at
+            // a bot with props or sight is how "I think everything is fine" gets checked before it is said
+            // again next minute.
+            Reach(note);
+
             return;
         }
 
@@ -646,6 +653,8 @@ public static class BotVigil
             _wanted = note.Watch;
         }
 
+        Reach(note);
+
         logger.Information(
             "The debugger has a finding ({Kind}, {Sure:P0}) about {Who}: {What}",
             note.Kind,
@@ -653,6 +662,38 @@ public static class BotVigil
             note.Bot,
             note.Finding
         );
+    }
+
+    /// <summary>
+    /// Carries out whatever command the answer asked for, if it asked for one.
+    ///
+    /// <para>
+    /// <b>Written into the debugger's own log as well as the command log, and on purpose.</b> The command
+    /// log is the record of what the hand did; this line is the record of what the hand did <em>to this
+    /// finding</em>, sitting under the claim it was meant to test. Read apart, either one is half a story:
+    /// a finding whose check is somewhere else cannot be audited by reading it, and a command whose reason
+    /// is somewhere else is a twitch.
+    /// </para>
+    /// </summary>
+    private static void Reach(BotDebugNote note)
+    {
+        if (note == null)
+        {
+            return;
+        }
+
+        var answer = BotHand.Run("the model", note.Probe, note.At, note.Finding);
+
+        if (answer == null)
+        {
+            return;
+        }
+
+        BotDebugLog.Block($"  it used its hands — {note.Probe} {note.At}:", answer);
+
+        // Kept where the next report can quote it. A command whose answer the model never sees is a command
+        // it will ask for again next minute, and again after that.
+        Remember($"{note.Probe} {note.At} -> {answer}");
     }
 
     /// <summary>The slow question, with thinking switched on. Rare, and it costs the minds their slot while it runs.</summary>

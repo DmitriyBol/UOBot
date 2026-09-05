@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Logging;
 
@@ -147,7 +147,16 @@ public static class BotSchool
     public static double MagicFee { get; set; } = 1.5;
 
     /// <summary>
-    /// How long a student must wait before it may be taught again. A day.
+    /// How long a student must wait before it may be taught again. Twenty minutes.
+    ///
+    /// <para>
+    /// <b>This line said "A day" for three days after the body below stopped meaning it, and it cost a
+    /// reader their picture of the shard.</b> Patrick read it on 05.09.2026 and concluded the captain
+    /// could not be earning much, because once a day is what the summary promised — while the value has
+    /// been twenty minutes since 02.09.2026, for the measured reasons three paragraphs down. A summary
+    /// line is the only part of a comment most readers ever read; when the number under it changes, that
+    /// line is the first thing that has to change with it.
+    /// </para>
     ///
     /// <para>
     /// <b>A cooldown rather than a price, because a price only rations the poor.</b> A bot that can afford
@@ -700,7 +709,15 @@ public static class BotSchool
     public static string Describe() =>
         Sessions == 0
             ? "no class has ever been held"
-            : $"{Sessions} classes held at ({Ground.X}, {Ground.Y}), {Empty} of them with nobody; {Taught} lessons paid for at {Fees}gp, {Points:F1} points handed out over {Beats} beats that taught something ({Nothing} found nothing left to teach, {Levelled} found the student level with the master, {Shouted} taught out of earshot)"
+            // <b>The two halves of the office are printed together, because separately they hid a sink that
+            // swallowed most of the shard's money.</b> Fees were reported here and wages in BotScout, and
+            // nobody had put them side by side: over 15 hours to 18:04 on 04.09.2026 Dain the Captain grew
+            // from 8 577gp to 98 205gp — two thirds of every coin on the island in one account — while the
+            // median purse stayed under a thousand. In the last of those sessions the office took 10 222gp
+            // in lessons and paid 198gp back out in wages, and both numbers were true and neither was
+            // readable beside the other. A number that only balances against a number in another file has to
+            // be said in the same sentence as it.
+            : $"{Sessions} classes held at ({Ground.X}, {Ground.Y}), {Empty} of them with nobody; {Taught} lessons paid for at {Fees}gp against {BotScout.Wages}gp paid back out in wages, {Points:F1} points handed out over {Beats} beats that taught something ({Nothing} found nothing left to teach, {Levelled} found the student level with the master, {Shouted} taught out of earshot)"
               + (Master is { Deleted: false } ? $"; {Master.Name} is on the field now with {_students.Count}" : "; the field is empty");
 
     public static void Forget()

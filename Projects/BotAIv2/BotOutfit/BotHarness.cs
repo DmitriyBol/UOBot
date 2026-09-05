@@ -300,12 +300,52 @@ public static class BotHarness
         }
     }
 
-    /// <summary>One of a kind, built to be measured. Null for anything that will not be built plainly.</summary>
+    /// <summary>
+    /// One of a kind, built to be measured. Null for anything that will not be built at all.
+    ///
+    /// <para>
+    /// <b>A constructor with an optional argument is not a parameterless constructor.</b>
+    /// <c>Activator.CreateInstance(Type)</c> looks for a genuinely empty signature, and every boot, shoe and
+    /// sandal in this fork is declared <c>Boots(int hue = 0)</c> — which C# lets a caller write as
+    /// <c>new Boots()</c> and reflection does not. So the survey threw four times at every single boot and
+    /// said so in four warnings that named the wrong cause.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>And the four it was throwing on would have been excluded anyway, which is worth writing down
+    /// rather than quietly deleting.</b> Footwear on this fork is <c>BaseShoes : BaseClothing</c>, so it has
+    /// no armour rating and the survey drops it a line later; the six slots the harness dresses are
+    /// InnerTorso, Pants, Arms, Gloves, Helm and Neck, and Shoes is not among them. So this fixes the survey
+    /// and not the wardrobe: what it buys is that the next piece declared with a default argument is
+    /// measured instead of skipped, and that the boot log stops naming a cause that was never the cause.
+    /// </para>
+    ///
+    /// <para>
+    /// The defaults are taken from the signature rather than guessed, so a piece is measured as the engine
+    /// would build it when nobody says otherwise.
+    /// </para>
+    /// </summary>
     private static Item Sample(Type kind)
     {
         try
         {
             return Activator.CreateInstance(kind) as Item;
+        }
+        catch (MissingMethodException)
+        {
+            var made = Defaulted(kind);
+
+            if (made != null)
+            {
+                return made;
+            }
+
+            logger.Warning(
+                "{Kind} has no constructor that can be called without arguments, so it is left out of the armoury",
+                kind.Name
+            );
+
+            return null;
         }
         catch (Exception e)
         {
@@ -313,6 +353,58 @@ public static class BotHarness
 
             return null;
         }
+    }
+
+    /// <summary>The shortest public constructor whose every argument has a default, built with those defaults.</summary>
+    private static Item Defaulted(Type kind)
+    {
+        var ctors = kind.GetConstructors();
+
+        for (var i = 0; i < ctors.Length; i++)
+        {
+            var wants = ctors[i].GetParameters();
+
+            if (wants.Length == 0)
+            {
+                continue;
+            }
+
+            var args = new object[wants.Length];
+            var all = true;
+
+            for (var j = 0; j < wants.Length; j++)
+            {
+                if (!wants[j].HasDefaultValue)
+                {
+                    all = false;
+
+                    break;
+                }
+
+                args[j] = wants[j].DefaultValue;
+            }
+
+            if (!all)
+            {
+                continue;
+            }
+
+            try
+            {
+                if (ctors[i].Invoke(args) is Item made)
+                {
+                    return made;
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Warning("{Kind} threw while being built for the armoury: {Why}", kind.Name, e.Message);
+
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

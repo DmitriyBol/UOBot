@@ -199,7 +199,7 @@ public sealed class BotArmourer : IBotProposer
 
         Once(body, piece, offer);
 
-        return new BotOrder(map, body.Location, bot, piece.Kind, offer);
+        return BotOrder.For(map, body.Location, bot, piece.Kind, offer);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Server.Items;
 using Server.Logging;
 using Server.Mobiles;
@@ -127,6 +127,13 @@ public static class BotPurse
         // is, and there is no spatial query for "how much money exists".
         var purses = new int[bots.Count];
         var counted = 0;
+
+        // <b>The fattest purse is named, because a number that large is a question and a name is its
+        // answer.</b> 98242gp stood here on the evening of 04.09.2026 — sixty-eight per cent of every coin
+        // 50 bots held between them — and the line could say only that somebody had it. This file argues two
+        // paragraphs above that a bot dropped silently from a measurement is how a measurement starts lying;
+        // an unnamed maximum is the same fault wearing a number.
+        Mobile richest = null;
         var kept = 0;
         var minded = 0;
         long pack = 0;
@@ -163,6 +170,11 @@ public static class BotPurse
 
             pack += pocket;
             bank += account;
+            if (richest == null || pocket + account > (richest.Backpack?.GetAmount(typeof(Gold)) ?? 0) + Banker.GetBalance(richest))
+            {
+                richest = bot;
+            }
+
             purses[counted++] = pocket + account;
         }
 
@@ -179,9 +191,13 @@ public static class BotPurse
 
         var poorest = purses[0];
         var middle = purses[counted / 2];
-        var richest = purses[counted - 1];
+        var richest2 = purses[counted - 1];
 
-        return $"{counted} purses that were earned: poorest {poorest}gp, middling {middle}gp, fattest {richest}gp, "
+        var name = richest == null
+            ? "nobody"
+            : $"{richest.Name} the {(richest as BotMobile)?.Class?.Name ?? "bot"}";
+
+        return $"{counted} purses that were earned: poorest {poorest}gp, middling {middle}gp, fattest {richest2}gp held by {name}, "
                + $"{pack + bank}gp between them with {pack}gp of it in pockets and {bank}gp in accounts{apart}";
     }
 

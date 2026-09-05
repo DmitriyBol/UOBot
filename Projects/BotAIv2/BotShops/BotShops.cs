@@ -455,8 +455,27 @@ public static class BotShops
     /// counting an intention.
     /// </para>
     /// </summary>
-    public static int Sell(IBotWilful bot, BaseVendor vendor, List<Item> goods)
+    public static int Sell(IBotWilful bot, BaseVendor vendor, List<Item> goods) =>
+        Sell(bot, vendor, goods, out _);
+
+    /// <summary>
+    /// The same, saying how many <em>units</em> actually crossed the counter.
+    ///
+    /// <para>
+    /// <b>Every sale on this shard was reported against a denominator that did not belong to it.</b> The
+    /// count said here was the number of stacks, and the peddler's own line used the number it had reclaimed
+    /// from a stall — while the goods handed over are everything of that kind in the pack, stall stock and
+    /// carried stock together. So "sold 4 Iron Ingot for 316gp" was four off a stall, seventy-five out of the
+    /// pack and 316gp for all seventy-nine: four gold an ingot, the ordinary price, printed as seventy-nine.
+    /// A person reading the log for what iron is worth on this island got a number an order of magnitude out,
+    /// in the one place prices are read. Units are counted before the sale, because the engine deletes the
+    /// stacks as it takes them.
+    /// </para>
+    /// </summary>
+    public static int Sell(IBotWilful bot, BaseVendor vendor, List<Item> goods, out int units)
     {
+        units = 0;
+
         var body = bot?.Self;
         var pack = body?.Backpack;
 
@@ -486,11 +505,17 @@ public static class BotShops
                 continue;
             }
 
-            order.Add(new SellItemResponse(item, Math.Max(1, item.Amount)));
+            var amount = Math.Max(1, item.Amount);
+
+            units += amount;
+
+            order.Add(new SellItemResponse(item, amount));
         }
 
         if (order.Count == 0)
         {
+            units = 0;
+
             return 0;
         }
 
@@ -498,6 +523,8 @@ public static class BotShops
 
         if (!vendor.OnSellItems(body, order))
         {
+            units = 0;
+
             return 0;
         }
 
@@ -505,16 +532,24 @@ public static class BotShops
 
         if (earned <= 0)
         {
+            units = 0;
+
             return 0;
         }
 
         Sold += order.Count;
         Earned += earned;
 
+        // <b>The number changed and the shape did not, and that is deliberate.</b> watch-shard.sh reads this
+        // line for the whole shard's income — the awk that sums it wants "sold N things to Somebody for Ngp"
+        // with the gold as a clean field. Saying the stack count as well, in any position, either breaks the
+        // match or leaves a comma stuck to the gold: it read nought gold entering the world beside forty-six
+        // sales at 21:12 on 04.09.2026. A log line another tool parses is an interface. The stack count is
+        // not worth a reader's attention anyway — units and gold are the two numbers a price is made of.
         logger.Information(
-            "{Name} sold {Count} things to {Vendor} for {Gold}gp",
+            "{Name} sold {Units} things to {Vendor} for {Gold}gp",
             body.Name,
-            order.Count,
+            units,
             vendor.Name,
             earned
         );

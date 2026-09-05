@@ -1,4 +1,4 @@
-using Server.Logging;
+﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -78,12 +78,15 @@ public sealed class BotPeddler : IBotProposer
     public static long NoBuyer { get; private set; }
 
     /// <summary>Trips to a counter actually offered.</summary>
+    /// <summary>Stalls left alone because the board has money down for that kind. See Propose.</summary>
+    public static long Spoken { get; private set; }
+
     public static long Offered { get; private set; }
 
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a trip to a counter with goods"
-            : $"{Asked} looks for something to peddle: {Offered} trips to a counter offered, {Stallless} had nothing of their own on the market, "
+            : $"{Asked} looks for something to peddle: {Offered} trips to a counter offered, {Stallless} had nothing of their own on the market, {Spoken} were left alone because the board has money down for that kind, "
               + $"{Wanted} held stalls somebody here still wants, {Fresh} held stalls not yet ignored for {IgnoredMs / 60000} minutes, "
               + $"{NoBuyer} found no shopkeeper in reach who buys the thing";
 
@@ -135,6 +138,24 @@ public sealed class BotPeddler : IBotProposer
             if (Core.TickCount - stall.ListedTick < IgnoredMs)
             {
                 Fresh++;
+
+                continue;
+            }
+
+            // <b>Somebody on this island has money down for this, so it does not go to a shopkeeper.</b> A
+            // counter is where goods go when nobody wanted them, and a want on the board with escrow behind
+            // it is the plainest possible statement that somebody did. On the night of 05.09.2026 the
+            // peddler carried twenty-five loads of feathers across to counters for 2034gp while 613 asks to
+            // fletch were refused for want of a feather and 439 arrow orders stood on the board unfilled:
+            // the island's scarcest material, sold out of the world by the one errand meant to clear what
+            // nobody needs. The price is the only thing between the two, and BotAuction.BeatStalls is
+            // already walking it down every StaleMs — ten minutes since Patrick's order the same night — so
+            // waiting costs a stall slot and buys a trade. Its own want does not count: a bot cannot buy
+            // from itself, and holding goods for an order only it has raised would be a stall that never
+            // clears.
+            if (BotAuction.Demand(bot, stall.Kind) != null)
+            {
+                Spoken++;
 
                 continue;
             }
@@ -201,5 +222,6 @@ public sealed class BotPeddler : IBotProposer
         Fresh = 0;
         NoBuyer = 0;
         Offered = 0;
+        Spoken = 0;
     }
 }

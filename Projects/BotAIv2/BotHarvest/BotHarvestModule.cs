@@ -61,6 +61,11 @@ public sealed class BotHarvestModule : BotModule
         // is ground goods, and because the one thing it must not become is a second forager: see BotHerbs.
         BotWill.Offer(new BotHerbalist());
 
+        // Wood, and the skill had been on the Gatherer's sheet since the class was written with no errand
+        // anywhere that swung an axe. It matters now because an arrow is a shaft and a feather, and a shaft
+        // is a log — see BotTimber.
+        BotWill.Offer(new BotWoodsman());
+
         logger.Information(
             "Harvest ready: a trip is reckoned at {Expects} a minute over {Minutes} minutes, an ingot at {Ingot} gold; the ground is swept {Reach} tiles around the first bot to ask, at most {Sweeps} times",
             BotDig.Prior,
@@ -89,6 +94,7 @@ public sealed class BotHarvestModule : BotModule
 
         BotGround.Reset();
         BotMiner.Forget();
+        BotWoodsman.Forget();
     }
 
     public static string Summarise() => BotGround.Describe();

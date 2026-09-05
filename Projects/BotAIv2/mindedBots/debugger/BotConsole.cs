@@ -21,11 +21,12 @@ namespace Server.BotAI.Mind;
 /// </para>
 ///
 /// <para>
-/// <b>It reads and it thinks; it does not touch the world.</b> Everything here answers out of measurements
-/// already taken, or puts a question to the model with those measurements attached. The one exception is
-/// <c>note</c>, which files a remark exactly as speaking to the debugger in the world does — and that is a
-/// note, not a command. Nothing in this file moves a bot, ends a piece of work or changes a number: the
-/// hands the debugger has are in the roll-call, where they are counted and their effect is measured.
+/// <b>It reads and it thinks, and since 04.09.2026 it can also reach.</b> Most of what is here answers out
+/// of measurements already taken, or puts a question to the model with those measurements attached.
+/// <c>note</c> files a remark exactly as speaking to the debugger in the world does. <c>do</c> hands one of
+/// <see cref="BotHand.Verbs"/> to the same bounded set of commands the model itself may ask for — and every
+/// use of it, from here or from the model, is written to <c>logs/bot-debugger-commands.log</c> before it
+/// happens, which is the only reason it is safe to have at all.
 /// </para>
 ///
 /// <para>
@@ -61,7 +62,7 @@ public static class BotConsole
             File.WriteAllText(_out, $"[{DateTime.Now:HH:mm:ss}] {BotVigil.Name} is listening at {_in}{Environment.NewLine}");
 
             logger.Information(
-                "The debugger's door is open: write a line into {In} and the answer appears in {Out}. Words it knows: state, bot <name>, idle, trades, fighting, rollcall, memory, note <text>, think <question>",
+                "The debugger's door is open: write a line into {In} and the answer appears in {Out}. Words it knows: state, bot <name>, idle, trades, fighting, rollcall, memory, note <text>, think <question>, hands, do <command>",
                 _in,
                 _out
             );
@@ -187,6 +188,21 @@ public static class BotConsole
 
                 return;
 
+            case "do":
+                {
+                    var (order, args) = Split(rest);
+                    var answer = BotHand.Run("the console", order, args, "asked by hand through the door");
+
+                    Say(answer ?? "nothing to do.");
+                }
+
+                return;
+
+            case "hands":
+                Say(BotHand.Describe() + $". I know: {string.Join(", ", BotHand.Verbs)}. {BotHand.Manual}");
+
+                return;
+
             case "think":
                 if (BotVigil.Consider(rest, Say))
                 {
@@ -202,7 +218,7 @@ public static class BotConsole
             default:
                 Say(
                     $"I do not know the word \"{verb}\". I know: state, bot <name>, idle, trades, fighting, rollcall,"
-                    + " memory, note <text>, think <question>."
+                    + " memory, note <text>, think <question>, hands, do <command>."
                 );
 
                 return;

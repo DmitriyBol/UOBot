@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
@@ -59,8 +59,27 @@ public static class BotAuction
     /// </summary>
     public static int BriskMs { get; set; } = 600000;
 
-    /// <summary>How long a stall may sit untouched before the price comes down. Half an hour.</summary>
-    public static int StaleMs { get; set; } = 1800000;
+    /// <summary>
+    /// How long a stall may sit untouched before the price comes down. Ten minutes.
+    ///
+    /// <para>
+    /// <b>Lowered from half an hour on Patrick's order of 05.09.2026, against a market that had grown faster
+    /// than its own markdown.</b> A night of opening the supply side — see <c>BotUnload.Wanted</c> — took the
+    /// stalls from 1558 things to 3584 in the same forty minutes, and at half an hour a step the pace works
+    /// out at one cut per listing per half hour: a price set at twice what anybody will pay needs seven of
+    /// them, which is three and a half hours. Over that window the population's own turnover fell from
+    /// 7288gp to 4898gp while its takings from shopkeepers rose — the surplus was leaving through the
+    /// counters rather than moving between bots, which is the one thing this market exists to prevent.
+    /// </para>
+    ///
+    /// <para>
+    /// The cut is measured from the last <em>sale</em> rather than the last touch — see
+    /// <c>BotAuction.BeatStalls</c>, which carries the reason — so shortening it does not punish a stall
+    /// that is selling. It only reaches the ones nobody is buying from, which are exactly the ones whose
+    /// price is wrong.
+    /// </para>
+    /// </summary>
+    public static int StaleMs { get; set; } = 600000;
 
     /// <summary>
     /// The least a thing may be offered for, and therefore the least it may fall to.
@@ -146,8 +165,32 @@ public static class BotAuction
     /// </summary>
     public static int MaxListings { get; set; } = 1024;
 
-    /// <summary>How many wants the market may hold at once.</summary>
-    public static int MaxWants { get; set; } = 128;
+    /// <summary>
+    /// How many wants the market may hold at once.
+    ///
+    /// <para>
+    /// <b>Five hundred and twelve, and the old hundred and twenty-eight was a ceiling this shard grew
+    /// through on the night the population went from thirty-four to fifty-four.</b> The board filled, and
+    /// every bot that wanted anything then took an errand which failed on its first beat and was offered
+    /// again immediately: 176 orders and 125 purchases in one half-hour window, 85 of them one bot asking
+    /// for one scroll. The reasoning is <see cref="MaxListings"/>'s, which says it plainly — the number is
+    /// there so an unbounded list cannot leak a night's memory, not because a small market is a virtue, and
+    /// every lookup is a scan on a short list walked a few times per bot per beat.
+    /// </para>
+    /// </summary>
+    public static int MaxWants { get; set; } = 512;
+
+    /// <summary>
+    /// Whether the want board has no room left.
+    ///
+    /// <para>
+    /// <b>Public because the check belongs in whoever is choosing, not in the work.</b> This shard has paid
+    /// for that lesson twice now — a guard put inside an errand fails on the first beat, the errand is
+    /// offered again on the next, and the result is a bot doing nothing at eight decisions a second while
+    /// the log fills with a line apiece. Passing a candidate over costs nothing; failing an errand is a loop.
+    /// </para>
+    /// </summary>
+    public static bool Full => _wants.Count >= MaxWants;
 
     /// <summary>
     /// The most units one supplier may deliver against one want at a time.
@@ -235,6 +278,21 @@ public static class BotAuction
     public static long Posted { get; private set; }
 
     public static long Abandoned { get; private set; }
+
+    /// <summary>Units that went straight off a stall to a want on the board. See <see cref="Cross"/>.</summary>
+    public static long Crossed { get; private set; }
+
+    /// <summary>
+    /// Wants that found the thing on a stall and would not pay the asking price.
+    ///
+    /// <para>
+    /// Not a failure of anything and counted so that it cannot be mistaken for one: a want raises its own
+    /// offer every beat, so this is the market at work rather than the market stuck. It is here because
+    /// "nobody is selling one" and "somebody is selling one dearer than I will pay" are different facts and
+    /// were producing the same silence.
+    /// </para>
+    /// </summary>
+    public static long Dear { get; private set; }
 
     public static long Raises { get; private set; }
 
@@ -1298,7 +1356,126 @@ public static class BotAuction
     private static void Beat()
     {
         BeatStalls();
+        Cross();
         BeatWants();
+    }
+
+    /// <summary>
+    /// The one thing this market never did: put a stall and a want for the same thing together.
+    ///
+    /// <para>
+    /// <b>Supply and demand could sit side by side for the life of the shard and never meet.</b> Every route
+    /// into <see cref="Fill"/> came from somebody holding the goods in a pack at that moment — a smith
+    /// finishing a hauberk, a hunter emptying a pack at a counter — so goods that had already been listed
+    /// were invisible to every want on the board, and a want was invisible to every stall. Nothing anywhere
+    /// crossed the two.
+    /// </para>
+    ///
+    /// <para>
+    /// Measured on 04.09.2026 at 10:53, on the trade it was written to fix: Calla stood with 60gp down for
+    /// twenty feathers while Alden, Vesna, Wulfric, Neriah and Merrick each carried feathers to Missy the
+    /// shopkeeper — the peddler's ten-minute rule doing exactly what it was built to do with goods the
+    /// population was funding an order for. Two hundred and sixty-one fletchers were passed over for want of
+    /// feathers in the same half hour. The same shape sits under every "raised its offer after 1 went
+    /// unfilled" line in the log.
+    /// </para>
+    ///
+    /// <para>
+    /// A crossing pays the want's offer and not the stall's ask, which is the rule everywhere else in this
+    /// market: a smith filling a want for a hauberk is paid what the buyer put down whatever the iron cost
+    /// it. The stall is told what it fetched, so a price that clears instantly ratchets up on its own.
+    /// </para>
+    /// </summary>
+    private static int Cross()
+    {
+        var crossed = 0;
+
+        for (var i = 0; i < _wants.Count; i++)
+        {
+            var want = _wants[i];
+
+            if (!want.IsOpen)
+            {
+                continue;
+            }
+
+            var stall = Cheapest(want.Kind, want.Buyer);
+
+            if (stall == null || stall.IsEmpty)
+            {
+                continue;
+            }
+
+            // A shopkeeper is the ceiling on what a bot may charge; a want's offer is the ceiling on what it
+            // will pay. Above it there is no sale and nothing to record: the want raises its own offer every
+            // beat and will reach the ask on its own if it is worth reaching.
+            if (stall.Price > want.Offer)
+            {
+                Dear++;
+
+                continue;
+            }
+
+            var seller = stall.Seller;
+            var body = seller?.Self;
+
+            if (body is not { Deleted: false })
+            {
+                continue;
+            }
+
+            // The market's own rules about who may fill a want, asked before anything moves rather than
+            // after — Fill refuses on all three, and a refusal after the goods have been lifted off the
+            // stall is goods in nobody's hands.
+            if (ReferenceEquals(want.Buyer, seller) || !want.Yields(seller, SliceMs) || Wanted(seller, want.Kind) != null)
+            {
+                continue;
+            }
+
+            var units = Math.Min(Math.Min(stall.Amount, want.Payable), Math.Max(1, Slice));
+
+            if (units <= 0)
+            {
+                continue;
+            }
+
+            var goods = stall.Lift(units);
+
+            if (goods == null)
+            {
+                continue;
+            }
+
+            var filled = Fill(seller, want, goods);
+
+            if (filled <= 0)
+            {
+                // Nothing went. The goods go back on the stall they came off, which is where their owner
+                // left them: a market that could drop a stack on the floor of a refusal would be a market
+                // that quietly eats its members' property.
+                stall.Add(goods);
+
+                continue;
+            }
+
+            crossed += filled;
+            Crossed += filled;
+
+            if (stall.Note(filled, filled * want.Offer, BriskMs) && stall.Raise(RaiseStep, MostMultiple))
+            {
+                Raises++;
+
+                logger.Information(
+                    "{Name} put {Item} up to {Price}gp after the board took {Units} off the stall at once",
+                    body.Name,
+                    stall.Label,
+                    stall.Price,
+                    filled
+                );
+            }
+        }
+
+        return crossed;
     }
 
     /// <summary>
@@ -1679,7 +1856,7 @@ public static class BotAuction
         var (units, worth) = Offered();
         var (sought, escrow) = Sought();
 
-        return $"{_listings.Count} of {MaxListings} stalls holding {units} things worth {worth}gp and {_wants.Count} of {MaxWants} wants for {sought} things with {escrow}gp down; {Sales} sales and {Fills} fills for {Turnover}gp, {Raises} prices raised, {Cuts} cut, {Forgotten} forgotten, {Abandoned} given up on; {Sells} orders refused to bots already selling the thing, {Recalled} of them settled by taking it back off the stall and {Unfunded} to bots that could not put the money down; {Cheap} things of {_worthless.Count} kinds were worth less than the {Floor}gp floor and stayed in the pack; {Fetches} deliveries fetched off the board holding {Fetched} things; the levy has taken {Levied}gp over {Levies} sales";
+        return $"{_listings.Count} of {MaxListings} stalls holding {units} things worth {worth}gp and {_wants.Count} of {MaxWants} wants for {sought} things with {escrow}gp down; {Sales} sales and {Fills} fills for {Turnover}gp, of which {Crossed} things went straight off a stall to a want on the board and {Dear} wants found the thing on a stall dearer than they would pay; {Raises} prices raised, {Cuts} cut, of which {BotHaggle.Describe()}, {Forgotten} forgotten, {Abandoned} given up on; {Sells} orders refused to bots already selling the thing, {Recalled} of them settled by taking it back off the stall and {Unfunded} to bots that could not put the money down; {Cheap} things of {_worthless.Count} kinds were worth less than the {Floor}gp floor and stayed in the pack; {Fetches} deliveries fetched off the board holding {Fetched} things; the levy has taken {Levied}gp over {Levies} sales";
     }
 
     private sealed class AuctionTimer : Timer

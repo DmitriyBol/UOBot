@@ -108,8 +108,20 @@ public sealed class BotAcquire : BotDeed
         new(Route.Stall, kind, spell, map, where, stall?.Price ?? 1, null, stall);
 
     /// <summary>By asking the population, with the money down.</summary>
+    /// <summary>
+    /// The board route, or nothing at all when the board has no room.
+    ///
+    /// <para>
+    /// <b>Asked here rather than in <see cref="Asking"/>, and the difference is a loop.</b> This route ends
+    /// in <c>BotAuction.Ask</c>, which answers null both when the bot cannot fund the want and when the
+    /// board is full — and the errand reported only the first, so "could not put the money down for it" was
+    /// said 125 times in one half-hour window by bots with money, about a board that had been full the whole
+    /// time. A candidate passed over here is free; the errand failing on its first beat is offered again on
+    /// the next.
+    /// </para>
+    /// </summary>
     public static BotAcquire Board(Type kind, int spell, Map map, Point3D where, int offer) =>
-        new(Route.Board, kind, spell, map, where, offer, null, null);
+        BotAuction.Full ? null : new BotAcquire(Route.Board, kind, spell, map, where, offer, null, null);
 
     public override string Kind => Trade;
 
@@ -288,7 +300,13 @@ public sealed class BotAcquire : BotDeed
 
         if (want == null)
         {
-            return BotDoing.Failed("could not put the money down for it");
+            // Two causes, one answer from Ask, and saying only one of them cost a night of reading the wrong
+            // subsystem. The board is checked first because it is the one that is nothing to do with this bot.
+            return BotDoing.Failed(
+                BotAuction.Full
+                    ? $"the board is full at {BotAuction.MaxWants} wants"
+                    : "could not put the money down for it"
+            );
         }
 
         _paid = Ask * want.Offer;

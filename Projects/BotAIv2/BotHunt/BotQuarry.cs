@@ -396,6 +396,95 @@ public static class BotQuarry
         _paid[kind] = (sofar.Gold + Math.Max(0, gold), sofar.Kills + 1);
     }
 
+    /// <summary>
+    /// What a standing order for something a carcass yields adds to that creature's worth.
+    ///
+    /// <para>
+    /// Two hundred, which is well above what any ordinary kill on this island pays, and deliberately so: the
+    /// point is not to nudge the odds but to turn the population's attention. When the board is asking for
+    /// feathers, birds stop being the worthless thing a hunter walks past.
+    /// </para>
+    /// </summary>
+    public static double Bounty { get; set; } = 200.0;
+
+    /// <summary>Kills chosen because the board was asking for what the carcass carries. For the summary.</summary>
+    public static long Sent { get; private set; }
+
+    /// <summary>
+    /// How much this creature is worth over its purse because somebody has put money down for what it is
+    /// made of.
+    ///
+    /// <para>
+    /// <b>This is the last link of the chain Patrick asked for, and without it the chain is open at both
+    /// ends.</b> An archer runs low and puts arrows on the board; a fletcher reads the board and can make
+    /// them out of wood and feathers; wood is money, and a feather is a thing that only exists because
+    /// somebody killed a bird. Nothing anywhere connected "the board wants feathers" to "go and hunt
+    /// something with feathers on it", so the fletchers would have stood idle beside a full order book while
+    /// the hunters walked past chickens all day looking for something that paid.
+    /// </para>
+    ///
+    /// <para>
+    /// Asked of the engine's own carcass properties rather than of a table of creatures — <c>Feathers</c>,
+    /// <c>Hides</c> and <c>Wool</c> are on <c>BaseCreature</c> and every animal on the shard fills them in.
+    /// A table would have been right on the day it was written and quietly wrong after the first new
+    /// creature.
+    /// </para>
+    /// </summary>
+    public static double Sought(BaseCreature creature)
+    {
+        if (creature == null || BotAuction.Wants.Count == 0)
+        {
+            return 0.0;
+        }
+
+        var worth = 0.0;
+
+        // <b>A want for arrows is a want for feathers, one step on.</b> The woodcutter's proposer has read it
+        // that way since the day it was written — "logs directly, or arrows, which are logs one step further
+        // on, and which is what an archer actually asks for" — and this side never learned the same sentence.
+        // It stopped mattering only while archers could not ask: on the evening of 04.09.2026 they began to,
+        // and 179 arrow orders stood on the board at 18:02 while this counter had been frozen at 122 for
+        // three half-hourly readings. An archer asking for arrows is the demand; nobody was carrying it back
+        // to the one act that puts a feather into the world.
+        if (creature.Feathers > 0 && (Demanded(typeof(Feather)) || Demanded(typeof(Arrow))))
+        {
+            worth += Bounty;
+        }
+
+        if (creature.Hides > 0 && Demanded(typeof(Hides)))
+        {
+            worth += Bounty;
+        }
+
+        if (creature.Wool > 0 && Demanded(typeof(Wool)))
+        {
+            worth += Bounty;
+        }
+
+        if (worth > 0.0)
+        {
+            Sent++;
+        }
+
+        return worth;
+    }
+
+    /// <summary>Whether anybody has money down on the board for this, right now.</summary>
+    private static bool Demanded(Type kind)
+    {
+        var wants = BotAuction.Wants;
+
+        for (var i = 0; i < wants.Count; i++)
+        {
+            if (wants[i].IsOpen && wants[i].Kind == kind)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>What one of these is worth, on the evidence. <see cref="Untried"/> when there is none.</summary>
     public static double Pays(Type kind) =>
         kind != null && _paid.TryGetValue(kind, out var known) && known.Kills > 0
@@ -409,6 +498,7 @@ public static class BotQuarry
         _shunned.Clear();
         _crowded.Clear();
         _paid.Clear();
+        Sent = 0;
     }
 
     /// <summary>What the population has learned about who is worth fighting. For the summary.</summary>
@@ -501,7 +591,7 @@ public static class BotQuarry
 
             // What it pays decides; how big it is only breaks a tie. That ordering is the whole of the fix:
             // among things a bot can beat, the useful question is which one carries something.
-            var pays = Pays(creature.GetType());
+            var pays = Pays(creature.GetType()) + Sought(creature);
 
             if (best != null && (pays < bestPays || pays == bestPays && power <= bestPower))
             {

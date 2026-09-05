@@ -1,4 +1,4 @@
-using Server.Logging;
+﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -56,6 +56,11 @@ public static class BotCore
         // reputation is a fact about the world rather than about anybody standing on it, and it took a
         // company most of an evening to learn.
         BotQuadStore.Configure();
+
+        // The engine's regeneration hooks, wrapped rather than replaced, so that a bot which has eaten
+        // recovers faster and nothing else on the shard changes at all. After RegenRates, which carries
+        // CallPriority(10) — see BotMeal.Configure for what happens if that ever inverts.
+        BotMeal.Configure();
 
         // Everything this assembly is made of. Order here is not meaningful; dependencies are.
         BotModules.Register(new BotClassModule());

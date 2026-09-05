@@ -41,6 +41,21 @@ public sealed class BotOrder : BotDeed
     private int _paid;
 
     /// <summary>Putting a fresh order on the board.</summary>
+    /// <summary>
+    /// An order, or nothing at all when the board has no room for one.
+    ///
+    /// <para>
+    /// <b>The gate is here, in the choosing, and it used to be on the errand's first beat.</b> Every
+    /// proposer that reaches for an order returns whatever this hands back, so a null is simply a candidate
+    /// passed over and costs nothing; the errand failing instead is offered again on the very next decision,
+    /// which on the night of 04.09.2026 was 176 failures in a half-hour window and 85 of them one bot asking
+    /// for one scroll. Passing a candidate over is free; failing an errand is a loop — this shard has now
+    /// paid for that sentence three times.
+    /// </para>
+    /// </summary>
+    public static BotOrder For(Map map, Point3D where, IBotWilful buyer, System.Type kind, int offer, int units = 1) =>
+        BotAuction.Full ? null : new BotOrder(map, where, buyer, kind, offer, units);
+
     public BotOrder(Map map, Point3D where, IBotWilful buyer, System.Type kind, int offer, int units = 1)
     {
         _map = map;

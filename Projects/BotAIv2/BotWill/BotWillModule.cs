@@ -1,4 +1,4 @@
-using Server.Logging;
+﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -46,11 +46,12 @@ public sealed class BotWillModule : BotModule
         // comes first because it decides whether this shard is full of miners or full of duellists, and it is
         // the cheapest possible place to notice that it was set to something absurd.
         logger.Information(
-            "Will ready: a point of skill is worth {Gold} gold, dying costs {Death} minutes; work is reviewed every {Review}ms, held at least {Dwell}ms, and replaced only above ×{Margin} against ×{Inertia} for the work in hand; a crowd bites {Crowd}, repetition {Repeat}",
+            "Will ready: a point of skill is worth {Gold} gold, dying costs {Death} minutes; work is reviewed every {Review}ms, held for what it reckons it needs between {Dwell}ms and {DwellCap}ms, and replaced only above ×{Margin} against ×{Inertia} for the work in hand; a crowd bites {Crowd}, repetition {Repeat}",
             BotYield.GoldPerSkillPoint,
             BotYield.DeathMinutes,
             BotWill.ReviewMs,
             BotWill.DwellMs,
+            BotWill.DwellCapMs,
             BotWill.SwitchMargin,
             BotAppraisal.Inertia,
             BotAppraisal.CrowdBite,

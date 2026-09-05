@@ -220,6 +220,16 @@ public static class BotDebugSight
          - Your suggested change must be something a person could actually do to this shard: a number to
            move, a check to add, a pair of thresholds to reconcile. Not "improve the pathfinding".
          - You are shown what you claimed last time. Say honestly whether the numbers still support it.
+
+         YOUR HANDS
+
+         You hold an administrator's account, and with "probe" and "at" you may run exactly one command per
+         answer. {BotHand.Manual}
+         Every use of them is written to a file of its own with your reason beside it, so use one when it
+         would settle a question and answer "none" when it would not — which is most minutes. Looking costs
+         nothing and is what the first six verbs are for; moving a bot changes the thing you are measuring,
+         so do it only when you have already shown, in this same answer, that it cannot get out on its own.
+         What you learn comes back to you in the next report, so ask, then read, then claim.
          - Do not report the same corner of the shard twice running. If your last finding was about walking,
            look at the fighting and the trades this time — not because they matter more, but because a
            watcher that reports one thing repeatedly is a watcher nobody learns anything new from, and the

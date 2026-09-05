@@ -617,13 +617,53 @@ public static class BotPopulation
         var pool = Names;
         var index = _named++;
 
-        return index < pool.Length ? pool[index] : $"{pool[index % pool.Length]} {index / pool.Length + 1}";
+        if (index < pool.Length)
+        {
+            return pool[index];
+        }
+
+        // <b>Past the end of the pool, a house name and never a number.</b> "Doran 2" is not a name, it is a
+        // collision handled in public: it reads as a second copy of somebody rather than as a person, and
+        // every line of the log, every stall report and every remark the population makes about itself then
+        // carries the seam. A surname costs nothing, keeps the given name — which is what makes a bot
+        // recognisable across a session — and gives twenty-two rounds of the pool before anything repeats.
+        //
+        // The name is the only thing about a bot that survives a restart, and what a bot has learned is
+        // filed under it, so widening the pool starts whoever was past the end of the old one over again.
+        // That is the price of the change and it is paid once.
+        var round = index / pool.Length - 1;
+
+        return $"{pool[index % pool.Length]} {Houses[round % Houses.Length]}";
     }
 
+    /// <summary>
+    /// Given names, in the order they are handed out. Wide enough that a population of the size this shard
+    /// actually runs never reaches <see cref="Houses"/> at all.
+    ///
+    /// <para>
+    /// Four names are deliberately absent — Aldric, Godric, Cedric and Baldric — because <c>BotMinds</c>
+    /// renames the bots it gives a mind to, and a pool able to hand out one of those would put two bots
+    /// answering to the same name in the same log.
+    /// </para>
+    /// </summary>
     private static readonly string[] Names =
     [
         "Alden", "Bryn", "Calla", "Doran", "Edda", "Faron", "Gerda", "Hale",
         "Ilsa", "Joss", "Kerrin", "Lysa", "Merrick", "Nessa", "Orin", "Perri",
-        "Quill", "Rowan", "Sable", "Torvin", "Ulla", "Vance", "Wynn", "Yarrow"
+        "Quill", "Rowan", "Sable", "Torvin", "Ulla", "Vance", "Wynn", "Yarrow",
+        "Aric", "Brannoc", "Corwin", "Delwyn", "Emrys", "Fenna", "Garrow", "Hollis",
+        "Isolde", "Jarek", "Kelda", "Lorcan", "Maeve", "Neriah", "Oswin", "Pell",
+        "Quenna", "Ronan", "Selwyn", "Talia", "Ulric", "Vesna", "Wulfric", "Ysolt",
+        "Bertram", "Cassia", "Dain", "Elspeth", "Fendrel", "Gwendra", "Harlan", "Ivo",
+        "Jorunn", "Kestrel", "Leofric", "Marek", "Nyla", "Otho", "Piers", "Rhiannon"
+    ];
+
+    /// <summary>Houses, for when the given names run out. See <see cref="Christen"/>.</summary>
+    private static readonly string[] Houses =
+    [
+        "Ashdown", "Blackbriar", "Coldwell", "Duskmere", "Eastmarch", "Fairholt",
+        "Greywood", "Hartley", "Ironvale", "Larkspur", "Marlow", "Northgate",
+        "Oakhurst", "Pinewood", "Quarrytop", "Ravenscar", "Stonebridge", "Thornwood",
+        "Umberly", "Vinemoor", "Westford", "Yewdale"
     ];
 }

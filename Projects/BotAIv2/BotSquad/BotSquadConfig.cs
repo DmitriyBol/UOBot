@@ -30,6 +30,15 @@ public sealed class BotSquadSettings
     /// <summary>The hard ceiling on one fight.</summary>
     public int? FightCapMs { get; set; }
 
+    /// <summary>How long a company stands on something it cannot hit before giving it up. See BotSquad.BlindMs.</summary>
+    public int? BlindMs { get; set; }
+
+    /// <summary>How long a company goes without a fight before letting go of members idle in it.</summary>
+    public int? RestCapMs { get; set; }
+
+    /// <summary>How long a company with nothing to fight lasts at all.</summary>
+    public int? IdleCapMs { get; set; }
+
     /// <summary>How many bots make a knot while sweeping.</summary>
     public int? KnotSize { get; set; }
 
@@ -71,6 +80,9 @@ public static class BotSquadConfig
         BotSquad.SlowestBlowMs = settings.SlowestBlowMs ?? BotSquad.SlowestBlowMs;
         BotSquad.Blows = settings.Blows ?? BotSquad.Blows;
         BotSquad.FightCapMs = settings.FightCapMs ?? BotSquad.FightCapMs;
+        BotSquad.BlindMs = settings.BlindMs ?? BotSquad.BlindMs;
+        BotSquad.RestCapMs = settings.RestCapMs ?? BotSquad.RestCapMs;
+        BotSquad.IdleCapMs = settings.IdleCapMs ?? BotSquad.IdleCapMs;
         BotScatter.KnotSize = settings.KnotSize ?? BotScatter.KnotSize;
         BotScatter.Spread = settings.Spread ?? BotScatter.Spread;
         BotSpoils.Earshot = settings.Earshot ?? BotSpoils.Earshot;

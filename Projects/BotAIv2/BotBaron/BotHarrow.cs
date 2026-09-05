@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
 using Server.Mobiles;
@@ -116,6 +117,12 @@ public sealed class BotHarrow : BotDeed
     /// other is the floor, and they are different statements even when they happen to agree.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// <b>No longer the floor under a march, by Patrick's protocol of 05.09.2026.</b> A muster that has
+    /// not raised its full company when the clock runs out is dropped and rested, not set out with. Kept
+    /// because a floor is the kind of number this file may want again, and deleting it would take the
+    /// argument above with it.
+    /// </summary>
     public static int Least { get; set; } = 3;
 
     /// <summary>
@@ -127,6 +134,60 @@ public sealed class BotHarrow : BotDeed
     /// </para>
     /// </summary>
     public static int MusterMs { get; set; } = 300000;
+
+    /// <summary>
+    /// How long a Baron leaves the whole idea alone after a muster that came to nothing. Five minutes.
+    ///
+    /// <para>
+    /// <b>Patrick's order of 05.09.2026, and what it is against is a Baron who never stops asking.</b> A
+    /// muster levies bots — nobody volunteers, <see cref="Levy"/> takes them — so a call that fails and is
+    /// posted again on the next beat is a standing tax on the population's working time. Three musters in
+    /// four minutes called up 1837 bots and marched none of them.
+    /// </para>
+    ///
+    /// <para>
+    /// Kept against the Baron rather than against the square, because the order was "he leaves the idea and
+    /// comes back to it in ten minutes". A rest per square would let him work through a list of dire ground
+    /// one square at a time and never rest at all, which is the same tax under a longer name.
+    /// </para>
+    /// </summary>
+    public static int RestMs { get; set; } = 600000;
+
+    /// <summary>Musters given up on, after which the Baron stands off the whole idea for <see cref="RestMs"/>.</summary>
+    public static long Rested { get; private set; }
+
+    private static readonly Dictionary<Serial, long> _resting = new();
+
+    /// <summary>Whether this Baron is standing off the idea of a harrowing altogether.</summary>
+    public static bool Resting(Mobile body)
+    {
+        if (body == null || !_resting.TryGetValue(body.Serial, out var until))
+        {
+            return false;
+        }
+
+        // By subtraction against a stamp that was itself a real tick, never against a nought default.
+        if (Core.TickCount - until < 0)
+        {
+            return true;
+        }
+
+        _resting.Remove(body.Serial);
+
+        return false;
+    }
+
+    /// <summary>Stands this Baron off the idea for <see cref="RestMs"/>.</summary>
+    public static void Rest(Mobile body)
+    {
+        if (body == null)
+        {
+            return;
+        }
+
+        _resting[body.Serial] = Core.TickCount + RestMs;
+        Rested++;
+    }
 
     /// <summary>
     /// Where the company forms up, or nought for the population's own home.
@@ -168,11 +229,23 @@ public sealed class BotHarrow : BotDeed
     /// </para>
     ///
     /// <para>
-    /// The five-minute call is still the backstop: when it runs out he marches with whoever is actually
-    /// standing there, which is the old rule applied to bodies instead of to names.
+    /// <b>The five-minute call is no longer a backstop that marches short.</b> Patrick's protocol of
+    /// 05.09.2026: the company is the company, and a call that cannot raise it is dropped and rested. See
+    /// RestMs.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Widened from eight to twenty-four on Patrick's order of 05.09.2026, and eight was not a zone, it
+    /// was a doorstep.</b> A company here can be twenty-one bodies — BotQuad.Levy raises the ask every time
+    /// a company is lost — and twenty-one bots do not fit in a circle eight tiles across without standing
+    /// on each other; the squad's own formation then places them where its stations are, which is further
+    /// out than that. So the count of who had turned up kept losing people who were standing perfectly well
+    /// at the muster: the recorded tally read "11 of 21 standing in it, 21 in the company" at 02:17, and
+    /// the eight tiles were the whole of the difference. Twenty-four is three squad stations deep and still
+    /// plainly one gathering rather than a district.
     /// </para>
     /// </summary>
-    public static int Assembly { get; set; } = 8;
+    public static int Assembly { get; set; } = 24;
 
     /// <summary>Corpses that finish the errand.</summary>
     public static int Quota { get; set; } = 20;
@@ -319,6 +392,14 @@ public sealed class BotHarrow : BotDeed
 
     private long _musteredTick;
 
+    /// <summary>Whether he has reached the muster point. The clock does not start until he has.</summary>
+    private bool _atMuster;
+
+    /// <summary>The last muster tally written down, so that only changes are said. See Advance.</summary>
+    private int _said0 = -1;
+
+    private int _said1 = -1;
+
     private Point3D _muster;
 
     /// <summary>When the island was last swept for bodies to call up. See <see cref="SweepMs"/>.</summary>
@@ -333,7 +414,7 @@ public sealed class BotHarrow : BotDeed
     }
 
     public static string Describe() =>
-        $"{Musters} musters called and {Called} bots called up, {Marches} of them marched, {Undermanned} could not raise {Least} bodies in {MusterMs / 60000} minutes of calling, {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them";
+        $"{Musters} musters called and {Called} bots called up, {Marches} of them marched, {Undermanned} could not raise the company asked for in {MusterMs / 60000} minutes of calling ({Rested} times the idea was then left alone for {RestMs / 60000} minutes), {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them";
 
     public override string Kind => Trade;
 
@@ -365,7 +446,7 @@ public sealed class BotHarrow : BotDeed
 
     public override string Stage =>
         !_marching
-            ? $"calling for volunteers to harrow ({_square.X}, {_square.Y}), where {_dead} have died: {_called} so far"
+            ? $"calling for volunteers to harrow ({_square.X}, {_square.Y}), where {_dead} have died: {_here} of {Wanted} gathered, {_called} called"
             : !_standing
                 ? $"marching {_called} of us on ({_square.X}, {_square.Y}), where {_dead} have died"
                 : $"harrowing ({_square.X}, {_square.Y}) with {_called} of us, {_kills} of {Quota} down";
@@ -441,7 +522,6 @@ public sealed class BotHarrow : BotDeed
         if (!_mustering)
         {
             _mustering = true;
-            _musteredTick = now;
 
             _muster = Rally(body);
 
@@ -468,19 +548,84 @@ public sealed class BotHarrow : BotDeed
         _called = squad.Count;
         _here = Gathered(squad);
 
-        var full = _here >= _wanted;
-
-        if (!full && now - _musteredTick < MusterMs)
+        // <b>The five minutes begin when he is standing in the square, not when he thought of it.</b>
+        // Patrick's protocol of 05.09.2026: declare, walk, and only then start counting. A clock started at
+        // the declaration is spent on the road — the muster point can be most of a town away — so a call
+        // that looked like five minutes of asking was however much of it was left when he arrived.
+        if (!body.InRange(_muster, Station))
         {
-            // Stand in the square while the call is open. A walk rather than Work, so that the fifteen-minute
-            // jam detector can see this errand doing something — and so that a person watching sees a Baron
-            // waiting in a square rather than a Baron frozen wherever the offer found him.
-            return BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"calling for volunteers at ({_muster.X}, {_muster.Y})");
+            return BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"to the muster at ({_muster.X}, {_muster.Y})");
         }
 
-        if (_here < Least)
+        if (!_atMuster)
+        {
+            _atMuster = true;
+            _musteredTick = now;
+
+            logger.Information(
+                "{Name} has reached the muster at ({MX}, {MY}) and is calling for {Wanted} to harrow ({X}, {Y}), where {Dead} have died",
+                body.Name,
+                _muster.X,
+                _muster.Y,
+                _wanted,
+                _square.X,
+                _square.Y,
+                _dead
+            );
+        }
+
+        // <b>Every change in the tally is written down, because a count read off a screen is not evidence.</b>
+        // Patrick watched a muster read 1 of 21, then 6, then 24, then 1 again on 05.09.2026, and none of
+        // those numbers could be got out of the log: Gathered counts company members inside Assembly tiles
+        // of the point, squad.Ceiling is set to the same _wanted every beat, and BotSquads.Join refuses
+        // anybody over it — so twenty-four of twenty-one cannot come from this pair. Which means the screen
+        // is showing some other pair, and the way to find out which is to have this one on the record with
+        // all three populations named apart: who is standing here, who is in the company at all, and what
+        // was asked for. Said on change only, so a five-minute muster is a handful of lines.
+        if (_here != _said0 || _called != _said1)
+        {
+            _said0 = _here;
+            _said1 = _called;
+
+            logger.Information(
+                "{Name}'s muster at ({MX}, {MY}): {Here} of {Wanted} standing in it, {Called} in the company, ceiling {Ceiling}, {Left}s left",
+                body.Name,
+                _muster.X,
+                _muster.Y,
+                _here,
+                _wanted,
+                _called,
+                squad.Ceiling,
+                Math.Max(0, (MusterMs - (now - _musteredTick)) / 1000)
+            );
+        }
+
+        // <b>The instant the company is whole, it marches.</b> No waiting out the clock with a full company,
+        // which is what the early exit has always been for; the change is what happens when the clock runs
+        // out instead. See below.
+        if (_here < _wanted && now - _musteredTick < MusterMs)
+        {
+            // Waiting is not walking. A walk to the tile the bot is already standing on never shortens, so
+            // the walker gave the journey up after about two minutes and the errand failed with "it got no
+            // nearer than 1 tiles" — 3 musters, 1837 bots called up, 0 marched, at 01:50 on 05.09.2026. The
+            // jam detector is safe on Work here: BotWill.LabourMs is fifteen minutes and this cannot outlive
+            // MusterMs.
+            return BotDoing.Work($"calling at ({_muster.X}, {_muster.Y}): {_here} of {_wanted} gathered");
+        }
+
+        // <b>Short at the bell means no march at all, and that is a change of rule made on Patrick's order.</b>
+        // This used to set out with whoever came down to Least — three — on the reasoning that a Baron who
+        // waits for a coincidence never leaves town. The order of 05.09.2026 is the other way about: the
+        // company is the company, and a call that cannot raise it is dropped for RestMs rather than answered
+        // with an escort. What made the old reasoning necessary was a muster that could not survive its own
+        // clock; with the clock fixed, five real minutes of levying is a fair test of whether the bodies
+        // exist, and marching six-strong work with three is how a harrowing becomes three more deaths on the
+        // square that is already on the board for having killed people.
+        if (_here < _wanted)
         {
             Undermanned++;
+
+            Rest(body);
 
             // Let go rather than held. A Baron standing about with one volunteer is two bots not working, and
             // the ground is still on the board for the next review.
@@ -489,7 +634,8 @@ public sealed class BotHarrow : BotDeed
             _squad = null;
 
             return BotDoing.Failed(
-                $"only {_here} of the {Least} were standing in the square for ({_square.X}, {_square.Y}), of {_called} called"
+                $"only {_here} of the {_wanted} were standing in the square for ({_square.X}, {_square.Y}) after"
+                + $" {MusterMs / 60000} minutes, of {_called} called"
             );
         }
 
@@ -504,8 +650,13 @@ public sealed class BotHarrow : BotDeed
 
             if (now - _musteredTick < MusterMs)
             {
-                return BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"calling for grandmasters at ({_muster.X}, {_muster.Y})");
+                // Waiting, not walking — the same correction as the muster above, for the same reason.
+                return body.InRange(_muster, Station)
+                    ? BotDoing.Work($"calling for grandmasters at ({_muster.X}, {_muster.Y}): {ready} of {Grandmasters} fit")
+                    : BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"calling for grandmasters at ({_muster.X}, {_muster.Y})");
             }
+
+            Rest(body);
 
             BotSquads.Leave(member);
 
@@ -785,6 +936,56 @@ public sealed class BotHarrow : BotDeed
     /// answered, because that is the thing the ground will be measured against.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// How many bots alive on this shard could walk on damned ground, asked of the whole population.
+    ///
+    /// <para>
+    /// <b>The test existed and was applied after the company had been raised, which is the wrong end of
+    /// it.</b> A square at the bleakest reading may be walked only by <see cref="Grandmasters"/> of them —
+    /// and on 05.09.2026 the Baron muster</see>ed twenty-one bots against (855, 1695) at -1.00, failed that
+    /// test because a population four hours old has no grandmasters at all, went on calling because the
+    /// clock had not run out, and had the company taken apart under him by its own beat for having nowhere
+    /// to be. The recorded tally reads 2 of 21, then 21 of 21, then 2, then 21, once a second: nineteen bots
+    /// pulled off their work and handed back every second for five minutes.
+    /// </para>
+    ///
+    /// <para>
+    /// So it is asked before anybody is called. The same rule <c>BotArmourer</c> states about the board — a
+    /// want nobody can fill is worse than an empty one — said about a company nobody can raise. Counted over
+    /// the population rather than over a squad, which is the only honest way to ask "could this island field
+    /// one at all".
+    /// </para>
+    /// </summary>
+    public static int Musterable()
+    {
+        var bots = BotPopulation.Bots;
+        var ready = 0;
+
+        for (var i = 0; i < bots.Count; i++)
+        {
+            var body = bots[i];
+
+            if (body is not { Deleted: false, Alive: true })
+            {
+                continue;
+            }
+
+            if (!Master(body) || BotThreat.Power(body) < Might)
+            {
+                continue;
+            }
+
+            if (BotGrimoire.Book(body) != null && Herbs(body) < Reagents)
+            {
+                continue;
+            }
+
+            ready++;
+        }
+
+        return ready;
+    }
+
     private static bool Fit(BotSquad squad, out int ready, out int unarmed)
     {
         ready = 0;
@@ -1115,6 +1316,8 @@ public sealed class BotHarrow : BotDeed
     {
         Marches = 0;
         Musters = 0;
+        Rested = 0;
+        _resting.Clear();
         Called = 0;
         Undermanned = 0;
         Emptied = 0;

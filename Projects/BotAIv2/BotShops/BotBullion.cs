@@ -1,3 +1,4 @@
+﻿using System;
 using Server.Items;
 using Server.Logging;
 
@@ -66,8 +67,11 @@ public sealed class BotBullion : IBotProposer
     /// <summary>How many ingots are enough to be worth working with. Below this it is worth ordering more.</summary>
     public static int Enough { get; set; } = 20;
 
-    /// <summary>How many are ordered at a time.</summary>
+    /// <summary>How many are ordered at a time when the purse allows it.</summary>
     public static int Batch { get; set; } = 20;
+
+    /// <summary>The fewest worth putting on the board at all. See the note where it is used.</summary>
+    public static int Least { get; set; } = 6;
 
     /// <summary>What an ingot is offered at when nothing on the shard has priced one.</summary>
     public static int Guess { get; set; } = 8;
@@ -81,6 +85,9 @@ public sealed class BotBullion : IBotProposer
     public static long Asked { get; private set; }
 
     public static long Poor { get; private set; }
+
+    /// <summary>Asks turned away for coming again inside the minute. See BotNeeds.</summary>
+    public static long Soon { get; private set; }
 
     public static long Stocked { get; private set; }
 
@@ -126,6 +133,15 @@ public sealed class BotBullion : IBotProposer
 
         Asked++;
 
+        // Once a minute per bot, on the same clock the rest of the needs keep. See BotNeeds. Counted, or
+        // the gates below stop adding up to Asked.
+        if (!BotNeeds.Due(body, "metal"))
+        {
+            Soon++;
+
+            return null;
+        }
+
         // <b>What it is short of, not what the file says.</b> A smith with eighty Blacksmithy works bronze,
         // and ordering iron while forty bronze ingots sat in the pack was a bot buying what it did not need
         // with money it wanted for what it did. Best answers with the dearest metal the bot can both use and
@@ -164,7 +180,16 @@ public sealed class BotBullion : IBotProposer
         // into the account — so asking the pack alone asks a question nobody is answering. It mattered from
         // the moment the purse stopped being emptied into the bank on every trip to a counter: a bot keeps a
         // hundred on it by design now, so a pack-only test could never clear any bar worth having.
-        if (BotYield.Wealth(body) < Batch * offer + Reserve)
+        // <b>As many as the purse will carry, down to a floor, rather than a batch of twenty or nothing.</b>
+        // A fixed batch against a fixed reserve is a multiplier with no floor, and a multiplier with no floor
+        // is a veto: at 12:01 on 04.09.2026 this read "157 cannot afford to buy it" out of 288, while the
+        // same smiths could have paid for six ingots and gone to work. The twin of this correction is in
+        // BotStores, on the trades that eat feather, wood and hide.
+        var wealth = BotYield.Wealth(body);
+        var afford = offer <= 0 ? 0 : (wealth - Reserve) / offer;
+        var units = Math.Min(Batch, afford);
+
+        if (units < Least)
         {
             Poor++;
 
@@ -174,7 +199,7 @@ public sealed class BotBullion : IBotProposer
         Ordered++;
         Once(body);
 
-        return new BotOrder(map, body.Location, bot, kind, offer, Batch);
+        return BotOrder.For(map, body.Location, bot, kind, offer, units);
     }
 
     /// <summary>Whether this class carries a hammer, which is the only definition of a smith worth having.</summary>
@@ -211,13 +236,14 @@ public sealed class BotBullion : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "no crafter has been asked about metal"
-            : $"{Asked} asked: {Ordered} ordered metal, {Standing} already have an order out, {Stocked} have {Enough} ingots already, {Shelved} have their own out on a stall, {Poor} cannot afford to buy it";
+            : $"{Asked} asked: {Ordered} ordered metal, {Standing} already have an order out, {Stocked} have {Enough} ingots already, {Shelved} have their own out on a stall, {Poor} cannot afford to buy it, {Soon} asked again inside the minute";
 
     public static void Forget()
     {
         _said = false;
         Asked = 0;
         Poor = 0;
+        Soon = 0;
         Stocked = 0;
         Shelved = 0;
         Standing = 0;

@@ -82,6 +82,18 @@ public sealed class BotLesson : BotDeed
 
     public override bool Alongside => true;
 
+    /// <summary>
+    /// Standing in one place is what this work is — <b>once the field is open</b>. See <see cref="BotDeed.Still"/>.
+    ///
+    /// <para>
+    /// A captain on its way to the ground it means to teach on is walking like anybody else, and a walk that
+    /// stops is the thing the stall watch exists to catch. Only from the moment the field is open does
+    /// standing still become the work rather than a symptom, and from that moment the roll's own clock —
+    /// <c>BotSchool.GatherMs</c>, then <c>LessonMs</c> — is what ends it.
+    /// </para>
+    /// </summary>
+    public override bool Still => _opened;
+
     public override string Stage =>
         !_teaching
             ? $"calling a class at ({BotSchool.Ground.X}, {BotSchool.Ground.Y}), {BotSchool.Students.Count} come so far"

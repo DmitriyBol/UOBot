@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
@@ -87,6 +87,12 @@ public static class BotWalk
     /// <summary>A running step, matching <c>movement.delay.runFoot</c>.</summary>
     public const int RunStepMs = 200;
 
+    /// <summary>A walking step on a mount, matching <c>movement.delay.walkMount</c>.</summary>
+    public const int WalkMountStepMs = 200;
+
+    /// <summary>A running step on a mount, matching <c>movement.delay.runMount</c>.</summary>
+    public const int RunMountStepMs = 100;
+
     /// <summary>How far away a door can be and still be the thing blocking this step.</summary>
     private const int DoorReach = 3;
 
@@ -146,6 +152,24 @@ public static class BotWalk
 
     /// <summary>How long the caller should wait before asking again.</summary>
     public static int StepDelayMs(bool run) => run ? RunStepMs : WalkStepMs;
+
+    /// <summary>
+    /// The same, for a body that may be on a horse.
+    ///
+    /// <para>
+    /// <b>Riding looked like hanging because the rider was being stepped at a footman's pace.</b> The engine
+    /// has four delays and this file knew two of them: <c>movement.delay.walkMount</c> is 200 against a foot
+    /// walk's 400, and <c>movement.delay.runMount</c> is 100 against a foot run's 200 — see
+    /// <c>Server.Movement.CalcMoves</c>, which is where <c>Mobile.ComputeMovementSpeed</c> reads them. So a
+    /// mounted bot moved at half the speed the engine allows it, while the client drew a horse animating at
+    /// the speed a horse animates: a gallop, then a wait, then a gallop. Nothing was stuck; the cadence was
+    /// simply the wrong one, and the stutter is what that looks like from outside.
+    /// </para>
+    /// </summary>
+    public static int StepDelayMs(Mobile bot, bool run) =>
+        bot?.Mounted == true
+            ? run ? RunMountStepMs : WalkMountStepMs
+            : run ? RunStepMs : WalkStepMs;
 
     /// <summary>
     /// One attempt at getting closer. Plans if it must, steps if it can, and says what happened.

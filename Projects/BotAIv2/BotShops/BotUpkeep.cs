@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Server.Items;
 using Server.Logging;
 
@@ -67,6 +67,30 @@ public sealed class BotUpkeep : IBotProposer
     /// <summary>Bots that already had something on the way. See the note in <see cref="Propose"/>.</summary>
     public static long Waiting { get; private set; }
 
+    /// <summary>Asks turned away for coming again inside the minute. See BotNeeds.</summary>
+    public static long Soon { get; private set; }
+
+    /// <summary>
+    /// The most worn thing anybody has been seen wearing, as a percentage of its life, and what it was.
+    ///
+    /// <para>
+    /// <b>A nought beside an unset maximum is unreadable, and this counter has been printing one for
+    /// weeks.</b> "60203 asked, 60203 are carrying nothing worn out" over four hours says the gate never
+    /// opened; it does not say whether that is because nothing on this shard ever wears — a weapon that is
+    /// re-issued, a mender that repairs, a layer nobody is reading — or because gear wears perfectly well
+    /// and never reaches a third of its life inside one session. Those are different faults with different
+    /// repairs, and the shard has spent a fortnight unable to tell them apart. The same correction
+    /// BotShopper.Richest and BotStable.Richest were given.
+    /// </para>
+    /// </summary>
+    public static double Worst { get; private set; } = 1.0;
+
+    /// <summary>What that thing was, so the answer names something rather than a number.</summary>
+    public static string WorstKind { get; private set; }
+
+    /// <summary>Pieces of gear looked at. Zero here means nothing is being read at all, which is its own fault.</summary>
+    public static long Looked { get; private set; }
+
     public string Name => "Upkeep";
 
     public BotStanding Rung => BotStanding.Free;
@@ -82,6 +106,15 @@ public sealed class BotUpkeep : IBotProposer
         }
 
         Asked++;
+
+        // Once a minute per bot, on the same clock the rest of the needs keep. See BotNeeds. Counted, or
+        // the gates below stop adding up to Asked.
+        if (!BotNeeds.Due(body, "gear"))
+        {
+            Soon++;
+
+            return null;
+        }
 
         // <b>Goods already made and paid for are not ordered again, and they are not fetched here either.</b>
         // Collecting used to be this proposer's first branch, on the sound reasoning that goods a bot has paid
@@ -129,7 +162,7 @@ public sealed class BotUpkeep : IBotProposer
         Raised++;
         Once(body, tired);
 
-        return new BotOrder(map, body.Location, bot, kind, offer);
+        return BotOrder.For(map, body.Location, bot, kind, offer);
     }
 
     /// <summary>
@@ -159,7 +192,17 @@ public sealed class BotUpkeep : IBotProposer
                 continue;
             }
 
+            Looked++;
+
             var left = now / (double)max;
+
+            // Recorded before the threshold is applied, which is the whole point of it: what the gate
+            // refuses is exactly what nobody could see.
+            if (left < Worst)
+            {
+                Worst = left;
+                WorstKind = $"{item.GetType().Name} at {now} of {max}";
+            }
 
             if (left > Worn || left >= least)
             {
@@ -206,7 +249,8 @@ public sealed class BotUpkeep : IBotProposer
         Asked == 0
             ? "nobody has been asked about their gear"
             : $"{Asked} asked: {Raised} ordered a replacement, {Waiting} already had one on the way, {Standing} already have one on order, "
-              + $"{Broke} could not afford one, {Sound} are carrying nothing worn out";
+              + $"{Broke} could not afford one, {Soon} asked again inside the minute, {Sound} are carrying nothing worn out (of {Looked} pieces read, "
+              + $"the most worn was {WorstKind ?? "nothing at all"} — {(int)(Worst * 100)}% of its life left, against a bar of {(int)(Worn * 100)}%)";
 
     public static void Forget()
     {
@@ -217,5 +261,9 @@ public sealed class BotUpkeep : IBotProposer
         Standing = 0;
         Raised = 0;
         Waiting = 0;
+        Soon = 0;
+        Worst = 1.0;
+        WorstKind = null;
+        Looked = 0;
     }
 }

@@ -491,6 +491,8 @@ public sealed class BotSquad
         _focusLowest = focus.Hits;
         _focusProgressTick = Core.TickCount;
         _focusSinceTick = Core.TickCount;
+        _ableTick = Core.TickCount;
+        _closedTick = Core.TickCount;
 
         logger.Information(
             "Squad {Id} of {Count} is dealing with {What} ({Power:F0})",
@@ -520,15 +522,24 @@ public sealed class BotSquad
         // answer to a question nobody was asking looked exactly like the failure it was written to detect.
         if (hopeless)
         {
-            var reach = InReach(out var nearest);
+            var reach = InReach(out var nearest, out var blind, out var refused, out var unsteady);
 
+            // <b>"In reach" meant a distance, and a distance is not the question the engine answers.</b>
+            // Every swing goes through <c>InLOS</c>, so a blade on the tile that touches a wraith through a
+            // crypt wall counted as in reach, in the fight, and doing nothing — and this line said so in the
+            // most reassuring words available. The two ways a bot standing on the right tile still cannot
+            // hurt anything are counted apart, exactly as BotSlay counts them, because a broken line is
+            // cured by another tile and a refusal is not.
             logger.Information(
-                "Squad {Id} broke off from {What}: {Why} — {Reach} of {Count} in reach, nearest {Nearest} tiles off, {Tries} tries at standing right",
+                "Squad {Id} broke off from {What}: {Why} — {Reach} of {Count} able to strike ({Blind} with no line to it, {Refused} refused by the engine, {Unsteady} moved too recently to shoot), nearest {Nearest} tiles off, {Tries} tries at standing right",
                 Id,
                 Focus.Name,
                 why,
                 reach,
                 Count,
+                blind,
+                refused,
+                unsteady,
                 nearest,
                 Attempt
             );
@@ -552,36 +563,169 @@ public sealed class BotSquad
         Stance = BotSquadStance.Marching;
     }
 
-    /// <summary>How many members are standing where they could touch the focus, and how far off the nearest is.</summary>
-    private int InReach(out int nearest)
+    /// <summary>
+    /// What stops this member landing a blow on the focus from exactly where it stands, if anything.
+    ///
+    /// <para>
+    /// <b>One rule, asked from the three places that were each answering it their own way.</b> The press set
+    /// a combatant on anybody inside twelve tiles, the break-off line counted anybody inside its own ring,
+    /// and the stationing asked neither — so a company could report itself fully engaged while not one arrow
+    /// left it. Every one of the four refusals below is the engine's, taken from the engine, and each has a
+    /// different cure: distance wants a walk, a broken line wants another tile, a refusal wants nothing at
+    /// all, and stillness wants to be left alone.
+    /// </para>
+    /// </summary>
+    private enum BotBlow
     {
-        nearest = int.MaxValue;
+        /// <summary>Not near enough for its own rank's ring.</summary>
+        Far,
+
+        /// <summary>Near enough, and no line to it. See BotFormation.Sighted — the engine drops the swing silently.</summary>
+        Blind,
+
+        /// <summary>Near enough and in plain sight, and the engine refuses the blow anyway.</summary>
+        Refused,
+
+        /// <summary>
+        /// Near enough, in sight, holding a bow — and it has moved too recently to loose an arrow.
+        ///
+        /// <para>
+        /// <b>This is the one the company never knew about, and it is the answer to a whole evening.</b>
+        /// <c>BaseRanged.OnSwing</c> refuses outright unless the archer has stood still for a second on this
+        /// era, and the formation re-stations everybody every <see cref="RestationMs"/> whenever the thing
+        /// being fought drifts two tiles — which a creature in a melee does constantly. So the shooters were
+        /// walked back and forth over one tile for the whole fight and never once fired, while every measure
+        /// this file had said they were in the fight. The lone hunter has known the number since 25.08.2026
+        /// and says so in as many words: "a kite that does not know this number is a bot that moves for ever
+        /// and never fires". <c>BotSlay.StillMs</c> is that number, and it is read from there rather than
+        /// copied, because two copies of an engine constant is how they come apart.
+        /// </para>
+        /// </summary>
+        Unsteady,
+
+        /// <summary>Swinging.</summary>
+        Able
+    }
+
+    /// <summary>
+    /// How far this member can actually hurt the focus from — which is not the same question as where the
+    /// formation means it to stand, and answering the first with the second put the archers on a treadmill.
+    ///
+    /// <para>
+    /// <b>A ring is a place to walk to; a reach is what the engine will let a blow cross.</b> The shooters'
+    /// ring is five tiles and a bow carries ten, so an archer that was hitting the thing perfectly well from
+    /// seven was judged out of the fight, marched two tiles back in, and lost its shot to the second of
+    /// stillness <c>BaseRanged.OnSwing</c> demands — and then the creature drifted and it happened again.
+    /// Measured on the first window that could see it: 96 beats of "moved too recently to fire" in sixteen
+    /// minutes, against six of every other refusal put together.
+    /// </para>
+    ///
+    /// <para>
+    /// The ring stays the floor, because a blade's reach is one tile and its ring is one tile, and nothing
+    /// should be able to make a rank <em>narrower</em> than the formation drew it. Casters are given the
+    /// spell range rather than the stick in their hands, which is the thing they are actually fighting with;
+    /// asked of the role rather than of the pack, because <c>BotStrike.Can</c> walks the whole backpack and
+    /// this is asked three times a second for every member of every company.
+    /// </para>
+    /// </summary>
+    private static int Reach(IBotSquadMember member, Mobile body)
+    {
+        var role = BotFormation.RoleOf(member);
+        var arm = body.Weapon?.MaxRange ?? 1;
+
+        if (role is BotRole.Caster or BotRole.Medic)
+        {
+            arm = Math.Max(arm, BotStrike.Range);
+        }
+
+        return Math.Max(BotFormation.PressRingFor(role), arm);
+    }
+
+    /// <summary>The verdict above, with how far off this member is on the way out.</summary>
+    private BotBlow Strike(IBotSquadMember member, out int away)
+    {
+        away = int.MaxValue;
 
         var focus = Focus;
+        var body = member?.Self;
+
+        if (body is not { Deleted: false, Alive: true } || focus is not { Deleted: false } || body.Map != focus.Map)
+        {
+            return BotBlow.Far;
+        }
+
+        away = Math.Max(
+            Math.Abs(body.Location.X - focus.Location.X),
+            Math.Abs(body.Location.Y - focus.Location.Y)
+        );
+
+        if (away > Reach(member, body))
+        {
+            return BotBlow.Far;
+        }
+
+        if (!body.InLOS(focus))
+        {
+            return BotBlow.Blind;
+        }
+
+        if (!body.CanBeHarmful(focus, false))
+        {
+            return BotBlow.Refused;
+        }
+
+        if (body.Weapon is BaseRanged && Core.TickCount - body.LastMoveTime < BotSlay.StillMs)
+        {
+            return BotBlow.Unsteady;
+        }
+
+        return BotBlow.Able;
+    }
+
+    /// <summary>
+    /// How many members could actually land a blow on the focus, how far off the nearest is, and — of the
+    /// ones near enough — how many are stopped by a broken line, by the engine's refusal, and by having
+    /// moved too recently to shoot.
+    /// </summary>
+    private int InReach(out int nearest, out int blind, out int refused, out int unsteady)
+    {
+        nearest = int.MaxValue;
+        blind = 0;
+        refused = 0;
+        unsteady = 0;
+
         var reach = 0;
 
         for (var i = 0; i < _members.Count; i++)
         {
-            var body = _members[i].Self;
-
-            if (body is not { Deleted: false, Alive: true } || focus == null || body.Map != focus.Map)
-            {
-                continue;
-            }
-
-            var away = Math.Max(
-                Math.Abs(body.Location.X - focus.Location.X),
-                Math.Abs(body.Location.Y - focus.Location.Y)
-            );
+            var verdict = Strike(_members[i], out var away);
 
             if (away < nearest)
             {
                 nearest = away;
             }
 
-            if (away <= BotFormation.PressRingFor(BotFormation.RoleOf(_members[i])))
+            switch (verdict)
             {
-                reach++;
+                case BotBlow.Blind:
+                    blind++;
+
+                    break;
+
+                case BotBlow.Refused:
+                    refused++;
+
+                    break;
+
+                case BotBlow.Unsteady:
+                    unsteady++;
+
+                    break;
+
+                case BotBlow.Able:
+                    reach++;
+
+                    break;
             }
         }
 
@@ -629,6 +773,24 @@ public sealed class BotSquad
         if (_members.Count == 0)
         {
             return "the last of them is gone";
+        }
+
+        // <b>A charge is held by an undertaking, and when the undertaking is gone nobody is holding it.</b>
+        // This is the fourth time on this shard that a company has outlived whoever raised it: BotScout,
+        // BotSweep and BotHarrow each learned to put the flag down, and BotProwl was written without a
+        // matching release at all — so a company raised for a walk to a hunting ground stood for ever,
+        // because a charged company does not age (see Quiet) and a leader is never let go of (see Release).
+        // Ninety-four of the hundred and thirty-six stall reports of 04.09.2026 were that, some nineteen
+        // minutes long, every one of them ending in the words "in a company".
+        //
+        // Rather than a fifth copy of the same two lines, the invariant is asserted here where it can be
+        // seen: whoever charged it did so from inside a running errand, and that errand is <c>Alongside</c>
+        // by construction — it is the only kind a Bound bot may hold. A leader holding anything else, or
+        // nothing, is a leader who is not charging this company with anything.
+        if (Charged && Leader?.Self is BotMobile head && head.Resolve?.Deed is not { Alongside: true })
+        {
+            Charged = false;
+            Unowned++;
         }
 
         if (_members.Count < 2 && !Charged)
@@ -740,9 +902,31 @@ public sealed class BotSquad
                 continue;
             }
 
-            if (!body.InRange(focus.Location, PressReach) || !body.CanBeHarmful(focus, false))
+            if (!body.InRange(focus.Location, PressReach))
             {
                 continue;
+            }
+
+            // Counted here and nowhere else, because this is the beat on which a bot either fights or does
+            // not. Everyone in reach is still put in warmode and still given the combatant whatever the
+            // verdict: the engine retries the swing every tick, so the moment the line opens or the bot has
+            // stood still long enough the blow lands without waiting for anything of ours.
+            switch (Strike(_members[i], out _))
+            {
+                case BotBlow.Blind:
+                    Blinded++;
+
+                    break;
+
+                case BotBlow.Refused:
+                    Refused++;
+
+                    continue;
+
+                case BotBlow.Unsteady:
+                    Unsteadied++;
+
+                    break;
             }
 
             // Nothing goes into a company's fight with its fists but the brawler. A squad member's own
@@ -761,6 +945,222 @@ public sealed class BotSquad
             {
                 body.Combatant = focus;
             }
+
+            // Only the ranks that stand off. A blow disturbs a cast whenever the caster is a player and every
+            // bot is one, so a blade casting from the contact ring is a bot doing neither thing: its spell is
+            // broken by the first swing against it and its own swing is spent waiting for a spell. The
+            // formation already draws that line — casters and medics are stationed at seven tiles and blades
+            // at one — so the rank is the answer and no new rule is needed. A warrior-mage is filed under
+            // Melee on purpose (see BotRole) and holds the line; hunting alone it casts, through BotSlay.
+            switch (BotFormation.RoleOf(_members[i]))
+            {
+                case BotRole.Medic:
+                    // A medic mends first and throws spells only when there is nobody to mend. See Mend.
+                    if (!Mend(body))
+                    {
+                        Conjure(body, focus);
+                    }
+
+                    break;
+
+                case BotRole.Caster:
+                    Conjure(body, focus);
+
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A medic in a company mends whoever in it is worst hurt. Returns whether it is busy doing so.
+    ///
+    /// <para>
+    /// <b>The same hole as the casting, found in the same hour, and worse.</b> <c>BotSurgeon</c> — the only
+    /// thing on this shard that offers "go and patch somebody up" — is a proposer on the <c>Free</c> rung,
+    /// and a squad member is <c>Bound</c>, where <c>BotWill</c> skips the auction entirely. So a healer that
+    /// joined a company stopped healing: not slowly, not badly — at all, for as long as the company lasted.
+    /// Five of the fifty-four bots on this shard are healers and every muster is written on the assumption
+    /// that one of them is behind the line.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Mending outranks throwing, and that ordering is the whole of the rule.</b> Given a spellbook and
+    /// an enemy, the attack ladder would happily spend a medic's whole pool on magic arrows while the blade
+    /// in front of it bled out — which is a strictly worse use of the same mana. So the medic is asked for a
+    /// patient first and only reaches for the attack ladder when the company is whole.
+    /// </para>
+    ///
+    /// <para>
+    /// Cloth is deliberately not attempted here. A bandage is a nine-second undertaking with its own timer
+    /// and its own failure modes, and that is <c>BotSalve</c>'s business on the Free rung; what this does is
+    /// the two-second spell, which is the thing a medic behind a line is for. A medic with no book and no
+    /// mana falls through to the attack ladder and then to its stick, exactly as it did before.
+    /// </para>
+    /// </summary>
+    private bool Mend(Mobile body)
+    {
+        // The click, and the same guard as the attack cast: a Bound bot's own undertaking is set aside, so
+        // the only cursor up is one of ours.
+        // <b>Worked out again rather than remembered, and with five healers on this shard that is the
+        // difference between a rule and a race.</b> A field on the company holding "who is being healed"
+        // is one field for however many medics are in it: the second one to begin a cast overwrites it, and
+        // the first one's click then lands on the second one's patient. Recomputing costs a walk of at most
+        // five members and cannot be wrong — if the worst-hurt has changed since the cast began, the new
+        // worst-hurt is the right place to put the heal anyway.
+        if (body.Target != null)
+        {
+            var at = Worst(body) ?? body;
+
+            if (BotMend.Aim(body, at))
+            {
+                Mended++;
+            }
+
+            return true;
+        }
+
+        if (body.Spell != null)
+        {
+            return true;
+        }
+
+        var patient = Worst(body);
+
+        if (patient == null)
+        {
+            return false;
+        }
+
+        var spell = BotMend.Spell(body, patient);
+
+        if (spell < 0)
+        {
+            return false;
+        }
+
+        return BotMend.Begin(body, spell);
+    }
+
+    /// <summary>
+    /// The worst-hurt member of this company within the medic's own reach, itself included.
+    ///
+    /// <para>
+    /// Itself included for the reason <c>BotSurgeon</c> gives: below its own failing mark a bot is on a
+    /// higher rung and looking after itself already, and above it nothing else in the world would offer.
+    /// </para>
+    /// </summary>
+    private Mobile Worst(Mobile medic)
+    {
+        Mobile worst = null;
+        var lowest = MendAbove;
+
+        for (var i = 0; i < _members.Count; i++)
+        {
+            var body = _members[i].Self;
+
+            if (body is not { Deleted: false, Alive: true } || body.Map != medic.Map || body.HitsMax <= 0)
+            {
+                continue;
+            }
+
+            if (!medic.InRange(body.Location, BotSurgeon.Reach) || !medic.InLOS(body))
+            {
+                continue;
+            }
+
+            var share = body.Hits / (double)body.HitsMax;
+
+            if (share >= lowest)
+            {
+                continue;
+            }
+
+            lowest = share;
+            worst = body;
+        }
+
+        return worst;
+    }
+
+    /// <summary>
+    /// How hurt somebody has to be before a company's medic spends a cast on them.
+    ///
+    /// <para>
+    /// Four fifths, which is the engine's own opinion of "genuinely hurt" put in one number: healing a bot
+    /// that has taken one scratch is the training dummy with a friend in it, and that is the shape the whole
+    /// ledger exists to refuse. See BotSurgeon, which says the same thing on the other side of the rung.
+    /// </para>
+    /// </summary>
+    public static double MendAbove { get; set; } = 0.8;
+
+    /// <summary>
+    /// A caster in a company casts, and until 04.09.2026 it did not.
+    ///
+    /// <para>
+    /// <b>The same shape as the archers, found in the same hour and for the same reason.</b> <c>BotStrike</c>
+    /// was written because "a caster's book filled up, its Inscribe climbed, its reagents were bought and
+    /// spent — on writing; in a fight it walked up and hit things with a stick". It is called from exactly
+    /// two places, <c>BotSlay</c> and the Baron's harrowing, and both of them are a bot fighting <em>alone</em>.
+    /// A member of a company is Bound, its own undertaking is set aside, and the only thing anything did for
+    /// it was set a combatant — which is the engine's word for "swing whatever is in your hands". So every
+    /// mage, every healer and every warrior-mage that joined a company went straight back to hitting things
+    /// with a stick, which is the one thing its whole build is arranged to avoid.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Melee goes on underneath, deliberately</b> — the engine swings on its own timer whatever else the
+    /// mobile is doing, so a caster loses nothing by also being in a fight, and a caster out of mana is
+    /// simply a bot with a stick again. That is BotSlay's own reasoning and it is repeated rather than
+    /// referenced only because the two live on opposite sides of the rung.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Stateless, unlike the hunt's version, and that is a decision.</b> BotSlay keeps three fields to
+    /// throttle itself; here the engine's own two are enough — a cast in flight sets <c>Spell</c>, a cast
+    /// waiting for its target sets <c>Target</c> — and <c>Begin</c> refuses politely during recovery. A
+    /// company beats once a second against a recovery of <see cref="BotStrike.CastMs"/>, so the wasted ask
+    /// is at most one a cycle, and the alternative is a per-member record on an object that is rebuilt every
+    /// world load.
+    /// </para>
+    /// </summary>
+    private static void Conjure(Mobile body, Mobile focus)
+    {
+        if (!BotStrike.Can(body))
+        {
+            return;
+        }
+
+        // The click a bot has no client to make. Only ever our own cursor: a Bound bot's own undertaking is
+        // set aside, so nothing else of ours is putting one up.
+        if (body.Target != null)
+        {
+            BotStrike.Aim(body, focus);
+
+            return;
+        }
+
+        // Mid-cast. The engine holds the delay, and the formation has already been told to leave a member
+        // that can strike where it stands.
+        if (body.Spell != null)
+        {
+            return;
+        }
+
+        var spell = BotStrike.Best(body);
+
+        if (spell < 0)
+        {
+            // It holds a book or a scroll and cannot pay for anything in it this instant. Counted, because
+            // "the casters are casting" and "the casters are out of mana" look identical from every other
+            // number on this shard, and the cure for the second is reagents rather than arithmetic.
+            Dry++;
+
+            return;
+        }
+
+        if (BotStrike.Begin(body, spell))
+        {
+            Conjured++;
         }
     }
 
@@ -818,7 +1218,42 @@ public sealed class BotSquad
     /// <summary>Members let go for doing nothing for a company that was doing nothing. For the summary.</summary>
     public static long Released { get; private set; }
 
-    public static void Forget() => Released = 0;
+    /// <summary>Beats on which a member stood near enough to fight and had no line to the thing. For the summary.</summary>
+    public static long Blinded { get; private set; }
+
+    /// <summary>Beats on which the engine itself refused the blow. Counted apart: a different cure.</summary>
+    public static long Refused { get; private set; }
+
+    /// <summary>Beats on which a shooter was in place and had moved too recently to fire. See BotBlow.Unsteady.</summary>
+    public static long Unsteadied { get; private set; }
+
+    /// <summary>Spells a company's back ranks actually got off. Nought before 04.09.2026: see Conjure.</summary>
+    public static long Conjured { get; private set; }
+
+    /// <summary>Heals a company's medics landed on their own. Nought before 04.09.2026: see Mend.</summary>
+    public static long Mended { get; private set; }
+
+    /// <summary>Charges taken back because the errand holding them had ended. See Update.</summary>
+    public static long Unowned { get; private set; }
+
+    /// <summary>Beats a caster in a company held a book it could not pay a single spell out of.</summary>
+    public static long Dry { get; private set; }
+
+    /// <summary>Fights given up because not one member could land a blow from anywhere it could reach.</summary>
+    public static long Blindfights { get; private set; }
+
+    public static void Forget()
+    {
+        Released = 0;
+        Blinded = 0;
+        Refused = 0;
+        Unsteadied = 0;
+        Conjured = 0;
+        Mended = 0;
+        Unowned = 0;
+        Dry = 0;
+        Blindfights = 0;
+    }
 
     /// <summary>
     /// Lets go of anybody who is neither doing something of its own nor going anywhere for the company.
@@ -878,7 +1313,18 @@ public sealed class BotSquad
                 continue;
             }
 
-            if (bot.Journey is { Moving: true } || bot.Resolve?.Deed != null)
+            // <b>The comment two screens up said <c>Alongside</c> and the code said "any errand at all", and
+            // the difference is the longest freeze on this shard.</b> A Bound bot's own auction is skipped
+            // (<c>BotWill.cs</c>), and an errand that is not <c>Alongside</c> is set aside rather than
+            // advanced — so a member holding one is doing nothing, can do nothing, and cannot be offered
+            // anything, and this line was reading exactly that state as "busy, leave it alone". It sat there
+            // until <c>AsideCapMs</c> gave the errand up: ten minutes. The log of 03.09.2026 has twenty-four
+            // of them in a day, eleven of them <c>unload</c>, and forty-four of sixty-five stall reports
+            // carrying the words "in a company".
+            //
+            // A parked errand is not a claim on the bot. It is the reason to let go of it: released, the bot
+            // is Free on the next beat and the errand it was holding advances instead of expiring.
+            if (bot.Journey is { Moving: true } || bot.Resolve?.Deed is { Alongside: true })
             {
                 continue;
             }
@@ -992,11 +1438,101 @@ public sealed class BotSquad
             return;
         }
 
+        // <b>Twelve seconds is the patience a fight deserves; a fight nobody is in deserves none of it.</b>
+        // "Its health has not moved" is the right clock for a company that is swinging and missing, and the
+        // wrong one for a company that is not swinging at all — and until the line was asked of the engine
+        // rather than of the distance, those two were the same reading. A company that cannot land a blow
+        // from anywhere it has been able to reach has tested its hypothesis and failed it; sitting out the
+        // rest of the window costs every member of it the difference, on top of the quiet clock afterwards.
+        //
+        // The clock is torn up by anybody at all becoming able to strike, so a company working its way round
+        // an obstacle is never cut off — only one that has been standing blind throughout.
+        // <b>And the clock must not start before it can mean anything.</b> Its first evening cut two fights
+        // off at four seconds with the break-off line reading "0 of 5 able to strike (0 with no line to it,
+        // 0 refused), nearest 14 tiles off" — nobody was blind, nobody was refused, nobody had arrived. A
+        // company still walking to a fight is not a company failing at one, and "able to strike" is false of
+        // both. Only the members standing on their own ring can say anything about whether the arrangement
+        // works, so with none of them there yet the clock is torn up along with the rest.
+        var able = InReach(out _, out var blind, out var refused, out var unsteady);
+        var arrived = able + blind + refused + unsteady;
+
+        // <b>Both of the clocks below judge a fight, and neither of them may run before there is one.</b>
+        // A company engages whatever the finder hands it, and the finder reaches forty tiles; the walk to a
+        // spectre twenty tiles off is a fair part of a minute. Started at the moment of engaging, "its
+        // health has not moved" was being said of a creature nobody had reached — Squad 63 said it twice in
+        // one window at seventeen and twenty tiles, and every one of those break-offs shuns the creature and
+        // then hands it straight back through the defender's path, which is where the forty-one rebuffs in
+        // the same window came from. The outer bound stays: a company that can never close gives up on the
+        // clock below rather than standing there for the whole FightCapMs.
+        if (arrived == 0)
+        {
+            _focusProgressTick = Core.TickCount;
+            _ableTick = Core.TickCount;
+
+            if (Core.TickCount - _closedTick >= CloseMs)
+            {
+                Disengage("we never got near it", true);
+            }
+
+            return;
+        }
+
+        _closedTick = Core.TickCount;
+
+        if (able > 0 || unsteady > 0 || blind + refused == 0)
+        {
+            _ableTick = Core.TickCount;
+        }
+        else if (Core.TickCount - _ableTick >= BlindMs)
+        {
+            Blindfights++;
+
+            Disengage(
+                blind > refused
+                    ? "we are standing on it and there is no line to it"
+                    : "we are standing on it and the engine refuses every blow",
+                true
+            );
+
+            return;
+        }
+
         if (Core.TickCount - _focusProgressTick >= NoProgressMs)
         {
             Disengage("its health has not moved", true);
         }
     }
+
+    /// <summary>
+    /// How long a company may stand round something none of it can hit before it gives the thing up.
+    ///
+    /// <para>
+    /// Four seconds: long enough for the ring to be turned once and walked to — the formation re-stations at
+    /// <see cref="RestationMs"/> and a blade covers a couple of tiles in that time — and short enough that a
+    /// creature inside a crypt wall costs a company one third of what it used to.
+    /// </para>
+    /// </summary>
+    public static int BlindMs { get; set; } = 4000;
+
+    /// <summary>When somebody in this company was last able to land a blow on the focus. See <see cref="BlindMs"/>.</summary>
+    private long _ableTick;
+
+    /// <summary>
+    /// How long a company may spend walking at something without one member of it arriving, before it gives
+    /// the thing up.
+    ///
+    /// <para>
+    /// Half a minute, which is a generous crossing of the forty tiles the company finder reaches, and a
+    /// sixth of the outright cap on a fight. What it replaces is the wrong sentence rather than a missing
+    /// one: before this, a company that never arrived broke off after twelve seconds saying the target's
+    /// health had not moved — true, unhelpful, and it taught the whole population to shun a creature nobody
+    /// had touched.
+    /// </para>
+    /// </summary>
+    public static int CloseMs { get; set; } = 30000;
+
+    /// <summary>When anybody in this company was last within reach of the focus at all. See <see cref="CloseMs"/>.</summary>
+    private long _closedTick;
 
     /// <summary>
     /// What the company killed, divided among whoever is standing there for it.
@@ -1139,6 +1675,24 @@ public sealed class BotSquad
                 continue;
             }
 
+            // <b>A member that can already hit the thing is standing in a good place, and the arithmetic has
+            // nothing better to offer it.</b> The wholesale re-station fires whenever the focus drifts two
+            // tiles, which a creature in a melee does every second or so — and every one of those walks
+            // resets a shooter's stillness clock, which <c>BaseRanged.OnSwing</c> requires a full second of
+            // on this era. So the archers were marched back and forth across one tile for the length of the
+            // fight and never fired once, while the company reported them in the fight the whole time:
+            // Squad 7 broke off from three creatures in a row on 04.09.2026 with "2 of 3 able to strike,
+            // 0 blind, 0 refused, nearest 5 tiles off" and the target's health exactly where it started.
+            //
+            // Unsteady counts as a good place too, and that is the point rather than an oversight: a bot
+            // that has just moved wants the one thing a re-station cannot give it, which is to be left where
+            // it is. Anybody the ring has to fix — too far, or with no line — is untouched by this and is
+            // moved as before.
+            if (Stance == BotSquadStance.Fighting && Strike(member, out _) is BotBlow.Able or BotBlow.Unsteady)
+            {
+                continue;
+            }
+
             var where = Stance == BotSquadStance.Scouting
                 ? BotScatter.PatchFor(this, member)
                 : BotFormation.StationFor(this, member);
@@ -1223,7 +1777,15 @@ public sealed class BotSquad
             return false;
         }
 
-        return !body.InRange(Focus.Location, BotFormation.PressRingFor(BotFormation.RoleOf(member)));
+        // <b>Near enough and unable to swing is the same problem as too far away, and only one of the two
+        // was ever asked about.</b> A member with no line to the focus is standing where the engine will not
+        // let it fight from — see BotFormation.Sighted — so it wants another tile exactly as a member who
+        // stopped short does. Without this, the one arrangement the formation has already proved useless is
+        // the one it holds: the station is satisfied, so nobody re-stations it, for the whole fight.
+        //
+        // A shooter that has merely moved too recently is <em>not</em> stranded: the cure for that is to
+        // stand still, and sending it anywhere is the disease. See BotBlow.Unsteady.
+        return Strike(member, out _) is BotBlow.Far or BotBlow.Blind;
     }
 
     /// <summary>A unit step from one point towards another, on the eight compass lines.</summary>

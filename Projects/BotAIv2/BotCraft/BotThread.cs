@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Engines.Craft;
 using Server.Items;
@@ -104,7 +104,31 @@ public static class BotThread
     public static CraftItem Recipe(Mobile bot, Type material, Type wanted) =>
         BotCraftwork.Recipe(bot, System, SkillName.Tailoring, material, wanted);
 
-    public static CraftItem Choose(Mobile bot, Type material)
+    public static CraftItem Choose(Mobile bot, Type material) => Choose(bot, material, -1);
+
+    /// <summary>
+    /// The same, told how much material the caller can actually put its hands on.
+    ///
+    /// <para>
+    /// <b>The pack was the wrong shelf to measure, and measuring it closed the leather trade on spec
+    /// entirely.</b> A tailor picks a recipe here and then, four lines further on in
+    /// <c>BotTailor.Leatherwork</c>, buys the hide off another bot's stall to make it with — which is the
+    /// whole point of the trade: it is where a hunter's afternoon turns into money. But this refused every
+    /// recipe the pack could not already pay for, so the purchase leg below it could never run. Tailors do
+    /// not hunt, so their packs are empty of leather, so the answer was always null. Measured over the four
+    /// hours to 09:26 on 04.09.2026: <em>0 sewed on spec</em> against 2099 answers filed under "found no
+    /// leather anywhere", while every hunter on the island was shedding sixteen to thirty leather a kill and
+    /// listing it.
+    /// </para>
+    ///
+    /// <para>
+    /// So the caller passes the sum the purchase leg will really have — pack plus one lot off the cheapest
+    /// stall — and the two numbers are one number. This is the same defect the comment below records the
+    /// smith paying for, caught on the other side: there, the offer was made on a floor the recipe could not
+    /// meet; here, the recipe was chosen against a floor the offer would have cleared.
+    /// </para>
+    /// </summary>
+    public static CraftItem Choose(Mobile bot, Type material, int budget)
     {
         var system = System;
 
@@ -120,7 +144,7 @@ public static class BotThread
         // bot walking to a forge and reporting "out of metal" four times in four minutes: the offer is made
         // on a floor of a few units and the recipe is chosen for difficulty, so the two numbers never had to
         // agree. See BotCraftwork.Choose.
-        var held = bot.Backpack?.GetAmount(material) ?? 0;
+        var held = budget >= 0 ? budget : bot.Backpack?.GetAmount(material) ?? 0;
 
         CraftItem best = null;
         var bestNeeds = -1.0;

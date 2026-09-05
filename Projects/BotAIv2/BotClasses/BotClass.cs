@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
@@ -272,7 +272,13 @@ public abstract class BotClass
     /// about mining, and nothing in <c>BotStable</c> asks what class this is.
     /// </para>
     /// </summary>
-    public virtual bool Rides => false;
+    /// <summary>
+    /// <b>Every class, by Patrick's order of 05.09.2026.</b> It was the gatherer and the architect, on the
+    /// reasoning that their day is the walk. That reasoning was never wrong; it was too narrow. Every trade
+    /// on this island walks — to a wood, to a counter, to a forge, to a square that has killed people — and
+    /// the flag is kept rather than deleted because a class that should not ride can still say so.
+    /// </summary>
+    public virtual bool Rides => true;
 
     /// <summary>
     /// Whether this class will stop to go through a corpse at all.

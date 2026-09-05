@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Logging;
 
@@ -92,6 +92,7 @@ public static class BotSquads
         Rescues = 0;
         Yields = 0;
         Buried = 0;
+        Rebuffs = 0;
         BotSquad.Forget();
 
         BotSpoils.Reset();
@@ -119,7 +120,7 @@ public static class BotSquads
             bound += _squads[i]?.Count ?? 0;
         }
 
-        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing; {BotSpoils.Describe()}";
+        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing, {Rebuffs} times one of them was handed back something it had already given up on, {BotSquad.Unowned} charges taken back because the errand holding them had ended; {BotSquad.Blinded} beats stood near enough to fight with no line to the thing, {BotSquad.Refused} refused the blow by the engine and {BotSquad.Unsteadied} were shooters that had moved too recently to fire, {BotSquad.Blindfights} fights given up because nobody could land one at all, {BotSquad.Conjured} spells thrown by the back ranks and {BotSquad.Mended} heals landed by their medics, against {BotSquad.Dry} beats with nothing they could pay for; {BotSpoils.Describe()}";
     }
 
     /// <summary>
@@ -245,10 +246,32 @@ public static class BotSquads
         // the nearest: six bots would declare a band against a skeleton, commit at once because a skeleton is
         // trivial, all go and kill it — while the lich that was actually killing them carried on casting.
         var worst = BotThreat.Strongest(member.Self, Reach);
+        var pick = worst ?? attacker;
 
-        squad.Engage(worst ?? attacker, member);
+        // <b>The note the company had just written about this very creature, read by nobody.</b> Breaking
+        // off as hopeless shuns the quarry for a quarter of an hour precisely so that nobody goes back to
+        // it — and <c>BotQuarry.Company</c>, the finder <c>Hunt</c> uses, honours that. This path does not
+        // go through a finder, so the creature the company gave up on two seconds ago hits somebody, and the
+        // whole company is handed it again. Squad 17 on 03.09.2026: broke off from a troll with three of
+        // three standing on it and its health untouched, re-engaged the same troll within the second, broke
+        // off again, twice over, and every member of it was frozen for the duration of both.
+        //
+        // Passed over rather than fought: the members still defend themselves, because being hit is their
+        // own business and always has been. What is refused here is committing the *company* to a fight it
+        // has already proved it cannot win.
+        if (BotQuarry.Shunned(pick))
+        {
+            Rebuffs++;
+
+            return;
+        }
+
+        squad.Engage(pick, member);
         Rescues++;
     }
+
+    /// <summary>Times a company was handed a creature it had already given up on, and passed. For the summary.</summary>
+    public static long Rebuffs { get; private set; }
 
     /// <summary>
     /// How far around a member the squad looks when working out what is attacking it. The whole company is
@@ -381,7 +404,13 @@ public static class BotSquads
 
             // Two facts about fighting that had nowhere else to be said, on the only clock in this assembly
             // that ticks slowly enough to say them: who came to whose aid, and who is swinging its fists.
-            logger.Information("Arms: {Cries}; {Hands}; {Scrolls}", BotCry.Describe(), BotArms.Describe(), BotArmoury.Describe());
+            logger.Information(
+                "Arms: {Cries}; {Hands}; {Scrolls}; {Mending}",
+                BotCry.Describe(),
+                BotArms.Describe(),
+                BotArmoury.Describe(),
+                BotMedic.Describe()
+            );
 
             // The bow's own line. It earns one because "the archer never kites" survived two nights of being
             // blamed on other things, and a decision nobody counts is a decision nobody can argue with.
@@ -391,11 +420,19 @@ public static class BotSquads
             // which is the same fault as having none: "the board is empty" and "nobody has looked at the
             // board" are different facts and were producing the same silence.
             logger.Information(
-                "Needs: {Gear}; {Metal}; {Forge}; {Thread}",
+                "Needs: {Gear}; {Metal}; {Forge}; {Thread}; {Arrows}; {Bottles}; {Skillet}; {Stores}; {Filled} things off a pack went straight to somebody's standing order, {Bespoken} trips to a counter were begun because the board wanted something in the pack, {Shed} things were listed on the spot by bots too heavy to walk, and {Sent} kills were chosen because the board wanted what the carcass carries",
                 BotUpkeep.Describe(),
                 BotBullion.Describe(),
                 BotSmith.Describe(),
-                BotTailor.Describe()
+                BotTailor.Describe(),
+                BotFletcher.Describe(),
+                BotAlchemist.Describe(),
+                BotCook.Describe(),
+                BotStores.Describe(),
+                BotUnload.Filled,
+                BotUnload.Bespoken,
+                BotUnload.Shed,
+                BotQuarry.Sent
             );
 
             // <b>The ground the whole economy is dug out of, and it has never once been printed.</b>
@@ -403,7 +440,12 @@ public static class BotSquads
             // world reload — which is to say nowhere. So how much rock this island has, how much of it is
             // behind a wall and how much turned out to be a mirage were facts nobody could read. It is the
             // same fault the market's own summary had, and BotBeat.Summarise carries the note about it.
-            logger.Information("The ground: {What}; {Stables}", BotGround.Describe(), BotStable.Describe());
+            logger.Information(
+                "The ground: {What}; {Wood}; {Stables}",
+                BotGround.Describe(),
+                BotWoodsman.Describe(),
+                BotStable.Describe()
+            );
         }
 
         for (var i = _squads.Count - 1; i >= 0; i--)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Server.Items;
@@ -465,6 +465,20 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         // entered. Nessa ordered a cap and gloves on 26.08.2026, paid for both, and was still wearing cloth
         // when the shard came down. See BotAuction.Fetch.
         BotAuction.Fetch(this);
+
+        // And the other direction: a crafter saying out loud what it is short of. Here for the reason the
+        // line above is here — an order is half a minute of paperwork and it loses every auction it enters
+        // against a bench that pays three hundred a minute. See BotStores.
+        BotStores.Keep(this);
+
+        // And the other side of the same shop: what this bot is selling, priced against what the board is
+        // offering for it. A condition rather than an errand — minding your own stall is not a journey. See
+        // BotHaggle.
+        BotHaggle.Keep(this);
+
+        // And supper, which is a condition like the rest of this family: eating is no journey, and an
+        // errand for it would lose every auction it entered and never happen. See BotMeal.
+        BotMeal.Keep(this);
 
         // A horse, bought out of a trip this bot was already making and called up whenever it is on foot.
         // Both are conditions rather than events, exactly like being dressed and like banking, and both cost

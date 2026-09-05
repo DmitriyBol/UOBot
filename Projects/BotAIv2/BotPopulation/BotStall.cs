@@ -79,6 +79,9 @@ public static class BotStall
     /// <summary>Bots carried out of a pocket that had already stalled somebody. See the escalation in Report.</summary>
     public static long Carried { get; private set; }
 
+    /// <summary>Looks passed over because the work stands still on purpose. See <see cref="BotDeed.Still"/>.</summary>
+    public static long Steady { get; private set; }
+
     /// <summary>How long a spot is remembered as having stalled somebody.</summary>
     public static int PocketMs { get; set; } = 1800000;
 
@@ -148,7 +151,25 @@ public static class BotStall
 
         // The stage rather than the deed's name: "walking to (1395, 1425)" and "scouting (1425, 1455)" are
         // the same errand and different progress, and progress is the thing being tested for.
-        var doing = bot.Resolve?.Deed?.Stage ?? bot.Resolve?.Deed?.Kind ?? "nothing";
+        var deed = bot.Resolve?.Deed;
+
+        // <b>A parked errand is not what the bot is doing, and quoting its stage is quoting the wrong
+        // thing.</b> A squad member sits on the Bound rung, where BotWill skips the auction and sets aside
+        // anything that is not Alongside — so the errand it happens to be holding is frozen by construction
+        // and its stage cannot change however well the bot is doing. Every remaining stall report on the
+        // morning of 04.09.2026 was that: five bots reported four minutes into "taking 2 Raw Ribs to Iman"
+        // while they were in a company fighting, and the log said so itself two lines later — "gave up
+        // peddle: set aside 10 minutes while Bound".
+        //
+        // Said rather than silenced. A bot really can be frozen inside a company — that was the whole of the
+        // night's worst defect — so the test still runs and still reports; what changes is that it now
+        // quotes the company, which is the thing that actually owns this bot, and therefore moves when the
+        // bot's situation moves instead of standing still by definition.
+        var parked = bot.Squad != null && deed is not (null or { Alongside: true });
+
+        var doing = parked
+            ? $"in a company; its own {deed.Kind} is set aside"
+            : deed?.Stage ?? deed?.Kind ?? "nothing";
 
         if (watch == null)
         {
@@ -164,6 +185,36 @@ public static class BotStall
         }
 
         watch.Looked = now;
+
+        // <b>Work that stands still on purpose is not standing still.</b> See BotDeed.Still: a student in
+        // the ranks and a captain calling a class both look exactly like a bot in a pocket to the two tests
+        // below, and both already have a clock of their own. Cancelling one of those is not half a repair,
+        // it is a repair of nothing done to a bot that had paid for what it was doing. Counted rather than
+        // silently skipped, because a category quietly excused from every test becomes the majority — this
+        // shard has done that once already, with 28 of 38 bots filtered out of the stuck count by a test
+        // that required a work of some kind.
+        //
+        // <b>Below the throttle and below the first sighting, and putting it above them inflated its own
+        // count by a factor of three.</b> A bot with no watch entry is never throttled, so a check that
+        // returns before one is made is asked on every beat rather than every EveryMs — 1482 passes in five
+        // minutes against a possible 540. A number that measures how often it was consulted rather than how
+        // many bots it excused is the sort of thing this project files under "the instrument lies first".
+        if (deed is { Still: true })
+        {
+            Steady++;
+
+            if (watch.Stuck)
+            {
+                watch.Stuck = false;
+                Stuck--;
+            }
+
+            watch.Where = bot.Location;
+            watch.Doing = doing;
+            watch.Since = now;
+
+            return;
+        }
 
         if (bot.Location != watch.Where || !string.Equals(doing, watch.Doing, System.StringComparison.Ordinal))
         {
@@ -298,8 +349,8 @@ public static class BotStall
 
     public static string Describe() =>
         Reported == 0
-            ? $"nobody has stood still for {PatienceMs / 60000} minutes"
-            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of {_pockets.Count} known pockets; worst: {Worst}";
+            ? $"nobody has stood still for {PatienceMs / 60000} minutes ({Steady} looks passed over as work that stands still on purpose)"
+            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of {_pockets.Count} known pockets, {Steady} looks passed over as work that stands still on purpose; worst: {Worst}";
 
     public static void Forget()
     {
@@ -308,6 +359,7 @@ public static class BotStall
         Reported = 0;
         Freed = 0;
         Carried = 0;
+        Steady = 0;
         Worst = null;
     }
 

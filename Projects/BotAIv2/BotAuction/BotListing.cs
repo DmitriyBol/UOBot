@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Items;
 
@@ -245,6 +245,64 @@ public sealed class BotListing
         return given;
     }
 
+    /// <summary>
+    /// Takes up to <paramref name="units"/> off the stall and hands them back as one object, or null.
+    ///
+    /// <para>
+    /// <b>The half <see cref="Deliver"/> could not do: a sale with no container to deliver into.</b> A want
+    /// filled off a stall never touches anybody's pack — the market holds the goods on the buyer's behalf
+    /// until it comes for them — so there is nowhere to drop them, and every existing route out of a stall
+    /// wanted somewhere to drop them. See <c>BotAuction.Cross</c>, which is the whole reason this exists.
+    /// </para>
+    ///
+    /// <para>
+    /// Whole objects while they fit and a split for the remainder, exactly as Deliver does it, and for the
+    /// same reason: nothing in the engine hands back half of a stack.
+    /// </para>
+    /// </summary>
+    public Item Lift(int units)
+    {
+        if (units <= 0)
+        {
+            return null;
+        }
+
+        for (var i = _stock.Count - 1; i >= 0; i--)
+        {
+            var item = _stock[i];
+
+            if (item == null || item.Deleted)
+            {
+                _stock.RemoveAt(i);
+
+                continue;
+            }
+
+            var held = Math.Max(1, item.Amount);
+
+            if (held <= units)
+            {
+                _stock.RemoveAt(i);
+                TouchedTick = Core.TickCount;
+
+                return item;
+            }
+
+            var split = Portion(item, units);
+
+            if (split == null)
+            {
+                continue;
+            }
+
+            TouchedTick = Core.TickCount;
+
+            return split;
+        }
+
+        return null;
+    }
+
     /// <summary>Everything left, dropped into a container. For a stall being withdrawn.</summary>
     public int Reclaim(Container into)
     {
@@ -300,6 +358,67 @@ public sealed class BotListing
     }
 
     /// <summary>Puts the price up, within the bound. Returns whether it actually moved.</summary>
+    /// <summary>
+    /// Moves the price towards what a named buyer is offering, within the same two bounds the beat's own
+    /// cut and raise keep. Returns whether it actually moved.
+    ///
+    /// <para>
+    /// <b>The market's clock walks a price down blindly; this walks it towards a number somebody has
+    /// actually put money behind.</b> Patrick's order of 05.09.2026. Every want on the board carries an
+    /// offer and an escrow, so "what a buyer will pay" is a fact this shard already knows and never used:
+    /// the summary read "1416 wants found the thing on a stall dearer than they would pay" against 200
+    /// crossings, which is a market where both sides are present, funded, and looking past each other. A
+    /// seller that can see the bid can meet it.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>A step towards it rather than a jump onto it</b>, for the reason the beat cuts by a tenth rather
+    /// than to the floor: a seller that matches the first offer it sees has no way back up if the offer was
+    /// a lowball, and a market of instant capitulation prices everything at whatever the poorest buyer
+    /// happens to have. The bounds are the listing's own — a quarter of the opening ask below, four times it
+    /// above — so haggling can never take a price somewhere the beat could not have taken it.
+    /// </para>
+    /// </summary>
+    public bool Meet(int offer, double step, double leastMultiple, double mostMultiple)
+    {
+        if (offer <= 0 || step <= 0.0)
+        {
+            return false;
+        }
+
+        var floor = Math.Max(BotAuction.Floor, (int)(Anchor * leastMultiple));
+        var ceiling = Math.Max(1, (int)(Anchor * mostMultiple));
+        var want = Math.Clamp(offer, floor, ceiling);
+
+        if (want == Price)
+        {
+            return false;
+        }
+
+        // At least a coin, so a step of a tenth on a price of three is a move rather than a rounding.
+        var stride = Math.Max(1, (int)(Math.Abs(want - Price) * step));
+        var asking = want > Price ? Math.Min(want, Price + stride) : Math.Max(want, Price - stride);
+
+        if (asking == Price)
+        {
+            return false;
+        }
+
+        if (asking > Price)
+        {
+            Raises++;
+        }
+        else
+        {
+            Cuts++;
+        }
+
+        Price = asking;
+        TouchedTick = Core.TickCount;
+
+        return true;
+    }
+
     public bool Raise(double step, double mostMultiple)
     {
         var ceiling = Math.Max(1, (int)(Anchor * mostMultiple));

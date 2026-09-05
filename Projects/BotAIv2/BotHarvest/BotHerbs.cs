@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Server.Items;
 using Server.Logging;
 using Server.Regions;
@@ -44,6 +44,9 @@ public sealed class BotHerbs : BotDeed
 
     public static int MostKinds { get; set; } = 5;
 
+    /// <summary>What a herb is reckoned at before the shard has ever traded one. BotForage's figure.</summary>
+    public static int Guess { get; set; } = 5;
+
     /// <summary>Fewest and most of any one kind.</summary>
     public static int LeastEach { get; set; } = 5;
 
@@ -61,6 +64,9 @@ public sealed class BotHerbs : BotDeed
     private readonly Point3D _where;
 
     private int _found;
+
+    /// <summary>What the haul is worth at the market's own price. See <see cref="Made"/>.</summary>
+    private int _worth;
 
     public BotHerbs(Map map, Point3D where)
     {
@@ -90,7 +96,28 @@ public sealed class BotHerbs : BotDeed
     /// </summary>
     public override double Coin => 1.0;
 
-    public override int Made => 0;
+    /// <summary>
+    /// What came back out of the woods, priced the way the shard prices it.
+    ///
+    /// <para>
+    /// <b>This declared nought, and declaring nought taught the whole shard that gathering is worthless.</b>
+    /// It is the identical defect <see cref="BotOrder.Made"/> records paying for, on the trade the shard can
+    /// least afford it: over the four hours to 09:26 on 04.09.2026 the population spent 25,770gp of its
+    /// 48,685gp at counters on reagents — fifty-three pence in every pound — and in the same four hours
+    /// sixty-five trips into the woods were taken, each one settling in the ledger as "0 in 1.0 min (0/min)".
+    /// A trade that reports nothing per minute is a trade the auction stops offering, so the only reagent
+    /// route the population had was the one that takes money out of the world.
+    /// </para>
+    ///
+    /// <para>
+    /// Goods and not coin, exactly as <see cref="BotForage"/>, <c>BotDig</c> and <c>BotChop</c> reckon what
+    /// they bring back — every other gathering trade on the shard already prices its haul this way and this
+    /// one was simply never given the line. The <see cref="Coin"/> factor above is left as it was: what a
+    /// trip is worth and whether a bot short of money should take it are two questions, and only the first
+    /// was being answered wrongly.
+    /// </para>
+    /// </summary>
+    public override int Made => _worth;
 
     public override string Stage =>
         _found > 0 ? $"back from the woods with {_found} herbs" : $"out to the woods near {_where}";
@@ -162,6 +189,11 @@ public sealed class BotHerbs : BotDeed
 
             picked += amount;
 
+            // Priced as it is picked and at the market's own price, so a reagent the population is bidding
+            // hard for makes the trip that fetched it worth what it really was. Guess is only ever reached
+            // before anybody has traded one.
+            _worth += amount * BotAuction.Worth(kind, Guess);
+
             // Ground that paid while a bot stood still on it. See BotQuad.Harvested.
             BotQuad.Harvested(body.Map, body.Location);
         }
@@ -173,9 +205,14 @@ public sealed class BotHerbs : BotDeed
             return BotDoing.Failed("the woods had nothing, or the pack was full");
         }
 
-        logger.Information("{Name} came back from the woods with {Count} herbs", body.Name, picked);
+        logger.Information(
+            "{Name} came back from the woods with {Count} herbs worth about {Worth}gp",
+            body.Name,
+            picked,
+            _worth
+        );
 
-        return BotDoing.Done($"{picked} herbs out of the woods");
+        return BotDoing.Done($"{picked} herbs out of the woods, worth about {_worth}gp");
     }
 }
 

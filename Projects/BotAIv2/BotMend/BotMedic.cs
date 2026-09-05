@@ -1,4 +1,4 @@
-using Server.Logging;
+﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -54,8 +54,12 @@ public sealed class BotMedic : IBotProposer
         //
         // Said as "nothing hostile near", not "nothing is targeting me": a creature two tiles away that has
         // not swung yet will swing during the bandage.
+        Asked++;
+
         if (BotThreat.Anything(body, BotMend.Peril))
         {
+            Hostile++;
+
             var foe = BotThreat.Hunter(body, BotMend.Peril);
 
             if (foe != null)
@@ -70,17 +74,63 @@ public sealed class BotMedic : IBotProposer
 
         if (spell >= 0)
         {
+            Spelled++;
+
             return new BotSalve(body, map, onSelf: true, SkillName.Magery);
         }
 
         if (BotMend.Cloth(body) > 0)
         {
+            Bandaged++;
+
             return new BotSalve(body, map, onSelf: true, SkillName.Healing);
         }
+
+        Dry++;
 
         Missing(body);
 
         return null;
+    }
+
+    /// <summary>
+    /// Every gate apart, and the denominator with them.
+    ///
+    /// <para>
+    /// <b>The one question the consumables trade turns on, and nothing anywhere could answer it.</b> The
+    /// shopper's tally said the population was "most often short of Bandage (9637 times)" in four hours,
+    /// which is a count of beats and not of bots — a handful that cannot buy any counts thousands of times,
+    /// and so does a whole population. So "the healers are dry" and "one healer is dry and asks often" were
+    /// the same figure, and there was no honest way to decide whether this shard needs somebody making
+    /// bandages out of cloth. <see cref="Dry"/> is a count of bots that were hurt, safe, out of mana and out
+    /// of cloth — which is a bot about to die of it.
+    /// </para>
+    /// </summary>
+    public static long Asked { get; private set; }
+
+    /// <summary>Hurt, but something was standing over it. Not a want of supplies.</summary>
+    public static long Hostile { get; private set; }
+
+    public static long Spelled { get; private set; }
+
+    public static long Bandaged { get; private set; }
+
+    /// <summary>Hurt, safe, and nothing to mend with. The number that says whether bandages are scarce.</summary>
+    public static long Dry { get; private set; }
+
+    public static string Describe() =>
+        Asked == 0
+            ? "nobody has been hurt and left to look after itself"
+            : $"{Asked} looked after themselves: {Spelled} had the mana, {Bandaged} had the cloth, "
+              + $"{Hostile} had something standing over them, {Dry} were hurt and safe with neither";
+
+    public static void ForgetCounts()
+    {
+        Asked = 0;
+        Hostile = 0;
+        Spelled = 0;
+        Bandaged = 0;
+        Dry = 0;
     }
 
     private static void Missing(Mobile body)

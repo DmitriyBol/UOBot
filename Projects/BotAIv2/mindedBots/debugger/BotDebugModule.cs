@@ -35,6 +35,7 @@ public sealed class BotDebugModule : BotModule
         BotDebugConfig.Load();
         BotDebugMemory.Load();
         BotDebugLog.Open(BotVigil.Name);
+        BotHand.Open(BotVigil.Name);
 
         BotVigil.Start();
         BotHail.Listen();

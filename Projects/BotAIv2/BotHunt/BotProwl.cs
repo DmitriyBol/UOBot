@@ -116,6 +116,9 @@ public sealed class BotProwl : BotDeed
     /// <summary>Whether this ground was accepted on the strength of a company that does not exist yet.</summary>
     private readonly bool _company;
 
+    /// <summary>The company this errand raised and charged, so that <see cref="Drop"/> can discharge it.</summary>
+    private BotSquad _squad;
+
     private bool _raised;
 
     private bool _gated;
@@ -233,6 +236,15 @@ public sealed class BotProwl : BotDeed
                     // Held together for the walk, exactly as a scouting party is: a company with nothing to
                     // fight yet is dissolved on its next beat otherwise, and there is nothing to fight until
                     // it arrives. See BotSquad.Charged.
+                    //
+                    // <b>And kept, so that it can be given back.</b> Every other charge on this shard has a
+                    // matching release — BotScout, BotSweep and BotHarrow all put the flag down when their
+                    // errand ends — and this one had none, so a company raised for a walk to a hunting
+                    // ground outlived the walk, the hunt and everything after it. A charged company never
+                    // ages (see BotSquad.Quiet), so it stood for ever with its leader holding "nothing":
+                    // 94 of the 136 stall reports in the small hours of 04.09.2026, some of them nineteen
+                    // minutes long, all of them with the words "in a company" on the end. See Drop.
+                    _squad = squad;
                     squad.Charged = true;
                 }
             }
@@ -362,5 +374,30 @@ public sealed class BotProwl : BotDeed
         BotQuad.Baulk(_map, _where);
 
         return false;
+    }
+
+    /// <summary>
+    /// The charge goes back where it came from, whatever ended this.
+    ///
+    /// <para>
+    /// In <c>Drop</c> rather than at any of the endings, because there are five of them — arrived, gave up,
+    /// outbid, stalled, died — and this shard has paid for a lesson written under exactly one of them three
+    /// times already. Drop is the single gate every ending goes through.
+    /// </para>
+    ///
+    /// <para>
+    /// The company itself is not dissolved. Discharging is enough and is the honest thing: with the flag
+    /// down the quiet clock starts, and a company that has found something to fight in the meantime goes on
+    /// fighting it rather than being broken up by the errand that introduced them.
+    /// </para>
+    /// </summary>
+    public override void Drop(IBotWilful bot)
+    {
+        if (_squad is { Disbanded: false })
+        {
+            _squad.Charged = false;
+        }
+
+        _squad = null;
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Server.Items;
 using Server.Logging;
 
@@ -53,6 +53,19 @@ public sealed class BotTailor : IBotProposer
     /// <summary>Neither an order nor leather anywhere: the cloth route, or nothing.</summary>
     public static long NoLeather { get; private set; }
 
+    /// <summary>
+    /// Answers where the bot could sew nothing at all out of hide — not one recipe within its skill that the
+    /// pack and the cheapest stall together could pay for.
+    ///
+    /// <para>
+    /// <b>Split out because the one counter beside it was answering for both and named only one of them.</b>
+    /// "Found no leather anywhere" carried every tailor that got as far as looking, whatever stopped it, and
+    /// for four hours it read 2099 while leather sat on stalls — the refusal was the recipe, not the hide.
+    /// A counter that names one cause and catches all of them is this shard's most-repeated defect.
+    /// </para>
+    /// </summary>
+    public static long NoRecipe { get; private set; }
+
     public string Name => "Tailor";
 
     public BotStanding Rung => BotStanding.Free;
@@ -105,8 +118,8 @@ public sealed class BotTailor : IBotProposer
             return leather;
         }
 
-        NoLeather++;
-
+        // Leatherwork has already filed which of the two refusals it was — no recipe, or no hide to be had —
+        // so nothing is counted a second time here.
         var shop = BotShops.Nearest(bot, typeof(Cloth));
 
         if (shop == null)
@@ -156,50 +169,69 @@ public sealed class BotTailor : IBotProposer
     /// </summary>
     private static BotDeed Leatherwork(IBotWilful bot, Mobile body)
     {
+        // <b>What the trade can lay hands on is worked out before the recipe, not after it.</b> The stall
+        // used to be read four lines below the chooser, and the chooser refused any recipe the pack alone
+        // could not pay for — so the purchase that is the entire point of the leather trade could never run.
+        // Tailors do not hunt; their packs hold no hide; the answer was always null. See BotThread.Choose.
+        var carried = BotThread.Amount(body, typeof(Leather));
+        var stall = BotAuction.Cheapest(typeof(Leather), bot);
+        var take = stall == null || stall.IsEmpty ? 0 : Math.Min(BotSew.Bolt, stall.Amount);
+
         // <b>The board first, exactly as the smith does it.</b> An order is money already in escrow and a
         // piece somebody is waiting for; sewing on spec is a guess about what might sell. Asked before the
         // bot's own judgement so that the piece made is the piece wanted.
         var order = Order(bot, body);
-        var recipe = order == null ? BotThread.Choose(body, typeof(Leather)) : BotThread.Recipe(body, typeof(Leather), order.Kind);
+        var recipe = order == null
+            ? BotThread.Choose(body, typeof(Leather), carried + take)
+            : BotThread.Recipe(body, typeof(Leather), order.Kind);
 
         if (recipe == null)
         {
+            NoRecipe++;
+
             return null;
         }
 
-        if (order != null)
-        {
-            ToOrder++;
-            Once(body, order);
-        }
-        else
-        {
-            OnSpec++;
-        }
-
         var need = BotThread.Units(recipe);
-        var carried = BotThread.Amount(body, typeof(Leather));
 
         // Free, and it would otherwise go out to a stall for somebody else to sew.
         if (carried >= need)
         {
+            Took(body, order);
+
             return new BotSew(body.Map, body.Location, null, 0, 0, need, order);
         }
 
-        var stall = BotAuction.Cheapest(typeof(Leather), bot);
-
-        if (stall == null || stall.IsEmpty)
+        // Enough on the stall to finish a piece counting what is already carried, or this is a purchase that
+        // buys a bot the right to stand still.
+        //
+        // <b>Counted where the deed is, not where the recipe was.</b> ToOrder and OnSpec used to be raised
+        // the moment a recipe existed and then this line could still hand back nothing, so both figures
+        // counted intentions and the summary read them out as work.
+        if (take <= 0 || carried + take < need)
         {
+            NoLeather++;
+
             return null;
         }
 
-        var take = Math.Min(BotSew.Bolt, stall.Amount);
+        Took(body, order);
 
-        // Enough on the stall to finish a piece counting what is already carried, or this is a purchase that
-        // buys a bot the right to stand still.
-        return carried + take >= need
-            ? new BotSew(body.Map, body.Location, stall, stall.Price, take, need, order)
-            : null;
+        return new BotSew(body.Map, body.Location, stall, stall.Price, take, need, order);
+    }
+
+    /// <summary>Which of the two counters this deed belongs to, raised once the deed is certain.</summary>
+    private static void Took(Mobile body, BotWant order)
+    {
+        if (order == null)
+        {
+            OnSpec++;
+
+            return;
+        }
+
+        ToOrder++;
+        Once(body, order);
     }
 
     /// <summary>
@@ -220,6 +252,12 @@ public sealed class BotTailor : IBotProposer
 
         BotWant best = null;
         var bestWorth = 0;
+
+        // <b>Raised once for the bot and not once for every want it walked past.</b> This counts against
+        // Asked, which is a count of bots, so a board holding six leather orders turned one short tailor into
+        // six — 567 against a denominator of 264 on 04.09.2026, a figure that cannot be read as a share of
+        // anything. Whether this bot was short of hide is one fact about this bot.
+        var starved = false;
 
         for (var i = 0; i < wants.Count; i++)
         {
@@ -248,7 +286,7 @@ public sealed class BotTailor : IBotProposer
 
                 if (stall == null || stall.IsEmpty || carried + Math.Min(BotSew.Bolt, stall.Amount) < need)
                 {
-                    ShortOfLeather++;
+                    starved = true;
 
                     continue;
                 }
@@ -256,6 +294,11 @@ public sealed class BotTailor : IBotProposer
 
             best = want;
             bestWorth = want.Worth;
+        }
+
+        if (starved && best == null)
+        {
+            ShortOfLeather++;
         }
 
         return best;
@@ -283,7 +326,7 @@ public sealed class BotTailor : IBotProposer
         Asked == 0
             ? $"nobody has been offered sewing ({NoKit} answers went to bots with no kit)"
             : $"{Asked} asked: {ToOrder} took an order off the board, {ShortOfLeather} passed one over for want of hide, "
-              + $"{OnSpec} sewed on spec, {NoLeather} found no leather anywhere and fell back on cloth";
+              + $"{OnSpec} sewed on spec, {NoRecipe} had nothing they could sew out of hide, {NoLeather} found no leather anywhere and fell back on cloth";
 
     /// <summary>Lets the complaints be made again after a world reload.</summary>
     public static void Forget()
@@ -297,5 +340,6 @@ public sealed class BotTailor : IBotProposer
         ShortOfLeather = 0;
         OnSpec = 0;
         NoLeather = 0;
+        NoRecipe = 0;
     }
 }

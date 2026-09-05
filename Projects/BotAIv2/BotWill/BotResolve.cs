@@ -40,6 +40,15 @@ public sealed class BotResolve
     /// </summary>
     public BotDoing Sent { get; internal set; }
 
+    /// <summary>
+    /// The closest this bot has come to the place <see cref="Sent"/> is walking it to, and how many beats
+    /// since that last improved. See <c>BotWill.TrekLimit</c>.
+    /// </summary>
+    public int Nearest { get; internal set; } = int.MaxValue;
+
+    /// <summary>Beats on the current walk order without getting any nearer. See <see cref="Nearest"/>.</summary>
+    public int Trudged { get; internal set; }
+
     /// <summary>When the current undertaking was taken on.</summary>
     public long SinceTick { get; internal set; }
 

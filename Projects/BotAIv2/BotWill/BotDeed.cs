@@ -165,6 +165,30 @@ public abstract class BotDeed
     public virtual bool Alongside => false;
 
     /// <summary>
+    /// Whether standing perfectly still, in one place, with the same thing to say about itself, is what this
+    /// work looks like when it is going <em>well</em>.
+    ///
+    /// <para>
+    /// <b>The stall watch tests two things and this is the answer to one of them.</b> It asks whether the
+    /// bot has moved and whether its <see cref="Stage"/> has changed, and takes the work off it when neither
+    /// has for four minutes — which is right for a walk to somewhere unreachable and exactly wrong for a
+    /// drill field. On 03.09.2026 it cancelled eight lessons: five students standing in their ranks, whose
+    /// stage says how many points they have picked up to one decimal place and therefore does not move at
+    /// all while the last few tenths of a skill come in at a hundredth a beat, and three captains calling a
+    /// class that nobody had yet joined. Every one of those students had already paid its fee.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>A display string is not a progress measure, and that is the whole lesson.</b> Rounding is a fact
+    /// about the sentence, not about the work. Rather than widen the decimal — which moves the boundary and
+    /// keeps the mistake — work that stands still on purpose says so, and is left to the clock it already
+    /// has: a lesson runs out at <c>BotSchool.LessonMs</c>, a roll closes at <c>GatherMs</c>. Whoever set a
+    /// clock owns ending the thing, which is the same rule the companies were taught.
+    /// </para>
+    /// </summary>
+    public virtual bool Still => false;
+
+    /// <summary>
     /// This undertaking is over, however it ended. Release whatever was being held for it — a claimed vein,
     /// a reserved order — and nothing else; the takings are counted by the brain.
     /// </summary>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -224,7 +224,9 @@ public static class BotBeat
             // Each bot's own pace rather than the population's. One that has run itself out of breath walks,
             // and a walk is four hundred milliseconds against a run's two hundred; scheduling it as though it
             // were still running asks it to move twice as often as the engine will allow.
-            bot.DueTick = now + BotWalk.StepDelayMs(bot.Running);
+            // Asked of the body rather than of the flag alone: a bot on a horse is allowed twice the pace
+            // and was being given a footman's. See BotWalk.StepDelayMs.
+            bot.DueTick = now + BotWalk.StepDelayMs(bot, bot.Running);
 
             Turns++;
 

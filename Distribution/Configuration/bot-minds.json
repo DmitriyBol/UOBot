@@ -1,38 +1,44 @@
 {
   "Lessons": {
     "Aldric": [
-      "On this shard, if a trade forecast exceeds 400 gold/min but yields zero payout in the first minute, skip that work type for the next ten minutes.",
-      "On this shard, if Drill forecast exceeds 150 gold/min but yields zero in first minute, skip Drill for five minutes.",
-      "On this shard, if Patrol forecast is zero, expect a yield of at least 3 gold/min.",
-      "On this shard, if Hunter forecast is under 50 gold/min, expect actual yield to exceed 80 gold/min.",
-      "On this shard, if Hunter forecast exceeds 100 gold/min and work lasts longer than one minute, expect actual yield to be less than half the forecasted rate.",
-      "On this shard, if Peddler forecast exceeds 350 gold/min and actual yield is under 10 gold in the first minute, skip Peddler for five minutes."
+      "On this shard, if Peddler forecast is under 200 gold/min, expect actual yield to exceed forecast by at least 50 gold.",
+      "On this shard, if Drill forecast is zero, skip immediately regardless of duration.",
+      "On this shard, if Hunter forecast exceeds 200 gold/min, expect actual yield within 5 gold of forecast.",
+      "On this shard, if Porter forecast exceeds 300 gold/min, expect actual yield to be less than 50 gold/min in the first minute.",
+      "On this shard, if Porter forecast exceeds 250 gold/min, skip for five minutes.",
+      "On this shard, if Hunter forecast is zero, skip immediately.",
+      "On this shard, if Patrol forecast is zero, take the work and expect actual yield over 50 gold/min.",
+      "On this shard, if Shopper forecast exceeds 100 gold/min, skip immediately."
     ],
     "Godric": [
-      "On this shard, assume trades without history yield zero only for their first cycle, then match the median profit rate.",
-      "On this shard, halve my expected gold-per-minute forecast for any trade without payout history.",
-      "On this shard, for trades without payout history, assume their expected value is at least double my initial forecast.",
-      "On this shard, assume trades without payout history yield 10% of my initial forecast.",
-      "On this shard, assume new trades yield zero gold per minute for their first cycle.",
-      "For trades without payout history, forecast zero gold per minute for the first cycle.",
-      "For trades without payout history, assume they yield negative gold per minute until proven otherwise.",
-      "On this shard, for trades without payout history, assume they yield negative gold per minute for their first cycle."
+      "On this shard, exclude Miner and any trade without payout history that yields zero gold per minute.",
+      "On this shard, exclude any trade yielding zero gold per minute regardless of forecast accuracy.",
+      "On this shard, exclude Miner trades with a forecast above 10 gold per minute without positive payout history in last cycle.",
+      "On this shard, expect Smith trades with positive history to yield at least 200 gold per minute regardless of initial forecast.",
+      "On this shard, exclude Tailor trades forecasting above 80 gold per minute unless they have a positive payout history in the last two cycles.",
+      "On this shard, exclude Tailor trades forecasting above 150 gold per minute regardless of payout history.",
+      "On this shard, exclude Smith trades unless the most recent completed cycle yielded at least 10 gold per minute.",
+      "On this shard, accept Peddler trades with zero forecast once they have completed a cycle."
     ],
     "Cedric": [
-      "On this shard, if Seeker forecast is zero and duration exceeds 2 minutes, assume minimum yield of 20 gold per minute.",
-      "On this shard, if Hunter forecast is zero, ignore duration variance in exclusion logic.",
-      "On this shard, exclude Hunter if yield is zero regardless of duration variance.",
-      "On this shard, exclude Drill if any run yields negative gold per minute.",
-      "On this shard, exclude Drill if yield is zero and forecast exceeded 150 gold per minute.",
-      "On this shard, exclude Scribe for the next selection if any run yields zero gold and duration exceeds forecast.",
-      "On this shard, exclude Scribe if any run yields zero gold regardless of duration.",
-      "On this shard, exclude Herbalist if any run yields zero gold."
+      "On this shard, exclude Hunter if yield is zero.",
+      "On this shard, exclude Drill if any run yields zero gold and forecast was non-zero.",
+      "On this shard, exclude Drill if forecast is zero.",
+      "On this shard, exclude Scribe if any run yields less than zero.",
+      "On this shard, exclude Scribe if forecast exceeds 400.",
+      "On this shard, exclude Hunter if forecast is less than 50.",
+      "exclude Herbalist if forecast exceeds 100",
+      "On this shard, exclude Herbalist if forecast is 120 or more."
     ],
     "Baldric": [
-      "Reject Baron tasks forecasting above 150 gold/min if any of the last three harrowings on that square returned less than 80% of their forecasted value.",
-      "On this shard, reject Baron tasks forecasting above 150 gold/min unless at least one kill has occurred on that square in the last hour.",
-      "On this shard, Stroll tasks at 4 minutes are fixed zero-value filler; accept them immediately when no active squares exist.",
-      "Accept Stroll only when no active squares exist and maintain fixed zero-value forecast without recalibrating forecasts."
+      "If expected follower gain is zero, reject trade immediately without considering shard forecast.",
+      "Reject Warden trades if expected follower gain is zero; do not accept them regardless of shard forecast accuracy or duration variance.",
+      "Reject any trade not involving a harrowing square; they yield zero follower gain on this shard.",
+      "On this shard, accept only trades involving a harrowing square; reject all others immediately.",
+      "On this shard, reject all trades named 'Baron' immediately; they yield zero follower gain regardless of duration.",
+      "Reject Stroll if any harrowing square has fewer than twenty corpses inside it; wait for the square to clear or accept Harrowing trade instead.",
+      "Accept Stroll only if no harrowing squares stand.",
+      "Accept Stroll only if no harrowing squares stand on the shard; reject all Baron trades immediately."
     ]
   }
 }

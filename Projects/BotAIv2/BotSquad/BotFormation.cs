@@ -316,10 +316,44 @@ public static class BotFormation
         return Point3D.Zero;
     }
 
-    /// <summary>Whether a body fits on this tile, at the height of whatever the squad is standing round.</summary>
+    /// <summary>
+    /// How far above the ground a pair of eyes sits, for asking whether a place a bot is not standing in yet
+    /// could see what the company is fighting. Taken from <c>BotSlay</c>, which took it from the engine:
+    /// <c>Map.LineOfSight</c> raises both ends by this before tracing, and a line traced from the floor
+    /// clips on the first step of ground it crosses and calls every open field blind.
+    /// </summary>
+    private const int Eye = 14;
+
+    /// <summary>
+    /// Whether a blow could leave this tile at all.
+    ///
+    /// <para>
+    /// <b>The half of a station nobody was asking for, and it was the whole of the trouble.</b> Every swing
+    /// in the engine is gated on <c>InLOS</c> — see <c>Mobile.CheckCombatTime</c>, which returns without so
+    /// much as advancing the swing clock when the line is broken — so a blade standing on the tile that
+    /// touches a wraith through a crypt wall is not fighting it, it is watching it, and there is no line
+    /// anywhere saying so. The evening of 03.09.2026 has 71 companies breaking off with the target's health
+    /// exactly where it started against 103 kills, and the break-off line reading <c>3 of 3 in reach,
+    /// nearest 1 tiles off</c> — three bots touching a troll for twelve seconds and never once swinging.
+    /// </para>
+    ///
+    /// <para>
+    /// Asked of the tile before anybody is sent to it rather than of the bot after it arrives, because the
+    /// cure for a blind station is a different station and the formation is the only thing that picks one.
+    /// The lone hunter has had this since 25.08.2026 (<c>BotSlay</c>); a company fight is the same rule and
+    /// was written apart from it, which is the shape of defect this project keeps paying for.
+    /// </para>
+    /// </summary>
+    private static bool Sighted(Map map, int x, int y, int z, Point3D at) =>
+        map.LineOfSight(new Point3D(x, y, z + Eye), new Point3D(at.X, at.Y, at.Z + Eye));
+
+    /// <summary>
+    /// Whether a body fits on this tile, at the height of whatever the squad is standing round — and whether
+    /// it could hit the thing from there. See <see cref="Sighted"/>.
+    /// </summary>
     private static bool Stand(Map map, int x, int y, Point3D near, out Point3D spot)
     {
-        if (BotStep.Ground(map, x, y, near.Z, BotStep.StandingReach, out var z))
+        if (BotStep.Ground(map, x, y, near.Z, BotStep.StandingReach, out var z) && Sighted(map, x, y, z, near))
         {
             spot = new Point3D(x, y, z);
 

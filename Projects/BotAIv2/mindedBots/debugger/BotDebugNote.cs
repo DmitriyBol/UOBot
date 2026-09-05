@@ -49,6 +49,21 @@ public sealed class BotDebugNote
     public string Watch { get; init; }
 
     /// <summary>
+    /// One administrator's command to run, out of <see cref="BotHand.Verbs"/>, or <c>none</c>.
+    ///
+    /// <para>
+    /// <b>Constrained to the list and defaulting to doing nothing, for the reason every other field here
+    /// is.</b> Free words would produce a verb that does not exist on the first minute and a verb that
+    /// exists and was not meant on the second. <c>none</c> is first in the list because a watcher offered a
+    /// hand and no way to keep it in its pocket uses it every time it is asked.
+    /// </para>
+    /// </summary>
+    public string Probe { get; init; }
+
+    /// <summary>What the command is aimed at: a bot's name, or a pair of coordinates. <c>-</c> for nothing.</summary>
+    public string At { get; init; }
+
+    /// <summary>
     /// The sorts of finding there are. An enum rather than free words, for the reason the minds learned the
     /// hard way: a constraint the sampler enforces cannot be reinterpreted and a sentence in a prompt always
     /// can. <c>nothing</c> is on the list on purpose and is the most important entry — a watcher with no way
@@ -104,6 +119,8 @@ public sealed class BotDebugNote
 
             Enumeration(writer, "last", Verdicts);
             Roster(writer, "watch", names);
+            Enumeration(writer, "probe", BotHand.Verbs);
+            Text(writer, "at", 1);
 
             writer.WriteEndObject();
 
@@ -117,6 +134,8 @@ public sealed class BotDebugNote
             writer.WriteStringValue("confidence");
             writer.WriteStringValue("last");
             writer.WriteStringValue("watch");
+            writer.WriteStringValue("probe");
+            writer.WriteStringValue("at");
             writer.WriteEndArray();
 
             writer.WriteEndObject();
@@ -217,7 +236,9 @@ public sealed class BotDebugNote
                 Fix = Word(root, "fix"),
                 Confidence = Sure(root),
                 Last = Word(root, "last") ?? "first",
-                Watch = Word(root, "watch") ?? "-"
+                Watch = Word(root, "watch") ?? "-",
+                Probe = Word(root, "probe") ?? "none",
+                At = Word(root, "at") ?? "-"
             };
         }
         // Any failure to read an answer is not an answer. See BotMindChoice.Read: a narrow catch here let a

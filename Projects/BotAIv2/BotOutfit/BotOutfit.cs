@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
@@ -211,6 +211,13 @@ public static class BotOutfit
         {
             tools.Add(typeof(MortarPestle));
         }
+
+        // <b>Universal, like the scissors and the skinning knife, and for the same argument.</b> Patrick's
+        // order of 05.09.2026 opened cooking to the population, and cooking is a disposition rather than a
+        // trade: the ingredient is a carcass, everybody hunts, DefCooking asks for no fire and no place, and
+        // the first recipes want no skill at all. A skillet in every pack is what makes the meat that was
+        // being walked across the island for two gold into a supper somebody wants. See BotOven.
+        tools.Add(typeof(Skillet));
 
         if (Wants(klass, SkillName.Inscribe))
         {

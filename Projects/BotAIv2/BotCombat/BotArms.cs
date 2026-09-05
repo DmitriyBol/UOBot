@@ -111,8 +111,94 @@ public static class BotArms
         return near;
     }
 
+    /// <summary>Times a shooter was found with an empty quiver and put a blade in its hand instead.</summary>
+    public static long Dry { get; private set; }
+
+    /// <summary>Times one of those took its bow back up because it had something to fire again.</summary>
+    public static long Restrung { get; private set; }
+
+    /// <summary>
+    /// Keeps a shooter's hand matched to its quiver: the blade when there is nothing to fire, the bow when
+    /// there is.
+    ///
+    /// <para>
+    /// <b>An empty quiver is an empty hand, and nothing on this shard knew it.</b> A bow with no arrows is a
+    /// weapon by every test in this file and by <c>Mobile.Weapon</c>, and the engine dutifully swings it:
+    /// <c>BaseRanged.OnSwing</c> calls <c>OnFired</c>, finds no ammunition, and returns having done nothing
+    /// at all — no damage, no message, no clue. Watched from outside it is a bot standing in front of a
+    /// mongbat for forty-five seconds with a hundred per cent of the mongbat left. Five archers ran
+    /// sixty-seven of those in ten minutes on 04.09.2026, and the rate had been climbing all night as the
+    /// population's arrows were spent: nobody fletches, the shopkeepers carry few, and gleaning brings back
+    /// one or two at a time off the ground.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Both directions, and one of them alone would have been a worse bug than the one it fixed.</b> A
+    /// shooter that drew its dagger and never went back to the bow would be permanently downgraded the
+    /// moment it restocked. So the hand follows the quiver, in both directions, and the swap is idempotent —
+    /// <c>Draw</c> does nothing when what is held already matches.
+    /// </para>
+    ///
+    /// <para>
+    /// This is <c>BotSlay</c>'s own rule about spells, applied to the thing it was written about: "a warrior
+    /// down to its last scroll closes and swings like a warrior rather than keeping a mage's distance on the
+    /// strength of one arrow".
+    /// </para>
+    /// </summary>
+    public static void Quiver(Mobile body, BotClass klass)
+    {
+        if (body is not BotMobile bot || klass?.Kit.Ranged is not { Count: > 0 } options)
+        {
+            return;
+        }
+
+        var pack = bot.Backpack;
+
+        if (pack == null)
+        {
+            return;
+        }
+
+        // Anything this class's bows could fire, not merely what the one in its hands takes: a crossbow in
+        // the pack and bolts to go with it is a loaded shooter however empty the bow it happens to hold.
+        var stocked = false;
+
+        for (var i = 0; i < options.Count && !stocked; i++)
+        {
+            var ammo = options[i].Ammunition;
+
+            stocked = ammo != null && pack.GetAmount(ammo) > 0;
+        }
+
+        var held = bot.Weapon as Item;
+        var shooting = held is BaseRanged && held.Parent == bot;
+
+        if (shooting == stocked)
+        {
+            return;
+        }
+
+        if (!bot.Draw(melee: !stocked))
+        {
+            return;
+        }
+
+        if (stocked)
+        {
+            Restrung++;
+        }
+        else
+        {
+            Dry++;
+        }
+    }
+
     public static bool Check(Mobile body, BotClass klass)
     {
+        // Before "is it holding a weapon", because a bow with nothing to fire passes that test and fails the
+        // fight. See Quiver.
+        Quiver(body, klass);
+
         if (Armed(body, klass))
         {
             return true;
@@ -157,8 +243,8 @@ public static class BotArms
 
     public static string Describe() =>
         Caught == 0
-            ? $"nobody has been caught bare-handed; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body"
-            : $"{Caught} found bare-handed: {Rearmed} had one in the pack, {Empty} had nothing at all; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body";
+            ? $"nobody has been caught bare-handed; {Dry} found with an empty quiver and {Restrung} took the bow back up; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body"
+            : $"{Caught} found bare-handed: {Rearmed} had one in the pack, {Empty} had nothing at all; {Dry} found with an empty quiver and {Restrung} took the bow back up; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body";
 
     public static void Forget()
     {
@@ -168,5 +254,7 @@ public static class BotArms
         Empty = 0;
         Dressed = 0;
         Declined = 0;
+        Dry = 0;
+        Restrung = 0;
     }
 }
