@@ -428,19 +428,38 @@ And the top eight are all one thing:
 hearth really is at Z=20. It is on a ledge, a roof, an upper floor: a bot cannot stand on the fire tile, and
 on raised ground there is no reachable neighbour at that height either.
 
-**The defect is that nothing ever strikes it off.** `BotGround` has no shunning, no failure count, no
-unreachable memory of any kind — grep it: there is no `Shun`, no `Unreachable`, no `Bad`. A hearth recorded
-once is offered forever, so the same four places absorb about 210 attempts each over one run, and every
-attempt costs a walk across the island.
+**Not one of the four was ever reached — 0 successes against 887 attempts.** That is what rules out the
+other candidate: a fire that is merely crowded would still show successes between the failures.
 
-This is the [[bot-note-written-but-not-read]] family with the note missing entirely rather than merely
-unread.
+**There are two guards against exactly this, both sit in the chosen path, and neither can fire.** The first
+version of this note said `BotGround` had no such memory at all; that was a bad grep (`Shun|Unreachable|Bad`)
+against code that spells it `Cautious` and `BotReach.Ask`.
 
-**Proposed fix, not deployed.** Count consecutive `no way through` per hearth and stop choosing one past a
-small bound — the same shape `BotQuad` already uses for quiet quadrants, which reports `11 shut and 0
-reopened`. Two cautions: with only twelve hearths, shutting them off must be reversible (a fire can become
-reachable when a door opens or a bot approaches from another side), and the count must be per *place*, not
-per bot, or fifty bots each get their own private twelve failures.
+1. `ledger?.Cautious(kind, on, where)` — **the code's own comment says it has never once fired**, because
+   `BotWill.Settle` files the caution under the undertaking's name ("cook") and `Nearest` asks under the
+   place's name ("hearth"). Both keys are right and they never meet. The comment records the same defect
+   costing 76 walks to one counter in 11 minutes on 25.08.
+2. `BotReach.Ask(...) == BotReachVerdict.Sealed` — cannot fire here by construction. The enum has three
+   values, and `Sealed` means *a pocket walked to its edges*. These fires stand on the island's main
+   landmass, which is never walked to its edges inside the budget — that is what every `TooBig` in the error
+   log is saying. **So the night's two findings are one: `TooBig` is the reason the unreachable-place guard
+   is silent.**
+
+**And the distance that picks the winner ignores Z entirely** — `Nearest` takes `Math.Sqrt` over X and Y
+only. A fire twenty tiles up a cliff measures as near as one on the road, so the bad ones win on merit.
+
+This is the [[bot-note-written-but-not-read]] family twice over: one note written under a key nobody reads,
+one guard whose question cannot be answered in the affirmative for any place that matters.
+
+**Proposed fix, not deployed, and the diagnosis points at the cheapest one.** Test standability when the
+hearth is *recorded*, not when it is walked to: a fire with no standable neighbouring tile is a fire nobody
+can ever cook at, it costs one check per hearth for the life of the shard, and it needs no memory, no
+timer and no reversibility argument. Failing that, the honest repair is guard 1 — make `Settle` file the
+caution under the place's name as well as the trade's — which fixes counters and forges in the same stroke,
+since the comment says they have been broken the same way since 25.08.
+
+A per-place failure count is the weakest of the three: it pays for the walk before it learns anything, and
+with twelve hearths it has to be reversible or a passing obstruction retires a good fire forever.
 
 **Why it was not fixed on the spot:** the fix needs a rebuild and a restart, and the restart would destroy
 the run that produced these numbers — the observation that was asked for. It also wipes the survey, which is
