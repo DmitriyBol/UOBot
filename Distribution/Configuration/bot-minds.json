@@ -36,8 +36,8 @@
       "Reject any trade not involving a harrowing square; they yield zero follower gain on this shard.",
       "On this shard, accept only trades involving a harrowing square; reject all others immediately.",
       "On this shard, reject all trades named 'Baron' immediately; they yield zero follower gain regardless of duration.",
-      "On this shard, reject Stroll if expected follower gain is zero, even when no harrowing squares stand.",
-      "On this shard, reject Stroll if forecasted value is zero or negative regardless of duration."
+      "On this shard, reject Stroll if forecasted value is zero or negative regardless of duration.",
+      "If a harrowing square is standing, reject Stroll immediately regardless of shard forecast accuracy."
     ]
   }
 }

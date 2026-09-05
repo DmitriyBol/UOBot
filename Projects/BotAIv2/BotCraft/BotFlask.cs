@@ -339,6 +339,37 @@ public static class BotFlask
 
     private static bool _saidNeeds;
 
+    /// <summary>
+    /// Why the last look at the mortar found nothing, split apart because one bucket was holding three
+    /// answers.
+    ///
+    /// <para>
+    /// <b>"Had the glass but no herbs" was everything Choose refused for.</b> It refuses on three quite
+    /// different grounds — the skill will not carry any draught, the reagent is not in the pack, or the
+    /// recipe table has nothing that fits — and the alchemist wrote all three into one number. Measured on
+    /// 05.09.2026 the share of new asks landing there rose from 14% to 37% inside one run *after* the
+    /// reagents were fixed, which is a time pattern rather than a supply one and could not be read at all
+    /// while the three were together.
+    /// </para>
+    /// </summary>
+    public enum Refusal
+    {
+        /// <summary>A draught can be made. Not a refusal.</summary>
+        None,
+
+        /// <summary>Every recipe wants more Alchemy than this bot has, less the margin.</summary>
+        Unskilled,
+
+        /// <summary>Skill enough, and not one of the reagents in the pack.</summary>
+        Reagentless,
+
+        /// <summary>Every draught it could make is at its cap or resting.</summary>
+        Full
+    }
+
+    /// <summary>Why the last <see cref="Choose"/> came back empty. For the summary.</summary>
+    public static Refusal Why { get; private set; }
+
     private static IReadOnlyList<Type> Wanted()
     {
         List<Type> want = [];
@@ -465,11 +496,16 @@ public static class BotFlask
     public static CraftItem Choose(IBotWilful will, Mobile bot, out Type made)
     {
         made = null;
+        Why = Refusal.None;
 
         if (bot == null || System == null)
         {
             return null;
         }
+
+        // Which of the three grounds the refusal rests on, if it comes to one. See Refusal.
+        var anySkilled = false;
+        var anyFull = false;
 
         CraftItem best = null;
         var bestStock = 0;
@@ -490,12 +526,15 @@ public static class BotFlask
                 continue;
             }
 
+            anySkilled = true;
+
             // <b>Five of a kind is the whole of what one bot may have going, pack and stall together.</b> The
             // draught is passed over rather than the round refused, so a brewer at its cap on heal potions
             // goes on to cure — which is the point of counting each kind apart. See Cap and RestMs.
             if (Resting(bot, kind))
             {
                 Capped++;
+                anyFull = true;
 
                 continue;
             }
@@ -503,6 +542,7 @@ public static class BotFlask
             if (Held(will, bot, kind) >= Cap)
             {
                 Capped++;
+                anyFull = true;
                 Rest(bot, kind);
 
                 continue;
@@ -528,6 +568,17 @@ public static class BotFlask
             bestStock = stock;
             best = recipe;
             made = kind;
+        }
+
+        // <b>Why, when the answer is nothing.</b> Three quite different grounds arrive at the alchemist as
+        // one number — "had the glass but no herbs" — and it was 211 of a window's asks with a share that
+        // rose from 14% to 37% inside one run *after* the reagents were put right, which is a pattern in
+        // time rather than in supply and could not be read while the three were together. Named in the order
+        // that decides what to do: a bot that cannot make anything wants a lesson, one that is full wants
+        // nothing, and one merely out of reagents wants an errand.
+        if (best == null && asked == null)
+        {
+            Why = anyFull ? Refusal.Full : anySkilled ? Refusal.Reagentless : Refusal.Unskilled;
         }
 
         if (asked == null)

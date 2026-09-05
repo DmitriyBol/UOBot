@@ -150,6 +150,21 @@ not meeting.
 `with metal but not enough for any recipe they can work`. Success went from 29% to 86% and pieces made went
 up, so the trade is ahead — but the number has not been tuned, only chosen.
 
+**Twenty of sixty `Forget()` methods are unreachable from any module's `Reset()`.** Their counters never go
+back to nought — not even on a world reload, which is the one event that resets the other forty.
+`BotHerbalist.Forget` was one of them and is now wired; the rest are listed by walking the call graph from
+each module's `Reset()`:
+
+```
+grep -l Module.cs, take each public override void Reset(), collect X.Forget*() calls,
+follow those through the bodies of the Forget methods they name, and diff against
+every public static void Forget*() declared in the assembly
+```
+
+Left alone deliberately. The practical weight is small — the summary is cumulative anyway, and a world
+reload inside a session is rare — and wiring twenty resets blind risks double-resetting counters whose scope
+nobody has checked. It is a consistency problem worth one careful pass, not a defect worth a blind sweep.
+
 **Three dials are `code only`.** `BotAnvil.Tries`, `BotOven.Keeps`, `BotBake.Keeps` — `BotCraftSettings` was
 written when sewing was the only craft and was never widened. They cannot be turned without a rebuild.
 

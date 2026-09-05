@@ -36,6 +36,25 @@ public sealed class BotAlchemist : IBotProposer
 
     public static long NoHerbs { get; private set; }
 
+    /// <summary>
+    /// Of those, the ones whose Alchemy will not carry a single draught yet.
+    ///
+    /// <para>
+    /// <b>One bucket was holding three answers, and the shard said so for hours before anybody could read
+    /// it.</b> "Had the glass but no herbs" is everything <c>BotFlask.Choose</c> refuses for, and it refuses
+    /// on three grounds that want opposite responses: no skill, no reagent, or everything already at its
+    /// cap. Measured across eight windows the share of new asks landing there settled at 85%, which is not a
+    /// supply figure at all — no shortage is that uniform. See <c>BotFlask.Refusal</c>.
+    /// </para>
+    /// </summary>
+    public static long Unskilled { get; private set; }
+
+    /// <summary>Of those, the ones with the skill and not the reagent. The only one an errand can answer.</summary>
+    public static long Reagentless { get; private set; }
+
+    /// <summary>Of those, the ones whose every draught is at its cap or resting.</summary>
+    public static long Stocked { get; private set; }
+
     public static long NoGlass { get; private set; }
 
     /// <summary>
@@ -119,6 +138,24 @@ public sealed class BotAlchemist : IBotProposer
             }
 
             NoHerbs++;
+
+            switch (BotFlask.Why)
+            {
+                case BotFlask.Refusal.Unskilled:
+                    Unskilled++;
+
+                    break;
+
+                case BotFlask.Refusal.Full:
+                    Stocked++;
+
+                    break;
+
+                default:
+                    Reagentless++;
+
+                    break;
+            }
 
             return null;
         }
@@ -273,7 +310,7 @@ public sealed class BotAlchemist : IBotProposer
         Asked == 0
             ? $"nobody has been offered the mortar ({NoKit} answers went to bots with no pestle)"
             : $"{Asked} asked to brew: {ToOrder} took an order off the board, {OnSpec} brewed on spec, "
-              + $"{NoHerbs} had the glass but no herbs, {Bare} had neither, {AtCap} were at the cap of {BotFlask.Cap} on everything they can make ({BotFlask.Capped} draughts passed over for it, {BotFlask.Rests} stood off for {BotFlask.RestMs / 60000} minutes), "
+              + $"{NoHerbs} had the glass but no herbs ({Unskilled} of them cannot carry a single recipe yet, {Reagentless} have the skill and not the reagent, {Stocked} are at the cap on everything), {Bare} had neither, {AtCap} were at the cap of {BotFlask.Cap} on everything they can make ({BotFlask.Capped} draughts passed over for it, {BotFlask.Rests} stood off for {BotFlask.RestMs / 60000} minutes), "
               + $"{NoGlass} had the herbs but no glass ({Sent} sent to buy some, {NoShop} found no counter with one in stock "
               + $"within reach, {NoPrice} found a counter that named no price)";
 
@@ -285,6 +322,9 @@ public sealed class BotAlchemist : IBotProposer
         Asked = 0;
         NoKit = 0;
         NoHerbs = 0;
+        Unskilled = 0;
+        Reagentless = 0;
+        Stocked = 0;
         NoGlass = 0;
         Bare = 0;
         AtCap = 0;
