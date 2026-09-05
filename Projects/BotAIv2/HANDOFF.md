@@ -195,10 +195,26 @@ The plain reading is that stalls open full of what the gatherers have just liste
 faster than the gatherers refill, and the rest is bought over a counter — which is money leaving the world,
 increasingly so the longer the shard lives.
 
-**What to measure, and it is not this number.** "How much went to shopkeepers" is the symptom. The question
-is whether the gatherers keep up with demand: listings against purchases, per kind of goods, over time. A
-kind that is bought faster than it is listed is the one to look at, and this counter cannot tell you which
-kind that is.
+**Measured, and the answer is capacity rather than a defect.** The stall stock over one run:
+
+```
+stalls:   162  219  249  282  320  353  368  391      rising
+things:  2091 3003 2170 2067 2014 1586 1110  863      falling by 71%
+worth:  12940 17363 9562 7700 6702 5417 4350 4574
+```
+
+More sellers holding less each. The goods are not evaporating — 505 sales and fills against 79 listings
+forgotten — they are being bought: 2491 reagents listed over the run against 1213 purchases off stalls and a
+net loss of 2140 things. Demand outruns supply, the stalls empty, and the rest of the shard's shopping goes
+over a counter, which is money leaving the world. Purses fall while turnover rises, which is the same fact
+seen from the other end.
+
+**The supply is two bots.** Herbs are gathered by the `Gatherer` class alone — `BotHerbalist` answers "this
+bot may not" to everyone else — and `bot-population.json` raises two of them against fifty-three consumers.
+
+So this is a decision about what the island should be, not a defect to fix: the lever is the class mix, and
+it belongs to Patrick. The arithmetic for how many gatherers would balance listings against purchases falls
+straight out of the numbers above.
 
 **The market moves one way.** `StaleMs` marks a seller's price down on a timer and never moves a buyer's bid
 up: of 191 price cuts in one window, one moved towards an actual bid and none moved up, with
