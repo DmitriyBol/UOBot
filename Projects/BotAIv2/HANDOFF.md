@@ -379,7 +379,22 @@ at what is refusing the roads*. Bots refusing each other's roads fits every part
 rescue drops a bot somewhere it cannot leave.
 
 **How to test it:** count our own bodies within a few tiles when the message fires. If crowding is the
-answer, the rescue destination is the bug — carrying a stranded bot into the one place guaranteed to be full. Not touched: this is `BotMovement`, which `ARCHITECTURE.md` calls the part
+answer, the rescue destination is the bug — carrying a stranded bot into the one place guaranteed to be full.
+
+**And it arrives in a wave, which the crowding story would predict.** Errors per ten minutes of one run:
+
+```
+0-9   2      40-49   6
+10-19 2      50-59  14
+20-29 5      60-69  16
+30-39 2      70-79   2
+```
+
+Eightfold at fifty to seventy minutes against the first half hour, then collapsing to two. The population
+works near home at first and almost nothing happens; it spreads, the strandings spike; the rescues carry
+everybody back, and it goes quiet. If that is the cycle it should repeat, and a two-hour run would show a
+second wave. Worth confirming before anything is touched — a mechanism that damps itself is a different
+problem from one that runs away. Not touched: this is `BotMovement`, which `ARCHITECTURE.md` calls the part
 that accumulated more measured defects than everything else together.
 
 ---
