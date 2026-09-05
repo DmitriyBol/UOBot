@@ -185,6 +185,21 @@ route.** It is built by bots walking, never saved, and a trade whose supply depe
 happened to wander will keep producing this shape — a craft that looks broken on a young shard and cures
 itself an hour later, with nothing anywhere saying which it is doing.
 
+**Supply drifts back to the shopkeepers as a run ages, and it has now done it twice.** Pricing a picked
+reagent at the shelf moved supply buying from `173 to a shopkeeper, 41 to a stall` to `1 / 311`. That holds on
+a young shard and then decays: on one run it reached `1879 / 1944`, and on the next it crossed over at
+`1206 to a shopkeeper, 1179 to a stall` after about an hour. Two runs, same shape, so it is not a fluke of
+one.
+
+The plain reading is that stalls open full of what the gatherers have just listed, the population empties them
+faster than the gatherers refill, and the rest is bought over a counter — which is money leaving the world,
+increasingly so the longer the shard lives.
+
+**What to measure, and it is not this number.** "How much went to shopkeepers" is the symptom. The question
+is whether the gatherers keep up with demand: listings against purchases, per kind of goods, over time. A
+kind that is bought faster than it is listed is the one to look at, and this counter cannot tell you which
+kind that is.
+
 **The market moves one way.** `StaleMs` marks a seller's price down on a timer and never moves a buyer's bid
 up: of 191 price cuts in one window, one moved towards an actual bid and none moved up, with
 `15410 stalls had no bid to move towards`. One dial doing two opposite jobs. **Left deliberately for
