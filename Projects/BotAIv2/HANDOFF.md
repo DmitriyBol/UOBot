@@ -506,6 +506,34 @@ with twelve hearths it has to be reversible or a passing obstruction retires a g
 the run that produced these numbers — the observation that was asked for. It also wipes the survey, which is
 never saved, so the twelve hearths would have to be rediscovered before the fix could be judged at all.
 
+### And it is not only the hearths: the shard's own guard lines read zero
+
+The same 20-minute window that carries 482 cook failures carries **2197 `no way through` in all**, and every
+trade that degraded names the same cause — herbs 345 of 346, prowl 810 of 857, peddle all of its:
+
+```
+  to a map coordinate   1947
+  to a named person      173      (Kepa, Caine, Ximena, Odon - shopkeepers)
+  to a creature           77
+```
+
+**And the two guard lines report nothing, across the whole run:**
+
+```
+0 counters passed over for having no way through to them
+0 with no forge in reach
+```
+
+A guard that has refused nothing in 2h50m, while 173 walks to a counter fail in twenty minutes. `Nearest` is
+shared by counters, forges and hearths, so this is one defect wearing three coats — and the code's own
+comment already said so for counters and forges, with a date on it.
+
+**What this does not prove.** The 1947 coordinate failures are not shown to come through `Nearest`; herbs and
+prowl aim at ground the survey never recorded, so they reach their targets by another road. They fail with
+the same words, which is suggestive and no more. Establishing whether they share a mechanism is the first
+thing to measure next, and it is worth doing before any fix: if they do, one repair covers 2197 failures a
+window; if they do not, repairing `Nearest` covers about 250 of them and the larger number is untouched.
+
 ### Confirmed on a second, longer run — and the two populations turn out to be one
 
 A 90-minute run (`session-2026-09-05_19-44`) reproduces the baseline exactly and sharpens both figures.
