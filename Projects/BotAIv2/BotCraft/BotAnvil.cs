@@ -301,10 +301,24 @@ public static class BotAnvil
     /// </para>
     ///
     /// <para>
-    /// Three is the smallest number that lets a smith miss twice and still make the thing: one piece costs
-    /// <c>c</c>, two misses cost <c>c</c> between them. It is a multiplier and not a floor, because what a
-    /// round eats depends on what is being made, and a number that did not depend on the recipe is how these
-    /// two thresholds came to sit on one shelf in the first place.
+    /// <b>What three actually buys, said properly, because the first version of this note said two.</b> A
+    /// miss costs half a piece, so <c>3c</c> carries four misses and then the piece — not two, which is
+    /// <c>2c</c>. Three is kept because it is what was measured: stints producing something went from three
+    /// in ten to eight in ten. Two was never tried, and the note claiming three was the smallest number that
+    /// would do was arithmetic that did not match its own number.
+    ///
+    /// <para>
+    /// <b>It is not free.</b> Dividing the pile by it turned 82 smiths in one window into "with metal but not
+    /// enough for any recipe they can work", where that bucket used to read nought. The trade is ahead —
+    /// more pieces out of fewer stints — but this is a dial that has been chosen once and never tuned, and
+    /// the number to watch when tuning it is that bucket against the count of stints that produced something.
+    /// </para>
+    ///
+    /// <para>
+    /// A multiplier and not a floor, because what a round eats depends on what is being made, and a number
+    /// that did not depend on the recipe is how these two thresholds came to sit on one shelf in the first
+    /// place.
+    /// </para>
     /// </para>
     /// </summary>
     public static int Tries { get; set; } = 3;

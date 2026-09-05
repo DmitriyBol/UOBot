@@ -677,6 +677,26 @@ has no supply.
 **A one-way ratchet.** A meter the engine only ever increases — hunger is the known one — makes a mechanism
 work a few times and then stop for good, with nothing in the log saying so.
 
+**Two errands wearing one name.** `BotSeeker` buys a scroll to write into a book; `BotArmoury` buys one to
+throw. Both built the same undertaking, which then tried to put every scroll into a book — so 233 of 430
+rounds in a session reported "the book would not take it" about warriors who had no book, had never wanted
+one, and had got exactly what they set out for. A round that succeeded, filed as a failure, 233 times, with
+the ledger pricing the trade off it. Underneath the mislabelling was a real refusal in the other direction: a
+caster that knew a spell could never buy a scroll of it to throw. When one undertaking serves two callers,
+ask what each of them wanted, and make it say which.
+
+**The first one of that type is not necessarily yours.** `FindItemByType<T>` returns whichever it meets
+first, and this population goes through every corpse it makes — so one looted necromancer's spellbook sitting
+in a caster's pack would answer "where is your spellbook" for ever after. Only a lookup whose *subtype*
+matters is exposed: the other twelve in this assembly ask for a concrete tool, where any skillet really is a
+skillet. Audited on 05.09.2026; only the spellbook was exposed, and it was **not** the cause of the scroll
+losses above — that theory was wrong, and the line above it is what actually did it.
+
+**Instrument before you fix.** Both of the entries above were first diagnosed wrong, on theories that were
+plausible and had the shape of defects this project has really had. What settled them was making the sentence
+in the log say which of its four ways it had failed. A guess costs a rebuild and a restart; a named counter
+costs the same once and never lies again.
+
 **The exit taken between the swing and the timer.** Crafting is asynchronous: the last swing takes the
 material before it gives back the thing. Counting before the next swing is only half the rule — a round that
 *ends* the moment its material runs out ends inside exactly that gap, and reports, truthfully as far as it can

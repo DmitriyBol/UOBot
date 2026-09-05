@@ -31,7 +31,7 @@ place: `BotWill`.
                     └───────┬───────────────────────┬──────────┘
                             │ asks every proposer   │ advances the held deed
         ┌───────────────────┴───────┐               │
-        │  IBotProposer  (8 of them)│               │  BotDoing: walk / work / done / failed
+        │ IBotProposer (28 of them) │               │  BotDoing: walk / work / done / failed
         │  Harvest Craft Spells     │               │
         │  Hunt Mend Shops Peddle   │               ▼
         └───────────────────────────┘        BotMovement (a step, a path, a queue of errands)
@@ -100,7 +100,7 @@ The intended layering, from the bottom:
 
 ```
 0  BotModules      the frame: phases, declared needs, a switch on each
-1  BotClasses      data: nine kinds of bot, what they want, what they carry
+1  BotClasses      data: thirteen kinds of bot, what they want, what they carry
 2  BotOutfit       what a bot owns and what death may not take
    BotMovement     a step, a path, pockets of unreachable ground, a queue of errands
    BotCombat       strength, threat, fight-or-walk — pure arithmetic over Mobile
@@ -113,7 +113,7 @@ The intended layering, from the bottom:
    BotHunt         close → fight → loot
    BotMend         heal, self above everything
 6  BotPopulation   the bot itself, and the population's clock
-   BotDashboard    [bots — three tabs
+   BotDashboard    [bots — five tabs
 ```
 
 **Four real inversions, named rather than hidden.** All four compile (one assembly), and each is a small debt
@@ -352,12 +352,16 @@ silence it with `NoWarn`.
 
 Naming these is part of the design. Each is a decision, not an oversight.
 
-**Squads are written and unwired.** `BotSquad` is 1 551 lines and nothing calls `BotSquads.Form`. Cooperation
-is already emergent and free: `BotThreat.OurPower` counts the neighbours, so two bots in a field take on what
-one would walk away from, and neither had to be told the other was there. Joining a company, when it comes,
-will be an obligation with a price (a share of the takings) rather than a muster by order — in v1 twelve of
-twenty bots were tied up "assisting", so the economy worked and there was nobody to take part in it. Until
-then this is dead code that compiles, which is the most expensive kind: it looks maintained.
+**Squads were written and unwired, and no longer are.** This paragraph stood unchanged while three callers
+appeared — a prowl that finds something one bot cannot take, a patrol, and the Baron's harrowing — and
+companies now form and disband on every session. The design it argued for is what shipped: joining is an
+obligation with a price, a share of the takings, rather than a muster by order. The v1 warning it was guarding
+against is still the one to keep in mind — twelve of twenty bots tied up "assisting", so the economy worked
+and there was nobody left to take part in it — which is what the `Bound` rung and `BotSpoils` are for.
+
+It is left here rather than deleted because the way it went wrong is the point: nothing in the shard
+complained, nothing in the log disagreed, and the sentence stayed true-looking for a fortnight after it
+stopped being true. That is what every hand-written document in this project is exposed to.
 
 **Nothing persists across a restart.** The population is rebuilt from configuration on every world load, so
 skills, spellbooks and ledgers all live one session. `BotBond` deliberately does not serialise — the engine's
@@ -381,22 +385,18 @@ and that every engine call was read out of the fork's source first.
 
 ## 12. Where to look for what
 
-| Question | Folder | Read |
-|---|---|---|
-| How does a subsystem get loaded, and how do I switch one off? | `BotModules` | `BotModules/README.md` |
-| What is a warrior? What does a mage own? | `BotClasses` | `BotClasses/README.md` |
-| What may death take from a bot? Why is issued gear weightless? | `BotOutfit` | `BotOutfit/README.md` |
-| How does a bot get anywhere? Why doesn't it get stuck? | `BotMovement` | `BotMovement/README.md`, `RESEARCH.md` |
-| Should this bot fight this thing? | `BotCombat` | `BotCombat/README.md` |
-| Why is this bot doing this? | `BotWill` | `BotWill/README.md` |
-| How do bots trade with each other? Who is short of what? | `BotAuction` | `BotAuction/README.md` |
-| How does a bot buy or sell over a counter? | `BotShops` | `BotShops/README.md` |
-| Where does metal come from? | `BotHarvest` | `BotHarvest/README.md` |
-| Where do finished goods come from? | `BotCraft` | `BotCraft/README.md` |
-| Where do spells come from, and why does a mage want them? | `BotSpells` | `BotSpells/README.md` |
-| Where does **gold** come from? | `BotHunt` | `BotHunt/README.md` |
-| What happens when a bot is losing? | `BotMend` | `BotMend/README.md` |
-| What is a bot, mechanically, and what drives its turn? | `BotPopulation` | `BotPopulation/README.md` |
-| How do I watch any of this? | `BotDashboard` | `BotDashboard/README.md` |
-| Squads, if they are ever wired up | `BotSquad` | `BotSquad/README.md` |
-| Who deals with ground that has already killed people? | `BotBaron` | `BotBaron/README.md` |
+**This section used to be a table of question → folder → README, and it is gone on purpose.** `MAP.md` answers
+the same question at file granularity, is generated from the source, and carries three things this table
+never could: which summary line each subsystem writes, what work it offers and on which rung, and the traps
+in it. A second index kept by hand is a second index to fall behind — which is what happened to four of the
+claims above before anybody noticed.
+
+| you want | read |
+|---|---|
+| where a file, a number or a log line lives | `MAP.md` |
+| what a dial is set to, and whether a config file can reach it | `DIALS.md` |
+| what the project is, what the bots do, how the economy works | `README.md` |
+| the state of the work and what is open | `HANDOFF.md` |
+| how to build it and what the boot log should say | `BUILD.md` |
+| why one subsystem decides what it decides | `<Subsystem>/README.md` |
+| **why the whole thing is shaped like this** | you are reading it |

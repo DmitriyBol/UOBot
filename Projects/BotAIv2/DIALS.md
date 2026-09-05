@@ -240,7 +240,7 @@ changed without a rebuild.
 | `BotMeal` | `Cheer` | `40.0` | *code only* |
 | `BotMeal` | `LastsMs` | `600000` | *code only* |
 | `BotMeal` | `Quickening` | `0.5` | *code only* |
-| `BotOven` | `Keeps` | `10` | *code only* |
+| `BotOven` | `Keeps` | `20` | *code only* |
 | `BotOven` | `Reach` | `2` | *code only* |
 | `BotOven` | `Worth` | `6` | *code only* |
 | `BotOven` | `Worthwhile` | `2` | *code only* |

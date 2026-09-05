@@ -113,8 +113,17 @@ public static class BotOven
     /// sells its meat — that is the butcher's trade and it is what prices the stuff — and a cook that kept
     /// every carcass it walked past would be a larder rather than a hunter.
     /// </para>
+    ///
+    /// <para>
+    /// <b>Twenty, and it has to be twenty because that is what a cook orders.</b> It was ten for half an
+    /// hour, against <c>BotStores.Batch</c> of twenty — so a cook whose order for twenty ribs was filled
+    /// immediately listed ten of them straight back, at rather less than it had just paid for them. Nobody
+    /// would have noticed: both numbers were defensible on their own and the loop is quiet, a few gold at a
+    /// time. It is this project's commonest defect, and this time it was introduced by the person fixing the
+    /// trade rather than found in it. The two numbers are one number.
+    /// </para>
     /// </summary>
-    public static int Keeps { get; set; } = 10;
+    public static int Keeps { get; set; } = 20;
 
     /// <summary>Stacks of raw meat kept off the market for a cook's own pan. For the summary.</summary>
     public static long Spared { get; private set; }
