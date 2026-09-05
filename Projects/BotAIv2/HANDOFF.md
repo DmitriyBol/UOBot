@@ -408,14 +408,15 @@ answer, the rescue destination is the bug — carrying a stranded bot into the o
 0-9   2      40-49   6
 10-19 2      50-59  14
 20-29 5      60-69  16
-30-39 2      70-79   2
+30-39 2      70-79  15
 ```
 
-Eightfold at fifty to seventy minutes against the first half hour, then collapsing to two. The population
-works near home at first and almost nothing happens; it spreads, the strandings spike; the rescues carry
-everybody back, and it goes quiet. If that is the cycle it should repeat, and a two-hour run would show a
-second wave. Worth confirming before anything is touched — a mechanism that damps itself is a different
-problem from one that runs away. Not touched: this is `BotMovement`, which `ARCHITECTURE.md` calls the part
+Eightfold at fifty minutes against the first half hour, and then **it stays there**. It does not damp.
+
+This paragraph first read the last bucket as a collapse to 2 and concluded the mechanism puts itself out.
+That bucket was simply not finished yet — the run had not reached the end of it. Half an hour later it had
+filled to 15. **A partial last bucket read as a completed one**, which is the same mistake as reading a young
+shard as a settled one, and it changes the whole answer: a plateau and a decay want different fixes. Not touched: this is `BotMovement`, which `ARCHITECTURE.md` calls the part
 that accumulated more measured defects than everything else together.
 
 ---
