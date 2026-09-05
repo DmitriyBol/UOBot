@@ -23,6 +23,8 @@ produced, less what was spent.
 | `BotWill.cs` | the decision itself: settle → advance → auction. And the census |
 | `BotWillConfig.cs` | `Configuration/bot-will.json` |
 | `BotWillModule.cs` | module, phase `World`, requires `Classes` |
+| `BotCommons.cs` | what the population as a whole has found out about what pays where |
+| `IBotWilful.cs` | what deciding needs a bot to be |
 
 ---
 

@@ -19,6 +19,7 @@ The analysis all of this is built on is in `RESEARCH.md`. This file is only what
 | `BotWalk.cs` | the moment of the step: doors, occupied tiles, casting, a last line of defence |
 | `BotMovementConfig.cs` | `Configuration/bot-movement.json` — budgets and deadlines only |
 | `BotMovementModule.cs` | module, phase `World`, depends on nothing |
+| `BotErrand.cs` | one thing a bot is trying to get to |
 
 ---
 

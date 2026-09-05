@@ -12,12 +12,13 @@ comment is the thing to change; this file is regenerated from those, never edite
 - The shape of the whole thing → `ARCHITECTURE.md`
 - Why a decision is the way it is → that subsystem's `README.md`
 
-**A warning about those READMEs.** They were written once, subsystem by subsystem, and several now
-describe a shard that no longer exists — `BotClasses` says nine classes where the engine reports thirteen,
-`BotDashboard` says three tabs where it opens five, `BotSquad` says nothing calls `BotSquads.Form` when
-three things do and companies form every session, and `mindedBots` says the Baron is not raised when he is.
-Read them for reasoning, never for facts. §2 below is generated from the source and cannot drift the same
-way.
+**A warning about those READMEs.** They are written by hand and they fall behind. On 05.09.2026 four of
+them described a shard that no longer existed — nine classes where the engine reports thirteen, three
+dashboard tabs where it opens five, "nothing calls `BotSquads.Form`" where three things do, and a Baron
+"not raised" who has been raised for days — and fourteen listed fewer files than their folders held.
+All of that is corrected, and `regen-map.py` now prints a line for any README whose file table has drifted
+again, because the way it accumulated was silently. Read them for reasoning; read §2 below, which is
+generated from the source, for facts.
 
 ---
 
@@ -675,6 +676,18 @@ has no supply.
 
 **A one-way ratchet.** A meter the engine only ever increases — hunger is the known one — makes a mechanism
 work a few times and then stop for good, with nothing in the log saying so.
+
+**The exit taken between the swing and the timer.** Crafting is asynchronous: the last swing takes the
+material before it gives back the thing. Counting before the next swing is only half the rule — a round that
+*ends* the moment its material runs out ends inside exactly that gap, and reports, truthfully as far as it can
+see, that nothing came of it. Any exit condition on "the material is gone" needs one swing's worth of
+patience.
+
+**A trade that can only use what it happens to be holding.** Every other craft here puts a funded order on
+the board for what it is short of; the cook could not, so 94% of every look at the skillet answered "no meat"
+while the hunters carrying it walked past. The counterweight is the glass rule: **a material with no producer
+must not be ordered by the armful**, because an order nobody can fill freezes the buyer's money in escrow
+until the market gives up on it.
 
 ---
 

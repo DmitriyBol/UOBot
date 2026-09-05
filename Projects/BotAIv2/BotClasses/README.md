@@ -1,6 +1,7 @@
 # Classes
 
-Nine classes, one file each. A class is **a description and a set of limits, with no behaviour**: it decides
+Thirteen classes, one file each — four melee, three ranged, two casters, a medic and three producers, four
+of which cast; the engine says so in one line at boot and that line is the only count worth trusting. A class is **a description and a set of limits, with no behaviour**: it decides
 nothing and controls nobody. Deciding is `BotWill`'s, and it reads classes the way it reads the map — as facts
 about the world.
 
@@ -16,6 +17,20 @@ about the world.
 | `BotArsenal.cs` | the weapons of the era, the spell ids and the potion types, named once |
 | `BotClasses.cs` | the registry of nine, and applying the configuration overrides |
 | `BotClassConfig.cs` | reading `Configuration/bot-classes.json` |
+| `BotArcher.cs` | the bow and nothing else, and the only class that can triple a hit |
+| `BotArchitect.cs` | the bot that is paid by the health of the market rather than by any errand in it |
+| `BotBaron.cs` | the one bot on the shard that is not trying to make a living |
+| `BotBrawler.cs` | fights with its hands, and is therefore never holding anything it has to put down |
+| `BotCaptain.cs` | the one bot on the shard that exists for the others rather than for itself |
+| `BotClassModule.cs` | the class layer as a module: reads its file, then says what the nine came out as |
+| `BotCrafter.cs` | metal, cloth and leather |
+| `BotGatherer.cs` | ore and timber, and the only bot that can find a reagent in the grass |
+| `BotHealer.cs` | the green staff |
+| `BotMage.cs` | a spellbook, a blue staff, and no metal |
+| `BotSage.cs` | the captain's opposite number, for the half of the population a captain cannot teach |
+| `BotWarrior.cs` | the plain fighter |
+| `BotWarriorArcher.cs` | shoots, and has a knife for when that stops working |
+| `BotWarriorMage.cs` | plate, a blade, and spells anyway |
 | the other nine | the classes themselves |
 
 ## The numbers, as the code has them

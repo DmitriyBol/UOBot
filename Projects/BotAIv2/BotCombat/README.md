@@ -8,6 +8,13 @@ needed reworking.
 | File | What is in it |
 |---|---|
 | `BotThreat.cs` | strength, threat, our side, and the decision to fight or walk on |
+| `BotArms.cs` | whether a bot has anything in its hands, asked at the moment it matters |
+| `BotBolt.cs` | getting away from whatever is killing it |
+| `BotCry.cs` | somebody of ours is being killed and has said so out loud |
+| `BotFugitive.cs` | offers a bot whose health is going the one thing that was missing from that rung: leaving |
+| `BotPeril.cs` | where the shard is dangerous, learned from the only two facts that actually say so: where bots are being hit, and where they are dying |
+| `BotRescue.cs` | going to somebody's aid, or hitting back at whatever is hitting you |
+| `BotRescuer.cs` | offers a free bot the chance to go to somebody's aid |
 
 No configuration file: the only dial is `Tolerance`, and it lives in code for now. When there is a second one
 there will be a file.

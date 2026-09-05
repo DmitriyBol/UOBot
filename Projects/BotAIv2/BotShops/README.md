@@ -12,6 +12,11 @@ buys cloth to work with — and whatever the population refused goes back over t
 | `BotPeddler.cs` | the proposer: whose stall the population has ignored |
 | `BotShopsConfig.cs` | `Configuration/bot-shops.json` |
 | `BotShopsModule.cs` | module, phase `World`, requires `Classes` and `Will` |
+| `BotBullion.cs` | a crafter with money buys its metal instead of going and digging it |
+| `BotNeeds.cs` | how often a bot reconsiders what it is short of |
+| `BotOrder.cs` | putting an order on the board, and going back for it when somebody has filled it |
+| `BotStores.cs` | a crafter short of the raw material of its trade, putting the order to the population |
+| `BotUpkeep.cs` | asking the population, by name, for a replacement for something that is wearing out |
 
 ---
 

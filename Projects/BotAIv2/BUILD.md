@@ -3,11 +3,16 @@
 For anybody with a clone of the engine fork to hand. Everything below was **read out of the fork itself**
 (`github.com/DmitriyBol/ModernUO-fork`, branch `main`) rather than guessed or copied from the first version.
 
-> **What to expect, honestly.** After these steps the shard builds, starts, **and four bots appear in Britain**
-> who dress themselves, take on work and go and do it. What you will not see: squads (nothing calls
-> `BotSquads.Form`, by decision), armour (there is none in the kit), or offensive spellcasting. All the work is
-> bounded to Britain (`Roam`, 200 tiles from the spawn point): a bot will never be offered a reason to cross a
-> continent.
+> **What to expect, honestly.** After these steps the shard builds, starts, **and fifty-three bots appear
+> outside Britain** who dress themselves, take on work and go and do it: they mine, cut wood, pick reagents,
+> forge, sew, brew, fletch, cook, write scrolls, trade over counters and with each other, bind wounds, hunt,
+> form companies, teach each other for a fee, and harrow ground that has killed somebody. Four of them think
+> through a local model if Ollama is running, and one invisible observer watches the rest.
+>
+> Everything in this box was written in August and described a much smaller shard — four bots, no squads, no
+> armour, roaming two hundred tiles. All four of those are now wrong, which is the standing hazard with these
+> documents: the numbers that matter live in `Distribution/Configuration/bot-*.json` and in the boot log, and
+> `MAP.md` is generated from the source. Trust those over prose.
 
 ---
 

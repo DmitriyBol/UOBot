@@ -12,6 +12,11 @@ Each block is half generated and half kept here:
 * kept in BLOCKS below — the paragraph saying what the subsystem is for, and the traps worth knowing before
   touching it.
 
+`regen-map.py` also reports drift in the subsystem READMEs rather than fixing it: those carry hand-written
+reasoning that a generator has no business rewriting, but their file tables silently fall behind the folder
+and that is how they came to say nine classes where there are thirteen. The check is a printed line, and
+acting on it is a person's job.
+
 DIALS.md is wholly generated: every `public static X Y { get; set; } = default;` in the assembly, with the
 default it was written with and the configuration key that overrides it where one exists. It is kept out of
 MAP.md so that the map stays cheap to read and a number stays one file away.
@@ -457,6 +462,48 @@ def dials(folders, order):
     return sum(len(f["dials"]) for f in folders.values()), sum(len(f["settable"]) for f in folders.values())
 
 
+ROW = re.compile(r"^\| `([A-Za-z0-9_]+\.cs)` \|")
+
+
+def drift():
+    """Subsystem READMEs whose file table no longer matches the folder. Reported, never rewritten."""
+    out = []
+
+    for folder in sorted(os.listdir(".")):
+        path = os.path.join(folder, "README.md")
+
+        if not os.path.isfile(path):
+            continue
+
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.read().split("\n")
+
+        # The first contiguous run of file rows is the "What is in it" table; later tables are other things.
+        first = last = None
+
+        for i, line in enumerate(lines):
+            if not ROW.match(line):
+                continue
+
+            if first is None:
+                first = last = i
+            elif i == last + 1:
+                last = i
+            else:
+                break
+
+        if first is None:
+            continue
+
+        listed = {ROW.match(lines[i]).group(1) for i in range(first, last + 1)}
+        actual = {f for f in os.listdir(folder) if f.endswith(".cs")}
+
+        if actual - listed or listed - actual:
+            out.append((folder, sorted(actual - listed), sorted(listed - actual)))
+
+    return out
+
+
 def main():
     folders = collect()
     order = ORDER + [f for f in sorted(folders) if f not in ORDER]
@@ -494,6 +541,17 @@ def main():
 
     if blank:
         print("no class summary, so no row text: " + ", ".join(blank))
+
+    for folder, undocumented, ghosts in drift():
+        parts = []
+
+        if undocumented:
+            parts.append("missing " + ", ".join(undocumented))
+
+        if ghosts:
+            parts.append("lists absent " + ", ".join(ghosts))
+
+        print("%s/README.md has drifted: %s" % (folder, "; ".join(parts)))
 
 
 if __name__ == "__main__":

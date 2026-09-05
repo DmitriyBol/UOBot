@@ -1,13 +1,12 @@
 # BotMindAI
 
-Three of the population have a mind: a local language model chooses what they do next. A fourth thinking
+Four of the population have a mind: a local language model chooses what they do next. A fifth thinking
 thing lives in this assembly and is not one of them — see **`debugger/`** below.
 
-**The Baron is not raised at the moment.** He was the fourth mind and is the only one whose subject is the
-island rather than a trade; the line that creates him is commented out in `BotMinds.Start` and `Baron` has
-been taken out of `bot-population.json`. Everything else about him — the class, the harrowings, the stipend,
-the paragraph in `BotMindSight.Calling` — is untouched and still correct. Putting the line back and adding
-the class to the population file is the whole of bringing him out again.
+**The Baron is the fourth**, and the only one whose subject is the island rather than a trade. He was out
+for a while — the line creating him commented out in `BotMinds.Start`, the class taken out of
+`bot-population.json` — and this file said so for longer than it was true. He is raised: `Baldric the baron`
+appears in the `Minds:` line every five minutes, and the `The Baron:` line is his own.
 
 **`debugger/` is a different kind of thing entirely** and shares only the transport. It is one invisible bot
 that watches the others and writes down what is wrong with them: no work, no wage, no mood, no class, and it
@@ -90,6 +89,8 @@ rules belong to. Without that, "it learns" is a claim nothing can support.
 | `BotMindProposer.cs` | The one place a thought becomes an offer. |
 | `BotOllama.cs` | The only thing that leaves the game thread. |
 | `BotMindLog.cs` | `logs/bot-minds.log` — decisions and reckonings, in order. |
+| `BotMindConfig.cs` | what Configuration/bot-mind.json is allowed to say |
+| `BotMindTalk.cs` | the one place the thinking bots can hear each other |
 
 ## Configuration
 

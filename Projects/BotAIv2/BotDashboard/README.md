@@ -1,6 +1,7 @@
 # Dashboard: one window onto the whole population
 
-`[bots` — an administrator-level command. Three tabs: the bots, their market, and what they cannot get hold of.
+`[bots` — an administrator-level command. Five tabs: the population, their market, what they are short of,
+what the city wants, and what everybody is doing.
 
 | File | What is in it |
 |---|---|

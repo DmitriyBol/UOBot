@@ -11,6 +11,12 @@ the brain works at all.
 | `BotMiner.cs` | the proposer: one offer to whoever has a pickaxe |
 | `BotHarvestConfig.cs` | `Configuration/bot-harvest.json` |
 | `BotHarvestModule.cs` | module, phase `World`, requires `Classes` and `Will` |
+| `BotChop.cs` | cutting wood: walk to the nearest tree and swing until the pack has enough or the tree has nothing left |
+| `BotForage.cs` | picking up the reagents the world leaves lying about, and putting them on the board |
+| `BotHerbs.cs` | a walk into the woods that comes back with herbs |
+| `BotProspect.cs` | a walk out past the last swept ground, so that there is rock on the board somewhere nobody has been |
+| `BotTimber.cs` | what a woodcutter needs to know: the axe, the trees within reach, and how much wood is worth a trip |
+| `BotWoodsman.cs` | offers a bot with an axe a trip to the woods, and only when somebody wants the wood |
 
 ---
 

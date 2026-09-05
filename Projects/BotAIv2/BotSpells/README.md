@@ -13,6 +13,8 @@ bots' market that is itself a bot.
 | `BotSeeker.cs` | the proposer: whose book is short |
 | `BotSpellsConfig.cs` | `Configuration/bot-spells.json` |
 | `BotSpellsModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Shops`, `Auction` |
+| `BotArmoury.cs` | offers any bot with a mana pool the chance to lay in a few attack scrolls |
+| `BotStrike.cs` | casting at something, as opposed to casting at somebody who is hurt |
 
 ---
 

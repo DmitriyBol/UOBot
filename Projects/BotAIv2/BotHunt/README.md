@@ -9,6 +9,11 @@ The first work in the project that **brings new gold into the world**. Everythin
 | `BotHunter.cs` | the proposer: who is whole enough to want a fight |
 | `BotHuntConfig.cs` | `Configuration/bot-hunt.json` |
 | `BotHuntModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Auction` |
+| `BotBand.cs` | calling a company together for something one bot cannot take, and seeing it through |
+| `BotGlean.cs` | picking spent ammunition up off the ground |
+| `BotMuster.cs` | offers a bot the chance to call a company against something it must otherwise walk past |
+| `BotPickings.cs` | going through something this bot killed without meaning to |
+| `BotProwl.cs` | going to look for a fight, when there is nothing to fight where the bot is standing |
 
 ---
 

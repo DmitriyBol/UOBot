@@ -10,6 +10,12 @@ project first does anything at all.**
 | `BotPopulation.cs` | who exists: purging saved bots, birth, placement, raising the fallen |
 | `BotPopulationConfig.cs` | `Configuration/bot-population.json` — the only configuration file with working values in it |
 | `BotPopulationModule.cs` | module, phase `World`, requires `Classes`, `Movement`, `Will` |
+| `BotHomeward.cs` | walking back to where the population lives, when there is nothing else to do and the bot is a long way from it |
+| `BotProgress.cs` | what a bot has become, kept across restarts: its skills, its fame, its karma and its savings |
+| `BotPurse.cs` | what a bot keeps in its pocket, and what it puts away the moment it is standing somewhere it can |
+| `BotReclaim.cs` | going back for what death took |
+| `BotStall.cs` | notices a bot that has stopped getting anywhere, and says so as an error |
+| `BotUnload.cs` | going to the counter when the pack is getting heavy: coin into the account, everything spare onto the market |
 
 ---
 

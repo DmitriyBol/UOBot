@@ -11,6 +11,10 @@ right to take from it.
 | `BotBinding.cs` | what "bound" means: the flag, zero weight, the stack count, giving back what was lost |
 | `BotBond.cs` | the record of what a bot was issued. Lives **on the bot**, not in a table |
 | `BotCasterStaff.cs` | the casting staff, blue or green — the colour comes from the class |
+| `BotBrawlerGloves.cs` | the gloves a brawler fights in |
+| `BotHarness.cs` | what a bot ought to be wearing, worked out from what this shard can actually make and what it costs |
+| `BotStable.cs` | buying a horse, and calling it up |
+| `BotSteed.cs` | a horse a bot carries in its pack and calls up when it has somewhere to be |
 
 **Eight kinds of reagent are issued, not six.** Six were chosen to match exactly the three starting spells, and
 that was right while a book held three spells and could hold no more. Without bloodmoss and mandrake root half a

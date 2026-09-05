@@ -2,9 +2,11 @@
 
 A standing company: a leader, a few followers, a formation, scouting, and dividing the spoils.
 
-> **Nothing calls `BotSquads.Form`.** This subsystem is written, compiles and has never run. That is a decision,
-> not an omission — see the last section — and it means everything below describes intent verified by reading
-> rather than behaviour verified by watching.
+> **This ran, and the note that used to stand here saying it never had is why the top of `MAP.md` warns
+> against reading these files for facts.** `BotSquads.Form` has three callers now — a prowl that finds
+> something one bot cannot take, a patrol, and the Baron's harrowing — and companies form and disband on
+> every session. What follows was written before that and describes intent; where it disagrees with the
+> `Companies:` line in a live log, the log is right.
 
 | File | What is in it |
 |---|---|
@@ -16,6 +18,9 @@ A standing company: a leader, a few followers, a formation, scouting, and dividi
 | `BotSquadMember.cs` | what a squad needs from a bot. Four things |
 | `BotSquadConfig.cs` | `Configuration/bot-squad.json` — numbers only |
 | `BotSquadModule.cs` | module, phase `World`, requires `Classes` |
+| `BotEnlist.cs` | falling in with a company that is already fighting, rather than starting a fight of your own beside it |
+| `BotPatrol.cs` | offers a captain the worst square on the island and a company to take there |
+| `BotSweep.cs` | a company called together for a place rather than for a creature, and kept together until the place stops killing people |
 
 ## One kind of group, not two
 

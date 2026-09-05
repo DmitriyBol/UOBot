@@ -8,8 +8,10 @@ fletch arrows, cook what they kill, write scrolls, buy and sell over NPC counter
 themselves with real money on the table, bind their own wounds and each other's, hunt, form companies for
 what one bot cannot take, teach each other for a fee, and harrow the ground that has already killed somebody.
 
-Four of them think: a local language model, through Ollama, chooses what they do next instead of the auction.
-A fifth thinking thing watches the other fifty-three and writes down what it believes is wrong with them.
+Four of them think — a local language model chooses what they do next instead of the auction — and a fifth
+thinking thing watches all the others and writes down what it believes is wrong with them. Both are optional,
+both are off without Ollama, and both have their own sections near the bottom: **The bots that think** and
+**Argus**.
 
 **Nothing in the engine changes to run this.** It is a separate assembly (`BotAIv2.dll`, namespace
 `Server.BotAI.V2`) that ModernUO loads through `Data/assemblies.json`; not one line of the core references
@@ -133,10 +135,15 @@ nothing and commands nobody, and `BotWill` reads it the way it reads the map.
 | `Brawler` | fights with its hands, and is therefore never holding anything it has to put down | 3 |
 | `Gatherer` | ore and timber, and the only bot that can find a reagent in the grass | 2 |
 | `Crafter` | metal, cloth and leather | 2 |
-| `Captain` | the one bot that exists for the others rather than for itself | 1 |
-| `Baron` | the one bot that is not trying to make a living | 1 |
-| `Architect` | paid by the health of the market rather than by any errand in it | 1 |
-| `Sage` | the captain's opposite number, for the half of the population a captain cannot teach | 1 |
+| `Captain`&nbsp;† | the one bot that exists for the others rather than for itself | 1 |
+| `Baron`&nbsp;† | the one bot that is not trying to make a living | 1 |
+| `Architect`&nbsp;† | paid by the health of the market rather than by any errand in it | 1 |
+| `Sage`&nbsp;† | the captain's opposite number, for the half of the population a captain cannot teach | 1 |
+
+† **These four are offices, and an office needs somebody in it.** They are the bodies the thinking bots claim,
+and without a mind they are an ordinary body wearing a title: what makes a captain a captain is that something
+is deciding whose square is killing people and which of the young ones is worth an hour of drill, and none of
+those is a question the auction can be asked. See **The bots that think**.
 
 They are raised outside Britain at `(1440, 1470)` on Felucca with 400gp each, and roam within a thousand
 tiles of it. The mix, the home and the purse are all `Distribution/Configuration/bot-population.json`.
@@ -257,15 +264,9 @@ for t in mine chop forge sew brew fletch cook inscribe hunt; do
 done
 ```
 
-**Argus, the observer.** An invisible figure nobody in the world can see, that cannot be hurt and cannot hurt
-anything. Every two minutes it asks three questions of every bot, lays a hand on the ones that answer no to
-all three, and writes what it believes into `logs/bot-debugger.log`. A person at the keyboard reaches it by
-writing a line into `Distribution/argus-in.txt`; the answer appears in `argus-out.txt` within a couple of
-seconds. Its hands are a bounded set — `props`, `sight`, `where`, `tile`, `tele`, `home`, `res`, `free`,
-`shun`, and `none`, which heads the list deliberately — and every use of them is written to
-`logs/bot-debugger-commands.log`, a separate file from its observations, so that a hand cannot quietly alter
-what it is watching without the record showing it. Nothing it can do deletes anything, sets a property,
-touches an account, or reaches a mobile that is not one of ours.
+**Argus, the observer.** An invisible figure that measures every bot on its own clock and writes what it
+believes into `logs/bot-debugger.log`, reachable from the keyboard without a client. It has its own section
+below — **Argus, the debugger** — because it is a thing you switch on rather than a thing the shard has.
 
 **Believe the shard before the watcher.** Five false alarms in one day were all artefacts of the instrument.
 
@@ -321,6 +322,162 @@ configuration key that overrides it. 216 of them can be changed without a rebuil
 **For the thinking bots** you also need [Ollama](https://ollama.com) running locally with the model named in
 `bot-minds.json`. Without it the four minded bots simply fall back to the auction like everybody else; nothing
 else is affected.
+
+---
+
+## The bots that think
+
+Four of the fifty-three do not use the auction. On their turn a local language model is handed what that bot
+can see — its purse, its skills, the work on offer with what each is forecast to pay, and the rules it has
+written for itself — and it answers with one choice. Everything else about them is an ordinary bot: they walk,
+fight, trade and die like the rest, and their work appears in the log under the same names with a `mind-`
+prefix.
+
+**They are offices, not builds.** The first version made them a blade, a bow and a book — three ways of
+fighting, which between them can only answer one question and answer it three times. Every bot on this shard
+fights; almost none of them decides anything that outlives the fight. So each mind was given a subject that is
+about the population rather than about the moment.
+
+| mind | claims the body of | falls back to | its subject |
+|---|---|---|---|
+| **Aldric** | `Captain` | `Warrior` | Where to take a company, whose ground is killing people, and which of the young ones is worth an hour of drill. Holds the training field and sells lessons. |
+| **Godric** | `Architect` | `Crafter` | What gets made and how well the shard is equipped. Paid by the health of the market rather than by any errand in it, so it is the only bot with a reason to make something nobody has asked for yet. |
+| **Cedric** | `Sage` | `Mage` | What the casters know: which spells are worth writing, who is short of what, and teaching the half of the population a captain cannot. |
+| **Baldric** | `Baron` | *nothing* | The island itself. Raises a levy for ground that has already killed somebody, walks his rounds, tours the towns, and pays a stipend out of his own account. He earns no wage — the market's levy is his whole income. |
+
+**Why those four classes need a mind.** Three of the minds fall back to an ordinary build because a thinking
+warrior in a warrior's body is still a thinking warrior. The Baron has no fallback on purpose: the sworn
+trades, the stipend and the share he stands out of all live on the class, so a Baron mind in a warrior's body
+would sit reading a prompt about harrowings it can never be offered. And a `Captain`, `Architect` or `Sage`
+body with nothing thinking inside it is a title with no office behind it — the class is raised and dressed
+like any other, but the decisions it exists to make are ones the auction was never asked. Raise those four
+classes without the minds and you get four ordinary bots with unusual kit.
+
+**They learn, and the learning is kept.** After a stint a mind may reckon up what it forecast against what the
+work actually paid, and write itself a rule — *"On this shard, if Drill forecast is zero, skip immediately
+regardless of duration."* Those rules live in `Distribution/Configuration/bot-minds.json` under each mind's
+own name and survive restarts. Each keeps a bounded number and drops the worst to make room.
+
+### Turning them on
+
+1. Install [Ollama](https://ollama.com) and pull the model:
+
+```bash
+ollama pull qwen3.5:9b
+```
+
+2. Leave it serving on `http://127.0.0.1:11434` — Ollama's own default, and this project's.
+
+3. Switch the module on in `Distribution/Configuration/modernuo.json`, and let it call the model:
+
+```json
+"bots": { "mind": { "enabled": true, "thinking": true } }
+```
+
+`enabled` raises the minds; `thinking` is what allows them to spend a call on the model. With `thinking` off
+they exist and choose by arithmetic like everybody else, which is the cheap way to run the shard.
+
+4. Make sure the four classes exist in `bot-population.json`, or a mind has no body to claim:
+
+```json
+"Classes": { "Captain": 1, "Baron": 1, "Architect": 1, "Sage": 1 }
+```
+
+5. Anything you want changed goes in `Distribution/Configuration/bot-mind.json`. An empty `{}` means every
+   default stands:
+
+| key | default | what it is |
+|---|---|---|
+| `Model` | `qwen3.5:9b` | as Ollama names it |
+| `Endpoint` | `http://127.0.0.1:11434` | where the daemon listens |
+| `KeepAlive` | `30m` | how long the model stays in video memory between questions |
+| `TimeoutMs` | `120000` | how long one question may take before it is abandoned |
+| `ThinkEveryMs` | — | how often a free bot may be asked to choose again |
+| `ReviewEveryMs` | — | how often a mind may spend a call reckoning up instead of choosing |
+| `ChoiceHoldsMs` | — | how long a choice waits for the auction to pick it up before it goes stale |
+| `MostLessons` | — | how many rules one mind keeps |
+| `Insistence` | — | what a mind's asking for a piece of work is worth on top of the work itself |
+| `WarriorName` `ArchitectName` `SageName` `BaronName` | Aldric, Godric, Cedric, Baldric | whose rules are whose |
+
+The boot log says what actually happened, and it is the only proof the model was reached:
+
+```
+Three minds are awake on qwen3.5:9b at http://127.0.0.1:11434: Aldric the captain,
+Godric the architect and Cedric the sage … 4 of 4 have bodies
+```
+
+Their thinking goes to `logs/bot-minds.log`, and the `Minds:` line in the five-minute summary carries how many
+decisions each made, how many were taken up, how many were outbid, and how long the model took on the wall
+clock.
+
+**If Ollama is not there, nothing breaks.** The calls fail, the minds fall back to the auction, and the shard
+runs exactly as it does for the other forty-nine bots.
+
+---
+
+## Argus, the debugger
+
+A fifth thinking thing that is **not one of the population**. It takes no work, joins no auction and owns
+nothing. It is an invisible figure that nobody in the world can see, that cannot be hurt and cannot hurt
+anything, and its whole job is to watch the bots and say what it believes is wrong with them.
+
+**What it does**
+
+- **Measures.** Every two seconds it reads every bot: where it is, whether it moved, what it is doing, and how
+  long it has been doing it. Everything it reports was measured by itself on its own clock, never taken from
+  the bots' own counters — which is the entire point of it.
+- **Asks two questions** every ten minutes: *is anybody stuck*, and *is anybody doing something that produces
+  nothing*. Three tests per bot, and it lays a hand only on the ones that answer no to all three.
+- **Reflects** every half hour: reads its own recent findings back and asks what shape the defect is.
+- **Remembers.** What it has come to believe, and how many times, lives in
+  `Distribution/Configuration/bot-debugger-memory.json` and survives restarts.
+- **Answers a person.** Write a line into `Distribution/argus-in.txt` and the answer appears in
+  `Distribution/argus-out.txt` within a couple of seconds — no client, no character, no login.
+
+**Its hands** are a bounded set, and `none` heads the list on purpose:
+
+| verb | what it does |
+|---|---|
+| `none` | do nothing, which is the right answer most of the time |
+| `props` | read everything the engine knows about one bot |
+| `sight` | what that bot can see from where it stands |
+| `where` · `tile` | where it is, and what the ground under it is |
+| `tele` · `home` | put it somewhere it can stand; send it back to camp |
+| `res` | raise it, if it is dead |
+| `free` | let go of whatever work it is holding |
+| `shun` | mark a creature or a patch as not worth another try |
+
+Nothing there deletes anything, sets a property, touches an account or an access level, or acts on a mobile
+that is not one of ours. The world save holds a real person's character, and a model that can be talked round
+by its own previous sentence must not be able to reach it. Every use is written to
+`logs/bot-debugger-commands.log` — a different file from its observations, so a hand cannot quietly alter what
+it is watching without the record showing it.
+
+### Turning it on
+
+1. Pull its model. It thinks with a different one from the population, deliberately:
+
+```bash
+ollama pull deepseek-r1:14b
+```
+
+2. Switch the module on in `Distribution/Configuration/modernuo.json`:
+
+```json
+"bots": { "debugger": { "enabled": true } }
+```
+
+3. Optional settings go in `Distribution/Configuration/bot-debugger.json`; `{}` keeps every default —
+   measuring every 2s, reporting every 10 minutes, reflecting every 30, and the thresholds at which it calls a
+   bot frozen, its work silent, or its progress settled.
+
+4. In game, `[argus` or `[debugger` brings it to you.
+
+Its observations go to `logs/bot-debugger.log`, and nothing else is written there.
+
+**Believe the shard before the watcher.** Five alarms in a single day were all artefacts of the instrument
+rather than faults in the population. Read its claim, then check the number it was made from against the
+shard's own five-minute summary before changing anything.
 
 ---
 

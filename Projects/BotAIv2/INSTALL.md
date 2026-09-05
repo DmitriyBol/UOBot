@@ -11,6 +11,12 @@ optional:
 `BotMindAI` references `BotAIv2` and never the other way round. You can ship the first without the second;
 you cannot ship the second alone.
 
+> **One engine patch is required.** `engine-patches/CraftItem-heat-source.patch` adds seventeen lines to
+> `Projects/UOContent/Engines/Craft/Core/CraftItem.cs`, exposing two questions the engine already answers
+> privately — is this tile a fire, is this mobile standing near one. The ground survey asks those rather than
+> keeping a second copy of the engine's heat table. Apply it with `git apply` from the fork root before
+> building, or `BotAIv2` will not compile.
+
 ---
 
 ## Requirements

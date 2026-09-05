@@ -182,6 +182,7 @@ changed without a rebuild.
 | `BotGround` | `Stride` | `4` | `SweepStride` |
 | `BotHerbs` | `ArriveWithin` | `4` | *code only* |
 | `BotHerbs` | `Guess` | `5` | *code only* |
+| `BotHerbs` | `Keeps` | `5` | *code only* |
 | `BotHerbs` | `LeastEach` | `5` | *code only* |
 | `BotHerbs` | `LeastKinds` | `2` | *code only* |
 | `BotHerbs` | `MostEach` | `20` | *code only* |
@@ -195,6 +196,7 @@ changed without a rebuild.
 | `BotOre` | `WorthSmelting` | `4` | `WorthSmelting` |
 | `BotProspect` | `Prior` | `30.0` | *code only* |
 | `BotProspect` | `WorkMinutes` | `4.0` | *code only* |
+| `BotTimber` | `Keeps` | `20` | *code only* |
 | `BotTimber` | `Reach` | `80` | *code only* |
 | `BotTimber` | `SwingReach` | `2` | *code only* |
 | `BotTimber` | `Worth` | `3` | *code only* |
@@ -208,6 +210,7 @@ changed without a rebuild.
 | `BotAnvil` | `Tries` | `3` | *code only* |
 | `BotBake` | `Keeps` | `1` | *code only* |
 | `BotBake` | `Prior` | `70.0` | *code only* |
+| `BotBake` | `SettleMs` | `SwingMs` | *code only* |
 | `BotBake` | `StallMs` | `SwingMs * 8` | *code only* |
 | `BotBake` | `SwingMs` | `3000` | *code only* |
 | `BotBake` | `WorkMinutes` | `2.0` | *code only* |
@@ -226,6 +229,7 @@ changed without a rebuild.
 | `BotFletch` | `StallMs` | `SwingMs * 8` | *code only* |
 | `BotFletch` | `SwingMs` | `3000` | *code only* |
 | `BotFletch` | `WorkMinutes` | `1.5` | *code only* |
+| `BotFletching` | `Keeps` | `20` | *code only* |
 | `BotFletching` | `LeastArrows` | `20` | *code only* |
 | `BotFletching` | `Worth` | `2` | *code only* |
 | `BotForge` | `Guess` | `45` | *code only* |
@@ -324,6 +328,7 @@ changed without a rebuild.
 | `BotStores` | `GuessGlass` | `5` | *code only* |
 | `BotStores` | `GuessLeather` | `6` | *code only* |
 | `BotStores` | `GuessLog` | `3` | *code only* |
+| `BotStores` | `GuessMeat` | `3` | *code only* |
 | `BotStores` | `Least` | `5` | *code only* |
 | `BotStores` | `Prior` | `20.0` | *code only* |
 | `BotStores` | `Reserve` | `150` | *code only* |

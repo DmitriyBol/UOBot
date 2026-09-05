@@ -10,6 +10,7 @@ on the table**, and move their own prices by what actually sells and what actual
 | `BotAuction.cs` | the market itself: list, ask, buy, fill, move a price, forget |
 | `BotAuctionConfig.cs` | `Configuration/bot-auction.json` — speeds, not prices |
 | `BotAuctionModule.cs` | module, phase `World`, depends on nothing |
+| `BotHaggle.cs` | a seller looking at what buyers are offering for what it has out, and moving its price towards them |
 
 ---
 
