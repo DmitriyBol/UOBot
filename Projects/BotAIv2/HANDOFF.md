@@ -368,7 +368,18 @@ roads in a row are refused — when in fourteen of the twenty cases its own tile
 at what is refusing the roads.*
 
 Distances from home: min 14, median 127, max 547 — scattered across the map rather than the one bad place
-03.09 had.
+03.09 had. **And the raised share is flat across that spread**, which rules out a single bad neighbourhood:
+
+```
+      <30 tiles from home   24 strandings   46% raised
+   30-100                   32              69%
+  100-250                   42              43%
+     >250                   10              40%
+```
+
+Against a 6.8% baseline every band is between six and ten times its share. The two dozen that happen within
+sight of home are not a separate at-home defect — they are the same one, on the raised ground that happens
+to be near home.
 
 **Two different populations, and they want different answers — one measurement separated them.**
 
