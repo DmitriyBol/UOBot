@@ -717,6 +717,13 @@ the identical freeze on feathers three weeks earlier — `122 for three half-hou
 standing arrow orders — which is what makes the shape worth naming rather than fixing twice. Read cumulative
 counters as a series, not as a value: growth that stops while demand continues is the tell.
 
+**Flat supply against skewed demand.** Every number healthy and the trade still failing: gatherers working,
+stalls full, sales brisk — and the population meeting 41% of its own reagent demand, buying the rest over a
+counter. Demand was lopsided fourfold (sulfurous ash was over half of it) while the pick was one of eight at
+random. The ash ran dry at once; the garlic nobody wanted made up a thousand unsold. **No single number shows
+this.** It appears only when two distributions are laid side by side — what is bought outside against what
+the population itself supplies. Picking the scarcest kind on the stalls took it to 96%.
+
 **Instrument before you fix.** Both of the entries above were first diagnosed wrong, on theories that were
 plausible and had the shape of defects this project has really had. What settled them was making the sentence
 in the log say which of its four ways it had failed. A guess costs a rebuild and a restart; a named counter
