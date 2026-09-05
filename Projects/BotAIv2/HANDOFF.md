@@ -339,6 +339,26 @@ written when sewing was the only craft and was never widened. They cannot be tur
 shutdown line, a clean save five minutes earlier, and the log stopping mid-second. One occurrence. If it
 happens again at a similar uptime it is a pattern and worth chasing.
 
+**Open, and the largest thing the broken error grep was hiding: a quarter of the population gets stuck and
+is teleported home.** Thirty-nine errors in one run, and twenty of them are the same one:
+
+```
+Oswin the Mage could get nowhere at all from (1391, 1442, 10) and has been carried
+home to (1441, 1466, 0); the ground it was on is TooBig, its tile allows DF of the
+eight directions
+```
+
+Fourteen distinct bots of fifty-three in thirty-six minutes — the Captain, the Baron, the Sage, mages,
+archers, gatherers. Four more read `can reach nothing … and it is standing at home`, and five are a bot that
+has not moved or changed what it is doing for minutes, mostly the Baron with `"nothing"` as its occupation.
+
+**It starts at the twenty-eighth minute of the run, not at boot.** While the population works near home
+nothing happens; as it spreads out, bots reach ground the search calls `TooBig` and have to be carried back.
+
+Not touched. This is `BotMovement`, which `ARCHITECTURE.md` calls the part that accumulated more measured
+defects than everything else put together, and it deserves a session that starts with it rather than a
+seventh change at the end of a long one.
+
 ---
 
 ## Documents, and what they are worth
