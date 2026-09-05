@@ -339,8 +339,8 @@ written when sewing was the only craft and was never widened. They cannot be tur
 shutdown line, a clean save five minutes earlier, and the log stopping mid-second. One occurrence. If it
 happens again at a similar uptime it is a pattern and worth chasing.
 
-**Open, and the largest thing the broken error grep was hiding: a quarter of the population gets stuck and
-is teleported home.** Thirty-nine errors in one run, and twenty of them are the same one:
+**Open, and the largest thing the broken error grep was hiding — but read the qualification before acting on
+it.** Twenty of thirty-nine errors in a run are a bot carried home off ground the search calls `TooBig`:
 
 ```
 Oswin the Mage could get nowhere at all from (1391, 1442, 10) and has been carried
@@ -355,9 +355,21 @@ has not moved or changed what it is doing for minutes, mostly the Baron with `"n
 **It starts at the twenty-eighth minute of the run, not at boot.** While the population works near home
 nothing happens; as it spreads out, bots reach ground the search calls `TooBig` and have to be carried back.
 
-Not touched. This is `BotMovement`, which `ARCHITECTURE.md` calls the part that accumulated more measured
-defects than everything else put together, and it deserves a session that starts with it rather than a
-seventh change at the end of a long one.
+**`TooBig` is a designed outcome, not a failure**, and the first version of this note called it one. See
+`BotPath.StrandedCells` — 25000 cells, ten times the ordinary bound — and the paragraph beside it: the look
+is only made once a bot has already had a dozen roads refused from one tile, and `TooBig` means the pocket
+was too large to *prove* impassable inside its 150ms, so carrying the bot home is the insurance firing
+correctly. It was set at the ordinary bound for an hour on 03.09 and one trap at (1757, 976) took fourteen
+bots in eighteen minutes; that is what the larger bound bought.
+
+**So the open question is narrower than "movement is broken".** Why does a bot reach a position where a dozen
+roads in a row are refused — when in fourteen of the twenty cases its own tile allowed all eight directions
+(`FF`)? The code's neighbouring message says the same thing in its own words: *this is not bad ground, look
+at what is refusing the roads.*
+
+Distances from home: min 14, median 127, max 547. So it is scattered across the map rather than one bad
+place, which is what 03.09 had. Not touched: this is `BotMovement`, which `ARCHITECTURE.md` calls the part
+that accumulated more measured defects than everything else together.
 
 ---
 
