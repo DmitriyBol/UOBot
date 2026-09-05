@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
 using Server.Regions;
@@ -51,6 +52,21 @@ public sealed class BotHerbs : BotDeed
     public static int LeastEach { get; set; } = 5;
 
     public static int MostEach { get; set; } = 20;
+
+    /// <summary>
+    /// How many of one reagent a picker keeps for itself before the rest goes to the population.
+    ///
+    /// Five, which is a caster's own working handful. A picker that sold everything and then bought the same
+    /// reagent back off a counter would be paying twice to carry what it was already holding — the rule the
+    /// archer's arrows and the cook's meat are both kept by.
+    /// </summary>
+    public static int Keeps { get; set; } = 5;
+
+    /// <summary>Reagents put into somebody's standing order. For the summary.</summary>
+    public static long Ordered { get; private set; }
+
+    /// <summary>The same, onto a stall. For the summary.</summary>
+    public static long Listed { get; private set; }
 
     /// <summary>The eight, in the order the world lists them. What the woods may have is any of these.</summary>
     private static readonly Type[] Kinds =
@@ -205,14 +221,89 @@ public sealed class BotHerbs : BotDeed
             return BotDoing.Failed("the woods had nothing, or the pack was full");
         }
 
+        // <b>Picking had no ending, and that is the whole reason the alchemist had nothing to work with.</b>
+        // "herbs" was the second commonest thing on this shard — 1982 rounds of it — while the brewer read
+        // "470 had the glass but no herbs, 633 had neither". Neither trade was broken; there was no edge
+        // between them. A funded order first and a stall second, the way the miner has always finished.
+        var (ordered, listed) = Store(bot);
+
         logger.Information(
-            "{Name} came back from the woods with {Count} herbs worth about {Worth}gp",
+            "{Name} came back from the woods with {Count} herbs worth about {Worth}gp, {Ordered} of them straight into somebody's order and {Listed} onto a stall",
             body.Name,
             picked,
-            _worth
+            _worth,
+            ordered,
+            listed
         );
 
-        return BotDoing.Done($"{picked} herbs out of the woods, worth about {_worth}gp");
+        return BotDoing.Done(
+            $"{picked} herbs out of the woods worth about {_worth}gp, {ordered} to order and {listed} put out to sell"
+        );
+    }
+
+    /// <summary>
+    /// Puts the picked reagents where the trades that want them can see them.
+    ///
+    /// Only the kinds this trade picks, so a caster's own spellbook reagents bought over a counter are not
+    /// swept out with them, and only what is above <see cref="Keeps"/>.
+    /// </summary>
+    private static (int Ordered, int Listed) Store(IBotWilful bot)
+    {
+        var body = bot?.Self;
+        var pack = body?.Backpack;
+
+        if (pack == null)
+        {
+            return (0, 0);
+        }
+
+        var ordered = 0;
+        var listed = 0;
+
+        // A snapshot: offering a stack moves it out of the pack.
+        List<Item> carried = [.. pack.Items];
+
+        for (var i = 0; i < carried.Count; i++)
+        {
+            var stack = carried[i];
+
+            if (stack is not { Deleted: false, Movable: true } || Array.IndexOf(Kinds, stack.GetType()) < 0)
+            {
+                continue;
+            }
+
+            var held = Math.Max(1, stack.Amount);
+            var spare = held - Keeps;
+
+            if (spare <= 0)
+            {
+                continue;
+            }
+
+            var goods = spare >= held ? stack : Mobile.LiftItemDupe(stack, held - spare);
+
+            if (goods == null)
+            {
+                continue;
+            }
+
+            var (went, out_) = BotAuction.Offer(bot, goods, Guess);
+
+            ordered += went;
+            listed += out_;
+        }
+
+        Ordered += ordered;
+        Listed += listed;
+
+        return (ordered, listed);
+    }
+
+    /// <summary>Forgotten with the world.</summary>
+    public static void ForgetTrade()
+    {
+        Ordered = 0;
+        Listed = 0;
     }
 }
 
@@ -334,7 +425,8 @@ public sealed class BotHerbalist : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody on this shard may go looking for herbs ({NotAGatherer} answers went to bots that may not)"
-            : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go";
+            : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go; "
+              + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker keeps";
 
     public static void Forget()
     {
@@ -343,5 +435,6 @@ public sealed class BotHerbalist : IBotProposer
         TooSoon = 0;
         NoWood = 0;
         Offered = 0;
+        BotHerbs.ForgetTrade();
     }
 }

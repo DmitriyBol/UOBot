@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Server.Engines.Harvest;
 using Server.Items;
 using Server.Regions;
@@ -109,6 +110,89 @@ public static class BotTimber
 
     /// <summary>How much wood the bot is carrying.</summary>
     public static int Logs(Mobile bot) => bot?.Backpack?.GetAmount(typeof(Log)) ?? 0;
+
+    /// <summary>
+    /// How many logs a woodcutter keeps back for itself before the rest goes to the population.
+    ///
+    /// A fletcher wants wood of its own, and a woodcutter that sold every log and then bought one back off a
+    /// stall would be paying the market to hold its own timber. Twenty, which is a round of arrows.
+    /// </summary>
+    public static int Keeps { get; set; } = 20;
+
+    /// <summary>Logs put where somebody can reach them. For the summary.</summary>
+    public static long Ordered { get; private set; }
+
+    /// <summary>The same, onto a stall rather than into a standing order.</summary>
+    public static long Listed { get; private set; }
+
+    /// <summary>
+    /// Puts the cut wood where the trades that want it can see it: a funded order first, a stall second.
+    ///
+    /// <para>
+    /// <b>Woodcutting had no ending.</b> It swung, it counted, and it stopped — and the logs rode home in a
+    /// pack, so on 05.09.2026 the shard read <em>133 of 212 fletchers could not find wood</em> while
+    /// woodcutters walked past them carrying it, and exactly one log was listed in a whole session. Mining
+    /// has finished this way since it was written; this is that ending, on the other gathering trade.
+    /// </para>
+    /// </summary>
+    public static (int Ordered, int Listed) Store(IBotWilful bot)
+    {
+        var body = bot?.Self;
+        var pack = body?.Backpack;
+
+        if (pack == null)
+        {
+            return (0, 0);
+        }
+
+        var ordered = 0;
+        var listed = 0;
+
+        // A snapshot: offering a stack moves it out of the pack, which mutates the list being read.
+        List<Item> carried = [.. pack.Items];
+
+        for (var i = 0; i < carried.Count; i++)
+        {
+            if (carried[i] is not Log wood || wood.Deleted || !wood.Movable)
+            {
+                continue;
+            }
+
+            var held = Math.Max(1, wood.Amount);
+            var spare = held - Keeps;
+
+            if (spare <= 0)
+            {
+                continue;
+            }
+
+            // Split off only what is spare. LiftItemDupe or nothing, the same rule the brewer and the cook
+            // keep: a failed split must never turn into a sale of the bot's own supplies.
+            var goods = spare >= held ? wood : Mobile.LiftItemDupe(wood, held - spare);
+
+            if (goods == null)
+            {
+                continue;
+            }
+
+            var (went, out_) = BotAuction.Offer(bot, goods, Worth);
+
+            ordered += went;
+            listed += out_;
+        }
+
+        Ordered += ordered;
+        Listed += listed;
+
+        return (ordered, listed);
+    }
+
+    /// <summary>Forgotten with the world.</summary>
+    public static void ForgetTrade()
+    {
+        Ordered = 0;
+        Listed = 0;
+    }
 
     /// <summary>
     /// The nearest tree within reach, as the target the engine expects, or null.

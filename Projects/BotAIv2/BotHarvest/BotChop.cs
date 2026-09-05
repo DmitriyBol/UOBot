@@ -182,7 +182,9 @@ public sealed class BotChop : BotDeed
         {
             Sheathe(body);
 
-            return BotDoing.Done($"{_cut} logs in {_swings} swings");
+            var (ordered, listed) = BotTimber.Store(bot);
+
+            return BotDoing.Done($"{_cut} logs in {_swings} swings, {ordered} to order and {listed} put out to sell");
         }
 
         // Looked for again every time, because a tree that has been cut out stops being a tree to the
@@ -193,9 +195,16 @@ public sealed class BotChop : BotDeed
         {
             Sheathe(body);
 
-            return _cut > 0
-                ? BotDoing.Done($"{_cut} logs in {_swings} swings — no tree left within reach")
-                : BotDoing.Failed("no tree within reach");
+            if (_cut <= 0)
+            {
+                return BotDoing.Failed("no tree within reach");
+            }
+
+            var (ordered, listed) = BotTimber.Store(bot);
+
+            return BotDoing.Done(
+                $"{_cut} logs in {_swings} swings, {ordered} to order and {listed} put out to sell — no tree left within reach"
+            );
         }
 
         var trunk = new Point3D(_tree.X, _tree.Y, _tree.Z);

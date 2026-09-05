@@ -156,7 +156,8 @@ public sealed class BotWoodsman : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody has been offered wood ({NoAxe} answers went to bots with no axe)"
-            : $"{Asked} asked to cut wood: {Sent} sent to a tree, {NoCall} found nobody asking for wood or arrows, {Stocked} were carrying enough already, {NoTree} had no tree within {BotTimber.Reach} tiles ({BotTimber.Townbound} passed over for standing inside a town)";
+            : $"{Asked} asked to cut wood: {Sent} sent to a tree, {NoCall} found nobody asking for wood or arrows, {Stocked} were carrying enough already, {NoTree} had no tree within {BotTimber.Reach} tiles ({BotTimber.Townbound} passed over for standing inside a town); "
+              + $"{BotTimber.Ordered} logs went straight into somebody's order and {BotTimber.Listed} onto a stall, above the {BotTimber.Keeps} each cutter keeps";
 
     public static void Forget()
     {
@@ -165,6 +166,7 @@ public sealed class BotWoodsman : IBotProposer
         NoCall = 0;
         Stocked = 0;
         NoTree = 0;
+        BotTimber.ForgetTrade();
         Sent = 0;
     }
 }

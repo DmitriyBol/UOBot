@@ -1253,6 +1253,56 @@ public static class BotAuction
     /// and takes them to a shopkeeper should not have to relearn what ingots are worth when it next has some.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Puts one stack where it will do the most good: a funded want first, a stall second.
+    ///
+    /// <para>
+    /// <b>Written because the gathering trades had no ending at all.</b> A miner finishes by filling wants
+    /// and listing what is left; the woodcutter and the herbalist simply stopped, and their goods rode home
+    /// in a pack. What that looked like on 05.09.2026 was a shard where <c>herbs</c> was the second commonest
+    /// thing anybody did — 1982 rounds of it — beside <em>1349 asked to brew: 470 had the glass but no herbs,
+    /// 633 had neither</em>, and 133 of 212 fletchers answering "could not find wood" while woodcutters
+    /// walked past them carrying logs. Neither trade was broken. There was no edge between them.
+    /// </para>
+    ///
+    /// <para>
+    /// A want before a stall, because a want is money already down: filling one pays the gatherer at the
+    /// moment it hands the goods over rather than whenever somebody wanders past a stall. Both are tried, and
+    /// a stack that finds neither stays in the pack for <c>BotUnload</c> to carry to a counter.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Three other places do this inline and are deliberately left alone</b> — <c>BotDig</c> falls back on
+    /// a bank box, <c>BotForge</c> owes its piece to the order it was made for, <c>BotBake</c> keeps a supper
+    /// back for the cook. Each nuance is the trade's own, and folding them into one helper would be folding
+    /// away the reasons.
+    /// </para>
+    /// </summary>
+    /// <returns>How many went to an order, and how many went onto a stall.</returns>
+    public static (int Ordered, int Listed) Offer(IBotWilful seller, Item goods, int fallback)
+    {
+        if (seller?.Self == null || goods is not { Deleted: false, Movable: true })
+        {
+            return (0, 0);
+        }
+
+        var kind = goods.GetType();
+        var held = Math.Max(1, goods.Amount);
+        var worth = Worth(kind, fallback);
+
+        var want = Demand(seller, kind);
+        var ordered = want == null ? 0 : Fill(seller, want, goods);
+
+        if (ordered >= held || goods.Deleted)
+        {
+            return (ordered, 0);
+        }
+
+        var listed = List(seller, goods, worth) == null ? 0 : held - ordered;
+
+        return (ordered, listed);
+    }
+
     public static int Reclaim(IBotWilful seller, Type kind)
     {
         var pack = seller?.Self?.Backpack;
