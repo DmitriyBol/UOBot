@@ -1101,6 +1101,13 @@ public sealed class BotSlay : BotDeed
                 continue;
             }
 
+            // The same rule, on the other material this island produces and no shopkeeper sells. See
+            // BotFletching.Spares: a fletcher standing over a bird was listing the only feathers there are.
+            if (BotFletching.Spares(body, item))
+            {
+                continue;
+            }
+
             // Offered to the population at whatever the shard reckons one is worth. Nobody has to want it: a
             // stall that sits for half an hour is taken to a counter instead.
             //

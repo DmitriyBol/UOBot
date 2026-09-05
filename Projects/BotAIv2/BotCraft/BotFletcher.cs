@@ -238,10 +238,12 @@ public sealed class BotFletcher : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody has been offered fletching ({NoKit} answers went to bots with no tool)"
-            : $"{Asked} asked to fletch: {ToOrder} took an order off the board, {OnSpec} made some on spec, {NoFeathers} had no feathers and nobody sells one, {NoWood} could not find wood; {Unfilled} times a fletcher with no feathers looked at an arrow order it could not fill";
+            : $"{Asked} asked to fletch: {ToOrder} took an order off the board, {OnSpec} made some on spec, {NoFeathers} had no feathers and nobody sells one, {NoWood} could not find wood; {Unfilled} times a fletcher with no feathers looked at an arrow order it could not fill; "
+              + $"{BotFletching.Spared} stacks of feathers kept back off a corpse against {BotFletching.Sold} sold on past the cap of {BotFletching.Keeps}";
 
     public static void Forget()
     {
+        BotFletching.ForgetTrade();
         Asked = 0;
         NoKit = 0;
         NoFeathers = 0;

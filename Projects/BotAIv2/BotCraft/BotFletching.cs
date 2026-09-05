@@ -75,6 +75,59 @@ public static class BotFletching
     public static int Feathers(Mobile bot) => Amount(bot, typeof(Feather));
 
     /// <summary>
+    /// How many feathers a fletcher keeps off a corpse rather than listing them.
+    ///
+    /// <para>
+    /// <b>The half nobody sells was being sold.</b> No shopkeeper on this shard stocks a feather — the fletcher
+    /// says so in as many words — so the only feathers on the island are the ones that come off birds. And
+    /// <c>BotSlay.Rifle</c> lists everything lifted off a corpse, so a fletcher standing over a bird put its
+    /// only source of feathers straight onto a stall and then read "no feathers and nobody sells one" on the
+    /// next beat: 65 of 262 asks on 05.09.2026, with <c>BotAuction.Reclaim</c> already in the proposer as a
+    /// patch on the same wound.
+    /// </para>
+    ///
+    /// <para>
+    /// Twenty, which is <see cref="LeastArrows"/> — a round of arrows and no more, so a fletcher stocks itself
+    /// and everything past that still reaches the market for whoever else wants it.
+    /// </para>
+    /// </summary>
+    public static int Keeps { get; set; } = 20;
+
+    /// <summary>Stacks of feathers kept back for a fletcher's own use. For the summary.</summary>
+    public static long Spared { get; private set; }
+
+    /// <summary>Stacks sold on instead, because nobody there could fletch or they were already stocked.</summary>
+    public static long Sold { get; private set; }
+
+    /// <summary>Feathers this bot should keep for its own bench instead of listing. See <see cref="Keeps"/>.</summary>
+    public static bool Spares(Mobile bot, Item item)
+    {
+        if (item == null || bot == null || item.GetType() != typeof(Feather) || Kit(bot) == null)
+        {
+            return false;
+        }
+
+        // Counted after it is in the pack, which is where the caller lifts it to before asking.
+        if (Feathers(bot) <= Keeps)
+        {
+            Spared++;
+
+            return true;
+        }
+
+        Sold++;
+
+        return false;
+    }
+
+    /// <summary>Forgotten with the world.</summary>
+    public static void ForgetTrade()
+    {
+        Spared = 0;
+        Sold = 0;
+    }
+
+    /// <summary>
     /// How many arrows this bot could make right now without buying anything.
     ///
     /// <para>

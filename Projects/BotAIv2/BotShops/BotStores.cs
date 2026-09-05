@@ -95,6 +95,25 @@ public static class BotStores
     /// <summary>What an empty bottle is offered at when nothing has priced one. The alchemist's own ask.</summary>
     public static int GuessGlass { get; set; } = 5;
 
+    /// <summary>
+    /// What a raw rib opens at. Three, which is what the market has actually been settling them at.
+    ///
+    /// <para>
+    /// <b>Meat passes the rule glass failed.</b> Nothing may be ordered by the armful unless somebody's
+    /// living is fetching it — that is the lesson the bottle cost this shard four-fifths of its trade for
+    /// half an hour. Meat has the best producer on the island: every hunt ends in a carcass, hunting is the
+    /// commonest thing anybody does, and carving is already folded into going through a corpse. What was
+    /// missing was the ask. The cook could only ever cook what it happened to be holding, so 94% of every
+    /// look at the skillet answered "no meat worth cooking" while the hunters who had it walked past.
+    /// </para>
+    ///
+    /// <para>
+    /// Ribs rather than the other four: 57 of the 67 raw meats this shard traded in a session were ribs, and
+    /// an order for a kind nothing drops is an order that freezes the money behind it.
+    /// </para>
+    /// </summary>
+    public static int GuessMeat { get; set; } = 3;
+
     /// <summary>What this is reckoned at per minute. Low: it is one beat of paperwork and then waiting.</summary>
     public static double Prior { get; set; } = 20.0;
 
@@ -106,7 +125,7 @@ public static class BotStores
     /// This runs on every bot's beat, and game logic is one thread — see the threading model — so a shared
     /// three-slot buffer is safe and costs nothing. A managed type cannot be stackalloc'd.
     /// </summary>
-    private static readonly Type[] _wanted = new Type[4];
+    private static readonly Type[] _wanted = new Type[5];
 
     /// <summary>Every gate apart, and the denominator with them. There is no bucket called "other".</summary>
     public static long Asked { get; private set; }
@@ -297,6 +316,14 @@ public static class BotStores
             into[count++] = typeof(Leather);
         }
 
+        // The cook, last, because it is the newest of these and the cheapest to go without. A funded want for
+        // ribs is also the only way a hunter is ever paid for meat — and the board already steers a kill by
+        // what the carcass carries, so the ask does two things at once.
+        if (BotOven.Kit(body) != null && BotOven.Amount(body, typeof(RawRibs)) < BotOven.Worthwhile)
+        {
+            into[count++] = typeof(RawRibs);
+        }
+
         // <b>Glass was added here on 04.09.2026 and taken out again half an hour later, and the reason is
         // worth keeping.</b> The argument was sound on its face — an alchemist sells a bottle for five gold
         // and most of the population cannot reach one, exactly as with wood — and the shard got measurably
@@ -329,6 +356,11 @@ public static class BotStores
             return GuessLog;
         }
 
+        if (kind == typeof(RawRibs))
+        {
+            return GuessMeat;
+        }
+
         return kind == typeof(Bottle) ? GuessGlass : GuessLeather;
     }
 
@@ -351,7 +383,7 @@ public static class BotStores
     public static string Describe() =>
         Asked == 0
             ? $"no crafter has been asked about its materials ({NoTrade} answers went to bots with neither kit)"
-            : $"{Asked} asked about a feather, a log or a hide: {Ordered} put the order to the population, {Standing} already have one out, "
+            : $"{Asked} asked about a feather, a log, a hide or a rib: {Ordered} put the order to the population, {Standing} already have one out, "
               + $"{Stocked} have {Enough} already, {Shelved} have their own out on a stall, "
               + $"{Poor} cannot afford one (the fattest purse among them held {Richest}gp); {Soon} crafters came again inside the minute (Asked counts materials, this counts bots)";
 

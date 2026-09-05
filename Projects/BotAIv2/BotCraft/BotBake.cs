@@ -49,6 +49,25 @@ public sealed class BotBake : BotDeed
     /// <summary>How long the meat may sit unchanged before the round is given up. Eight swings' worth.</summary>
     public static int StallMs { get; set; } = SwingMs * 8;
 
+    /// <summary>
+    /// How long to wait for the pan after the last of the meat goes in.
+    ///
+    /// <para>
+    /// <b>The last swing takes the meat before it gives back the meal.</b> <c>CraftItem.Craft</c> ends by
+    /// starting a timer, so there is a second in which the pack holds neither — and a round that finishes the
+    /// moment the meat runs out finishes inside exactly that second. It then reports, truthfully as far as it
+    /// can see, that nothing came of it. On 05.09.2026 that was 37 rounds ending "the meat is gone" against
+    /// 26 that cooked something, and the 26 were only the ones where an earlier swing had already landed.
+    /// </para>
+    ///
+    /// <para>
+    /// The same fault the alchemist had, one step along: there it was the count taken after the swing instead
+    /// of before the next one, here it is the <em>exit</em> taken between the two. One swing's worth of
+    /// patience is enough, because that is what the engine's own timer is measured against.
+    /// </para>
+    /// </summary>
+    public static int SettleMs { get; set; } = SwingMs;
+
     private enum Leg
     {
         Walk,
@@ -164,7 +183,13 @@ public sealed class BotBake : BotDeed
 
         if (left <= 0)
         {
-            return Finish(bot, body, "the meat is gone");
+            // Not yet: the meal from the last swing may still be in the engine's timer. See SettleMs.
+            if (_swung && Core.TickCount - _swungTick < SettleMs)
+            {
+                return BotDoing.Work("waiting for the pan");
+            }
+
+            return Finish(bot, body, _cooked > 0 ? "the meat is gone" : "the meat went and nothing came back");
         }
 
         if (_lastLeft != left)
