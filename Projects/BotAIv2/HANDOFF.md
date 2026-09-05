@@ -461,6 +461,26 @@ purses alone.
 **Do not treat rising want prices as a market to fix.** They are a symptom with the same root as everything
 above.
 
+**Open, unexplained, and left that way deliberately: counter buying fell about tenfold in the last quarter
+hour of the run** — real `X bought N Thing from Y` events per five minutes went `11 13 4 5 7 1 1`, and the
+`Trade:` line's own delta went `293 45 108 121 0 1 0`. Selling to shopkeepers carried on, so bots still reach
+counters.
+
+Four things checked and none of them it:
+
+- **Not an instrument.** Real purchase events fell with the counter, so the summary is telling the truth.
+- **Not reach.** Selling continues at the same counters in the same windows.
+- **Not affordability.** `cannot afford one` grows steadily at about 50 a window all run, not in a step, and
+  the metal equivalent sits flat near 10. The fattest purse among those who cannot afford is frozen at 189gp
+  — it is a cumulative maximum, so it says nothing about now.
+- **Not a shift to stalls.** Stall purchases held flat (30, 23, 24 per quarter hour) while counter buying fell.
+
+Recorded without a conclusion on purpose. The next candidate worth a counter is whether supply thresholds are
+simply met — `33597 were short of nothing` out of 43775 looks — which would make this the population going
+quiet rather than going wrong.
+
+
+
 ## The largest single loss in the shard: twelve hearths, several unreachable, never struck off
 
 **Found 05.09 late, by asking what the recent failures actually say. It is bigger than everything else on
