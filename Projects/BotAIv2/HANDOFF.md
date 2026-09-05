@@ -412,16 +412,17 @@ longer a guess.
 pointing at it.** Per five-minute window, over 2h50m:
 
 ```
-window     finished   failed   fail%
-  2-4          ~330      ~22     5-9%
-  7-9          ~205     ~114   31-38%
- 13-15         ~190     ~325   51-70%
- 22-24         ~145     ~495   77-78%
- 32-34         ~135     ~515   77-82%
+                    finished   failed   fail%
+first 5 windows         1482      170     10%
+last 10 windows         2263     4979     69%
 ```
 
 **Finished work halves and failures multiply by twenty.** Not a plateau, not a step: a climb across the whole
 run. Every other finding on this page is a contributor to this line or is noise beside it.
+
+**Take the aggregate, not the last window.** Individual windows swing hard — the last ten read
+`68 72 74 77 79 45 82 82 76 53` — and an earlier draft of this note quoted "77-82%" off two consecutive bad
+ones. Every number in it was true and the impression it left was not. The honest current figure is 69%.
 
 **Two things it settles.** The climb starts at window 5-7, and the hearth defect starts at window 10 — so the
 hearths are a large contributor but **something is already degrading before them**. And "cooking output is
