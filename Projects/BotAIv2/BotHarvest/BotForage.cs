@@ -321,7 +321,7 @@ public sealed class BotForage : BotDeed
 
             var amount = Math.Max(1, item.Amount);
 
-            if (BotAuction.List(bot, item, BotAuction.Worth(item.GetType(), Guess)) != null)
+            if (BotAuction.List(bot, item, BotAuction.Worth(item.GetType(), BotShops.Shelf(bot, item.GetType(), Guess))) != null)
             {
                 put += amount;
             }

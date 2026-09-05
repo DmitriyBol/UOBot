@@ -59,8 +59,18 @@ public sealed class BotHerbs : BotDeed
     /// Five, which is a caster's own working handful. A picker that sold everything and then bought the same
     /// reagent back off a counter would be paying twice to carry what it was already holding — the rule the
     /// archer's arrows and the cook's meat are both kept by.
+    ///
+    /// <para>
+    /// And kept only by a bot that has some use for them: a spellbook to cast from or a mortar to brew with.
+    /// Most pickers are gatherers and are neither, and a handful held back by somebody who will never spend it
+    /// is a handful the population cannot reach.
+    /// </para>
     /// </summary>
     public static int Keeps { get; set; } = 5;
+
+    /// <summary>How much this bot keeps: the handful if it can cast or brew, nothing if it can do neither.</summary>
+    private static int KeptBy(Mobile bot) =>
+        BotGrimoire.Book(bot) != null || BotFlask.Kit(bot) != null ? Keeps : 0;
 
     /// <summary>Reagents put into somebody's standing order. For the summary.</summary>
     public static long Ordered { get; private set; }
@@ -176,6 +186,9 @@ public sealed class BotHerbs : BotDeed
         //
         // One kind, in the amount the class asks for. A class that names no amount gets the Sage's trip,
         // which is what this file was written for and is left exactly as it was.
+        // Once, before anything is priced. Shelf asks which counters are known and does not sweep for them.
+        BotShops.Survey(body.Map, body.Location);
+
         var handful = klass is { ForageYieldMax: > 0 };
         var kinds = handful ? 1 : Utility.RandomMinMax(LeastKinds, MostKinds);
         var picked = 0;
@@ -206,9 +219,14 @@ public sealed class BotHerbs : BotDeed
             picked += amount;
 
             // Priced as it is picked and at the market's own price, so a reagent the population is bidding
-            // hard for makes the trip that fetched it worth what it really was. Guess is only ever reached
-            // before anybody has traded one.
-            _worth += amount * BotAuction.Worth(kind, Guess);
+            // hard for makes the trip that fetched it worth what it really was.
+            //
+            // <b>Valued at the same number it will be sold at, and it has to be the same call.</b> The
+            // fallback here was Guess while Store came to open at the shopkeeper's shelf price — five against
+            // three for garlic — so the trip reported takings it could not get and the ledger would have
+            // learned to over-price this trade by two thirds. Both ends ask Shelf now, which reaches Guess
+            // only where no shopkeeper within reach stocks the thing at all.
+            _worth += amount * BotAuction.Worth(kind, Shelf(bot, kind));
 
             // Ground that paid while a bot stood still on it. See BotQuad.Harvested.
             BotQuad.Harvested(body.Map, body.Location);
@@ -257,6 +275,8 @@ public sealed class BotHerbs : BotDeed
             return (0, 0);
         }
 
+        BotShops.Survey(body.Map, body.Location);
+
         var ordered = 0;
         var listed = 0;
 
@@ -273,7 +293,7 @@ public sealed class BotHerbs : BotDeed
             }
 
             var held = Math.Max(1, stack.Amount);
-            var spare = held - Keeps;
+            var spare = held - KeptBy(body);
 
             if (spare <= 0)
             {
@@ -287,7 +307,7 @@ public sealed class BotHerbs : BotDeed
                 continue;
             }
 
-            var (went, out_) = BotAuction.Offer(bot, goods, Guess);
+            var (went, out_) = BotAuction.Offer(bot, goods, Shelf(bot, stack.GetType()));
 
             ordered += went;
             listed += out_;
@@ -298,6 +318,29 @@ public sealed class BotHerbs : BotDeed
 
         return (ordered, listed);
     }
+
+    /// <summary>
+    /// What one of these opens at: the shopkeeper's own asking price, and only then a guess.
+    ///
+    /// <para>
+    /// <b>Opening above the shelf is opening at a price nobody on this island can rationally pay.</b>
+    /// <c>BotShopper</c> takes whichever of stall and counter is cheaper and gives a tie to one of ours, so a
+    /// reagent listed at five when a herbalist sells garlic at three is a reagent that will never move: 1986
+    /// of them went onto stalls in one window and every caster that wanted one walked to a shopkeeper and
+    /// paid the world instead of paying a bot. The same fault the fletcher already documents about arrows,
+    /// on the trade that produces the most goods per hour of anything here.
+    /// </para>
+    ///
+    /// <para>
+    /// Measured rather than declared, like the loot floor in <c>BotSlay.Rifle</c>: the engine knows what a
+    /// shopkeeper charges and there is no table here to go stale. The guess is only ever reached where no
+    /// shopkeeper within reach stocks the thing at all — which for the deeper reagents is most of them, and
+    /// is exactly where a bot's stall is the only supply there is.
+    /// </para>
+    /// </summary>
+    /// <param name="bot">Whose reach decides which counters count. The survey is the caller's to do once —
+    /// see the two call sites, both of which sweep before their loop rather than inside it.</param>
+    private static int Shelf(IBotWilful bot, Type kind) => BotShops.Shelf(bot, kind, Guess);
 
     /// <summary>Forgotten with the world.</summary>
     public static void ForgetTrade()
@@ -426,7 +469,7 @@ public sealed class BotHerbalist : IBotProposer
         Asked == 0
             ? $"nobody on this shard may go looking for herbs ({NotAGatherer} answers went to bots that may not)"
             : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go; "
-              + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker keeps";
+              + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker that can cast or brew keeps back";
 
     public static void Forget()
     {

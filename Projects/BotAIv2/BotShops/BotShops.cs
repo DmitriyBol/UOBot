@@ -278,6 +278,45 @@ public static class BotShops
     public static int Price(BaseVendor vendor, Type wanted) => Sells(vendor, wanted, out var entry) ? entry.Price : 0;
 
     /// <summary>
+    /// What a bot's own goods of this kind should open at: the shelf price where a shopkeeper in reach
+    /// stocks it, and only then the trade's own guess.
+    ///
+    /// <para>
+    /// <b>An opening ask above the shelf is an ask nobody on this island can rationally take.</b>
+    /// <see cref="BotShopper"/> compares stall against counter and gives a tie to one of ours, so a reagent
+    /// listed at five where a herbalist sells garlic at three is a reagent that never moves: 1986 of them sat
+    /// on stalls in one window while every caster that wanted one walked past and paid the world instead. The
+    /// fletcher already carries this lesson about arrows; this is where the rest of the shard asks it.
+    /// </para>
+    ///
+    /// <para>
+    /// Measured off the engine rather than declared, like the loot floor in <c>BotSlay.Rifle</c> — there is no
+    /// table here to go stale. The fallback is only ever reached where nothing within reach stocks the thing
+    /// at all, which is exactly where a bot's stall is the only supply there is.
+    /// </para>
+    /// </summary>
+    /// <param name="survey">The caller sweeps for counters once, before its own loop, and passes false.</param>
+    public static int Shelf(IBotWilful bot, Type kind, int fallback, bool survey = false)
+    {
+        var body = bot?.Self;
+
+        if (body == null || kind == null)
+        {
+            return fallback;
+        }
+
+        if (survey)
+        {
+            Survey(body.Map, body.Location);
+        }
+
+        var shop = Nearest(bot, kind);
+        var price = shop == null ? 0 : Price(shop, kind);
+
+        return price > 0 ? price : fallback;
+    }
+
+    /// <summary>
     /// Whether this shopkeeper will <em>buy</em> this thing, and what it pays for one.
     ///
     /// <para>
