@@ -426,6 +426,31 @@ filled to 15. **A partial last bucket read as a completed one**, which is the sa
 shard as a settled one, and it changes the whole answer: a plateau and a decay want different fixes. Not touched: this is `BotMovement`, which `ARCHITECTURE.md` calls the part
 that accumulated more measured defects than everything else together.
 
+**Open, and separate from the movement work although it hides inside the same errors: the Baron has no work
+to do.** Of 67 errors in a run, three bots hold seventeen — Baldric 8, Aldric 5, Cedric 4, against a fair
+share of about 1.3 each. The three offices, at six, four and three times their share.
+
+But they are not the same failure. Aldric and Cedric are stranded like everybody else. **Six of Baldric's
+eight are `has not moved`, every one with the occupation `"nothing"`** — for four, seven, fourteen and
+seventeen minutes at a stretch. He is not stuck. He is idle.
+
+Why, from his own summary line:
+
+```
+1663 times a Baron was asked: 1663 found nowhere reading at or below -0.30
+1663 times a Baron was asked to walk his rounds: 0 were offered unknown ground
+3145 times a Baron was asked: 3145 were offered a town
+48285 offers withheld from classes sworn elsewhere
+```
+
+**The harrowing threshold never fires.** Not once in a run does any square read at or below `-0.30`; the
+danger map does not get that bad. And ordinary work is withheld from him because he is sworn to the office —
+that is the design, and it is what makes the threshold load-bearing. What is left is the town walk, offered
+3145 times, and he still sits with nothing for a quarter of an hour at a time.
+
+Two numbers that never meet, in the family this project keeps paying for: the harrow bar against what the
+danger map actually reaches. First thing to check is the distribution of square readings against `-0.30`.
+
 ---
 
 ## Documents, and what they are worth
