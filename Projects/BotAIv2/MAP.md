@@ -51,6 +51,12 @@ measurement about exhaustion impossible for the first two or three hours. Never 
 
 ---
 
+> **The level sits outside the bracket: `[19:57:35 ERR]`.** A pattern of `\[ERR` matches nothing in this log
+> and reports a clean run for ever — which it did here for a whole evening, through twenty-six real errors,
+> while the shard was saying a Baron had stopped moving and that bronze ingots nobody wants were piling up on
+> the market. Grep for `' ERR]'`, with the space. The instrument that says everything is fine is the one
+> worth checking first.
+
 ## 1. Reading a summary line
 
 Every five minutes (`BotBeat.SummaryMs`, `BotSquads.SayEveryMs`, both 300000) the population writes one block

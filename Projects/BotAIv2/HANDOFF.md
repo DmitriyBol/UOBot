@@ -263,6 +263,25 @@ obvious source; it is cumulative for the life of the shard, so a reagent that ra
 as the scarcest thing on the island and the gatherers would have chased it for ever. Stock on the stalls is a
 fact about now and puts itself out.
 
+**Open defect: 36 funded orders for metal, none of them ever filled.** Smiths put money down for ingots,
+miners list ingots — 62 listings of copper, iron and bronze — and the two have not met once in a run:
+
+```
+36 ordered metal        0 metal wants filled        0 ingots bought off a stall
+```
+
+Meanwhile `544 of 763` smiths answer "short of metal" and no stint has ended in the last fifty minutes,
+with mining perfectly healthy at 106 stints and the seam map fully built at 512 seams. It is not the auction:
+forge asks 340/min when it does ask, against hunting's 223, and appears as runner-up seven times in a whole
+run. It has nothing to work with.
+
+The shard says the shape out loud in its own error log:
+`No shopkeeper within reach buys Bronze Ingot, and no bot wants it either; it will sit on the market`.
+The likely cause is the one the meat orders had — a want names one kind and the supply is another. Every
+recipe says iron and `BotAnvil.Best` exists precisely because none of them means it, so an order for
+`IronIngot` filled by neither copper nor bronze would produce exactly this. **Unverified**: the wants' own
+kinds have not been read yet, and that is the first thing to check.
+
 **The market moves one way.** `StaleMs` marks a seller's price down on a timer and never moves a buyer's bid
 up: of 191 price cuts in one window, one moved towards an actual bid and none moved up, with
 `15410 stalls had no bid to move towards`. One dial doing two opposite jobs. **Left deliberately for
