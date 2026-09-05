@@ -378,10 +378,17 @@ stranded above:    13            every one of them with 0 of ours within 2 tiles
    Z = 4, 10, 34, 36, 40
 ```
 
-Nearly half the strandings are on raised ground, and **not one** of the frozen bots had another bot beside
-it. So crowding cannot be the answer for the scattered cases, and this project already has the note for what
-raised ground does: an invented Z is a place nothing can stand on — it works on the flat and fails on a hill.
-That is where the scattered strandings point.
+Half the strandings are on raised ground, and **not one** of the frozen bots had another bot beside it.
+
+**With the denominator it stops being a hint and becomes the finding.** Over 3238 pieces of work the
+population stands on flat ground 92% of the time and on raised ground 8%. Its strandings split 50/50. That is
+raised ground failing **more than six times its share**, on 36 cases — and the earlier note here said "nearly
+half are on a hill", which on its own means nothing at all, because it never asked how much of the shard's
+day is spent on hills.
+
+This project already carries the note for what raised ground does: an invented Z is a place nothing can stand
+on, working on the flat and failing on a hill. That is where the scattered strandings point, and it is no
+longer a guess.
 
 **The crowding lead below is therefore only about the six at the camp.** It was written first and as the
 lead; it is not.
