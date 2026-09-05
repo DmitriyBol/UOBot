@@ -390,6 +390,62 @@ This project already carries the note for what raised ground does: an invented Z
 on, working on the flat and failing on a hill. That is where the scattered strandings point, and it is no
 longer a guess.
 
+## The largest single loss in the shard: twelve hearths, several unreachable, never struck off
+
+**Found 05.09 late, by asking what the recent failures actually say. It is bigger than everything else on
+this page put together, and it is in code added the same day.**
+
+The shard's own cook line, at 2h35m:
+
+```
+62882 asked to cook: 8913 put something on, 35113 had no meat worth cooking,
+0 had meat but no recipe their skill would carry,
+18856 had both and no fire they could get to (of 12 known)
+```
+
+**18856 bots held meat and the skill to cook it and could not reach a fire.** Two of every three cooks that
+were otherwise ready. And the island holds only **twelve** known hearths.
+
+In a 30-minute window, `no way through to (x, y, z)` is **1218 of 2567 work failures — 47% of everything
+that failed.** Their destinations, against a 5.9% baseline of raised ground taken from successful work:
+
+```
+raised destinations   372 of 1218   30.5%    5.2x the population's share
+84 distinct raised targets, of which the top eight take 67% of raised failures
+```
+
+And the top eight are all one thing:
+
+```
+216 failed at cook: off to a fire to cook Ribs   (1448, 1615, 20)
+210 failed at cook: off to a fire to cook Ribs   (1648, 1601, 20)
+208 failed at cook: off to a fire to cook Ribs   (1549, 1680, 30)
+210 failed at cook: off to a fire to cook Ribs   (1353, 1779, 15)
+```
+
+**It is not the invented-Z defect, and that was the first guess.** `NoteHearth` takes `tile.Z` and
+`NoteItemHearths` takes `item.GetWorldLocation()` — both read the world, neither computes a height. The
+hearth really is at Z=20. It is on a ledge, a roof, an upper floor: a bot cannot stand on the fire tile, and
+on raised ground there is no reachable neighbour at that height either.
+
+**The defect is that nothing ever strikes it off.** `BotGround` has no shunning, no failure count, no
+unreachable memory of any kind — grep it: there is no `Shun`, no `Unreachable`, no `Bad`. A hearth recorded
+once is offered forever, so the same four places absorb about 210 attempts each over one run, and every
+attempt costs a walk across the island.
+
+This is the [[bot-note-written-but-not-read]] family with the note missing entirely rather than merely
+unread.
+
+**Proposed fix, not deployed.** Count consecutive `no way through` per hearth and stop choosing one past a
+small bound — the same shape `BotQuad` already uses for quiet quadrants, which reports `11 shut and 0
+reopened`. Two cautions: with only twelve hearths, shutting them off must be reversible (a fire can become
+reachable when a door opens or a bot approaches from another side), and the count must be per *place*, not
+per bot, or fifty bots each get their own private twelve failures.
+
+**Why it was not fixed on the spot:** the fix needs a rebuild and a restart, and the restart would destroy
+the run that produced these numbers — the observation that was asked for. It also wipes the survey, which is
+never saved, so the twelve hearths would have to be rediscovered before the fix could be judged at all.
+
 ### Confirmed on a second, longer run — and the two populations turn out to be one
 
 A 90-minute run (`session-2026-09-05_19-44`) reproduces the baseline exactly and sharpens both figures.
