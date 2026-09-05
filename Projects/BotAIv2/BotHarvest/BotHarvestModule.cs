@@ -95,6 +95,14 @@ public sealed class BotHarvestModule : BotModule
         BotGround.Reset();
         BotMiner.Forget();
         BotWoodsman.Forget();
+
+        // <b>Dead since it was written, and nothing said so.</b> BotHerbalist.Forget exists, resets the
+        // picking counters and the trade's own tallies with them, and had no caller anywhere in the
+        // assembly — so the Gathering line's herb clause was the one number in the summary that survived a
+        // world reload while every other trade's went back to nought. Found while working out why two
+        // consecutive readings of it were identical, which is a question that would not have been asked at
+        // all if the rest of the block had not reset in step.
+        BotHerbalist.Forget();
     }
 
     public static string Summarise() => BotGround.Describe();
