@@ -195,7 +195,7 @@ public sealed class BotHerbs : BotDeed
 
         for (var i = 0; i < kinds; i++)
         {
-            var kind = Kinds[Utility.Random(Kinds.Length)];
+            var kind = Scarcest();
 
             var amount = handful
                 ? Utility.RandomMinMax(Math.Max(1, klass.ForageYieldMin), klass.ForageYieldMax)
@@ -341,6 +341,67 @@ public sealed class BotHerbs : BotDeed
     /// <param name="bot">Whose reach decides which counters count. The survey is the caller's to do once —
     /// see the two call sites, both of which sweep before their loop rather than inside it.</param>
     private static int Shelf(IBotWilful bot, Type kind) => BotShops.Shelf(bot, kind, Guess);
+
+    /// <summary>
+    /// Which reagent to pick: the one the population has least of on its stalls.
+    ///
+    /// <para>
+    /// <b>Uniform picking against skewed demand is a supply that cannot be spent.</b> This was
+    /// <c>Kinds[Utility.Random(Kinds.Length)]</c> — an eighth of each — while what the shard actually wanted
+    /// over one run was sulfurous ash 1320, bloodmoss 393, nightshade 314, ginseng 243 and almost nothing of
+    /// the rest. So the ash ran out at once and was bought over a counter, and the other seven piled up: 2661
+    /// reagents listed, 1661 of them sold, a thousand standing unsold, and the population meeting 41% of its
+    /// own reagent demand while the remainder left the world as coin over a shopkeeper's counter.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Read off the stalls rather than off a tally of shortages, and the difference matters.</b>
+    /// <c>BotShopper</c> keeps a count of what bots have been short of, but it is cumulative for the life of
+    /// the shard: a reagent that ran dry once an hour ago still reads as the scarcest thing on the island.
+    /// Stock on the stalls is a fact about now, and it is self-correcting — the moment the pickers have
+    /// covered a kind, it stops being the scarcest and they move to the next.
+    /// </para>
+    ///
+    /// <para>
+    /// Ties go to chance, so eight empty kinds at the start of a shard do not send every picker after the
+    /// same one.
+    /// </para>
+    /// </summary>
+    private static Type Scarcest()
+    {
+        Type worst = null;
+        var least = int.MaxValue;
+        var seen = 0;
+
+        for (var i = 0; i < Kinds.Length; i++)
+        {
+            var held = BotAuction.Stocked(Kinds[i]);
+
+            if (held > least)
+            {
+                continue;
+            }
+
+            // Reservoir sampling over the ties, which costs one random draw and no list.
+            if (held < least)
+            {
+                least = held;
+                seen = 1;
+                worst = Kinds[i];
+
+                continue;
+            }
+
+            seen++;
+
+            if (Utility.Random(seen) == 0)
+            {
+                worst = Kinds[i];
+            }
+        }
+
+        return worst ?? Kinds[Utility.Random(Kinds.Length)];
+    }
 
     /// <summary>Forgotten with the world.</summary>
     public static void ForgetTrade()

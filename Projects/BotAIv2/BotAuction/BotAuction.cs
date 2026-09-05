@@ -453,6 +453,39 @@ public static class BotAuction
     /// Cheapest rather than nearest, because this market is placeless: a stall holds its goods out of the
     /// world, so distance is not a fact about buying from one.
     /// </summary>
+    /// <summary>
+    /// How much of this kind is standing on every stall between them.
+    ///
+    /// <para>
+    /// <b>A current fact, which is what makes it usable as a signal.</b> The shard already tallies what bots
+    /// have been short of — <c>BotShopper</c>'s own dictionary — but that is a running total for the life of
+    /// the shard, so a kind that ran out once and has been plentiful since still reads as the scarcest thing
+    /// on the island. Stock on the stalls answers the question actually being asked: is there any of this
+    /// now.
+    /// </para>
+    /// </summary>
+    public static int Stocked(Type kind)
+    {
+        if (kind == null)
+        {
+            return 0;
+        }
+
+        var held = 0;
+
+        for (var i = 0; i < _listings.Count; i++)
+        {
+            var lot = _listings[i];
+
+            if (lot is { IsEmpty: false } && lot.Kind == kind)
+            {
+                held += lot.Amount;
+            }
+        }
+
+        return held;
+    }
+
     public static BotListing Cheapest(Type kind, IBotWilful except)
     {
         BotListing best = null;
