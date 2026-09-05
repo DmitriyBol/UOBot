@@ -1092,6 +1092,15 @@ public sealed class BotSlay : BotDeed
                 continue;
             }
 
+            // Its own raw material stays in the pack, for exactly the reason its own arrows do: a cook that
+            // lists the meat it is standing over has sold the one ingredient of the trade it carries a
+            // skillet for, and will buy a supper back at a counter later. See BotOven.Spares, which holds
+            // back a round's worth and no more, and only for somebody who can actually cook it.
+            if (BotOven.Spares(body, item))
+            {
+                continue;
+            }
+
             // Offered to the population at whatever the shard reckons one is worth. Nobody has to want it: a
             // stall that sits for half an hour is taken to a counter instead.
             //

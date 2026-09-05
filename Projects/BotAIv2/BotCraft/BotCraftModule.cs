@@ -1,4 +1,4 @@
-using Server.Logging;
+﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -37,12 +37,37 @@ public sealed class BotCraftModule : BotModule
         // chain ended at a bank box: nothing on the shard could turn an ingot into an object.
         BotWill.Offer(new BotSmith());
 
+        // Wood and feathers into arrows. Until this, arrows were the one consumable on this shard with no
+        // source at all: the population was born with about nineteen hundred between thirteen shooters, the
+        // provisioner keeps twenty at a time, and the rest of the supply was archers picking their own spent
+        // shafts up off the ground one and two at a time. See BotFletching.
+        BotWill.Offer(new BotFletcher());
+
+        // Herbs and glass into bottles. Three classes have asked for Alchemy at a hundred since the day they
+        // were written, every one of them carries a mortar and pestle issued on the strength of it, and until
+        // now nothing anywhere could brew a thing. See BotFlask.
+        BotWill.Offer(new BotAlchemist());
+
+        // The shortest chain on the shard: a carcass, a skillet, a supper. No place, no fire, no walk.
+        // See BotOven, and BotMeal for what eating one does.
+        BotWill.Offer(new BotCook());
+
         logger.Information(
-            "Craft ready: a tailor buys {Bolt} cloth at a time, works {Margin} points below its own skill, attempts every {Swing}ms, and asks {Price}gp a piece",
+            "Craft ready: a tailor buys {Bolt} cloth at a time, works {Margin} points below its own skill, attempts every {Swing}ms, and asks {Price}gp a piece; a fletcher makes at least {Least} arrows at a time and opens them at {Arrow}gp, buying wood to match the feathers it holds because nobody anywhere sells a feather",
             BotSew.Bolt,
             BotThread.Margin,
             BotSew.SwingMs,
-            BotSew.GoldPerPiece
+            BotSew.GoldPerPiece,
+            BotFletching.LeastArrows,
+            BotFletching.Worth
+        );
+
+        logger.Information(
+            "Brewing ready: a brewer works {Margin} points below its own Alchemy, sets up once it holds {Least} bottles, buys {Batch} empties at a time and opens a draught at {Worth}gp against the alchemist's fifteen; it brews only what the population drinks",
+            BotFlask.Margin,
+            BotFlask.LeastBottles,
+            BotFlask.Batch,
+            BotFlask.Worth
         );
     }
 
@@ -50,5 +75,11 @@ public sealed class BotCraftModule : BotModule
     {
         BotTailor.Forget();
         BotSmith.Forget();
+        BotFletcher.Forget();
+        BotAlchemist.Forget();
+        BotCook.Forget();
+        BotBake.Forget();
+        BotMeal.Forget();
+        BotStores.Forget();
     }
 }

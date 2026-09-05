@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Server.Engines.Craft;
 using Server.Engines.Harvest;
 using Server.Logging;
 using Server.Mobiles;
@@ -198,6 +199,8 @@ public static class BotGround
 
     private static readonly List<(Map Map, Point3D Where)> _fires = [];
 
+    private static readonly List<(Map Map, Point3D Where)> _hearths = [];
+
     private static readonly List<(Map Map, Point3D Where)> _counters = [];
 
     private static readonly List<(Map Map, Point3D Where)> _surveyed = [];
@@ -207,6 +210,20 @@ public static class BotGround
     public static IReadOnlyList<BotSeam> Seams => _seams;
 
     public static IReadOnlyList<(Map Map, Point3D Where)> Fires => _fires;
+
+    /// <summary>
+    /// Every fire on record, which is a wider thing than <see cref="Fires"/>.
+    ///
+    /// <para>
+    /// <b>A forge is a fire, but most fires are not forges.</b> The list above is a list of workshops: a
+    /// forge that also has an anvil beside it, because that pair is what a smith needs and remembering a
+    /// lone forge would send one on a walk to a place it cannot work. A cook needs neither the anvil nor
+    /// the forge — it needs heat, and the engine counts ovens, fireplaces, campfires, firepits, heating
+    /// stands and braziers as heat exactly as it counts a forge. Kept apart rather than merged, because
+    /// widening the smith's list to let the cook work would send every smith to a bakery.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<(Map Map, Point3D Where)> Hearths => _hearths;
 
     public static IReadOnlyList<(Map Map, Point3D Where)> Counters => _counters;
 
@@ -223,8 +240,78 @@ public static class BotGround
     /// <summary>A forge, in either of the two forms this shard has them in.</summary>
     public static bool IsForgeId(int id) => id is 4017 or (>= 6522 and <= 6569) or 11736;
 
+    /// <summary>
+    /// Anything the engine will cook over, asked of the engine rather than answered here.
+    ///
+    /// See <c>CraftItem.IsHeatSource</c>. A second copy of that table living in this file is a second thing
+    /// to keep in step, and the one that fell out of step would fail the way this defect failed: silently,
+    /// with a bot swinging a skillet at nothing.
+    /// </summary>
+    public static bool IsHearthId(int id) => CraftItem.IsHeatSource(id);
+
     /// <summary>An anvil, which is the other half of a workshop.</summary>
     public static bool IsAnvilId(int id) => id is 4015 or 4016 or 11733 or 11734;
+
+    /// <summary>
+    /// A point past the edge of what has been swept, for somebody to go and look at.
+    ///
+    /// <para>
+    /// <b>Outwards from the town, in the direction of the lode and beyond it.</b> The named lode is the one
+    /// place on this island known from outside to be worth walking to, so the line from home through it is
+    /// the best guess the shard has about where more rock lies — and past the lode is the only part of that
+    /// line nobody has swept. Stepped out one sweep's width at a time so that each trip is the next ring
+    /// rather than a leap into the sea, and refused once the map runs out.
+    /// </para>
+    ///
+    /// <para>
+    /// Nought when everything within a day's walk has been looked at. That is a real answer and not a
+    /// failure: an island whose ground is all known and all barren is a fact about the island, and the
+    /// summary should be able to say it rather than send bots out for ever.
+    /// </para>
+    /// </summary>
+    public static Point3D Frontier(Map map, Point3D from)
+    {
+        if (map == null || map == Map.Internal || Lode == Point3D.Zero)
+        {
+            return Point3D.Zero;
+        }
+
+        var dx = Lode.X - from.X;
+        var dy = Lode.Y - from.Y;
+        var span = Math.Max(1, (int)Math.Sqrt(dx * dx + dy * dy));
+
+        // Ring by ring, starting at the lode itself and stepping out by a sweep each time.
+        for (var step = 1; step <= Rings; step++)
+        {
+            var out0 = span + step * Reach;
+            var x = from.X + dx * out0 / span;
+            var y = from.Y + dy * out0 / span;
+
+            if (x < 8 || y < 8 || x >= map.Width - 8 || y >= map.Height - 8)
+            {
+                break;
+            }
+
+            // A height taken from the map rather than invented: a Z of nought out of arithmetic is a place
+            // that works on a plain and cannot be stood on anywhere else. See BotStep.Settle.
+            if (!BotStep.Settle(map, x, y, out var z))
+            {
+                continue;
+            }
+
+            var where = new Point3D(x, y, z);
+
+            if (!Surveyed(map, where))
+            {
+                return where;
+            }
+        }
+
+        return Point3D.Zero;
+    }
+
+    /// <summary>How many sweeps out from the lode the prospector will consider. Half a map's worth.</summary>
+    public static int Rings { get; set; } = 12;
 
     /// <summary>Whether this patch of the world has already been swept.</summary>
     public static bool Surveyed(Map map, Point3D around)
@@ -279,6 +366,7 @@ public static class BotGround
 
         var seams = 0;
         var fires = 0;
+        var hearths = 0;
 
         for (var x = around.X - Reach; x <= around.X + Reach; x++)
         {
@@ -299,6 +387,11 @@ public static class BotGround
                     fires++;
                 }
 
+                if (NoteHearth(map, x, y))
+                {
+                    hearths++;
+                }
+
                 if (system == null || x % Stride != 0 || y % Stride != 0)
                 {
                     continue;
@@ -312,6 +405,7 @@ public static class BotGround
         }
 
         fires += NoteItemFires(map, around);
+        hearths += NoteItemHearths(map, around);
 
         var counters = NoteCounters(map, around);
 
@@ -321,16 +415,18 @@ public static class BotGround
         // forges on record all night while a smith standing on Felucca with a pack of ore was told there
         // were none, and no number could have said which of the two was wrong.
         logger.Information(
-            "Swept {Reach} tiles around {Where} on {Map} in {Elapsed}ms: {Seams} seams, {Fires} fires, {Counters} counters (now {AllSeams}, {AllFires}, {AllCounters})",
+            "Swept {Reach} tiles around {Where} on {Map} in {Elapsed}ms: {Seams} seams, {Fires} fires, {Hearths} hearths, {Counters} counters (now {AllSeams}, {AllFires}, {AllHearths}, {AllCounters})",
             Reach,
             around,
             map,
             clock.ElapsedMilliseconds,
             seams,
             fires,
+            hearths,
             counters,
             _seams.Count,
             _fires.Count,
+            _hearths.Count,
             _counters.Count
         );
 
@@ -440,6 +536,64 @@ public static class BotGround
             }
 
             _fires.Add((map, where));
+            found++;
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// A fire on this tile, of any kind the engine will cook over. No anvil asked for and none wanted.
+    /// </summary>
+    private static bool NoteHearth(Map map, int x, int y)
+    {
+        if (_hearths.Count >= MaxPlaces)
+        {
+            return false;
+        }
+
+        foreach (var tile in map.Tiles.GetStaticAndMultiTiles(x, y))
+        {
+            if (!IsHearthId(tile.ID))
+            {
+                continue;
+            }
+
+            var where = new Point3D(x, y, tile.Z);
+
+            if (Known(_hearths, map, where))
+            {
+                return false;
+            }
+
+            _hearths.Add((map, where));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Fires that are objects rather than map tiles. See <see cref="NoteItemFires"/>.</summary>
+    private static int NoteItemHearths(Map map, Point3D around)
+    {
+        var found = 0;
+
+        foreach (var item in map.GetItemsInRange(around, Reach))
+        {
+            if (item.Deleted || _hearths.Count >= MaxPlaces || !IsHearthId(item.ItemID))
+            {
+                continue;
+            }
+
+            var where = item.GetWorldLocation();
+
+            if (Known(_hearths, map, where))
+            {
+                continue;
+            }
+
+            _hearths.Add((map, where));
             found++;
         }
 
@@ -732,6 +886,9 @@ public static class BotGround
 
     public const string CounterKind = "counter";
 
+    /// <summary>The ledger's key for "I could not get to a fire here". See <see cref="FireKind"/>.</summary>
+    public const string HearthKind = "hearth";
+
     /// <summary>
     /// How long one miner holds a seam before anybody else may work it.
     ///
@@ -821,6 +978,19 @@ public static class BotGround
     /// <summary>Seams struck off because somebody stood on them and found nothing. See <see cref="Barren"/>.</summary>
     public static long Emptied { get; private set; }
 
+    /// <summary>Seams put on the board by a bot that walked out past the frontier. See BotProspect.</summary>
+    public static long Prospected { get; private set; }
+
+    /// <summary>Prospecting walks that found nothing in the ground at all.</summary>
+    public static long Fruitless { get; private set; }
+
+
+    /// <summary>Noted by BotProspect, which is the only thing that may.</summary>
+    internal static void Found(int seams) => Prospected += seams;
+
+    /// <summary>The same, for a walk that found nothing.</summary>
+    internal static void FoundNothing() => Fruitless++;
+
     /// <summary>Seams passed over for being inside a town's walls.</summary>
     public static long Townbound { get; private set; }
 
@@ -831,6 +1001,13 @@ public static class BotGround
     /// <summary>The nearest counter this bot has not lately failed to reach.</summary>
     public static Point3D Counter(IBotWilful bot, Point3D from, Point3D except = default) =>
         Nearest(_counters, bot?.Self?.Map, from, except, bot, CounterKind);
+
+    /// <summary>The nearest fire of any kind this bot has not lately failed to reach.</summary>
+    public static Point3D Hearth(IBotWilful bot, Point3D from, Point3D except = default) =>
+        Nearest(_hearths, bot?.Self?.Map, from, except, bot, HearthKind);
+
+    /// <summary>The nearest fire of any kind, without asking whose it is.</summary>
+    public static Point3D Hearth(Map map, Point3D from) => Nearest(_hearths, map, from);
 
     private static Point3D Nearest(
         List<(Map Map, Point3D Where)> places, Map map, Point3D from, Point3D except = default,
@@ -906,6 +1083,7 @@ public static class BotGround
     {
         _seams.Clear();
         _fires.Clear();
+        _hearths.Clear();
         _counters.Clear();
         _surveyed.Clear();
         _digging.Clear();
@@ -916,5 +1094,5 @@ public static class BotGround
     }
 
     public static string Describe() =>
-        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_counters.Count} counters; {Walled} seams passed over with no way through, {Townbound} for being inside the walls, {Emptied} struck off as barren, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {Spared} asks answered out of the last scan, patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y})";
+        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_hearths.Count} hearths, {_counters.Count} counters; {Walled} seams passed over with no way through, {Townbound} for being inside the walls, {Emptied} struck off as barren, {BotMiner.Sent} sent out past the frontier and {Prospected} seams found there over {Fruitless} empty walks, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {Spared} asks answered out of the last scan, patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y})";
 }
