@@ -57,6 +57,34 @@ public sealed class BotForge : BotDeed
     /// <summary>What a piece of ironwork is offered at when nothing on the shard has priced one.</summary>
     public static int Guess { get; set; } = 45;
 
+    /// <summary>
+    /// How stints at the anvil ended. Every ending apart, with the denominator, and no bucket called "other".
+    ///
+    /// <para>
+    /// Kept because the proposer's counters say what smiths were <em>offered</em> and nothing at all about
+    /// what became of it. Between them they made the shape of this trade's waste invisible: the summary read
+    /// sixteen forging on spec, and only a grep of the whole log showed that fifty-two of seventy-eight
+    /// stints ended with nothing and thirty-eight of those were out of metal. A number worth changing a
+    /// threshold over should not have to be grepped for.
+    /// </para>
+    /// </summary>
+    public static long Stints { get; private set; }
+
+    /// <summary>Stints that ended with something on the anvil.</summary>
+    public static long Wrought { get; private set; }
+
+    /// <summary>Pieces made across all of them.</summary>
+    public static long Pieces { get; private set; }
+
+    /// <summary>Stints the metal ran out under. The one this trade was losing to. See BotAnvil.Tries.</summary>
+    public static long RanOut { get; private set; }
+
+    /// <summary>Stints that used every swing they had and made nothing.</summary>
+    public static long Fruitless { get; private set; }
+
+    /// <summary>Stints given up at a forge the engine would not smith at, or with no road to one.</summary>
+    public static long NoPlace { get; private set; }
+
     private enum Leg
     {
         Walk,
@@ -170,6 +198,9 @@ public sealed class BotForge : BotDeed
         {
             Refuse(bot);
 
+            Stints++;
+            NoPlace++;
+
             return BotDoing.Failed(
                 $"no anvil the engine will accept within {BotAnvil.Reach} of the forge at ({_smithy.X}, {_smithy.Y})"
             );
@@ -254,7 +285,18 @@ public sealed class BotForge : BotDeed
         // it in bronze because a delivery arrived — and it should, because the same swing in a better metal
         // is a better piece for nothing. See BotAnvil.Best: dearest the skill will take and the pack can
         // fill, falling back to iron.
-        _metal = BotAnvil.Best(body, cost);
+        //
+        // <b>Asked for a round's worth first, and only then for one piece's worth.</b> Best takes the
+        // dearest metal that covers what it is given, so asking it for one piece is asking it to prefer the
+        // pile it will exhaust: a smith with thirty iron and ten bronze was sent to beat an eight-ingot
+        // cutlass out of the bronze, missed once, and reported "out of metal" standing on thirty iron. The
+        // two numbers are one number — see BotAnvil.Tries, which is what Choose picks against as well.
+        _metal = BotAnvil.Best(body, cost * BotAnvil.Tries);
+
+        if (BotAnvil.Ingots(body, _metal) < cost * BotAnvil.Tries)
+        {
+            _metal = BotAnvil.Best(body, cost);
+        }
 
         if (_swings < MaxSwings && BotAnvil.Ingots(body, _metal) < cost && BotAuction.Reclaim(bot, _metal) > 0)
         {
@@ -273,6 +315,17 @@ public sealed class BotForge : BotDeed
                 _leg = Leg.Hand;
 
                 return Handing(bot, body);
+            }
+
+            Stints++;
+
+            if (_swings >= MaxSwings)
+            {
+                Fruitless++;
+            }
+            else
+            {
+                RanOut++;
             }
 
             return BotDoing.Failed(_swings >= MaxSwings ? "nothing came of the iron" : "out of metal");
@@ -307,6 +360,9 @@ public sealed class BotForge : BotDeed
 
         if (goods.Count == 0)
         {
+            Stints++;
+            Fruitless++;
+
             return BotDoing.Done($"{_swings} attempts at {_kind?.Name} and nothing to show");
         }
 
@@ -348,6 +404,26 @@ public sealed class BotForge : BotDeed
 
         _handed = filled + listed;
 
+        Stints++;
+        Wrought++;
+        Pieces += _made;
+
         return BotDoing.Done($"{_made} {_kind?.Name} made, {filled} to order and {listed} on the stall");
+    }
+
+    public static string Describe() =>
+        Stints == 0
+            ? "no stint at an anvil has ended yet"
+            : $"{Stints} stints at an anvil ended: {Wrought} with {Pieces} pieces beaten out, {RanOut} out of metal, "
+              + $"{Fruitless} that used every swing and made nothing, {NoPlace} that found no anvil the engine would take";
+
+    public static void Forget()
+    {
+        Stints = 0;
+        Wrought = 0;
+        Pieces = 0;
+        RanOut = 0;
+        Fruitless = 0;
+        NoPlace = 0;
     }
 }

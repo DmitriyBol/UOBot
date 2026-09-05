@@ -99,6 +99,106 @@ public static class BotAnvil
     }
 
     /// <summary>
+    /// Takes this bot's own metal back off its own stall, whatever metal it is, and says how much came back.
+    ///
+    /// <para>
+    /// <b>Three gates in a ring, and the smith starved inside it.</b> <c>BotBullion</c> refuses to order iron
+    /// from a bot that is selling iron, and says in as many words that the metal is "fetched back at the
+    /// anvil, see BotForge" — which is true, <see cref="BotForge"/> reclaims when it runs short mid-work. But
+    /// <c>BotSmith</c> will not offer the anvil at all below <c>LeastMetal</c>, so a smith whose ingots were
+    /// on its own stall could never reach the errand that would fetch them. The two halves of it printed side
+    /// by side in the same sentence every five minutes and never met: at 21:42 on 04.09.2026,
+    /// "241 short of metal" beside "160 have their own out on a stall", with nought forged all session.
+    /// </para>
+    ///
+    /// <para>
+    /// So the fetch happens where the shortage is noticed, which is the fletcher's rule about its own
+    /// feathers and the tailor's about its own leather. Nothing is bought and nothing walks: the market holds
+    /// a stall's goods out of the world, so a bot takes its own back from wherever it is standing.
+    /// </para>
+    /// </summary>
+    /// <summary>
+    /// Caps every metal this bot could work at <paramref name="amount"/> in a keep-list, rather than iron
+    /// alone.
+    ///
+    /// <para>
+    /// <b>Two lists of what counts as metal, and they were about to be set against each other.</b>
+    /// <c>BotUnload.Needed</c> named <see cref="Metal"/> — iron and nothing else — so a smith's bronze was
+    /// merchandise and went out on a stall, while <see cref="Best"/> and <see cref="Fetch"/> know every
+    /// sub-resource the bot's skill allows. Left as it was, the porter would list the bronze and the smith
+    /// would fetch it straight back, for ever, on the beat. The same reading, in one place, is the only way
+    /// two subsystems can agree about a thing.
+    /// </para>
+    /// </summary>
+    public static void Keep(Mobile body, Dictionary<Type, int> keep, int amount)
+    {
+        var system = System;
+
+        if (system == null || keep == null)
+        {
+            keep?.TryAdd(Metal, amount);
+
+            return;
+        }
+
+        keep[Metal] = amount;
+
+        if (body == null)
+        {
+            return;
+        }
+
+        var able = body.Skills[Skill].Value;
+        var metals = system.CraftSubRes;
+
+        for (var i = 0; i < metals.Count; i++)
+        {
+            var metal = metals.GetAt(i);
+
+            if (metal?.ItemType != null && metal.RequiredSkill <= able)
+            {
+                keep[metal.ItemType] = amount;
+            }
+        }
+    }
+
+    public static int Fetch(IBotWilful bot, Mobile body, int need)
+    {
+        var system = System;
+        var pack = body?.Backpack;
+
+        if (system == null || pack == null || bot == null)
+        {
+            return 0;
+        }
+
+        var able = body.Skills[Skill].Value;
+        var metals = system.CraftSubRes;
+        var back = 0;
+
+        for (var i = 0; i < metals.Count; i++)
+        {
+            var metal = metals.GetAt(i);
+
+            // Only metal this bot could actually work. Fetching back what it cannot smith would empty a stall
+            // that was selling perfectly well to somebody who can.
+            if (metal?.ItemType == null || metal.RequiredSkill > able)
+            {
+                continue;
+            }
+
+            back += BotAuction.Reclaim(bot, metal.ItemType);
+
+            if (Ingots(body, metal.ItemType) >= need)
+            {
+                break;
+            }
+        }
+
+        return back;
+    }
+
+    /// <summary>
     /// How near an anvil and a forge a body has to be for the engine to let it smith.
     ///
     /// <para>
@@ -186,7 +286,39 @@ public static class BotAnvil
         return most;
     }
 
-    public static CraftItem Choose(Mobile bot) => BotCraftwork.Choose(bot, System, Skill, Metal, Stock(bot));
+    /// <summary>
+    /// How many attempts a stint at the anvil is set up to survive. Three.
+    ///
+    /// <para>
+    /// <b>A failed swing is not a free swing: the engine eats half the metal for it.</b>
+    /// <c>CraftItem.ConsumeRes</c> takes <c>amounts[i] - amounts[i] / 2</c> on a failure and
+    /// <c>CraftSystem.ConsumeOnFailure</c> is true for smithing, so a broadsword that does not come off costs
+    /// five of its ten ingots. Every number in this trade was written as though a swing that failed cost
+    /// nothing, and the whole of the waste follows from that one assumption: a smith set out holding exactly
+    /// what one piece needs, missed twice, and walked home. On 05.09.2026 that was thirty-eight of the
+    /// fifty-two stints that ended in nothing, and the log wrote the same sentence every time —
+    /// <em>2 attempts, 0 made — out of metal</em>.
+    /// </para>
+    ///
+    /// <para>
+    /// Three is the smallest number that lets a smith miss twice and still make the thing: one piece costs
+    /// <c>c</c>, two misses cost <c>c</c> between them. It is a multiplier and not a floor, because what a
+    /// round eats depends on what is being made, and a number that did not depend on the recipe is how these
+    /// two thresholds came to sit on one shelf in the first place.
+    /// </para>
+    /// </summary>
+    public static int Tries { get; set; } = 3;
+
+    /// <summary>
+    /// The best thing this bot could make and see through, or null.
+    ///
+    /// The stock is divided by <see cref="Tries"/> so that what is chosen is what the pack can afford to
+    /// attempt, rather than what it can afford to attempt once. Choosing on the undivided pile is choosing
+    /// the dearest recipe the metal will just barely cover, which is the recipe most likely to end the round
+    /// with nothing.
+    /// </summary>
+    public static CraftItem Choose(Mobile bot) =>
+        BotCraftwork.Choose(bot, System, Skill, Metal, Stock(bot) / Math.Max(1, Tries));
 
     /// <summary>The recipe for exactly this thing, if this bot could make one. For orders off the board.</summary>
     public static CraftItem Recipe(Mobile bot, Type wanted) =>

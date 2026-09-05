@@ -1,4 +1,4 @@
-using Server.Logging;
+﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -47,6 +47,9 @@ public sealed class BotSmith : IBotProposer
     /// <summary>Orders passed over for want of iron rather than for want of skill. Counted apart on purpose.</summary>
     public static long ShortOfMetal { get; private set; }
 
+    /// <summary>Ingots taken back off the smith's own stall so that it could work at all.</summary>
+    public static long Fetched { get; private set; }
+
     /// <summary>Smiths past the metal floor whose pack could still not fill any recipe their skill allows.</summary>
     public static long NothingAffordable { get; private set; }
 
@@ -87,6 +90,14 @@ public sealed class BotSmith : IBotProposer
             }
 
             return null;
+        }
+
+        // Its own metal back off its own stall before it is told it has none — the fletcher's rule about its
+        // feathers and the tailor's about its leather, on the trade that was locked out of the anvil by it.
+        // See BotAnvil.Fetch for the ring of three gates this breaks.
+        if (BotAnvil.Ingots(body, BotAnvil.Best(body, LeastMetal)) < LeastMetal)
+        {
+            Fetched += BotAnvil.Fetch(bot, body, LeastMetal);
         }
 
         // Any metal it can work, not iron alone. A smith standing on forty bronze ingots was being told it
@@ -155,6 +166,10 @@ public sealed class BotSmith : IBotProposer
         BotWant best = null;
         var bestWorth = 0;
 
+        // Raised once for the bot rather than once for every want it walked past — this counts against
+        // Asked, which is a count of bots, and the tailor's twin of it read 567 against a denominator of 264.
+        var starved = false;
+
         for (var i = 0; i < wants.Count; i++)
         {
             var want = wants[i];
@@ -186,13 +201,18 @@ public sealed class BotSmith : IBotProposer
 
             if (BotAnvil.Ingots(body, BotAnvil.Best(body, cost)) < cost)
             {
-                ShortOfMetal++;
+                starved = true;
 
                 continue;
             }
 
             best = want;
             bestWorth = want.Worth;
+        }
+
+        if (starved && best == null)
+        {
+            ShortOfMetal++;
         }
 
         return best;
@@ -220,7 +240,8 @@ public sealed class BotSmith : IBotProposer
         Asked == 0
             ? "nobody with a hammer has been asked to forge"
             : $"{Asked} asked: {ToOrder} took an order off the board, {ShortOfMetal} passed one over for want of iron, {OnSpec} forged on spec, "
-              + $"{NoMetal} short of metal, {NothingAffordable} with metal but not enough for any recipe they can work, {NoForge} with no forge in reach";
+              + $"{NoMetal} short of metal ({Fetched} ingots fetched back off their own stalls to stop being it), {NothingAffordable} with metal but not enough for any recipe they can work, {NoForge} with no forge in reach; "
+              + $"{BotForge.Describe()}";
 
     public static void Forget()
     {
@@ -233,7 +254,9 @@ public sealed class BotSmith : IBotProposer
         NoForge = 0;
         ToOrder = 0;
         ShortOfMetal = 0;
+        Fetched = 0;
         NothingAffordable = 0;
         OnSpec = 0;
+        BotForge.Forget();
     }
 }
