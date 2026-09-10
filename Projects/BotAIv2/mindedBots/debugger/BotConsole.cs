@@ -62,7 +62,7 @@ public static class BotConsole
             File.WriteAllText(_out, $"[{DateTime.Now:HH:mm:ss}] {BotVigil.Name} is listening at {_in}{Environment.NewLine}");
 
             logger.Information(
-                "The debugger's door is open: write a line into {In} and the answer appears in {Out}. Words it knows: state, bot <name>, idle, trades, fighting, rollcall, memory, note <text>, think <question>, hands, do <command>",
+                "The debugger's door is open: write a line into {In} and the answer appears in {Out}. Words it knows: state, bot <name>, idle, trades, fighting, rollcall, memory, note <text>, think <question>, hands, do <command>, dials <word>, dial <Class.Name> <value>",
                 _in,
                 _out
             );
@@ -191,7 +191,7 @@ public static class BotConsole
             case "do":
                 {
                     var (order, args) = Split(rest);
-                    var answer = BotHand.Run("the console", order, args, "asked by hand through the door");
+                    var answer = BotHand.Run("the console", order, args, "asked by hand through the door", true);
 
                     Say(answer ?? "nothing to do.");
                 }
@@ -199,11 +199,33 @@ public static class BotConsole
                 return;
 
             case "hands":
-                Say(BotHand.Describe() + $". I know: {string.Join(", ", BotHand.Verbs)}. {BotHand.Manual}");
+                Say(
+                    BotHand.Describe() + $". I know: {string.Join(", ", BotHand.Verbs)}. {BotHand.Manual}"
+                    + $" By hand only: {BotHand.ByHand}"
+                );
+
+                return;
+
+            // Reading and writing are two words rather than one with a flag: "dials" can never change
+            // anything, whatever is typed after it, and that is worth being true of a whole word rather
+            // than of an argument somebody has to get right at two in the morning.
+            case "dials":
+                Say(BotDials.Show(rest));
+
+                return;
+
+            case "dial":
+                {
+                    var (which, wanted) = Split(rest);
+
+                    Say(BotDials.Set(which, wanted, "the console"));
+                }
 
                 return;
 
             case "think":
+                // Consider now answers true for a question it has merely taken in hand, and says so itself;
+                // the line below is only for a question it could not take at all.
                 if (BotVigil.Consider(rest, Say))
                 {
                     Say($"thinking about: {rest} — the answer will follow here and in the log.");
@@ -218,7 +240,7 @@ public static class BotConsole
             default:
                 Say(
                     $"I do not know the word \"{verb}\". I know: state, bot <name>, idle, trades, fighting, rollcall,"
-                    + " memory, note <text>, think <question>, hands, do <command>."
+                    + " memory, note <text>, think <question>, hands, do <command>, dials <word>, dial <Class.Name> <value>."
                 );
 
                 return;

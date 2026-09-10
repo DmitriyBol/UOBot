@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Server.Guilds;
 using Server.Items;
 using Server.Logging;
 using Server.Misc;
@@ -317,6 +318,11 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         Build(klass);
         Learn(klass);
+        LearnCommon();
+
+        // Whose company it keeps, which the engine itself understands: guildmates read as Notoriety.Ally,
+        // so this is the one standing statement about which bots are on the same side. See BotGuilds.
+        BotGuilds.Enrol(this);
 
         Bond = BotOutfit.Give(this, klass);
 
@@ -517,6 +523,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         {
             case BotWalkResult.Refused:
             case BotWalkResult.GaveUp:
+            case BotWalkResult.Stalled:
                 {
                     if (++Refusals >= BotPopulation.StrandedLimit)
                     {
@@ -909,6 +916,49 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     private static readonly Layer[] TwoHands = [Layer.OneHanded, Layer.TwoHanded];
 
     /// <summary>
+    /// The guild's abbreviation, in front of the name rather than behind it.
+    ///
+    /// <para>
+    /// <b>Patrick's order of 09.09.2026: he wants to see whose band a bot is in before he reads its name.</b>
+    /// The engine puts it behind — <c>Mobile.AddNameProperties</c> builds the label as
+    /// <c>prefix, name, suffix</c> and hangs <c>[ABC]</c> off the suffix — so the abbreviation moves by
+    /// being written into the prefix instead. One cliloc, 1050045, feeds both the tooltip and the name that
+    /// appears over the head on a single click, so moving it here moves it in both places at once.
+    /// </para>
+    ///
+    /// <para>
+    /// Overridden here and nowhere else, so it is true of this population and of nothing in the engine: the
+    /// server assembly is not ours to edit, and a shard-wide change to how every mobile is labelled is a far
+    /// larger thing than what was asked for.
+    /// </para>
+    ///
+    /// <para>
+    /// What is deliberately dropped for a bot in a guild is the <c>Lord</c>/<c>Lady</c> fame prefix, because
+    /// there is one prefix and the abbreviation is now in it. No bot on this shard is near the ten thousand
+    /// fame that earns it; if one ever is, this is the line that decided.
+    /// </para>
+    /// </summary>
+    public override void AddNameProperties(IPropertyList list)
+    {
+        if (Guild is not Guild guild || string.IsNullOrEmpty(guild.Abbreviation))
+        {
+            base.AddNameProperties(list);
+
+            return;
+        }
+
+        var title = PropertyTitle && !string.IsNullOrEmpty(Title) ? $" {Title}" : " ";
+
+        // ~1_PREFIX~~2_NAME~~3_SUFFIX~, the same line the engine writes, with the band in front.
+        list.Add(1050045, $"[{guild.Abbreviation.FixHtmlFormattable()}] \t{Name ?? " "}\t{ApplyNameSuffix(title)}");
+
+        if (DisplayGuildTitle)
+        {
+            list.Add(guild.Name.FixHtml());
+        }
+    }
+
+    /// <summary>
     /// It died. The bond decides what it keeps, the decision layer counts what the work came to, and the
     /// squad stops counting it as help.
     /// </summary>
@@ -943,6 +993,15 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         BotWill.Died(this);
         BotSquads.Leave(this);
+
+        // <b>And whose hand it was, if it was a hand of ours.</b> Only when the killer is another bot of
+        // another guild: everything on this island that kills bots is a monster, and a guild bearing a
+        // grudge against an ogre would be a quarrel nobody could ever settle. Read off the corpse rather
+        // than off the last blow, because the corpse is what the engine itself credits.
+        if ((c as Corpse)?.Killer is BotMobile { Deleted: false } slayer && slayer != this)
+        {
+            BotRegard.Killed((slayer.Guild as Guilds.Guild)?.Name, (Guild as Guilds.Guild)?.Name);
+        }
 
         // The heaviest single reading the peril map ever takes, and the only unambiguous one. A bot that did
         // not come back is the evidence a captain is actually looking for.
@@ -1096,7 +1155,12 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         _ranked = true;
         _rankedTick = now;
 
-        BotRank = Titles.GetSkillTitle(this);
+        // <b>Out of what it earned, never out of what it was handed.</b> Everything in Common is given to
+        // every bot at birth, so a granted skill at a hundred makes the whole population read "Grandmaster
+        // Merchant" — which is what happened within the hour of Item Identification being handed out on
+        // 08.09.2026. A title is a claim about achievement; a handout is not one, and the same reasoning
+        // already keeps BotHarrow.Master from mustering forty-nine grandmasters for the same reason.
+        BotRank = Titles.GetSkillTitle(this, Earned());
     }
 
     /// <summary>
@@ -1104,6 +1168,43 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     /// <see cref="Mobile.Title"/> so the engine goes on formatting the name its own way. See <see cref="Rank"/>.
     /// </summary>
     public string BotRank { get; private set; }
+
+    /// <summary>The highest skill this bot actually worked up to, ignoring anything every bot is given.</summary>
+    private Skill Earned()
+    {
+        Skill best = null;
+
+        for (var i = 0; i < Skills.Length; i++)
+        {
+            var skill = Skills[i];
+
+            if (skill == null || Granted(skill.SkillName))
+            {
+                continue;
+            }
+
+            if (best == null || skill.BaseFixedPoint > best.BaseFixedPoint)
+            {
+                best = skill;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>Whether this is one of the skills handed to every bot. See <see cref="Common"/>.</summary>
+    public static bool Granted(SkillName skill)
+    {
+        for (var i = 0; i < Common.Length; i++)
+        {
+            if (Common[i].Skill == skill)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Whether a language model is choosing this one's work. Set by BotMindAI when it takes a body.
@@ -1379,6 +1480,53 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     }
 
     private static readonly double[] StartingAllowance = [50.0, 30.0, 20.0];
+
+    /// <summary>
+    /// What every bot knows how to do, whatever it was born as.
+    ///
+    /// <para>
+    /// <b>Separate from <see cref="Learn"/> on purpose, and it must stay separate.</b> Learn spends the
+    /// hundred points of character creation across the class's own skills, in order, and the shape of that
+    /// spend — fifty, thirty, twenty — is what makes a smith a smith. A skill everybody has is not part of
+    /// that argument: adding it to a class's list would take points away from the trade the class exists to
+    /// practise, and adding it to every class's list would be the same defect written thirteen times.
+    /// </para>
+    ///
+    /// <para>
+    /// Given outright rather than as a target to grow into, because these are not what a bot is becoming.
+    /// <see cref="BotProgress"/> only ever raises a skill it restores, so a value handed over here survives
+    /// a restart untouched.
+    /// </para>
+    /// </summary>
+    private void LearnCommon()
+    {
+        for (var i = 0; i < Common.Length; i++)
+        {
+            var (skill, value) = Common[i];
+            var held = Skills[skill];
+
+            if (held != null && value > held.Base)
+            {
+                held.Base = Math.Clamp(value, 0.0, 100.0);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The skills every bot is born knowing, and what at.
+    ///
+    /// <para>
+    /// <c>ItemID</c> at a hundred by Patrick's order of 08.09.2026: a population that loots chests has to be
+    /// able to tell what it has picked up, and this is knowledge rather than a trade — nobody on this shard
+    /// is supposed to be *becoming* an appraiser. A hundred also removes the roll: <c>ItemIdentification</c>
+    /// asks <c>CheckTargetSkill(ItemID, item, 0, 100)</c>, so anything less would leave a bot holding an
+    /// unidentified magic sword it cannot price and cannot sell.
+    /// </para>
+    /// </summary>
+    public static readonly (SkillName Skill, double Value)[] Common =
+    [
+        (SkillName.ItemID, 100.0)
+    ];
 
     /// <summary>
     /// The skill that swings whatever the roll actually handed this bot, taken from the bond.

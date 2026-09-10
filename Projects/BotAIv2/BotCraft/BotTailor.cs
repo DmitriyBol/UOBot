@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Server.Items;
 using Server.Logging;
 
@@ -145,9 +145,32 @@ public sealed class BotTailor : IBotProposer
             return null;
         }
 
+        // <b>The same question the leatherwork path asks, and this branch never asked it.</b> It checked that
+        // somebody sells cloth and that the price is a number — and not whether this bot can make anything
+        // out of cloth at all. A tailor whose skill reaches no cloth recipe was therefore offered "go and buy
+        // some", walked, bought, and failed with "nothing it knows how to make from Cloth" — whereupon the
+        // same offer was made again, because nothing about the bot had changed.
+        //
+        // On 09.09.2026 that loop ran 1,240 times in nine minutes across four bots and took the whole shard's
+        // completion band down to 25%, which is how the alarm found it. It had been latent for as long as the
+        // branch existed: it needs a bot with money, and until the guilds began standing for their members
+        // these four never had any. Two thresholds on one shelf, with the right one already written twelve
+        // lines below.
+        var recipe = BotThread.Choose(body, typeof(Cloth), BotSew.Bolt);
+
+        if (recipe == null)
+        {
+            NoRecipe++;
+
+            return null;
+        }
+
         var price = BotShops.Price(shop, typeof(Cloth));
 
-        return price > 0 ? new BotSew(shop, price) : null;
+        // The recipe chosen here decides how much cloth the errand must have before it starts sewing. Handing
+        // it over rather than letting the errand assume one is the whole of the fix for the loop described on
+        // the constructor: the question asked here and the question asked there are now the same question.
+        return price > 0 ? new BotSew(shop, price, BotThread.Units(recipe)) : null;
     }
 
     /// <summary>

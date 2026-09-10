@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
 using Server.Mobiles;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -98,6 +99,21 @@ public static class BotAuction
     /// </para>
     /// </summary>
     public static int Floor { get; set; } = 2;
+
+    /// <summary>
+    /// Stalls taken off the board because they had stood at their lowest ask past <see cref="StuckMs"/>.
+    ///
+    /// The number to read beside it is <see cref="Unreclaimed"/>: a stall given back is a board place freed
+    /// and a thing that can still find a shopkeeper, a stall that could not be given back is a bot whose
+    /// pack is full and a place still occupied.
+    /// </summary>
+    public static long Stood { get; private set; }
+
+    /// <summary>Things handed back to their sellers off those stalls.</summary>
+    public static long Returned { get; private set; }
+
+    /// <summary>Times the seller's pack would not take its own goods back, so the stall was left standing.</summary>
+    public static long Unreclaimed { get; private set; }
 
     /// <summary>
     /// The levy taken on every sale this market settles, as a share, with a minimum of one gold.
@@ -765,6 +781,12 @@ public static class BotAuction
 
         Sales++;
         Turnover += bill;
+
+        // <b>The one thing that mends a quarrel between guilds, and it is trade rather than an apology.</b>
+        // Both ways round, because a sale is the only event on this shard that both parties chose: one
+        // wanted the goods and the other wanted the coin, and neither is the injured party. Everything that
+        // worsens an opinion is one-sided — see BotRegard.Trespassed, which moves only the landowner's.
+        BotRegard.Traded((buyer?.Guild as Guilds.Guild)?.Name, (seller?.Guild as Guilds.Guild)?.Name);
 
         if (stall.Note(given, bill, BriskMs) && stall.Raise(RaiseStep, MostMultiple))
         {
@@ -1852,20 +1874,69 @@ public static class BotAuction
             // as touching it — see BotListing.DealtTick — so the stall that most needs a markdown, restocked
             // every few minutes and bought from never, was the one this clock could never reach. Two and
             // three quarter hours on 03.09.2026: 1902 things listed at 13066gp, 18 prices raised, none cut.
-            if (now - stall.DealtTick < StaleMs || !stall.Cut(CutStep, LeastMultiple))
+            if (now - stall.DealtTick < StaleMs)
             {
                 continue;
             }
 
-            Cuts++;
+            if (stall.Cut(CutStep, LeastMultiple))
+            {
+                Cuts++;
+
+                logger.Information(
+                    "{Name} cut {Item} to {Price}gp after {Amount} sat unsold",
+                    seller.Name,
+                    stall.Label,
+                    stall.Price,
+                    stall.Amount
+                );
+
+                continue;
+            }
+
+            // <b>The end of a stall's life, which it did not have.</b> Everything above this line is the
+            // markdown: a tenth off every StaleMs until LeastMultiple, a quarter of what it opened at. Then
+            // Cut returns false and the old code reached `continue` — for ever. Only an *empty* stall was
+            // ever forgotten, so a pitch holding something the population has walked past at every price
+            // stood until the shard stopped, holding one of MaxListings places while it did.
+            //
+            // Handed back rather than destroyed or bought by anybody. A shopkeeper is the buyer of last
+            // resort this world already has, it pays coin that comes from outside the bot economy, and the
+            // peddler already exists to walk things to one; the goods rejoin the seller's pack and take that
+            // road. Nothing here spends anybody's money to make the problem invisible.
+            if (now - stall.ListedTick < StuckMs)
+            {
+                continue;
+            }
+
+            var pack = seller.Backpack;
+            var back = pack == null ? 0 : stall.Reclaim(pack);
+
+            if (back <= 0)
+            {
+                // The pack would not take it. Left standing rather than destroyed: the bot will be lighter
+                // later, and a stall is a worse place for goods than a pack but a better one than nowhere.
+                Unreclaimed++;
+
+                continue;
+            }
+
+            Returned += back;
+            Stood++;
 
             logger.Information(
-                "{Name} cut {Item} to {Price}gp after {Amount} sat unsold",
+                "{Name} took back {Amount} {Item} after {Minutes} minutes at {Price}gp, its lowest ask",
                 seller.Name,
+                back,
                 stall.Label,
-                stall.Price,
-                stall.Amount
+                (now - stall.ListedTick) / 60000,
+                stall.Price
             );
+
+            if (stall.IsEmpty)
+            {
+                _listings.RemoveAt(i);
+            }
         }
     }
 
@@ -1934,12 +2005,154 @@ public static class BotAuction
         }
     }
 
+    /// <summary>
+    /// What the board is actually made of, by kind: the most-wanted things and the most-stocked ones.
+    ///
+    /// <para>
+    /// <b>Written because "61 wants and 350 stalls" cannot answer the only question that matters about
+    /// them.</b> On 08.09.2026 the tailors sewed 2952 pieces on their own judgement against 71 to order and
+    /// four thinking crafters spent themselves down from 340gp to under 40 buying leather for goods nobody
+    /// had asked for — and nothing on the shard could say whether the board held orders they were ignoring
+    /// or held nothing they could ever make. Those are opposite defects with opposite cures.
+    /// </para>
+    /// </summary>
+    public static string Board(int most = 6)
+    {
+        Dictionary<Type, int> wanted = [];
+        Dictionary<Type, int> stocked = [];
+
+        for (var i = 0; i < _wants.Count; i++)
+        {
+            var want = _wants[i];
+
+            if (want?.Kind != null && want.IsOpen)
+            {
+                wanted[want.Kind] = wanted.TryGetValue(want.Kind, out var had) ? had + want.Amount : want.Amount;
+            }
+        }
+
+        for (var i = 0; i < _listings.Count; i++)
+        {
+            var stall = _listings[i];
+
+            if (stall?.Kind != null && !stall.IsEmpty)
+            {
+                stocked[stall.Kind] = stocked.TryGetValue(stall.Kind, out var had) ? had + stall.Amount : stall.Amount;
+            }
+        }
+
+        return $"most wanted: {Top(wanted, most)}; most stocked: {Top(stocked, most)}";
+    }
+
+    /// <summary>The heaviest few of a tally, largest first, as one readable clause.</summary>
+    private static string Top(Dictionary<Type, int> tally, int most)
+    {
+        if (tally.Count == 0)
+        {
+            return "nothing";
+        }
+
+        List<(Type Kind, int Amount)> ordered = [];
+
+        foreach (var (kind, amount) in tally)
+        {
+            ordered.Add((kind, amount));
+        }
+
+        ordered.Sort(static (a, b) => b.Amount.CompareTo(a.Amount));
+
+        var say = ValueStringBuilder.Create(160);
+
+        try
+        {
+            for (var i = 0; i < ordered.Count && i < most; i++)
+            {
+                if (i > 0)
+                {
+                    say.Append(", ");
+                }
+
+                say.Append(ordered[i].Kind.Name);
+                say.Append(' ');
+                say.Append(ordered[i].Amount);
+            }
+
+            return say.ToString();
+        }
+        finally
+        {
+            say.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// How long a stall has to stand before it counts as one nobody is going to buy.
+    ///
+    /// <para>
+    /// Half an hour, which is three price cuts: by then a stall has been offered at nine tenths, eight
+    /// tenths and seven tenths of what it opened at, and the population has walked past all three.
+    /// </para>
+    /// </summary>
+    public static int StuckMs { get; set; } = 1800000;
+
+    /// <summary>
+    /// The stalls that have stood past <see cref="StuckMs"/>: how many, how many things they hold, what
+    /// they are asking, and how old the oldest is in minutes.
+    ///
+    /// <para>
+    /// <b>Nothing on this shard could see this, which is why it went unnoticed.</b> A stall's price ratchets
+    /// down by <see cref="CutStep"/> once per <see cref="StaleMs"/> until it reaches
+    /// <see cref="LeastMultiple"/>, a quarter — and then it simply stands. Only an <em>empty</em> stall is
+    /// ever forgotten (see <see cref="ForgetMs"/>), so a stall holding something nobody wants is held for
+    /// the life of the shard, taking up one of <see cref="MaxListings"/> places while it does it.
+    /// </para>
+    /// </summary>
+    public static (int Stalls, int Things, int Worth, int OldestMinutes) Stuck()
+    {
+        var now = Core.TickCount;
+        var stalls = 0;
+        var things = 0;
+        var worth = 0;
+        var oldest = 0;
+
+        for (var i = 0; i < _listings.Count; i++)
+        {
+            var stall = _listings[i];
+
+            if (stall == null || stall.IsEmpty)
+            {
+                continue;
+            }
+
+            var age = now - stall.ListedTick;
+
+            if (age < StuckMs)
+            {
+                continue;
+            }
+
+            stalls++;
+            things += stall.Amount;
+            worth += stall.Price * stall.Amount;
+
+            var minutes = (int)(age / 60000);
+
+            if (minutes > oldest)
+            {
+                oldest = minutes;
+            }
+        }
+
+        return (stalls, things, worth, oldest);
+    }
+
     public static string Describe()
     {
         var (units, worth) = Offered();
         var (sought, escrow) = Sought();
+        var (stuckStalls, stuckThings, stuckWorth, stuckOldest) = Stuck();
 
-        return $"{_listings.Count} of {MaxListings} stalls holding {units} things worth {worth}gp and {_wants.Count} of {MaxWants} wants for {sought} things with {escrow}gp down; {Sales} sales and {Fills} fills for {Turnover}gp, of which {Crossed} things went straight off a stall to a want on the board and {Dear} wants found the thing on a stall dearer than they would pay; {Raises} prices raised, {Cuts} cut, of which {BotHaggle.Describe()}, {Forgotten} forgotten, {Abandoned} given up on; {Sells} orders refused to bots already selling the thing, {Recalled} of them settled by taking it back off the stall and {Unfunded} to bots that could not put the money down; {Cheap} things of {_worthless.Count} kinds were worth less than the {Floor}gp floor and stayed in the pack; {Fetches} deliveries fetched off the board holding {Fetched} things; the levy has taken {Levied}gp over {Levies} sales";
+        return $"{_listings.Count} of {MaxListings} stalls holding {units} things worth {worth}gp and {_wants.Count} of {MaxWants} wants for {sought} things with {escrow}gp down; {Sales} sales and {Fills} fills for {Turnover}gp, of which {Crossed} things went straight off a stall to a want on the board and {Dear} wants found the thing on a stall dearer than they would pay; {Raises} prices raised, {Cuts} cut, of which {BotHaggle.Describe()}, {Forgotten} forgotten, {Abandoned} given up on; {Sells} orders refused to bots already selling the thing, {Recalled} of them settled by taking it back off the stall and {Unfunded} to bots that could not put the money down; {Cheap} things of {_worthless.Count} kinds were worth less than the {Floor}gp floor and stayed in the pack; {Fetches} deliveries fetched off the board holding {Fetched} things; the levy has taken {Levied}gp over {Levies} sales; {stuckStalls} stalls have stood more than {StuckMs / 60000} minutes holding {stuckThings} things at {stuckWorth}gp, the oldest for {stuckOldest} minutes; {Stood} stalls were taken off the board at their lowest ask and {Returned} things went back to their sellers, {Unreclaimed} could not be handed back";
     }
 
     private sealed class AuctionTimer : Timer

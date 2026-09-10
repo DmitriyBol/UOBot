@@ -99,6 +99,41 @@ public sealed class BotPickings : BotDeed
 
     public override double Coin => 1.0;
 
+    /// <summary>
+    /// The road was refused, so the place is written down — and this is the half that was missing.
+    ///
+    /// <para>
+    /// <b>Asking the reach ledger was not enough and the log said so within the hour.</b>
+    /// <c>BotReach.Ask</c> answers out of pockets that enclosure searches have proved closed: it is about
+    /// the ground a bot is <em>standing in</em>. A corpse fifteen tiles below the floor is not a pocket
+    /// anybody has surveyed, so the answer is Unknown and the offer goes through. Corwin took this errand
+    /// 533 times in five minutes on 10.09.2026 at one such corpse and took the whole shard's band to 33%,
+    /// an hour after the reach guard went in and four hours after the identical loop on a spent arrow.
+    /// </para>
+    ///
+    /// <para>
+    /// So the failure marks the place, the way <c>BotUnload.Bend</c> has always marked a counter it could
+    /// not reach, and the proposer reads the mark. Both halves are needed: a mark nobody reads is this
+    /// project's oldest and most repeated defect, and the appraisal's own caution factor is not a substitute
+    /// — a fifth root turns 0.15 into 0.68, which does not stop anything.
+    /// </para>
+    ///
+    /// <para>
+    /// False, always: there is no second place to try. The errand ends and the mark stops it coming back.
+    /// </para>
+    /// </summary>
+    public override bool Bend(IBotWilful bot)
+    {
+        var where = _corpse?.GetWorldLocation() ?? Point3D.Zero;
+
+        if (where != Point3D.Zero)
+        {
+            bot?.Resolve?.Ledger?.Beware(Trade, _map, where);
+        }
+
+        return false;
+    }
+
     public override int Made => _made;
 
     private int _made;
@@ -191,6 +226,12 @@ public sealed class BotPicker : IBotProposer
 
     public static long Offered { get; private set; }
 
+    /// <summary>Corpses passed over because the ground they lie on has already been proved unreachable.</summary>
+    public static long Sealed { get; private set; }
+
+    /// <summary>Corpses passed over because this bot's own road to them was refused before. See BotPickings.Bend.</summary>
+    public static long Baulked { get; private set; }
+
     public string Name => "Picker";
 
     public BotStanding Rung => BotStanding.Free;
@@ -275,6 +316,26 @@ public sealed class BotPicker : IBotProposer
             return null;
         }
 
+        var lies = found.GetWorldLocation();
+
+        // Two questions, because one of them is not enough. The reach ledger knows about ground that
+        // enclosure searches have proved closed; this bot's own ledger knows about roads that were actually
+        // refused, which is the only thing that knows about a corpse under the floor. See BotPickings.Bend.
+        if (BotReach.Ask(map, body.Location, lies, BotArrival.Within(BotPickings.Reach))
+            == BotReachVerdict.Sealed)
+        {
+            Sealed++;
+
+            return null;
+        }
+
+        if (bot.Resolve?.Ledger?.Cautious(BotPickings.Trade, map, lies) == true)
+        {
+            Baulked++;
+
+            return null;
+        }
+
         Offered++;
 
         return new BotPickings(map, found);
@@ -283,7 +344,7 @@ public sealed class BotPicker : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered anything they killed"
-            : $"{Asked} looks for its own kills ({Sworn} answers went to classes that never stoop): {Offered} bodies offered, {Picked} already been through, {NothingDead} had nothing of theirs lying about; {BotPickings.Barren} held nothing worth carrying";
+            : $"{Asked} looks for its own kills ({Sworn} answers went to classes that never stoop): {Offered} bodies offered, {Picked} already been through, {NothingDead} had nothing of theirs lying about; {BotPickings.Barren} held nothing worth carrying, {Sealed} lay where nothing can walk, {Baulked} had refused this bot a road before, and {BotGleaner.Sealed} spent arrows lay the same way ({BotGleaner.Baulked} of them already refused)";
 
     public static void Forget()
     {

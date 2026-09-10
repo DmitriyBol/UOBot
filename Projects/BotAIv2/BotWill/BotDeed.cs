@@ -162,7 +162,88 @@ public abstract class BotDeed
     /// what the company killed — would be credited to nothing at all.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Whether this work is not about money, and must not be refused for failing to earn any.
+    ///
+    /// <para>
+    /// <b>One deed on this shard is paid nothing on purpose, and the arithmetic threw it away for exactly
+    /// that.</b> The Baron's rounds pay nothing by design — they are where he is between harrowings — and
+    /// while he walks them he spends: on kit, on the stipend, on what a company costs. The ledger measured
+    /// that honestly and concluded rounds were worth -40.5 gold a minute, whereupon
+    /// <see cref="BotAppraisal"/>'s "expected to pay nothing" veto refused them. With harrowings unavailable
+    /// — a fresh population has no grandmasters, so no company can be raised for damned ground — the Baron
+    /// was offered one thing, refused it, and stood in Britain for twelve minutes with 600gp in his pack.
+    /// </para>
+    ///
+    /// <para>
+    /// The flag rather than a floor on the estimate: a floor would quietly rescue every unprofitable errand
+    /// on the shard, including the ones that <i>ought</i> to be refused, and the reason this one is different
+    /// is a fact about the work rather than about its price.
+    /// </para>
+    /// </summary>
+    public virtual bool Unpaid => false;
+
+    /// <summary>
+    /// Whether this work can be done by a bot that cannot take a single step.
+    ///
+    /// <para>
+    /// <b>Almost nothing can, and the default says so.</b> A bot past its carrying ceiling is refused every
+    /// move by the engine, so an errand that begins with a walk is an errand it will hold, fail, and be
+    /// offered again — Joss stood on one tile for thirteen minutes taking and dropping thirty-two of them,
+    /// and Roderic reached 271 stones of a 218 ceiling on 08.09.2026 while taking peddling at 183 a minute
+    /// over the unloading that would have freed him at 74.
+    /// </para>
+    ///
+    /// <para>
+    /// The one thing that is true here is putting goods on the market, because a stall holds its wares
+    /// wherever the seller stands. So <c>BotUnload</c> answers true and everything else keeps the default.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>What is done with the answer changed on 09.09.2026, and the change is the point of the flag.</b>
+    /// It was first a veto in <c>BotAppraisal</c>, which left heavy bots with nothing at all to do for
+    /// twenty-seven minutes at a stretch; then a factor there, which left them doing exactly what they had
+    /// been doing, because a fiftieth under a fifth root is 0.46. It is read in <c>BotWill.Auction</c> as a
+    /// <em>rank</em> now: for a bot past its carrying ceiling, everything that answers true is compared only
+    /// with the others that do, and everything else is compared beneath them. A price cannot express "this
+    /// cannot be started" at any value; an order can, and it keeps the floor as well, since a bot with
+    /// nothing standing on offer simply has one rank and the auction it always had.
+    /// </para>
+    /// </summary>
+    public virtual bool Standing => false;
+
     public virtual bool Alongside => false;
+
+    /// <summary>
+    /// Whether this work has already spent something that dropping it will not get back.
+    ///
+    /// <para>
+    /// <b>False for nearly everything, and it has to be, because giving work up cheaply is how a population
+    /// stays responsive.</b> A hunt abandoned halfway has cost some walking; a dig abandoned halfway has
+    /// cost some swings. Nothing is owed to either and the auction is right to move on. The exception is
+    /// work with a purchase in the middle of it: <c>BotSupply</c> draws the guild's money, buys a lot at a
+    /// shop, and only then sets off for the hall, so an errand dropped after the first leg has converted
+    /// the guild's coin into goods in a courier's pack and delivered none of it.
+    /// </para>
+    ///
+    /// <para>
+    /// Measured 09.09.2026, and it was a defect of mine hours old. Making the carrying ceiling a rank rather
+    /// than a discount (see <c>BotWill.Auction</c>) meant a courier that went over its ceiling <em>by
+    /// buying the lot</em> immediately had the errand taken off it by the unloading, which then sold the
+    /// guild's goods where it stood. Supply errands dropped after the money was spent went from ten in the
+    /// hour before to eighty in the hour after, thirty-eight of them to the unloading, and three hundred and
+    /// sixty sewing kits were bought to put two hundred and eighteen on a shelf.
+    /// </para>
+    ///
+    /// <para>
+    /// The cure has two halves and this is the second. The first is not to send a courier for more than it
+    /// can carry, which is where the state should never arise (<c>BotSupplier.Fits</c>); this is what
+    /// happens when it arises anyway. It does not make the work immortal - see <c>BotDeed.Pressing</c>,
+    /// which still takes precedence, as does the carrying ceiling itself, because a bot that cannot walk
+    /// cannot deliver either and nothing is served by holding it to a promise it cannot keep.
+    /// </para>
+    /// </summary>
+    public virtual bool Committed => false;
 
     /// <summary>
     /// Whether standing perfectly still, in one place, with the same thing to say about itself, is what this

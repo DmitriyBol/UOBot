@@ -32,22 +32,35 @@ public sealed class BotMindModule : BotModule
     public override void Start()
     {
         BotMindConfig.Load();
-        BotMindLog.Open();
-
-        BotWill.Offer(new BotMindProposer());
 
         BotMinds.Start();
+
+        // Both of these are for minds that exist. With none running, the proposer would be asked for an
+        // offer for every bot on every beat only to answer nothing, and the boot line below would announce
+        // three thinkers that are not there — which is the same fault as the log file: a subsystem that is
+        // switched on with nothing to do reads exactly like one that is working.
+        if (BotMinds.All.Count == 0)
+        {
+            return;
+        }
+
+        BotWill.Offer(new BotMindProposer());
 
         // The numbers this is actually running with, said once at startup, because the file may have moved
         // any of them and a belief about behaviour built on the defaults in the source can be wrong by a
         // factor of two without anything looking odd.
+        //
+        // <b>Who is thinking is counted, not written down.</b> This line said "Three minds are awake:
+        // Aldric the captain, Godric the architect and Cedric the sage" while four crafters were running and
+        // those three were stood down — and it went on saying "4 of 3 have bodies" without anybody's build
+        // breaking. The same fault as a hard-written population size, in the one line most likely to be read
+        // as authoritative.
         logger.Information(
-            "Three minds are awake on {Model} at {Endpoint}: {Warrior} the captain, {Architect} the architect and {Sage} the sage, asked to choose every {Think}ms while free, reckoning up at most every {Review}ms, holding {Lessons} rules each ({PerTrade} of them about any one trade) and asking with a weight of {Insistence:F2}; {Embodied} of 3 have bodies. Their thinking is written to {Log}",
+            "{Count} minds are awake on {Model} at {Endpoint}: {Who}; asked to choose every {Think}ms while free, reckoning up at most every {Review}ms, holding {Lessons} rules each ({PerTrade} of them about any one trade) and asking with a weight of {Insistence:F2}; {Embodied} of them have bodies. Their thinking is written to {Log}",
+            BotMinds.All.Count,
             BotOllama.Model,
             BotOllama.Endpoint,
-            BotMinds.WarriorName,
-            BotMinds.ArchitectName,
-            BotMinds.SageName,
+            Who(),
             BotMind.ThinkEveryMs,
             BotMind.ReviewEveryMs,
             BotMind.MostLessons,
@@ -56,6 +69,20 @@ public sealed class BotMindModule : BotModule
             BotMinds.Embodied,
             BotMindLog.Path ?? "nowhere"
         );
+    }
+
+    /// <summary>The minds by name and office, for the boot line, read off the list rather than a constant.</summary>
+    private static string Who()
+    {
+        var minds = BotMinds.All;
+        var names = new string[minds.Count];
+
+        for (var i = 0; i < minds.Count; i++)
+        {
+            names[i] = $"{minds[i].Name} the {minds[i].Trade}";
+        }
+
+        return string.Join(", ", names);
     }
 
     /// <summary>What the two of them have done, for whoever is reading the log.</summary>

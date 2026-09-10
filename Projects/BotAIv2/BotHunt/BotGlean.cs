@@ -72,6 +72,24 @@ public sealed class BotGlean : BotDeed
     /// <summary>No coin changes hands; what comes back is goods, and goods it would otherwise have bought.</summary>
     public override double Coin => 0.0;
 
+    /// <summary>
+    /// The road was refused, so the arrow's tile is written down. The other half of the guard in
+    /// <c>BotGleaner.Propose</c>, and without it that guard has nothing to read.
+    ///
+    /// See <c>BotPickings.Bend</c> for the whole argument: the reach ledger is about ground a bot stands
+    /// in, an arrow through the floor is not a surveyed pocket, and a mark nobody reads is this project's
+    /// most repeated defect. False always — there is no second arrow to try on this errand.
+    /// </summary>
+    public override bool Bend(IBotWilful bot)
+    {
+        if (_where != Point3D.Zero)
+        {
+            bot?.Resolve?.Ledger?.Beware(Trade, _map, _where);
+        }
+
+        return false;
+    }
+
     /// <summary>What was picked up, at whatever the shard reckons an arrow is worth.</summary>
     public override int Made => _gathered * BotAuction.Worth(_kind, 1);
 
@@ -168,8 +186,64 @@ public sealed class BotGlean : BotDeed
 /// so a full archer walks past its own spent arrows rather than tidying the field for its own sake.
 /// </para>
 /// </summary>
+    /// <summary>
+    /// The road was refused, so the place is written down — and this is the half that was missing.
+    ///
+    /// <para>
+    /// <b>Asking the reach ledger was not enough and the log said so within the hour.</b>
+    /// <c>BotReach.Ask</c> answers out of pockets that enclosure searches have proved closed: it is about
+    /// the ground a bot is <em>standing in</em>. A corpse fifteen tiles below the floor is not a pocket
+    /// anybody has surveyed, so the answer is Unknown and the offer goes through. Corwin took the picking errand
+    /// 533 times in five minutes on 10.09.2026 at one such corpse and took the whole shard's band to 33%,
+    /// an hour after the reach guard went in and four hours after the identical loop on a spent arrow.
+    /// </para>
+    ///
+    /// <para>
+    /// So the failure marks the place, the way <c>BotUnload.Bend</c> has always marked a counter it could
+    /// not reach, and the proposer reads the mark. Both halves are needed: a mark nobody reads is this
+    /// project's oldest and most repeated defect, and the appraisal's own caution factor is not a substitute
+    /// — a fifth root turns 0.15 into 0.68, which does not stop anything.
+    /// </para>
+    ///
+    /// <para>
+    /// False, always: there is no second place to try. The errand ends and the mark stops it coming back.
+    /// </para>
+    /// </summary>
+    // (on BotGlean, for the arrow that started it: (1457, 1461, -15), 355 attempts in five minutes.)
+
 public sealed class BotGleaner : IBotProposer
 {
+    /// <summary>
+    /// Spent arrows passed over because the ground they lie on has already been proved unreachable.
+    ///
+    /// <para>
+    /// <b>Written after this proposer took the whole shard's completion band down with it.</b> On
+    /// 10.09.2026 at 07:23 the band read 28% against a steady 76%, and 406 of the window's 440 failures
+    /// were three archers — Brannoc 235, Aric 120, Bertram 51 — walking at one arrow lying at
+    /// (1457, 1461, <b>-15</b>): seventeen tiles from home and fifteen below it, inside the ground. Three
+    /// hundred and fifty-five attempts in five minutes at a single tile.
+    /// </para>
+    ///
+    /// <para>
+    /// <c>Nearest</c> answers "what is the closest one" and nothing asked whether it could be walked to, so
+    /// every failure put the same arrow straight back on offer. The cure is the one <c>BotStudent</c>
+    /// already uses and it costs a dictionary lookup: the reach ledger is asked, and it answers only from
+    /// pockets that real searches have already proved closed. A proposal declined costs nothing; an errand
+    /// taken and failed costs a place in the band.
+    /// </para>
+    /// </summary>
+    public static long Sealed { get; private set; }
+
+    /// <summary>Arrows passed over because this bot's own road to them was refused before.</summary>
+    public static long Baulked { get; private set; }
+
+    /// <summary>Forgotten with the rest of the counters on a world reload.</summary>
+    public static void Forget()
+    {
+        Sealed = 0;
+        Baulked = 0;
+    }
+
     public string Name => "Gleaner";
 
     public BotStanding Rung => BotStanding.Free;
@@ -204,6 +278,29 @@ public sealed class BotGleaner : IBotProposer
 
         var lying = BotGlean.Nearest(body, kind, BotGlean.Reach);
 
-        return lying == null ? null : new BotGlean(kind, map, lying.GetWorldLocation());
+        if (lying == null)
+        {
+            return null;
+        }
+
+        var where = lying.GetWorldLocation();
+
+        if (bot.Resolve?.Ledger?.Cautious(BotGlean.Trade, map, where) == true)
+        {
+            Baulked++;
+
+            return null;
+        }
+
+        // Asked of the reach ledger, which already knows. See Sealed: an arrow that fell through the floor
+        // is still the nearest arrow, for ever, and nothing here had ever asked whether it could be reached.
+        if (BotReach.Ask(map, body.Location, where, BotArrival.Within(BotGlean.Touch)) == BotReachVerdict.Sealed)
+        {
+            Sealed++;
+
+            return null;
+        }
+
+        return new BotGlean(kind, map, where);
     }
 }

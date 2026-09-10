@@ -75,6 +75,19 @@ public sealed class BotHarvestModule : BotModule
             BotGround.MaxSurveys
         );
 
+        // Taken from the engine here rather than in a field initialiser, because the mining system is built
+        // by content initialisation and a value read before that would be the fallback for the life of the
+        // shard. Said out loud because it is the number that decides whether a rested seam comes back full
+        // or barren, and it was wrong by half for as long as it was ours. See BotOre.RespawnMs.
+        // The ear on the harvest system own sentences. Opened before anybody swings, and closed in Reset,
+        // or a world reload leaves two ears on one head. See BotHeard.
+        BotHeard.Listen();
+
+        logger.Information(
+            "A worked-out seam rests {Rest}s, which is the engine's own longest refill for an ore bank plus a minute; a rest shorter than that hands the next miner a barren hole",
+            BotGround.RestFromEngine() / 1000
+        );
+
         logger.Information(
             "Foraging ready: anything the world calls a reagent, picked up from {Reach} tiles away while a pack is under {Full:P0} full, reckoned at {Expects} a minute and put on the board at {Guess}gp a piece",
             BotForage.Reach,
@@ -92,6 +105,7 @@ public sealed class BotHarvestModule : BotModule
     {
         logger.Information("Harvest, before the reload: {State}", BotGround.Describe());
 
+        BotHeard.Forget();
         BotGround.Reset();
         BotMiner.Forget();
         BotWoodsman.Forget();

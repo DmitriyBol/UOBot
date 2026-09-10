@@ -56,6 +56,8 @@ public static class BotAudit
     /// <summary>How long a bot is left alone after being touched, so a cure has time to work or not.</summary>
     public static int RestMs { get; set; } = 300000;
 
+
+
     /// <summary>What was true about one bot when the window opened.</summary>
     private sealed class Mark
     {

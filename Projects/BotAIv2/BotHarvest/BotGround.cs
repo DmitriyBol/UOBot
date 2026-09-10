@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Server.Engines.Craft;
@@ -6,6 +6,7 @@ using Server.Engines.Harvest;
 using Server.Logging;
 using Server.Mobiles;
 using Server.Regions;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -164,6 +165,34 @@ public static class BotGround
     public static int AnvilReach { get; set; } = 3;
 
     /// <summary>
+    /// How far above or below a bot's own feet a workshop may stand and still be its workshop.
+    ///
+    /// <para>
+    /// <b>Two of this island's four forges stand on an upper storey and cost the shard 93 errands in one
+    /// night.</b> (1424, 1558, 30) and (1361, 1574, 30) are <c>SmallForgeAddon</c>s thirty units above the
+    /// street, on floors whose only standable surface is that same thirty. <see cref="HasAnvil"/> sweeps for
+    /// items at <c>z = 0</c>, so a forge three storeys up is found from the pavement, filed, chosen as the
+    /// nearest, walked at, and refused — over and over, because nothing in the choosing ever asked how high
+    /// it was.
+    /// </para>
+    ///
+    /// <para>
+    /// Asked of the bot rather than of the place, which is the same rule the reach ledger keeps: height is a
+    /// fact about a bot and a place together. A smith that ever does find itself on that floor may use that
+    /// forge. Twenty-four is <see cref="BotStep.StandingReach"/> — two storeys, enough for stairs, a cellar
+    /// or a hillside, not enough for a roof — and it is the number the debugger's own <c>tile</c> verb uses
+    /// to answer "does a body fit here". Set it past 127 to turn the rule off on a running shard.
+    /// </para>
+    /// </summary>
+    public static int Storey { get; set; } = BotStep.StandingReach;
+
+    /// <summary>Choices steered away from a workshop on a floor the asker is not on. See <see cref="Storey"/>.</summary>
+    public static long Upstairs { get; private set; }
+
+    /// <summary>Choices steered away from ground that has refused the population. See <see cref="BotRefused"/>.</summary>
+    public static long Refused { get; private set; }
+
+    /// <summary>
     /// Most seams remembered at once.
     ///
     /// <para>
@@ -177,6 +206,20 @@ public static class BotGround
     /// </para>
     ///
     /// <para>
+    /// <para>
+    /// <b>Five hundred filled too, and it filled in twenty minutes.</b> With the sweep ceiling raised from
+    /// sixteen to sixty-four on 08.09.2026 the list reached 511 of 512 before the shard was half an hour
+    /// old, and a full list refuses everything after it — including the rock that replaces what the miners
+    /// are working out. Seams are struck off as they are emptied, so a ceiling that binds is a population
+    /// that runs out of ground to dig on a shard which still has plenty.
+    /// </para>
+    ///
+    /// <para>
+    /// Two thousand. The cost is one comparison per seam per miner per review, and a review is every fifteen
+    /// seconds for eleven miners; the sweep's own duplicate check is the quadratic one, and at this size a
+    /// three-hundred-seam sweep is under a million comparisons — milliseconds.
+    /// </para>
+    ///
     /// Raised rather than made to evict, and the difference matters. Eviction needs a rule for which seam to
     /// throw away, and every rule available here is wrong: the poorest is the one a novice can work, the
     /// furthest is the mountains this was all done to reach, the oldest is whatever the shard learned first.
@@ -184,7 +227,7 @@ public static class BotGround
     /// review, which against the movement budget is nothing.
     /// </para>
     /// </summary>
-    public static int MaxSeams { get; set; } = 512;
+    public static int MaxSeams { get; set; } = 2048;
 
     public static int MaxPlaces { get; set; } = 48;
 
@@ -192,8 +235,26 @@ public static class BotGround
     /// How many sweeps the population may run in one world. A backstop, not a policy: a sweep is tens of
     /// thousands of tile reads, and a population wandering a continent should not be able to spend its
     /// afternoon surveying it.
+    ///
+    /// <para>
+    /// <b>Sixteen was the backstop and it became the budget, which is the second time that happened in one
+    /// day.</b> A sweep covers 250 tiles around a bot and a fresh one is refused within 125 of an old one,
+    /// so sixteen of them cover a patch a couple of thousand tiles across at best — and the population is
+    /// allowed to want things a thousand tiles from home in every direction, which is a square four times
+    /// that. On 08.09.2026 the shard hit the ceiling and said so, once, at error level, and the consequences
+    /// arrived wearing other names: "Roderic could not be offered mining: no fire within its own reach",
+    /// "found no shopkeeper selling cloth within its own reach", two counters and four forges known to a
+    /// population of forty-nine.
+    /// </para>
+    ///
+    /// <para>
+    /// Sixty-four, and the cost is bounded by what a sweep actually measures at: this shard's own log has
+    /// them between 7ms and 156ms, most of them under 20ms, spread over hours. The whole allowance is a
+    /// couple of seconds of game loop across a session — against a population that could not find a bank.
+    /// See BotQuad.Most for the same defect on the island map, found the same afternoon.
+    /// </para>
     /// </summary>
-    public static int MaxSurveys { get; set; } = 16;
+    public static int MaxSurveys { get; set; } = 64;
 
     private static readonly List<BotSeam> _seams = [];
 
@@ -206,6 +267,8 @@ public static class BotGround
     private static readonly List<(Map Map, Point3D Where)> _surveyed = [];
 
     private static bool _saidCapped;
+
+    private static bool _saidFullOfSeams;
 
     public static IReadOnlyList<BotSeam> Seams => _seams;
 
@@ -300,6 +363,13 @@ public static class BotGround
             }
 
             var where = new Point3D(x, y, z);
+
+            // Ground the population has already failed to reach is not worth surveying: the prospector would
+            // walk at it, give up, and hand the same square to the next one. See BotRefused.
+            if (BotRefused.Refusing(map, where))
+            {
+                continue;
+            }
 
             if (!Surveyed(map, where))
             {
@@ -430,12 +500,69 @@ public static class BotGround
             _counters.Count
         );
 
+        // <b>And which fires, by address.</b> A count said "four forges" all night while two of them stood
+        // thirty units above the street and could not be reached by anybody; no number could have told the
+        // two apart, and finding out took a person asking the debugger about five coordinates by hand. There
+        // are never more than a few dozen, so naming them costs one line a sweep and answers the question
+        // outright. See Storey.
+        if (fires > 0)
+        {
+            var where = ValueStringBuilder.Create(256);
+
+            try
+            {
+                for (var i = 0; i < _fires.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        where.Append(", ");
+                    }
+
+                    where.Append('(');
+                    where.Append(_fires[i].Where.X);
+                    where.Append(", ");
+                    where.Append(_fires[i].Where.Y);
+                    where.Append(", ");
+                    where.Append(_fires[i].Where.Z);
+                    where.Append(')');
+                }
+
+                logger.Information(
+                    "The fires now known, by address, against a population standing at z {Feet}: {Fires}",
+                    BotPopulation.Where.Z,
+                    where.ToString()
+                );
+            }
+            finally
+            {
+                where.Dispose();
+            }
+        }
+
         return seams;
     }
 
     private static bool NoteSeam(Map map, int x, int y, HarvestSystem system)
     {
-        if (_seams.Count >= MaxSeams || BotOre.Examine(map, x, y, system) == null)
+        if (_seams.Count >= MaxSeams)
+        {
+            // Said once, for the reason the sweep ceiling is said once: a list that has stopped growing looks
+            // exactly like an island with no more rock in it, and the difference only shows up hours later as
+            // miners with nowhere to dig. See MaxSurveys.
+            if (!_saidFullOfSeams)
+            {
+                _saidFullOfSeams = true;
+
+                logger.Error(
+                    "The seam list is full at {Max} and no more rock will be recorded anywhere on the island",
+                    MaxSeams
+                );
+            }
+
+            return false;
+        }
+
+        if (BotOre.Examine(map, x, y, system) == null)
         {
             return false;
         }
@@ -490,7 +617,7 @@ public static class BotGround
 
             // A fire on its own is a fire. Smelting only needs the fire, but a workshop is what a crafter
             // will want later, and remembering the pair costs nothing now.
-            if (!HasAnvil(map, x, y) || Known(_fires, map, where))
+            if (!HasAnvil(map, x, y) || Known(_fires, map, where) || !Footed(map, where))
             {
                 return false;
             }
@@ -530,7 +657,7 @@ public static class BotGround
 
             var where = item.GetWorldLocation();
 
-            if (Known(_fires, map, where) || !HasAnvil(map, where.X, where.Y))
+            if (Known(_fires, map, where) || !HasAnvil(map, where.X, where.Y) || !Footed(map, where))
             {
                 continue;
             }
@@ -561,7 +688,7 @@ public static class BotGround
 
             var where = new Point3D(x, y, tile.Z);
 
-            if (Known(_hearths, map, where))
+            if (Known(_hearths, map, where) || !Footed(map, where))
             {
                 return false;
             }
@@ -588,7 +715,7 @@ public static class BotGround
 
             var where = item.GetWorldLocation();
 
-            if (Known(_hearths, map, where))
+            if (Known(_hearths, map, where) || !Footed(map, where))
             {
                 continue;
             }
@@ -626,6 +753,98 @@ public static class BotGround
 
         return found;
     }
+
+    /// <summary>
+    /// Whether a body could stand at this workshop, or beside it, at the height the workshop is at.
+    ///
+    /// <para>
+    /// <b>A place with no floor under it was filed as work and walked at forty-three times.</b> The hearth
+    /// at (1512, 1426, 15) answers the debugger with "the floor could not be found" - no standable surface
+    /// at that tile at any height - and 43 of the 206 cooking errands that failed on the road in one session
+    /// went to it. Nothing between the filing and the walking ever asked the question, so every cook in
+    /// range was handed it in turn.
+    /// </para>
+    ///
+    /// <para>
+    /// The same test <see cref="BotPath"/> makes when it turns a destination into a place to walk to, in the
+    /// same order and with the same tolerances: the tile's own height first, the floor under it second if
+    /// that floor is within a person's height of what was asked for, and the ring around it last. Written
+    /// out here rather than borrowed because the one in BotPath is private to the search and takes an
+    /// arrival with it; if the two ever disagree, this is the copy that is wrong.
+    /// </para>
+    /// </summary>
+    private static bool Footed(Map map, Point3D where)
+    {
+        if (!NeedFooting)
+        {
+            return true;
+        }
+
+        var z = (sbyte)Math.Clamp(where.Z, sbyte.MinValue, sbyte.MaxValue);
+
+        if (BotStep.Mask(map, where.X, where.Y, z).WalkMask != 0)
+        {
+            return true;
+        }
+
+        if (BotStep.Settle(map, where.X, where.Y, out var under)
+            && Math.Abs(under - where.Z) <= BotArrival.PersonHeight)
+        {
+            return true;
+        }
+
+        // <b>Tighter than the tile's own test, on both counts, and the loose version let the worst hearth on
+        // the island straight back in.</b> The first draft copied BotPath.Footing exactly: a ring of two
+        // tiles, accepting any floor within a person's height. (1512, 1426, 15) passed it — the hearth is
+        // fifteen units up, the street below is at nought, and fifteen is inside sixteen — so it was filed,
+        // and Roderic walked at it until his stamina ran out.
+        //
+        // Two corrections. The ring is one tile, because that is the arrival almost every errand actually
+        // asks for and BotPath then measures its own footing at; two was a copy of a ceiling, not of the
+        // real reach. And the height is half a person rather than a whole one: a brazier standing on a table
+        // is six units above the floor beside it and must still count, while fifteen is a storey and the
+        // floor beside it is a different room's.
+        for (var dx = -FootingSweep; dx <= FootingSweep; dx++)
+        {
+            for (var dy = -FootingSweep; dy <= FootingSweep; dy++)
+            {
+                if ((dx != 0 || dy != 0)
+                    && BotStep.Settle(map, where.X + dx, where.Y + dy, out var rz)
+                    && Math.Abs(rz - where.Z) <= BotArrival.PersonHeight / 2)
+                {
+                    return true;
+                }
+            }
+        }
+
+        Unfooted++;
+
+        return false;
+    }
+
+    /// <summary>
+    /// How far around a workshop to look for something to stand on.
+    ///
+    /// One tile: the arrival nearly every errand asks for is <c>Beside</c>, and BotPath measures its footing
+    /// over exactly the tiles the arrival allows. Two was copied from that method's ceiling rather than from
+    /// its reach, and the difference filed a hearth a storey above the street.
+    /// </summary>
+    public static int FootingSweep { get; set; } = 1;
+
+    /// <summary>
+    /// Whether a workshop has to have somewhere to stand before it is filed at all.
+    ///
+    /// <para>
+    /// A switch rather than a constant because this rule removes places from the shard's list and there is
+    /// no undoing that on a running world - a swept square is never swept again. If a morning ever finds the
+    /// island with no fires on it, this is the number to put back and restart, and the survey line names
+    /// every fire by address so that argument can be had with facts.
+    /// </para>
+    /// </summary>
+    public static bool NeedFooting { get; set; } = true;
+
+    /// <summary>Workshops refused for having no floor at them or beside them. See <see cref="Footed"/>.</summary>
+    public static long Unfooted { get; private set; }
 
     private static bool HasAnvil(Map map, int x, int y)
     {
@@ -793,6 +1012,20 @@ public static class BotGround
                 continue;
             }
 
+            // <b>Rock that has just been worked out is not rock, and until now it was handed straight back
+            // to the next miner.</b> BotGround.Barren strikes a seam off only when nobody ever found
+            // anything there; a seam that gave up its ore and ran dry stayed on the board exactly as it was.
+            // Measured 08.09.2026: 225 mining errands in forty minutes ending "emptied 8 rocks and found no
+            // more", between them 87 gold and no goods at all, and the shard's finishing rate falling from
+            // 89% to 67% as the miners worked through a list of holes.
+            //
+            // Rested rather than removed, because ore does come back and the survey does not run again on
+            // its own. See Drained.
+            if (Draining(seam.Where))
+            {
+                continue;
+            }
+
             // Somebody is already on it.
             if (!Free(body, seam.Where))
             {
@@ -956,6 +1189,54 @@ public static class BotGround
     /// <c>BotPeril.Cleared</c> makes about a harrowed square — the row goes, and reality writes a new one.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// How long a seam that has been worked out is left alone before anybody is sent to it again.
+    ///
+    /// <para>
+    /// <b>The engine's own refill time plus a minute, and not a number anybody chose.</b> This read ten
+    /// minutes, which is exactly <em>the earliest</em> moment the engine could have put the ore back — see
+    /// <see cref="BotOre.RespawnMs"/>, where the whole measurement is written down. A rest shorter than the
+    /// refill hands a barren seam back to the next miner, and the next miner cannot tell the difference from
+    /// outside: it walks out, works through its allowance of rocks, finds nothing and rests the seam again.
+    /// </para>
+    ///
+    /// <para>
+    /// Settable, because it is still a dial and Patrick may want to see what a shorter one does. The default
+    /// is the only part taken from the engine.
+    /// </para>
+    /// </summary>
+    public static int DrainedMs { get; set; } = 600000;
+
+    /// <summary>
+    /// Sets the rest from the engine's own refill time, once, at start-up.
+    ///
+    /// Not a static initialiser: the mining system is built by content initialisation, and a value read
+    /// before that would be the fallback for the life of the shard — the same trap
+    /// <c>BotShopper.Makeable</c> guards against by refusing to cache before the systems exist.
+    /// </summary>
+    public static int RestFromEngine()
+    {
+        DrainedMs = BotOre.RespawnMs + 60000;
+
+        return DrainedMs;
+    }
+
+    /// <summary>Seams resting because somebody worked them out. See <see cref="Drained"/>.</summary>
+    public static long Dry { get; private set; }
+
+    private static readonly Dictionary<Point3D, long> _drained = [];
+
+    /// <summary>Somebody took the last of the ore here. The seam rests before it is offered again.</summary>
+    public static void Drained(Point3D where)
+    {
+        _drained[where] = Core.TickCount;
+        Dry++;
+    }
+
+    /// <summary>Whether this seam is still resting after being worked out.</summary>
+    public static bool Draining(Point3D where) =>
+        _drained.TryGetValue(where, out var when) && Core.TickCount - when < DrainedMs;
+
     public static bool Barren(Point3D where)
     {
         for (var i = 0; i < _seams.Count; i++)
@@ -1016,6 +1297,47 @@ public static class BotGround
     {
         var ledger = kind == null ? null : bot?.Resolve?.Ledger;
 
+        // <b>Two passes, and the second one is what stops a rule from starving the island.</b> There are two
+        // counters on this shard and four fires. A record that can rest a square - and BotRefused rests one
+        // for two minutes on the first refusal, doubling to two hours - can therefore rest every bank the
+        // population has, and then nobody walks to one, and then nobody arrives to disprove it, and the
+        // record has locked the door it is standing behind. That shape has cost this project a night before:
+        // an instrument paid for out of the waste it was meant to end, which switches itself off exactly when
+        // it is needed.
+        //
+        // So the soft rule - a square resting after refusing somebody - is asked on the first pass only. If
+        // nothing survives it, the second pass drops it and takes the nearest thing there is. Counted, so
+        // that a day when the population is living on the second pass is a day that says so.
+        //
+        // <b>The storey rule is not soft and is asked on both.</b> See where it is applied: a rest may have
+        // expired, a floor has not moved.
+        for (var pass = 0; pass < 2; pass++)
+        {
+            var found = Pick(places, map, from, except, ledger, kind, pass == 0, bot?.Self);
+
+            if (found != Point3D.Zero)
+            {
+                if (pass > 0)
+                {
+                    Anyway++;
+                }
+
+                return found;
+            }
+        }
+
+        return Point3D.Zero;
+    }
+
+    /// <summary>Times the choice had to be made with the soft rules switched off. See <see cref="Nearest"/>.</summary>
+    public static long Anyway { get; private set; }
+
+    /// <summary>One pass of <see cref="Nearest"/>, with the soft rules on or off.</summary>
+    private static Point3D Pick(
+        List<(Map Map, Point3D Where)> places, Map map, Point3D from, Point3D except, BotLedger ledger, string kind,
+        bool choosy, Mobile who = null
+    )
+    {
         var best = Point3D.Zero;
         var bestAway = double.MaxValue;
 
@@ -1030,6 +1352,21 @@ public static class BotGround
 
             if (except != Point3D.Zero && where == except)
             {
+                continue;
+            }
+
+            // <b>Somebody else's, and this one is not soft.</b> A forge in a guild hall belongs to that
+            // guild — Patrick's order of 08.09.2026 — and unlike the rules below it is asked on both passes,
+            // because a rest may expire and ownership does not. It is safe to make hard here for one reason:
+            // it can only ever refuse a place standing inside a house, and every fire, forge and counter in
+            // Britain stands in the street. See BotEstate.MayUse.
+            if (who != null && !BotEstate.MayUse(who, on, where))
+            {
+                if (choosy)
+                {
+                    BotEstate.Bar();
+                }
+
                 continue;
             }
 
@@ -1055,6 +1392,38 @@ public static class BotGround
             // no way through is no way through for anybody.
             if (BotReach.Ask(on, from, where, BotArrival.Within(1)) == BotReachVerdict.Sealed)
             {
+                continue;
+            }
+
+            // A floor nobody standing here could be on. See Storey: two of the four forges this shard knows
+            // are thirty units above the street, and until this line every smith on the pavement chose one of
+            // them whenever it was the nearest.
+            // <b>Asked on both passes, unlike the resting rule beside it, and the difference is what the two
+            // facts are made of.</b> A square that refused somebody may have refused them for a reason that
+            // has since gone — a creature in a doorway, a bot in the way — so relaxing it when nothing else
+            // is left costs one wasted walk at worst. A workshop three storeys up is geometry: it will be
+            // three storeys up on the next beat and on every beat after, and handing it to a smith who has
+            // nowhere else to go is not a fallback, it is a guaranteed failure dressed as one.
+            //
+            // Measured 08.09.2026: 55 choices had to be made with both rules off, and Emeric and Wulfric
+            // spent them walking at (1361, 1574, 30) — one of the two forges nobody can reach — while their
+            // purses went from 340gp to 40 and 13. The right answer when every forge is on another floor is
+            // that there is no forge, which BotSmith already counts and reports as NoForge.
+            if (Math.Abs(where.Z - from.Z) > Storey)
+            {
+                Upstairs++;
+
+                continue;
+            }
+
+            // And what the population as a whole has already proved about this ground. BotRefused is written
+            // by whoever gives up on a road and cleared by whoever arrives, and until now it was read by the
+            // frontier, the herbs and the hunt and by nothing that picks a workshop — which is the shape of
+            // defect this project has paid for more often than any other: a note filed and not read.
+            if (choosy && BotRefused.Refusing(on, where))
+            {
+                Refused++;
+
                 continue;
             }
 
@@ -1088,11 +1457,17 @@ public static class BotGround
         _surveyed.Clear();
         _digging.Clear();
         _told.Clear();
+        _drained.Clear();
+        Dry = 0;
         Spared = 0;
+        Upstairs = 0;
+        Unfooted = 0;
+        Refused = 0;
+        Anyway = 0;
 
         _saidCapped = false;
     }
 
     public static string Describe() =>
-        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_hearths.Count} hearths, {_counters.Count} counters; {Walled} seams passed over with no way through, {Townbound} for being inside the walls, {Emptied} struck off as barren, {BotMiner.Sent} sent out past the frontier and {Prospected} seams found there over {Fruitless} empty walks, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {Spared} asks answered out of the last scan, patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y})";
+        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_hearths.Count} hearths, {_counters.Count} counters; {Walled} seams passed over with no way through, {Townbound} for being inside the walls, {Emptied} struck off as barren and {Dry} rested after being worked out, {BotMiner.Sent} sent out past the frontier and {Prospected} seams found there over {Fruitless} empty walks, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {BotDig.Drained} rocks given up with the engine's bank under them empty against {BotDig.Fumbled} still holding ore the miner kept missing and {BotDig.Allowanced} trips that stopped on their own allowance of eight (the miners that gave up on full rock were being given {(BotDig.Fumbled > 0 ? BotDig.FumbledChance / BotDig.Fumbled : 0.0):P0} a swing by the engine, {BotDig.Locked} swings were taken with the pickaxe still locked by the one before, and {BotDig.Stirred} quiet swings were taken by a bot that had moved since the last one, {BotDig.Adrift} swings the engine cancelled for that and {BotDig.Laden} whose ore was lost to a full pack), {Spared} asks answered out of the last scan, {Unfooted} workshops never filed for having no floor at them, {Upstairs} passed over for standing on another floor and {Refused} for ground that has refused the population ({Anyway} choices then had to be made with the resting rule off, or there would have been nowhere at all), patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y}); {BotHeard.Describe()}";
 }

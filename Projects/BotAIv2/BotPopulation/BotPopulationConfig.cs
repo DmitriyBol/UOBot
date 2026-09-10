@@ -42,6 +42,12 @@ public sealed class BotPopulationSettings
     /// </summary>
     public int? Purse { get; set; }
 
+    /// <summary>
+    /// Whether savings survive a restart along with skills. Off by default — see
+    /// <see cref="BotProgress.Savings"/> for what turning it back on cures and what it hides.
+    /// </summary>
+    public bool? KeepEarnings { get; set; }
+
     /// <summary>How far from home the population may want anything at all.</summary>
     public int? Roam { get; set; }
 
@@ -147,6 +153,7 @@ public static class BotPopulationConfig
 
         BotPopulation.Spread = settings.Spread ?? BotPopulation.Spread;
         BotOutfit.Purse = settings.Purse ?? BotOutfit.Purse;
+        BotProgress.Savings = settings.KeepEarnings ?? BotProgress.Savings;
         BotPopulation.Roam = settings.Roam ?? BotPopulation.Roam;
         BotPopulation.ReviveMs = settings.ReviveMs ?? BotPopulation.ReviveMs;
 

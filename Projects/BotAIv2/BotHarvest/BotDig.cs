@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Server.Engines.Harvest;
 using Server.Items;
 using Server.Mobiles;
@@ -76,17 +76,34 @@ public sealed class BotDig : BotDeed
     public static int TargetOre { get; set; } = 20;
 
     /// <summary>
-    /// How many swings without anything new in the pack before the tile is given up on.
+    /// How many swings without anything new in the pack before the tile is given up on, at a miner who never
+    /// misses.
     ///
     /// <para>
-    /// A backstop rather than the main measure. Emptiness itself is read from the engine — see
-    /// <see cref="BotOre.Left"/> — so an exhausted block is never chosen in the first place; what this
-    /// catches is the other reason nothing appears, which is a run of failed skill rolls on rock the bot is
-    /// not good enough for. Six is enough to ride out ordinary bad luck and few enough not to spend a minute
-    /// on a hole.
+    /// <b>A backstop that was doing the deciding, and it was sized for a master.</b> The reasoning was that
+    /// emptiness is read from the engine, so this only had to catch a run of bad rolls — six being "enough to
+    /// ride out ordinary bad luck". Ordinary luck for this population is not what that assumed:
+    /// <c>HarvestSystem</c> rolls against iron's nought-to-a-hundred, so a bot with thirty mining misses
+    /// seven swings in ten, and a run of six misses is not bad luck, it is Tuesday.
+    /// </para>
+    ///
+    /// <para>
+    /// Measured on the morning of 09.09.2026, the first time the two cases were ever counted apart:
+    /// <b>16 rocks given up with the engine's bank under them empty against 35 still holding ore.</b> Two in
+    /// three rocks written off as worked out were full, the seam was then rested for everybody, and the log
+    /// said the island was running out of ore. It was not. The miners were missing.
+    /// </para>
+    ///
+    /// <para>
+    /// So the real limit is this divided by what the engine says the bot's chance actually is — see
+    /// <see cref="BotOre.Chance"/> — floored here and capped at <see cref="MostDry"/>. A master gives up
+    /// after six quiet swings and a novice after twenty, which is the same statement about both of them.
     /// </para>
     /// </summary>
     public static int DryLimit { get; set; } = 6;
+
+    /// <summary>And the most, however hopeless the miner. A minute of swinging at one rock is enough.</summary>
+    public static int MostDry { get; set; } = 24;
 
     /// <summary>
     /// How near a counter a bot has to stand to bank and to put goods out.
@@ -151,7 +168,7 @@ public sealed class BotDig : BotDeed
     /// shard already had this and mining was the one that did not.
     /// </para>
     /// </summary>
-    public static int SwingMs { get; set; } = 1000;
+    public static int SwingMs { get; set; } = 2000;
 
     private enum Leg
     {
@@ -221,6 +238,97 @@ public sealed class BotDig : BotDeed
     /// <summary>Rocks written off because nothing could get within swinging reach of them.</summary>
     public static long Unreachable { get; private set; }
 
+    // ---- Two ways a rock stops yielding, and they were the same number. -------------------------------
+    //
+    // <b>The comment on DryLimit has always named both and nothing ever counted them apart.</b> A rock goes
+    // quiet either because the engine's bank under it is empty — the honest end of a vein — or because the
+    // bot is not good enough for it and is missing its rolls on rock that is still full. Both write the tile
+    // off, both end the trip with "found no more", and the difference between them is the difference between
+    // "the island is worked out" and "the miners cannot mine". On 09.09.2026 the shard was reporting the
+    // first at 7% finishing in an hour and nobody could say which it was, because one number stood for both.
+
+    /// <summary>Rocks given up on with the engine's own bank under them reading empty.</summary>
+    public static long Drained { get; private set; }
+
+    /// <summary>Rocks given up on with ore still in them: a run of missed rolls, not a worked-out vein.</summary>
+    public static long Fumbled { get; private set; }
+
+    /// <summary>Trips that ended because the trip's allowance of rocks ran out rather than the ground did.</summary>
+    public static long Allowanced { get; private set; }
+
+    /// <summary>
+    /// The chance the engine gave the bots that gave up on rock which still held ore, summed, and how many
+    /// of them there were — so the summary can print the average.
+    ///
+    /// <para>
+    /// <b>Written because two hypotheses about the fumbles were both wrong and a third guess was not worth
+    /// making.</b> The count climbs with the length of a session — 22 drained against 1 fumbled twenty
+    /// minutes in, 32 against 219 an hour in, on the same population. A full pack would explain it and does
+    /// not: <see cref="Digging"/> leaves for the fire at <c>FillFraction</c> of the carrying ceiling before a
+    /// swing is ever taken. Harder veins would explain it and do not: below a vein's requirement the engine
+    /// falls back to iron and the roll is against iron either way, so a bot's chance is its mining skill over
+    /// a hundred and nothing else.
+    /// </para>
+    ///
+    /// <para>
+    /// So the thing to print is the chance itself. If the average sits near what the population's mining
+    /// skill implies, <see cref="MostDry"/> is simply too small a cap for a green miner — twenty-four misses
+    /// at one chance in ten happens eight times in a hundred. If it sits far above, something is stopping
+    /// the swings that has nothing to do with the rolls, and that is a different hunt.
+    /// </para>
+    /// </summary>
+    public static double FumbledChance { get; private set; }
+
+    /// <summary>
+    /// Swings the engine could not even begin, because the last one had not let go of the pickaxe.
+    ///
+    /// <para>
+    /// <b>The one thing left that would explain a bot missing twenty-four times at two chances in three.</b>
+    /// The measured chance behind the fumbles is 67% — a run of twenty-four misses at that rate happens once
+    /// in a million million, so the rolls are not being made. <c>StartHarvesting</c> takes
+    /// <c>BeginAction(tool)</c> and hands it back in <c>FinishHarvesting</c>, nine tenths of a second later;
+    /// if anything loses that timer — a bot that dies mid-swing, a world reload, a range check that ends the
+    /// harvest by another road — the lock is never given back and every swing that bot takes for the rest of
+    /// its life is a silent no-op. Nothing anywhere would say so: <c>StartHarvesting</c> returns void.
+    /// </para>
+    ///
+    /// <para>
+    /// Counted rather than fixed, because which of those it is decides what the cure is, and a cure applied
+    /// to the wrong one is how a morning goes.
+    /// </para>
+    /// </summary>
+    public static long Locked { get; private set; }
+
+    /// <summary>
+    /// Quiet swings taken by a bot that had moved since the one before it.
+    ///
+    /// <para>
+    /// <b>The last candidate standing, and the only one that explains "it arrives with time".</b> A harvest
+    /// does not resolve where it starts: <c>OnHarvesting</c> and then <c>FinishHarvesting</c> both call
+    /// <c>CheckRange(..., timed: true)</c>, nine tenths of a second after the swing, and a bot that has moved
+    /// out of the two-tile reach in that time has its harvest ended with <c>TimedOutOfRangeMessage</c> and
+    /// nothing in its pack. From inside the errand that is indistinguishable from a missed roll — which is
+    /// why the fumbles read as bots missing at 86%, a rate at which twenty-four misses in a row is a one in
+    /// a hundred million million million event.
+    /// </para>
+    ///
+    /// <para>
+    /// And it fits the one thing every other candidate failed to explain: it grows with the length of a
+    /// session, because companies form as a session goes on and a bot on the Bound rung is walked about by
+    /// its squad while it holds its own errand.
+    /// </para>
+    /// </summary>
+    public static long Stirred { get; private set; }
+
+    /// <summary>Swings the engine cancelled because the bot had moved while they resolved. See BotHeard.</summary>
+    public static long Adrift { get; private set; }
+
+    /// <summary>Swings whose ore was destroyed for want of room in the pack. See BotHeard.</summary>
+    public static long Laden { get; private set; }
+
+    /// <summary>Where the bot stood when it last swung, for <see cref="Stirred"/>.</summary>
+    private Point3D _swungFrom;
+
     /// <summary>Whether a swing has been taken, and when. See <see cref="SwingMs"/>.</summary>
     private bool _swung;
 
@@ -232,6 +340,12 @@ public sealed class BotDig : BotDeed
 
     private int _made;
 
+    /// <summary>Ore raised on this trip and not yet turned into bars. See <see cref="Made"/>.</summary>
+    private int _raw;
+
+    /// <summary>What one of those is reckoned at. Taken once, when the first comes out of the ground.</summary>
+    private int _rawWorth;
+
     /// <summary>What a bar was reckoned at when the takings were counted. Kept so the same number comes back
     /// off <see cref="Made"/> if one is sold into a want a moment later.</summary>
     private int _worth;
@@ -242,6 +356,12 @@ public sealed class BotDig : BotDeed
 
     /// <summary>Rocks this trip has emptied. See <see cref="MaxSpent"/> for why it dies with the trip.</summary>
     private readonly List<Point3D> _spent = [];
+
+    /// <summary>Of those, how many the engine said were actually out of ore.</summary>
+    private int _ranDry;
+
+    /// <summary>And how many still held ore this bot could not get out. See <see cref="DryLimit"/>.</summary>
+    private int _missed;
 
     public BotDig(BotSeam seam)
     {
@@ -278,7 +398,27 @@ public sealed class BotDig : BotDeed
     /// </summary>
     public override double Coin => 0.0;
 
-    public override int Made => _made;
+    /// <summary>
+    /// What this trip has produced: bars if it has reached a fire, and the ore in the pack if it has not.
+    ///
+    /// <para>
+    /// <b>Ore in a pack was worth nothing, and it is the largest single thing wrong with mining on this
+    /// shard.</b> <c>_made</c> only became a number at the forge, so a bot that had dug twenty ore and was
+    /// carrying it recorded <c>dropped mine: carrying ore to a fire: 0 in 2.0 min (0/min): 0 coin, 0 made</c>
+    /// — and <c>BotCommons.Corrected</c> then drags the whole trade's estimate towards nought. Measured over
+    /// forty-five minutes on 09.09.2026: 130 mining trips, 42 finished, 17 failed and <b>71 dropped</b>, of
+    /// which 46 were dropped after the digging was done, on the walk to the fire or to the counter. Mining
+    /// was teaching itself that mining is worthless, and then acting on it.
+    /// </para>
+    ///
+    /// <para>
+    /// The rule is <c>BotRestock</c>'s and it has always been stated there in as many words: goods are worth
+    /// what they cost. Ore that exists is produce, whatever leg the errand is on. Priced by the market rather
+    /// than by a guess here — the same call the bars use — and replaced rather than added to when it becomes
+    /// bars, so nothing is counted twice.
+    /// </para>
+    /// </summary>
+    public override int Made => _made + _raw * _rawWorth;
 
     public override string Stage => _leg switch
     {
@@ -315,7 +455,7 @@ public sealed class BotDig : BotDeed
         {
             var doing = _leg switch
             {
-                Leg.Seam => Digging(body),
+                Leg.Seam => Digging(bot, body),
                 Leg.Fire => Melting(body),
                 _ => Banking(bot)
             };
@@ -329,7 +469,7 @@ public sealed class BotDig : BotDeed
         return BotDoing.Failed("could not settle on a next step");
     }
 
-    private BotDoing Digging(Mobile body)
+    private BotDoing Digging(IBotWilful bot, Mobile body)
     {
         var carried = BotOre.Carried(body);
 
@@ -420,7 +560,41 @@ public sealed class BotDig : BotDeed
 
             if (_spent.Count > 0)
             {
-                return BotDoing.Failed($"emptied {_spent.Count} rocks and found no more");
+                // <b>Two endings wearing one sentence, and the commoner of the two was the wrong one.</b>
+                // 252 of 309 of these lines on 09.09.2026 read "emptied 8 rocks", which is exactly MaxSpent:
+                // the trip had used up its own allowance of rocks and stopped looking, and the seam was then
+                // rested as though the ground had run dry. A seam rested for a budget nobody spent is a seam
+                // taken off the board while it is still full of ore, and it is the population that pays for
+                // it — the board shrinks, the miners walk further, and the log says the island is exhausted.
+                if (_spent.Count >= MaxSpent)
+                {
+                    Allowanced++;
+                }
+
+                // <b>Whose fault the rock went quiet decides where the note goes, and until now every note
+                // went to the same place.</b> Rock the engine says is empty is a fact about the ground and
+                // belongs on the board, where it stops every miner. Rock still full that this bot could not
+                // work is a fact about this bot — a run of missed rolls on a vein above its skill — and
+                // resting the seam for that takes good ore off the board for everybody, which is how a board
+                // of 1,135 seams turns into a population walking further every hour. Its own ledger is where
+                // the second one goes: another miner, or this one in an hour, is welcome to it.
+                if (_ranDry >= _missed)
+                {
+                    // Worked out, so it rests. See BotGround.Drained: without this the same hole goes back on
+                    // the board and the next miner walks to it, which cost 225 errands and the shard's
+                    // finishing rate in one afternoon.
+                    BotGround.Drained(_seam.Where);
+
+                    return BotDoing.Failed(
+                        $"emptied {_ranDry} of {_spent.Count} rocks and found no more, and the seam rests"
+                    );
+                }
+
+                bot?.Resolve?.Ledger?.Beware(Trade, _map, _seam.Where);
+
+                return BotDoing.Failed(
+                    $"missed too often on {_missed} of {_spent.Count} rocks that still hold ore; the seam keeps its place"
+                );
             }
 
             // Nothing was ever found here, which is a fact about the ground rather than about this bot's
@@ -485,18 +659,66 @@ public sealed class BotDig : BotDeed
         _approaches = 0;
         _walled = 0;
 
-        // What the last swing produced, judged before the next one is taken.
-        if (carried > _seen)
+        // <b>What the engine actually said about the last swing, which is the only thing here that is not an
+        // inference.</b> Patrick's order of 09.09.2026: a vein is worked out when the bot sees the message
+        // that there is nothing in it. The harvest system distinguishes six outcomes and says which — see
+        // BotHeard — and until the engine was given a seam to say it through, every one of those sentences
+        // was dropped before anything could hear it.
+        var word = BotHeard.Last(body, Server.Engines.Harvest.Mining.System?.OreAndStone, out _);
+
+        switch (word)
         {
-            _seen = carried;
-            _dry = 0;
+            case BotHeard.Word.Empty:
+            case BotHeard.Word.Taken:
+                {
+                    // The rock is done, in the engine's own words. Nothing to weigh up.
+                    BotHeard.Clear(body);
+                    Drained++;
+                    _ranDry++;
+                    _spent.Add(at);
+                    _tile = null;
+                    _dry = 0;
+
+                    return default;
+                }
+
+            case BotHeard.Word.Full:
+                {
+                    // The ore came out of the bank and was destroyed for want of room. Carrying on here costs
+                    // the vein and pays nobody.
+                    BotHeard.Clear(body);
+                    Laden++;
+                    _dry = 0;
+                    _leg = BotOre.Carried(body) >= BotOre.WorthSmelting ? Leg.Fire : Leg.Counter;
+
+                    return default;
+                }
+
+            case BotHeard.Word.Adrift:
+                {
+                    // The swing was cancelled rather than rolled, because the bot moved while it resolved.
+                    // Not the rock's fault and not a miss, so it does not spend the rock's patience.
+                    BotHeard.Clear(body);
+                    Adrift++;
+                    _dry = _dry > 0 ? _dry - 1 : 0;
+
+                    break;
+                }
+
+            case BotHeard.Word.Broken:
+                {
+                    BotHeard.Clear(body);
+
+                    return BotDoing.Failed("the pickaxe wore out");
+                }
         }
-        else if (++_dry >= DryLimit)
+
+        // And the bank as it stands, which agrees with the sentence above almost always and is the guard for
+        // the almost: a rock whose bank is empty is empty whether or not anybody was told.
+        if (_swung && BotOre.Left(_map, at.X, at.Y) <= 0)
         {
-            // Emptied, or it never held anything. It has to be written down, not merely dropped: a depleted
-            // vein looks exactly like a full one from outside — depletion lives in the engine's own bank of
-            // resources, while what a bot can read is the tile's definition — so looking again without
-            // remembering hands the bot the same rock for the rest of its life.
+            Drained++;
+            _ranDry++;
             _spent.Add(at);
             _tile = null;
             _dry = 0;
@@ -504,7 +726,7 @@ public sealed class BotDig : BotDeed
             return default;
         }
 
-        // Held while it is actually being worked, and renewed each swing: a claim that is not being used
+        // Held while it is actually being worked, and renewed each beat: a claim that is not being used
         // lapses by itself, which is what keeps it from fencing off rock nobody is digging.
         BotGround.Working(body, _seam.Where);
 
@@ -513,27 +735,111 @@ public sealed class BotDig : BotDeed
         // it ran at whatever rate the population's clock happened to offer, two to five times a second. Seen
         // from a client it is unmistakable and it is not what a bot doing a day's work looks like. The engine
         // does not mind, which is exactly why nothing complained.
+        //
+        // <b>And everything that judges a swing now sits below this line, which is the whole of the fault
+        // this file was opened for.</b> The dryness counter was above it, so it counted <em>beats</em> and
+        // called them swings: the population beats several times a second and a swing is taken once every
+        // SwingMs, so six quiet beats is one or two actual attempts. A rock was written off having barely
+        // been struck, the seam was rested behind it, and the shard reported an island running out of ore.
+        // Counted apart for the first time on 09.09.2026: 16 rocks given up with the engine's bank under
+        // them empty against 35 that still held ore. Two in three.
         if (_swung && Core.TickCount - _swungTick < SwingMs)
         {
             return BotDoing.Work($"digging {_seam.Ore}");
+        }
+
+        // How many quiet swings mean anything, for this bot at this rock. See DryLimit.
+        var patience = System.Math.Clamp(
+            (int)System.Math.Ceiling(DryLimit / System.Math.Max(0.05, BotOre.Chance(body, _map, at.X, at.Y))),
+            DryLimit,
+            MostDry
+        );
+
+        // <b>What the last swing produced, judged now that a swing is actually due — and this is the only
+        // place on the shard where that can be seen at all.</b> <c>StartHarvesting</c> does not hand the ore
+        // over: it starts a <c>HarvestTimer</c>, whose last tick starts a <c>HarvestSoundTimer</c>, and it is
+        // that one — <c>EffectSoundDelay</c>, nine tenths of a second later — which calls <c>Harvest</c> and
+        // puts the ore in the pack. So reading the pack on the line after the swing reads the pack as it was
+        // before it. Two things were doing exactly that: this file's credit to <c>BotQuad.Harvested</c>, so
+        // the peril map has never once been told that a piece of ground pays, and my own first attempt at
+        // pricing the ore below. Both are here now, a beat later, where the ore has actually arrived.
+        if (carried > _seen)
+        {
+            var raised = carried - _seen;
+
+            _seen = carried;
+            _dry = 0;
+
+            // Ground that actually paid, rather than ground a bot stood on and swung at.
+            BotQuad.Harvested(_map, body.Location);
+
+            // Priced once, the first time this trip produces anything, and at what the market says ore is
+            // fetching rather than at a number chosen here. Half a bar is the fallback because the engine
+            // wants about two ore to a bar. See Made.
+            if (_rawWorth <= 0)
+            {
+                _rawWorth = System.Math.Max(
+                    1,
+                    BotAuction.Worth(typeof(IronOre), System.Math.Max(1, GoldPerIngot / 2))
+                );
+            }
+
+            _raw += raised;
+        }
+        else if (_swung && ++_dry >= patience)
+        {
+            // Emptied, or it never held anything. It has to be written down, not merely dropped: a depleted
+            // vein looks exactly like a full one from outside — depletion lives in the engine's own bank of
+            // resources, while what a bot can read is the tile's definition — so looking again without
+            // remembering hands the bot the same rock for the rest of its life.
+            // Which of the two it was, asked of the engine at the moment of giving up. It is one lookup on a
+            // dictionary and it is the whole difference between a worked-out island and a population of
+            // miners too green for the rock in front of them.
+            if (BotOre.Left(_map, at.X, at.Y) > 0)
+            {
+                Fumbled++;
+                _missed++;
+
+                // What the engine actually gave this bot at this rock, kept so the average can be read. See
+                // FumbledChance.
+                FumbledChance += BotOre.Chance(body, _map, at.X, at.Y);
+            }
+            else
+            {
+                Drained++;
+                _ranDry++;
+            }
+
+            _spent.Add(at);
+            _tile = null;
+            _dry = 0;
+
+            return default;
         }
 
         _swung = true;
         _swungTick = Core.TickCount;
         _swings++;
 
-        // Counted before and after, because a swing is not a take: the engine declines most of them, and the
-        // square is being credited for ground that actually paid while a bot stood still on it. See
-        // BotQuad.Harvested. Carried walks the pack, and swings are throttled to one every SwingMs, so this
-        // is two walks of a backpack every few seconds.
-        var had = BotOre.Carried(body);
-
-        BotOre.Swing(body, tool, _system, _tile);
-
-        if (BotOre.Carried(body) > had)
+        // Whether the engine will even look at this swing. See Locked: the pickaxe carries the lock and it is
+        // handed back by a timer, so a lost timer means every swing after it is a silent no-op.
+        if (!body.CanBeginAction(tool))
         {
-            BotQuad.Harvested(_map, body.Location);
+            Locked++;
         }
+
+        // And whether the last swing had a chance of landing at all: it resolves nine tenths of a second
+        // after it is taken, at a range checked again then. See Stirred.
+        if (_swung && _dry > 0 && body.Location != _swungFrom)
+        {
+            Stirred++;
+        }
+
+        _swungFrom = body.Location;
+
+        // Nothing is read back off the pack here: the ore is nine tenths of a second away and this line would
+        // read the pack as it was before the swing. Everything that judges a swing is a beat above.
+        BotOre.Swing(body, tool, _system, _tile);
 
         // <b>What came out of this hillside, written down for everybody.</b> The seam list already says what
         // a vein asks of a miner; this says what it has actually paid, which is the fact a miner would want
@@ -591,6 +897,10 @@ public sealed class BotDig : BotDeed
             // bad roll at a forge in town would teach the bot that a perfectly good vein two hundred tiles
             // away is not worth digging. The trip really did happen and really did earn its mining checks;
             // what it did not do is produce metal.
+            // It really did burn: the ore is gone and no bar came of it, so the trip produced nothing after
+            // all. Anything else would credit a bad roll with what it destroyed.
+            _raw = 0;
+
             _leg = Leg.Counter;
 
             return BotDoing.Done($"the ore burned away, {_swings} swings");
@@ -603,6 +913,11 @@ public sealed class BotDig : BotDeed
         // of smiths will be asking for; a coloured vein prices its own bars at the counter below.
         _worth = BotAuction.Worth(typeof(IronIngot), GoldPerIngot);
         _made += made * _worth;
+
+        // The ore is in the fire and the bars are the produce now. Cleared rather than left, or the trip
+        // would be credited with the same metal twice. See Made.
+        _raw = 0;
+
         _leg = Leg.Counter;
 
         return default;

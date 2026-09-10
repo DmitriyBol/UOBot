@@ -87,14 +87,20 @@ public sealed class BotPopulationModule : BotModule
             BotBeat.Describe()
         );
 
+        // <b>After the whole roster exists, and not before.</b> Patrick's rules of 09.09.2026 are statements
+        // about a group — five at least, one of them able to make things, fifteen at most — and a bot being
+        // born cannot be told whether it satisfies any of them. See BotGuilds.Muster.
+        BotGuilds.Muster();
+
         // Said separately and always, including the nought. "Nobody was remembered" and "nobody was saved in
         // the first place" look identical in a log that prints neither, and this is the line that will be
         // read on the morning somebody wonders why the smith is a novice again.
         logger.Information(
-            "Learning carried over: {Restored} of {Remembered} remembered bots picked up where they left off, with {Returned}gp of earlier earnings handed back",
+            "Learning carried over: {Restored} of {Remembered} remembered bots picked up where they left off, with {Returned}gp of earlier earnings handed back (savings carry over: {Savings})",
             BotProgress.Restored,
             BotProgress.Remembered,
-            BotProgress.Returned
+            BotProgress.Returned,
+            BotProgress.Savings
         );
     }
 
@@ -105,6 +111,8 @@ public sealed class BotPopulationModule : BotModule
     /// </summary>
     public override void Reset()
     {
+        BotGuilds.Forget();
+
         // <b>The island is no longer cleared here, and that is the point of saving it.</b> This used to drop
         // every quadrant on a reload, on the reasoning that the records name a Map and a Map from the world
         // being replaced is a deleted object. The facets themselves are not replaced — Map.Maps outlives any

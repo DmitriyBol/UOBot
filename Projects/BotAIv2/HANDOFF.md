@@ -736,3 +736,353 @@ Changes go into the fork, shakedown happens on a live shard, and what has actual
 The pattern this project keeps returning to: a mechanism that looks broken is usually **two numbers that never
 met**, and the engine **refuses in silence** — it answers a refusal by sending a message to a screen the bot
 has not got. `MAP.md` §4 lists the shapes those defects take, and every one of them was paid for.
+
+---
+
+# Night of 09–10.09.2026 — packs, the carrying rank, and six wrong diagnoses
+
+Patrick's order was: watch the shard overnight, fix what is critical, and concentrate on what the bots carry
+— "not a ton of rubbish each; they have a bank for that". The example was one bot holding eight heal potions,
+ten sewing kits, and piles of leather and cloth.
+
+## What is now true that was not
+
+**The allowance was about the pack and every place that read it asked about the stack.** Four sites in
+`BotUnload` tested `item.Amount <= allowed`, item by item. A sewing kit does not stack, so each one is an
+amount of one against an allowance of two and every one of them was kept; a tailor with five bundles of ten
+leather kept all fifty, because no single bundle was over twenty. The intent is written three lines above
+the sale in that same file — *"keeping to that number and listing the rest is the whole of the difference
+between a population of hoarders and a market"* — and the code had never done it. All four now share
+`BotUnload.Over`, which carries a running total per kind.
+
+**How it was found is worth more than the fix.** The pack census printed `Pickaxe 253 (121 surplus)` while
+the seller passed over every one of them: two readings of one allowance, disagreeing. The instrument was the
+one that happened to be right.
+
+**Tools and potions had no ceiling at all** — `int.MaxValue` in the same table, which is not a cap but a
+promise never to let go. Potions now use the number the class already declared and that was being
+overwritten (`klass.PotionLimit`, which `BotOutfit.PotionsFor` has always returned and `Needed` threw away);
+tools use `BotUnload.SpareTools`, two — one to work with, one for when it wears through.
+
+**Weight that is not the bot's own is now a reason to walk to a counter** (`BotUnload.Hoard`, forty stones).
+The other four reasons ask whether the bot is uncomfortable, rich, wanted or exposed. Ore is heavy and cheap
+and slipped past all of them: 652 stones of iron across the population, every ounce surplus by the shard's
+own rules.
+
+**A new instrument: the `Packs:` line.** What the whole population is carrying, how much is over the
+allowance, and the six heaviest kinds. Every other weight instrument here is about bots already in trouble;
+a pack fills with rubbish while the bot is comfortably under its ceiling.
+
+**A new hand for Argus: `pack <bot>`** — what it carries, what it may keep of each, what is surplus.
+
+**The school publishes its clock** (`BotSchool.Left`). The captain owned it and nobody deciding to come could
+see it, so about twenty bots per cold start walked to a lesson that ended before they arrived.
+
+**Argus chooses where a revel stands.** Both callers passed `Point3D.Zero`; the model is now asked for
+`x`/`y`, its direction is always kept and only a distance outside 30–120 tiles of the population is
+corrected. Blocked ground no longer cancels the camp silently — `Footing` rings outward and `Unpitched`
+counts the failures.
+
+## What was broken in the making, and by whom
+
+Making the carrying ceiling a **rank** rather than a discount was right (overloaded bots taking work that
+needs a step: 155/hour → 28) and it had a second cost that took hours to see: a courier that goes over its
+ceiling *by buying the guild's lot* had the errand taken off it on the spot and sold what the guild had just
+paid for. Supply errands dropped after the money was spent went from 10/hour to 80. Cured in two halves —
+`BotSupplier.Fits` (do not send a courier for more than it can carry) and `BotDeed.Committed` (work that has
+already spent money is not weighed against a better price).
+
+## Open, with numbers
+
+- **Things the market will not take can never leave a pack by selling.** Measured tonight: unload errands
+  finishing with *"5 the market would not take; the porter counted 5 worth leaving"* — the two numbers agree,
+  the listing floor of 2gp refuses them, and only `Dump` can shift them, which runs only for a bot that
+  cannot walk. This is the second root of "a ton of rubbish" and it is untouched.
+- **A cap released all at once is a crowd.** Six casters simultaneously carried exactly eight surplus heal
+  potions to the one shopkeeper who buys them and jammed on his tile; seven of nine stall reports that
+  window were that errand. A destination has no crowding factor, though a kind of work does.
+- **Blank scrolls, 140 stones across the population**, uncapped on purpose and defensible — but it is weight.
+- **`BotPorter` has five reasons to offer nothing and counts one.** Everything about why counter trips
+  collapsed is guesswork until it counts all five.
+
+## The methodological lesson, which cost most of the night
+
+**Six diagnoses were confidently wrong, every one of them from comparing unlike windows.** Sessions here run
+from ten minutes to an hour, and the shard warms up non-linearly: the completion band climbs 26% → 54% →
+65% → 76% over an hour, and the market gave 379 stall sales in its first twenty minutes and 1146 in the whole
+hour — it *slowed down*. Comparing a young session with an old one proves whatever you like.
+
+What actually works is a **live dial on a running shard**: same world, same minute, one number moved. It cost
+me one more mistake to learn the rest of it — a band that rises after a dial moves has not been explained
+until the dial is moved back and the band falls again. Mine did not fall, which means the recovery was
+warm-up and not the dial.
+
+Falsified along the way, so nobody spends the time again: unloading on the spot instead of at a counter;
+`Committed` turning drops into failures; a surge in brewing; side effects in the census (`Kit()` is a pure
+lookup everywhere); the island running out of ore; and the walk failures, which normalised to 21% of prowls
+and not the 50% the raw count suggested.
+
+**And twice a new counter lied before the shard did** — the census printed "49 packs hold 0 stones"
+(`Item.TotalWeight` is the weight of an item's *contents*; `PileWeight` is the stack's own), and the pack
+reader called 340 gold and a spellbook surplus because it did not repeat the two exclusions the sale makes.
+Both looked like findings.
+
+## Tested and innocent: the path-search budget
+
+`BotPath.CeilingMs` was raised 60 → 240 on the running shard and the walk failures fell fourfold — "could
+get nowhere at all" 4 → 1, "got no nearer" 17 → 4 in matched ten-minute windows. It looked like the answer
+to four things at once: counter trips collapsing, coin staying in pockets, the market going quiet, and the
+pack surplus refusing to fall.
+
+**Moving it back to 60 did not bring the failures back** — 0 and 4 in the next window. The improvement was
+the session warming up, not the dial, and the same trap had already caught the tool-cap bisect an hour
+earlier. The budget is not the cause of anything measured that night; do not spend the time again.
+
+The rule this produced, which is the most useful thing in this section: **a number that improves after a
+dial moves has not been explained until the dial is moved back and it worsens again.** One direction is
+never evidence on a shard that warms up over an hour.
+
+## The second root of "a ton of rubbish", with the number
+
+Lowering `BotUnload.Hoard` from 40 to 15 on the running shard did **not** shed anything: the pack surplus
+went 58% → 53% → 61% → 65% while the completion band held at 70%. The trigger only *offers* the errand; it
+cannot make the market take what it refuses.
+
+**881 things of 29 kinds were worth less than the 2gp listing floor and stayed in the pack** in one
+forty-five-minute session, against 287 things successfully listed. Unload errands finish saying so in as
+many words — *"12 the market would not take; the porter counted 1 worth leaving"*.
+
+So surplus below the floor has **no way out of a pack at all**: the market refuses it, and `Dump` — which
+would drop it — runs only for a bot that cannot walk. It accumulates for the life of the shard. Spined
+leather led the census at 582 stones, all of it surplus.
+
+Three ways out, each with a different price, and the choice is Patrick's:
+
+1. **Sell it to a shopkeeper.** They buy what the market will not price. The peddler already walks to them;
+   the unload errand does not. Most economically honest, most work.
+2. **Drop it when the market refuses at a counter**, not only when immobile. Cheapest change; litters the
+   world, and the litter has to decay.
+3. **Lower the listing floor.** One dial; fills the market with penny lots, which is what the floor was put
+   there to prevent.
+
+Not done, deliberately: it is a design decision with a real cost either way, and it was three in the morning.
+
+## Two more, found at four in the morning and not touched
+
+**A company member that goes overloaded is a monument, and the carrying rank cannot reach it.**
+`BotLadder.Standing` returns `Bound` before `Busy`, and the auction is skipped for a bound bot — so the one
+errand that would free it is never offered. Two caught in one session, both holding *"nothing"*:
+Bertram at 188 of 184 stones with 0 stamina, Hale at 140 of 131 with 0 stamina, both in a company. This is
+exactly the state the rank was written to prevent (see `BotAppraisal.StoppedShare` and `BotDeed.Standing`),
+sitting behind a gate the rank does not see. Either the standing errand has to be reachable on the Bound
+rung, or the company has to let a bot that cannot walk go.
+
+**Deliveries are taken absurdly far.** The thirty-two stall reports of that session sit at a median of 203
+tiles from home and a maximum of 857, and twenty-four of them are *"taking N of something to somebody"* —
+one bot walked two hundred tiles to hand over a single war mace. Distance is priced in `BotAppraisal` as a
+ratio of working time to walking time, which is right for a dig and wrong for a delivery whose whole content
+is the walk. Nothing here is broken; the price is simply not the one a courier should be paid.
+
+## The errors alarm is measuring the stall watch's cadence
+
+Background error rate on this shard is **0.5–0.8 per minute**, steady across three sessions of 62, 81 and
+122 minutes. The `errors` alarm fires at five in sixty seconds — so it should never fire, and it fired five
+times in one night.
+
+Every one of those bursts was `BotStall` output, and it lands **in a single second**: seven errors at
+02:04:52, four at 03:17:37, four at 02:05:22. The watch runs on its own timer and reports everything it has
+found at once, so an alarm that counts lines per minute is counting the watch's reporting cadence rather
+than the shard's health. The stall reports are also already counted by `BotStall` itself and printed on the
+`Standing still:` line, so they reach the operator twice — once as information and once as an alarm.
+
+Not changed, because it is instrument policy rather than a defect: either the watch spaces its reports, or
+the errors rule stops counting lines that another rule already owns. Whichever is chosen, an alarm that
+fires every twenty minutes on ordinary events is one nobody reads by morning.
+
+## Corrections to the section above, made the same night
+
+**The rescues are not elevated.** At matched age (+60 minutes) "has been carried home" reads 9, 9 and 6
+across the 20:26, 22:13 and 01:43 sessions — the session carrying all of that night's changes has the
+*fewest*. An earlier reading of "0 in three sessions against 3 tonight" was taken at +22 minutes and was
+small-sample noise. Do not re-open it on that evidence.
+
+**And the crowding has a second and worse address than the potion shopkeeper: the population point itself.**
+Two bots reported "can reach nothing from (1442, 1465) — standing at home, this is not bad ground, look at
+what is refusing the roads" in the same second. Forty-nine bots return to one tile; what refuses the roads
+at home is each other. The potion jam at Delano and this are one defect with two addresses — a destination
+has no crowding factor, though a kind of work does.
+
+**Sized before anyone acts on it:** seven of these in four hours, seven different bots, two or three an hour,
+no trend, and each resolves itself. Calling it "worse than the potion jam" on the strength of two reports in
+one second was wrong — the jam was six bots at once and it repeated. Home crowding is real, rare and
+self-limiting; the shopkeeper jam is the one that costs work.
+
+**A filter note, because it cost a wrong sentence.** "Every error burst is the stall watch" is true, but the
+watch speaks in at least three shapes: *"has not moved or changed"*, *"has not left X for N minutes while
+taking and dropping"*, and *"can reach nothing … standing at home"*. A grep for the first two under-counts
+and makes a burst look mixed.
+
+## The third and largest root: a permanent verdict from one unmeasured guess
+
+At five hours the packs held 5443 stones, 4305 of them surplus, and **2126 of those were spined leather —
+thirty-nine per cent of everything the population was carrying, in one commodity.** It appears in the log
+fifty-four times and every one of them is the census line. Never listed, never bought, never sold, never
+wanted.
+
+`BotAuction.List` adds a kind to `_worthless` the first time any bot offers one below `Floor` (2gp), and
+`Sellable` skips a worthless kind outright from then on — for every bot, for the rest of the session. So the
+kind is never counted as surplus, never carried to a counter, never disposed of, and `Rifle` goes on putting
+more of it into packs off every corpse.
+
+**The trap is where the price comes from.** `Worth` answers with the market's own price only once somebody
+has bid or bought; until then it hands back the caller's guess. The first listing attempt therefore happens
+at an unmeasured guess — and that one guess condemns the kind permanently. Tainted wool, bone piles and raw
+ribs are in the same state behind it.
+
+This is the largest of the three roots by weight and the cheapest to argue about: nothing here is a
+threshold that wants tuning, it is a verdict taken on one sample and never revisited. Whatever is done —
+re-test a condemned kind after a while, refuse to condemn until a price has actually been observed, or stop
+picking up what has been condemned — it should be done before the other two.
+
+## Fixed at seven in the morning: an arrow inside the ground
+
+The band fell from a steady 76% to **28%** in one five-minute window. Grouping the failures first — the rule
+that has paid for itself every time — put 406 of the window's 440 on three archers: Brannoc 235, Aric 120,
+Bertram 51. All of them on **one tile**: `(1457, 1461, -15)`, seventeen tiles from home and fifteen below it.
+Three hundred and fifty-five attempts in five minutes at a single spent arrow lying inside the ground.
+
+`BotGleaner.Propose` took the nearest lying arrow and offered a walk to it with **no reachability question at
+all**. An arrow that has fallen through the floor stays the nearest arrow for ever, so every failure put the
+same one straight back on offer. `BotPicker` had the identical hole for corpses — fifty of the same window's
+failures.
+
+Both now ask `BotReach.Ask` before offering, exactly as `BotStudent` has always done, and count the refusal
+(`BotGleaner.Sealed`, `BotPicker.Sealed`). The gleaner had no summary line of its own, so its counter is
+printed on the picker's — a number nobody prints is a number nobody has.
+
+**Proved for one of the two, and say which.** After an hour: glean failures **0**, pickings failures **1**,
+against 355 in five minutes before — and the band back to **78%**. But `BotPicker.Sealed` read **4** and
+`BotGleaner.Sealed` read **0**, so the picker's check demonstrably declined four corpses while the gleaner's
+never declined anything. The loop is gone; the gleaner fix is not what removed it, because it never fired.
+Its hole may simply not have been triggered this session — no spent arrow happened to lie in a sealed
+pocket. Treat the gleaner's guard as written and untested.
+
+## The crowding defect is not an incident, it is the shape of every restock
+
+Third sighting, and this one is the dominant stall shape of its session: **six of the seven stalls in the
+07:27 session were "after paper"**, and all six bots stood inside an eight-by-nine tile patch — Delwyn,
+Emrys, Garrow, Hale, Hollis and Isolde, six mages, one errand, one destination, four minutes each.
+
+The same picture as the potion jam at Delano (six casters, one shopkeeper) and the two bots that could not
+leave the population point. Whenever a need arises for a whole class at once — and a cap or a supply release
+makes it arise for a whole class at once — the entire class walks to the single shop that sells the thing
+and blocks itself in front of it.
+
+`BotAppraisal` discounts a kind of work by how many others are already doing it (`CrowdBite`, four fifths).
+Nothing discounts a *place*. That asymmetry is the whole defect, and it will get worse as the pack work
+above makes more bots set out to buy and sell rather than fewer.
+
+Worth fixing before the "sell the junk to a shopkeeper" option in the section above, which would otherwise
+add a fourth address to the same jam.
+
+## 10.09.2026, morning: the leftovers on the market
+
+Patrick's order: small things sit on the auction unsold for a very long time; consider letting Argus buy
+them out as an event, or decide with him what is better.
+
+**What was actually wrong.** A stall's price is cut by `CutStep` once per `StaleMs` down to
+`LeastMultiple` — a quarter of what it opened at. Then `Cut` returns false and the beat reached `continue`,
+for ever. Only an **empty** stall was ever forgotten (`ForgetMs`), so a pitch holding something the
+population had walked past at every price stood until the shard stopped, holding one of `MaxListings`
+places while it did. Nothing anywhere could see this: `BotAuction.Describe()` went to a gump nobody opens
+and to the world reload, which is the same "which is to say nowhere" as `BotGround.Describe` before it.
+
+**Done.** The market has a line in the summary now (`Market:`), with a new reading beside it — how many
+stalls have stood past `StuckMs` (thirty minutes, three price cuts), what they hold and what the oldest is.
+And a stall that has reached its lowest ask and stood past that is **handed back to its owner**: the goods
+rejoin the seller's pack and take the road the peddler already walks, to a shopkeeper — the buyer of last
+resort this world already has, paying coin that comes from outside the bot economy.
+
+Measured over one hour: **88 stalls taken off the board, 194 things returned, 0 that could not be handed
+back**, and the standing backlog fell to **4 stalls holding 10 things at 52gp**. The cost is real and small:
+"the stall was empty by the time it got here" went from 3 to 7 over matched fifty-minute windows — sometimes
+a stall is pulled from under a buyer already walking to it. Eighty-eight places freed for four wasted walks.
+
+**Argus was asked and agreed: do not buy the leftovers.** His words: it "would not address the root cause",
+and "any issues would likely be resolved by adjusting the proposers or trade thresholds rather than buying
+leftover items". Weight that as agreement rather than as proof — his stated evidence was generic ("the bots
+are on their feet", "no signs of economic collapse") and did not engage with the figures he was given. The
+argument against a buyout stands on its own: his treasury is a tax on the guilds, so buying junk would spend
+their money to hide the one signal that says nobody wants the thing, and would teach the population that
+making unwanted things pays. See `captains-till-not-a-faucet`.
+
+**And a defect found on the way to asking him.** `BotVigil.Consider` dropped a console question whenever the
+single Ollama slot was busy — and it is busy nearly always, because four thinking crafters share it and ask
+several times a minute. Three questions in a row were lost, while the prompt that method builds opens with
+"SOMEBODY AT THE KEYBOARD IS ASKING YOU THIS, AND IT COMES BEFORE ANYTHING ELSE HERE". The sentence promised
+first place and the gate gave last. A question is now held and asked the moment the slot frees, ahead of the
+revel and the ordinary look, counted as `BotVigil.Held`. That is what made the answer above possible.
+
+### The residue, diagnosed but not fixed
+
+An hour on the new build: **97 stalls reclaimed, 292 things returned, 0 failures** — and **8 stalls still
+standing past thirty minutes, holding 152 things at 345gp**, the oldest 51 minutes. Few stalls, many things:
+these are not forgotten trinkets, they are large piles.
+
+**Why they escape.** The reclaim fires when `BotListing.Cut` answers "no lower", and the floor it compares
+against is `Anchor * LeastMultiple`. A seller restocking its own pitch raises the anchor — the market line
+reads **697 prices raised against 1919 cut** in that hour, and the same kinds are cut over and over (Lesser
+Heal Potion 134 times, Leather 121, Thigh Boots 119). A stall that is topped up therefore always has room to
+cut again, never reaches "no lower", and is never handed back.
+
+**The obvious cure and why it was not shipped.** Reclaim on age and no sale — `now - ListedTick >= StuckMs
+&& now - DealtTick >= StuckMs` — regardless of whether a cut is still possible. That subsumes the present
+condition and would take the piles too. Its blast radius is the whole market, and judging it needs a session
+plus the forty-minute warm-up; there was not that much time left before the shard was to be left running
+unattended, and the known cost of the present change had already doubled ("the stall was empty by the time
+it got here", 7 → 17 over matched windows). Shipping an unmeasured market-wide change immediately before
+walking away is the trade this project has paid for before.
+
+### The Baron started marching, and that is what the "dying" alarm was
+
+At 13:33 the alarm reported **10 bots dead at their work in five minutes out of 49 alive** — a kind that had
+not fired once all night. It was a harrowing: Faron called sixteen volunteers to (2055, 1035), "where 6 have
+died", marched them, and they were killed retreating.
+
+**Not a grinder.** Twenty deaths in the session against twenty "should rise again" lines, and the population
+line reads 49 bots, 48 on their feet, 1 waiting to be revived. The cost is a purse each time
+(`Perri died doing flee: -165 coin`), not a body.
+
+**The change worth noticing is upstream of the deaths.** Over matched two-hour windows: **seven companies
+marched in this session against none in the 22:13 session**, and all ten deaths came from them. The Baron's
+whole purpose is finally happening where it previously did not. Cause deliberately unattributed — plausibly
+bots have more free time now that fewer errands fail and fewer stand loaded, but that is a story, not a
+measurement, and this file has enough of those from one night.
+
+Worth watching over a long unattended run: whether the death rate stays recoverable when harrowings become
+routine, and whether the purse lost per death is a meaningful drain on the economy.
+
+### Seven hours later: which half of the reachability guard actually works
+
+Free-flight run of 7h19m, and the four counters settle it:
+
+| | gleaner (arrows) | picker (corpses) |
+|---|---|---|
+| `Sealed` — the reach ledger (`BotReach.Ask`) | **0** | **0** |
+| `Baulked` — the place this bot was refused before | **132** | **75** |
+
+**The reach ledger fired not once in seven hours. The baulk did all the work, two hundred and seven times.**
+Glean failures over the whole run: **2**. Pickings: **8** — against 355 in five minutes before the repair.
+
+So the morning's first guard was the wrong question asked well: `BotReach.Ask` answers about pockets that
+enclosure searches have proved closed — ground a bot is *standing in* — and the problem was always an
+unreachable *destination*. It costs a dictionary lookup and it is harmless, so it stays; but nothing should
+be built on it, and anything else with this shape wants the baulk, not the ledger.
+
+**A loop found in the same reading and not diagnosed.** Hale failed `acquire` 477 times over the run, 387 of
+them "could not put the money down for it" and **376 inside the 16:00 hour**. The affordability veto in
+`BotAppraisal` and the escrow charge both count purse plus bank, so the obvious pocket-versus-bank
+explanation is wrong. It is self-limiting — Hale holds 809gp now, is brewing, contentment 1.00 — which makes
+it a different animal from the glean loops, which were permanent. Diagnosing it wants a counter on why
+`BotAuction.Ask` returned null, not more reading: the errand already learned once (see the note on
+`BotAcquire.Board`) that one null hides two causes.

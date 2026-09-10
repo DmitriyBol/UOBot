@@ -40,8 +40,8 @@ ROOT = "(root)"
 ORDER = [
     ROOT, "BotModules", "BotPopulation", "BotWill", "BotMovement", "BotClasses", "BotOutfit",
     "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotAuction", "BotSpells",
-    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotQuad", "BotRanger",
-    "BotDashboard", "mindedBots", "mindedBots/debugger",
+    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotEstate", "BotQuad", "BotRanger",
+    "BotDashboard", "BotAlarm", "mindedBots", "mindedBots/debugger",
 ]
 
 # folder -> (title, what it is, [traps])
@@ -223,6 +223,17 @@ BLOCKS = {
         "of his own account.",
         [],
     ),
+    "BotEstate": (
+        "the guilds' halls",
+        "The one thing this population builds that outlives it. A guild levies its members, finds ground the "
+        "engine will take a house on, raises a hall, and fits it out with the tools of its own trade. Next "
+        "start the halls are read back out of the world by the name on their signs and handed to whoever "
+        "leads that guild now.",
+        ["A house is permanent and a population is not, so an unowned hall decays: `BotEstate.Adopt` is the "
+         "only thing standing between an evening's building and an empty ruin.",
+         "The price is a dial rather than the engine's 35,250gp, which no bot on this shard could ever "
+         "reach. Watch the `short` clause in the summary before moving it."],
+    ),
     "BotQuad": (
         "the island as squares",
         "The map cut into squares thirty tiles across, each carrying one number: how safe the population has "
@@ -236,6 +247,21 @@ BLOCKS = {
         "One file: the King's Rangers' kit, which is the Baron's livery on five more bodies.",
         [],
     ),
+    "BotAlarm": (
+        "the smoke alarm",
+        "The one place the shard speaks first. Six rules are read once a minute, each dividing a number the "
+        "other subsystems already keep by something that gives it meaning, and anything past a threshold "
+        "becomes a line of JSON in `logs/alerts.ndjson` — raised once, repeated at most every fifteen "
+        "minutes, and cleared in its own event when it goes back to normal. An hourly heartbeat says so "
+        "when nothing is wrong. Errors are counted by reading the tail of the shard's own session log, "
+        "which is the only way to see them all without modifying the engine's logger.",
+        ["Every threshold is a dial, so tuning happens through the debugger's door on a living shard rather "
+         "than by restarting: `dial BotSigns.ErrorsAt 3`.",
+         "A window equal to the tick fires every other tick. `BotSigns.Due` carries half a tick of slack for "
+         "that reason, and every event reports the window it actually measured rather than the one intended.",
+         "The error count is read through a buffered redirect and can lag the world by a buffer. Good for "
+         "noticing, useless for timing."],
+    ),
     "BotDashboard": (
         "watching it happen",
         "`[bots` — an administrator command opening five tabs: the population, their market, what they are "
@@ -244,11 +270,15 @@ BLOCKS = {
     ),
     "mindedBots": (
         "bots that think",
-        "Four of the population choose what to do next through a local language model over Ollama rather "
-        "than through the auction: a warrior, an architect, a sage and the Baron. The model is given what "
-        "the bot can see and returns a choice; everything else about them is an ordinary bot.",
+        "The four crafters — and from 07.09.2026 nobody else — choose what to do next through a local "
+        "language model over Ollama rather than through the auction. The model is given what the bot can "
+        "see and returns a choice; everything else about them is an ordinary bot. The warrior, architect, "
+        "sage and Baron minds are commented out in `BotMinds.Start` rather than deleted.",
         ["The model is asked on a wall clock and the answer costs real seconds. Anything that waits on it "
-         "must not be holding the game loop."],
+         "must not be holding the game loop.",
+         "A crafter mind is shown four blocks nothing else gets: its own bench, the board of wants (with "
+         "the craft and skill each needs), what is on the stalls, and what the other three are holding. "
+         "The last of those exists because four minds given identical state make identical choices."],
     ),
     "mindedBots/debugger": (
         "Argus, the observer",
@@ -279,6 +309,7 @@ LINES = {
     "BotHunt": ["Companies:"],
     "BotDrill": ["The captain:"],
     "BotBaron": ["The Baron:"],
+    "BotEstate": ["Estate:"],
     "BotQuad": ["The captain:"],
     "mindedBots": ["Minds:"],
 }

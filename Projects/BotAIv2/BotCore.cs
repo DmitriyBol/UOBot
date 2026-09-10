@@ -80,9 +80,18 @@ public static class BotCore
         // find out whether anybody on the island is worth teaching.
         BotModules.Register(new BotDrillModule());
 
+        // After the population, for the same reason as the captain: it hands every hall in the world back to
+        // the guild that owns it, and a guild has no leader until the population has enrolled.
+        BotModules.Register(new BotEstateModule());
+
         // After the squads, whose module it needs, and it says so itself rather than relying on this order.
         BotModules.Register(new BotBaronModule());
         BotModules.Register(new BotDashboardModule());
+
+        // Last, and it reads only. The smoke alarm: it divides numbers the other modules keep, so it wants
+        // them started, and it is registered here rather than with the debugger because a shard watched by
+        // nobody should still be able to shout.
+        BotModules.Register(new BotAlarmModule());
 
         BotModules.Start(BotPhase.Settings);
 

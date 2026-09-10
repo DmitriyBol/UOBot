@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Server.Items;
 using Server.Logging;
 
@@ -156,7 +156,7 @@ public sealed class BotWoodsman : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody has been offered wood ({NoAxe} answers went to bots with no axe)"
-            : $"{Asked} asked to cut wood: {Sent} sent to a tree, {NoCall} found nobody asking for wood or arrows, {Stocked} were carrying enough already, {NoTree} had no tree within {BotTimber.Reach} tiles ({BotTimber.Townbound} passed over for standing inside a town); "
+            : $"{Asked} asked to cut wood: {Sent} sent to a tree, {NoCall} found nobody asking for wood or arrows, {Stocked} were carrying enough already, {NoTree} had no tree within {BotTimber.Reach} tiles ({BotTimber.Townbound} passed over for standing inside a town and {BotTimber.Fenced} on ground that has refused the population); {BotChop.Spoken} trees given up because the engine said they were cut out against {BotChop.Silent} given up by the clock alone; "
               + $"{BotTimber.Ordered} logs went straight into somebody's order and {BotTimber.Listed} onto a stall, above the {BotTimber.Keeps} a cutter that can fletch keeps back";
 
     public static void Forget()

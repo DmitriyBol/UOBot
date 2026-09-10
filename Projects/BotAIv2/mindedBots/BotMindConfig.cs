@@ -40,6 +40,12 @@ public sealed class BotMindSettings
     /// <summary>What the Baron is called.</summary>
     public string BaronName { get; set; }
 
+    /// <summary>
+    /// What the four crafters are called, in order. However many names are here is how many crafter minds
+    /// there are, so this is also where a fifth would be added — or where they would be cut to two.
+    /// </summary>
+    public string[] CrafterNames { get; set; }
+
     /// <summary>How often a free bot may be asked to choose again.</summary>
     public int? ThinkEveryMs { get; set; }
 
@@ -89,6 +95,10 @@ public static class BotMindConfig
         BotMinds.ArchitectName = settings.ArchitectName ?? BotMinds.ArchitectName;
         BotMinds.SageName = settings.SageName ?? BotMinds.SageName;
         BotMinds.BaronName = settings.BaronName ?? BotMinds.BaronName;
+
+        // Length included: an empty array in the file is a legitimate way of saying "no thinking crafters",
+        // and treating it as "unset" would make that instruction unspeakable.
+        BotMinds.CrafterNames = settings.CrafterNames ?? BotMinds.CrafterNames;
 
         BotMind.ThinkEveryMs = settings.ThinkEveryMs ?? BotMind.ThinkEveryMs;
         BotMind.ReviewEveryMs = settings.ReviewEveryMs ?? BotMind.ReviewEveryMs;

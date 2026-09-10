@@ -113,6 +113,126 @@ public static class BotShops
     }
 
     /// <summary>
+    /// What the town's shelves have run out of, by kind, and how often somebody was turned away.
+    ///
+    /// <para>
+    /// <b>A shortage the shard felt everywhere and recorded nowhere.</b> <c>BotShopper</c> keeps a tally of
+    /// what bots are short of, and it is a good one — but it only ever sees a bot's <em>kit</em>: bandages,
+    /// reagents, tools, bottles it wears. A crafter's raw material goes through <c>BotStores</c> and
+    /// <c>BotBullion</c> instead, so "the shelf holds no Bottle at any price" was written eight times in ten
+    /// minutes, over and over, into a tally that had no row for it. Anything reading shortages to decide what
+    /// to stock — the guild counters do — was therefore blind to exactly the shortages that stop a craft.
+    /// </para>
+    ///
+    /// <para>
+    /// Counted here, at the counter, where the refusal actually happens and whatever the errand was called.
+    /// It is a fact about the town rather than about the bot: an empty shelf is empty for everybody.
+    /// </para>
+    /// </summary>
+    private static readonly Dictionary<Type, long> _dry = [];
+
+    /// <summary>What the town has run out of, commonest first. See <see cref="_dry"/>.</summary>
+    public static List<(Type Kind, long Times)> Dry()
+    {
+        List<(Type Kind, long Times)> found = [];
+
+        foreach (var (kind, times) in _dry)
+        {
+            found.Add((kind, times));
+        }
+
+        found.Sort((a, b) => b.Times.CompareTo(a.Times));
+
+        return found;
+    }
+
+    /// <summary>The commonest of them, for the shops line.</summary>
+    private static string Driest()
+    {
+        Type worst = null;
+        long most = 0;
+
+        foreach (var (kind, times) in _dry)
+        {
+            if (times > most)
+            {
+                most = times;
+                worst = kind;
+            }
+        }
+
+        return worst == null ? "nothing" : $"{worst.Name} ({most} times)";
+    }
+
+    /// <summary>How often the shelves are looked at to see whether any is due a refill.</summary>
+    public static int KeepEveryMs { get; set; } = 60000;
+
+    /// <summary>Shelves refilled because their hour had come round. See <see cref="Keep"/>.</summary>
+    public static long Refills { get; private set; }
+
+    private static long _kept;
+
+    private static bool _everKept;
+
+    /// <summary>
+    /// Refills any shelf whose hour has come round, whether or not anybody is standing at it.
+    ///
+    /// <para>
+    /// <b>A shop that has sold out can only be refilled by somebody buying from it, and nobody is sent to a
+    /// shop that has sold out.</b> The engine refills on two events and this population causes neither:
+    /// <c>OnOpenShop</c>, which is a player opening the window, and <c>BotShops.Buy</c>, which requires a bot
+    /// already standing at the counter with money out. But <see cref="Sells"/> answers false once
+    /// <c>info.Amount</c> reaches nought, and <see cref="Nearest"/> only ever offers a shop that
+    /// <see cref="Sells"/> approved — so the last bottle bought off a shelf is the last bottle that shelf
+    /// ever holds, unless some other bot happens to want something else from the same vendor.
+    /// </para>
+    ///
+    /// <para>
+    /// That is the self-blocking shape this project has paid for before: a mechanism that switches itself off
+    /// exactly when it is needed. Measured 09.09.2026: nine failures of "the shelf holds no Bottle at any
+    /// price" in ten minutes, against a shard whose alchemists refill hourly and whose engine doubles a
+    /// sold-out entry's stock at the next refill — demand the population was generating and could not reach.
+    /// </para>
+    ///
+    /// <para>
+    /// A shelf refilling on its own clock is nearer the engine's intent than one refilling on footfall, not
+    /// further from it: the shop-window check exists because that is the only moment a refill matters to a
+    /// human. For this population the equivalent moment is any moment at all, so it is asked once a minute
+    /// and <c>Restock</c> itself does nothing until the vendor's own hour is up.
+    /// </para>
+    /// </summary>
+    public static void Keep()
+    {
+        var now = Core.TickCount;
+
+        if (_everKept && now - (_kept + KeepEveryMs) < 0)
+        {
+            return;
+        }
+
+        _kept = now;
+        _everKept = true;
+
+        for (var i = 0; i < _shops.Count; i++)
+        {
+            var vendor = _shops[i];
+
+            if (vendor is not { Deleted: false } || !vendor.IsActiveSeller)
+            {
+                continue;
+            }
+
+            if (Core.Now - vendor.LastRestock <= vendor.RestockDelay)
+            {
+                continue;
+            }
+
+            vendor.Restock();
+            Refills++;
+        }
+    }
+
+    /// <summary>
     /// Whether this shopkeeper sells the thing, and what it is asking.
     ///
     /// The entry is needed rather than only the price, because buying wants the serial of the display object
@@ -654,6 +774,9 @@ public static class BotShops
 
         if (!Sells(vendor, wanted, out var entry) || entry.Price <= 0)
         {
+            _dry.TryGetValue(wanted, out var turned);
+            _dry[wanted] = turned + 1;
+
             refused = $"the shelf holds no {wanted.Name} at any price";
 
             return 0;
@@ -755,8 +878,12 @@ public static class BotShops
         Spent = 0;
         Sold = 0;
         Earned = 0;
+        Refills = 0;
+        _dry.Clear();
+        _kept = 0;
+        _everKept = false;
     }
 
     public static string Describe() =>
-        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp, {Walled} counters passed over for having no way through to them";
+        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp, {Walled} counters passed over for having no way through to them, {Refills} shelves refilled on their own hour; the town is oftenest out of {Driest()}";
 }

@@ -356,8 +356,45 @@ public static class BotVigil
         // World.Saving as well as the slot: the transport answers "no" to both by calling straight back with
         // nothing, and a debugger that treats that as an unreadable answer writes a warning to the log every
         // two seconds for the length of a save.
+        // Judged first and on every beat, because a revel whose time is up should pay before anything else
+        // is thought about. Costs a tick comparison when none is running, which is nearly always.
+        BotRevel.Settle();
+
+        // And the other half of a hunt: something to hunt. Called every beat for the same reason as the line
+        // above — a wave that is dead should be followed by the next one, and a revel that has ended should
+        // leave nothing behind. See BotWaves.
+        BotWaves.Muster();
+
+        // The crown's own income, on the same beat and just as cheap when it is not due: two ticks compared.
+        // See BotRevel.Tax — the prize money has to come from somewhere, and it comes from the guilds.
+        BotRevel.Tax();
+
         if (_asking || !BotOllama.Free || World.Saving)
         {
+            return;
+        }
+
+        // A person's question first of all, for the reason Consider gives at length: it is the rarest thing
+        // that ever wants this slot and the only one with somebody waiting on the answer.
+        if (_pending != null)
+        {
+            var question = _pending;
+            var reply = _pendingReply;
+
+            _pending = null;
+            _pendingReply = null;
+
+            Consider(question, reply);
+
+            return;
+        }
+
+        // Something for the population to do, when the quarter of an hour is up and the model is free. Asked
+        // before the ordinary look because it is rarer and would otherwise never get the slot. See BotRevel.
+        if (BotRevel.Due())
+        {
+            Revel();
+
             return;
         }
 
@@ -514,6 +551,79 @@ public static class BotVigil
     }
 
     /// <summary>The frequent question. No thinking: this one is mostly reading, and it must not hold the slot.</summary>
+    /// <summary>
+    /// Asks the model to think of something for the population to do, and declares whatever comes back.
+    ///
+    /// <para>
+    /// It is handed the same picture of the shard the ordinary look gets — what is being taken on, what is
+    /// short, who is idle, what the market holds — because the whole point is that the revel should answer
+    /// the shard's actual state rather than be a random party. "nothing" is an allowed and expected answer.
+    /// </para>
+    /// </summary>
+    private static void Revel()
+    {
+        _asking = true;
+
+        var report = BotDebugSight.Report(
+            Beside(),
+            Census(),
+            "",
+            [],
+            Subsystems(SubsystemBudget),
+            "",
+            0
+        );
+
+        BotOllama.Ask(
+            BotRevel.System(Name),
+            Bounded(report),
+            BotRevel.Schema,
+            true,
+            (json, waited) => Revelled(json, waited),
+            Model,
+            KeepAlive,
+            TimeoutMs
+        );
+    }
+
+    /// <summary>What came back, bounded by this shard's own rules before any of it touches the world.</summary>
+    private static void Revelled(string json, long waited)
+    {
+        _asking = false;
+
+        var plan = BotRevelPlan.Read(json);
+
+        if (plan == null)
+        {
+            logger.Warning("The watcher was asked for a revel and said nothing that could be read");
+
+            return;
+        }
+
+        if (string.Equals(plan.Kind, "nothing", StringComparison.OrdinalIgnoreCase))
+        {
+            BotDebugLog.Write($"no revel this time ({waited}ms): {plan.Why}");
+
+            return;
+        }
+
+        // A trade no proposer answers to would be a price rise on nothing, and nothing about that is
+        // visible: the bonus applies, nobody notices, nobody is paid. Said aloud instead. See BotRevel.Known.
+        if (!BotRevel.Known(plan.Kind))
+        {
+            logger.Warning(
+                "The watcher wanted a revel for {Kind}, which is not work anybody takes; nothing is declared",
+                plan.Kind
+            );
+
+            return;
+        }
+
+        var said = BotRevel.Declare(plan.Kind, plan.Prize, plan.Say, plan.Why, plan.Camp, plan.Spot);
+
+        BotDebugLog.Write($"revel after {waited}ms — {said}");
+    }
+
     private static void Look(long now, long waited)
     {
         var roster = Roster();
@@ -662,6 +772,19 @@ public static class BotVigil
             note.Bot,
             note.Finding
         );
+
+        // Onto the alarm channel as well, so that one file is enough to watch. Marked a conjecture in the
+        // sentence itself: everything else on that channel is a count the shard took, and this is a model's
+        // opinion about counts — ten of the first dozen were artefacts of the instrument rather than defects
+        // of the shard, and a reader who cannot tell the two apart at a glance will act on the wrong ones.
+        BotAlarm.Note(
+            "finding",
+            $"CONJECTURE from {Name} ({note.Kind}, {(int)Math.Round(note.Confidence * 100)}% sure) about"
+            + $" {note.Bot}: {note.Finding}",
+            Findings,
+            0,
+            "-"
+        );
     }
 
     /// <summary>
@@ -805,7 +928,28 @@ public static class BotVigil
     /// sees, not a second rendering that could differ from it.
     /// </summary>
     public static string Digest() =>
-        Census() + "\n" + Measured(Core.TickCount) + "\nTHE LAST ROLL-CALL\n" + BotAudit.Last;
+        Census() + "\n" + Measured(Core.TickCount) + "\nTHE LAST ROLL-CALL\n" + BotAudit.Last + Tampered();
+
+    /// <summary>
+    /// Dials a person has moved by hand since the shard came up, said at the foot of every digest — the
+    /// model's as well as the door's.
+    ///
+    /// <para>
+    /// <b>Because the alternative is an observer explaining the consequence of a deliberate change as a
+    /// defect.</b> A threshold moved at half past seven is invisible in every measurement afterwards: the
+    /// numbers simply are what they are, and nothing in them says a hand was on them. That is the same trap
+    /// as a configuration file overriding the source — the value is real and the reason for it is nowhere
+    /// near it. Said plainly, and said as an act rather than a measurement, because it is one.
+    /// </para>
+    /// </summary>
+    private static string Tampered()
+    {
+        var note = BotDials.Note();
+
+        return note == null
+            ? ""
+            : $"\n\nCHANGED BY HAND SINCE THE SHARD CAME UP — these are deliberate, not faults: {note}";
+    }
 
     /// <summary>
     /// One bot in full, by name, or the roster if that is not one of them.
@@ -972,11 +1116,49 @@ public static class BotVigil
     /// model against the three minds indefinitely.
     /// </para>
     /// </summary>
+    /// <summary>A question from the keyboard that the model was too busy to take, waiting for the next slot.</summary>
+    private static string _pending;
+
+    private static Action<string> _pendingReply;
+
+    /// <summary>Questions from the keyboard that had to wait for the model. For the summary.</summary>
+    public static long Held { get; private set; }
+
+    /// <summary>
+    /// A question from somebody at the keyboard.
+    ///
+    /// <para>
+    /// <b>It used to be dropped whenever the model was busy, which was nearly always.</b> One Ollama slot
+    /// serves four thinking crafters and the watcher's own quarter-hourly work, and the crafters ask
+    /// several times a minute — so the one verb a person has for asking Argus anything lost every race it
+    /// entered. Three questions in a row on 10.09.2026 came back "the model is busy", while the prompt this
+    /// method builds opens with the words "SOMEBODY AT THE KEYBOARD IS ASKING YOU THIS, AND IT COMES BEFORE
+    /// ANYTHING ELSE HERE". The sentence promised first place and the gate gave last.
+    /// </para>
+    ///
+    /// <para>
+    /// So it is held instead of dropped, and <see cref="Update"/> asks it the moment the slot frees — ahead
+    /// of the revel and ahead of the ordinary look, on the same argument the revel already makes for itself:
+    /// it is rarer, so it would otherwise never get the slot. One question is held at a time; a second
+    /// replaces it, because a person who asks twice means the second one.
+    /// </para>
+    /// </summary>
     public static bool Consider(string question, Action<string> reply)
     {
-        if (string.IsNullOrWhiteSpace(question) || reply == null || _asking || !BotOllama.Free || World.Saving)
+        if (string.IsNullOrWhiteSpace(question) || reply == null)
         {
             return false;
+        }
+
+        if (_asking || !BotOllama.Free || World.Saving)
+        {
+            _pending = question;
+            _pendingReply = reply;
+            Held++;
+
+            reply("the model is busy; the question is held and goes first the moment it frees.");
+
+            return true;
         }
 
         _asking = true;

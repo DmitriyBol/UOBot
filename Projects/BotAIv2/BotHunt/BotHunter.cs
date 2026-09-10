@@ -166,7 +166,23 @@ public sealed class BotHunter : IBotProposer
         // Half the ground the population may want things on, and not because a prowl is less entitled to it.
         // The far edge of the roam is where the bad terrain is — the bots carried home by the rescue were all
         // picked up out there — and a walk that ends in being rescued is worse than a shorter walk.
-        var roam = Math.Max(BotQuarry.Reach, BotPopulation.Roam / 2);
+        //
+        // <b>And never further than a path is paid to look, which is the half that was missing.</b> Two
+        // numbers sat on one shelf and had never met: this one says how far a dart may be thrown, and
+        // BotPath's ceiling says how far a road is ever searched for. On 08.09.2026 they read five hundred
+        // and two hundred and forty. In the ten minutes measured, 432 of the shard's 495 refused roads were
+        // prowls, their destinations averaged 392 tiles from home, and 324 of them lay beyond three hundred
+        // and fifty — a band no search on this shard is funded to cross. Those errands did not sometimes
+        // fail; they could not succeed, and every one of them paid for a full search before finding out.
+        //
+        // Nothing else needed changing to see it: Roam is a dial, and halving it live moved the whole of the
+        // shard's refused-road count within minutes.
+        //
+        // <b>It cannot be fixed by remembering places.</b> BotRefused files a square eight tiles across and
+        // the far edge of a five-hundred-tile box is thousands of them, so a dart lands on a fresh square
+        // every time and the record it should have consulted is always empty. A note about a place is no
+        // answer to a sample taken over an area.
+        var roam = Math.Clamp(BotPopulation.Roam / 2, BotQuarry.Reach, Walkable);
 
         var best = Point3D.Zero;
         var bestPaid = -1.0;
@@ -267,8 +283,68 @@ public sealed class BotHunter : IBotProposer
                 continue;
             }
 
+            // <b>And near enough that a road to it would ever be searched for — measured from the bot, which
+            // is the correction that makes the rule work at all.</b> The candidates are reckoned around the
+            // population's home and not around the asker, on purpose, so that a company setting out sets out
+            // to the same place. That is right, and it means clamping the throw says nothing about the length
+            // of the walk: a bot that has itself wandered four hundred tiles out is handed a destination
+            // beside the house, and the road it needs is four hundred tiles long whatever the throw was.
+            //
+            // The search is funded by distance — MsPerTile a tile up to CeilingMs — so beyond Walkable no
+            // road is ever found, from anywhere, for anybody. Asked here, of this bot and this square, rather
+            // than of the box the darts were thrown into. See Walkable.
+            if (!Utility.InRange(body.Location, where, Walkable))
+            {
+                Distant++;
+
+                continue;
+            }
+
+            // <b>And ground somebody has actually stood on, which is the only cheap promise that a road to it
+            // exists.</b> Everything this shard knows about bad ground is a record of failures — the reach
+            // ledger's pockets, the quadrant baulks, BotRefused's squares — and all three are the wrong shape
+            // for a dart. A refusal describes one square; the island has hundreds of thousands of them, so a
+            // random throw lands on a fresh one every time and the record it should have consulted is always
+            // empty. Measured on 08.09.2026: with the throw already clamped to what a search is funded to
+            // cross, 249 of 350 failures in five minutes were still prowls, their destinations averaging 177
+            // tiles away — well inside the budget. Remembering where nobody could get to is no answer to a
+            // sample taken over an area.
+            //
+            // <b>The positive record is the one that scales, and it was already written down.</b> BotQuad
+            // marks a square trodden when a bot has stood in it, keeps it across restarts, and this shard
+            // read 4096 of them back at boot — some three and a half million tiles. Its own Frontier says the
+            // reasoning in as many words, about exploration: a candidate beside ground somebody has walked
+            // can be got to, and a square picked off a blank map cannot promise that. Frontier was the only
+            // thing reading it.
+            //
+            // Its own square or one beside it, so the hunt may still push a ring outwards rather than pace
+            // what it already knows. Off by a dial, because a rule that narrows where the population may go
+            // has to be answerable on a running shard.
+            if (TroddenOnly && !Walked(map, where))
+            {
+                Untrodden++;
+
+                continue;
+            }
+
             if (Region.Find(where, map)?.IsPartOf<TownRegion>() == true)
             {
+                continue;
+            }
+
+            // <b>And here, where every candidate passes, rather than only in the two named pickers.</b>
+            // Paying and Noisy each ask this and the darts did not, so the one path that produces most of the
+            // prowls on this shard was the one path that could not learn: 1009 prowls in forty-four minutes on
+            // 08.09.2026, 676 of them over inside fifteen seconds, GOODS nought and GOLD -2840. A dart lands
+            // on a rooftop, the road is refused, the square is written down where everybody can read it, and
+            // the next dart lands on it again because nobody here was reading.
+            //
+            // Free, and it has to be: this is inside the sampling loop. One dictionary lookup, and arriving
+            // anywhere clears the square again.
+            if (BotRefused.Refusing(map, where))
+            {
+                Darted++;
+
                 continue;
             }
 
@@ -449,9 +525,23 @@ public sealed class BotHunter : IBotProposer
 
         var where = new Point3D(rich.X, rich.Y, z);
 
-        // The same two tests every sampled candidate has to pass: somewhere else, and reachable.
+        // The same three tests every sampled candidate has to pass: somewhere else, not resting after
+        // refusing somebody, and reachable.
+        //
+        // <b>The middle one was written down and never read.</b> BotProwl.Bend files a baulk on ground it
+        // could not get through, and until 07.09.2026 the only list that consulted those marks was the one
+        // companies are sent to. This picker asked nothing, so the square that had just refused four bots was
+        // handed to a fifth - 618 prowls failed on "no way through" in fifty minutes, and every one of them
+        // paid for a full path search first.
         if (Utility.InRange(body.Location, where, BotQuarry.Reach))
         {
+            return Point3D.Zero;
+        }
+
+        if (BotQuad.Baulking(map, where) || BotRefused.Refusing(map, where))
+        {
+            Rested++;
+
             return Point3D.Zero;
         }
 
@@ -513,11 +603,18 @@ public sealed class BotHunter : IBotProposer
 
         var where = new Point3D(worst.X, worst.Y, z);
 
-        // The same two tests every sampled candidate has to pass: somewhere else, and reachable.
+        // The same tests as the noisy picker above, including the baulk, and for the same reason.
         if (Utility.InRange(body.Location, where, BotQuarry.Reach)
             || Region.Find(where, map)?.IsPartOf<TownRegion>() == true
             || BotReach.Ask(map, body.Location, where, BotArrival.Within(BotQuarry.Reach)) == BotReachVerdict.Sealed)
         {
+            return Point3D.Zero;
+        }
+
+        if (BotQuad.Baulking(map, where) || BotRefused.Refusing(map, where))
+        {
+            Rested++;
+
             return Point3D.Zero;
         }
 
@@ -535,6 +632,72 @@ public sealed class BotHunter : IBotProposer
 
     /// <summary>Quarry passed over because the crowd around it was already hopeless. See <c>BotThreat.Overrun</c>.</summary>
     public static long Overrun { get; private set; }
+
+    /// <summary>
+    /// Candidate hunting grounds passed over because that square is resting after refusing somebody.
+    ///
+    /// Its own tally rather than folded into the others: this is the shard declining to spend a path search
+    /// on ground it has already been turned away from, and if it ever grows to swallow the whole map that is
+    /// a different fault from the one it was written for.
+    /// </summary>
+    public static long Rested { get; private set; }
+
+    /// <summary>
+    /// Whether a dart may only land on ground the population has stood on, or beside it.
+    ///
+    /// A dial, not a constant: it narrows where the population is willing to go, and anything that does that
+    /// has to be answerable without a rebuild. Set it false and the darts go back to the blank map.
+    /// </summary>
+    public static bool TroddenOnly { get; set; } = true;
+
+    /// <summary>Sampled grounds passed over because nobody has ever stood in that square or beside it.</summary>
+    public static long Untrodden { get; private set; }
+
+    /// <summary>
+    /// Whether this square, or one of the eight around it, is ground a bot has actually stood in.
+    ///
+    /// The ring is what keeps the hunt able to grow: the middle alone would pace what the population already
+    /// knows for ever, and one square out is a walk of at most <see cref="BotQuad.Side"/> tiles past the last
+    /// place somebody proved a road to.
+    /// </summary>
+    private static bool Walked(Map map, Point3D where)
+    {
+        if (BotQuad.Trodden(map, where))
+        {
+            return true;
+        }
+
+        for (var dx = -1; dx <= 1; dx++)
+        {
+            for (var dy = -1; dy <= 1; dy++)
+            {
+                if ((dx != 0 || dy != 0)
+                    && BotQuad.Trodden(map, new Point3D(where.X + dx * BotQuad.Side, where.Y + dy * BotQuad.Side, where.Z)))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Hunting grounds passed over for lying further from the asker than any road is searched for.
+    ///
+    /// Its own bucket, and it wants watching against <see cref="Stranded"/>: the day this reads high and
+    /// Stranded reads high with it is the day the population has walked so far from home that nothing near
+    /// it is on offer any more, and the answer to that is to send it home, not to widen this.
+    /// </summary>
+    public static long Distant { get; private set; }
+
+    /// <summary>
+    /// Sampled hunting grounds passed over for having refused somebody. Its own bucket rather than
+    /// <see cref="Rested"/>'s: the two named pickers ask the same question about squares somebody chose on
+    /// purpose, and pouring the darts into that number would hide which of the four candidate paths the
+    /// saving came from.
+    /// </summary>
+    public static long Darted { get; private set; }
 
     /// <summary>
     /// How far from home a square the map calls dangerous may be and still be worth setting out for.
@@ -556,6 +719,64 @@ public sealed class BotHunter : IBotProposer
     /// </para>
     /// </summary>
     public static int FearedReach { get; set; } = 800;
+
+    /// <summary>
+    /// How far a hunting ground may be from home before no road to it is ever searched for.
+    ///
+    /// <para>
+    /// Not a preference: it is <see cref="BotPath.CeilingMs"/> divided by <see cref="BotPath.MsPerTile"/>,
+    /// which is the shard's own statement of how much distance one search is funded to cross. Reading it
+    /// rather than writing a second number down is the point — a copy of it here would drift from the
+    /// original the first time either moved, and the whole of this defect was two numbers that had never
+    /// been compared.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>It is a price, not a wall, and the first version of this note said the opposite.</b> The evidence
+    /// for "no road exists past here" — 85% of refused roads lying beyond the line — was gathered while
+    /// every bot on the shard was being refused every step by an exhausted mount, so those failures belonged
+    /// to the engine and not to the search. Tested properly the same afternoon, on a healthy shard, by
+    /// raising this to 900 with a dial and watching for fifteen minutes:
+    /// </para>
+    ///
+    /// <para>
+    /// refused roads stayed flat at one or two a minute — so distance does <em>not</em> make roads vanish —
+    /// while the searching bill went from 2191 searches at 3.36ms each with 8% partial, to 6325 at 13.36ms
+    /// with <b>51% partial</b>: eleven times the game loop for the same work. So the clamp stays, and it
+    /// stays as what it is: the distance past which a search stops being worth what it costs. Errands that
+    /// are rare enough to pay that bill — scouting is one Baron a few times an hour — should not use it, and
+    /// BotScout says so at length.
+    /// </para>
+    /// </summary>
+    public static int Walkable
+    {
+        get => _walkable > 0 ? _walkable : Default;
+        set => _walkable = value;
+    }
+
+    /// <summary>
+    /// How far a dart may be thrown from the asker, when nothing has been dialled.
+    ///
+    /// <para>
+    /// <b>Five hundred, and the derived 240 turned out to be a cage.</b> The derivation — CeilingMs over
+    /// MsPerTile — is where the search budget stops growing, and using it here penned the whole population
+    /// into a circle of that radius around wherever it was standing, which is to say around home. Measured
+    /// 08.09.2026: 16151 candidates thrown away in twenty-five minutes as too far, and every target the
+    /// population chose that hour fell inside x 1200-1680, y 1230-1710 — the circle, drawn on the map by the
+    /// bots themselves. Patrick asked why they never go south to the marsh; that is the answer.
+    /// </para>
+    ///
+    /// <para>
+    /// Five hundred is <c>Roam / 2</c>, which is what the dart sampler was written to throw at in the first
+    /// place, so this stops being a second opinion about distance and goes back to being one. It is not free
+    /// — at 900 the searching bill went from 3.36ms and 8% partial to 13.4ms and 51% — so it stays a dial,
+    /// and the two numbers to watch when moving it are the average search cost and the partial share in
+    /// "Getting about".
+    /// </para>
+    /// </summary>
+    public static int Default { get; set; } = 500;
+
+    private static int _walkable;
 
     private static void Missing(Map map)
     {
@@ -595,12 +816,16 @@ public sealed class BotHunter : IBotProposer
     public static long Sought { get; private set; }
 
     public static string Describe() =>
-        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overmatched} grounds passed over for asking more strength than whoever looked had, {Claimed} for somebody already raising a company for them, {Overrun} quarry passed over for the crowd already round it, {BotProwl.Baulked} prowls given up for getting no nearer, {BotProwl.Raised} companies raised for ground one bot could not take, {BotProwl.Unraised} given up for not raising one";
+        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overmatched} grounds passed over for asking more strength than whoever looked had, {Claimed} for somebody already raising a company for them, {Overrun} quarry passed over for the crowd already round it, {Rested} named grounds passed over as resting after refusing somebody and {Darted} sampled ones, {Distant} further from the asker than {Walkable} tiles, which is as far as a road is ever searched for, {Untrodden} on squares nobody has ever stood in or beside, {BotProwl.Baulked} prowls given up for getting no nearer, {BotProwl.Raised} companies raised for ground one bot could not take, {BotProwl.Unraised} given up for not raising one";
 
     public static void Forget()
     {
         _saidNoQuarry = false;
         Sworn = 0;
+        Rested = 0;
+        Darted = 0;
+        Distant = 0;
+        Untrodden = 0;
         Quiet = 0;
         Stranded = 0;
         Overmatched = 0;

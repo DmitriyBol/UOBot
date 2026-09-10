@@ -148,6 +148,37 @@ public sealed class BotHerbs : BotDeed
     public override string Stage =>
         _found > 0 ? $"back from the woods with {_found} herbs" : $"out to the woods near {_where}";
 
+    /// <summary>
+    /// The way to that patch of woods does not exist: remember it, so this bot stops choosing it.
+    ///
+    /// <para>
+    /// <b>Written at 02:20 on 08.09.2026, on a shard that had been running two hours.</b> Herb gathering had
+    /// taken on 2959 errands and failed 2910 of them — 98% — every one on "no way through", each one costing
+    /// a full path search, each one lasting a fifth of a minute before the bot chose the same kind of place
+    /// again. It was the single largest source of failure on the shard and the reason the finished share of
+    /// work had fallen from 69% to 17% over one night.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>The identical defect was found and fixed in <see cref="BotForage"/> on 02.09.2026</b> — "the only
+    /// trade of them all that did not call Ledger.Beware", 281 refusals against one square — and this file
+    /// was not looked at then. Same shape, same cure, copied deliberately: the ledger bands places 64 tiles
+    /// wide, so one refusal teaches the bot about the whole patch rather than about one tile of it.
+    /// </para>
+    ///
+    /// <para>
+    /// Returns false for <see cref="BotForage"/>'s reason: the proposer chose this patch and choosing again
+    /// from here would choose it again. The errand ends, and the next decision is made by a bot that knows
+    /// something it did not know before.
+    /// </para>
+    /// </summary>
+    public override bool Bend(IBotWilful bot)
+    {
+        bot?.Resolve?.Ledger?.Beware(Trade, _map, _where);
+
+        return false;
+    }
+
     public override BotDoing Advance(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -429,6 +460,9 @@ public sealed class BotHerbalist : IBotProposer
 
     public static long Asked { get; private set; }
 
+    /// <summary>Patches passed over because this bot has already been refused the road to them.</summary>
+    public static long Refused { get; private set; }
+
     /// <summary>Asked of a bot whose class has no such trip. Not a refusal — nearly every answer is this.</summary>
     public static long NotAGatherer { get; private set; }
 
@@ -468,7 +502,7 @@ public sealed class BotHerbalist : IBotProposer
             return null;
         }
 
-        var where = Wood(body, map);
+        var where = Wood(body, map, bot?.Resolve?.Ledger);
 
         if (where == Point3D.Zero)
         {
@@ -492,7 +526,7 @@ public sealed class BotHerbalist : IBotProposer
     /// the proposer contract says in as many words that the question may be real but must not be expensive.
     /// </para>
     /// </summary>
-    private static Point3D Wood(Mobile body, Map map)
+    private static Point3D Wood(Mobile body, Map map, BotLedger ledger)
     {
         var home = BotPopulation.Where;
         var roam = Math.Min(Range, BotPopulation.Roam);
@@ -520,6 +554,34 @@ public sealed class BotHerbalist : IBotProposer
                 continue;
             }
 
+            // <b>What this bot has already learned about that ground, which nothing here asked until now.</b>
+            // BotHerbs.Bend was given a Beware at 02:16 on 08.09.2026 and the failures came back within the
+            // hour: the mark was being written and this sampler, the only thing that chooses where to go,
+            // never read it. Third time in one night that a note was filed and not read — the hunt's baulks
+            // and the stall watch's silence were the other two.
+            //
+            // Refusals are per-bot, so this is per-bot too. The ledger bands ground 64 tiles wide, so one
+            // refusal covers the patch rather than the tile, and the caution lapses on its own clock.
+            // <b>Cautious, not Expect, and the difference cost an hour.</b> Expect answers "what is this
+            // ground worth", which for a patch nobody has worked is the claim itself - a positive number,
+            // always, so the test never fired once in thirty-five minutes. Caution is a separate question
+            // with a separate method, and it is the one BotGround, BotMiner and BotShops all ask.
+            // What the whole population has learned about this ground, before what this bot has learned:
+            // one bot's caution is a private opinion, a shard-wide refusal is a fact about the island.
+            if (BotRefused.Refusing(map, where))
+            {
+                Refused++;
+
+                continue;
+            }
+
+            if (ledger != null && ledger.Cautious(BotHerbs.Trade, map, where))
+            {
+                Refused++;
+
+                continue;
+            }
+
             return where;
         }
 
@@ -529,7 +591,7 @@ public sealed class BotHerbalist : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody on this shard may go looking for herbs ({NotAGatherer} answers went to bots that may not)"
-            : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go; "
+            : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go, {Refused} patches passed over as already refused; "
               + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker that can cast or brew keeps back";
 
     public static void Forget()
@@ -538,6 +600,7 @@ public sealed class BotHerbalist : IBotProposer
         NotAGatherer = 0;
         TooSoon = 0;
         NoWood = 0;
+        Refused = 0;
         Offered = 0;
         BotHerbs.ForgetTrade();
     }

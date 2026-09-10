@@ -81,6 +81,15 @@ public sealed class BotProgress : GenericPersistence
     public static long Returned { get; private set; }
 
     /// <summary>
+    /// Whether a bot's savings survive a restart along with its skills.
+    ///
+    /// False by Patrick's order of 08.09.2026: a purse carried across many restarts stops being a fact about
+    /// the economy and becomes a fact about how often the shard has been started. Skills still carry over —
+    /// what a bot has learned is its own, what it has banked is the session's.
+    /// </summary>
+    public static bool Savings { get; set; }
+
+    /// <summary>
     /// Gives a freshly raised bot whatever the bot of that name had learned, or leaves it a novice.
     ///
     /// <para>
@@ -144,9 +153,19 @@ public sealed class BotProgress : GenericPersistence
         // Upward only, like the skills above, and into the account rather than the pack: this is savings, not
         // pocket money, every seller on this shard is paid by deposit, and a thousand coins in a backpack is
         // twenty stones of carrying weight that would drop into the first corpse.
+        // <b>Off by Patrick's order of 08.09.2026, and the reason it was ever on is directly above.</b> He
+        // watched the Architect sit on twelve thousand gold that no single session had earned and asked for
+        // the account to be cleared with everything else a restart clears. That is a legitimate call — a
+        // fortune carried across twenty restarts is not a measurement of this shard, it is a measurement of
+        // how many times it has been started — but it is the exact condition the note above was written to
+        // cure, so it is a switch and not a deletion.
+        //
+        // The numbers to watch after turning it off are the ones that told the story last time: riders who
+        // cannot afford a horse, pupils who cannot afford a lesson, bots who cannot afford a piece of
+        // armour. If those come back, this is why.
         var has = BotYield.Wealth(bot);
 
-        if (learned.Purse > has)
+        if (Savings && learned.Purse > has)
         {
             var owed = learned.Purse - has;
 

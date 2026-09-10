@@ -47,6 +47,13 @@ public static class BotTimber
     public static long Townbound { get; private set; }
 
     /// <summary>
+    /// Trees passed over for standing on ground that has refused the population. Its own bucket, because
+    /// "inside the walls" and "nobody can get there" are different facts and the day one of them moves the
+    /// other must not move with it.
+    /// </summary>
+    public static long Fenced { get; private set; }
+
+    /// <summary>
     /// How near the trunk the engine insists on before it will let an axe swing.
     ///
     /// <para>
@@ -255,6 +262,20 @@ public static class BotTimber
                     if (Region.Find(new Point3D(found.X, found.Y, found.Z), map)?.IsPartOf<GuardedRegion>() == true)
                     {
                         Townbound++;
+
+                        continue;
+                    }
+
+                    // <b>And the nearest tree is the same tree every time.</b> This walks rings outward from
+                    // the bot's feet and returns the first trunk it meets, so a tree in a fenced garden is
+                    // handed to the same woodsman on every review for as long as it stands there: Nessa
+                    // failed at (1444, 1458, 2) forty times in fifty-five minutes on 08.09.2026, one of the
+                    // 126 chop errands that session which ended in no way through. The refusal is written by
+                    // whoever gives up on the road and cleared by whoever arrives, so this skips a trunk
+                    // nobody could get to and takes it up again the moment anybody proves otherwise.
+                    if (BotRefused.Refusing(map, new Point3D(found.X, found.Y, found.Z)))
+                    {
+                        Fenced++;
 
                         continue;
                     }

@@ -1,3 +1,4 @@
+using System;
 ﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -168,25 +169,8 @@ public sealed class BotHarrower : IBotProposer
         // with the worst and this threw the answer away instead of asking for the next one. The reach
         // ledger is already filtered here for exactly this reason; this is the same shape of fact about the
         // same candidate. Counted once per ask rather than per candidate: it walks the population.
-        var ready = BotHarrow.Musterable();
         var unready = 0;
-
-        var quad = BotQuad.Direst(
-            map,
-            body.Location,
-            Range,
-            at =>
-            {
-                if (BotQuad.Damning(map, at) && ready < BotHarrow.Grandmasters)
-                {
-                    unready++;
-
-                    return false;
-                }
-
-                return Reachable(map, body.Location, at);
-            }
-        );
+        var quad = BotQuad.Direst(map, body.Location, Range, Takeable(map, body.Location, () => unready++));
 
         if (unready > 0)
         {
@@ -217,6 +201,40 @@ public sealed class BotHarrower : IBotProposer
     }
 
     /// <summary>Whether the ground between the Baron and the square is not already known to be closed.</summary>
+    /// <summary>
+    /// The test a square has to pass before a Baron would march on it: not damned beyond what the island can
+    /// raise, and a road to it.
+    ///
+    /// <para>
+    /// <b>Handed out rather than kept private, because the rounds ask the same question and were asking a
+    /// different one.</b> <c>BotWarden</c> stands the scouting aside whenever dire ground exists — right in
+    /// principle, since a Baron leading a company is refused a harrowing and the two offices must not
+    /// compete on price. But it asked <c>BotQuad.Direst</c> with no filter at all, so it stood aside for
+    /// ground this proposer then refused as damned, and the Baron was left with neither office. Measured on
+    /// 08.09.2026: twenty asks, twenty "stood aside for ground dire enough to harrow" and twenty "passed
+    /// over damned ground the island cannot yet raise a company for", printed in the same paragraph, and a
+    /// Baron who did nothing but stroll round the town for an afternoon. Two gates in a ring, each holding
+    /// the door for the other — the same shape as the three that once ringed the smith.
+    /// </para>
+    /// </summary>
+    /// <param name="refused">Called once per square turned away for being damned. May be null.</param>
+    public static Func<Point3D, bool> Takeable(Map map, Point3D from, Action refused = null)
+    {
+        var ready = BotHarrow.Musterable();
+
+        return at =>
+        {
+            if (BotQuad.Damning(map, at) && ready < BotHarrow.Grandmasters)
+            {
+                refused?.Invoke();
+
+                return false;
+            }
+
+            return Reachable(map, from, at);
+        };
+    }
+
     private static bool Reachable(Map map, Point3D from, Point3D square)
     {
         if (BotReach.Ask(map, from, square, BotArrival.Within(BotHarrow.Side / 3)) != BotReachVerdict.Sealed)
@@ -255,7 +273,7 @@ public sealed class BotHarrower : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"no Baron has ever been offered a harrowing ({NotABaron} answers went to bots that are not Barons)"
-            : $"{Asked} times a Baron was asked: {Offered} were offered ground, {Held} were already leading a company, {Unfit} were too hurt, {Quiet} found nowhere reading at or below {BotQuad.Dire:F2}, {Sealed} found the worst of it behind something, {Unfooted} found nowhere in it to stand, {Resting} came too soon after a muster that failed, {Unready} passed over damned ground the island cannot yet raise a company for; {BotHarrow.Describe()}";
+            : $"{Asked} times a Baron was asked: {Offered} were offered ground, {Held} were already leading a company, {Unfit} were too hurt, {Quiet} found nowhere reading at or below {BotQuad.Dire:F2}, {Sealed} found the worst of it behind something, {Unfooted} found nowhere in it to stand, {Resting} came too soon after a muster that failed, {Unready} passed over damned ground the island cannot yet raise a company for ({BotHarrow.Musterable()} of the {BotHarrow.Grandmasters} needed are fit for it today); {BotHarrow.Describe()}";
 
     public static void Forget()
     {

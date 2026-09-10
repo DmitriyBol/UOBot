@@ -103,6 +103,12 @@ public sealed class BotRounds : BotDeed
 
     public override double Minutes => WorkMinutes;
 
+    /// <summary>
+    /// It pays nothing and it is meant to. See <see cref="BotDeed.Unpaid"/> for the twelve minutes this cost
+    /// before it existed.
+    /// </summary>
+    public override bool Unpaid => true;
+
     public override SkillName? Trains => null;
 
     public override int Outlay => 0;

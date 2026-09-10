@@ -145,6 +145,42 @@ public static class BotArms
     /// strength of one arrow".
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Whether this bot has anything its class's bows could fire.
+    ///
+    /// <para>
+    /// Anything they could fire, not merely what the bow in its hands takes: a crossbow in the pack and
+    /// bolts to go with it is a loaded shooter however empty the bow it happens to hold.
+    /// </para>
+    ///
+    /// <para>
+    /// Public because the crafters' minds are shown how many shooters on this island have nothing to shoot,
+    /// and a second implementation of that test living in the prompt would drift from this one — which is
+    /// the version the fight actually uses.
+    /// </para>
+    /// </summary>
+    public static bool Stocked(BotMobile bot, BotClass klass)
+    {
+        var pack = bot?.Backpack;
+
+        if (pack == null || klass?.Kit.Ranged is not { Count: > 0 } options)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < options.Count; i++)
+        {
+            var ammo = options[i].Ammunition;
+
+            if (ammo != null && pack.GetAmount(ammo) > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static void Quiver(Mobile body, BotClass klass)
     {
         if (body is not BotMobile bot || klass?.Kit.Ranged is not { Count: > 0 } options)
@@ -159,16 +195,7 @@ public static class BotArms
             return;
         }
 
-        // Anything this class's bows could fire, not merely what the one in its hands takes: a crossbow in
-        // the pack and bolts to go with it is a loaded shooter however empty the bow it happens to hold.
-        var stocked = false;
-
-        for (var i = 0; i < options.Count && !stocked; i++)
-        {
-            var ammo = options[i].Ammunition;
-
-            stocked = ammo != null && pack.GetAmount(ammo) > 0;
-        }
+        var stocked = Stocked(bot, klass);
 
         var held = bot.Weapon as Item;
         var shooting = held is BaseRanged && held.Parent == bot;

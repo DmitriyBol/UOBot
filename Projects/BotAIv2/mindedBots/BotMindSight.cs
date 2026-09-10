@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Server.BotAI.V2;
+using Server.Engines.Craft;
 using Server.Text;
 using Server.Items;
 using Server.Mobiles;
@@ -122,10 +123,98 @@ public static class BotMindSight
                 sorrow is the dead and the squares nobody has dealt with — never an empty purse, and never an
                 idle afternoon.
                 """,
+            "crafter" =>
+                """
+
+                One more thing, and it is the whole of what makes you different from the others.
+
+                YOU ARE ONE OF THE FOUR CRAFTERS, AND THERE ARE NO OTHERS. Nobody else on this island makes
+                anything. Every weapon, every piece of armour, every arrow, every potion, every scroll and
+                every meal is made by the four of you or it does not exist here. The others fight, gather and
+                carry; you are the only ones who turn what they bring back into something worth having.
+
+                READ YOUR STATE IN THIS ORDER, AND STOP AT THE FIRST THING YOU CAN DO.
+
+                First, the board. A want there is a bot that has already paid for something it cannot make:
+                the gold is lodged and waiting, so you are not gambling on being paid, you are collecting.
+                Each row tells you which craft makes the thing, what skill it takes and what you have. If a
+                row says you can make it now, that is your work and nothing on this list beats it. A want
+                whose price has been raised again and again with nothing delivered is the loudest sentence
+                this island can say: it has been trying to buy that for a long time and nobody could.
+
+                Second, what the island is short of. Bare armour slots, shooters with nothing to shoot, bots
+                that have not eaten — those numbers are counted at the moment you read them, and every one of
+                them is a thing only you can fix. A bot with an empty slot is a bot that dies sooner; an
+                archer with no arrows is a bow being carried for nothing. Nobody has ordered these. Make them
+                anyway, put them on a stall, and the island pays you for them.
+
+                Third, your skill, if it is what is stopping you. Skill counts as earnings on this shard, so
+                an hour spent getting better is paid work, not a detour. Make the dearest thing you are
+                allowed to attempt — your bench lists them — until the number moves. Do not practise a skill
+                that is already at its target; it earns you nothing more.
+
+                Fourth, material. You carry a pickaxe, an axe and the skill to use both, and the stalls list
+                what everything costs. Buy it if it is on a stall and you can afford it; dig or cut it if it
+                is not, or if buying costs more than the finished thing is worth. Ore, wood, leather and
+                cloth all reach you either way.
+
+                Fifth, selling. A stack of ingots in your pack is worth nothing to anybody. The same ingots
+                on a stall, or turned into what somebody asked for, are the island getting richer, and that
+                is what you are judged on. Put spare material where the others can buy it.
+
+                THREE RULES THAT OVERRIDE ALL OF THAT.
+
+                Do not make what has already failed to sell. Your own stalls tell you what has been cut in
+                price and still sold nothing. That is the island answering you in money, and it is worth more
+                than any forecast you can make.
+
+                Do not stand at a bench another crafter is already at. You are shown what the other three are
+                holding right now. Four of you on one trade is three of you wasted, and the wants nobody can
+                fill will still be sitting there afterwards.
+
+                Do not take work for a thing nothing on this island can produce. The board hides those from
+                you already; if you find yourself reasoning about one anyway, you have invented it.
+
+                Hunt, dig or cut when it is the shortest road to what you are making, or when the board is
+                empty and the island is short of nothing. Not as a way of filling an afternoon.
+                """,
             _ => ""
         };
 
     /// <summary>Everything about right now, as the question.</summary>
+    /// <summary>
+    /// How long the last state written was, in characters.
+    ///
+    /// <para>
+    /// Watched rather than assumed. The debugger's prompt grew from 14780 to 19981 characters over a few
+    /// sittings and quietly strangled the model it was written for — nothing failed, the answers simply got
+    /// worse. Every block added here costs some of the same budget, so the number is printed in the minds'
+    /// own summary where it can be seen growing.
+    /// </para>
+    /// </summary>
+    public static int LastChars { get; private set; }
+
+    /// <summary>
+    /// Set true and the next state built is written out in full, once, to the minds' own log; it puts
+    /// itself back to false afterwards.
+    ///
+    /// <para>
+    /// <b>Because everything else about a prompt is inferred from what the model said back.</b> Four
+    /// crafters in a row talked about sewing ringmail, which is forged, and the whole of an evening's
+    /// diagnosis was guesswork about whether the state said something misleading, said nothing, or said the
+    /// right thing to a model that ignored it. Those are three different faults with three different fixes
+    /// and no way to tell them apart from the outside.
+    /// </para>
+    ///
+    /// <para>
+    /// It is a dial, so it is turned on through the debugger's door on a living shard —
+    /// <c>dial BotMindSight.Dump true</c> — and one state appears in <c>bot-minds.log</c> a few seconds
+    /// later. One, not a stream: a switch that stays on fills a log with megabytes of duplicated prompt and
+    /// is exactly the kind of instrument that gets left on by accident.
+    /// </para>
+    /// </summary>
+    public static bool Dump { get; set; }
+
     public static string State(BotMind mind, BotMobile body, IReadOnlyList<string> trades)
     {
         var sb = ValueStringBuilder.Create(2048);
@@ -135,6 +224,12 @@ public static class BotMindSight
             Body(ref sb, body);
             Around(ref sb, body);
             Ground(ref sb, mind, body);
+            Bench(ref sb, mind, body);
+            Board(ref sb, mind, body);
+            Fellows(ref sb, mind, body);
+            Materials(ref sb, mind);
+            Island(ref sb, mind, body);
+            Shelf(ref sb, mind, body);
             Past(ref sb, mind);
             Heard(ref sb, mind);
             Lessons(ref sb, mind);
@@ -143,7 +238,18 @@ public static class BotMindSight
             sb.Append("\nChoose one trade from the list, say what you expect it to be worth per minute, how many minutes you expect to spend on it, and why in one sentence.");
             sb.Append(" You may also put one short line in `say` for the other thinking bots to read — something you have found, somewhere worth coming to, something you have given up on. Leave it empty unless it is worth their attention.");
 
-            return sb.ToString();
+            var state = sb.ToString();
+
+            LastChars = state.Length;
+
+            if (Dump)
+            {
+                Dump = false;
+
+                BotMindLog.Write(mind.Name, $"the whole of what it reads, {state.Length} characters", state);
+            }
+
+            return state;
         }
         finally
         {
@@ -325,6 +431,909 @@ public static class BotMindSight
 
     /// <summary>How many squares of dangerous ground are recited. A list, not a map.</summary>
     public static int Squares { get; set; } = 6;
+
+    /// <summary>
+    /// The facts a decision was made from, in one line, for the minds' log.
+    ///
+    /// <para>
+    /// <b>Because a reason without its evidence cannot be checked.</b> The log records what a mind chose and
+    /// the sentence it gave for choosing - and that sentence is the model's account of itself, which is
+    /// exactly the thing least worth trusting. When a crafter says "the board is empty so I will sew", the
+    /// question a person asks the next morning is whether the board really was empty, and until now the only
+    /// way to answer it was to have been watching at the time.
+    /// </para>
+    ///
+    /// <para>
+    /// Kept to one line and to numbers the shard measured itself. The full state is available on demand
+    /// through <see cref="Dump"/>; this is what is worth having on every decision, for ever.
+    /// </para>
+    /// </summary>
+    public static string Brief(BotMind mind, BotMobile body)
+    {
+        if (body == null)
+        {
+            return "no body";
+        }
+
+        using var line = ValueStringBuilder.Create(320);
+
+        var pack = body.Backpack?.TotalGold ?? 0;
+        var load = BotLadder.Load(body);
+        var ceiling = Math.Max(1, BotLadder.Ceiling(body));
+
+        line.Append($"saw: {pack}gp in pack, {Banker.GetBalance(body)}gp banked, {load * 100 / ceiling}% loaded");
+
+        if (mind.Trade == "crafter")
+        {
+            var canMake = 0;
+            var cannot = 0;
+            string best = null;
+            var bestOffer = 0;
+
+            var wants = BotAuction.Wants;
+
+            for (var i = 0; i < wants.Count; i++)
+            {
+                var want = wants[i];
+
+                if (want == null || want.Amount <= 0 || !BotShopper.Makeable(want.Kind))
+                {
+                    continue;
+                }
+
+                var recipe = BotShopper.MadeBy(want.Kind);
+                var have = recipe == null ? 0.0 : body.Skills[recipe.Value.Skill]?.Base ?? 0.0;
+
+                if (recipe != null && have >= recipe.Value.MinSkill)
+                {
+                    canMake++;
+
+                    if (want.Offer > bestOffer)
+                    {
+                        bestOffer = want.Offer;
+                        best = want.Label;
+                    }
+                }
+                else
+                {
+                    cannot++;
+                }
+            }
+
+            line.Append($"; board: {canMake} wants it could make now, {cannot} beyond its skill");
+
+            if (best != null)
+            {
+                line.Append($", dearest reachable {best} at {bestOffer}gp");
+            }
+
+            var stalls = BotAuction.Listings;
+            var kinds = 0;
+            var cheapest = int.MaxValue;
+
+            for (var i = 0; i < stalls.Count; i++)
+            {
+                if (stalls[i] == null)
+                {
+                    continue;
+                }
+
+                kinds++;
+                cheapest = Math.Min(cheapest, stalls[i].Price);
+            }
+
+            line.Append($"; stalls: {kinds} listings from {(kinds == 0 ? 0 : cheapest)}gp");
+
+            var minds = BotMinds.All;
+            var others = 0;
+
+            for (var i = 0; i < minds.Count; i++)
+            {
+                if (minds[i] != mind && minds[i]?.Body is { Deleted: false })
+                {
+                    if (others == 0)
+                    {
+                        line.Append("; others: ");
+                    }
+                    else
+                    {
+                        line.Append(", ");
+                    }
+
+                    others++;
+                    line.Append($"{minds[i].Name} {minds[i].Body.Resolve?.Deed?.Kind ?? "-"}");
+                }
+            }
+        }
+
+        return line.ToString();
+    }
+
+    /// <summary>
+    /// How many wants and how many kinds of stall a crafter is shown. Enough to choose between, few enough
+    /// to leave room to think: the debugger's prompt grew to 19981 characters and choked the model it was
+    /// written for, and that lesson is this project's, not a general one.
+    /// </summary>
+    public static int Rows { get; set; } = 8;
+
+    /// <summary>
+    /// What this bot can make, and how good it is at each of them.
+    ///
+    /// <para>
+    /// <b>The skills are read off the body and the targets off the class, rather than either being written
+    /// here.</b> A prompt that lists a trade's skills is wrong the day somebody adds one — Fletching was
+    /// added to the crafter on 04.09.2026 for the arrows nobody could make, and a hand-written list would
+    /// have gone on describing a crafter who could not fletch.
+    /// </para>
+    ///
+    /// <para>
+    /// Both numbers are given because they answer different questions: what it is at says whether the thing
+    /// on the board can be made now, and how far it is from its target says whether an hour of practice is
+    /// worth anything. A skill already at its target earns nothing further, and a mind that cannot see that
+    /// keeps taking work it has stopped being paid for.
+    /// </para>
+    /// </summary>
+    private static void Bench(ref ValueStringBuilder sb, BotMind mind, BotMobile body)
+    {
+        if (mind.Trade != "crafter")
+        {
+            return;
+        }
+
+        var klass = body.Class;
+
+        if (klass?.Skills == null || klass.Skills.Count == 0)
+        {
+            return;
+        }
+
+        sb.AppendLine("\nWHAT YOU CAN MAKE, AND HOW GOOD YOU ARE AT IT");
+
+        for (var i = 0; i < klass.Skills.Count; i++)
+        {
+            var (skill, target) = klass.Skills[i];
+            var have = body.Skills[skill]?.Base ?? 0.0;
+
+            sb.Append("- ");
+            sb.Append(skill.ToString());
+
+            // <b>The trade beside the skill, because the two are not the same word.</b> Told it had
+            // Blacksmith 20 and shown a menu containing Smith and Tailor, a mind announced it would buy
+            // cloth and make Ringmail Gloves as a tailor - ringmail is forged out of iron ingots, and the
+            // engine would have refused every attempt. Same class of mistake as guessing a recipe: the fact
+            // exists in the shard and simply was not in front of it.
+            var bench = Bench(skill);
+
+            if (bench != null)
+            {
+                sb.Append(" (the trade called ");
+                sb.Append(bench);
+                sb.Append(')');
+            }
+
+            sb.Append(": ");
+            sb.Append((int)have);
+            sb.Append(" of ");
+            sb.Append((int)target);
+
+            if (have >= target)
+            {
+                sb.AppendLine(" - as good as this trade asks. Practice pays you nothing more here.");
+            }
+            else if (have < 30.0)
+            {
+                sb.AppendLine(" - a beginner. Only the cheapest recipes come out, and half the material is lost on a failure.");
+            }
+            else
+            {
+                sb.AppendLine(" - getting better still pays.");
+            }
+
+            Recipes(ref sb, skill, have);
+        }
+    }
+
+    /// <summary>
+    /// Two or three things this bot could actually make with that skill right now, and how many there are
+    /// in all.
+    ///
+    /// <para>
+    /// <b>Because a mind with no list invents one.</b> Given a board, a bench and prices but never a recipe,
+    /// four crafters in a row announced they would sew <i>bandages</i> — an item no craft system on this
+    /// shard produces, and the one the order board had to be filtered for on 05.09.2026 for exactly the same
+    /// reason. Their actual work was fine: the shard picks the recipe, not the mind. But an explanation that
+    /// names something impossible is an explanation nobody can check, and a mind reasoning from an invented
+    /// recipe will misjudge every forecast it makes about that trade.
+    /// </para>
+    ///
+    /// <para>
+    /// The examples are the ones at the top of what it can reach — the hardest it is allowed to attempt
+    /// rather than the easiest, because the easiest is what it will be given anyway and says nothing about
+    /// what the skill has bought.
+    /// </para>
+    /// </summary>
+    /// <summary>
+    /// What a thing of this name costs on the cheapest stall holding one, or 0 if nobody is selling it.
+    ///
+    /// Matched on the label rather than the type because that is what a stall is listed under and what the
+    /// mind is shown; a type-level match would quietly miss the coloured and named variants that make up
+    /// most of a market.
+    /// </summary>
+    private static int Cheapest(string material)
+    {
+        if (string.IsNullOrEmpty(material))
+        {
+            return 0;
+        }
+
+        var listings = BotAuction.Listings;
+        var best = 0;
+
+        for (var i = 0; i < listings.Count; i++)
+        {
+            var listing = listings[i];
+
+            if (listing?.Label == null || listing.Kind?.Name != material)
+            {
+                continue;
+            }
+
+            if (best == 0 || listing.Price < best)
+            {
+                best = listing.Price;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Which trade on the work menu is made with this skill, or null for the skills that make nothing —
+    /// Mining and Lumberjacking fetch material, and no bench belongs to them.
+    ///
+    /// Answered by asking the craft systems what they make with it rather than out of a table written here,
+    /// so it cannot drift from <see cref="BotShopper.MadeBy"/>, which the board rows use.
+    /// </summary>
+    private static string Bench(SkillName skill)
+    {
+        CraftSystem[] systems = [BotAnvil.System, BotThread.System, BotFlask.System, BotFletching.System, BotQuill.System];
+
+        for (var i = 0; i < systems.Length; i++)
+        {
+            var recipes = systems[i]?.CraftItems;
+
+            if (recipes == null)
+            {
+                continue;
+            }
+
+            for (var r = 0; r < recipes.Count; r++)
+            {
+                var recipe = recipes[r];
+                var needs = recipe?.Skills?.Count > 0 ? recipe.Skills[0] : null;
+
+                if (needs?.SkillToMake != skill)
+                {
+                    continue;
+                }
+
+                return BotShopper.MadeBy(recipe.ItemType)?.Trade;
+            }
+        }
+
+        return null;
+    }
+
+    private static void Recipes(ref ValueStringBuilder sb, SkillName skill, double have)
+    {
+        CraftSystem[] systems = [BotAnvil.System, BotThread.System, BotFlask.System, BotFletching.System, BotQuill.System];
+
+        var can = 0;
+        var shown = 0;
+
+        for (var i = 0; i < systems.Length; i++)
+        {
+            var recipes = systems[i]?.CraftItems;
+
+            if (recipes == null)
+            {
+                continue;
+            }
+
+            for (var r = 0; r < recipes.Count; r++)
+            {
+                var recipe = recipes[r];
+                var needs = recipe?.Skills?.Count > 0 ? recipe.Skills[0] : null;
+
+                if (needs == null || needs.SkillToMake != skill || needs.MinSkill > have)
+                {
+                    continue;
+                }
+
+                can++;
+
+                if (shown >= 3)
+                {
+                    continue;
+                }
+
+                shown++;
+
+                sb.Append(shown == 1 ? "    you can make: " : ", ");
+                sb.Append(recipe.NameString ?? recipe.ItemType?.Name ?? "something");
+
+                // <b>The first one carries its material and what that costs, and nothing else does.</b>
+                // "Practise on the cheap things" is not an instruction a mind can act on until it knows what
+                // the cheap thing is made of and whether that is on a stall - the crafters spent an evening
+                // announcing they would buy cloth for recipes that eat leather. One recipe's worth, because
+                // this line is read on every decision and a full bill of materials would crowd out the board.
+                if (shown == 1)
+                {
+                    var eats = BotShopper.MadeBy(recipe.ItemType);
+
+                    if (eats?.Material != null && eats.Value.Needs > 0)
+                    {
+                        sb.Append(" (eats ");
+                        sb.Append(eats.Value.Needs);
+                        sb.Append(' ');
+                        sb.Append(eats.Value.Material);
+
+                        var price = Cheapest(eats.Value.Material);
+
+                        if (price > 0)
+                        {
+                            sb.Append(", on the stalls from ");
+                            sb.Append(price);
+                            sb.Append("gp");
+                        }
+                        else
+                        {
+                            sb.Append(", none on any stall");
+                        }
+
+                        sb.Append(')');
+                    }
+                }
+            }
+        }
+
+        if (shown == 0)
+        {
+            // <b>Two different silences.</b> Mining at 50 and Tinkering at 0 both make nothing, and only one
+            // of those is about the number: mining fetches material and has no bench at all. Printing the
+            // same sentence for both told a crafter its best skill was useless.
+            sb.AppendLine(
+                Bench(skill) == null
+                    ? "    nothing is made with this skill - it fetches material."
+                    : "    you cannot make anything with this skill yet."
+            );
+
+            return;
+        }
+
+        if (can > shown)
+        {
+            sb.Append(" and ");
+            sb.Append(can - shown);
+            sb.Append(" others");
+        }
+
+        sb.AppendLine(".");
+    }
+
+    /// <summary>
+    /// The wants on the board: what the island has paid for and cannot get.
+    ///
+    /// <para>
+    /// <b>Filtered to what the shard is able to make at all.</b> The board once carried bandages, which no
+    /// craft system here produces, and 3982 attempts were spent walking towards them before
+    /// <c>BotShopper.Makeable</c> was written. Showing a mind an order nothing can fill is inviting it to
+    /// spend its afternoons on the one thing guaranteed to fail.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>The raises are the point of the row, not the price.</b> A want whose offer has been lifted five
+    /// times with nothing delivered is the island saying it has been trying to buy this for half an hour.
+    /// That is a stronger signal than any number the auction produces, and nothing else in the state
+    /// carries it.
+    /// </para>
+    /// </summary>
+    private static void Board(ref ValueStringBuilder sb, BotMind mind, BotMobile body)
+    {
+        if (mind.Trade != "crafter")
+        {
+            return;
+        }
+
+        sb.AppendLine("\nTHE BOARD: WHAT THE ISLAND HAS PAID FOR AND CANNOT GET");
+
+        var wants = BotAuction.Wants;
+        var shown = 0;
+        var unmakeable = 0;
+
+        // <b>Wants for the same thing at the same price are one row.</b> Eight bots each wanting one leather
+        // bustier arm posted eight orders, and the eight identical lines filled the whole board a mind is
+        // shown - so a scroll nobody could write and a chest worth twice as much were pushed off the end of
+        // a list that was, read literally, one item long.
+        var seen = new Dictionary<(string Label, int Offer), (int Wanted, int Orders, int Escrow, int Filled, int Raises, Type Kind)>();
+
+        for (var i = 0; i < wants.Count; i++)
+        {
+            var want = wants[i];
+
+            if (want == null || want.Amount <= 0)
+            {
+                continue;
+            }
+
+            if (!BotShopper.Makeable(want.Kind))
+            {
+                unmakeable++;
+
+                continue;
+            }
+
+            var key = (want.Label, want.Offer);
+
+            if (seen.TryGetValue(key, out var had))
+            {
+                seen[key] = (had.Wanted + want.Amount, had.Orders + 1, had.Escrow + want.Escrow, had.Filled + want.Filled, Math.Max(had.Raises, want.Raises), had.Kind);
+            }
+            else
+            {
+                seen[key] = (want.Amount, 1, want.Escrow, want.Filled, want.Raises, want.Kind);
+            }
+        }
+
+        foreach (var ((label, offer), row) in seen)
+        {
+            if (shown >= Rows)
+            {
+                break;
+            }
+
+            shown++;
+
+            sb.Append("- ");
+            sb.Append(row.Wanted);
+            sb.Append(" x ");
+            sb.Append(label);
+            sb.Append(" at ");
+            sb.Append(offer);
+            sb.Append("gp each, ");
+            sb.Append(row.Escrow);
+            sb.Append("gp already lodged");
+
+            if (row.Orders > 1)
+            {
+                sb.Append(", across ");
+                sb.Append(row.Orders);
+                sb.Append(" separate orders");
+            }
+
+            if (row.Filled > 0)
+            {
+                sb.Append(", ");
+                sb.Append(row.Filled);
+                sb.Append(" delivered so far");
+            }
+
+            if (row.Raises > 0)
+            {
+                sb.Append(". The price has been raised ");
+                sb.Append(row.Raises);
+                sb.Append(row.Raises == 1 ? " time" : " times");
+                sb.Append(row.Filled > 0 ? " and it is still short" : " and nothing has ever been delivered");
+            }
+
+            // <b>Which craft, and what it takes.</b> Without this line a mind reasons about the recipe from
+            // the name of the item and the name of its own class: the first thinking crafter this shard ever
+            // had announced it would forge a Mind Blast Scroll. The recipe is read out of the engine's own
+            // craft systems, so it cannot disagree with what the bot will actually be allowed to attempt.
+            var recipe = BotShopper.MadeBy(row.Kind);
+
+            if (recipe != null)
+            {
+                var fact = recipe.Value;
+                var have = body.Skills[fact.Skill]?.Base ?? 0.0;
+
+                sb.Append(". Made by ");
+                sb.Append(fact.Craft);
+                sb.Append(" - take the trade called ");
+                sb.Append(fact.Trade);
+                sb.Append(" - needs ");
+                sb.Append(fact.Skill.ToString());
+                sb.Append(' ');
+                sb.Append((int)fact.MinSkill);
+                sb.Append("; you have ");
+                sb.Append((int)have);
+                sb.Append(have >= fact.MinSkill ? " and can make it now" : " and cannot make it yet");
+
+                // What one costs in material, so the offer can be judged against the price of the stuff it
+                // is made of rather than admired on its own. Without it a crafter cannot tell an order worth
+                // taking from one that pays less than the ingots.
+                if (fact.Material != null && fact.Needs > 0)
+                {
+                    sb.Append(". Each one eats ");
+                    sb.Append(fact.Needs);
+                    sb.Append(' ');
+                    sb.Append(fact.Material);
+                }
+            }
+
+            sb.AppendLine(".");
+        }
+
+        if (shown == 0)
+        {
+            sb.AppendLine("Nothing. Nobody has paid for anything you could make - so make what sells, or go and get material.");
+        }
+
+        if (unmakeable > 0)
+        {
+            sb.Append("(");
+            sb.Append(unmakeable);
+            sb.AppendLine(" more wants are for things no craft on this island can produce. They are not yours; leave them.)");
+        }
+    }
+
+    /// <summary>
+    /// What the other crafters are doing at this moment.
+    ///
+    /// <para>
+    /// <b>Because four minds given the same state make the same choice.</b> In the first minutes of the four
+    /// thinking crafters, all four read the same stalls, the same empty board and the same beginner's skill
+    /// list, and all four chose to buy cloth and sew shirts — one island, four bots, one trade, and the
+    /// wants nobody could fill still sitting there. Nothing was wrong with any single decision. The state
+    /// simply contained no fact about the other three.
+    /// </para>
+    ///
+    /// <para>
+    /// It says what they hold rather than what they intend. An intention is a forecast and can be
+    /// abandoned in the next second; the deed a bot is holding is what is actually happening on the island.
+    /// </para>
+    /// </summary>
+    private static void Fellows(ref ValueStringBuilder sb, BotMind mind, BotMobile body)
+    {
+        if (mind.Trade != "crafter")
+        {
+            return;
+        }
+
+        var minds = BotMinds.All;
+        var said = 0;
+
+        sb.AppendLine("\nTHE OTHER CRAFTERS, AND WHAT THEY ARE DOING NOW");
+
+        for (var i = 0; i < minds.Count; i++)
+        {
+            var other = minds[i];
+
+            if (other == null || other == mind || other.Trade != "crafter")
+            {
+                continue;
+            }
+
+            var fellow = other.Body;
+
+            if (fellow is not { Deleted: false })
+            {
+                continue;
+            }
+
+            said++;
+
+            sb.Append("- ");
+            sb.Append(other.Name);
+            sb.Append(": ");
+            sb.AppendLine(fellow.Resolve?.Deed?.Kind ?? "nothing yet");
+        }
+
+        if (said == 0)
+        {
+            sb.AppendLine("Nobody. You are the only crafter working on this island right now.");
+        }
+        else
+        {
+            sb.AppendLine("Four of you share one island. Two at the same bench is one bench wasted.");
+        }
+    }
+
+    /// <summary>
+    /// What is on the stalls, and what it costs - the answer to "where would I get one".
+    ///
+    /// <para>
+    /// A crafter that can only dig is a crafter that stops when the seam does. Buying is the other half of
+    /// getting hold of a material, and the market is the one place on this shard where the price of a thing
+    /// is a fact rather than a guess. The cheapest of each kind, because that is what the bot would actually
+    /// pay, and the count beside it because one ingot and two hundred ingots are different worlds.
+    /// </para>
+    /// </summary>
+    private static void Materials(ref ValueStringBuilder sb, BotMind mind)
+    {
+        if (mind.Trade != "crafter")
+        {
+            return;
+        }
+
+        sb.AppendLine("\nWHAT IS FOR SALE ON THE STALLS, AND WHAT IT COSTS");
+        // <b>Written the other way round three hours earlier, and it was false.</b> The line said "gold in the
+        // bank buys nothing until you have been to fetch it", which is a true fact about an older version of
+        // this shard and about nothing else: both BotAuction.Pay and BotShops draw the shortfall straight out
+        // of the account (Banker.Withdraw) precisely so that a rich bot is never unable to buy a bandage. A
+        // stale fact in a prompt is worse than a missing one - the mind reasons carefully from it, and there
+        // is nothing in its own experience that can contradict it.
+        sb.AppendLine("You pay from your pack, and whatever it is short of is taken from your bank account automatically. Both purses spend.");
+
+        var listings = BotAuction.Listings;
+        var seen = new Dictionary<string, (int Count, int Cheapest)>();
+
+        for (var i = 0; i < listings.Count; i++)
+        {
+            var listing = listings[i];
+
+            if (listing?.Label == null)
+            {
+                continue;
+            }
+
+            if (seen.TryGetValue(listing.Label, out var had))
+            {
+                seen[listing.Label] = (had.Count + 1, Math.Min(had.Cheapest, listing.Price));
+            }
+            else
+            {
+                seen[listing.Label] = (1, listing.Price);
+            }
+        }
+
+        if (seen.Count == 0)
+        {
+            sb.AppendLine("Nothing at all is on sale. Whatever you need, you will have to go and get it yourself.");
+
+            return;
+        }
+
+        var listed = 0;
+
+        foreach (var (label, what) in seen)
+        {
+            if (listed >= Rows)
+            {
+                break;
+            }
+
+            listed++;
+
+            sb.Append("- ");
+            sb.Append(label);
+            sb.Append(": ");
+            sb.Append(what.Count);
+            sb.Append(what.Count == 1 ? " stall, from " : " stalls, from ");
+            sb.Append(what.Cheapest);
+            sb.AppendLine("gp.");
+        }
+
+        if (seen.Count > listed)
+        {
+            sb.Append("(and ");
+            sb.Append(seen.Count - listed);
+            sb.AppendLine(" other kinds of thing on other stalls.)");
+        }
+    }
+
+    /// <summary>
+    /// What the population is short of at this moment: bare armour slots, shooters with nothing to shoot,
+    /// bots that have not eaten.
+    ///
+    /// <para>
+    /// <b>Counted now, never accumulated.</b> Every subsystem here keeps a running total — <c>BotArms.Dry</c>,
+    /// <c>BotArmourer.Standing</c>, <c>BotMeal.Empty</c> — and every one of those is the wrong number to show
+    /// a mind. A total that has been growing since boot reads as the state of this minute and is not: the
+    /// clearest case this shard has produced was "848 could not afford armour", entirely true, entirely about
+    /// the first five minutes of a session hours old. So this walks the population and counts what is true
+    /// right now, which costs one pass over forty-nine bots four times a minute.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>This is the block that makes "work for the good of the island" a fact rather than an exhortation.</b>
+    /// A crafter told only to be useful will decide what useful means; a crafter shown that eleven of thirteen
+    /// shooters have no arrows knows what to make before lunch. Every test used here is the same call the
+    /// shard itself makes — <see cref="BotArms.Stocked"/>, <see cref="BotMeal.IsFed"/>,
+    /// <see cref="BotHarness.Layers"/> — rather than a second opinion written for the prompt.
+    /// </para>
+    /// </summary>
+    private static void Island(ref ValueStringBuilder sb, BotMind mind, BotMobile body)
+    {
+        if (mind.Trade != "crafter")
+        {
+            return;
+        }
+
+        var bots = BotPopulation.Bots;
+        var layers = BotHarness.Layers;
+
+        var alive = 0;
+        var bare = 0;
+        var slots = 0;
+        var shooters = 0;
+        var dry = 0;
+        var hungry = 0;
+
+        for (var i = 0; i < bots.Count; i++)
+        {
+            var other = bots[i];
+
+            if (other is not { Deleted: false, Alive: true })
+            {
+                continue;
+            }
+
+            alive++;
+
+            var open = 0;
+
+            for (var l = 0; l < layers.Count; l++)
+            {
+                if (other.FindItemOnLayer(layers[l]) == null)
+                {
+                    open++;
+                }
+            }
+
+            if (open > 0)
+            {
+                bare++;
+                slots += open;
+            }
+
+            if (other.Class?.Kit.Ranged is { Count: > 0 })
+            {
+                shooters++;
+
+                if (!BotArms.Stocked(other, other.Class))
+                {
+                    dry++;
+                }
+            }
+
+            if (!BotMeal.IsFed(other))
+            {
+                hungry++;
+            }
+        }
+
+        sb.AppendLine("\nWHAT THE ISLAND IS SHORT OF, COUNTED THIS MOMENT");
+
+        sb.Append("- Armour: ");
+        sb.Append(bare);
+        sb.Append(" of ");
+        sb.Append(alive);
+        sb.Append(" bots have a bare slot, ");
+        sb.Append(slots);
+        sb.AppendLine(" empty slots between them.");
+        sb.AppendLine("  Metal armour is forged (the trade called Smith) out of ingots; leather and cloth armour is sewn (the trade called Tailor). Nobody else can make either.");
+
+        // <b>Said as a state, never as a count of a negative.</b> "0 of 12 shooters have nothing to shoot"
+        // was read by the model as an emergency about arrows, and it is the sentence for everything being
+        // fine. A number whose good value is zero has to be phrased so that zero reads as good.
+        sb.Append("- Arrows: ");
+
+        if (shooters == 0)
+        {
+            sb.AppendLine("nobody on this island shoots.");
+        }
+        else if (dry == 0)
+        {
+            sb.Append("every one of the ");
+            sb.Append(shooters);
+            sb.AppendLine(" shooters has something to shoot. Nothing wanted here.");
+        }
+        else
+        {
+            sb.Append(dry);
+            sb.Append(" of ");
+            sb.Append(shooters);
+            sb.AppendLine(" shooters are out of ammunition. Arrows are made by fletching (the trade called Fletcher) out of boards and feathers, and nobody but a crafter can make one.");
+        }
+
+        // <b>Named as a comfort rather than a famine, and with the craft that answers it.</b> Told "49 of 49
+        // have not eaten recently", the model decided the island was starving and set about sewing hats for
+        // the hungry. Nobody starves on this shard - a meal quickens recovery and lifts mood, and that is the
+        // whole of it - and hats are not food. Both halves of that confusion were in the sentence.
+        sb.Append("- Food: ");
+        sb.Append(hungry);
+        sb.Append(" of ");
+        sb.Append(alive);
+        sb.AppendLine(" have not eaten in the last while. Nobody starves here - a meal only quickens recovery and lifts the mood - and food is cooked (the trade called Cook) out of raw meat and flour.");
+    }
+
+    /// <summary>
+    /// This bot's own stalls: what it has put up, what has sold, and what has not.
+    ///
+    /// <para>
+    /// <b>Because "make what sells" is unanswerable without knowing what sold.</b> A mind judging its own
+    /// trades on the forecast it gave them is grading its own homework; this is the only place in its state
+    /// where the island answers back in money. A stall whose price has been cut repeatedly with nothing sold
+    /// is the shard saying, as plainly as it can, that this thing was not worth making.
+    /// </para>
+    /// </summary>
+    private static void Shelf(ref ValueStringBuilder sb, BotMind mind, BotMobile body)
+    {
+        if (mind.Trade != "crafter")
+        {
+            return;
+        }
+
+        var listings = BotAuction.Listings;
+
+        var mine = 0;
+        var sold = 0;
+        var earned = 0;
+        var stale = 0;
+        string worst = null;
+        var worstCuts = 0;
+
+        for (var i = 0; i < listings.Count; i++)
+        {
+            var listing = listings[i];
+
+            if (listing?.Seller != body)
+            {
+                continue;
+            }
+
+            mine++;
+            sold += listing.Sold;
+            earned += listing.Earned;
+
+            if (listing.Sold == 0 && listing.Cuts > 0)
+            {
+                stale++;
+
+                if (listing.Cuts > worstCuts)
+                {
+                    worstCuts = listing.Cuts;
+                    worst = listing.Label;
+                }
+            }
+        }
+
+        sb.AppendLine("\nYOUR OWN STALLS");
+
+        if (mine == 0)
+        {
+            sb.AppendLine("You have nothing on the market. Nothing you have made is earning while you do something else.");
+
+            return;
+        }
+
+        sb.Append("You are holding ");
+        sb.Append(mine);
+        sb.Append(mine == 1 ? " stall. " : " stalls. ");
+        sb.Append(sold);
+        sb.Append(" things sold off them for ");
+        sb.Append(earned);
+        sb.AppendLine("gp all told.");
+
+        if (stale > 0)
+        {
+            sb.Append(stale);
+            sb.Append(stale == 1 ? " stall has" : " stalls have");
+            sb.Append(" had the price cut and still sold nothing");
+
+            if (worst != null)
+            {
+                sb.Append(" - worst of them ");
+                sb.Append(worst);
+                sb.Append(", cut ");
+                sb.Append(worstCuts);
+                sb.Append(worstCuts == 1 ? " time" : " times");
+            }
+
+            sb.AppendLine(". Nobody wants more of that; make something else.");
+        }
+    }
 
     private static void Past(ref ValueStringBuilder sb, BotMind mind)
     {

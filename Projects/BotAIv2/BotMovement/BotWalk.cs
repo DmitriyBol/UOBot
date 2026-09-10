@@ -53,7 +53,22 @@ public enum BotWalkResult
     Refused,
 
     /// <summary>Genuinely getting nowhere for long enough to admit it. The journey is over.</summary>
-    GaveUp
+    GaveUp,
+
+    /// <summary>
+    /// The same, and told apart from it on purpose: a hundred attempts at stepping without the bot moving a
+    /// single tile.
+    ///
+    /// <para>
+    /// <b>This is a fact about the tile the bot is standing on, never about where it was going.</b> Told
+    /// apart because <see cref="BotWill"/> writes an unreached ending into <see cref="BotRefused"/>, against
+    /// the destination — and on 08.09.2026 that put 1242 refusals on ground that had done nothing wrong and
+    /// steered 39254 choices away from it, of which arrival later disproved five per cent. Every one of them
+    /// was a bot whose mount had run out of steps and which could not have walked anywhere at all, to any
+    /// destination on the island. See BotJourney.Stalled.
+    /// </para>
+    /// </summary>
+    Stalled
 }
 
 /// <summary>
@@ -232,7 +247,7 @@ public static class BotWalk
             journey.Complete();
             GaveUp++;
 
-            return Ended(side);
+            return side ? BotWalkResult.Blocked : BotWalkResult.Stalled;
         }
 
         // Mid-cast, before anything is counted.

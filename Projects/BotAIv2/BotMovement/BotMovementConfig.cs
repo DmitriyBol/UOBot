@@ -68,6 +68,18 @@ public sealed class BotMovementSettings
 
     /// <summary>Plans in a row that get no closer before the far side is asked about.</summary>
     public int? PlansBeforeAskingTheFarSide { get; set; }
+
+    /// <summary>How wide a square one refusal of the ground covers.</summary>
+    public int? RefusalGrain { get; set; }
+
+    /// <summary>How long one refusal rests a square, before the doubling.</summary>
+    public int? RefusalRestMs { get; set; }
+
+    /// <summary>The ceiling on that doubling.</summary>
+    public int? MostRefusalRestMs { get; set; }
+
+    /// <summary>Most refused squares remembered at once.</summary>
+    public int? MostRefusedPlaces { get; set; }
 }
 
 /// <summary>Reads the movement file and moves the numbers it names.</summary>
@@ -113,5 +125,9 @@ public static class BotMovementConfig
         BotPath.StrandedCeilingMs = settings.StrandedCeilingMs ?? BotPath.StrandedCeilingMs;
         BotWalk.PlansBeforeAskingTheFarSide =
             settings.PlansBeforeAskingTheFarSide ?? BotWalk.PlansBeforeAskingTheFarSide;
+        BotRefused.Grain = settings.RefusalGrain ?? BotRefused.Grain;
+        BotRefused.RestMs = settings.RefusalRestMs ?? BotRefused.RestMs;
+        BotRefused.MostRestMs = settings.MostRefusalRestMs ?? BotRefused.MostRestMs;
+        BotRefused.MostPlaces = settings.MostRefusedPlaces ?? BotRefused.MostPlaces;
     }
 }

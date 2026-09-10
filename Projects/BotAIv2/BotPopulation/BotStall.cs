@@ -64,6 +64,16 @@ public static class BotStall
 
         public bool Stuck;
 
+        /// <summary>Where it has been standing, kept apart from what it is doing. See the churn test.</summary>
+        public Point3D Anchor;
+
+        public long AnchorSince;
+
+        /// <summary>Errands swapped without the bot moving a tile.</summary>
+        public int Swaps;
+
+        public long Churned;
+
     }
 
     private static readonly Dictionary<Serial, Watch> _watched = [];
@@ -81,6 +91,20 @@ public static class BotStall
 
     /// <summary>Looks passed over because the work stands still on purpose. See <see cref="BotDeed.Still"/>.</summary>
     public static long Steady { get; private set; }
+
+    /// <summary>
+    /// How long a bot may hold one tile while its errands come and go before that counts as stuck.
+    ///
+    /// Twice the ordinary patience on purpose: this test is about a bot that looks busy, and the cost of
+    /// firing it early is cancelling work that was about to move.
+    /// </summary>
+    public static int ChurnMs { get; set; } = 480000;
+
+    /// <summary>How many errands must come and go on that one tile before it means anything.</summary>
+    public static int ChurnAt { get; set; } = 3;
+
+    /// <summary>Bots caught swapping errands without moving. For the summary.</summary>
+    public static long Churn { get; private set; }
 
     /// <summary>How long a spot is remembered as having stalled somebody.</summary>
     public static int PocketMs { get; set; } = 1800000;
@@ -216,6 +240,61 @@ public static class BotStall
             return;
         }
 
+        // <b>A bot that stands on one tile while its errands come and go is stuck, and the test below could
+        // not see it.</b> That test clears its clock whenever the errand changes, which is right for a bot
+        // making progress and exactly wrong for one that cannot move: Joss the Gatherer held a single tile
+        // for thirteen minutes on 07.09.2026 at 247 of 236 stones with no stamina, taking and dropping
+        // thirty-two errands - each one asking for a step it could not take, each one resetting the clock
+        // that was supposed to notice. Two conditions that each look like progress, and between them nothing
+        // was watching.
+        //
+        // Kept as its own clock, anchored to the tile and cleared only by moving off it. The errand count is
+        // required as well as the time, so a smith standing at an anvil for ten minutes - one errand, no
+        // swaps - is not touched by this.
+        if (bot.Location != watch.Anchor)
+        {
+            watch.Anchor = bot.Location;
+            watch.AnchorSince = now;
+            watch.Swaps = 0;
+        }
+        else
+        {
+            if (!string.Equals(doing, watch.Doing, System.StringComparison.Ordinal))
+            {
+                watch.Swaps++;
+            }
+
+            if (watch.Swaps >= ChurnAt
+                && now - watch.AnchorSince >= ChurnMs
+                && (watch.Churned == 0 || now - watch.Churned >= SayEveryMs))
+            {
+                watch.Churned = now;
+                Churn++;
+
+                logger.Error(
+                    "{Name} the {Class} has not left ({X}, {Y}) for {Minutes} minutes while taking and dropping {Swaps} errands, carrying {Load} of {Ceiling} stones with {Stamina} stamina: it is not idle, it cannot move",
+                    bot.Name,
+                    bot.Class?.Name ?? "bot",
+                    bot.Location.X,
+                    bot.Location.Y,
+                    (now - watch.AnchorSince) / 60000,
+                    watch.Swaps,
+                    BotLadder.Load(bot),
+                    BotLadder.Ceiling(bot),
+                    bot.Stam
+                );
+
+                if (bot.Resolve?.Deed != null)
+                {
+                    BotWill.Abandon(bot, "it was swapping errands without moving");
+                    Freed++;
+                }
+
+                watch.Swaps = 0;
+                watch.AnchorSince = now;
+            }
+        }
+
         if (bot.Location != watch.Where || !string.Equals(doing, watch.Doing, System.StringComparison.Ordinal))
         {
             if (watch.Stuck)
@@ -348,9 +427,9 @@ public static class BotStall
     }
 
     public static string Describe() =>
-        Reported == 0
+        Reported == 0 && Churn == 0
             ? $"nobody has stood still for {PatienceMs / 60000} minutes ({Steady} looks passed over as work that stands still on purpose)"
-            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of {_pockets.Count} known pockets, {Steady} looks passed over as work that stands still on purpose; worst: {Worst}";
+            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of {_pockets.Count} known pockets, {Churn} caught swapping errands without moving a tile, {Steady} looks passed over as work that stands still on purpose, {BotPopulation.Rescued} carried home for reaching nothing at all and {BotPopulation.Boxedin} of those put down with no way off the tile; worst: {Worst}";
 
     public static void Forget()
     {

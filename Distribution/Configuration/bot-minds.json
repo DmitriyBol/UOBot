@@ -1,43 +1,44 @@
 {
   "Lessons": {
-    "Aldric": [
-      "On this shard, if Peddler forecast is under 200 gold/min, expect actual yield to exceed forecast by at least 50 gold.",
-      "On this shard, if Drill forecast is zero, skip immediately regardless of duration.",
-      "On this shard, if Hunter forecast exceeds 200 gold/min, expect actual yield within 5 gold of forecast.",
-      "On this shard, if Porter forecast exceeds 300 gold/min, expect actual yield to be less than 50 gold/min in the first minute.",
-      "On this shard, if Porter forecast exceeds 250 gold/min, skip for five minutes.",
-      "On this shard, if Hunter forecast is zero, skip immediately.",
-      "On this shard, if Patrol forecast is zero, take the work and expect actual yield over 50 gold/min.",
-      "On this shard, if Shopper forecast exceeds 100 gold/min, skip immediately."
+    "Roderic": [
+      "For Smith, reject any work forecasting positive gold per minute; only accept zero-forecast work.",
+      "For Hunter, zero-forecast work yields no profit regardless of duration; reject unless all other crafts are idle.",
+      "For Smith, zero-forecast wants yield nothing; reject them immediately.",
+      "Accept Tailor work forecasting zero gold per minute when the want remains active; my internal forecast underestimates value.",
+      "Reject Tailor work forecasting zero gold per minute; actual earnings are negative regardless of want duration.",
+      "For Cook, zero-forecast work yields no profit; reject immediately regardless of want duration.",
+      "For Miner, accept zero-forecast wants; actual earnings are positive even when forecast is zero.",
+      "For Miner, reject zero-forecast wants; actual earnings match the forecast exactly."
     ],
-    "Godric": [
-      "On this shard, exclude Miner and any trade without payout history that yields zero gold per minute.",
-      "On this shard, exclude any trade yielding zero gold per minute regardless of forecast accuracy.",
-      "On this shard, exclude Miner trades with a forecast above 10 gold per minute without positive payout history in last cycle.",
-      "On this shard, expect Smith trades with positive history to yield at least 200 gold per minute regardless of initial forecast.",
-      "On this shard, exclude Tailor trades forecasting above 80 gold per minute unless they have a positive payout history in the last two cycles.",
-      "On this shard, exclude Tailor trades forecasting above 150 gold per minute regardless of payout history.",
-      "On this shard, exclude Smith trades unless the most recent completed cycle yielded at least 10 gold per minute.",
-      "On this shard, accept Peddler trades with zero forecast once they have completed a cycle."
+    "Emeric": [
+      "On this shard, Peddler work with zero forecast drains coin; reject it even if an active Want exists.",
+      "On this shard, reject all Tailor work with zero forecast; it wastes time regardless of Want status.",
+      "On this shard, reject all Tailor work regardless of forecast value; the forecasts are consistently inflated.",
+      "On this shard, reject Cook work with positive forecasts; they consistently overstate value.",
+      "On this shard, accept Woodsman work with zero forecast if a Want exists; forecasts consistently underestimate value.",
+      "On this shard, reject Woodsman work with positive forecast; they overstate value and hide material costs.",
+      "Accept Miner work with zero forecast when a Want exists; ignore ore shortage requirement.",
+      "On this shard, reject Miner work with zero forecast regardless of Wants."
     ],
-    "Cedric": [
-      "On this shard, exclude Hunter if yield is zero.",
-      "On this shard, exclude Drill if any run yields zero gold and forecast was non-zero.",
-      "On this shard, exclude Drill if forecast is zero.",
-      "On this shard, exclude Scribe if any run yields less than zero.",
-      "On this shard, exclude Scribe if forecast exceeds 400.",
-      "On this shard, exclude Hunter if forecast is less than 50.",
-      "exclude Herbalist if forecast exceeds 100",
-      "On this shard, exclude Herbalist if forecast is 120 or more."
+    "Ulric": [
+      "Accept any trade with a zero forecast immediately; this shard consistently underestimates earnings by roughly 20 gold per minute.",
+      "Smith forecasts are unreliable; only accept Smith work listed in the active shortage count.",
+      "Reject Tailor work with a forecast below 75 gold per minute unless it is on the active shortage count.",
+      "Reject all Tailor work unless it is listed in the island's active shortage count.",
+      "Reject Smith work with a forecast above 180 gold per minute.",
+      "Reject any trade with a forecast above 100 gold per minute unless it is on the active shortage list.",
+      "Reject Woodsman work with a forecast above 150 gold per minute regardless of active shortage status.",
+      "Reject Shopper work with any positive forecast unless it is on the active shortage count."
     ],
-    "Baldric": [
-      "If expected follower gain is zero, reject trade immediately without considering shard forecast.",
-      "Reject Warden trades if expected follower gain is zero; do not accept them regardless of shard forecast accuracy or duration variance.",
-      "Reject any trade not involving a harrowing square; they yield zero follower gain on this shard.",
-      "On this shard, accept only trades involving a harrowing square; reject all others immediately.",
-      "On this shard, reject all trades named 'Baron' immediately; they yield zero follower gain regardless of duration.",
-      "On this shard, reject Stroll if forecasted value is zero or negative regardless of duration.",
-      "If a harrowing square is standing, reject Stroll immediately regardless of shard forecast accuracy."
+    "Wulfric": [
+      "If Smith forecast is zero, switch crafts immediately without waiting for a cycle check.",
+      "If Smith forecast is zero, switch crafts immediately.",
+      "On this shard, if Tailor yields zero gold despite a forecast, switch immediately regardless of stall stock or wants.",
+      "If Woodsman forecast is zero, start immediately and expect value to rise; do not switch.",
+      "On this shard, if Woodsman actual yield drops to zero mid-cycle, switch immediately regardless of initial forecast.",
+      "On this shard, if Miner forecast is positive but actual yield drops below zero within the first minute, switch immediately regardless of stall stock.",
+      "On this shard, if Miner forecast exceeds actual yield by more than 50% within two minutes, switch immediately regardless of stall stock.",
+      "On this shard, if Tailor forecast is positive but actual yield ends negative, switch immediately regardless of stall stock or wants."
     ]
   }
 }

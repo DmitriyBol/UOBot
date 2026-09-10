@@ -104,6 +104,9 @@ public sealed class BotArmourer : IBotProposer
 
     public static long Broke { get; private set; }
 
+    /// <summary>Pieces of armour a guild paid for because the wearer could not. See BotGuilds.Stand.</summary>
+    public static long Guilded { get; private set; }
+
     /// <summary>
     /// The fattest purse among those turned away for want of money. See <see cref="BotStable.Richest"/>.
     /// </summary>
@@ -185,14 +188,27 @@ public sealed class BotArmourer : IBotProposer
 
         if (wealth - offer <= Keeps(offer))
         {
-            Broke++;
+            // <b>Before giving up: ask the guild.</b> Patrick's order of 09.09.2026 is that a guild keeps its
+            // own equipped, and this is the seam it works through — the member is short, the guild stands the
+            // difference, the member orders its own armour off the same board as everybody else, and the
+            // crafter most likely to fill that order is the guild's own. See BotGuilds.Stand.
+            var owing = offer + Keeps(offer) - wealth;
 
-            if (wealth > Richest)
+            if (BotGuilds.Stand(wearer, owing))
             {
-                Richest = wealth;
+                Guilded++;
             }
+            else
+            {
+                Broke++;
 
-            return null;
+                if (wealth > Richest)
+                {
+                    Richest = wealth;
+                }
+
+                return null;
+            }
         }
 
         Offers++;

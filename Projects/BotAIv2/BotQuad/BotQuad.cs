@@ -272,7 +272,33 @@ public static class BotQuad
     }
 
     /// <summary>Whether this ground may be walked only by a company of grandmasters. See <see cref="DireLoss"/>.</summary>
-    public static bool Damning(Map map, Point3D where) => Safety(map, where) <= Damned;
+    /// <summary>
+    /// Whether this ground is damned: it has swallowed a company whole, and reads at the floor of the scale.
+    ///
+    /// <para>
+    /// <b>Both halves, and for a while it was only the second.</b> <see cref="Damned"/> is
+    /// <see cref="Bleakest"/> — the floor of the scale — so asking "does it read at the floor" damns any
+    /// square that has merely been ground down: a blow is worth -0.01 and there are squares outside Britain
+    /// with four hundred of them. On 08.09.2026 the island's worst square read exactly -1.00 on 1126
+    /// crossings, 402 blows and <em>nought dead</em>, and the Baron had refused to march anywhere for an
+    /// afternoon because the only dire ground on the island was "damned" and no company of fifteen
+    /// grandmasters exists on a shard whose best trade skill is ninety-nine. One number was doing two jobs:
+    /// the limit of a scale and a verdict about a massacre.
+    /// </para>
+    ///
+    /// <para>
+    /// <see cref="Quad.Wipes"/> is the verdict, it is what the doc on <see cref="DireLoss"/> always
+    /// described, and it survives a restart. Asked of the square's own standing reputation rather than of
+    /// <see cref="Safety"/>, because Safety adds the crowd standing in it this second — so a wandering pack
+    /// could damn open country for as long as it happened to be there.
+    /// </para>
+    /// </summary>
+    public static bool Damning(Map map, Point3D where)
+    {
+        var quad = Known(map, where);
+
+        return quad != null && quad.Wipes > 0 && quad.Safety <= Damned;
+    }
 
     /// <summary>
     /// A company of the crown was lost whole in this square, and what the crown does about it.
@@ -395,14 +421,63 @@ public static class BotQuad
         quad.Baulks > 0 && now - quad.BaulkedTick < (long)BaulkMs * quad.Baulks;
 
     /// <summary>
+    /// Whether this piece of ground is resting after somebody failed to reach it.
+    ///
+    /// <para>
+    /// <b>The mark was written and never read, except in one place.</b> <see cref="Baulk"/> has been filed
+    /// by every errand that could not get through since it was written, and exactly one list consults it -
+    /// the feared squares a company is sent to. The hunt picks its ground from two other lists and asked
+    /// nothing, so a square that had just refused four bots was handed straight to a fifth. Over fifty
+    /// minutes on 07.09.2026 that produced 618 prowls failed on "no way through" out of 1302 such failures
+    /// in all, and each one of them costs a path search: 29858 searches examined 1.1 billion tiles and spent
+    /// 376 seconds of the game loop.
+    /// </para>
+    ///
+    /// <para>
+    /// It is not a permanent refusal. The rest is <see cref="BaulkMs"/> multiplied by how many times the
+    /// square has refused somebody, so ground that failed once is tried again in ten minutes and ground that
+    /// has failed a dozen times is left alone for two hours - which is the difference between a bot that was
+    /// unlucky and a place that is genuinely sealed.
+    /// </para>
+    /// </summary>
+    public static bool Baulking(Map map, Point3D where)
+    {
+        if (map == null)
+        {
+            return false;
+        }
+
+        return _quads.TryGetValue(Key(map, where), out var quad) && Resting(quad, Core.TickCount);
+    }
+
+    /// <summary>
     /// Most squares remembered at once.
     ///
-    /// Felucca is 6144 by 4096, which is 205 by 137 quadrants — twenty-eight thousand of them, and a
-    /// population of thirty will never stand in most of them. The cap is a backstop against a bug, not a
-    /// budget: at four thousand it holds every square this shard's bots have ever been near, several times
-    /// over, and each is a handful of numbers.
+    /// <para>
+    /// Felucca is 6144 by 4096, which is 205 by 137 quadrants — twenty-eight thousand of them.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>This said four thousand was "a backstop against a bug, not a budget", holding every square the
+    /// bots had ever been near several times over. That was simply wrong, and it stopped the Baron
+    /// scouting.</b> The population's own roam is a thousand tiles, which is a two-thousand-tile square, and
+    /// two thousand tiles is sixty-seven quadrants a side — four and a half thousand squares before a bot
+    /// has stepped one tile outside what it is allowed to want. On 08.09.2026 the map held exactly 4096 of
+    /// them with 4094 marked trodden, <see cref="At"/> had been silently returning null to every new square
+    /// for days, and the frontier — which is a known square with an unknown neighbour — could not exist:
+    /// every neighbour that would have been unknown was never created. The Baron was told twenty times in
+    /// twenty that everything within reach had been walked, and walked round the town instead.
+    /// </para>
+    ///
+    /// <para>
+    /// Thirty-two thousand covers the whole facet with room to spare. Each square is a handful of numbers,
+    /// so the whole map is a couple of megabytes; the old figure was not saving anything worth having.
+    /// </para>
     /// </summary>
-    public static int Most { get; set; } = 4096;
+    public static int Most { get; set; } = 32768;
+
+    /// <summary>Said once when the map fills, because a silent ceiling is a ceiling nobody can find.</summary>
+    private static bool _saidFull;
 
     /// <summary>One square of the island, and everything the population knows about it.</summary>
     public sealed class Quad
@@ -665,6 +740,19 @@ public static class BotQuad
 
         if (_quads.Count >= Most)
         {
+            // <b>Never silently, and it was silent for days.</b> A map that stops taking new ground looks
+            // exactly like an island that has been fully explored — the frontier goes empty, the Baron is
+            // told everything is walked, and nothing anywhere says why. See Most.
+            if (!_saidFull)
+            {
+                _saidFull = true;
+
+                logger.Error(
+                    "The island map is full at {Most} squares and will record no new ground; scouting will report everything as already walked until this is raised",
+                    Most
+                );
+            }
+
             return null;
         }
 
@@ -1613,6 +1701,7 @@ public static class BotQuad
         var quiet = 0;
         var wanted = 0;
         var dire = 0;
+        var damned = 0;
         Quad worst = null;
 
         foreach (var quad in _quads.Values)
@@ -1637,6 +1726,15 @@ public static class BotQuad
                 dire++;
             }
 
+            // <b>Told apart from dire, and the day it was not cost the Baron an afternoon.</b> A square at
+            // the floor of the scale is not the same thing as a square that has eaten a company, and the
+            // whole of the harrowing turns on the difference — see Damning. Printed so the two can never
+            // again be argued about without numbers.
+            if (quad.Wipes > 0 && quad.Safety <= Damned)
+            {
+                damned++;
+            }
+
             if (worst == null || quad.Safety < worst.Safety)
             {
                 worst = quad;
@@ -1645,7 +1743,7 @@ public static class BotQuad
 
         return $"{_quads.Count} quadrants of {Side} tiles, {trodden} of them stood in: {quiet} too quiet to hunt "
             + $"({Hushed} shut and {Roused} reopened since the shard came up, which is the direction rather than the level) "
-               + $"(above {TooQuiet:F2}), {wanted} worth going to (at or below {Wanted:F2}), {dire} dire (at or below {Dire:F2}); "
+               + $"(above {TooQuiet:F2}), {wanted} worth going to (at or below {Wanted:F2}), {dire} dire (at or below {Dire:F2}) of which {damned} damned by a company being lost in them; "
                + $"worst is {worst}; {Discovered} first set foot in, {Credited} raised for crossings, "
                + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough, {Walled} born safe inside the walls";
     }

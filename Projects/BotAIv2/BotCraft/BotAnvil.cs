@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Server.Engines.Craft;
 using Server.Items;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -27,13 +28,163 @@ public static class BotAnvil
     /// <summary>The skill this trade is measured in.</summary>
     public const SkillName Skill = SkillName.Blacksmith;
 
-    /// <summary>The metal everything here is made of.</summary>
-    public static Type Metal => typeof(IronIngot);
+    /// <summary>
+    /// The metal the engine's recipes are written in, and the last resort when nothing better is known.
+    ///
+    /// <para>
+    /// <b>Everything that looks a recipe up must use this and not <see cref="Metal"/>.</b>
+    /// <c>BotCraftwork.Simple</c> matches a recipe by <c>Resources[0].ItemType == material</c>, and every
+    /// blacksmithing recipe on this shard names <c>IronIngot</c> whatever it is going to be made of - the
+    /// sub-resource is chosen at the swing, not at the lookup. Handing the island's own metal to Choose or
+    /// Recipe therefore matches no recipe at all and stops the trade dead, silently, with a smith standing
+    /// at a hot forge holding forty bars. Caught here on 08.09.2026 before it ever ran.
+    /// </para>
+    /// </summary>
+    public static Type Base => typeof(IronIngot);
+
+    /// <summary>
+    /// The metal to fall back on when this bot is carrying none: whatever the island actually has, not iron.
+    ///
+    /// <para>
+    /// <b>An empty smith ordered a metal this island does not produce, and did it 578 times in a night.</b>
+    /// Felucca's veins here give dull copper, bronze, shadow iron, copper and verite - and over a whole
+    /// session, not one iron ore. <see cref="Best"/> answers with the dearest metal already in the pack, so
+    /// for an empty pack it answered with the constant, the constant was iron, and <c>BotBullion</c> put a
+    /// standing order on the board for iron. Miners came back with coloured bars, looked for an order
+    /// matching what they held, found none, and banked them. Both halves worked perfectly and never met -
+    /// the same shape as the market that never crossed a stall with a want.
+    /// </para>
+    ///
+    /// <para>
+    /// The market is the honest source and it is the one the miners themselves write to: <c>BotDig.Store</c>
+    /// puts every bar on a stall before it will put one in a box. So this is not a guess about the island,
+    /// it is a reading of what the island's own miners have brought back and are holding out for sale.
+    /// </para>
+    ///
+    /// <para>
+    /// Iron when the board holds no metal at all, which is a young shard rather than a wrong one.
+    /// </para>
+    /// </summary>
+    public static Type Metal => Plentiful(double.MaxValue) ?? Base;
+
+    /// <summary>How long one reading of the board stands before it is taken again.</summary>
+    public static int PlentifulMs { get; set; } = 60000;
+
+    /// <summary>How many bars of a metal have to be on the board before it counts as one the island has.</summary>
+    public static int LeastPlentiful { get; set; } = 10;
+
+    /// <summary>What the board last said the island's metal was, for the report.</summary>
+    public static string Reading { get; private set; } = "not read yet";
+
+    private static readonly Dictionary<Type, int> _onBoard = [];
+
+    private static long _readAt;
+
+    /// <summary>
+    /// The commonest metal on the market that a bot of this skill could work, or null when there is none.
+    ///
+    /// Read at most once a minute for the whole population: the board is up to a thousand stalls and this is
+    /// asked on every smith's beat.
+    /// </summary>
+    public static Type Plentiful(double able)
+    {
+        var system = System;
+
+        if (system == null)
+        {
+            return null;
+        }
+
+        var now = Core.TickCount;
+
+        if (_onBoard.Count == 0 || now - _readAt >= PlentifulMs)
+        {
+            Read(system);
+            _readAt = now;
+        }
+
+        var metals = system.CraftSubRes;
+
+        Type best = null;
+        var most = LeastPlentiful - 1;
+
+        for (var i = 0; i < metals.Count; i++)
+        {
+            var metal = metals.GetAt(i);
+
+            if (metal?.ItemType == null || metal.RequiredSkill > able)
+            {
+                continue;
+            }
+
+            if (!_onBoard.TryGetValue(metal.ItemType, out var held) || held <= most)
+            {
+                continue;
+            }
+
+            best = metal.ItemType;
+            most = held;
+        }
+
+        return best;
+    }
+
+    /// <summary>One pass over the board, totalling every metal on it.</summary>
+    private static void Read(CraftSystem system)
+    {
+        _onBoard.Clear();
+
+        var stalls = BotAuction.Listings;
+
+        for (var i = 0; i < stalls.Count; i++)
+        {
+            var stall = stalls[i];
+            var kind = stall?.Kind;
+
+            if (kind == null || stall.IsEmpty)
+            {
+                continue;
+            }
+
+            _onBoard[kind] = _onBoard.TryGetValue(kind, out var held) ? held + stall.Amount : stall.Amount;
+        }
+
+        var metals = system.CraftSubRes;
+        var say = ValueStringBuilder.Create(128);
+
+        try
+        {
+            for (var i = 0; i < metals.Count; i++)
+            {
+                var metal = metals.GetAt(i);
+
+                if (metal?.ItemType == null || !_onBoard.TryGetValue(metal.ItemType, out var held))
+                {
+                    continue;
+                }
+
+                if (say.Length > 0)
+                {
+                    say.Append(", ");
+                }
+
+                say.Append(metal.ItemType.Name);
+                say.Append(' ');
+                say.Append(held);
+            }
+
+            Reading = say.Length == 0 ? "no metal on the board at all, so iron stands" : say.ToString();
+        }
+        finally
+        {
+            say.Dispose();
+        }
+    }
 
     /// <summary>The hammer this bot forges with, if it is carrying one.</summary>
     public static SmithHammer Kit(Mobile bot) => bot?.Backpack?.FindItemByType<SmithHammer>();
 
-    /// <summary>How much of a given metal is in the pack. Iron when nothing else is named.</summary>
+    /// <summary>How much of a given metal is in the pack. The island's own metal when nothing else is named.</summary>
     public static int Ingots(Mobile bot, Type metal = null) => bot?.Backpack?.GetAmount(metal ?? Metal) ?? 0;
 
     /// <summary>
@@ -95,7 +246,11 @@ public static class BotAnvil
             bestNeeds = metal.RequiredSkill;
         }
 
-        return best ?? Metal;
+        // <b>Nothing in the pack, so this is the answer that becomes an order.</b> Falling back to the
+        // constant here is what put 578 standing orders for iron on a board no miner could fill; falling back
+        // to the island's own metal, at a skill this bot can actually work, is an order somebody comes back
+        // with. See Plentiful.
+        return best ?? Plentiful(able) ?? Base;
     }
 
     /// <summary>
@@ -136,12 +291,12 @@ public static class BotAnvil
 
         if (system == null || keep == null)
         {
-            keep?.TryAdd(Metal, amount);
+            keep?.TryAdd(Base, amount);
 
             return;
         }
 
-        keep[Metal] = amount;
+        keep[Base] = amount;
 
         if (body == null)
         {
@@ -264,7 +419,7 @@ public static class BotAnvil
 
         var able = bot.Skills[Skill].Value;
         var metals = system.CraftSubRes;
-        var most = pack.GetAmount(Metal);
+        var most = pack.GetAmount(Base);
 
         for (var i = 0; i < metals.Count; i++)
         {
@@ -332,18 +487,18 @@ public static class BotAnvil
     /// with nothing.
     /// </summary>
     public static CraftItem Choose(Mobile bot) =>
-        BotCraftwork.Choose(bot, System, Skill, Metal, Stock(bot) / Math.Max(1, Tries));
+        BotCraftwork.Choose(bot, System, Skill, Base, Stock(bot) / Math.Max(1, Tries));
 
     /// <summary>The recipe for exactly this thing, if this bot could make one. For orders off the board.</summary>
     public static CraftItem Recipe(Mobile bot, Type wanted) =>
-        BotCraftwork.Recipe(bot, System, Skill, Metal, wanted);
+        BotCraftwork.Recipe(bot, System, Skill, Base, wanted);
 
     /// <summary>
     /// One attempt at the anvil, in the metal named. The metal is what the engine calls the sub-resource, and
     /// passing anything but iron is the whole of how a bronze helm comes to exist. See <see cref="Best"/>.
     /// </summary>
     public static bool Swing(Mobile bot, CraftItem recipe, BaseTool tool, Type metal = null) =>
-        BotCraftwork.Swing(bot, System, recipe, metal ?? Metal, tool);
+        BotCraftwork.Swing(bot, System, recipe, metal ?? Base, tool);
 
     /// <summary>How many of that thing are in the pack.</summary>
     public static int Made(Mobile bot, Type kind) => BotCraftwork.Made(bot, kind);

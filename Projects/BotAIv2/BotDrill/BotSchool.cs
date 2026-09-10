@@ -244,6 +244,32 @@ public static class BotSchool
     /// <summary>Whether the field is open to be joined right now.</summary>
     public static bool Gathering { get; private set; }
 
+    /// <summary>When the roll was opened, so that whoever is deciding to come can tell how long is left.</summary>
+    private static long _openedTick;
+
+    private static bool _everOpened;
+
+    /// <summary>
+    /// How much of the joining window is left, in milliseconds. Nought when nobody is calling a class.
+    ///
+    /// <para>
+    /// <b>The captain owned this clock and never published it, so nobody deciding to come could see it.</b>
+    /// <c>BotLesson</c> closes the roll at <see cref="GatherMs"/> from its own start, and a bot four hundred
+    /// tiles away that sets out on the last second of that window walks the whole way to a field that is
+    /// empty by the time it arrives. Twenty of them do it at every cold start, in one burst, because a cold
+    /// start is the one moment the whole population is free at once: measured at 19 on 09.09.2026 at 20:34
+    /// and 20 on 10.09.2026 at 00:08, each time inside three minutes and never again that session.
+    /// </para>
+    ///
+    /// <para>
+    /// The "has it ever opened" flag rather than a stamp of nought, for the reason given wherever a tick is
+    /// compared on this shard: on some hosts the count starts enormous and can wrap negative, so zero is a
+    /// real reading and not a way of saying never.
+    /// </para>
+    /// </summary>
+    public static int Left =>
+        Gathering && _everOpened ? Math.Max(0, GatherMs - (int)(Core.TickCount - _openedTick)) : 0;
+
     private static readonly List<BotMobile> _students = [];
 
     public static IReadOnlyList<BotMobile> Students => _students;
@@ -324,6 +350,8 @@ public static class BotSchool
 
         Master = master;
         Gathering = true;
+        _openedTick = Core.TickCount;
+        _everOpened = true;
         _students.Clear();
 
         Sessions++;

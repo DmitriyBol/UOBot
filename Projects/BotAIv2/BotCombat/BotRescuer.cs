@@ -99,7 +99,7 @@ public sealed class BotRescuer : IBotProposer
 
         var trains = bot.Bond?.Weapon?.Skill ?? SkillName.Wrestling;
 
-        return new BotRescue(new BotSlay(foe, trains), friend, foe, own: false);
+        return new BotRescue(new BotSlay(foe, trains), friend, foe, own: false, rescuer: body);
     }
 
     private static void Once(Mobile body, Mobile friend)

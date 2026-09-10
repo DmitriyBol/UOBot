@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using Server.Engines.Craft;
 using Server.Items;
 using Server.Logging;
 
@@ -89,6 +91,9 @@ public sealed class BotShopper : IBotProposer
     /// <summary>Trips to another bot's stall offered — cheaper than the shelf.</summary>
     public static long ToStall { get; private set; }
 
+    /// <summary>Trips to the bot's own guild counter offered — the same price as the shelf, and next door.</summary>
+    public static long ToHall { get; private set; }
+
     /// <summary>Orders put on the needs board because nobody sells the thing at all.</summary>
     public static long ToBoard { get; private set; }
 
@@ -103,6 +108,85 @@ public sealed class BotShopper : IBotProposer
 
     /// <summary>What the population is short of, by kind, so the summary can name the commonest.</summary>
     private static readonly System.Collections.Generic.Dictionary<Type, long> _short = [];
+
+    /// <summary>
+    /// How long a shortage keeps its full weight before the tally starts forgetting it.
+    ///
+    /// <para>
+    /// <b>This tally is not a summary counter and it was being kept as one.</b> Every other number on this
+    /// shard is cumulative since the world loaded, and that is right for a number somebody reads once every
+    /// five minutes. This one is read by <c>BotSupplier</c> to decide <em>what to buy next</em>, and a
+    /// lifetime total answers a different question from the one that decision asks: whatever ran short in
+    /// the first ten minutes of a shard sits at the top of the restocking order for the rest of the night,
+    /// however well supplied it has been since.
+    /// </para>
+    ///
+    /// <para>
+    /// Halved every quarter of an hour rather than windowed, because halving needs no history: a kind that
+    /// is still running short keeps its place easily, one that has been fixed drifts down through the
+    /// order in about an hour, and nothing has to be stored to know which. Entries that fall to nothing are
+    /// dropped, so a kind that stopped being a problem stops being considered at all.
+    /// </para>
+    /// </summary>
+    public static int ForgetMs { get; set; } = 900000;
+
+    private static long _forgot;
+
+    private static bool _everForgot;
+
+    /// <summary>
+    /// Halves every shortage if the interval has passed. Called from both sides of the tally, so it happens
+    /// whether the population is reporting shortages or the supplier is reading them.
+    ///
+    /// The "has it ever run" flag rather than a stamp of nought: on some hosts the tick count starts
+    /// enormous and can wrap negative, so zero is a real reading and not a way of saying never. Same
+    /// reasoning as <c>BotLadder.Hunted</c>.
+    /// </summary>
+    private static void Fade()
+    {
+        var now = Core.TickCount;
+
+        if (!_everForgot)
+        {
+            _everForgot = true;
+            _forgot = now;
+
+            return;
+        }
+
+        if (now - _forgot < ForgetMs)
+        {
+            return;
+        }
+
+        _forgot = now;
+
+        List<Type> gone = null;
+
+        foreach (var (kind, times) in _short)
+        {
+            var left = times / 2;
+
+            if (left <= 0)
+            {
+                (gone ??= []).Add(kind);
+            }
+            else
+            {
+                _short[kind] = left;
+            }
+        }
+
+        if (gone == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < gone.Count; i++)
+        {
+            _short.Remove(gone[i]);
+        }
+    }
 
     public BotDeed Propose(IBotWilful bot)
     {
@@ -128,6 +212,8 @@ public sealed class BotShopper : IBotProposer
             return null;
         }
 
+        Fade();
+
         _short.TryGetValue(wanted, out var seen);
         _short[wanted] = seen + 1;
 
@@ -151,6 +237,31 @@ public sealed class BotShopper : IBotProposer
             ToStall++;
 
             return new BotRestock(stall, wanted, Math.Min(amount, stall.Amount), map, body.Location);
+        }
+
+        // <b>Then the guild's own shelf, before the walk to Britain.</b> A hall counter is stocked out of the
+        // same shopkeepers at the same prices, so per unit it can only tie — and a tie goes to one of ours
+        // for two reasons here rather than one: the coin stays in the population, and the errand is a walk
+        // across the guild's yard instead of a walk across the island. Three percent of this population's
+        // waking minutes were that walk.
+        //
+        // Priced by the unit to compare with a shelf, though what is actually bought is the whole lot: a
+        // shop sells a packet. Rounded up, so a packet that works out fractionally dearer per bandage than
+        // the town is not preferred on a rounding error.
+        var merchant = BotShelf.Of(body);
+        var lotPrice = 0;
+        var ours = merchant == null ? null : BotShelf.Offer(merchant, wanted, out lotPrice);
+
+        if (ours != null)
+        {
+            var unit = (int)Math.Ceiling(lotPrice / (double)Math.Max(1, ours.Amount));
+
+            if ((counter <= 0 || unit <= counter) && BotYield.Wealth(body) >= lotPrice)
+            {
+                ToHall++;
+
+                return new BotRestock(merchant, wanted, Math.Max(1, ours.Amount), unit);
+            }
         }
 
         if (counter <= 0)
@@ -198,6 +309,33 @@ public sealed class BotShopper : IBotProposer
         return new BotRestock(shop, wanted, amount, counter);
     }
 
+    /// <summary>
+    /// What the population has been short of, commonest first.
+    ///
+    /// <para>
+    /// <b>The tally was already being kept and only ever printed.</b> Every look for supplies writes down
+    /// what the bot turned out to be lacking, so by the time a guild wonders what to put on its shelf the
+    /// answer has been measured a few thousand times — by the population itself, in the only currency that
+    /// matters, which is what it kept reaching for and not finding. A list written by hand here would be a
+    /// second copy of that, and it would drift the day a class was added. See <see cref="BotSupplier"/>.
+    /// </para>
+    /// </summary>
+    public static List<(Type Kind, long Times)> Shortages()
+    {
+        Fade();
+
+        List<(Type Kind, long Times)> found = [];
+
+        foreach (var (kind, times) in _short)
+        {
+            found.Add((kind, times));
+        }
+
+        found.Sort((a, b) => b.Times.CompareTo(a.Times));
+
+        return found;
+    }
+
     /// <summary>What the population is most often short of, and how often.</summary>
     private static string Commonest()
     {
@@ -220,9 +358,9 @@ public sealed class BotShopper : IBotProposer
         Looks == 0
             ? "nobody has been looked at for supplies"
             : $"{Looks} looks for supplies: {Stocked} were short of nothing, {ToCounter} sent to a shopkeeper, "
-              + $"{ToStall} to a cheaper stall, {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
+              + $"{ToStall} to a cheaper stall, {ToHall} to their own guild's counter, {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
               + $"{Broke} wanted something nobody sells and could not afford one made (the fattest purse among them held {Richest}gp); "
-              + $"most often short of {Commonest()}";
+              + $"most often short of {Commonest()} lately";
 
     public static void ForgetCounts()
     {
@@ -230,11 +368,13 @@ public sealed class BotShopper : IBotProposer
         Stocked = 0;
         ToCounter = 0;
         ToStall = 0;
+        ToHall = 0;
         ToBoard = 0;
         Unmakeable = 0;
         Broke = 0;
         Richest = 0;
         _short.Clear();
+        _everForgot = false;
     }
 
     /// <summary>
@@ -472,6 +612,118 @@ public sealed class BotShopper : IBotProposer
     /// Cached by type, because the answer cannot change while the server is up.
     /// </para>
     /// </summary>
+    /// <summary>What craft makes a thing, which skill it is made with, and how much of that skill it takes.</summary>
+    /// <summary>
+    /// What it takes to make one of a thing: the craft, the trade on a bot's menu, the skill and its
+    /// threshold, and the material the recipe consumes.
+    ///
+    /// <c>Material</c> is the first resource line, which for every recipe on this shard is the one that
+    /// matters — ingots for armour, leather for a bustier, boards for a shaft. The others are trimmings.
+    /// </summary>
+    public readonly record struct BotRecipeFact(
+        string Craft,
+        string Trade,
+        SkillName Skill,
+        double MinSkill,
+        string Material,
+        int Needs
+    );
+
+    private static readonly Dictionary<Type, BotRecipeFact?> _recipes = [];
+
+    /// <summary>
+    /// Which craft makes this thing, and what it takes.
+    ///
+    /// <para>
+    /// <b>Written because a mind guessed, and guessed wrong within a minute of being given a board.</b> On
+    /// 07.09.2026 a thinking crafter read "2 Mind Blast Scrolls, already paid for" and announced it would
+    /// <i>forge</i> them. Nothing in what it was shown said which craft makes a scroll, so it reasoned from
+    /// the name of its own class — and a want it could have filled in ten minutes became an afternoon at an
+    /// anvil that will never produce one.
+    /// </para>
+    ///
+    /// <para>
+    /// The skill and its requirement come from the same place as the answer to "can this be made at all":
+    /// the engine's own craft systems. Neither is written down here, because a table of recipes maintained
+    /// by hand would be a second, slowly diverging copy of the shard's rules — and the divergence would show
+    /// up as bots confidently attempting things the engine refuses.
+    /// </para>
+    /// </summary>
+    public static BotRecipeFact? MadeBy(Type wanted)
+    {
+        if (wanted == null)
+        {
+            return null;
+        }
+
+        if (_recipes.TryGetValue(wanted, out var known))
+        {
+            return known;
+        }
+
+        // The third column is what the trade is called on a bot's own menu of work, and it is here rather
+        // than left to be inferred. A mind shown "made by smithing" and offered a list containing Smith,
+        // Tailor and Fletcher will still choose Tailor if tailoring is the only craft it feels able to do:
+        // that happened within an hour of the board being written, four crafters in a row announcing they
+        // would sew ringmail. Naming the trade closes the gap between what must be made and what to pick.
+        (string Craft, string Trade, CraftSystem System)[] systems =
+        [
+            ("smithing", "Smith", BotAnvil.System),
+            ("tailoring", "Tailor", BotThread.System),
+            ("alchemy", "Alchemist", BotFlask.System),
+            ("fletching", "Fletcher", BotFletching.System),
+            ("scribing", "Scribe", BotQuill.System)
+        ];
+
+        BotRecipeFact? found = null;
+
+        for (var i = 0; i < systems.Length && found == null; i++)
+        {
+            var recipes = systems[i].System?.CraftItems;
+
+            if (recipes == null)
+            {
+                continue;
+            }
+
+            for (var r = 0; r < recipes.Count; r++)
+            {
+                var recipe = recipes[r];
+
+                if (recipe?.ItemType != wanted)
+                {
+                    continue;
+                }
+
+                // The first skill line is the one the craft is made with; the others are extras the engine
+                // checks alongside it. Taking the lowest of them would answer a different question.
+                var skill = recipe.Skills?.Count > 0 ? recipe.Skills[0] : null;
+
+                var resource = recipe.Resources?.Count > 0 ? recipe.Resources[0] : null;
+
+                found = new BotRecipeFact(
+                    systems[i].Craft,
+                    systems[i].Trade,
+                    skill?.SkillToMake ?? SkillName.Blacksmith,
+                    skill?.MinSkill ?? 0.0,
+                    resource?.ItemType?.Name,
+                    resource?.Amount ?? 0
+                );
+
+                break;
+            }
+        }
+
+        // Cached only once the systems exist, for the reason Makeable carries: an answer taken before
+        // content initialisation would be remembered for the life of the shard.
+        if (systems[0].System != null)
+        {
+            _recipes[wanted] = found;
+        }
+
+        return found;
+    }
+
     public static bool Makeable(Type wanted)
     {
         if (wanted == null)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -126,7 +126,7 @@ public static class BotBeat
 
         _summaryTick = now;
 
-        logger.Information("Getting about: {Paths}; {Walk}; {Reach}", BotPath.Describe(), BotWalk.Describe(), BotReach.Describe());
+        logger.Information("Getting about: {Paths}; {Walk}; {Reach}; {Refused}", BotPath.Describe(), BotWalk.Describe(), BotReach.Describe(), BotRefused.Describe());
 
         // <b>The market was in the same position these were, and for longer.</b> Its own summary existed and
         // went to two places: a gump nobody has open at four in the morning, and the world reload. So the one
@@ -177,6 +177,21 @@ public static class BotBeat
         // method nothing runs. What that hid is the other half of the money question: what the population
         // buys and sells. "The population has 20903gp" and "the population bought nothing all afternoon" are
         // the two halves of the same answer, and only the first of them was ever printed.
+        // <b>And the same trap caught the day's own new work within the hour.</b> BotPlunder and BotFreedom
+        // were written on 08.09.2026 and their Describes went into BotHuntModule.Summarise — one of the eight
+        // dead facades this comment block names three paragraphs above. Printed here instead, where the
+        // numbers are actually read.
+        // What the board is made of, not just how big it is. See BotAuction.Board.
+        logger.Information("The board: {What}", BotAuction.Board());
+
+        logger.Information(
+            "Spoils: {Chests}; {Prisoners}; {Plunderer}; {Liberator}",
+            BotPlunder.Describe(),
+            BotFreedom.Describe(),
+            BotPlunderer.Describe(),
+            BotLiberator.Describe()
+        );
+
         logger.Information(
             "Trade: {Shops}; {Peddling}; {Quarry}; {Standing}",
             BotShops.Describe(),
@@ -184,6 +199,13 @@ public static class BotBeat
             BotQuarry.Describe(),
             BotPopulation.Describe()
         );
+
+        logger.Information("Guilds: {What}", BotGuilds.Describe());
+
+        // What the guilds own, and — the half that matters on an evening when nothing is bought — how far
+        // short of owning it they are. A hall is the one thing on this shard that outlives the population,
+        // so it is worth a line of its own rather than a clause in somebody else's.
+        logger.Information("Estate: {What}", BotEstate.Describe());
     }
 
     private static void Tick()
@@ -200,6 +222,15 @@ public static class BotBeat
         // the soonest it could fire was five. BotMarkers keeps its own throttle, so this costs a subtraction
         // per tick and delivers the interval it actually names.
         BotMarkers.Tick();
+
+        // The slow souring between guilds whose halls stand near each other. It keeps its own throttle for
+        // the same reason the pins do, so this is a subtraction a tick and fires at the interval it names.
+        BotRegard.Drift();
+
+        // And the town's shelves, which otherwise can only be refilled by somebody buying from them — and
+        // nobody is ever sent to a shelf that has sold out. Its own throttle, and the engine's own hour
+        // inside that. See BotShops.Keep.
+        BotShops.Keep();
 
         for (var i = 0; i < bots.Count; i++)
         {
