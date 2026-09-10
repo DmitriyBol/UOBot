@@ -1,3 +1,4 @@
+using System;
 using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -179,6 +180,26 @@ public sealed class BotDrill : IBotProposer
 /// </summary>
 public sealed class BotStudent : IBotProposer
 {
+    /// <summary>
+    /// How much longer than a straight line a walk to the field is reckoned to take.
+    ///
+    /// A third again, because a straight line is the best case and nothing walks one: a bot that would
+    /// arrive on the last second of the joining window is a bot that arrives late, and the whole point of
+    /// asking is to not spend the walk.
+    /// </summary>
+    public static double Punctual { get; set; } = 1.33;
+
+    /// <summary>
+    /// Times a bot was not offered a lesson because it could not have reached the field before the roll
+    /// closed.
+    ///
+    /// Its own bucket beside <c>Sealed</c>: "there is no way there" and "there is a way and not enough time"
+    /// are different faults with different repairs, and this one is expected to be large for a few seconds
+    /// after a class opens and nought the rest of the time. Reading it high and flat means the field is
+    /// somewhere the population cannot reach in ninety seconds, which is a fact about where it stands.
+    /// </summary>
+    public static long Belated { get; private set; }
+
     public string Name => "Student";
 
     public BotStanding Rung => BotStanding.Free;
@@ -310,6 +331,24 @@ public sealed class BotStudent : IBotProposer
             return null;
         }
 
+        // <b>Whether it can get there before the roll closes, which nothing asked.</b> The same shape as
+        // BotSupplier.Fits and for the same reason: work a bot cannot finish is not work priced low, it is
+        // work not offered. See BotSchool.Left for the burst of twenty this costs at every cold start.
+        //
+        // The walk is estimated the way BotAppraisal estimates every other one — tiles at the engine's own
+        // step delay — and then allowed a margin, because a straight line is the best case and bots do not
+        // walk in straight lines. A bot that would arrive on the last second is a bot that arrives late.
+        var dx = Math.Abs(body.Location.X - BotSchool.Ground.X);
+        var dy = Math.Abs(body.Location.Y - BotSchool.Ground.Y);
+        var walk = (dx > dy ? dx : dy) * BotWalk.StepDelayMs(false) * Punctual;
+
+        if (walk > BotSchool.Left)
+        {
+            Belated++;
+
+            return null;
+        }
+
         Came++;
 
         return new BotAttend(map, student, bill);
@@ -318,7 +357,7 @@ public sealed class BotStudent : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a place in a class"
-            : $"{Asked} asked: {Came} offered a place, {NoClass} found no class open, {Closed} came after the roll closed, {Full} found it full, {WrongSort} were neither warrior nor archer, {NothingToLearn} had nothing left to learn from the master, {Broke} could not afford the fee (the fattest purse among them held {Richest}gp), {Sealed} could not have walked there at all";
+            : $"{Asked} asked: {Came} offered a place, {NoClass} found no class open, {Closed} came after the roll closed, {Full} found it full, {WrongSort} were neither warrior nor archer, {NothingToLearn} had nothing left to learn from the master, {Broke} could not afford the fee (the fattest purse among them held {Richest}gp), {Sealed} could not have walked there at all, {Belated} could not have got there before the roll closed";
 
     public static void Forget()
     {
@@ -328,6 +367,7 @@ public sealed class BotStudent : IBotProposer
         WrongSort = 0;
         NothingToLearn = 0;
         Broke = 0;
+        Belated = 0;
         Richest = 0;
         Full = 0;
         Came = 0;

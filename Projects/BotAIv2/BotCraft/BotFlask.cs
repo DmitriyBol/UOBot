@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Server.Engines.Craft;
 using Server.Items;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -41,6 +42,24 @@ public static class BotFlask
 
     /// <summary>The tool. Handed out with the skill; see <see cref="BotOutfit.ToolsFor"/>.</summary>
     public static BaseTool Kit(Mobile bot) => bot?.Backpack?.FindItemByType<MortarPestle>();
+
+    /// <summary>
+    /// How many of each herb a brewer keeps on hand.
+    ///
+    /// <para>
+    /// <b>A brewer's reagents were nobody's errand.</b> <c>BotShopper</c> buys them only for a build whose kit
+    /// declares reagents, which is every caster and no crafter — so the bot carrying the mortar was never sent
+    /// for the one half of its trade it cannot gather. It read "had the glass but no herbs" 57 times in a
+    /// five-minute window with 1936 herbs on the population's own stalls.
+    /// </para>
+    ///
+    /// <para>
+    /// Five, which is one draught of each of the eight and no hoard. Bought rather than ordered by the armful:
+    /// the shopper takes a stall before a counter and only asks the board when neither has any, so this cannot
+    /// repeat what ordering glass did to this shard's trade. See <c>BotStores</c> for that.
+    /// </para>
+    /// </summary>
+    public static int Herbs { get; set; } = 5;
 
     /// <summary>How far below its own skill a bot keeps its work. The needle's figure, for the needle's reason.</summary>
     public static double Margin { get; set; } = 5.0;
@@ -283,6 +302,135 @@ public static class BotFlask
     public static (Type Reagent, int Units, int Glass) Costs(CraftItem recipe) =>
         Twofold(recipe, out var reagent, out var units, out var glass) ? (reagent, units, glass) : (null, 0, 0);
 
+    /// <summary>
+    /// The reagents this trade actually consumes, asked of the recipes rather than listed here.
+    ///
+    /// <para>
+    /// <b>A brewer wants two of the eight, and telling it to want all eight is telling it to shop for forty
+    /// minutes before it reaches either.</b> There are two draught families on this shard — heal and cure —
+    /// and between them they burn ginseng and garlic. The shopper's reagent list is in casting order, ash and
+    /// pearl first, and it buys one kind per errand at roughly two errands a bot in twenty minutes. So a
+    /// brewer sent after "reagents" spent its first four trips on ash and black pearl it can never use, and
+    /// the summary read "had the glass but no herbs" on a rising share the whole time — 35% of new asks in
+    /// one window, 58% in the next.
+    /// </para>
+    ///
+    /// <para>
+    /// Read from <c>Costs</c>, so adding a third draught family adds its reagent here and nowhere else. Built
+    /// once: the recipe table does not change while the shard is up.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<Type> Needs
+    {
+        get
+        {
+            if (_needs is { Count: > 0 })
+            {
+                return _needs;
+            }
+
+            return _needs = Wanted();
+        }
+    }
+
+    private static IReadOnlyList<Type> _needs;
+
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFlask));
+
+    private static bool _saidNeeds;
+
+    /// <summary>
+    /// Why the last look at the mortar found nothing, split apart because one bucket was holding three
+    /// answers.
+    ///
+    /// <para>
+    /// <b>"Had the glass but no herbs" was everything Choose refused for.</b> It refuses on three quite
+    /// different grounds — the skill will not carry any draught, the reagent is not in the pack, or the
+    /// recipe table has nothing that fits — and the alchemist wrote all three into one number. Measured on
+    /// 05.09.2026 the share of new asks landing there rose from 14% to 37% inside one run *after* the
+    /// reagents were fixed, which is a time pattern rather than a supply one and could not be read at all
+    /// while the three were together.
+    /// </para>
+    /// </summary>
+    public enum Refusal
+    {
+        /// <summary>A draught can be made. Not a refusal.</summary>
+        None,
+
+        /// <summary>Every recipe wants more Alchemy than this bot has, less the margin.</summary>
+        Unskilled,
+
+        /// <summary>Skill enough, and not one of the reagents in the pack.</summary>
+        Reagentless,
+
+        /// <summary>Every draught it could make is at its cap or resting.</summary>
+        Full
+    }
+
+    /// <summary>Why the last <see cref="Choose"/> came back empty. For the summary.</summary>
+    public static Refusal Why { get; private set; }
+
+    private static IReadOnlyList<Type> Wanted()
+    {
+        List<Type> want = [];
+        var families = BotArsenal.Draughts;
+
+        var system = System;
+        var recipes = system?.CraftItems;
+
+        if (recipes == null)
+        {
+            // Before content initialisation there is no table to read. Not cached in that case — see Needs,
+            // which asks again next time rather than remembering an empty answer for the life of the shard.
+            return want;
+        }
+
+        for (var i = 0; i < families.Count; i++)
+        {
+            var kind = BotArsenal.Potion(families[i]);
+
+            for (var j = 0; j < recipes.Count; j++)
+            {
+                // Asked of the table and not of a bot: this is what the trade consumes, not what one bot's
+                // skill will carry today.
+                if (recipes[j].ItemType != kind || !Twofold(recipes[j], out var reagent, out _, out _))
+                {
+                    continue;
+                }
+
+                if (!want.Contains(reagent))
+                {
+                    want.Add(reagent);
+                }
+
+                break;
+            }
+        }
+
+        // <b>Said once, and here rather than at boot, because at boot it is a lie.</b> The first version of
+        // this line logged from BotCraftModule.Initialize and reported "0 reagents: nothing" every start —
+        // DefAlchemy.CraftSystem is an ordinary property filled during content initialisation, not a lazy
+        // one, so there is no table to read at that moment and the line said nothing about what the shard
+        // does. Said on the first real resolution instead, which is the only moment the answer is true.
+        //
+        // A derived list that comes back empty is a feature that silently does nothing, and this trade has
+        // already been exactly that once today.
+        if (!_saidNeeds && want.Count > 0)
+        {
+            _saidNeeds = true;
+
+            logger.Information(
+                "A brewer is sent after {Count} reagents, {Herbs} of each, read off the recipes: {Names}",
+                want.Count,
+                Herbs,
+                string.Join(", ", want.ConvertAll(t => t.Name))
+            );
+        }
+
+
+        return want;
+    }
+
     /// <summary>How much skill a recipe asks for. Its minimum, which is what the engine rolls against.</summary>
     public static double Requirement(CraftItem recipe)
     {
@@ -348,11 +496,16 @@ public static class BotFlask
     public static CraftItem Choose(IBotWilful will, Mobile bot, out Type made)
     {
         made = null;
+        Why = Refusal.None;
 
         if (bot == null || System == null)
         {
             return null;
         }
+
+        // Which of the three grounds the refusal rests on, if it comes to one. See Refusal.
+        var anySkilled = false;
+        var anyFull = false;
 
         CraftItem best = null;
         var bestStock = 0;
@@ -373,12 +526,15 @@ public static class BotFlask
                 continue;
             }
 
+            anySkilled = true;
+
             // <b>Five of a kind is the whole of what one bot may have going, pack and stall together.</b> The
             // draught is passed over rather than the round refused, so a brewer at its cap on heal potions
             // goes on to cure — which is the point of counting each kind apart. See Cap and RestMs.
             if (Resting(bot, kind))
             {
                 Capped++;
+                anyFull = true;
 
                 continue;
             }
@@ -386,6 +542,7 @@ public static class BotFlask
             if (Held(will, bot, kind) >= Cap)
             {
                 Capped++;
+                anyFull = true;
                 Rest(bot, kind);
 
                 continue;
@@ -411,6 +568,17 @@ public static class BotFlask
             bestStock = stock;
             best = recipe;
             made = kind;
+        }
+
+        // <b>Why, when the answer is nothing.</b> Three quite different grounds arrive at the alchemist as
+        // one number — "had the glass but no herbs" — and it was 211 of a window's asks with a share that
+        // rose from 14% to 37% inside one run *after* the reagents were put right, which is a pattern in
+        // time rather than in supply and could not be read while the three were together. Named in the order
+        // that decides what to do: a bot that cannot make anything wants a lesson, one that is full wants
+        // nothing, and one merely out of reagents wants an errand.
+        if (best == null && asked == null)
+        {
+            Why = anyFull ? Refusal.Full : anySkilled ? Refusal.Reagentless : Refusal.Unskilled;
         }
 
         if (asked == null)

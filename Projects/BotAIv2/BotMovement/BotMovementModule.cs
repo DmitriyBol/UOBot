@@ -52,6 +52,17 @@ public sealed class BotMovementModule : BotModule
             BotPath.EnclosureCells,
             BotPath.EnclosureCeilingMs
         );
+
+        // Its own line, because it is the shard's newest record of the ground and the one whose numbers are
+        // least settled: a refusal rests a square {RestMs} and doubles per refusal to {MostRestMs}, and
+        // whether those are right is a question the morning after answers.
+        logger.Information(
+            "Refused ground: one entry per {Grain} tiles, resting {RestMs}ms doubling to {MostRestMs}ms, at most {MostPlaces} squares remembered; arriving anywhere clears one",
+            BotRefused.Grain,
+            BotRefused.RestMs,
+            BotRefused.MostRestMs,
+            BotRefused.MostPlaces
+        );
     }
 
     /// <summary>
@@ -62,17 +73,20 @@ public sealed class BotMovementModule : BotModule
     {
         BotWalk.Walking = false;
 
-        logger.Information("Movement, before the reload: {Paths}; {Walk}; {Reach}",
+        logger.Information("Movement, before the reload: {Paths}; {Walk}; {Reach}; {Refused}",
             BotPath.Describe(),
             BotWalk.Describe(),
-            BotReach.Describe()
+            BotReach.Describe(),
+            BotRefused.Describe()
         );
 
         BotPath.Reset();
         BotWalk.Reset();
         BotReach.Reset();
+        BotRefused.Forget();
     }
 
     /// <summary>Everything the summary wants to say about getting about, in three clauses.</summary>
-    public static string Summarise() => $"{BotPath.Describe()}; {BotWalk.Describe()}; {BotReach.Describe()}";
+    public static string Summarise() =>
+        $"{BotPath.Describe()}; {BotWalk.Describe()}; {BotReach.Describe()}; {BotRefused.Describe()}";
 }

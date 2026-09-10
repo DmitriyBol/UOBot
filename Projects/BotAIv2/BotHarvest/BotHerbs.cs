@@ -59,8 +59,18 @@ public sealed class BotHerbs : BotDeed
     /// Five, which is a caster's own working handful. A picker that sold everything and then bought the same
     /// reagent back off a counter would be paying twice to carry what it was already holding — the rule the
     /// archer's arrows and the cook's meat are both kept by.
+    ///
+    /// <para>
+    /// And kept only by a bot that has some use for them: a spellbook to cast from or a mortar to brew with.
+    /// Most pickers are gatherers and are neither, and a handful held back by somebody who will never spend it
+    /// is a handful the population cannot reach.
+    /// </para>
     /// </summary>
     public static int Keeps { get; set; } = 5;
+
+    /// <summary>How much this bot keeps: the handful if it can cast or brew, nothing if it can do neither.</summary>
+    private static int KeptBy(Mobile bot) =>
+        BotGrimoire.Book(bot) != null || BotFlask.Kit(bot) != null ? Keeps : 0;
 
     /// <summary>Reagents put into somebody's standing order. For the summary.</summary>
     public static long Ordered { get; private set; }
@@ -138,6 +148,37 @@ public sealed class BotHerbs : BotDeed
     public override string Stage =>
         _found > 0 ? $"back from the woods with {_found} herbs" : $"out to the woods near {_where}";
 
+    /// <summary>
+    /// The way to that patch of woods does not exist: remember it, so this bot stops choosing it.
+    ///
+    /// <para>
+    /// <b>Written at 02:20 on 08.09.2026, on a shard that had been running two hours.</b> Herb gathering had
+    /// taken on 2959 errands and failed 2910 of them — 98% — every one on "no way through", each one costing
+    /// a full path search, each one lasting a fifth of a minute before the bot chose the same kind of place
+    /// again. It was the single largest source of failure on the shard and the reason the finished share of
+    /// work had fallen from 69% to 17% over one night.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>The identical defect was found and fixed in <see cref="BotForage"/> on 02.09.2026</b> — "the only
+    /// trade of them all that did not call Ledger.Beware", 281 refusals against one square — and this file
+    /// was not looked at then. Same shape, same cure, copied deliberately: the ledger bands places 64 tiles
+    /// wide, so one refusal teaches the bot about the whole patch rather than about one tile of it.
+    /// </para>
+    ///
+    /// <para>
+    /// Returns false for <see cref="BotForage"/>'s reason: the proposer chose this patch and choosing again
+    /// from here would choose it again. The errand ends, and the next decision is made by a bot that knows
+    /// something it did not know before.
+    /// </para>
+    /// </summary>
+    public override bool Bend(IBotWilful bot)
+    {
+        bot?.Resolve?.Ledger?.Beware(Trade, _map, _where);
+
+        return false;
+    }
+
     public override BotDoing Advance(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -176,13 +217,16 @@ public sealed class BotHerbs : BotDeed
         //
         // One kind, in the amount the class asks for. A class that names no amount gets the Sage's trip,
         // which is what this file was written for and is left exactly as it was.
+        // Once, before anything is priced. Shelf asks which counters are known and does not sweep for them.
+        BotShops.Survey(body.Map, body.Location);
+
         var handful = klass is { ForageYieldMax: > 0 };
         var kinds = handful ? 1 : Utility.RandomMinMax(LeastKinds, MostKinds);
         var picked = 0;
 
         for (var i = 0; i < kinds; i++)
         {
-            var kind = Kinds[Utility.Random(Kinds.Length)];
+            var kind = Scarcest();
 
             var amount = handful
                 ? Utility.RandomMinMax(Math.Max(1, klass.ForageYieldMin), klass.ForageYieldMax)
@@ -206,9 +250,14 @@ public sealed class BotHerbs : BotDeed
             picked += amount;
 
             // Priced as it is picked and at the market's own price, so a reagent the population is bidding
-            // hard for makes the trip that fetched it worth what it really was. Guess is only ever reached
-            // before anybody has traded one.
-            _worth += amount * BotAuction.Worth(kind, Guess);
+            // hard for makes the trip that fetched it worth what it really was.
+            //
+            // <b>Valued at the same number it will be sold at, and it has to be the same call.</b> The
+            // fallback here was Guess while Store came to open at the shopkeeper's shelf price — five against
+            // three for garlic — so the trip reported takings it could not get and the ledger would have
+            // learned to over-price this trade by two thirds. Both ends ask Shelf now, which reaches Guess
+            // only where no shopkeeper within reach stocks the thing at all.
+            _worth += amount * BotAuction.Worth(kind, Shelf(bot, kind));
 
             // Ground that paid while a bot stood still on it. See BotQuad.Harvested.
             BotQuad.Harvested(body.Map, body.Location);
@@ -257,6 +306,8 @@ public sealed class BotHerbs : BotDeed
             return (0, 0);
         }
 
+        BotShops.Survey(body.Map, body.Location);
+
         var ordered = 0;
         var listed = 0;
 
@@ -273,7 +324,7 @@ public sealed class BotHerbs : BotDeed
             }
 
             var held = Math.Max(1, stack.Amount);
-            var spare = held - Keeps;
+            var spare = held - KeptBy(body);
 
             if (spare <= 0)
             {
@@ -287,7 +338,7 @@ public sealed class BotHerbs : BotDeed
                 continue;
             }
 
-            var (went, out_) = BotAuction.Offer(bot, goods, Guess);
+            var (went, out_) = BotAuction.Offer(bot, goods, Shelf(bot, stack.GetType()));
 
             ordered += went;
             listed += out_;
@@ -297,6 +348,90 @@ public sealed class BotHerbs : BotDeed
         Listed += listed;
 
         return (ordered, listed);
+    }
+
+    /// <summary>
+    /// What one of these opens at: the shopkeeper's own asking price, and only then a guess.
+    ///
+    /// <para>
+    /// <b>Opening above the shelf is opening at a price nobody on this island can rationally pay.</b>
+    /// <c>BotShopper</c> takes whichever of stall and counter is cheaper and gives a tie to one of ours, so a
+    /// reagent listed at five when a herbalist sells garlic at three is a reagent that will never move: 1986
+    /// of them went onto stalls in one window and every caster that wanted one walked to a shopkeeper and
+    /// paid the world instead of paying a bot. The same fault the fletcher already documents about arrows,
+    /// on the trade that produces the most goods per hour of anything here.
+    /// </para>
+    ///
+    /// <para>
+    /// Measured rather than declared, like the loot floor in <c>BotSlay.Rifle</c>: the engine knows what a
+    /// shopkeeper charges and there is no table here to go stale. The guess is only ever reached where no
+    /// shopkeeper within reach stocks the thing at all — which for the deeper reagents is most of them, and
+    /// is exactly where a bot's stall is the only supply there is.
+    /// </para>
+    /// </summary>
+    /// <param name="bot">Whose reach decides which counters count. The survey is the caller's to do once —
+    /// see the two call sites, both of which sweep before their loop rather than inside it.</param>
+    private static int Shelf(IBotWilful bot, Type kind) => BotShops.Shelf(bot, kind, Guess);
+
+    /// <summary>
+    /// Which reagent to pick: the one the population has least of on its stalls.
+    ///
+    /// <para>
+    /// <b>Uniform picking against skewed demand is a supply that cannot be spent.</b> This was
+    /// <c>Kinds[Utility.Random(Kinds.Length)]</c> — an eighth of each — while what the shard actually wanted
+    /// over one run was sulfurous ash 1320, bloodmoss 393, nightshade 314, ginseng 243 and almost nothing of
+    /// the rest. So the ash ran out at once and was bought over a counter, and the other seven piled up: 2661
+    /// reagents listed, 1661 of them sold, a thousand standing unsold, and the population meeting 41% of its
+    /// own reagent demand while the remainder left the world as coin over a shopkeeper's counter.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Read off the stalls rather than off a tally of shortages, and the difference matters.</b>
+    /// <c>BotShopper</c> keeps a count of what bots have been short of, but it is cumulative for the life of
+    /// the shard: a reagent that ran dry once an hour ago still reads as the scarcest thing on the island.
+    /// Stock on the stalls is a fact about now, and it is self-correcting — the moment the pickers have
+    /// covered a kind, it stops being the scarcest and they move to the next.
+    /// </para>
+    ///
+    /// <para>
+    /// Ties go to chance, so eight empty kinds at the start of a shard do not send every picker after the
+    /// same one.
+    /// </para>
+    /// </summary>
+    private static Type Scarcest()
+    {
+        Type worst = null;
+        var least = int.MaxValue;
+        var seen = 0;
+
+        for (var i = 0; i < Kinds.Length; i++)
+        {
+            var held = BotAuction.Stocked(Kinds[i]);
+
+            if (held > least)
+            {
+                continue;
+            }
+
+            // Reservoir sampling over the ties, which costs one random draw and no list.
+            if (held < least)
+            {
+                least = held;
+                seen = 1;
+                worst = Kinds[i];
+
+                continue;
+            }
+
+            seen++;
+
+            if (Utility.Random(seen) == 0)
+            {
+                worst = Kinds[i];
+            }
+        }
+
+        return worst ?? Kinds[Utility.Random(Kinds.Length)];
     }
 
     /// <summary>Forgotten with the world.</summary>
@@ -324,6 +459,9 @@ public sealed class BotHerbalist : IBotProposer
     public static int Samples { get; set; } = 6;
 
     public static long Asked { get; private set; }
+
+    /// <summary>Patches passed over because this bot has already been refused the road to them.</summary>
+    public static long Refused { get; private set; }
 
     /// <summary>Asked of a bot whose class has no such trip. Not a refusal — nearly every answer is this.</summary>
     public static long NotAGatherer { get; private set; }
@@ -364,7 +502,7 @@ public sealed class BotHerbalist : IBotProposer
             return null;
         }
 
-        var where = Wood(body, map);
+        var where = Wood(body, map, bot?.Resolve?.Ledger);
 
         if (where == Point3D.Zero)
         {
@@ -388,7 +526,7 @@ public sealed class BotHerbalist : IBotProposer
     /// the proposer contract says in as many words that the question may be real but must not be expensive.
     /// </para>
     /// </summary>
-    private static Point3D Wood(Mobile body, Map map)
+    private static Point3D Wood(Mobile body, Map map, BotLedger ledger)
     {
         var home = BotPopulation.Where;
         var roam = Math.Min(Range, BotPopulation.Roam);
@@ -416,6 +554,34 @@ public sealed class BotHerbalist : IBotProposer
                 continue;
             }
 
+            // <b>What this bot has already learned about that ground, which nothing here asked until now.</b>
+            // BotHerbs.Bend was given a Beware at 02:16 on 08.09.2026 and the failures came back within the
+            // hour: the mark was being written and this sampler, the only thing that chooses where to go,
+            // never read it. Third time in one night that a note was filed and not read — the hunt's baulks
+            // and the stall watch's silence were the other two.
+            //
+            // Refusals are per-bot, so this is per-bot too. The ledger bands ground 64 tiles wide, so one
+            // refusal covers the patch rather than the tile, and the caution lapses on its own clock.
+            // <b>Cautious, not Expect, and the difference cost an hour.</b> Expect answers "what is this
+            // ground worth", which for a patch nobody has worked is the claim itself - a positive number,
+            // always, so the test never fired once in thirty-five minutes. Caution is a separate question
+            // with a separate method, and it is the one BotGround, BotMiner and BotShops all ask.
+            // What the whole population has learned about this ground, before what this bot has learned:
+            // one bot's caution is a private opinion, a shard-wide refusal is a fact about the island.
+            if (BotRefused.Refusing(map, where))
+            {
+                Refused++;
+
+                continue;
+            }
+
+            if (ledger != null && ledger.Cautious(BotHerbs.Trade, map, where))
+            {
+                Refused++;
+
+                continue;
+            }
+
             return where;
         }
 
@@ -425,8 +591,8 @@ public sealed class BotHerbalist : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody on this shard may go looking for herbs ({NotAGatherer} answers went to bots that may not)"
-            : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go; "
-              + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker keeps";
+            : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go, {Refused} patches passed over as already refused; "
+              + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker that can cast or brew keeps back";
 
     public static void Forget()
     {
@@ -434,6 +600,7 @@ public sealed class BotHerbalist : IBotProposer
         NotAGatherer = 0;
         TooSoon = 0;
         NoWood = 0;
+        Refused = 0;
         Offered = 0;
         BotHerbs.ForgetTrade();
     }

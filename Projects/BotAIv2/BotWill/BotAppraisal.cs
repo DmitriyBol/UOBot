@@ -12,7 +12,10 @@ public readonly struct BotWeigh
         double room,
         double caution,
         double purse,
-        double score
+        double score,
+        double stopped = 1.0,
+        double revel = 1.0,
+        double ground = 1.0
     )
     {
         Estimate = estimate;
@@ -22,6 +25,9 @@ public readonly struct BotWeigh
         Caution = caution;
         Purse = purse;
         Score = score;
+        Stopped = stopped;
+        Revel = revel;
+        Ground = ground;
     }
 
     /// <summary>Gold-equivalent per minute expected, prior and experience together.</summary>
@@ -36,6 +42,15 @@ public readonly struct BotWeigh
     public double Caution { get; }
 
     public double Purse { get; }
+
+    /// <summary>The carrying-ceiling factor. One unless the bot is over its load and the work needs a step.</summary>
+    public double Stopped { get; }
+
+    /// <summary>Whatever the watcher declared worth doing this quarter of an hour. One nearly always.</summary>
+    public double Revel { get; }
+
+    /// <summary>Whose land the work stands on. One on ground no guild has claimed, which is most of it.</summary>
+    public double Ground { get; }
 
     public double Score { get; }
 
@@ -55,8 +70,24 @@ public readonly struct BotWeigh
     {
         var bend = Estimate > 0.0 ? Score / Estimate : 0.0;
 
+        // <b>And then three more factors were added over a fortnight and none of them was ever printed.</b>
+        // The note above is about a line that could not be checked against itself; the same thing happened
+        // again quietly, because the carrying ceiling, the watcher's revels and now the guild lands all
+        // multiply into the product while the sentence went on naming five things. A bot refusing work at a
+        // fiftieth for a full pack read as a bot refusing work for no stated reason at all.
+        //
+        // Printed only when they bite, which is the compromise: these lines are written thousands of times
+        // an hour and all three are one nearly always, so the common sentence is exactly the one Patrick
+        // already reads — and the moment any of them is doing something, it says so.
+        var extra = "";
+
+        if (Stopped < 1.0 || Revel != 1.0 || Ground != 1.0)
+        {
+            extra = $" × load {Stopped:F2} × revel {Revel:F2} × ground {Ground:F2}";
+        }
+
         return $"{Score:F0}/min = {Estimate:F0} × {bend:F2}, that being the fifth root of "
-               + $"near {Nearness:F2} × new {Novelty:F2} × room {Room:F2} × safe {Caution:F2} × purse {Purse:F2}";
+               + $"near {Nearness:F2} × new {Novelty:F2} × room {Room:F2} × safe {Caution:F2} × purse {Purse:F2}{extra}";
     }
 
     public override string ToString() => Describe();
@@ -82,6 +113,65 @@ public readonly struct BotWeigh
 /// </summary>
 public static class BotAppraisal
 {
+    /// <summary>Times an unpaid deed was let past the earnings veto.</summary>
+    public static long Unpaid { get; private set; }
+
+    /// <summary>
+    /// Offers marked down because the bot is past its carrying ceiling and the work needs a step.
+    ///
+    /// Its own bucket: this reading high is not a fault in the work, it is a population that is loading
+    /// itself to a standstill, and the number to look at beside it is how often BotUnload had to sell from
+    /// where the bot stood.
+    ///
+    /// <b>It counts a mark-down and never counted a decision, and reading it as one wasted a night.</b> The
+    /// number climbed exactly as designed all through 09.09.2026 while the bots it counted went on taking
+    /// the very work it was marking, because a fiftieth under a fifth root is 0.46, and 0.46 of a wage a bot
+    /// cannot earn still beats all of a wage it can. What the ceiling decides now is an order, and the
+    /// order is counted where orders are made: <c>BotWill.Grounded</c> and <c>BotWill.Dislodged</c> are the
+    /// pair that say whether anything came of this one.
+    /// </summary>
+    public static long Stopped { get; private set; }
+
+    /// <summary>
+    /// What work that needs a step is worth to a bot that cannot take one. A fiftieth.
+    ///
+    /// <para>
+    /// <b>It does not do what this used to claim, and no number here could.</b> The claim was "enough that
+    /// anything doable on the spot wins, never so little that it becomes a refusal", and a factor cannot
+    /// meet both demands at once, because <see cref="Considerations"/> takes the fifth root of the product:
+    /// a fiftieth reaches the score as 0.46, which loses to nothing, and the value that would win outright
+    /// is the value that vetoes. Lysa the Woodsman took a chop at 229/min over her own unloading on
+    /// 09.09.2026 with this factor doing exactly what it was set to do.
+    /// </para>
+    ///
+    /// <para>
+    /// The winning is done by rank in <c>BotWill.Auction</c> now. What is left here is the half a factor is
+    /// good at and the half that is true: work a bot cannot start is worth less to it, so it is priced
+    /// lower and the log line says by how much. It still ranks two walking errands against each other
+    /// honestly, and it still holds an unloading in hand against a passing better price.
+    /// </para>
+    /// </summary>
+    public static double StoppedShare { get; set; } = 0.02;
+
+    /// <summary>
+    /// A multiplier on one kind of work, set by something outside this assembly, or null.
+    ///
+    /// <para>
+    /// <b>The one seam through which the watcher may move the population without commanding it.</b> Argus
+    /// lives in the minds assembly, which depends on this one and must never be depended on in return — so
+    /// it cannot be called from here. It fills this in instead, and what arrives is a number in exactly the
+    /// same shape as crowding and caution: a factor, competing honestly with them.
+    /// </para>
+    ///
+    /// <para>
+    /// Deliberately not a command. A revel that triples the worth of mining does not order anybody to mine;
+    /// it makes mining beat what else is on offer for those it beats, and a bot with something better in
+    /// front of it goes on doing that. A revel nobody enters is a fact about the price, and the watcher is
+    /// told so when it pays nobody.
+    /// </para>
+    /// </summary>
+    public static Func<string, double> Revelry { get; set; }
+
     /// <summary>How many factors bend the estimate. The root taken of their product.</summary>
     public const int Considerations = 5;
 
@@ -195,13 +285,35 @@ public static class BotAppraisal
         // worth, then what the place is worth.
         var claim = BotCommons.Corrected(deed.Kind, deed.Expects);
 
-        var estimate = resolve.Ledger.Expect(deed.Kind, map, deed.Where, claim);
+        // <b>And the ledger is not asked about work that is not about money either.</b> The ledger's answer
+        // is what this bot has earned on this ground, which is exactly the wrong question to put to an errand
+        // whose whole purpose is ground nobody has stood on: the frontier has paid nobody anything by
+        // definition, so the answer is nought, every time, for ever.
+        //
+        // Measured on 08.09.2026, and it is why the Baron would not scout. He took it once — "35/min = 40 ×
+        // 0.88" — and from the next review on it read "over scout ... at 0/min" while he walked round the
+        // town at six. Both of his offices are unpaid by construction, so the one with the higher claim has
+        // to be allowed to say so; judging them on takings ranks them both at nothing and then picks between
+        // two nothings on tie-breaks.
+        var estimate = deed.Unpaid ? claim : resolve.Ledger.Expect(deed.Kind, map, deed.Where, claim);
 
         if (estimate <= 0.0)
         {
-            veto = $"{deed.Kind} is expected to pay {estimate:F1}/min here, against a claim of {claim:F1}";
+            // Work that says it is not about money is not judged on money. It still has to be the best thing
+            // on offer to be taken - it comes in at the smallest number that is not a refusal, so anything
+            // that pays at all beats it - but it can no longer be thrown away for being what it is.
+            if (deed.Unpaid)
+            {
+                Unpaid++;
 
-            return 0.0;
+                estimate = 0.01;
+            }
+            else
+            {
+                veto = $"{deed.Kind} is expected to pay {estimate:F1}/min here, against a claim of {claim:F1}";
+
+                return 0.0;
+            }
         }
 
         // How much of the time this would cost is spent working rather than walking. The reason distance is
@@ -242,19 +354,55 @@ public static class BotAppraisal
             1.0
         );
 
-        var product = nearness * novelty * room * caution * purse;
+        // <b>A factor, not a veto, and the veto version cost three crafters twenty-seven minutes apiece.</b>
+        // Past its carrying ceiling the engine refuses a bot every move, so work that begins with a walk is
+        // work it cannot start — but refusing such work outright leaves a bot with nothing at all whenever
+        // the one errand it *can* do is unavailable for reasons of its own. Measured within the hour of
+        // writing it: Ulric, Wulfric and Roderic stood on the Free rung for 1677, 1640 and 1632 seconds,
+        // every offer refused with "mine needs a step, and this bot is carrying 242 of 222", and not one of
+        // them ever reached the unloading that would have freed it.
+        //
+        // <b>And a factor with a floor is not a preference either, which is the correction of 09.09.2026.</b>
+        // What stood here promised that "at a fiftieth, anything that can be done standing still wins
+        // outright". It never did: the score takes the fifth root of the product, so a fiftieth arrives as
+        // 0.46, and half of a wage a bot cannot earn goes on beating all of a wage it can. The middle
+        // position was imaginary. Between the veto that made monuments and the multiplier that changed
+        // nothing there is no third number to find, because the two failures are one root apart.
+        //
+        // What this still is, and it is worth keeping: an honest price. Work a bot cannot begin is worth
+        // less to it than work it can, the log line says by how much, and two walking errands are still
+        // ranked against each other properly. What decides is one rung up, in BotWill.Auction, where a full
+        // pack orders the offers instead of pricing them; the floor the note above is about lives on there
+        // unchanged, because a rank with nothing above it changes no answer at all. See BotDeed.Standing.
+        var stopped = !deed.Standing && BotLadder.Load(body) > BotLadder.Ceiling(body) ? StoppedShare : 1.0;
+
+        if (stopped < 1.0)
+        {
+            Stopped++;
+        }
+
+        // Whatever the watcher has declared worth doing this quarter of an hour. One when it has declared
+        // nothing, which is nearly always. See Revelry.
+        var revel = Revelry?.Invoke(deed.Kind) ?? 1.0;
+
+        // Whose ground the work stands on. One everywhere no guild has built, which on this island is most
+        // of it — so this costs nothing until a hall goes up, and it can never be nought. See BotLand: a
+        // claim that refused would be four guilds between them forbidding the population to work.
+        var ground = BotLand.Worth(body, map, deed.Where);
+
+        var product = nearness * novelty * room * caution * purse * stopped * revel * ground;
 
         if (product <= 0.0)
         {
             veto = $"{deed.Kind} weighed out at nothing: near {nearness:F2}, new {novelty:F2}, room {room:F2},"
-                + $" safe {caution:F2}, purse {purse:F2}";
+                + $" safe {caution:F2}, purse {purse:F2}, standing {stopped:F2}, revel {revel:F2}, ground {ground:F2}";
 
             return 0.0;
         }
 
         var score = estimate * Math.Pow(product, 1.0 / Considerations);
 
-        weigh = new BotWeigh(estimate, nearness, novelty, room, caution, purse, score);
+        weigh = new BotWeigh(estimate, nearness, novelty, room, caution, purse, score, stopped, revel, ground);
 
         return score;
     }

@@ -95,6 +95,29 @@ public sealed class BotHomeward : BotDeed
     public override double Expects => Worth;
 
     /// <summary>
+    /// Not about money, and it must not be refused for failing to earn any.
+    ///
+    /// <para>
+    /// <b>The second deed on this shard to need this flag, and it was found the same way as the first.</b>
+    /// The Baron's rounds pay nothing by design, the ledger measured that honestly, and the arithmetic threw
+    /// them away — twelve minutes standing in Britain with 600gp in his pack. This is the same thing at
+    /// population scale: at 03:20 on 09.09.2026 Argus was asked who was idle and every one of them gave the
+    /// same answer — <i>"39 proposers asked, 2 offered work, and it was refused: homeward is expected to pay
+    /// -25.7/min here, against a claim of 1.2"</i> — while standing in Britain, where
+    /// <c>BotThreat.Hostile</c> answers false for anybody inside a town region and so there is genuinely
+    /// nothing to fight, nothing to hunt, and almost nothing to do.
+    /// </para>
+    ///
+    /// <para>
+    /// So the one errand whose whole purpose is to cure "there is nothing to do here" was refused for being
+    /// unprofitable, by a shard that had learned — correctly — that walking home earns nothing and costs
+    /// upkeep on the way. It is measured right and priced wrong, which is precisely what this flag is for.
+    /// The shard's own count of it: 416 times nothing was worth doing, in eighty minutes.
+    /// </para>
+    /// </summary>
+    public override bool Unpaid => true;
+
+    /// <summary>
     /// How long the walk will take, honestly.
     ///
     /// <para>

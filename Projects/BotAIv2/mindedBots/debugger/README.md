@@ -152,6 +152,39 @@ means "keep the numbers the code chose", which is what is written on the first b
 Switch: `bots.debugger.enabled` in `modernuo.json`. It is on by default, deliberately — a watcher that has
 to be remembered is a watcher that is off on the night something goes wrong.
 
+## The door, and the dials behind it
+
+The shard is headless, so its console cannot be typed into. `BotConsole` is the way in instead: write a line
+into `Distribution/argus-in.txt`, read the answer out of `Distribution/argus-out.txt` a couple of seconds
+later. The input file is emptied as it is read, which is the whole of the protocol — what is in it is what
+has not been answered yet.
+
+| Word | What it does |
+|---|---|
+| `state` | the whole digest, the same text the model is given |
+| `bot <name>`, `idle`, `trades`, `fighting`, `rollcall` | one bot, the loiterers, the trade table, the combat table, the last roll-call |
+| `memory`, `note <text>` | what it remembers; a remark from a person, filed as one |
+| `think <question>` | puts the question to the model with the measurements attached |
+| `hands`, `do <verb> <target>` | the bounded verbs of `BotHand`, and their use |
+| `dials <word>` | every dial whose `Class.Name` contains the word, with its live value |
+| `dial <Class.Name> <value>` | moves one. `reset` puts it back. Bare name reads it |
+
+**Dials are `BotDials`, and they are the reason a shard no longer has to be restarted to try a number.**
+Every `public static` property of a simple type in either bot assembly is reachable — 561 of them, found by
+reflection rather than from a list, so a new subsystem's numbers are there the day it is written. A change
+takes effect on the living object at once and lasts until the shard stops.
+
+Three things about it are deliberate:
+
+- **Nothing is written to `Configuration/bot-*.json`.** A tool that edited the files could make a shard that
+  boots differently from the one anybody tested, and a wrongly-cased key is ignored in silence here. Keeping
+  a value means writing it in by hand; `dials changed` prints the list to copy from.
+- **The model cannot reach it.** No dial verb is in `BotHand`. An observer that can move the thresholds it
+  judges against negotiates with the shard instead of measuring it.
+- **Every change is journalled to `logs/bot-dials.log` before it happens, and refused if that write fails** —
+  the same order as the hand's log, for the same reason. What was moved is also said at the foot of every
+  digest, so the model that reads the numbers afterwards knows a hand was on them.
+
 ## Files
 
 | File | What it is |
@@ -163,5 +196,42 @@ to be remembered is a watcher that is off on the night something goes wrong.
 | `BotVigil.cs` | the three clocks, the census, the choosing of whom to stand beside, and the two questions |
 | `BotDebugSight.cs` | what it is told. The whole of its judgement, and every line a defect surface |
 | `BotDebugNote.cs` | the schemas and the reading of answers |
+| `BotAudit.cs` | the roll-call: three questions to every bot, every two minutes |
+| `BotHail.cs` | being spoken to in the world, and answering there |
+| `BotHand.cs` | the ten verbs it may use, and the journal that makes them safe |
+| `BotConsole.cs` | the door: `argus-in.txt` in, `argus-out.txt` out |
+| `BotDials.cs` | every tunable number in both assemblies, read and moved while the shard runs |
+| `BotRevel.cs` | the revels: what is declared, what it pays, the crown's purse and the tax that fills it |
+| `BotWaves.cs` | something to fight when a hunt is called into an empty field: waves that grow, and clear away after |
+| `BotDebugMemory.cs` | what it carries between reports |
 | `BotDebugLog.cs` | `logs/bot-debugger.log` |
 | `BotDebugConfig.cs` | `Configuration/bot-debugger.json` |
+
+---
+
+## Revels, waves, and the crown's purse
+
+Added 08→09.09.2026. The watcher already read the whole shard every ten minutes and formed an opinion about
+it; these turn that opinion into something that happens.
+
+**A revel** (`BotRevel`) makes one trade worth three times as much for twelve minutes and puts a prize behind
+it. It invents no mechanism: bots know nothing of events, and what a revel moves is the price of a kind of
+work — `BotAppraisal.Revelry`, a factor competing honestly with crowding and caution. A revel nobody enters
+pays nobody, which is itself a measurement.
+
+**It is two contests at once.** The best bot takes half the purse; the guild that did most of it between them
+splits the other half. That is how a guild takes part in an event without a war — Patrick's order of
+09.09.2026 — and it is why the score is kept twice, by serial and by guild name.
+
+**Waves** (`BotWaves`) answer the oldest complaint in this log: *nothing within 50 tiles of the bots is worth
+fighting.* When a hunt is declared and the field really is empty, the watcher puts one weak thing down, then
+two, then three, then a strong one with two weak, up to two strong and five weak — Patrick's own table. The
+next wave waits for the last to be dead; nothing is spawned in a guarded town, where the watch would kill it
+before a bot arrived; and whatever is still standing when the revel ends is deleted. A shard that accumulates
+ettins because a watcher had an idea an hour ago is a shard nobody can measure.
+
+**The purse** used to be six thousand for the session and no more, which meant a shard left running all night
+stopped being able to pay for anything after the fifth revel. It is now a running balance filled by a tax:
+six per cent of what each guild can spare, every quarter of an hour, taken by the same collector the hall levy
+uses so no member is ever left below its keep. **The tax mints nothing** — money goes from the guilds to the
+crown and comes back as prizes. This project has paid for a faucet once already.

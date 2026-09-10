@@ -1,4 +1,4 @@
-﻿using Server.Items;
+using Server.Items;
 using Server.Logging;
 using Server.Targeting;
 
@@ -32,15 +32,29 @@ public sealed class BotChop : BotDeed
     public static int SwingMs { get; set; } = 2000;
 
     /// <summary>
-    /// How long the axe may go without producing a log before the trip is given up.
+    /// How long the axe may go without producing a log before the tree is given up on.
     ///
     /// <para>
-    /// Half a minute, which is a dozen swings. A tree that has been cut out answers every swing with nothing
-    /// and looks exactly like a tree that is simply unlucky, and the engine says which only by silence — the
-    /// message it would send goes to a client this bot has not got.
+    /// Half a minute, which is a dozen swings. <b>A backstop now rather than the measure, and the note that
+    /// stood here said exactly why it had to be the measure:</b> "the engine says which only by silence — the
+    /// message it would send goes to a client this bot has not got". That is no longer true. The engine says
+    /// "there's not enough wood here to harvest" in as many words, and since 09.09.2026 there is a seam for a
+    /// bot to hear it through — see <c>BotHeard</c> and <c>engine-patches/HarvestDefinition-said.patch</c>.
+    /// </para>
+    ///
+    /// <para>
+    /// What silence cost, measured the evening the ear was opened: the harvest system said <b>there is
+    /// nothing left here 1,105 times in twenty minutes</b>, the great majority of them to woodcutters, while
+    /// this clock made every one of them wait out half a minute of swinging at a stump first.
     /// </para>
     /// </summary>
     public static int StallMs { get; set; } = 30000;
+
+    /// <summary>Trees given up on because the engine said they were cut out. See <c>BotHeard</c>.</summary>
+    public static long Spoken { get; private set; }
+
+    /// <summary>And trees given up on by the clock alone, which is now the unusual case.</summary>
+    public static long Silent { get; private set; }
 
     private readonly Map _map;
 
@@ -242,6 +256,60 @@ public sealed class BotChop : BotDeed
             _grewTick = now;
         }
 
+        // <b>What the engine said about the last swing, before any clock is consulted.</b> Patrick's order of
+        // 09.09.2026, the same one the miners got: a tree is cut out when the bot sees the message saying so.
+        // Everything below this was inference from silence, and half a minute of swinging at a stump was the
+        // price of it.
+        var word = BotHeard.Last(body, Server.Engines.Harvest.Lumberjacking.System?.GetDefinition(), out _);
+
+        switch (word)
+        {
+            case BotHeard.Word.Empty:
+            case BotHeard.Word.Taken:
+                {
+                    BotHeard.Clear(body);
+                    Spoken++;
+
+                    _tree = null;
+                    _grewTick = 0;
+
+                    return BotDoing.Work(
+                        _cut > 0 ? $"moving to the next tree, {_cut} logs so far" : "looking for another tree"
+                    );
+                }
+
+            case BotHeard.Word.Broken:
+                {
+                    BotHeard.Clear(body);
+
+                    return BotDoing.Failed("the axe wore out");
+                }
+
+            case BotHeard.Word.Full:
+                {
+                    // The log came off the tree and was destroyed for want of room. Carrying on here costs the
+                    // wood and pays nobody.
+                    BotHeard.Clear(body);
+                    Sheathe(body);
+
+                    var (ordered, listed) = BotTimber.Store(bot);
+
+                    return BotDoing.Done(
+                        $"{_cut} logs in {_swings} swings, {ordered} to order and {listed} put out to sell — the pack would hold no more"
+                    );
+                }
+
+            case BotHeard.Word.Adrift:
+                {
+                    // The swing was cancelled rather than swung, because the bot moved while it resolved. The
+                    // tree is not to blame, so the clock below is not allowed to hold it against it.
+                    BotHeard.Clear(body);
+                    _grewTick = now;
+
+                    break;
+                }
+        }
+
         _swungTick = now;
         _swings++;
 
@@ -262,7 +330,11 @@ public sealed class BotChop : BotDeed
             return BotDoing.Work("cutting wood");
         }
 
-        // This one is finished. Not the trip — the next ring out almost always holds another.
+        // This one is finished, by the clock rather than by anything the engine said. That is now the unusual
+        // ending and it is counted apart, because a clock that keeps firing while the ear stays quiet means
+        // the ear has stopped working.
+        Silent++;
+
         _tree = null;
         _grewTick = 0;
 

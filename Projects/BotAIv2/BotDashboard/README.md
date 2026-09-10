@@ -1,11 +1,13 @@
 # Dashboard: one window onto the whole population
 
-`[bots` — an administrator-level command. Five tabs: the population, their market, what they are short of,
-what the city wants, and what everybody is doing.
+`[bots` — an administrator-level command. Eight tabs: the population, their market, what they are short of,
+what the city wants, what the population knows, the island as squares, whatever the watcher has declared,
+and the halls the guilds own.
 
 | File | What is in it |
 |---|---|
-| `BotDashboardGump.cs` | the window: three tabs, pages, buttons |
+| `BotDashboardGump.cs` | the window: seven tabs, pages, buttons |
+| `BotCrier.cs` | the notice board the watcher pins a revel to, so this window can read one |
 | `BotDashboardModule.cs` | module, phase `Settings`: registers the command |
 
 ---
@@ -119,3 +121,48 @@ frequent auto-refresh it would want a cache.
 `OnResponse(NetState, in RelayInfo)`,
 `AddBackground/AddAlphaRegion/AddLabel/AddLabelCropped/AddItem/AddButton/AddImageTiled`, `Singleton`,
 `SendGump/CloseGump` from `Server.Gumps`, `CommandSystem.Register` with `[Usage]`/`[Description]` from `Server`.
+
+---
+
+## The "Revel" tab
+
+Added 08.09.2026 on Patrick's order: *a tab where Argus writes the event he is running or about to run, and
+buttons to teleport to it.*
+
+It shows what is on — the trade being paid triple, the prize, the clock running down, what Argus called out
+and why — then who has taken it up and who is leading. Between revels it shows the countdown to the next
+time the watcher may think of one, the treasury it has left, and the last five that ended.
+
+Two buttons, and two because the two places are usually not the same one: **go to the camp** (or to wherever
+the revel was called, when it is a price rather than a place) and **go to the watcher**. Both re-read the
+notice at the moment they are pressed rather than trusting the window, because a revel ends on its own clock
+and teleporting an administrator to where a camp used to be is worse than saying it is gone.
+
+**The seam.** Argus lives in `mindedBots/`, an assembly that references this one and must never be
+referenced back, so this tab cannot ask him anything. He fills in `BotCrier.Posted` at start-up and clears
+it when he stops; the tab reads a copied notice. When nothing is watching, `BotCrier.Read()` is null and the
+tab says *that* rather than showing an empty table, because "no watcher" and "nothing declared" are two
+different facts about a shard.
+
+---
+
+## The "Halls" tab
+
+Added 08.09.2026 on Patrick's order, the evening the first one went up.
+
+One row per guild hall — whose it is, where it stands, who owns it now, how many of the guild are co-owners,
+how many things are inside, the engine's own word for how it is wearing, and what was paid — with a button
+that puts whoever is reading it on the doorstep. The teleport aims at `BaseHouse.BanLocation`, which is the
+engine's "just outside the front door" for every multi it knows; arriving in the middle of somebody's wall
+is not an entrance.
+
+**The lower half is the half worth reading when the upper half is empty.** Under the halls are the guilds
+that have not built one, with what they have raised against what one costs — and a guild that has the money
+is called out as waiting for *ground* rather than for coin. A shard where nothing is ever built looks
+identical from every other tab, and the answer is always one of those two numbers. The `plots:` line along
+the bottom says which of the engine's five placement rules is doing the refusing.
+
+**Condition is not decoration.** A house whose owner has been deleted decays in this era, and a population
+is rebuilt from nothing every restart — so an unowned hall is the one thing here that can go quietly wrong.
+`BotEstate.Adopt` hands each hall to whoever leads that guild now, and this column is how you would find out
+if it ever stopped.

@@ -4,6 +4,7 @@ using Server.Gumps;
 using Server.Items;
 using Server.Logging;
 using Server.Mobiles;
+using Server.Multis;
 using Server.Network;
 
 namespace Server.BotAI.V2;
@@ -103,6 +104,43 @@ public sealed class BotDashboardGump : DynamicGump
     /// </summary>
     private const int QuadTab = 5;
 
+    /// <summary>
+    /// What the watcher has declared, and where it is.
+    ///
+    /// <para>
+    /// <b>The one tab about something that was nobody's plan.</b> Argus reads the shard, forms an opinion
+    /// and turns it into a revel — a trade made worth three times as much for twelve minutes, sometimes with
+    /// an orc camp raised to go with it. None of that is visible from the other five tabs: the population
+    /// simply starts mining, and the reason is a sentence in a log file. This is that sentence, with the
+    /// clock beside it and a button that puts whoever is reading it on the spot.
+    /// </para>
+    ///
+    /// <para>
+    /// Read through <see cref="BotCrier"/> rather than from the watcher itself, because the watcher lives in
+    /// an assembly that references this one and must never be referenced back.
+    /// </para>
+    /// </summary>
+    private const int RevelTab = 6;
+
+    /// <summary>
+    /// What the population owns: the guild halls, where they stand and what is in them.
+    ///
+    /// <para>
+    /// <b>The only tab about something permanent.</b> Everything else here is gone by the next restart — the
+    /// bots, their purses, their errands, the market. A hall is a world object: it outlives the population
+    /// that levied for it, is found again at the next start by the name on its sign, and stays on the island
+    /// until somebody takes it down. That is worth a page which says where each one is and puts whoever is
+    /// reading it on the doorstep.
+    /// </para>
+    ///
+    /// <para>
+    /// The half of the page that is easy to miss is the lower half: the guilds that have <em>no</em> hall,
+    /// with what they have raised against what one costs. A shard where nothing is ever built looks the same
+    /// from every other tab, and the answer is always one of two numbers — the money, or the ground.
+    /// </para>
+    /// </summary>
+    private const int HallTab = 7;
+
     private readonly int _tab;
 
     private readonly int _page;
@@ -123,11 +161,16 @@ public sealed class BotDashboardGump : DynamicGump
 
     private readonly List<BotWant> _wants = [];
 
+    /// <summary>The halls this window is showing, snapshotted like every other row on it.</summary>
+    private readonly List<BaseHouse> _estate = [];
+
     public override bool Singleton => true;
 
     private BotDashboardGump(int tab, int page) : base(30, 30)
     {
-        _tab = tab is MarketTab or NeedsTab or CrownTab or KnownTab or QuadTab ? tab : BotsTab;
+        _tab = tab is MarketTab or NeedsTab or CrownTab or KnownTab or QuadTab or RevelTab or HallTab
+            ? tab
+            : BotsTab;
 
         if (_tab == MarketTab)
         {
@@ -157,10 +200,26 @@ public sealed class BotDashboardGump : DynamicGump
         // Visit reads _bots by row, and Fill only ever puts the *current page* into it — so a button numbered
         // from the whole population would point at whoever happens to be twelfth on this page, or at nothing
         // at all. One list, filled with exactly the bots this page offers to walk to.
-        if (_tab == QuadTab)
+        if (_tab is QuadTab or RevelTab)
         {
             _pages = 1;
             _page = 0;
+
+            return;
+        }
+
+        if (_tab == HallTab)
+        {
+            _pages = 1;
+            _page = 0;
+
+            foreach (var hall in BotEstate.Halls)
+            {
+                if (hall is { Deleted: false })
+                {
+                    _estate.Add(hall);
+                }
+            }
 
             return;
         }
@@ -189,6 +248,8 @@ public sealed class BotDashboardGump : DynamicGump
         Tab(ref builder, 580, "City", CrownTab);
         Tab(ref builder, 660, "Known", KnownTab);
         Tab(ref builder, 750, "Quad", QuadTab);
+        Tab(ref builder, 830, "Revel", RevelTab);
+        Tab(ref builder, 910, "Halls", HallTab);
 
         builder.AddButton(Width - 90, 12, 4014, 4016, 5);
         builder.AddLabel(Width - 60, 12, Ink, "refresh");
@@ -214,6 +275,14 @@ public sealed class BotDashboardGump : DynamicGump
         else if (_tab == QuadTab)
         {
             QuadPage(ref builder);
+        }
+        else if (_tab == RevelTab)
+        {
+            RevelPage(ref builder);
+        }
+        else if (_tab == HallTab)
+        {
+            HallsPage(ref builder);
         }
         else
         {
@@ -684,7 +753,17 @@ public sealed class BotDashboardGump : DynamicGump
             12,
             4005,
             4007,
-            tab switch { MarketTab => 2, NeedsTab => 6, CrownTab => 7, KnownTab => 9, QuadTab => 10, _ => 1 }
+            tab switch
+            {
+                MarketTab => 2,
+                NeedsTab  => 6,
+                CrownTab  => 7,
+                KnownTab  => 9,
+                QuadTab   => 10,
+                RevelTab  => 11,
+                HallTab   => 14,
+                _         => 1
+            }
         );
         builder.AddLabel(x + 20, 12, Ink, name);
     }
@@ -758,6 +837,35 @@ public sealed class BotDashboardGump : DynamicGump
                 DisplayTo(from, QuadTab);
 
                 return;
+
+            case 11:
+                DisplayTo(from, RevelTab);
+
+                return;
+
+            case 12:
+                Stand(from, false);
+
+                return;
+
+            case 13:
+                Stand(from, true);
+
+                return;
+
+            case 14:
+                DisplayTo(from, HallTab);
+
+                return;
+        }
+
+        // Before the two below it, and the order is the whole of it being right: every one of these ranges
+        // is open-ended, so the highest has to be asked first or it is answered by the one underneath.
+        if (button >= 300)
+        {
+            Doorstep(from, button - 300);
+
+            return;
         }
 
         if (button >= 200)
@@ -771,6 +879,295 @@ public sealed class BotDashboardGump : DynamicGump
         {
             Visit(from, button - 100);
         }
+    }
+
+    /// <summary>
+    /// The halls: one row each, and under them the guilds that have not built yet and why.
+    /// </summary>
+    private void HallsPage(ref DynamicGumpBuilder builder)
+    {
+        builder.AddLabel(14, 60, Head, "guild");
+        builder.AddLabel(160, 60, Head, "where");
+        builder.AddLabel(280, 60, Head, "owner");
+        builder.AddLabel(440, 60, Head, "of the guild");
+        builder.AddLabel(560, 60, Head, "inside");
+        builder.AddLabel(700, 60, Head, "condition");
+        builder.AddLabel(860, 60, Head, "paid");
+        builder.AddLabel(960, 60, Head, "go");
+
+        for (var i = 0; i < _estate.Count && i < Rows; i++)
+        {
+            var hall = _estate[i];
+            var y = 86 + i * (RowHeight + 4);
+
+            builder.AddLabelCropped(14, y, 140, 20, Head, hall.Sign?.Name ?? "unnamed");
+            builder.AddLabel(160, y, Ink, $"{hall.X}, {hall.Y}");
+            builder.AddLabelCropped(280, y, 150, 20, Ink, hall.Owner?.Name ?? "nobody");
+            builder.AddLabel(440, y, Ink, $"{(hall.CoOwners?.Count ?? 0) + 1}");
+            builder.AddLabel(560, y, Ink, $"{Furnishings(hall)} things");
+            builder.AddLabelCropped(700, y, 150, 20, Ink, Condition(hall));
+            builder.AddLabel(860, y, Ink, $"{hall.Price}gp");
+
+            builder.AddButton(960, y, 4005, 4007, 300 + i);
+        }
+
+        if (_estate.Count == 0)
+        {
+            builder.AddLabel(14, 86, Bad, "Nothing has been built on this island yet.");
+        }
+
+        // The other half of the answer, and the half worth reading when the first is empty: what each guild
+        // without a hall has raised, against what one costs.
+        var y2 = 86 + Math.Max(1, _estate.Count) * (RowHeight + 4) + 20;
+
+        builder.AddImageTiled(14, y2 - 12, Width - 28, 1, 9274);
+        builder.AddLabel(14, y2, Head, "still saving");
+
+        var waiting = 0;
+
+        foreach (var guild in BotGuilds.Standing)
+        {
+            if (BotEstate.Hall(guild) != null)
+            {
+                continue;
+            }
+
+            var fund = BotEstate.Fund(guild);
+            var row = y2 + 26 + waiting++ * 24;
+
+            builder.AddLabelCropped(14, row, 140, 20, Ink, guild.Name);
+
+            if (fund >= BotEstate.Price)
+            {
+                builder.AddLabel(160, row, Good, $"has {fund}gp of {BotEstate.Price} — it is the ground it is waiting for");
+            }
+            else
+            {
+                builder.AddLabel(160, row, Ink, $"has {fund}gp of {BotEstate.Price}, {BotEstate.Price - fund}gp short");
+            }
+        }
+
+        if (waiting == 0)
+        {
+            builder.AddLabel(160, y2, Good, "every guild has one");
+        }
+
+        builder.AddLabelCropped(14, Height - 34, Width - 28, 20, Ink, BotPlot.Describe());
+    }
+
+    /// <summary>How many things stand in a hall: its fittings and whatever is locked down in it.</summary>
+    private static int Furnishings(BaseHouse hall) => (hall.Addons?.Count ?? 0) + (hall.LockDowns?.Count ?? 0);
+
+    /// <summary>
+    /// The engine's own word for how a house is wearing, which is the one number about a hall that can go
+    /// wrong quietly: an unowned house in this era decays, and nothing else on this shard would say so.
+    /// </summary>
+    private static string Condition(BaseHouse hall) => hall.DecayLevel.ToString();
+
+    /// <summary>Puts whoever pressed the button outside a hall's door.</summary>
+    private void Doorstep(Mobile from, int row)
+    {
+        if (row < 0 || row >= _estate.Count)
+        {
+            return;
+        }
+
+        var hall = _estate[row];
+
+        if (hall.Deleted || hall.Map == null || hall.Map == Map.Internal)
+        {
+            from.SendMessage("That hall is not standing any more.");
+
+            DisplayTo(from, HallTab);
+
+            return;
+        }
+
+        // The ban location rather than the middle of the house: it is the engine's own "outside the front
+        // door" for every multi it knows, and arriving inside somebody's wall is not an entrance.
+        from.MoveToWorld(hall.BanLocation, hall.Map);
+        from.SendMessage($"The hall of {hall.Sign?.Name ?? "somebody"}, {Furnishings(hall)} things inside it.");
+
+        DisplayTo(from, HallTab);
+    }
+
+    /// <summary>
+    /// The revel: what is on, what it is for, and where to stand to watch it.
+    /// </summary>
+    private void RevelPage(ref DynamicGumpBuilder builder)
+    {
+        var notice = BotCrier.Read();
+
+        if (notice == null)
+        {
+            // Nothing is watching, which is a different thing from nothing being declared, and the tab says
+            // which of the two it is rather than showing an empty table that could mean either.
+            builder.AddLabel(14, 60, Bad, "No watcher is running on this shard, so nothing is being declared.");
+            builder.AddLabel(14, 84, Ink, "Revels come from the minds assembly. Without it this tab has nothing to show.");
+
+            return;
+        }
+
+        builder.AddLabel(14, 60, Head, "what is on");
+
+        if (notice.Running)
+        {
+            builder.AddLabel(
+                14,
+                86,
+                Good,
+                $"{notice.Kind} is worth x{notice.Bonus:F1} for another {Clock(notice.EndsIn)}, prize {notice.Prize}gp"
+            );
+
+            builder.AddLabel(14, 112, Head, "it said");
+            builder.AddHtml(120, 112, Width - 150, 40, notice.Said ?? "nothing at all");
+
+            builder.AddLabel(14, 158, Head, "because");
+            builder.AddHtml(120, 158, Width - 150, 60, notice.Why ?? "no reason was given");
+
+            if (notice.Entered == 0)
+            {
+                builder.AddLabel(14, 226, Bad, "nobody has taken it up yet");
+            }
+            else
+            {
+                builder.AddLabel(
+                    14,
+                    226,
+                    Ink,
+                    $"{notice.Entered} have taken it up; {notice.Leading} leads with {notice.LeadingDid}"
+                );
+            }
+
+            if (notice.Wave > 0)
+            {
+                builder.AddLabel(14, 250, Good, $"wave {notice.Wave} is standing, {notice.Standing} of it alive");
+            }
+        }
+        else
+        {
+            builder.AddLabel(14, 86, Ink, $"Nothing is on. The watcher may declare again in {Clock(notice.NextIn)}.");
+
+            if (notice.Past is { Length: > 0 })
+            {
+                builder.AddLabel(14, 112, Ink, $"the last one — {notice.Past[0]}");
+            }
+            else
+            {
+                builder.AddLabel(14, 112, Ink, "nothing has been declared yet");
+            }
+        }
+
+        // Where to stand. Two buttons rather than one: the thing itself may be an hour's walk from the
+        // watcher who declared it, and on a quiet shard the more useful of the two is whichever is nearer
+        // to something happening.
+        var where = notice.Map != null && notice.Where != Point3D.Zero;
+
+        builder.AddImageTiled(14, 262, Width - 28, 1, 9274);
+
+        if (where)
+        {
+            builder.AddButton(14, 276, 4005, 4007, 12);
+
+            if (notice.Camp)
+            {
+                builder.AddLabel(52, 276, Head, $"go to the camp at ({notice.Where.X}, {notice.Where.Y})");
+            }
+            else
+            {
+                builder.AddLabel(52, 276, Head, $"go to where it was called, ({notice.Where.X}, {notice.Where.Y})");
+            }
+        }
+        else
+        {
+            builder.AddLabel(14, 276, Ink, "nowhere in particular: this one is a price, not a place");
+        }
+
+        if (notice.WatcherMap != null && notice.Watcher != Point3D.Zero)
+        {
+            builder.AddButton(14, 306, 4005, 4007, 13);
+            builder.AddLabel(
+                52,
+                306,
+                Head,
+                $"go to {notice.WatcherName ?? "the watcher"}, standing at ({notice.Watcher.X}, {notice.Watcher.Y})"
+            );
+        }
+
+        builder.AddImageTiled(14, 340, Width - 28, 1, 9274);
+
+        builder.AddLabel(14, 354, Head, "the crown");
+        builder.AddLabel(
+            120,
+            354,
+            Ink,
+            $"{notice.Declared} declared, {notice.Won} won, {notice.Ignored} ignored, {notice.Bands} taken by a whole guild; {notice.Paid}gp paid out, {notice.Collected}gp taken in tax, {notice.Purse}gp in the purse"
+        );
+
+        builder.AddLabelCropped(14, 384, Width - 28, 20, Ink, notice.Waves ?? "no waves have been called");
+
+        // What the watcher's own events have actually come to, trade by trade. A kind held three times that
+        // drew nobody is the row worth seeing, and it is the row the watcher is now shown before it chooses.
+        builder.AddLabelCropped(14, 404, Width - 28, 20, Ink, notice.Ledger ?? "none have been held yet");
+
+        builder.AddLabel(14, 434, Head, "before this");
+
+        var past = notice.Past ?? [];
+
+        for (var i = 0; i < past.Length && i < 5; i++)
+        {
+            builder.AddLabelCropped(120, 434 + i * 24, Width - 150, 20, Ink, past[i]);
+        }
+
+        if (past.Length == 0)
+        {
+            builder.AddLabel(120, 434, Ink, "nothing has ended yet");
+        }
+    }
+
+    /// <summary>Milliseconds as a clock a person reads, because 431000 is not a length of time to anybody.</summary>
+    private static string Clock(long ms)
+    {
+        var seconds = Math.Max(0, ms / 1000);
+
+        return $"{seconds / 60}m {seconds % 60:D2}s";
+    }
+
+    /// <summary>
+    /// Puts whoever pressed the button where the revel is, or beside the watcher who declared it.
+    ///
+    /// The notice is read again rather than remembered from when the window was drawn: a revel ends on its
+    /// own clock, and a button that teleports an administrator to where a camp used to be is worse than a
+    /// button that says the camp is gone.
+    /// </summary>
+    private void Stand(Mobile from, bool watcher)
+    {
+        var notice = BotCrier.Read();
+
+        var map = watcher ? notice?.WatcherMap : notice?.Map;
+        var at = watcher ? notice?.Watcher ?? Point3D.Zero : notice?.Where ?? Point3D.Zero;
+
+        if (map == null || map == Map.Internal || at == Point3D.Zero)
+        {
+            from.SendMessage(watcher ? "The watcher is nowhere to be found." : "That revel has no place any more.");
+
+            DisplayTo(from, RevelTab);
+
+            return;
+        }
+
+        from.MoveToWorld(at, map);
+
+        if (watcher)
+        {
+            from.SendMessage($"{notice.WatcherName ?? "The watcher"} is standing here.");
+        }
+        else
+        {
+            from.SendMessage($"This is where {notice.Kind ?? "the last revel"} was called.");
+        }
+
+        DisplayTo(from, RevelTab);
     }
 
     private void Visit(Mobile from, int row)

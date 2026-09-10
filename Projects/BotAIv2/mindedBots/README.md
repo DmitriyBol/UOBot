@@ -1,23 +1,84 @@
 # BotMindAI
 
-Four of the population have a mind: a local language model chooses what they do next. A fifth thinking
-thing lives in this assembly and is not one of them — see **`debugger/`** below.
+**The four crafters think, and nothing else on this shard does.** Patrick's order of 07.09.2026: the
+Captain, the Architect, the Sage and the Baron were stood down, and the whole of the Crafter class — four
+bodies, `Roderic`, `Emeric`, `Ulric` and `Wulfric` — is held by minds. There are no unthinking crafters.
 
-**The Baron is the fourth**, and the only one whose subject is the island rather than a trade. He was out
-for a while — the line creating him commented out in `BotMinds.Start`, the class taken out of
-`bot-population.json` — and this file said so for longer than it was true. He is raised: `Baldric the baron`
-appears in the `Minds:` line every five minutes, and the `The Baron:` line is his own.
+This is the first office where thinking is not a supplement to the arithmetic but the whole of how the trade
+is run, and the reason is the shape of the work. A crafter's job is a chain: a want on the board, a material
+that may not exist yet, a skill that may not be high enough, and a price that has to beat buying the thing
+outright. The auction can weigh one link of that. It cannot decide to go and cut wood today so that there
+are arrows tomorrow.
 
-**`debugger/` is a different kind of thing entirely** and shares only the transport. It is one invisible bot
-that watches the others and writes down what is wrong with them: no work, no wage, no mood, no class, and it
-never enters the auction. It has its own module, its own configuration file and its own log. Read
-`debugger/README.md`; nothing below this line applies to it.
+The four stood-down minds are **commented, not deleted**, in `BotMinds.Start` — the Baron's line was
+commented the same way on 01.09.2026 and putting him back cost exactly one line. Their lessons are still on
+disk in `Configuration/bot-minds.json` under their old names.
 
-It is a **separate assembly on purpose**. `BotMindAI` references `BotAIv2`; nothing in `BotAIv2`
-references this. Delete `"BotMindAI.dll"` from `Distribution/Data/assemblies.json` and the shard is
-exactly what it was, with the warrior and the archer among the ordinary fourteen. That property was the
-requirement, and it is enforced by the build rather than by discipline — a reference the other way would
-not compile.
+A fifth thinking thing lives in this assembly and is not one of them — see **`debugger/`** below.
+
+## What a crafter is shown, and why each block is there
+
+Six blocks are added to the state for `crafter` minds only. Each exists because of something that went
+wrong without it, and every fact in them is read out of the running shard rather than written down here.
+
+| Block | What it says | The mistake it prevents |
+|---|---|---|
+| `Bench` | every skill of its class, **which trade on the menu is made with it**, what it is at, what the class targets, and two or three things it could make right now | a mind with Blacksmith 20 announced it would buy cloth and make ringmail **as a tailor** |
+| `Board` | the wants: amount, price, **gold already lodged**, deliveries, **how many times the price has been raised**, and **which craft makes it, which trade to take, what skill it needs, what this bot has** | the first thinking crafter read "2 Mind Blast Scrolls, paid for" and announced it would *forge* them |
+| `Materials` | each kind of thing on the stalls, how many stalls, the cheapest price | a crafter that can only dig stops when the seam does |
+| `Island` | **counted at that moment**: bots with a bare armour slot and how many slots, shooters with nothing to shoot, bots that have not eaten | "work for the good of the island" is an exhortation until it is a number; and every subsystem's own total is cumulative, which reads as *now* and is not |
+| `Shelf` | its own stalls: what sold, what it earned, **what has been cut in price and still not sold** | a mind judging its trades on its own forecasts is grading its own homework |
+| `Fellows` | what the other three are **holding** right now | four minds given identical state make identical choices |
+
+The board is filtered through `BotShopper.Makeable`, so a want nothing on the island can produce is never
+shown as work — and the number of those filtered out is shown instead, which is a different fact worth
+having.
+
+**The raises are the point of a board row, not the price.** A want lifted five times with nothing delivered
+is the island saying it has been trying to buy that for half an hour, and nothing else in the state carries
+that.
+
+**The minds are staggered across the thinking interval.** Four created in the same millisecond ask in the
+same second, read a state none of them has changed yet, and choose the same trade — which they did, three
+rounds running, with `Fellows` in front of them saying "nothing yet". `BotMind.Stagger` offsets each by a
+share of `ThinkEveryMs`, so by the time the second thinks, the first is holding something.
+
+**The state's length is printed in the `Minds:` summary.** Every block costs some of the budget the model
+has to think in, and the debugger's prompt reached 19981 characters before anybody noticed the answers
+getting worse. A number that grows silently is the one to instrument.
+
+## What the log holds about one decision
+
+`logs/bot-minds.log`, four lines per choice, and each answers a different question:
+
+```
+Roderic — chose Tailor, expects 142/min over 60 min (2489ms)
+    <the model's own sentence for it>
+Roderic — could have taken
+    Miner, Woodsman, Tailor, Armoury, Hunter
+Roderic — and
+    saw: 240gp in pack, 0gp banked, 25% loaded; board: 0 wants it could make now, 9 beyond its skill;
+    stalls: 81 listings from 3gp; others: Emeric mine, Ulric mine, Wulfric mine
+```
+
+**The second pair exists because a reason without its evidence cannot be checked.** The model's sentence is
+its account of itself, which is the thing least worth trusting: when a crafter says "the board is empty so I
+will sew", the question the next morning is whether the board really was empty, and until this line there
+was no way to answer it without having been watching. `BotMindSight.Brief` writes it from the same objects
+the state was built from.
+
+A fifth line appears when the auction preferred its own arithmetic:
+
+```
+Emeric — its choice of Tailor was not taken up; the auction is holding mine instead
+```
+
+Two thirds of these minds' choices were going unused and the log said only that they were. A bare count
+cannot tell "the arithmetic disagreed" from "the mind keeps choosing work that is gone by the time the
+auction comes round"; the word after *holding* answers it.
+
+For everything else there is `dial BotMindSight.Dump true` — the next state written out in full, once.
+
 
 ## What the model actually decides
 

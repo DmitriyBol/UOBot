@@ -29,6 +29,21 @@ public sealed class BotCraftSettings
 
     /// <summary>How long the sewing itself is expected to take.</summary>
     public double? WorkMinutes { get; set; }
+
+    /// <summary>
+    /// What an afternoon at an anvil is reckoned at per minute before experience corrects it.
+    ///
+    /// Added on 07.09.2026 with the rest of the smith's dials: this file was written when sewing was the
+    /// only craft on the shard, and every number the forge runs on was reachable only by rebuilding. A
+    /// number that cannot be moved on a living shard is a number nobody tries.
+    /// </summary>
+    public double? ForgePrior { get; set; }
+
+    /// <summary>How long a stint at the anvil is expected to take.</summary>
+    public double? ForgeMinutes { get; set; }
+
+    /// <summary>How many recipes and metals the smith will try before giving a stint up.</summary>
+    public int? AnvilTries { get; set; }
 }
 
 /// <summary>Reads the craft file and moves the numbers it names.</summary>
@@ -62,5 +77,10 @@ public static class BotCraftConfig
         BotSew.GoldPerPiece = settings.GoldPerPiece ?? BotSew.GoldPerPiece;
         BotSew.Prior = settings.Expects ?? BotSew.Prior;
         BotSew.WorkMinutes = settings.WorkMinutes ?? BotSew.WorkMinutes;
+
+        BotForge.Prior = settings.ForgePrior ?? BotForge.Prior;
+        BotForge.WorkMinutes = settings.ForgeMinutes ?? BotForge.WorkMinutes;
+
+        BotAnvil.Tries = settings.AnvilTries ?? BotAnvil.Tries;
     }
 }

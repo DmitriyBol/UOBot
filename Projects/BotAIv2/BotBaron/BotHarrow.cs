@@ -1063,7 +1063,7 @@ public sealed class BotHarrow : BotDeed
 
         for (var i = 0; i < skills.Length; i++)
         {
-            if (skills[i].Base >= GrandmasterAt)
+            if (skills[i].Base >= GrandmasterAt && !BotMobile.Granted(skills[i].SkillName))
             {
                 return true;
             }
@@ -1071,6 +1071,7 @@ public sealed class BotHarrow : BotDeed
 
         return false;
     }
+
 
     /// <summary>How many reagents of any kind are in the pack. One type check covers every herb in the era.</summary>
     private static int Herbs(Mobile body)

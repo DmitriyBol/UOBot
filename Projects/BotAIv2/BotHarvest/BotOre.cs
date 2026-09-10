@@ -111,6 +111,82 @@ public static class BotOre
         return Mining.System?.OreAndStone?.GetBank(map, x, y)?.Current ?? 0;
     }
 
+    /// <summary>
+    /// The longest the engine may take to put ore back into a bank, in milliseconds.
+    ///
+    /// <para>
+    /// <b>Two numbers on one shelf that had never met.</b> <c>HarvestBank.Consume</c> sets the refill time
+    /// the first time a full bank is touched, at <c>MinRespawn + rnd * (MaxRespawn - MinRespawn)</c> — ten to
+    /// twenty minutes for ore in this era — and refills the whole bank at once. Our own
+    /// <c>BotGround.DrainedMs</c> rested a worked-out seam for ten, a number chosen here for sounding right.
+    /// So a seam came back onto the board at the earliest moment the engine could possibly have refilled it
+    /// and, most of the time, before it had: the next miner walked out, swung at eight barren rocks and
+    /// filed the seam as worked out again. On the morning of 09.09.2026 that was 112 of 122 mining failures
+    /// in one hour, and mining finished 7% of what it took on.
+    /// </para>
+    ///
+    /// <para>
+    /// Asked of the engine rather than copied from it, for the reason this whole assembly gives everywhere
+    /// else: a number written down twice is a number that drifts, and a shard configured for a different era
+    /// would move one copy and not the other.
+    /// </para>
+    /// </summary>
+    public static int RespawnMs =>
+        (int)(Mining.System?.OreAndStone?.MaxRespawn ?? System.TimeSpan.FromMinutes(20.0)).TotalMilliseconds;
+
+    /// <summary>
+    /// What the engine gives this bot for one swing at this tile, between nought and one.
+    ///
+    /// <para>
+    /// <b>The number every backstop in mining was implicitly guessing at.</b> <c>HarvestSystem.Harvest</c>
+    /// rolls <c>Mobile.CheckSkill(def.Skill, resource.MinSkill, resource.MaxSkill)</c>, and the engine's own
+    /// chance for that is <c>(value - min) / (max - min)</c>. For iron that is nought to a hundred, so a bot
+    /// with thirty mining misses seven swings in ten — which is not bad luck, it is the ordinary working life
+    /// of a novice miner, and the code that decided a rock was empty after six quiet swings was reading it as
+    /// an empty rock.
+    /// </para>
+    ///
+    /// <para>
+    /// The resource asked about is the one <c>MutateResource</c> would actually hand over: below the vein's
+    /// requirement the engine quietly falls back to iron, so a green miner in a valorite seam is rolling
+    /// against iron's numbers and not against valorite's. Getting that wrong would make this pessimistic in
+    /// exactly the place it matters most.
+    /// </para>
+    /// </summary>
+    public static double Chance(Mobile bot, Map map, int x, int y)
+    {
+        var def = Mining.System?.OreAndStone;
+
+        if (bot == null || def == null || map == null)
+        {
+            return 1.0;
+        }
+
+        var vein = VeinAt(map, x, y);
+
+        if (vein == null)
+        {
+            return 1.0;
+        }
+
+        var skill = bot.Skills[def.Skill].Base;
+
+        // The engine's own fallback: below the vein's requirement it hands over iron instead, and the roll
+        // is made against iron. See HarvestSystem.MutateResource.
+        var resource = skill < vein.ReqSkill || skill < vein.MinSkill
+            ? def.Resources is { Length: > 0 } ? def.Resources[0] : vein
+            : vein;
+
+        var span = resource.MaxSkill - resource.MinSkill;
+
+        if (span <= 0.0)
+        {
+            return skill >= resource.MinSkill ? 1.0 : 0.0;
+        }
+
+        return System.Math.Clamp((skill - resource.MinSkill) / span, 0.0, 1.0);
+    }
+
     /// <summary>Iron asks nothing of the miner, which is exactly what makes it common.</summary>
     public static bool IsCommon(HarvestResource vein) => vein == null || vein.ReqSkill <= 0.0;
 

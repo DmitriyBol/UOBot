@@ -78,6 +78,27 @@ public static class BotMinds
     /// </summary>
     public static string BaronName { get; set; } = "Baldric";
 
+    /// <summary>
+    /// The four crafters, by name, and every one of them thinks.
+    ///
+    /// <para>
+    /// <b>Patrick's order of 07.09.2026: there are no unthinking crafters on this shard.</b> The class is now
+    /// held by four minds and by nobody else, which makes this the first office where thinking is not a
+    /// supplement to the arithmetic but the whole of how the trade is run. The reason it is this class rather
+    /// than another: a crafter is the only bot whose work is a chain — a want on the board, a material that
+    /// may not exist yet, a skill that may not be high enough, and a price that has to beat buying the thing
+    /// outright. The auction can weigh one link. It cannot decide to go and cut wood today so that there are
+    /// arrows tomorrow.
+    /// </para>
+    ///
+    /// <para>
+    /// New names rather than the old ones on purpose: lessons are kept by name, and a mind inheriting a
+    /// warrior's rules about Peddler forecasts would start its life believing things about a trade it no
+    /// longer has.
+    /// </para>
+    /// </summary>
+    public static string[] CrafterNames { get; set; } = ["Roderic", "Emeric", "Ulric", "Wulfric"];
+
     /// <summary>Whether the beat is running.</summary>
     public static bool Running => _timer != null;
 
@@ -107,15 +128,31 @@ public static class BotMinds
         Stop();
 
         _minds.Clear();
-        _minds.Add(new BotMind(WarriorName, "warrior"));
+
+        // <b>Nobody is thinking on this shard from 07.09.2026, by instruction.</b> All four minds are stood
+        // down and the Captain, the Sage, the Architect and the Baron are ordinary bots: their bodies, their
+        // classes, their company and their drill field are untouched, because every piece of work written for
+        // an office is offered on the class rather than on the mind — <c>BotHarrower.Propose</c> tests
+        // <c>Class: BotBaron</c> and its neighbours do the same. What changes is only who chooses: the
+        // auction's arithmetic instead of a model.
+        //
+        // The lines are commented rather than deleted, exactly as the Baron's was on 01.09.2026 and for the
+        // reason that worked: bringing a mind back cost one line and one entry in bot-population.json, and
+        // everything it needed was still here and still correct. The lessons they learned are on disk in
+        // Configuration/bot-minds.json and are not touched either.
+        //
+        // What this frees: the whole of the video card goes to the debugger, which is not a mind and keeps
+        // watching, and bot-minds.log stops growing.
+        //
+        // _minds.Add(new BotMind(WarriorName, "warrior"));
 
         // <b>The minds are offices, and none of them is a build.</b> They were a blade, a bow and a book —
         // three ways of fighting, which between them can only answer one question and answer it three times.
         // Every bot on the shard fights; almost none of them decides anything that outlives the fight. So the
         // rest are offices whose whole subject is the population rather than the moment: what gets made and
         // how well the shard is equipped, and what the casters know.
-        _minds.Add(new BotMind(ArchitectName, "architect"));
-        _minds.Add(new BotMind(SageName, "sage"));
+        // _minds.Add(new BotMind(ArchitectName, "architect"));
+        // _minds.Add(new BotMind(SageName, "sage"));
 
         // <b>Back on the shard from 02.09.2026, by instruction.</b> He was stood down for a day while the
         // debugger took his slot; the code was left standing precisely so that bringing him back would be
@@ -131,9 +168,52 @@ public static class BotMinds
         // him out again. What took his slot is the debugger — see the debugger folder — which is not a mind
         // at all: it takes no work, joins no auction and only watches.
         //
-        _minds.Add(new BotMind(BaronName, "baron"));
+        // _minds.Add(new BotMind(BaronName, "baron"));
+
+        // <b>The four crafters, and they are the only minds on the shard from 07.09.2026.</b> One per body
+        // of the Crafter class, which the population raises four of and nothing else claims. If the
+        // population is ever configured with fewer, the extra minds simply find no body and say so at the
+        // next census rather than taking somebody else's — see Claim, where "crafter" has no fallback for
+        // the same reason the Baron has none: the whole of the office lives on the class.
+        for (var i = 0; i < CrafterNames.Length; i++)
+        {
+            var mind = new BotMind(CrafterNames[i], "crafter");
+
+            // <b>Spread across the thinking interval, and this is not tidiness.</b> Four minds started in
+            // the same millisecond ask their question in the same second, read a state none of them has
+            // changed yet, and choose the same trade — which is exactly what the first four crafters did,
+            // three times running, while the block telling each what the others were holding sat in front of
+            // them saying "nothing yet". A mind cannot be told about a decision that has not been made. So
+            // they are offset by a share of the interval each: by the time the second one thinks, the first
+            // is holding something, and the fact exists to be read.
+            mind.Stagger(i * BotMind.ThinkEveryMs / Math.Max(1, CrafterNames.Length));
+
+            _minds.Add(mind);
+        }
 
         Load();
+
+        // <b>No minds, no beat.</b> The list being empty is now a real state rather than a transient one, and
+        // a two-second timer that claims nobody, builds a menu nobody reads and writes "no minds are running"
+        // into the log every five minutes is not a switched-off subsystem — it is a switched-on one that has
+        // nothing to do, which is harder to read in a log and costs the same. Said once, plainly, so that
+        // "nobody is thinking" is a fact in the boot lines rather than something inferred from silence.
+        if (_minds.Count == 0)
+        {
+            logger.Information(
+                "No minds are running: the Captain, the Architect, the Sage and the Baron are ordinary bots and the auction chooses for them. Their names and the lessons they learned are kept in {Path}; putting one back is one line in BotMinds.Start",
+                MemoryPath
+            );
+
+            return;
+        }
+
+        // Opened here rather than in the module, because here is the first moment anybody knows whether
+        // there will be any minds at all. Opened before Claim, because Claim writes the first lines into it.
+        // A log file stamped "minds awake" with the current time while nothing is thinking is an instrument
+        // that looks alive, and this shard has been misled by one of those before.
+        BotMindLog.Open();
+
         Claim();
 
         _saidTick = Core.TickCount;
@@ -192,6 +272,11 @@ public static class BotMinds
                 "architect" => ["Architect", "Crafter"],
                 "sage" => ["Sage", "Mage"],
                 "baron" => ["Baron"],
+
+                // <b>No fallback, for the Baron's reason.</b> A crafter mind in a warrior's body would read a
+                // prompt about the board, the materials and its own forge every twenty seconds while being
+                // offered none of them.
+                "crafter" => ["Crafter"],
                 _ => ["Captain", "Warrior"]
             };
 
@@ -433,7 +518,7 @@ public static class BotMinds
         {
             _saidTick = Core.TickCount;
 
-            logger.Information("Minds: {What}", $"{Describe()}; {BotOllama.Describe()}; {BotMindTalk.Lines} lines said between them");
+            logger.Information("Minds: {What}", $"{Describe()}; {BotOllama.Describe()}; {BotMindTalk.Lines} lines said between them; the state they read last ran to {BotMindSight.LastChars} characters");
         }
 
         if (_trades.Count == 0)

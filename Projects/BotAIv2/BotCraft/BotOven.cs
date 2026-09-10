@@ -155,8 +155,18 @@ public static class BotOven
                 continue;
             }
 
-            // Counted after it is in the pack, which is where the caller lifts it to before asking.
-            if (Amount(bot, kind) <= Keeps)
+            // <b>Unless somebody has already put money down for it, in which case holding it is what keeps
+            // the board frozen.</b> The want for ribs exists so a hunter can be paid for meat — that is
+            // written into BotStores in as many words. But on this shard the hunter and the cook are the
+            // same bot: it kills a cow, this rule keeps the ribs for its own pan, and the funded order it
+            // could have filled goes on standing. Measured 08.09.2026, sixteen minutes after a restart: 45
+            // bots each with 60gp down, 900 ribs wanted on the board, **not one delivery**, and 6919gp of a
+            // population's 12729 locked in escrow that nothing could release.
+            //
+            // Asked of the board rather than of this bot, and Demand already refuses a bot its own order, so
+            // a cook never sells itself its own dinner. What it does now is prefer a paying customer over
+            // its own larder, which is what a market is for.
+            if (Amount(bot, kind) <= Keeps && BotAuction.Demand(bot as IBotWilful, kind) == null)
             {
                 Spared++;
 

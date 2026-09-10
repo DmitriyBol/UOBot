@@ -13,6 +13,8 @@ The first work in the project that **brings new gold into the world**. Everythin
 | `BotGlean.cs` | picking spent ammunition up off the ground |
 | `BotMuster.cs` | offers a bot the chance to call a company against something it must otherwise walk past |
 | `BotPickings.cs` | going through something this bot killed without meaning to |
+| `BotPlunder.cs` | going through a chest, crate or barrel standing out in the world — a camp's, a ruin's |
+| `BotFreedom.cs` | getting a prisoner out of a camp and walking it home for the engine's bounty |
 | `BotProwl.cs` | going to look for a fight, when there is nothing to fight where the bot is standing |
 
 ---
@@ -157,3 +159,62 @@ only on writing.
 
 **Armour.** There is none in the kit at all. That is the next step, together with smithing — before it, armour
 would be a need a shopkeeper satisfies, i.e. a new gold sink rather than a crafter's income.
+
+
+## A chase has a length as well as a clock
+
+Patrick's order of 09.09.2026: *if the quarry runs and the bot cannot reach it, drop it after fifty tiles.*
+
+`BotSlay` had `CapMs` — a chase gives up after so long — and a clock does not bound a bot's position. A quarry
+that walks away as fast as the bot walks after it is a bot travelling in a straight line for as long as the
+cap allows, and the shard was paying for it: fourteen bots carried home in an hour on 09.09.2026, all in
+bursts of two to six inside one minute, and the six at 17:34 were standing in a single ten-tile patch at
+(1208, 2202) — **737 tiles from home, where `BotPopulation.Roam` is 200**. A company had chased something
+clean off the ground the population is allowed to choose work on, and got stuck there together.
+
+`BotSlay.Leash`, fifty tiles, measured from **where the chase began** rather than from home. That distinction
+is the point: the walk out to a quarry is a journey the decision layer priced and agreed to, and what was
+never agreed to is that walk becoming unbounded the moment the quarry starts running. The roam limit governs
+what a bot may *choose*; this governs what a chase may *drag* it into.
+
+Counted as `BotSlay.Slipped`, and the ending says so — *"a dire wolf drew it 63 tiles and was let go"*.
+
+
+## Archers backed away from things that were not chasing them
+
+Patrick, 09.09.2026: *"why the hell do archers always run away from mobs? They should kite, yes — but if they
+can shoot they MUST shoot."*
+
+One condition. `BotSlay.Kiting` asked whether the quarry was within `reach - 1`, and a bow reaches ten — so a
+creature **nine tiles away**, which is the distance an archer exists to fight at, read as "something has
+closed on me". The tally over one session: **1,514 kites against 860 shots**. Nearly two beats in three spent
+walking backwards from things already exactly where they were wanted.
+
+`BotSlay.KiteWithin`, five tiles — half the reach a bow is worth, which is a statement about the archer's
+advantage rather than a tidy number. Above it the bot stands and shoots; below it the idle window is spent
+opening the distance. Widening cannot cost a shot by construction, because the kite only runs while the bow
+is reloading; what the old nine-tile gate wasted was position and time.
+
+**Four was tried first and was measured wrong within the hour** — one past `TooClose`, tidy, and one tile
+wide, because anything inside three is already handled by the branch below. Result: 1,537 archer asks, every
+one of them *far enough off to simply shoot*, and not a single kite. Half of what was asked for had gone
+inert.
+
+### And a lesson about the instrument rather than the shard
+
+At four tiles the tally read *longest clock seen 227ms against 1700ms needed*, and that was read here as
+proof that the bow never fires — the engine returns a quarter of a second and retries when the shooter has
+moved inside the last second, which fits 227ms exactly. It was wrong. `Longest` was only sampled **after** the
+distance gate, so tightening the gate stopped it being sampled at all, and a number that had almost stopped
+being written read as a number that had stopped moving.
+
+Sampling stillness on every ask settled it:
+
+```
+1974 of them had been standing still long enough for the engine to loose an arrow,
+longest stillness seen 37647ms against the 1000ms it wants — longest clock seen 5382ms
+```
+
+A weapon clock reaching 5,382ms is `GetDelay` having been returned, which only happens when a shot was
+actually loosed. The bows work. **A counter behind a gate measures the gate, not the world** — read where a
+number is written before believing what it says.

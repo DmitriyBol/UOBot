@@ -40,8 +40,22 @@ public static class BotPopulation
     /// </summary>
     public static Point3D Where { get; set; } = new(1592, 1680, 10);
 
-    /// <summary>How far around that point bots are scattered, so they do not all arrive on one tile.</summary>
-    public static int Spread { get; set; } = 6;
+    /// <summary>
+    /// How far around that point bots are scattered, so they do not all arrive on one tile.
+    ///
+    /// <para>
+    /// <b>Six put forty-nine bots into a thirteen-tile square, and the rescue kept dropping them into it.</b>
+    /// On the night of 07-08.09.2026 fifty-four bots were carried home for being able to reach nothing, and
+    /// fifteen of them - twenty-eight per cent - then reported that they could reach nothing from home
+    /// either, seconds apart, standing on the population's own doorstep on ground the shard itself called
+    /// good. What refuses the roads there is the other bots. Ten makes the patch twenty-one tiles across and
+    /// the same population eleven per cent of it rather than twenty-nine.
+    /// </para>
+    /// </summary>
+    public static int Spread { get; set; } = 10;
+
+    /// <summary>Placements that had to take a tile with no way off it. See <see cref="TryPlace"/>.</summary>
+    public static long Boxedin { get; private set; }
 
     /// <summary>
     /// How far from home this population is allowed to want anything. Two hundred tiles: Britain and its
@@ -581,13 +595,37 @@ public static class BotPopulation
             return false;
         }
 
-        for (var attempt = 0; attempt < Attempts; attempt++)
+        // <b>A tile a body fits on is not the same as a tile a body can leave.</b> CanSpawnMobile counts the
+        // other bots, so nobody is put on top of anybody; what it does not ask is whether all eight
+        // neighbours are taken too. With forty-nine bots living in one patch that is a common shape, and it
+        // is what the rescue kept producing: carried home at 01:29:26, "can reach nothing" at 01:29:58, from
+        // ground the shard's own line called good.
+        //
+        // So the first pass wants a way out as well as a place to stand, and only the second settles for a
+        // place to stand. The second is counted, because the day this reads high the patch is full and the
+        // number to change is Spread.
+        for (var pass = 0; pass < 2; pass++)
         {
-            var x = Where.X + Utility.RandomMinMax(-Spread, Spread);
-            var y = Where.Y + Utility.RandomMinMax(-Spread, Spread);
-
-            if (map.CanSpawnMobile(x, y, Where.Z - 8, Where.Z + 8, false, false, out var z))
+            for (var attempt = 0; attempt < Attempts; attempt++)
             {
+                var x = Where.X + Utility.RandomMinMax(-Spread, Spread);
+                var y = Where.Y + Utility.RandomMinMax(-Spread, Spread);
+
+                if (!map.CanSpawnMobile(x, y, Where.Z - 8, Where.Z + 8, false, false, out var z))
+                {
+                    continue;
+                }
+
+                if (pass == 0 && !Roomy(map, x, y, z))
+                {
+                    continue;
+                }
+
+                if (pass > 0)
+                {
+                    Boxedin++;
+                }
+
                 bot.MoveToWorld(new Point3D(x, y, z), map);
 
                 return true;
@@ -603,6 +641,48 @@ public static class BotPopulation
         bot.MoveToWorld(Where, map);
 
         return true;
+    }
+
+    /// <summary>
+    /// Whether a body standing here would have somewhere to put its first step: a neighbouring tile the
+    /// planner allows and nobody is standing on.
+    ///
+    /// <para>
+    /// Both halves are needed and they come from different places. <see cref="BotStep.Mask"/> is the
+    /// planner's own answer about the ground and knows nothing about who is on it - creatures move, so a
+    /// planner that treated them as walls would teach itself walls that are not there. Whether anybody is
+    /// standing on the tile is a question about this second, and this is the one second it matters.
+    /// </para>
+    /// </summary>
+    private static bool Roomy(Map map, int x, int y, int z)
+    {
+        var footing = (sbyte)Math.Clamp(z, sbyte.MinValue, sbyte.MaxValue);
+        var mask = BotStep.Mask(map, x, y, footing);
+
+        if (mask.WalkMask == 0)
+        {
+            return false;
+        }
+
+        for (var d = 0; d < 8; d++)
+        {
+            if ((mask.WalkMask & (1 << d)) == 0)
+            {
+                continue;
+            }
+
+            var nx = x;
+            var ny = y;
+
+            Movement.Movement.Offset((Direction)d, ref nx, ref ny);
+
+            if (map.CanSpawnMobile(nx, ny, z - 8, z + 8, false, false, out _))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static int _named;

@@ -410,6 +410,15 @@ public static class BotQuarry
     /// <summary>Kills chosen because the board was asking for what the carcass carries. For the summary.</summary>
     public static long Sent { get; private set; }
 
+    /// <summary>What this creature's meat becomes on the corpse. The engine's own mapping, read not copied.</summary>
+    private static Type Butchered(MeatType meat) =>
+        meat switch
+        {
+            MeatType.Bird    => typeof(RawBird),
+            MeatType.LambLeg => typeof(RawLambLeg),
+            _                => typeof(RawRibs)
+        };
+
     /// <summary>
     /// How much this creature is worth over its purse because somebody has put money down for what it is
     /// made of.
@@ -457,6 +466,20 @@ public static class BotQuarry
         }
 
         if (creature.Wool > 0 && Demanded(typeof(Wool)))
+        {
+            worth += Bounty;
+        }
+
+        // <b>Meat, added after this counter froze at 45 for four readings running.</b> The note above records
+        // the identical freeze on feathers — 179 arrow orders standing while the count sat at 122 for three
+        // half-hourly readings — and this is the same omission on the material the shard now asks for most.
+        // A cook could put money down for ribs from 05.09.2026 and 68 such wants were filled, but nothing
+        // carried that demand back to the one act that puts meat into the world, so the board steered hunts
+        // for hide and feather and stopped dead the moment those were satisfied.
+        //
+        // The kind matters: a bird carves into RawBird and a sheep into RawLambLeg, and an order for ribs is
+        // not filled by either. Asked of the creature's own MeatType, which is what the engine's carve reads.
+        if (creature.Meat > 0 && Demanded(Butchered(creature.MeatType)))
         {
             worth += Bounty;
         }

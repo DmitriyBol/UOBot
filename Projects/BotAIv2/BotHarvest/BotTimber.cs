@@ -47,6 +47,13 @@ public static class BotTimber
     public static long Townbound { get; private set; }
 
     /// <summary>
+    /// Trees passed over for standing on ground that has refused the population. Its own bucket, because
+    /// "inside the walls" and "nobody can get there" are different facts and the day one of them moves the
+    /// other must not move with it.
+    /// </summary>
+    public static long Fenced { get; private set; }
+
+    /// <summary>
     /// How near the trunk the engine insists on before it will let an axe swing.
     ///
     /// <para>
@@ -116,8 +123,20 @@ public static class BotTimber
     ///
     /// A fletcher wants wood of its own, and a woodcutter that sold every log and then bought one back off a
     /// stall would be paying the market to hold its own timber. Twenty, which is a round of arrows.
+    ///
+    /// <para>
+    /// <b>And only for a bot that can actually use it, which is the correction that made this work at all.</b>
+    /// Most woodcutters are gatherers and carry no fletcher's tools, so a flat twenty meant a cutter reached
+    /// its keep-back and stopped — `0 logs went straight into somebody's order and 0 onto a stall` in a whole
+    /// window, with a fletcher's funded order for exactly twenty standing on the board unfilled. A keep-back
+    /// that blocks a paid order is not a keep-back, it is a hoard. The cook's meat is kept by the same rule:
+    /// see <c>BotOven.Spares</c>, which asks for a skillet before it holds anything back.
+    /// </para>
     /// </summary>
     public static int Keeps { get; set; } = 20;
+
+    /// <summary>How much this particular bot keeps: the full stock if it can fletch, nothing if it cannot.</summary>
+    public static int KeptBy(Mobile bot) => BotFletching.Kit(bot) != null ? Keeps : 0;
 
     /// <summary>Logs put where somebody can reach them. For the summary.</summary>
     public static long Ordered { get; private set; }
@@ -159,7 +178,7 @@ public static class BotTimber
             }
 
             var held = Math.Max(1, wood.Amount);
-            var spare = held - Keeps;
+            var spare = held - KeptBy(body);
 
             if (spare <= 0)
             {
@@ -243,6 +262,20 @@ public static class BotTimber
                     if (Region.Find(new Point3D(found.X, found.Y, found.Z), map)?.IsPartOf<GuardedRegion>() == true)
                     {
                         Townbound++;
+
+                        continue;
+                    }
+
+                    // <b>And the nearest tree is the same tree every time.</b> This walks rings outward from
+                    // the bot's feet and returns the first trunk it meets, so a tree in a fenced garden is
+                    // handed to the same woodsman on every review for as long as it stands there: Nessa
+                    // failed at (1444, 1458, 2) forty times in fifty-five minutes on 08.09.2026, one of the
+                    // 126 chop errands that session which ended in no way through. The refusal is written by
+                    // whoever gives up on the road and cleared by whoever arrives, so this skips a trunk
+                    // nobody could get to and takes it up again the moment anybody proves otherwise.
+                    if (BotRefused.Refusing(map, new Point3D(found.X, found.Y, found.Z)))
+                    {
+                        Fenced++;
 
                         continue;
                     }

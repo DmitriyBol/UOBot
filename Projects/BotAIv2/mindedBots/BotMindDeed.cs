@@ -148,6 +148,24 @@ public sealed class BotMindDeed : BotDeed
     /// </summary>
     public override bool Hurries => _work.Hurries;
 
+    /// <summary>
+    /// Forwarded for the reason directly above, and it stopped being cosmetic on 09.09.2026.
+    ///
+    /// <para>
+    /// This flag used to be read by <c>BotAppraisal</c> as a factor, so a wrapper that lost it cost a
+    /// thinking bot a discount and nothing else. It is now read by <c>BotWill.Auction</c> as the rank that
+    /// decides what a bot too heavy to walk may take at all - and Porter is on the menu the minds are shown,
+    /// so a mind that asked to go and unload would have had its own answer weighed as work that needs a
+    /// step. Four bots on this shard think; they would have been the only four still loading themselves to
+    /// a standstill, which is the hardest kind of difference to notice.
+    /// </para>
+    /// </summary>
+    public override bool Standing => _work.Standing;
+
+    /// <summary>Forwarded, for the reason the two above give: a wrapper that answers for itself here would
+    /// let the four thinking bots alone throw away goods a guild had paid for.</summary>
+    public override bool Committed => _work.Committed;
+
     public override string Stage => _work.Stage;
 
     public override bool Pressing(IBotWilful bot) => _work.Pressing(bot);

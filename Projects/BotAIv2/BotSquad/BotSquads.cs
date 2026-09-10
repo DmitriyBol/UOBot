@@ -111,14 +111,34 @@ public static class BotSquads
     /// were inside them was not.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// How many bots are held in companies this moment.
+    ///
+    /// <para>
+    /// <b>Wanted outside this file the day a wider muster reach turned three quarters of the shard into one
+    /// army.</b> A bot on the Bound rung is not offered work of its own — that is the whole point of the
+    /// rung — so this number is also the count of bots that have stopped mining, sewing and trading. See
+    /// BotMuster.MostBound.
+    /// </para>
+    /// </summary>
+    public static int Bound
+    {
+        get
+        {
+            var held = 0;
+
+            for (var i = 0; i < _squads.Count; i++)
+            {
+                held += _squads[i]?.Count ?? 0;
+            }
+
+            return held;
+        }
+    }
+
     public static string Describe()
     {
-        var bound = 0;
-
-        for (var i = 0; i < _squads.Count; i++)
-        {
-            bound += _squads[i]?.Count ?? 0;
-        }
+        var bound = Bound;
 
         return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing, {Rebuffs} times one of them was handed back something it had already given up on, {BotSquad.Unowned} charges taken back because the errand holding them had ended; {BotSquad.Blinded} beats stood near enough to fight with no line to the thing, {BotSquad.Refused} refused the blow by the engine and {BotSquad.Unsteadied} were shooters that had moved too recently to fire, {BotSquad.Blindfights} fights given up because nobody could land one at all, {BotSquad.Conjured} spells thrown by the back ranks and {BotSquad.Mended} heals landed by their medics, against {BotSquad.Dry} beats with nothing they could pay for; {BotSpoils.Describe()}";
     }
@@ -420,7 +440,7 @@ public static class BotSquads
             // which is the same fault as having none: "the board is empty" and "nobody has looked at the
             // board" are different facts and were producing the same silence.
             logger.Information(
-                "Needs: {Gear}; {Metal}; {Forge}; {Thread}; {Arrows}; {Bottles}; {Skillet}; {Stores}; {Filled} things off a pack went straight to somebody's standing order, {Bespoken} trips to a counter were begun because the board wanted something in the pack, {Shed} things were listed on the spot by bots too heavy to walk, and {Sent} kills were chosen because the board wanted what the carcass carries",
+                "Needs: {Gear}; {Metal}; {Forge}; {Thread}; {Arrows}; {Bottles}; {Skillet}; {Stores}; {Filled} things off a pack went straight to somebody's standing order, {Bespoken} trips to a counter were begun because the board wanted something in the pack, {Shed} things were listed on the spot by bots too heavy to walk, {Exposed} trips were begun because a pack was worth more than a bot should be carrying about, {Hoarding} because it held more stones of somebody else's goods than it should, {Dumped} things nobody would buy were left on the ground by bots that could not walk ({Stranded} of these errands were finished with no counter known at all, {Cornered} were offered to a bot with nothing the market wants so that the dropping could be reached, and {Immovable} of those found nothing to drop either), and {Sent} kills were chosen because the board wanted what the carcass carries",
                 BotUpkeep.Describe(),
                 BotBullion.Describe(),
                 BotSmith.Describe(),
@@ -432,10 +452,27 @@ public static class BotSquads
                 BotUnload.Filled,
                 BotUnload.Bespoken,
                 BotUnload.Shed,
+                BotUnload.Exposed,
+                BotUnload.Hoarding,
+                BotUnload.Dumped,
+                BotUnload.Stranded,
+                BotUnload.Cornered,
+                BotUnload.Immovable,
                 BotQuarry.Sent
             );
 
-            // <b>The ground the whole economy is dug out of, and it has never once been printed.</b>
+            // <b>The market's own state, which went to a gump nobody opens and to the world reload.</b> That is
+        // the same "which is to say nowhere" as BotGround.Describe, and it hid a whole class of fault: a
+        // stall whose price has ratcheted to its floor and still not sold is never removed, because only an
+        // empty stall is ever forgotten. Nobody could see how many of those there were.
+        logger.Information("Market: {What}", BotAuction.Describe());
+
+        // What the population is actually carrying about, which nothing has ever printed. See
+        // BotUnload.Weighed: every other weight instrument on this shard is about bots already in trouble,
+        // and a pack filling with things nobody wants stays under the ceiling the whole time it is doing it.
+        logger.Information("Packs: {What}", BotUnload.Weighed());
+
+        // <b>The ground the whole economy is dug out of, and it has never once been printed.</b>
             // BotGround.Describe existed and went to exactly two places: a gump nobody has open, and the
             // world reload — which is to say nowhere. So how much rock this island has, how much of it is
             // behind a wall and how much turned out to be a mirage were facts nobody could read. It is the

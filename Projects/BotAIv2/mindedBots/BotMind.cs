@@ -249,6 +249,17 @@ public sealed class BotMind
     public long Under { get; private set; }
 
     /// <summary>One beat of thought. Cheap when there is nothing to do, which is most beats.</summary>
+    /// <summary>
+    /// Holds this mind's first question back by <paramref name="ms"/>, so that minds created together do not
+    /// think together. See the call in <c>BotMinds.Start</c> for why it matters.
+    /// </summary>
+    public void Stagger(int ms)
+    {
+        // Forward in time rather than backward: the gate compares now against this, so a stamp in the future
+        // is a mind that has not yet had its turn. Set once, at birth, and never touched again.
+        _askedTick = Core.TickCount + ms;
+    }
+
     public void Beat(IReadOnlyList<string> trades)
     {
         var body = Body;
@@ -267,6 +278,17 @@ public sealed class BotMind
             }
 
             // Never picked up: the shard preferred its own arithmetic, which is allowed and is worth counting.
+            //
+            // <b>And worth naming.</b> Two thirds of these minds' choices were going unused, and the log said
+            // only that they were: a bare count cannot distinguish "the arithmetic disagreed" from "the mind
+            // is choosing work that is never on offer by the time the auction comes round". What the bot is
+            // actually holding answers that in one word.
+            BotMindLog.Write(
+                Name,
+                $"its choice of {Choice.Intent} was not taken up; the auction is holding {body.Resolve?.Deed?.Kind ?? "nothing"} instead",
+                null
+            );
+
             Passed++;
             Choice = null;
         }
@@ -444,6 +466,13 @@ public sealed class BotMind
         Chose++;
 
         BotMindLog.Write(Name, $"chose {choice.Intent}, expects {choice.Expect:F0}/min over {choice.Minutes:F0} min ({waited}ms)", choice.Why);
+
+        // <b>The menu and the evidence, on every decision.</b> A choice recorded with only the model's own
+        // sentence for it cannot be checked afterwards: "the board is empty so I will sew" is either a fair
+        // reading of the shard or a fabrication, and the log used to hold no way of telling. Both lines are
+        // written at the same moment as the choice, from the same objects the state was built from.
+        BotMindLog.Write(Name, "could have taken", string.Join(", ", trades));
+        BotMindLog.Write(Name, "and", BotMindSight.Brief(this, Body));
 
         Speak(choice.Say);
     }

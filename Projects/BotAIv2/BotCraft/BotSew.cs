@@ -179,8 +179,29 @@ public sealed class BotSew : BotDeed
     /// </summary>
     private int _want;
 
-    /// <summary>Cloth, off a shelf in town. The chain that waits on nobody.</summary>
-    public BotSew(BaseVendor shop, int price)
+    /// <summary>
+    /// Cloth, off a shelf in town. The chain that waits on nobody.
+    ///
+    /// <para>
+    /// <b><c>need</c> is the units of the recipe the proposer actually chose, and it used to be one.</b> The
+    /// comment that stood here said a bolt is bought wholesale and covers any recipe, so the cloth route
+    /// never had this question to answer — and that is true of a bot which buys. A bot that is already
+    /// carrying <em>one</em> stray cloth never buys: <see cref="Shopping"/> reads one against a need of one,
+    /// declares the material in hand and goes straight to the work, where <c>BotThread.Choose</c> is asked
+    /// what can be made out of a single cloth and answers nothing.
+    /// </para>
+    ///
+    /// <para>
+    /// So the errand failed on its first beat, the proposer offered it again because nothing about the bot
+    /// had changed, and the pair ran <b>ten times a second</b>. Measured 09.09.2026 at 14:26: Kelda alone
+    /// produced 218 of the 254 failures in a five-minute window and took the whole shard's completion band
+    /// to 53%, which is what raised the alarm. Two thresholds on one shelf — the proposer asked
+    /// <c>Choose(body, Cloth, Bolt)</c>, "could you make something out of twenty", and the errand asked
+    /// <c>Choose(body, Cloth)</c>, "can you make something out of what you are holding". Now both numbers
+    /// are the same number.
+    /// </para>
+    /// </summary>
+    public BotSew(BaseVendor shop, int price, int need)
     {
         _stuff = typeof(Cloth);
         _shop = shop;
@@ -188,10 +209,7 @@ public sealed class BotSew : BotDeed
         _where = shop?.Location ?? Point3D.Zero;
         _price = Math.Max(1, price);
         _take = Bolt;
-
-        // One, which is what this leg has always meant by "has cloth": a bolt is bought wholesale and covers
-        // any recipe on the list, so the cloth route never had this question to answer.
-        _need = 1;
+        _need = Math.Max(1, need);
     }
 
     /// <summary>

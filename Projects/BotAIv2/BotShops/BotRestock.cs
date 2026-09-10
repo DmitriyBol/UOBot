@@ -81,15 +81,43 @@ public sealed class BotRestock : BotDeed
         _where = where;
     }
 
+    /// <summary>
+    /// The same errand again, at the bot's own guild's counter.
+    ///
+    /// <para>
+    /// <b>The third place a bandage can come from, and the reason the hall was worth building.</b> A stall
+    /// needs no walk, a shopkeeper needs a walk to Britain, and this needs a walk across the guild's own
+    /// yard — so it sits between them and it is where the errand lands whenever the guild has thought to
+    /// stock the thing. The gold has already left the world, at the town counter, when the guild bought it;
+    /// what changes hands here is one member paying its own guild, which is coin staying in the population.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>What is bought is the lot, not the count, and the lot is looked up on arrival rather than held.</b>
+    /// A shelf sells packets — twenty bandages tied together — and somebody else may have taken the packet
+    /// while this bot was walking. Carrying the merchant and the kind instead of the item means the errand
+    /// takes whatever the shelf has when it gets there, and only fails when the shelf is bare.
+    /// </para>
+    /// </summary>
+    public BotRestock(PlayerVendor merchant, Type wanted, int amount, int price)
+    {
+        _merchant = merchant;
+        _wanted = wanted;
+        _amount = Math.Max(1, amount);
+        _price = Math.Max(1, price);
+    }
+
+    private readonly PlayerVendor _merchant;
+
     private readonly Map _map;
 
     private readonly Point3D _where;
 
     public override string Kind => Trade;
 
-    public override Map Map => _shop?.Map ?? _map;
+    public override Map Map => _shop?.Map ?? _merchant?.Map ?? _map;
 
-    public override Point3D Where => _shop?.Location ?? _where;
+    public override Point3D Where => _shop?.Location ?? _merchant?.Location ?? _where;
 
     public override double Expects => Prior;
 
@@ -162,6 +190,44 @@ public sealed class BotRestock : BotDeed
             _paid = _bought * price;
 
             return BotDoing.Done($"{_bought} {_wanted?.Name} off the market for {_paid}gp");
+        }
+
+        if (_merchant != null)
+        {
+            if (_merchant.Deleted || _merchant.Map == null || _merchant.Map == Map.Internal)
+            {
+                return BotDoing.Failed("the guild's merchant is gone");
+            }
+
+            if (!body.InRange(_merchant.Location, BotShelf.Reach))
+            {
+                return BotDoing.Walk(
+                    _merchant.Map,
+                    _merchant,
+                    BotArrival.Within(BotShelf.Reach),
+                    $"to the counter of {body.Guild?.Name ?? "the guild"}"
+                );
+            }
+
+            var lot = BotShelf.Offer(_merchant, _wanted, out var asking);
+
+            if (lot == null)
+            {
+                return BotDoing.Failed($"the guild's shelf has no {_wanted?.Name} left on it");
+            }
+
+            _bought = BotShelf.Take(body, _merchant, lot, out var declined);
+
+            if (_bought <= 0)
+            {
+                return BotDoing.Failed(declined ?? "the guild's merchant would not sell it");
+            }
+
+            _paid = asking;
+
+            (bot as BotMobile)?.Rearm();
+
+            return BotDoing.Done($"{_bought} {_wanted?.Name} off the guild's own counter for {_paid}gp");
         }
 
         if (_shop == null || _shop.Deleted || _shop.Map == null || _shop.Map == Map.Internal)

@@ -6,6 +6,7 @@ the brain works at all.
 | File | What is in it |
 |---|---|
 | `BotOre.cs` | ore: what is in a hill, what digs it, one swing, and what ore becomes in a fire |
+| `BotHeard.cs` | what the harvest system last said to each bot, and which sentence means what |
 | `BotGround.cs` | what the population knows about places: one sweep yields veins, fires and counters |
 | `BotDig.cs` | an obligation with three legs: vein → fire → counter |
 | `BotMiner.cs` | the proposer: one offer to whoever has a pickaxe |
@@ -153,3 +154,126 @@ adding a class silently excluded it from working.
 `StartHarvesting`, `ore.OnDoubleClick` plus `bot.Target.Invoke`, `map.Tiles.GetStaticTiles`,
 `GetStaticAndMultiTiles`, `GetMobilesInRange<Banker>`, `Banker.Deposit`, `pack.ConsumeTotal`, `box.DropItem`,
 `Utility.InRange`, `Mobile.InRange`, `HarvestDefinition.GetBank(...).Current`, `MaxRange`.
+
+
+## The island was never running out of ore
+
+Patrick's order of 09.09.2026 named this as a question of design: *mining finishes 28% against 63–73% for
+everything else, and three quarters of the failures are a worked-out seam — so what does mining do when the
+island is exhausted?*
+
+It was not exhausted. Three faults, found in that order, each one hiding the next.
+
+**One. Nothing counted the two cases apart.** `emptied N rocks and found no more` was written whether the
+engine's bank under the rock was empty or full. Counting them separately took four lines and settled the
+question immediately: **16 rocks given up with the bank empty against 35 that still held ore.** Two in three
+write-offs were wrong, and each one rested the seam behind it, so the board shrank all afternoon while the
+log said the ground was giving out.
+
+**Two. The seam rested for half as long as the engine takes to refill.** `BotGround.DrainedMs` was ten
+minutes, chosen here. `HarvestBank.Consume` sets the refill at `MinRespawn + rnd × (MaxRespawn − MinRespawn)`
+— ten to twenty minutes for ore — and it starts that clock **at the first swing on a full bank**, not when
+the bank empties. So a rested seam came back onto the board at the earliest instant the engine could possibly
+have refilled it, and usually before. It is now `BotOre.RespawnMs + 60000`, taken from the engine at start-up
+and said out loud in the boot line.
+
+**Three, and this was the whole of it: the dryness counter counted beats and called them swings.** In
+`BotDig.Digging` the test *did the last swing produce anything* sat **above** the swing throttle. The
+population beats every 100ms; `SwingMs` is 1000. So one real attempt cost up to ten increments of `_dry`, and
+at `DryLimit` of six a rock was written off in **under a second** — routinely before it had been struck at
+all. Everything above is downstream of that: the misses that looked like an empty vein, the seams rested for
+nothing, the 28%.
+
+Moving the whole judgement below the throttle took mining to **85% on the first window, with not one rock
+given up that still held ore**. Over the following twenty minutes: 11 rocks given up, every one of them with
+the engine's bank genuinely empty, and mining's failures reduced to reachability.
+
+Two things were kept from the middle diagnosis because they are right on their own terms:
+
+- `DryLimit` is now divided by what the engine says the bot's chance actually is (`BotOre.Chance`, floored at
+  six and capped at `MostDry`). `CheckSkill(Mining, 0, 100)` means a bot with thirty mining misses seven
+  swings in ten; six quiet *swings* would still have been a master's number.
+- The engine's own bank is asked first, every swing. `Left <= 0` is the truth about a rock and costs a
+  dictionary lookup; everything else in that branch is a backstop for the case where the rock is full.
+
+**The lesson to carry.** A counter that says "N attempts in a row without result", sitting beside the
+throttle for those attempts, is worth checking in both directions: what unit does the counter tick in, and
+what unit does the event happen in? Both numbers here had been on the screen for weeks and had never been put
+beside each other.
+
+**Still open.** Twenty-seven percent of mining trips are *dropped* on the leg `carrying ore to a fire` — the
+digging is done, the ore is in the pack, and the auction prefers something else on the way to the forge. The
+ore is not lost; `unload` collects it. That is the `work-judged-before-it-can-pay` family and a separate
+question from this one.
+
+
+## Listening to what the harvest system says
+
+Patrick's order of 09.09.2026: *a vein counts as worked out when the bot **sees** the message that there is
+nothing in it.*
+
+Everything before this inferred it — a run of quiet swings, or the engine's bank read from the side — and
+inference was wrong about two write-offs in three. The engine had been saying it plainly the whole time.
+`HarvestSystem` distinguishes six outcomes and names each one:
+
+| it says | it means |
+|---|---|
+| There is no metal here to mine | the vein is worked out |
+| Someone has gotten to the metal before you | worked out by another hand a moment earlier |
+| You loosen some rocks but fail to find any useable ore | a missed roll; the rock is fine |
+| You have moved too far away to continue | the swing was cancelled, not rolled |
+| Your backpack is full, so the ore you mined is lost | the bank was charged and the ore destroyed |
+| You have worn out your tool | no pickaxe |
+
+**None of it could reach a bot.** `HarvestDefinition.SendMessageTo` calls `Mobile.SendLocalizedMessage`,
+which is not virtual and writes straight to a `NetState` — and a bot has none. Six distinct answers, dropped
+on the floor, while this file guessed at them from the outside.
+
+So the engine got one event — `HarvestDefinition.Said`, raised before the send, altering nothing, recorded in
+`engine-patches/HarvestDefinition-said.patch` — and `BotHeard` listens on it. `BotDig` now reads the sentence
+before anything else: *empty* or *taken* writes the rock off outright, *full pack* takes the trip to a fire
+rather than destroying more ore out of a bank it cannot receive, *out of range* does not spend the rock's
+patience because the swing was never rolled, and *worn-out tool* ends the errand. The bank check stays
+underneath as the guard for the almost.
+
+The whole set is in the `The ground:` line, so a session's mining can be read as the engine's own account of
+it:
+
+```
+the harvest system said: N times there is nothing left here, N somebody got there first, N a missed swing,
+N moved too far to finish, N a full pack, N a worn-out tool, N something else
+```
+
+**And the swing itself is two seconds now**, by the same order — `BotDig.SwingMs`, up from one. A harvest
+resolves nine tenths of a second after it starts, so a second left almost no margin; two is a pickaxe swung
+at the pace of something with arms.
+
+### The axe, by the same rule
+
+`BotChop.StallMs` carried a note that was the plainest possible statement of the problem: *"a tree that has
+been cut out answers every swing with nothing and looks exactly like a tree that is simply unlucky, and the
+engine says which only by silence — the message it would send goes to a client this bot has not got."* Half a
+minute of swinging at a stump, every stump, because the sentence had nowhere to land.
+
+It lands now. `BotChop` reads the same ear against the lumberjacking definition, and the clock is a backstop
+behind it — counted apart, so a day when the clock starts firing again is a day the ear has stopped working:
+
+```
+N trees given up because the engine said they were cut out against N given up by the clock alone
+```
+
+First ten minutes after: **462 against 0.** Chopping finished 76% of what it took on, against 42–52% earlier
+the same day.
+
+### Scoping, which the ear needed and did not have
+
+The first cut recorded one row per bot and nothing else, and the instrument caught its own fault within
+twenty minutes: **1,105 "there is nothing left here" against 24 rocks written off.** Most of them were the
+woodcutters, and the miners were reading them — a bot that had been cutting wood a minute earlier had its
+axe's verdict applied to the first rock it swung at.
+
+Two guards, answering different questions. `BotHeard.Last` takes the definition the caller is asking about,
+so a sentence about another craft is not an answer; and `FreshMs` requires it to be younger than the swing
+interval, so a sentence about an older swing is not an answer either. Both are counted as *N sentences were
+passed over as being about another craft or an older swing* — a number that should stay lively, because a
+nought there would mean the guards are not being reached.

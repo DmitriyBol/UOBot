@@ -119,7 +119,11 @@ public sealed class BotWarden : IBotProposer
         // two offices cannot be allowed to compete on price: whichever is offered first simply wins, and the
         // rounds are offered constantly while a harrowing waits on the island going wrong. This is the same
         // shape as a squad member having no work of its own, which this project has already paid for once.
-        if (BotQuad.Direst(map, body.Location, BotHarrower.Range, null) != null)
+        // <b>And asked with the harrowing's own test, not with a bare "is there dire ground".</b> Standing
+        // aside for ground the harrowing will then refuse leaves the Baron with neither office — twenty asks
+        // on 08.09.2026, twenty stood aside here and twenty refused there, and a Baron who strolled round the
+        // town all afternoon. See BotHarrower.Takeable: one rule, asked in both places.
+        if (BotQuad.Direst(map, body.Location, BotHarrower.Range, BotHarrower.Takeable(map, body.Location)) != null)
         {
             Wanted++;
 

@@ -67,6 +67,41 @@ public sealed class BotSlay : BotDeed
     /// </summary>
     public static double FleeAt { get; set; } = 0.4;
 
+    /// <summary>
+    /// How far a bot will be drawn from where the chase began before it gives the quarry up.
+    ///
+    /// <para>
+    /// <b>Patrick's order of 09.09.2026: if the quarry runs and the bot cannot reach it, drop it after fifty
+    /// tiles.</b> The chase had a clock — <see cref="CapMs"/> — and no length, and a clock does not bound a
+    /// bot's position: a quarry that walks away as fast as the bot walks after it is a bot travelling in a
+    /// straight line for as long as the cap allows.
+    /// </para>
+    ///
+    /// <para>
+    /// It shows in the rescues. Fourteen bots carried home in an hour on 09.09.2026, all of them in bursts of
+    /// two to six within one minute; the six at 17:34 were standing in one ten-tile patch at (1208, 2202) —
+    /// <b>737 tiles from home, where <c>BotPopulation.Roam</c> is 200</b>. A company had chased something off
+    /// the edge of the ground the population is allowed to choose work on, and got stuck there together. The
+    /// roam limit governs what a bot may <em>choose</em>; nothing governed what a chase could <em>drag</em> it
+    /// into.
+    /// </para>
+    ///
+    /// <para>
+    /// Measured from where the chase started rather than from home, because that is the thing this bot
+    /// actually decided: the walk out to a quarry is priced by the decision layer and is legitimate, and what
+    /// is not legitimate is that walk turning into an unbounded one once the quarry starts running.
+    /// </para>
+    /// </summary>
+    public static int Leash { get; set; } = 50;
+
+    /// <summary>Chases given up for running past the leash.</summary>
+    public static long Slipped { get; private set; }
+
+    /// <summary>Where the chase began. Point3D.Zero until the first beat of the closing leg.</summary>
+    private Point3D _began;
+
+    private bool _begun;
+
     /// <summary>How full a pack may get with loot before the rest is left on the corpse.</summary>
     public static double FillFraction { get; set; } = 0.8;
 
@@ -178,6 +213,42 @@ public sealed class BotSlay : BotDeed
     /// </para>
     /// </summary>
     public static int TooClose { get; set; } = 3;
+
+    /// <summary>
+    /// How near the quarry has to be before an archer spends its idle window opening the distance.
+    ///
+    /// <para>
+    /// <b>Patrick, 09.09.2026: "why the hell do archers always run away from mobs? They should kite, yes —
+    /// but if they can shoot they MUST shoot."</b> He was right and the fault was one condition.
+    /// <see cref="Kiting"/> asked whether the quarry was within <c>reach - 1</c>, and a bow reaches ten — so
+    /// an archer with a creature <em>nine tiles away</em>, which is the distance it exists to fight at, read
+    /// that as "something has closed on me" and backed off. Measured over one session: <b>1,514 kites against
+    /// 860 shots</b>, so an archer spent nearly two beats in three walking backwards from things that were
+    /// already exactly where it wanted them.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Five, and four was measured wrong within the hour.</b> Four is one past <see cref="TooClose"/>, and
+    /// taking it from there was tidy and too tight: over thirty minutes the tally read <b>1,537 archer asks,
+    /// every one of them "far enough off to simply shoot", and not one kite</b>. Something inside three tiles
+    /// is already handled by the branch further down, so a gate at four left the kite a single tile wide and
+    /// it never came up. Half of what Patrick asked for — *they should kite, yes* — had gone inert.
+    /// </para>
+    ///
+    /// <para>
+    /// Five is where an archer has lost half the ten tiles its bow is worth, which is a statement about its
+    /// advantage rather than about the tidiness of the number. And widening cannot cost a shot by
+    /// construction: the kite only runs while the bow is reloading — see the clock in <see cref="Kiting"/> —
+    /// so the thing the old nine-tile gate actually wasted was position and time, not arrows.
+    /// </para>
+    ///
+    /// <para>
+    /// The retreat itself is unchanged — <see cref="Away"/> still opens to the full reach — so an archer that
+    /// is genuinely crowded still backs off as far as it ever did. What changed is that it stops doing it to
+    /// things that are not crowding it.
+    /// </para>
+    /// </summary>
+    public static int KiteWithin { get; set; } = 5;
 
     /// <summary>
     /// Where a bot with this reach would rather stand: comfortably inside its own range and outside anybody
@@ -379,6 +450,27 @@ public sealed class BotSlay : BotDeed
             BotQuarry.Crowd(_quarry);
 
             return BotDoing.Failed($"could not catch {_quarry.Name}");
+        }
+
+        // Where this chase started, taken on its first beat rather than in the constructor: an undertaking is
+        // created wherever the auction happened to run and the walk out to the quarry is a legitimate,
+        // priced journey. What the leash bounds is how far the quarry may then drag the bot. See Leash.
+        if (!_begun)
+        {
+            _begun = true;
+            _began = body.Location;
+        }
+
+        var drawn = Math.Max(Math.Abs(body.X - _began.X), Math.Abs(body.Y - _began.Y));
+
+        if (drawn > Leash)
+        {
+            // Filed against the quarry rather than the ground: it is the creature that ran, and the ground it
+            // ran over is nobody's fault. Crowd is the same note a chase that timed out leaves.
+            BotQuarry.Crowd(_quarry);
+            Slipped++;
+
+            return BotDoing.Failed($"{_quarry.Name} drew it {drawn} tiles and was let go");
         }
 
         _fell = _quarry.Location;
@@ -1034,7 +1126,27 @@ public sealed class BotSlay : BotDeed
     /// have been the more familiar mistake.
     /// </para>
     /// </summary>
-    public static (int Taken, int Coins, int Made) Rifle(IBotWilful bot, Mobile body, Corpse corpse)
+    public static (int Taken, int Coins, int Made) Rifle(IBotWilful bot, Mobile body, Corpse corpse) =>
+        Rifle(bot, body, corpse, item => corpse.CheckLoot(body, item));
+
+    /// <summary>
+    /// The same, out of any container the bot is allowed to go through — a chest in a camp, a crate, a barrel.
+    ///
+    /// <para>
+    /// <b>One rule, not two.</b> What goes in a pack, what is held back as kit or as raw material, what is
+    /// listed and at what price — all of it is decided here and nowhere else. A second copy written for
+    /// chests would have agreed with this one for about a week: this file already carries the scars of the
+    /// leather trade being strangled by a flat one-gold fallback that lived in only one of two places.
+    /// </para>
+    ///
+    /// <para>
+    /// The permission is the caller's, because it differs: a corpse asks the engine whether this bot may
+    /// loot it at all, and a chest standing in an orc camp asks nothing of anybody.
+    /// </para>
+    /// </summary>
+    public static (int Taken, int Coins, int Made) Rifle(
+        IBotWilful bot, Mobile body, Container from, Func<Item, bool> may
+    )
     {
         var taken = 0;
         var coins = 0;
@@ -1050,13 +1162,13 @@ public sealed class BotSlay : BotDeed
         var ceiling = BotLadder.Ceiling(body) * FillFraction;
 
         // A snapshot: moving things out mutates the list being read.
-        List<Item> lying = [.. corpse.Items];
+        List<Item> lying = [.. from.Items];
 
         for (var i = 0; i < lying.Count; i++)
         {
             var item = lying[i];
 
-            if (item == null || item.Deleted || !item.Movable || !corpse.CheckLoot(body, item))
+            if (item == null || item.Deleted || !item.Movable || may?.Invoke(item) == false)
             {
                 continue;
             }
@@ -1072,7 +1184,7 @@ public sealed class BotSlay : BotDeed
 
             if (BotLadder.Load(body) >= ceiling)
             {
-                // Full. What is left stays on the corpse for whoever comes past, which is a better answer than
+                // Full. What is left stays where it lies for whoever comes past, which is a better answer than
                 // a hunter that cannot carry its own takings home.
                 break;
             }
@@ -1233,7 +1345,8 @@ public sealed class BotSlay : BotDeed
     public static string Bows() =>
         Asked == 0
             ? "nobody has been offered a kite"
-            : $"{Asked} asked: {Handless} were melee and have no kite to give, {Kited} gave ground, {Distant} were already at the weapon's edge, {Rushed} had the shot too near, {Closed} drew steel instead — longest clock seen {Longest}ms against {StillMs + KiteSlackMs}ms needed";
+            : $"{Asked} asked: {Handless} were melee and have no kite to give, {Kited} gave ground, {Distant} were far enough off to simply shoot, {Rushed} had the shot too near, {Closed} drew steel instead — longest clock seen {Longest}ms against {StillMs + KiteSlackMs}ms needed; "
+              + $"{Steady} of them had been standing still long enough for the engine to loose an arrow, longest stillness seen {Stillest}ms against the {StillMs}ms it wants";
 
     /// <summary>Zeroes the kite's tally.</summary>
     public static void ForgetBows()
@@ -1245,11 +1358,47 @@ public sealed class BotSlay : BotDeed
         Kited = 0;
         Longest = 0;
         Closed = 0;
+        Stillest = 0;
+        Steady = 0;
     }
+
+    /// <summary>
+    /// The longest a bow-carrying bot has been standing still at the moment it was asked, in milliseconds.
+    ///
+    /// <para>
+    /// <b>The number the whole archer question turns on, and nothing had ever read it.</b> Pre-AOS,
+    /// <c>BaseRanged.OnSwing</c> fires only when <c>Core.TickCount - attacker.LastMoveTime >= 1000</c>; if the
+    /// shooter has moved inside that second the engine does not fire and does not wait either — it returns a
+    /// quarter of a second and tries again. So an archer that is never still for a full second never looses an
+    /// arrow, and its weapon clock never advances past 250ms, which is precisely what the kite's own tally was
+    /// reporting: <b>longest clock seen 227ms against the 1,700ms it waits for</b>, over four thousand asks.
+    /// </para>
+    ///
+    /// <para>
+    /// Read here rather than reasoned about, because "the bot is standing" and "the engine thinks the bot is
+    /// standing" are different claims and only the second one fires a bow.
+    /// </para>
+    /// </summary>
+    public static long Stillest { get; private set; }
+
+    /// <summary>Asks at which the bot had been still long enough for the engine to loose an arrow.</summary>
+    public static long Steady { get; private set; }
 
     private bool Kiting(Mobile body, int reach)
     {
         Asked++;
+
+        var still = Core.TickCount - body.LastMoveTime;
+
+        if (still > Stillest)
+        {
+            Stillest = still;
+        }
+
+        if (still >= StillMs)
+        {
+            Steady++;
+        }
 
         if (reach <= 1 || (body.Weapon?.MaxRange ?? 1) <= 1)
         {
@@ -1258,7 +1407,9 @@ public sealed class BotSlay : BotDeed
             return false;
         }
 
-        if (!body.InRange(_quarry.Location, reach - 1))
+        // <b>Close enough to be worth backing away from, not merely close enough to shoot.</b> This read
+        // reach - 1 and so fired at nine tiles for a bow. See KiteWithin.
+        if (!body.InRange(_quarry.Location, KiteWithin))
         {
             Distant++;
 

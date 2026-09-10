@@ -49,6 +49,24 @@ public sealed class BotScout : BotDeed
     public static int Solvent { get; set; } = 300;
 
     /// <summary>How far a captain will take a party to look at somewhere new.</summary>
+    /// <summary>
+    /// How far out the frontier is looked for.
+    ///
+    /// <para>
+    /// <b>Deliberately not clamped to <see cref="BotHunter.Walkable"/>, and it was for an hour on
+    /// 08.09.2026.</b> That clamp is a price rule, not a reachability one — measured the same afternoon,
+    /// raising it from 240 to 900 left the count of refused roads flat at one or two a minute while the
+    /// searching bill went from 3.36ms a search and 8% partial to 13.36ms and 51%. Distance costs clock; it
+    /// does not make a road stop existing.
+    /// </para>
+    ///
+    /// <para>
+    /// A price rule has to be applied where the price is paid, and this is the one errand on the shard where
+    /// it is not: forty-seven bots throw darts for prowls, and exactly one Baron scouts, a few times an
+    /// hour. Clamped, the frontier vanished — everything within 240 tiles has been walked for days — and the
+    /// Baron strolled round the town instead. Unclamped, he took scouting three times in three minutes.
+    /// </para>
+    /// </summary>
     public static int Range
     {
         get => _range > 0 ? _range : BotPopulation.Roam;
@@ -182,6 +200,26 @@ public sealed class BotScout : BotDeed
     public override int Outlay => _wage;
 
     public override double Coin => 1.0;
+
+    /// <summary>
+    /// Paid nothing on purpose, like the rounds — and the flag was put on the rounds and not on this.
+    ///
+    /// <para>
+    /// <b>Scouting cannot show a profit at all, by construction.</b> It pays a wage out of the Baron's own
+    /// purse to whoever walks with him (<see cref="Outlay"/>) and brings back <em>ground</em>: quadrants
+    /// nobody had stood in, which is what every hunting ground, every seam and every forge on this shard is
+    /// eventually found through. The ledger measures money, so it measured this at a loss and
+    /// <c>BotAppraisal</c>'s "expected to pay nothing" veto threw it away.
+    /// </para>
+    ///
+    /// <para>
+    /// Found on 08.09.2026, an afternoon after the identical defect was fixed on <c>BotRounds</c> — same
+    /// office, same shard, same flag, one file along. The Baron was being offered scouting nine times out of
+    /// nine and taking his 6-a-minute stroll round the town instead, while the island's frontier went
+    /// unwalked. See BotDeed.Unpaid for why this is a flag and not a floor under the estimate.
+    /// </para>
+    /// </summary>
+    public override bool Unpaid => true;
 
     public override bool Alongside => true;
 

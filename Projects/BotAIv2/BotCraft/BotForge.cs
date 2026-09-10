@@ -38,7 +38,32 @@ public sealed class BotForge : BotDeed
     public const string Trade = "forge";
 
     /// <summary>What smithing is reckoned at per minute before the ledger corrects it.</summary>
-    public static double Prior { get; set; } = 55.0;
+    /// <summary>
+    /// What an afternoon at an anvil is reckoned at per minute before experience corrects it.
+    ///
+    /// <para>
+    /// <b>Raised from 55 on the night of 07.09.2026, because at 55 the work was never once taken.</b> An hour
+    /// of a shard whose whole craft is held by four thinking bots produced `51 forged on spec` - fifty-one
+    /// offers - and `took on forge: 0`. Mining was reckoned at 60 to 67 and won every single time, so no bot
+    /// ever stood at an anvil, and the summary line said "no stint at an anvil has ended yet" for an hour.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>And it could not correct itself, which is the part worth remembering.</b> The ledger revises a
+    /// trade's expectation from what it actually paid - but only for work that has been done. An opening
+    /// number set too low is therefore self-sealing: the work never wins, so it never pays, so there is
+    /// nothing to revise it with. Within fifteen minutes of the dial being moved to 120 on the live shard the
+    /// first daggers were coming off the anvil at 940 and 1300 a minute, which is where the honest number
+    /// was all along - twenty times the guess that was keeping it off the menu.
+    /// </para>
+    ///
+    /// <para>
+    /// Left at 120 rather than at the measured 1000: the ledger climbs from here on its own now that the work
+    /// is being taken, and an opening number set to the best case would be the same mistake pointing the
+    /// other way.
+    /// </para>
+    /// </summary>
+    public static double Prior { get; set; } = 120.0;
 
     /// <summary>How long a stint at the anvil is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 6.0;
