@@ -32,11 +32,6 @@ public static class BotCore
 
     private static bool _loadedOnce;
 
-    /// <summary>
-    /// Master switch, read from <c>bots.enabled</c> in modernuo.json and written back on first boot so
-    /// it is discoverable in the config file rather than buried in code. Each module has its own switch
-    /// besides this one — <c>bots.&lt;name&gt;.enabled</c>.
-    /// </summary>
     public static bool Enabled { get; private set; }
 
     public static void Configure()
@@ -48,21 +43,18 @@ public static class BotCore
             return;
         }
 
-        // Before the modules and before the world: a persistence must be registered by the time the save is
-        // read, and this one carries the only thing about a bot that is worth keeping across a restart.
         BotProgress.Configure();
 
-        // What the population found out about the island, kept the same way. See BotQuadStore: the ground's
-        // reputation is a fact about the world rather than about anybody standing on it, and it took a
-        // company most of an evening to learn.
         BotQuadStore.Configure();
 
-        // The engine's regeneration hooks, wrapped rather than replaced, so that a bot which has eaten
-        // recovers faster and nothing else on the shard changes at all. After RegenRates, which carries
-        // CallPriority(10) — see BotMeal.Configure for what happens if that ever inverts.
+        BotClaimStore.Configure();
+
+        BotSeatStore.Configure();
+
+        BotWarStore.Configure();
+
         BotMeal.Configure();
 
-        // Everything this assembly is made of. Order here is not meaningful; dependencies are.
         BotModules.Register(new BotClassModule());
         BotModules.Register(new BotMovementModule());
         BotModules.Register(new BotSquadModule());
@@ -76,21 +68,15 @@ public static class BotCore
         BotModules.Register(new BotMendModule());
         BotModules.Register(new BotPopulationModule());
 
-        // After the population, because a captain deciding whether to hold a class reads the whole roster to
-        // find out whether anybody on the island is worth teaching.
         BotModules.Register(new BotDrillModule());
 
-        // After the population, for the same reason as the captain: it hands every hall in the world back to
-        // the guild that owns it, and a guild has no leader until the population has enrolled.
         BotModules.Register(new BotEstateModule());
 
-        // After the squads, whose module it needs, and it says so itself rather than relying on this order.
         BotModules.Register(new BotBaronModule());
+
+        BotModules.Register(new BotDelveModule());
         BotModules.Register(new BotDashboardModule());
 
-        // Last, and it reads only. The smoke alarm: it divides numbers the other modules keep, so it wants
-        // them started, and it is registered here rather than with the debugger because a shard watched by
-        // nobody should still be able to shout.
         BotModules.Register(new BotAlarmModule());
 
         BotModules.Start(BotPhase.Settings);
@@ -107,13 +93,6 @@ public static class BotCore
         );
     }
 
-    /// <summary>
-    /// The world is in memory. Anything that had to ask about the map may now do so.
-    ///
-    /// Reachable more than once. On a reload the modules that are already running are put back to
-    /// nothing first, because their counters describe a population that is about to be rebuilt — and a
-    /// total that is never reset does not look wrong, it looks like a population twice the size.
-    /// </summary>
     private static void OnWorldLoad()
     {
         if (_loadedOnce)

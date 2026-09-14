@@ -33,29 +33,16 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotNeeds
 {
-    /// <summary>How long between one bot's reviews of one of its needs.</summary>
     public static int EveryMs { get; set; } = 60000;
 
-    /// <summary>The most stamps kept before the lapsed ones are swept. Two per bot per question is plenty.</summary>
     public static int MostStamps { get; set; } = 4096;
 
-    /// <summary>Questions answered rather than passed over. For the summary.</summary>
     public static long Asked { get; private set; }
 
-    /// <summary>Questions passed over because the same bot asked the same one inside the minute.</summary>
     public static long Passed { get; private set; }
 
     private static readonly Dictionary<(Serial Who, string What), long> _asked = new();
 
-    /// <summary>
-    /// Whether this bot may reconsider this need now, stamping it when it may.
-    ///
-    /// <para>
-    /// Asked once and acted on: a caller that asks twice has spent its minute on the first of them. Stamps
-    /// are compared by subtraction against a real tick, never against a nought default — see
-    /// <c>BotStipend</c> for the host whose counter starts enormous and can wrap negative.
-    /// </para>
-    /// </summary>
     public static bool Due(Mobile body, string what)
     {
         if (body == null || string.IsNullOrEmpty(what))
@@ -107,7 +94,6 @@ public static class BotNeeds
             ? "nobody has looked at what they are short of yet"
             : $"needs reviewed {Asked} times, {Passed} asks inside the {EveryMs / 1000}s between one bot's reviews";
 
-    /// <summary>Forgotten with the world, like every store in this assembly that is keyed by serial.</summary>
     public static void Forget()
     {
         _asked.Clear();

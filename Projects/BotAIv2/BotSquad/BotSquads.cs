@@ -26,7 +26,6 @@ public static class BotSquads
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSquads));
 
-    /// <summary>How often a squad reconsiders itself. Its life is slow; the bots inside it are not.</summary>
     public const int BeatMs = 1000;
 
     private static readonly List<BotSquad> _squads = [];
@@ -47,14 +46,11 @@ public static class BotSquads
 
     public static long Yields { get; private set; }
 
-    /// <summary>
-    /// Bots turned away from a company that had already been taken apart.
-    ///
-    /// A named nought that should stay small rather than nought: companies really do dissolve in the same
-    /// beat somebody decides to join one, and the whole point is that the answer is now "no" instead of a bot
-    /// spending the rest of the shard's life in a company that does not exist.
-    /// </summary>
     public static long Buried { get; private set; }
+
+    public static long Enemies { get; private set; }
+
+    public static long Inside { get; private set; }
 
     public static bool Running => _timer != null;
 
@@ -65,7 +61,6 @@ public static class BotSquads
             return;
         }
 
-        // Seeded from a real tick rather than left at zero: these counters can start enormous and wrap.
         _saidTick = Core.TickCount;
 
         _timer = new SquadTimer(TimeSpan.FromMilliseconds(BeatMs));
@@ -93,34 +88,14 @@ public static class BotSquads
         Yields = 0;
         Buried = 0;
         Rebuffs = 0;
+        Friendly = 0;
+        Enemies = 0;
+        Inside = 0;
         BotSquad.Forget();
 
         BotSpoils.Reset();
     }
 
-    /// <summary>
-    /// The companies in a sentence, and how many bots they are holding.
-    ///
-    /// <para>
-    /// <b>The count of bots bound to a company was the one figure this line did not carry, and it is the one
-    /// with a consequence.</b> A bound bot does not take part in the auction at all — the ladder answers for
-    /// it — so a company standing about is not merely idle, it is a hole in the population's working time
-    /// that nothing else on the shard reports. On 03.09.2026 at 08:13 the stall watch caught Faron 2 the
-    /// Healer four minutes into "fell in with company 3", and answering how common that was meant grepping
-    /// an hour of log for the phrase. Squads standing, formed and disbanded were all here; how many bots
-    /// were inside them was not.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// How many bots are held in companies this moment.
-    ///
-    /// <para>
-    /// <b>Wanted outside this file the day a wider muster reach turned three quarters of the shard into one
-    /// army.</b> A bot on the Bound rung is not offered work of its own — that is the whole point of the
-    /// rung — so this number is also the count of bots that have stopped mining, sewing and trading. See
-    /// BotMuster.MostBound.
-    /// </para>
-    /// </summary>
     public static int Bound
     {
         get
@@ -140,20 +115,9 @@ public static class BotSquads
     {
         var bound = Bound;
 
-        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon, {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing, {Rebuffs} times one of them was handed back something it had already given up on, {BotSquad.Unowned} charges taken back because the errand holding them had ended; {BotSquad.Blinded} beats stood near enough to fight with no line to the thing, {BotSquad.Refused} refused the blow by the engine and {BotSquad.Unsteadied} were shooters that had moved too recently to fire, {BotSquad.Blindfights} fights given up because nobody could land one at all, {BotSquad.Conjured} spells thrown by the back ranks and {BotSquad.Mended} heals landed by their medics, against {BotSquad.Dry} beats with nothing they could pay for; {BotSpoils.Describe()}";
+        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon ({Friendly} more by a bot of a guild not at war with it, passed over as friendly fire, {Inside} from inside the company itself, {Enemies} bots refused a place for being at war with the leader), {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing, {Rebuffs} times one of them was handed back something it had already given up on, {BotSquad.Unowned} charges taken back because the errand holding them had ended; {BotSquad.Blinded} beats stood near enough to fight with no line to the thing, {BotSquad.Refused} refused the blow by the engine and {BotSquad.Unsteadied} were shooters that had moved too recently to fire, {BotSquad.Blindfights} fights given up because nobody could land one at all, {BotFormation.Unanchored} stations answered with standing fast because nothing round the enemy could be walked to, {BotSquad.Conjured} spells thrown by the back ranks and {BotSquad.Mended} heals landed by their medics, against {BotSquad.Dry} beats with nothing they could pay for; {BotSpoils.Describe()}";
     }
 
-    /// <summary>
-    /// Calls a squad together. Whoever calls it leads it.
-    ///
-    /// <para>
-    /// A founder who cannot fight is refused, and that refusal is one of the first version's plainer lessons.
-    /// Its rung order put "this is dangerous, call for help" <em>above</em> "I am running out of health", so a
-    /// bot on its last few points would declare a company it could not itself take part in; the company
-    /// counted only able fighters, found none, and disbanded in the same tick — and the same bot posted it
-    /// again on the next. Whoever is in that state should be running, not recruiting.
-    /// </para>
-    /// </summary>
     public static BotSquad Form(IBotSquadMember leader)
     {
         if (leader?.Self is not { Deleted: false, Alive: true } || !leader.AbleToFight)
@@ -179,9 +143,6 @@ public static class BotSquads
         return squad;
     }
 
-    /// <summary>
-    /// Puts a bot in a squad. The only way in, and therefore the only place the cap is enforced.
-    /// </summary>
     public static bool Join(BotSquad squad, IBotSquadMember member)
     {
         if (squad == null || member?.Self is not { Deleted: false, Alive: true })
@@ -189,12 +150,6 @@ public static class BotSquads
             return false;
         }
 
-        // <b>A company that has been taken apart is not a company, and every other test here passes for
-        // one.</b> Dissolve drops the squad out of the list the timer walks and clears the Squad of everybody
-        // in it, but the object goes on answering Count, Ceiling and Map exactly as before — through a leader
-        // whose own Squad is now null. So a bot could fall in with a company that had ceased to exist one
-        // second earlier, and then never get out of it, because nothing thinks about a squad that is not in
-        // the list. See BotSquad.Disbanded for the two log lines that say so.
         if (squad.Disbanded)
         {
             Buried++;
@@ -207,10 +162,15 @@ public static class BotSquads
             return true;
         }
 
-        // The company's own ceiling rather than the shard's, because a harrowing was ordered six strong and
-        // a muster is worth five. See BotSquad.Ceiling: it is MaxSize for everybody who does not ask.
         if (member.Squad != null || squad.Count >= squad.Ceiling || squad.Map != member.Self.Map)
         {
+            return false;
+        }
+
+        if (squad.Leader?.Self is Mobile lead && BotRegard.AtWar(lead, member.Self))
+        {
+            Enemies++;
+
             return false;
         }
 
@@ -220,10 +180,6 @@ public static class BotSquads
         return true;
     }
 
-    /// <summary>
-    /// Takes a bot out. Its station errand goes with it — the errand underneath, whatever the bot was doing
-    /// before it joined, is still there.
-    /// </summary>
     public static void Leave(IBotSquadMember member)
     {
         var squad = member?.Squad;
@@ -237,21 +193,11 @@ public static class BotSquads
         member.Squad = null;
     }
 
-    /// <summary>The squad this bot is in, or null.</summary>
     public static BotSquad Of(IBotSquadMember member) => member?.Squad;
 
-    /// <summary>Whether these two are in the same squad. Used wherever "one of ours" has to mean something.</summary>
     public static bool Together(IBotSquadMember a, IBotSquadMember b) =>
         a?.Squad != null && ReferenceEquals(a.Squad, b?.Squad);
 
-    /// <summary>
-    /// One of ours has been set upon. This is the whole of the shared mind, and it is one line of consequence:
-    /// the squad now has a focus, and the formation now anchors on whoever was hit.
-    ///
-    /// Nobody is asked to come and help. Every station is derived from the anchor, so the moment the anchor
-    /// moves onto the member under attack, every other member is already walking towards it — including the
-    /// ones a hundred feet away on a sweep, whose patches were derived from that same anchor.
-    /// </summary>
     public static void Note(IBotSquadMember member, Mobile attacker)
     {
         var squad = member?.Squad;
@@ -261,24 +207,23 @@ public static class BotSquads
             return;
         }
 
-        // The strongest thing around the member that was hit, not necessarily the thing that hit it. On a
-        // graveyard the nearest hostile is always a skeleton, and the first version's companies formed against
-        // the nearest: six bots would declare a band against a skeleton, commit at once because a skeleton is
-        // trivial, all go and kill it — while the lich that was actually killing them carried on casting.
+        if (attacker is BotMobile other && member.Self is Mobile self && !BotRegard.AtWar(self, other))
+        {
+            Friendly++;
+
+            return;
+        }
+
+        if (squad.Has(attacker))
+        {
+            Inside++;
+
+            return;
+        }
+
         var worst = BotThreat.Strongest(member.Self, Reach);
         var pick = worst ?? attacker;
 
-        // <b>The note the company had just written about this very creature, read by nobody.</b> Breaking
-        // off as hopeless shuns the quarry for a quarter of an hour precisely so that nobody goes back to
-        // it — and <c>BotQuarry.Company</c>, the finder <c>Hunt</c> uses, honours that. This path does not
-        // go through a finder, so the creature the company gave up on two seconds ago hits somebody, and the
-        // whole company is handed it again. Squad 17 on 03.09.2026: broke off from a troll with three of
-        // three standing on it and its health untouched, re-engaged the same troll within the second, broke
-        // off again, twice over, and every member of it was frozen for the duration of both.
-        //
-        // Passed over rather than fought: the members still defend themselves, because being hit is their
-        // own business and always has been. What is refused here is committing the *company* to a fight it
-        // has already proved it cannot win.
         if (BotQuarry.Shunned(pick))
         {
             Rebuffs++;
@@ -290,30 +235,12 @@ public static class BotSquads
         Rescues++;
     }
 
-    /// <summary>Times a company was handed a creature it had already given up on, and passed. For the summary.</summary>
     public static long Rebuffs { get; private set; }
 
-    /// <summary>
-    /// How far around a member the squad looks when working out what is attacking it. The whole company is
-    /// counted at this range, so it has to be wide enough that the far knot of a sweep is included and narrow
-    /// enough that the next field is not.
-    /// </summary>
+    public static long Friendly { get; private set; }
+
     public static int Reach { get; set; } = 12;
 
-    /// <summary>
-    /// Whether the holder of a tile should give it up to whoever is asking.
-    ///
-    /// <para>
-    /// Two trees with a gap between them, a mage standing in the gap, something hostile on the far side. The
-    /// mage dies there in seconds; the blade behind it would take minutes. So the blade asks, and the mage
-    /// yields — not because anything recognised a chokepoint, but because the tile belongs to the rank that
-    /// stands nearer the threat, and the formation already says which rank that is.
-    /// </para>
-    ///
-    /// <para>
-    /// It does not work the other way round. A mage cannot move a blade: the blade is where it belongs.
-    /// </para>
-    /// </summary>
     public static bool ShouldYield(IBotSquadMember holder, Mobile asker)
     {
         if (holder?.Self is not { Deleted: false, Alive: true } body || asker is not IBotSquadMember member)
@@ -321,15 +248,6 @@ public static class BotSquads
             return false;
         }
 
-        // Inside one company the formation decides, because there the tiles mean something: a shield wall
-        // that reshuffles itself every time somebody wants past is not a wall.
-        //
-        // <b>While it is a shield wall.</b> A company that is not fighting holds no wall — its stations are
-        // only where everybody happens to be standing — so the rank rule there protects nothing and is four
-        // bots refusing each other in a field. Edda, Faron, Gerda and Calla stood at (1298-1303, 1070-1073)
-        // for eight minutes on 03.09.2026, every one of them reported "in a company", every one holding an
-        // errand of its own that the company had no opinion about, and none outranking any other. In a fight
-        // this branch still runs and rank still decides, exactly as before.
         if (holder.Squad is { Stance: BotSquadStance.Fighting } && ReferenceEquals(holder.Squad, member.Squad))
         {
             if (!BotFormation.OutranksFor(member, holder))
@@ -342,24 +260,6 @@ public static class BotSquads
             return true;
         }
 
-        // <b>And everybody else gets out of the way, which they flatly refused to do until now.</b> This
-        // began and ended at "same company, and the asker outranks you" — so two bots from different
-        // companies, or the twenty-odd in none at all, would stand facing each other for ever. With
-        // thirty-four bots crowding one training field and one bank counter it showed up as a third of every
-        // step on the shard being refused by the engine (11028 of 33015 in one window) and four bots at a
-        // time reported stuck by the stall watch, none of them overloaded and none of them lost.
-        //
-        // The one standing still yields to the one who is going somewhere. That is the whole rule and it is
-        // what a person would do in a doorway. It cannot deadlock only because the test below is motion
-        // rather than intent: a bot that has not moved lately has nothing to lose by a step, and two that
-        // have are not in each other's way for long.
-        // <b>Moving, not Walking, and the difference is the whole of whether this rule can deadlock.</b>
-        // Walking asks whether the bot holds a plan with tiles left in it, which a bot whose every step is
-        // refused does for as long as it stands there. So the rule that reads "the one standing still yields
-        // to the one who is going somewhere" was in fact "nobody with a plan yields to anybody", and four
-        // bots with plans through each other's tiles held that position for four minutes at (1344, 878) on
-        // 03.09.2026. Moving asks whether a step has actually been taken lately, which is what the rule
-        // always meant and what makes its own argument true: two bots both moving are both moving.
         if (body is BotMobile { Journey.Moving: true })
         {
             return false;
@@ -370,13 +270,6 @@ public static class BotSquads
         return true;
     }
 
-    /// <summary>
-    /// Which way somebody giving up a tile should step: away from whatever the squad is dealing with, or away
-    /// from the asker when there is nothing.
-    ///
-    /// Not merely to clear the tile — to clear it in the direction the yielder wanted to go anyway. A caster
-    /// pushed out of a gap should end up behind the line, which is its own station.
-    /// </summary>
     public static Direction YieldAwayFrom(IBotSquadMember holder, Mobile asker)
     {
         var body = holder?.Self;
@@ -393,27 +286,15 @@ public static class BotSquads
             return body.Direction;
         }
 
-        // Four points round the compass from whatever it is backing away from.
         var towards = (int)(body.GetDirectionTo(from) & Direction.Mask);
 
         return (Direction)((towards + 4) & 0x7);
     }
 
-    /// <summary>
-    /// How often the state of companies is said out loud.
-    ///
-    /// <para>
-    /// <b>"No squads formed" is not a measurement, and for two evenings it was all there was.</b> The count
-    /// went from fifteen in twenty minutes to none, twice over, and nothing in the log distinguished a
-    /// population with nothing worth ganging up on from one too scattered to gather two helpers — which want
-    /// opposite fixes. This says both, beside each other, every five minutes.
-    /// </para>
-    /// </summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static long _saidTick;
 
-    /// <summary>One beat: every squad reconsiders itself, and the ones that are finished are cleared away.</summary>
     public static void Update()
     {
         if (Core.TickCount - _saidTick >= SayEveryMs)
@@ -422,25 +303,19 @@ public static class BotSquads
 
             logger.Information("Companies: {Standing}; {Muster}; {Enlist}", Describe(), BotMuster.Describe(), BotEnlister.Describe());
 
-            // Two facts about fighting that had nowhere else to be said, on the only clock in this assembly
-            // that ticks slowly enough to say them: who came to whose aid, and who is swinging its fists.
             logger.Information(
-                "Arms: {Cries}; {Hands}; {Scrolls}; {Mending}",
+                "Arms: {Cries}; {Hands}; {Scrolls}; {Mending}; {Standing}",
                 BotCry.Describe(),
                 BotArms.Describe(),
                 BotArmoury.Describe(),
-                BotMedic.Describe()
+                BotMedic.Describe(),
+                BotAttendant.Describe()
             );
 
-            // The bow's own line. It earns one because "the archer never kites" survived two nights of being
-            // blamed on other things, and a decision nobody counts is a decision nobody can argue with.
             logger.Information("Bows: {Kites}", BotSlay.Bows());
 
-            // The board, from the asking side. Counters were written for both of these and printed nowhere,
-            // which is the same fault as having none: "the board is empty" and "nobody has looked at the
-            // board" are different facts and were producing the same silence.
             logger.Information(
-                "Needs: {Gear}; {Metal}; {Forge}; {Thread}; {Arrows}; {Bottles}; {Skillet}; {Stores}; {Filled} things off a pack went straight to somebody's standing order, {Bespoken} trips to a counter were begun because the board wanted something in the pack, {Shed} things were listed on the spot by bots too heavy to walk, {Exposed} trips were begun because a pack was worth more than a bot should be carrying about, {Hoarding} because it held more stones of somebody else's goods than it should, {Dumped} things nobody would buy were left on the ground by bots that could not walk ({Stranded} of these errands were finished with no counter known at all, {Cornered} were offered to a bot with nothing the market wants so that the dropping could be reached, and {Immovable} of those found nothing to drop either), and {Sent} kills were chosen because the board wanted what the carcass carries",
+                "Needs: {Gear}; {Metal}; {Forge}; {Thread}; {Arrows}; {Bottles}; {Skillet}; {Stores}; {Filled} things off a pack went straight to somebody's standing order, {Bespoken} trips to a counter were begun because the board wanted something in the pack, {Shed} things were listed on the spot by bots too heavy to walk, {Exposed} trips were begun because a pack was worth more than a bot should be carrying about, {Hoarding} because it held more stones of somebody else's goods than it should, {Stored} lots of {Stowed} things the market would not take went into bank boxes ({Boxless} times the box would not take them either), {Dumped} things nobody would buy were left on the ground by bots that could not walk ({Stranded} of these errands were finished with no counter known at all, {Cornered} were offered to a bot with nothing the market wants so that the dropping could be reached, and {Immovable} of those found nothing to drop either), and {Sent} kills were chosen because the board wanted what the carcass carries",
                 BotUpkeep.Describe(),
                 BotBullion.Describe(),
                 BotSmith.Describe(),
@@ -454,6 +329,9 @@ public static class BotSquads
                 BotUnload.Shed,
                 BotUnload.Exposed,
                 BotUnload.Hoarding,
+                BotUnload.Stored,
+                BotUnload.Stowed,
+                BotUnload.Boxless,
                 BotUnload.Dumped,
                 BotUnload.Stranded,
                 BotUnload.Cornered,
@@ -461,22 +339,10 @@ public static class BotSquads
                 BotQuarry.Sent
             );
 
-            // <b>The market's own state, which went to a gump nobody opens and to the world reload.</b> That is
-        // the same "which is to say nowhere" as BotGround.Describe, and it hid a whole class of fault: a
-        // stall whose price has ratcheted to its floor and still not sold is never removed, because only an
-        // empty stall is ever forgotten. Nobody could see how many of those there were.
         logger.Information("Market: {What}", BotAuction.Describe());
 
-        // What the population is actually carrying about, which nothing has ever printed. See
-        // BotUnload.Weighed: every other weight instrument on this shard is about bots already in trouble,
-        // and a pack filling with things nobody wants stays under the ceiling the whole time it is doing it.
         logger.Information("Packs: {What}", BotUnload.Weighed());
 
-        // <b>The ground the whole economy is dug out of, and it has never once been printed.</b>
-            // BotGround.Describe existed and went to exactly two places: a gump nobody has open, and the
-            // world reload — which is to say nowhere. So how much rock this island has, how much of it is
-            // behind a wall and how much turned out to be a mirage were facts nobody could read. It is the
-            // same fault the market's own summary had, and BotBeat.Summarise carries the note about it.
             logger.Information(
                 "The ground: {What}; {Wood}; {Stables}",
                 BotGround.Describe(),
@@ -511,18 +377,6 @@ public static class BotSquads
         }
     }
 
-    /// <summary>
-    /// Takes a whole company apart, for whoever raised it.
-    ///
-    /// <para>
-    /// <b>Update's own rule is that whoever set the charge owns ending the company, and there was no way for
-    /// an owner to do it.</b> BotScout.Disband says in its summary that it lets the party go, and what it had
-    /// was Leave, which detaches one bot — the leader. The other five inherited a new leader with no errand
-    /// and stood there: a company only dissolves itself at nought members or at one uncharged, and five bots
-    /// on the Bound rung have no work of their own to walk away to. On 03.09.2026 every bot the stall watch
-    /// caught standing still was reported "in a company", and the captain beside them "on its own".
-    /// </para>
-    /// </summary>
     public static void Disband(BotSquad squad, string why)
     {
         if (squad == null || !_squads.Contains(squad))
@@ -535,7 +389,6 @@ public static class BotSquads
 
     private static void Dissolve(BotSquad squad, string why)
     {
-        // First, so that a Join arriving in the same beat is refused rather than attaching to a corpse.
         squad.Bury();
 
         var members = squad.Members;

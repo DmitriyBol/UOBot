@@ -15,49 +15,34 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotMendSettings
 {
-    /// <summary>How hurt something has to be before it is worth mending.</summary>
     public double? Hurt { get; set; }
 
-    /// <summary>How much of its health a bot is mended to before the job is done.</summary>
     public double? Mended { get; set; }
 
-    /// <summary>How near a heal is cast from. The bandage's reach is the engine's and not ours to move.</summary>
     public int? Cast { get; set; }
 
-    /// <summary>How long after a blow a bot still counts as being under fire.</summary>
     public int? UnderFireMs { get; set; }
 
-    /// <summary>The share of health below which a bot swallows a bottle instead of mending properly.</summary>
     public double? Gulp { get; set; }
 
-    /// <summary>How much more urgent mending is at death's door than at the threshold.</summary>
     public double? Urgency { get; set; }
 
-    /// <summary>How far a caster looks for somebody else worth healing.</summary>
     public int? Watch { get; set; }
 
-    /// <summary>How often another attempt is made.</summary>
     public int? TryMs { get; set; }
 
-    /// <summary>What mending is reckoned at per minute before experience corrects it.</summary>
     public double? Expects { get; set; }
 
-    /// <summary>How long a patch-up is expected to take.</summary>
     public double? WorkMinutes { get; set; }
 
-    /// <summary>How far a fleeing bot looks for what it is running from, and how far counts as away.</summary>
     public int? FleeWatch { get; set; }
 
-    /// <summary>How far a fleeing bot heads in one go.</summary>
     public int? FleeBound { get; set; }
 
-    /// <summary>How long a flight may go on before it is given up as not working, in milliseconds.</summary>
     public int? FleeGiveUpMs { get; set; }
 
-    /// <summary>How much of the strength a hurt bot has left the opposition may come to before it runs.</summary>
     public double? FleeBearable { get; set; }
 
-    /// <summary>What getting away is reckoned at per minute. See <see cref="BotBolt.Prior"/> before moving it.</summary>
     public double? FleeExpects { get; set; }
 }
 
@@ -99,8 +84,6 @@ public static class BotMendConfig
 
         BotSurgeon.Reach = settings.Watch ?? BotSurgeon.Reach;
 
-        // The other answer this rung gives. Kept in the mending file because it is the same question —
-        // a bot that is losing, and what it should do about it.
         BotBolt.Watch = settings.FleeWatch ?? BotBolt.Watch;
         BotBolt.Bound = settings.FleeBound ?? BotBolt.Bound;
         BotBolt.GiveUpMs = settings.FleeGiveUpMs ?? BotBolt.GiveUpMs;

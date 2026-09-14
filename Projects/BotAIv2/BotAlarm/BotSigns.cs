@@ -40,52 +40,24 @@ public static class BotSigns
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSigns));
 
-    /// <summary>How often the rules are read.</summary>
     public static int TickMs { get; set; } = 60000;
 
-    /// <summary>Errors in one look before the channel is told. The shard's own rate was 0.3 a minute.</summary>
     public static int ErrorsAt { get; set; } = 5;
 
-    /// <summary>The window the work rules are judged over.</summary>
     public static int WorkMs { get; set; } = 300000;
 
-    /// <summary>Fewest pieces of work taken on in that window before finishing them is judged at all.</summary>
     public static int WorkLeast { get; set; } = 20;
 
-    /// <summary>The share of work taken that must finish. Four in five were finishing when this was written.</summary>
-    /// <summary>
-    /// Below this share of work finishing, over the work window, the shard says so.
-    ///
-    /// <para>
-    /// <b>Raised from 0.25 to 0.55 on 08.09.2026, and the old figure was a measurement of a sick shard.</b>
-    /// A quarter was chosen when the population was finishing between 9% and 49% of what it took on — which
-    /// turned out to be the engine refusing every step of an exhausted mount, not the work being wrong. With
-    /// that fixed the same population finishes 72% to 91% window after window, nine windows running, and a
-    /// floor at a quarter could not fire again short of the shard stopping outright.
-    /// </para>
-    ///
-    /// <para>
-    /// Seventeen points below the worst window actually observed. Close enough that a real collapse trips it
-    /// within one window; far enough that the ordinary swing between 72 and 91 does not. It is a threshold on
-    /// a noisy ratio, so it wants revisiting whenever the population's shape changes — and the way to set it
-    /// is the way this one was set: read nine consecutive windows off a healthy shard first.
-    /// </para>
-    /// </summary>
     public static double WorkFloor { get; set; } = 0.55;
 
-    /// <summary>The share of the population standing still that is worth waking somebody for.</summary>
     public static double StandShare { get; set; } = 0.3;
 
-    /// <summary>Fewest bots alive before the standing share means anything.</summary>
     public static int StandLeast { get; set; } = 10;
 
-    /// <summary>How long a market with stalls and wants on it may move nothing at all.</summary>
     public static int MarketMs { get; set; } = 600000;
 
-    /// <summary>Deaths in one work window that count as a plague rather than a bad afternoon.</summary>
     public static int DeathsAt { get; set; } = 10;
 
-    /// <summary>How often the channel says that nothing is wrong.</summary>
     public static int AliveMs { get; set; } = 3600000;
 
     private static long _errorsAt;
@@ -112,10 +84,8 @@ public static class BotSigns
 
     private static long _aliveErrors;
 
-    /// <summary>Times the rules have been read this session.</summary>
     public static long Looks { get; private set; }
 
-    /// <summary>Sets every anchor to now, so the first window measures this session and not the last one.</summary>
     public static void Start()
     {
         var now = Core.TickCount;
@@ -139,21 +109,8 @@ public static class BotSigns
         Looks = 0;
     }
 
-    /// <summary>
-    /// Whether a window is up, with half a tick of slack.
-    ///
-    /// <b>Without the slack a window equal to the tick fires every other tick.</b> Found the hour this was
-    /// written: the heartbeat was dialled to a minute against a one-minute tick and came out two minutes
-    /// apart, while the event it wrote still called its window "1m". A period and a sampling rate that are
-    /// the same number do not divide cleanly, and the number that lies about it is the one in the report.
-    /// </summary>
     private static bool Due(long now, long anchor, int every) => now - anchor >= every - TickMs / 2;
 
-    /// <summary>
-    /// The window as it actually was, not as it was meant to be. Every event says how long it looked over,
-    /// and a rule that reports its intention instead of its measurement is a rule whose numbers cannot be
-    /// compared with each other.
-    /// </summary>
     private static string Window(long now, long anchor)
     {
         var seconds = (now - anchor) / 1000;
@@ -161,14 +118,8 @@ public static class BotSigns
         return seconds < 90 ? $"{seconds}s" : $"{(seconds + 30) / 60}m";
     }
 
-    /// <summary>
-    /// Percentages, said the same way whatever the host's locale is. <c>P0</c> here renders with a
-    /// non-breaking space on a Russian machine, and this shard has already lost time to locale-shaped
-    /// differences between what a number looks like on the developer's box and everywhere else.
-    /// </summary>
     private static int Percent(double share) => (int)Math.Round(share * 100);
 
-    /// <summary>One look at everything. Called from the module's own clock.</summary>
     public static void Look()
     {
         Looks++;
@@ -194,11 +145,6 @@ public static class BotSigns
         }
     }
 
-    /// <summary>
-    /// Errors printed since the last look. Cleared as soon as a quiet minute passes, because a burst that
-    /// has stopped is a different thing from one that is still going and the difference is what a person
-    /// woken at midnight most wants to know.
-    /// </summary>
     private static void Errors()
     {
         var now = Core.TickCount;
@@ -227,10 +173,6 @@ public static class BotSigns
         }
     }
 
-    /// <summary>
-    /// How much of the population is standing still, as a share of it. The number is the shard's own count
-    /// of stalled bots, not a second opinion derived from positions.
-    /// </summary>
     private static void Standing()
     {
         var alive = BotPopulation.Count;
@@ -269,11 +211,6 @@ public static class BotSigns
         }
     }
 
-    /// <summary>
-    /// Work taken on against work finished, over the work window, plus deaths in the same window. Judged
-    /// only when enough work was taken on to divide by — otherwise a quiet five minutes reads as a broken
-    /// shard, which is the shape of false alarm this project has produced most often.
-    /// </summary>
     private static void Work(long now)
     {
         var taken = BotWill.Taken - _workTaken;
@@ -330,10 +267,6 @@ public static class BotSigns
         }
     }
 
-    /// <summary>
-    /// A market with things on it, money down for things, and nothing moving either way. Both halves are
-    /// required: an empty market is not a stuck one, and the difference is the whole of the alarm.
-    /// </summary>
     private static void Market(long now)
     {
         var sells = BotAuction.Sells - _marketSells;
@@ -374,11 +307,6 @@ public static class BotSigns
         );
     }
 
-    /// <summary>
-    /// The hourly "nothing is wrong", with the numbers it is asserting that about. Without it, a channel
-    /// that has quietly stopped writing looks exactly like a shard with nothing to report — and this project
-    /// has already lost an evening to a monitor whose filter matched nothing at all.
-    /// </summary>
     private static void Heartbeat(long now)
     {
         var taken = BotWill.Taken - _aliveTaken;
@@ -401,7 +329,6 @@ public static class BotSigns
         );
     }
 
-    /// <summary>One line for the boot log and the summaries.</summary>
     public static string Describe() =>
         $"{Looks} looks taken, thresholds: {ErrorsAt} errors a minute, work finishing below {Percent(WorkFloor)}% of"
         + $" {WorkLeast}+ taken in {WorkMs / 60000}m, {Percent(StandShare)}% of the population standing still,"

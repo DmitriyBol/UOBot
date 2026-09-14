@@ -33,15 +33,11 @@ public sealed class BotSpellsModule : BotModule
     {
         BotSpellsConfig.Load();
 
-        // Needs the world, because it reads the answer off one of each scroll rather than guessing it.
         BotGrimoire.Read();
 
         BotWill.Offer(new BotScribe());
         BotWill.Offer(new BotSeeker());
 
-        // Scrolls for everybody else. Until this, the only bot that ever asked for one was a mage filling a
-        // book — one want per spell, once, for ever — so the scribes had no customers and the board of what
-        // the population needs stayed empty. See BotArmoury.
         BotWill.Offer(new BotArmoury());
 
         logger.Information(

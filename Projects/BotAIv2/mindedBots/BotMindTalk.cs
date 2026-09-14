@@ -22,24 +22,18 @@ namespace Server.BotAI.Mind;
 /// </summary>
 public static class BotMindTalk
 {
-    /// <summary>How many lines are kept. Short: this is what somebody said lately, not a history.</summary>
     public static int Keep { get; set; } = 6;
 
-    /// <summary>How long a line is worth repeating to anybody. Older than this and it is about a dead moment.</summary>
     public static int HoldsMs { get; set; } = 240000;
 
-    /// <summary>Longest line a mind may say. Anything past this is cut: the prompt has to stay short.</summary>
     public static int MostLetters { get; set; } = 120;
 
-    /// <summary>How often one mind may speak out loud in the world. Reading is not rationed; saying is.</summary>
     public static int SpeakEveryMs { get; set; } = 25000;
 
     private static readonly List<(string Who, string What, long Tick)> _said = [];
 
-    /// <summary>Lines posted this session.</summary>
     public static long Lines { get; private set; }
 
-    /// <summary>Puts a line on the board. Trimmed, capped, and never allowed to repeat the speaker's last.</summary>
     public static bool Post(string who, string what)
     {
         if (string.IsNullOrWhiteSpace(who) || string.IsNullOrWhiteSpace(what))
@@ -54,8 +48,6 @@ public static class BotMindTalk
             line = line[..MostLetters];
         }
 
-        // Saying the same thing twice running is not communication, and a model given a field to fill will
-        // fill it every time whether or not anything has changed.
         for (var i = _said.Count - 1; i >= 0; i--)
         {
             if (_said[i].Who == who)
@@ -80,7 +72,6 @@ public static class BotMindTalk
         return true;
     }
 
-    /// <summary>What everybody except this one has said lately, oldest first.</summary>
     public static IEnumerable<(string Who, string What, int SecondsAgo)> Heard(string listener)
     {
         for (var i = 0; i < _said.Count; i++)

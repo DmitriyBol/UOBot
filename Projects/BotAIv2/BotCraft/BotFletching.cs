@@ -36,33 +36,16 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotFletching
 {
-    /// <summary>The engine's fletching system, or null before content initialisation has built it.</summary>
     public static CraftSystem System => DefBowFletching.CraftSystem;
 
-    /// <summary>The tool. Without one a bot with the skill is a bot with an opinion about arrows.</summary>
     public static BaseTool Kit(Mobile bot) => bot?.Backpack?.FindItemByType<FletcherTools>();
 
-    /// <summary>What one arrow eats: one shaft and one feather.</summary>
     public const int PerArrow = 1;
 
-    /// <summary>What one shaft eats: one log.</summary>
     public const int PerShaft = 1;
 
-    /// <summary>How many arrows are worth making a trip for. Below this the chain costs more than it returns.</summary>
     public static int LeastArrows { get; set; } = 20;
 
-    /// <summary>
-    /// How much a made arrow opens at on the market.
-    ///
-    /// <para>
-    /// <b>Two, which is what the sentence here has always claimed and what the number never was.</b> It read
-    /// three and called itself "the provisioner's own price"; the provisioner asks two —
-    /// <c>SBProvisioner</c>, <c>GenericBuyInfo(typeof(Arrow), 2, 20, …)</c> — and one gold is the whole
-    /// difference between a trade and a stall that stands until the peddler carries it to a counter. A
-    /// shopkeeper is the ceiling everywhere else in this market; an opening ask above it is a thing no bot on
-    /// this island can ever rationally buy.
-    /// </para>
-    /// </summary>
     public static int Worth { get; set; } = 2;
 
     public static int Amount(Mobile bot, Type stuff) =>
@@ -74,32 +57,12 @@ public static class BotFletching
 
     public static int Feathers(Mobile bot) => Amount(bot, typeof(Feather));
 
-    /// <summary>
-    /// How many feathers a fletcher keeps off a corpse rather than listing them.
-    ///
-    /// <para>
-    /// <b>The half nobody sells was being sold.</b> No shopkeeper on this shard stocks a feather — the fletcher
-    /// says so in as many words — so the only feathers on the island are the ones that come off birds. And
-    /// <c>BotSlay.Rifle</c> lists everything lifted off a corpse, so a fletcher standing over a bird put its
-    /// only source of feathers straight onto a stall and then read "no feathers and nobody sells one" on the
-    /// next beat: 65 of 262 asks on 05.09.2026, with <c>BotAuction.Reclaim</c> already in the proposer as a
-    /// patch on the same wound.
-    /// </para>
-    ///
-    /// <para>
-    /// Twenty, which is <see cref="LeastArrows"/> — a round of arrows and no more, so a fletcher stocks itself
-    /// and everything past that still reaches the market for whoever else wants it.
-    /// </para>
-    /// </summary>
     public static int Keeps { get; set; } = 20;
 
-    /// <summary>Stacks of feathers kept back for a fletcher's own use. For the summary.</summary>
     public static long Spared { get; private set; }
 
-    /// <summary>Stacks sold on instead, because nobody there could fletch or they were already stocked.</summary>
     public static long Sold { get; private set; }
 
-    /// <summary>Feathers this bot should keep for its own bench instead of listing. See <see cref="Keeps"/>.</summary>
     public static bool Spares(Mobile bot, Item item)
     {
         if (item == null || bot == null || item.GetType() != typeof(Feather) || Kit(bot) == null)
@@ -107,7 +70,6 @@ public static class BotFletching
             return false;
         }
 
-        // Counted after it is in the pack, which is where the caller lifts it to before asking.
         if (Feathers(bot) <= Keeps)
         {
             Spared++;
@@ -120,22 +82,12 @@ public static class BotFletching
         return false;
     }
 
-    /// <summary>Forgotten with the world.</summary>
     public static void ForgetTrade()
     {
         Spared = 0;
         Sold = 0;
     }
 
-    /// <summary>
-    /// How many arrows this bot could make right now without buying anything.
-    ///
-    /// <para>
-    /// Shafts it already holds plus shafts its logs would become, capped by feathers — because a feather is
-    /// the half nobody sells and is therefore always the binding constraint. Stated as one number so that
-    /// every gate in the trade asks the same question and no two of them can drift apart.
-    /// </para>
-    /// </summary>
     public static int Possible(Mobile bot)
     {
         var shafts = Shafts(bot) + Logs(bot) / PerShaft;
@@ -143,30 +95,9 @@ public static class BotFletching
         return Math.Min(shafts, Feathers(bot)) / PerArrow;
     }
 
-    /// <summary>The recipe for one named thing out of one named material, or null if this bot cannot work it.</summary>
     public static CraftItem Recipe(Mobile bot, Type material, Type wanted) =>
         BotCraftwork.Recipe(bot, System, SkillName.Fletching, material, wanted);
 
-    /// <summary>
-    /// The recipe that feathers a shaft into an arrow, or null when this bot cannot work it.
-    ///
-    /// <para>
-    /// <b>This needs its own lookup, and its absence is why no bot on this shard has ever made an arrow.</b>
-    /// <c>BotCraftwork.Simple</c> — which every other recipe lookup here goes through — refuses any recipe
-    /// with more than one resource, by design and for good reasons on the trades it serves. The arrow has
-    /// two: <c>DefBowFletching</c> declares <c>AddCraft(typeof(Arrow), …, typeof(Shaft), …)</c> and then
-    /// <c>AddRes(index, typeof(Feather), …)</c> on the next line. So the general lookup answered null for
-    /// the arrow every time it was ever asked, and the trade reported "it does not know how to feather a
-    /// shaft" — twelve times in half an hour on 04.09.2026, the first half hour in which any fletcher had
-    /// ever held a feather to try it with.
-    /// </para>
-    ///
-    /// <para>
-    /// Shaft into arrow is the only two-material step in this trade; log into shaft is a single material and
-    /// still goes through the general lookup. See <c>BotFlask</c>, where every recipe in the trade is a pair
-    /// and the whole file exists for that reason.
-    /// </para>
-    /// </summary>
     public static CraftItem Feathering(Mobile bot)
     {
         var system = System;
@@ -216,8 +147,6 @@ public static class BotFletching
                 continue;
             }
 
-            // Both halves counted, because a swing spends both and the engine simply declines when either is
-            // short — silently, which is what makes an unasked question here cost a whole afternoon.
             if (Shafts(bot) < shafts || Feathers(bot) < feathers)
             {
                 continue;
@@ -229,11 +158,9 @@ public static class BotFletching
         return null;
     }
 
-    /// <summary>One turn of the handle. True when the engine accepted the attempt.</summary>
     public static bool Swing(Mobile bot, CraftItem recipe, Type material, BaseTool tool) =>
         BotCraftwork.Swing(bot, System, recipe, material, tool);
 
-    /// <summary>How many of that thing are in the pack. The only honest way to count what a swing produced.</summary>
     public static int Made(Mobile bot, Type kind) =>
         kind == null ? 0 : bot?.Backpack?.GetAmount(kind, true) ?? 0;
 }

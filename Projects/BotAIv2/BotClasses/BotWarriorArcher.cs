@@ -17,7 +17,6 @@ public sealed class BotWarriorArcher : BotClass
 
     public override BotRole Role => BotRole.Ranged;
 
-    /// <summary>Archery outright. The dagger is an admission, not a second trade.</summary>
     public override SkillName? MainSkill => SkillName.Archery;
 
     protected override void Defaults()

@@ -38,10 +38,8 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotPeddle : BotDeed
 {
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "peddle";
 
-    /// <summary>How long the errand is expected to take once the bot is there.</summary>
     public static double WorkMinutes { get; set; } = 3.0;
 
     private readonly BaseVendor _shop;
@@ -69,49 +67,27 @@ public sealed class BotPeddle : BotDeed
 
     public override string Kind => Trade;
 
+    public override bool Steadfast => true;
+
     public override Map Map => _shop?.Map;
 
     public override Point3D Where => _shop?.Location ?? Point3D.Zero;
 
-    /// <summary>
-    /// What the load is actually worth over that counter, per minute — not a flat prior.
-    ///
-    /// The proposer knows both numbers exactly, which almost nothing else in this project does: how many
-    /// there are, and what this shopkeeper pays for one. A guess would be strictly worse than the truth, and
-    /// twenty ingots outranking three is the behaviour anybody would want.
-    /// </summary>
     public override double Expects => Math.Max(1.0, _units * (double)_price / Math.Max(0.5, WorkMinutes));
 
     public override double Minutes => WorkMinutes;
 
-    /// <summary>Nothing. Handing goods over a counter teaches a bot nothing at all.</summary>
     public override SkillName? Trains => null;
 
-    /// <summary>Nothing to pay. This is the earning half of a living, and the only one that makes new coin.</summary>
     public override int Outlay => 0;
 
-    /// <summary>All of it, and this is the one undertaking in the project of which that is true.</summary>
     public override double Coin => 1.0;
 
-    /// <summary>Nothing is produced here. The takings are the coin, counted by the brain as it always is.</summary>
     public override int Made => 0;
 
     public override string Stage =>
         _sold > 0 ? $"sold {_sold} {_label} for {_earned}gp" : $"taking {_units} {_label} to {_shop?.Name}";
 
-    /// <summary>
-    /// The way to the shopkeeper turned out not to exist.
-    ///
-    /// <para>
-    /// <b>Nothing to bend to here, and something to write down — and it was the writing down that was
-    /// missing.</b> What this undertaking carries was priced against <em>this</em> shopkeeper, so swapping in
-    /// another one mid-errand would carry a stale price; failing is the honest answer. But the failure has to
-    /// be filed under the <em>place's</em> name, because that is the word the shop lookup asks in. Filed under
-    /// the undertaking's name — which is all <c>BotWill.Settle</c> can do — it is written and never read, and
-    /// the next beat picks the same unreachable shopkeeper on distance alone. Calla walked at Gus thirty-one
-    /// times in an hour on 26.08.2026 that way.
-    /// </para>
-    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
         if (_shop == null)
@@ -140,23 +116,9 @@ public sealed class BotPeddle : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
-            // The distance the work itself asks for, on the line above. See BotArrival.Beside.
-            // <b>Followed rather than aimed at, because a shopkeeper wanders.</b> A walk order to a point is
-            // matched by that point, so a vendor that shuffles one tile behind its counter makes every beat a
-            // fresh order: the journey is replaced, and with it every counter that would have said this was
-            // going nowhere — MaxEmptyPlans, MaxPlansWithoutCloser and StallAttempts all reset before any of
-            // them can fire. That is why a stuck errand of this kind is silent. On 03.09.2026 at 04:16 the
-            // roll-call had Doran the Crafter on peddle for 210 seconds and Calla for 182, neither arriving,
-            // neither failing, and nothing in the log at all. BotDoing.Walk's follow form matches on the
-            // mobile itself, so the order stands still while the shopkeeper does not. Every errand that walks
-            // to a counter is changed with it — sew, restock, acquire and inscribe have the same shape.
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} with {_label}");
         }
 
-        // The goods stay in the market until the bot is standing at the counter, and that is not tidiness. A
-        // stall holds its stock out of the world, so nothing can be dropped, killed for or double-sold on the
-        // way — take it out early and a failed walk leaves a bot wandering with a pack full of what nobody
-        // wanted.
         var taken = BotAuction.Reclaim(bot, _kind);
 
         if (taken <= 0)
@@ -166,15 +128,10 @@ public sealed class BotPeddle : BotDeed
 
         var goods = Gather(body, _kind);
 
-        // <b>What is handed over is the stall's stock and the pack's together, so the stall's share is not
-        // the denominator of the price.</b> Reporting `taken` here made a four-gold ingot read as seventy-nine.
-        // See BotShops.Sell, which counts the units as it builds the order.
         _earned = BotShops.Sell(bot, _shop, goods, out var units);
 
         if (_earned <= 0)
         {
-            // Standing at the counter holding goods it cannot sell. The stall is gone, so they go back out on
-            // the market at the price it remembered — this is a failed errand, not lost property.
             for (var i = 0; i < goods.Count; i++)
             {
                 BotAuction.List(bot, goods[i], Math.Max(1, _price));
@@ -188,7 +145,6 @@ public sealed class BotPeddle : BotDeed
         return BotDoing.Done($"{units} {_label} for {_earned}gp");
     }
 
-    /// <summary>Everything of that kind in the pack, as objects, so the counter can be shown all of it.</summary>
     private static List<Item> Gather(Mobile body, Type kind)
     {
         List<Item> found = [];

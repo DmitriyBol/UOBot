@@ -45,11 +45,6 @@ public sealed class BotAuctionModule : BotModule
         );
     }
 
-    /// <summary>
-    /// A world reload is a different world, and every stall in this one belongs to a seller about to stop
-    /// existing. Goods are destroyed rather than handed back, because a bank box belonging to a bot that is
-    /// being deleted is not somewhere anything survives.
-    /// </summary>
     public override void Reset()
     {
         logger.Information("The market, before the reload: {State}", BotAuction.Describe());

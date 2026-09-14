@@ -14,41 +14,26 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotSquadSettings
 {
-    /// <summary>Most a squad may hold.</summary>
     public int? MaxSize { get; set; }
 
-    /// <summary>
-    /// The longest a single attack can take to come round again. The break-off window is this times
-    /// <see cref="Blows"/> — set the parts rather than the product, so the squad's patience and its
-    /// restationing clock cannot be tuned apart from one another.
-    /// </summary>
     public int? SlowestBlowMs { get; set; }
 
-    /// <summary>How many fruitless swings of the slowest weapon a company sits through before breaking off.</summary>
     public int? Blows { get; set; }
 
-    /// <summary>The hard ceiling on one fight.</summary>
     public int? FightCapMs { get; set; }
 
-    /// <summary>How long a company stands on something it cannot hit before giving it up. See BotSquad.BlindMs.</summary>
     public int? BlindMs { get; set; }
 
-    /// <summary>How long a company goes without a fight before letting go of members idle in it.</summary>
     public int? RestCapMs { get; set; }
 
-    /// <summary>How long a company with nothing to fight lasts at all.</summary>
     public int? IdleCapMs { get; set; }
 
-    /// <summary>How many bots make a knot while sweeping.</summary>
     public int? KnotSize { get; set; }
 
-    /// <summary>How far a knot goes from the anchor.</summary>
     public int? Spread { get; set; }
 
-    /// <summary>How close a member has to be to be counted in a share-out.</summary>
     public int? Earshot { get; set; }
 
-    /// <summary>How far around a member the squad looks when working out what is attacking it.</summary>
     public int? Reach { get; set; }
 }
 

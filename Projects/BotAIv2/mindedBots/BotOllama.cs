@@ -39,81 +39,34 @@ public static class BotOllama
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOllama));
 
-    /// <summary>Where the daemon listens. Local by default; nothing here is meant to leave the machine.</summary>
     public static string Endpoint { get; set; } = "http://127.0.0.1:11434";
 
-    /// <summary>Which model answers. See the module's opening line for what is actually loaded.</summary>
     public static string Model { get; set; } = "qwen3.5:9b";
 
-    /// <summary>
-    /// How long the model is held in video memory between questions.
-    ///
-    /// <para>
-    /// Sent on <em>every</em> request rather than set once, because the timer is refreshed per call and a
-    /// bot that thinks every few minutes would otherwise pay the cold load — twenty-seven seconds, measured —
-    /// each time. Twelve gigabytes holds one model of this size and no more, so there is never a second one
-    /// to make room for.
-    /// </para>
-    /// </summary>
     public static string KeepAlive { get; set; } = "30m";
 
-    /// <summary>
-    /// How long one question may take before it is abandoned. Generous: a cold load is half of it.
-    ///
-    /// <para>
-    /// <b>Enforced per request, and it used to be enforced nowhere.</b> The figure was handed to the
-    /// <see cref="HttpClient"/> in its field initialiser — which runs once, before any configuration file is
-    /// read — so <c>Configuration/bot-mind.json</c> could name any timeout it liked and the transport went on
-    /// using two minutes. A setting that appears to have been read and silently does nothing is this shard's
-    /// most-repeated defect, and here it was in the one file that talks to the outside. The client is now
-    /// given a bound it will never reach and each request carries its own.
-    /// </para>
-    /// </summary>
     public static int TimeoutMs { get; set; } = 120000;
 
-    /// <summary>How many questions may be in flight at once. Two minds, one graphics card, one question.</summary>
     public static int MostInFlight { get; set; } = 1;
 
     private static readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
 
     private static int _inFlight;
 
-    /// <summary>Questions asked, answers that parsed, and answers that did not.</summary>
     public static long Asked { get; private set; }
 
     public static long Answered { get; private set; }
 
     public static long Refused { get; private set; }
 
-    /// <summary>
-    /// Wall-clock milliseconds spent waiting on plain questions, and on thinking ones, counted apart.
-    ///
-    /// <para>
-    /// <b>One average over both describes neither.</b> A decision comes back in about a second and a half;
-    /// a reckoning with thinking switched on took fifty-eight seconds once and ninety-nine another time on
-    /// this card. Averaged together they read "4326ms a question", which is not how long anything actually
-    /// takes and hides the only figure that matters — because while a thinking call runs, the single slot
-    /// is held and neither mind can decide anything at all.
-    /// </para>
-    /// </summary>
     public static long WaitedMs { get; private set; }
 
     public static long Thoughts { get; private set; }
 
     public static long ThoughtMs { get; private set; }
 
-    /// <summary>Whether another question may be asked at all right now.</summary>
     public static bool Free => _inFlight < MostInFlight;
 
-    /// <summary>
-    /// Asks, and calls back on the game thread with the raw JSON the model produced, or null.
-    ///
-    /// <para>
-    /// Deferred while the world is being written out. A save is the one moment the loop is genuinely busy
-    /// with something that cannot be interleaved, and a mind that has waited three seconds can wait three
-    /// more.
-    /// </para>
-    /// </summary>
     public static void Ask(
         string system,
         string user,
@@ -172,8 +125,6 @@ public static class BotOllama
         }
         catch (Exception e)
         {
-            // Swallowed rather than thrown: the daemon being off is an ordinary state of the world for this
-            // assembly, and it must cost the shard nothing but a line.
             logger.Warning("Could not reach the model at {Endpoint}: {Message}", Endpoint, e.Message);
         }
 
@@ -181,7 +132,6 @@ public static class BotOllama
 
         var waited = clock.ElapsedMilliseconds;
 
-        // Back onto the game thread. Everything the caller does with this touches the world.
         Core.LoopContext.Post(
             _ =>
             {
@@ -212,7 +162,6 @@ public static class BotOllama
         );
     }
 
-    /// <summary>Pulls the assistant's message out of a chat response, or null if it is not there.</summary>
     private static string Content(string payload)
     {
         try
@@ -227,23 +176,13 @@ public static class BotOllama
                 return string.IsNullOrWhiteSpace(text) ? null : text;
             }
         }
-        // Any failure to read an answer is not an answer. See BotMindChoice.Read: a narrow catch here let a
-        // missing ru-RU resource assembly, thrown while a JsonException was being built, reach the event loop
-        // and take the shard down on 03.09.2026.
         catch (Exception)
         {
-            // Falls through to null. A daemon that answers with something other than its own protocol is a
-            // daemon this code has no business guessing about.
         }
 
         return null;
     }
 
-    /// <summary>
-    /// The request. Written with the writer rather than by interpolation because the prompt contains
-    /// newlines, quotes and whatever a creature happens to be called, and a hand-built JSON string is a
-    /// defect waiting for the first monster with an apostrophe in its name.
-    /// </summary>
     private static string Body(string system, string user, string schema, bool think, string model, string keepAlive)
     {
         var buffer = new System.IO.MemoryStream();
@@ -278,8 +217,6 @@ public static class BotOllama
 
             writer.WriteStartObject("options");
 
-            // Low but not zero. A bot that answers identically to an identical situation never tries the
-            // second-best idea, and the second-best idea is where every lesson in this file came from.
             writer.WriteNumber("temperature", 0.4);
             writer.WriteNumber("num_ctx", 8192);
             writer.WriteEndObject();
@@ -290,7 +227,6 @@ public static class BotOllama
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    /// <summary>What the transport has done this session, in one line, with the two kinds of call apart.</summary>
     public static string Describe()
     {
         if (Asked == 0)

@@ -32,58 +32,24 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotUrges
 {
-    /// <summary>
-    /// How much boredom an idle minute adds. At a tenth, ten minutes of nothing to do takes a bot from
-    /// content to fed up, which is about the pace at which a person watching the shard notices.
-    /// </summary>
     public static double BoredomPerMinute { get; set; } = 0.10;
 
-    /// <summary>How much boredom a hundred gold-equivalent of takings lifts.</summary>
     public static double ReliefPerHundred { get; set; } = 0.25;
 
-    /// <summary>Where boredom starts changing behaviour rather than only being reported.</summary>
     public static double Restless { get; set; } = 0.5;
 
     private long _stampTick;
 
-    /// <summary>
-    /// Whether the clock has ever been read.
-    ///
-    /// A flag rather than "is the stamp still zero", and that is this shard's rule rather than taste: on
-    /// some hosts the tick count is a pass-through of the physical machine's uptime counter, so it starts
-    /// enormous and can wrap negative. Zero is a legitimate reading, which makes it useless as "never".
-    /// </summary>
     private bool _stamped;
 
     private long _barrenTick;
 
-    /// <summary>
-    /// How tired of doing nothing this bot is, from nought to one.
-    /// </summary>
     public double Boredom { get; private set; }
 
-    /// <summary>
-    /// How short this bot is of the money its own plans need, from nought to one. Recomputed from what is on
-    /// offer every time the auction runs, and zero when nothing on offer costs anything.
-    /// </summary>
     public double Need { get; private set; }
 
-    /// <summary>
-    /// Whether the last look for work found nothing at all.
-    ///
-    /// <para>
-    /// The number that matters most for judging the <em>world</em> rather than the bot. If takings are the
-    /// measure of work, then a bot with nothing worth doing is not a bot with a broken motive — it is a shard
-    /// with nothing left on it that this bot can profit from, and that is a content problem wearing the
-    /// costume of an AI problem. The first version could not tell the two apart at all.
-    /// </para>
-    /// </summary>
     public bool IsBarren { get; private set; }
 
-    /// <summary>
-    /// Minutes since this was last asked, and the clock is moved on. Elapsed time rather than a count of
-    /// beats, so nothing here changes meaning when the population's beat is retuned.
-    /// </summary>
     public double Since(long now)
     {
         if (!_stamped)
@@ -101,26 +67,13 @@ public sealed class BotUrges
         return minutes > 0.0 ? minutes : 0.0;
     }
 
-    /// <summary>Nothing is happening and nothing is being done about it. Boredom rises.</summary>
     public void Idle(double minutes) =>
         Boredom = Math.Clamp(Boredom + minutes * BoredomPerMinute, 0.0, 1.0);
 
-    /// <summary>
-    /// Something is being done about it. Boredom holds exactly where it is — deliberately, and it is not the
-    /// same as relief.
-    ///
-    /// <para>
-    /// A bot that has been walking to a mine for two minutes is neither entertained nor getting more bored;
-    /// it is waiting to find out. Relief comes from the takings when the work settles, which is what makes
-    /// unprofitable busyness fail to comfort a bot. The first version's patrol relieved boredom, so a bot
-    /// with nothing to do had something to do about it, and it never came back.
-    /// </para>
-    /// </summary>
     public void Held(double minutes)
     {
     }
 
-    /// <summary>Takings arrived. Boredom falls in proportion to what they came to.</summary>
     public void Paid(double worth)
     {
         if (worth <= 0.0)
@@ -131,14 +84,9 @@ public sealed class BotUrges
         Boredom = Math.Clamp(Boredom - worth / 100.0 * ReliefPerHundred, 0.0, 1.0);
     }
 
-    /// <summary>
-    /// Need, from the purse and from the largest outlay anything on offer wanted. Called by the auction,
-    /// which is the only place both figures are known at once.
-    /// </summary>
     public void Weigh(int wealth, int outlay) =>
         Need = outlay <= 0 ? 0.0 : Math.Clamp(1.0 - (double)wealth / outlay, 0.0, 1.0);
 
-    /// <summary>The last look found nothing worth doing. The clock starts on the first such look.</summary>
     public void Barren(long now)
     {
         if (IsBarren)
@@ -150,14 +98,11 @@ public sealed class BotUrges
         _barrenTick = now;
     }
 
-    /// <summary>Something was taken on. Whatever the drought was, it is over.</summary>
     public void Fruitful() => IsBarren = false;
 
-    /// <summary>How long this bot has had nothing worth doing, in minutes. Zero when it has something.</summary>
     public double BarrenMinutes(long now) =>
         IsBarren ? Math.Max(0.0, (now - _barrenTick) / 60000.0) : 0.0;
 
-    /// <summary>Whether boredom has reached the point where it changes what the bot picks.</summary>
     public bool IsRestless => Boredom >= Restless;
 
     public override string ToString() => $"boredom {Boredom:F2}, need {Need:F2}";

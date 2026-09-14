@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Items;
@@ -48,65 +48,42 @@ public static class BotGuilds
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuilds));
 
-    /// <summary>Whether the population is organised into guilds at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>
-    /// How much more a guildmate's cry, or a guildmate's company, is worth than a stranger's.
-    ///
-    /// <para>
-    /// A multiplier and a small one. Loyalty should tilt a choice, not decide it: at two, a bot walks past a
-    /// stranger bleeding in front of it to help somebody of its own three screens away, and that is not what
-    /// was asked for. At <see cref="Kinship"/> it prefers its own among equals, which is what a guild is.
-    /// </para>
-    /// </summary>
     public static double Kinship { get; set; } = 1.35;
 
-    /// <summary>
-    /// The fewest a guild may be founded with. Patrick's number.
-    ///
-    /// Below five a guild is a pair of friends: it cannot hold a hall, cannot field a company, and cannot
-    /// survive one of its members dying. The rule bites at formation only — a guild that falls below five
-    /// later is not disbanded, because disbanding it would take a hall off the island for a bad afternoon.
-    /// </summary>
     public static int Least { get; set; } = 5;
 
-    /// <summary>
-    /// The most a guild may hold. Patrick's number, and the reason for it was on the shard in front of him:
-    /// the Blade held thirty-five of forty-nine bots and would have won any quarrel before it started.
-    /// </summary>
     public static int Most { get; set; } = 15;
 
-    /// <summary>
-    /// The size a guild is aimed at when the roster is dealt out. Between <see cref="Least"/> and
-    /// <see cref="Most"/>, and nearer the top of that range than the bottom: a band of ten can lose two
-    /// members to a bad night and still be a guild.
-    /// </summary>
     public static int Band { get; set; } = 10;
 
-    /// <summary>
-    /// The classes that count as being able to make things.
-    ///
-    /// <para>
-    /// <b>A maker rather than a producer, and the difference matters.</b> <c>BotRole.Producer</c> also holds
-    /// the gatherer, which digs ore and cuts wood and cannot turn either into a breastplate. Patrick's rule
-    /// is that a guild must have somebody who can <em>equip</em> it, so the test is the smaller one: five
-    /// bots on this shard qualify, which is what sets the ceiling on how many guilds there can be.
-    /// </para>
-    /// </summary>
-    public static readonly string[] Makers = ["Crafter", "Architect"];
+    public static readonly string[] Makers = ["Crafter"];
 
-    /// <summary>
-    /// The names a guild may have, in the order they are used.
-    ///
-    /// <para>
-    /// <b>A fixed pool rather than invented names, and a hall is the reason.</b> A hall is found again after
-    /// a restart by the name written on its sign (<c>BotEstate.Adopt</c>), so a population that invented
-    /// fresh names every start would orphan every building it has ever raised. The four at the head of the
-    /// list are the four the old caste system used, so the halls already standing are inherited rather than
-    /// abandoned.
-    /// </para>
-    /// </summary>
+    public static readonly string[] Barred = ["Baron", "Captain", "Architect", "Sage", "Brawler"];
+
+    public static long Excused { get; private set; }
+
+    public static bool Outside(BotMobile bot)
+    {
+        var klass = bot?.Class?.Name;
+
+        if (klass == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < Barred.Length; i++)
+        {
+            if (string.Equals(klass, Barred[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static readonly (string Name, string Abbrev)[] Names =
     [
         ("The Hammer", "HAM"),
@@ -119,24 +96,16 @@ public static class BotGuilds
         ("The Ash", "ASH")
     ];
 
-    /// <summary>Bots enrolled.</summary>
     public static long Enrolled { get; private set; }
 
-    /// <summary>Bots the rules could not place: no room, or no guild to put them in.</summary>
     public static long Unplaced { get; private set; }
 
-    /// <summary>Guilds standing.</summary>
     public static int Count => _guilds.Count;
 
-    /// <summary>The guilds themselves, for anything that has business with all of them at once.</summary>
     public static IEnumerable<Guild> Standing => _guilds.Values;
 
-    /// <summary>
-    /// The guild of this name, or null.
-    ///
-    /// Asked by name because a name is what survives: a hall's sign carries it across restarts, which is
-    /// how <see cref="BotEstate"/> knows whose house it found. See <c>BotEstate.Adopt</c>.
-    /// </summary>
+    public static Guild Named(string name) => name == null ? null : _guilds.GetValueOrDefault(name);
+
     public static Guild Find(string name) =>
         !string.IsNullOrEmpty(name) && _guilds.TryGetValue(name, out var guild) && !guild.Disbanded
             ? guild
@@ -144,10 +113,8 @@ public static class BotGuilds
 
     private static readonly Dictionary<string, Guild> _guilds = [];
 
-    /// <summary>Whether the roster has been dealt out yet. Until it has, <see cref="Enrol"/> does nothing.</summary>
     private static bool _dealt;
 
-    /// <summary>Whether this bot's class can make things. See <see cref="Makers"/>.</summary>
     public static bool IsMaker(BotMobile bot)
     {
         var klass = bot?.Class?.Name;
@@ -168,16 +135,6 @@ public static class BotGuilds
         return false;
     }
 
-    /// <summary>
-    /// Deals the whole population out into guilds. Called once, after the population has been raised.
-    ///
-    /// <para>
-    /// <b>Once, and with the whole roster in view, because the rules cannot be applied one bot at a time.</b>
-    /// "At least five, one of whom can make things" is a statement about a group; a bot arriving on its own
-    /// cannot be told whether it satisfies it. The old version enrolled each bot as it was born, which is
-    /// exactly why it could only ever sort them by a property each one had on its own — its trade.
-    /// </para>
-    /// </summary>
     public static void Muster()
     {
         if (!Running)
@@ -195,6 +152,13 @@ public static class BotGuilds
 
             if (bot is not { Deleted: false } || bot.Class == null)
             {
+                continue;
+            }
+
+            if (Outside(bot))
+            {
+                Excused++;
+
                 continue;
             }
 
@@ -222,9 +186,6 @@ public static class BotGuilds
             return;
         }
 
-        // How many bands the rules allow, and it is the tightest of four numbers rather than the first one
-        // that came to mind. Aim for Band each; never more bands than there are makers or names; never so
-        // many that one would be under Least; and never so few that one would be over Most.
         var bands = Math.Max(1, (int)Math.Round(all / (double)Band));
 
         bands = Math.Min(bands, makers.Count);
@@ -238,9 +199,6 @@ public static class BotGuilds
             return;
         }
 
-        // Dealt by role rather than in roster order, so every band comes out mixed: fighters, a medic, a
-        // caster. Roster order is birth order, which is class order, which would put every archer in one
-        // guild — the caste system again, wearing the new rules.
         rest.Sort((a, b) => ((int)(a.Class?.Role ?? BotRole.Producer)).CompareTo((int)(b.Class?.Role ?? BotRole.Producer)));
 
         var bench = new List<BotMobile>[bands];
@@ -250,8 +208,6 @@ public static class BotGuilds
             bench[i] = [makers[i]];
         }
 
-        // The makers left over are dealt like anybody else: a second smith in a guild is a good thing, it is
-        // only the first one that is a rule.
         for (var i = bands; i < makers.Count; i++)
         {
             rest.Add(makers[i]);
@@ -270,9 +226,6 @@ public static class BotGuilds
 
             if (bench[into % bands].Count >= Most)
             {
-                // Every band is full. Honest rather than silent: these bots keep to themselves and the
-                // number is reported, because a population with a fifth of it outside every guild is a fact
-                // about the ceiling rather than about the bots.
                 Unplaced++;
 
                 continue;
@@ -289,26 +242,23 @@ public static class BotGuilds
         _dealt = true;
 
         logger.Information(
-            "Guilds mustered: {Bands} of them out of {All} bots, {Makers} makers, {Unplaced} left out — {What}",
+            "Guilds mustered: {Bands} of them out of {All} bots, {Makers} makers, {Unplaced} left out, {Excused} whose class stands outside the bands — {What}",
             bands,
             all,
             makers.Count,
             Unplaced,
+            Excused,
             Describe()
+        );
+
+        logger.Information(
+            "Guild membership: a member gives a guild with nothing to show {Patience} minutes before it may walk out, one a minute at most, and is then barred from every guild for {Rejoin} hours; a leader may put one member out and take one bot on every {Roster} minutes, and may not take back somebody who walked out of its own guild",
+            Patience / 60000,
+            RejoinMs / 3600000,
+            BotRoster.EveryMs / 60000
         );
     }
 
-    /// <summary>
-    /// Makes one guild and puts the band in it.
-    ///
-    /// <para>
-    /// <b>An existing guild of the same name is reused, and that is the whole of surviving a restart.</b>
-    /// Guilds are world objects: they outlive the population, and the population is rebuilt from nothing
-    /// every start. Making a fresh "The Hammer" each time would leave a graveyard of empty guilds in the
-    /// save, one per restart, for ever. The engine counts a guild disbanded when its leader is deleted — so
-    /// the first bot of a returning guild is made its leader, which revives it.
-    /// </para>
-    /// </summary>
     private static void Form((string Name, string Abbrev) named, List<BotMobile> band)
     {
         if (band == null || band.Count == 0)
@@ -329,8 +279,6 @@ public static class BotGuilds
         }
         else
         {
-            // Back from the save with a leader who no longer exists, and a membership list full of bots that
-            // were deleted with the last population. Both are cleared out before the new band moves in.
             guild.Leader = leader;
 
             for (var i = guild.Members.Count - 1; i >= 0; i--)
@@ -347,23 +295,38 @@ public static class BotGuilds
         for (var i = 0; i < band.Count; i++)
         {
             guild.AddMember(band[i]);
+            Show(band[i]);
+            Joined(band[i]);
             Enrolled++;
         }
     }
 
-    /// <summary>
-    /// One bot arriving after the roster was dealt: it joins the smallest guild with room.
-    ///
-    /// <para>
-    /// Does nothing at all until <see cref="Muster"/> has run, and that is deliberate: during the opening
-    /// burst every bot in the population is born within a second of every other, and a rule about groups
-    /// cannot be applied to the first of them.
-    /// </para>
-    /// </summary>
+    private static void Show(Mobile bot)
+    {
+        if (bot is { Deleted: false })
+        {
+            bot.DisplayGuildTitle = true;
+        }
+    }
+
     public static void Enrol(BotMobile bot)
     {
         if (!Running || !_dealt || bot is not { Deleted: false } || bot.Guild != null)
         {
+            return;
+        }
+
+        if (Outside(bot))
+        {
+            Excused++;
+
+            return;
+        }
+
+        if (Cools(bot))
+        {
+            Cooling++;
+
             return;
         }
 
@@ -390,33 +353,297 @@ public static class BotGuilds
         }
 
         smallest.AddMember(bot);
+        Show(bot);
+        Joined(bot);
         Enrolled++;
     }
 
-    /// <summary>
-    /// Whether these two are of the same guild.
-    ///
-    /// Asked of the engine's own record rather than of a table here: a bot's guild can be changed by
-    /// anything, and two answers to one question is how this shard's oldest defects were built.
-    /// </summary>
+    public static bool Leaving { get; set; } = true;
+
+    public static int Patience { get; set; } = 1800000;
+
+    public static int RejoinMs { get; set; } = 172800000;
+
+    public static int ReviewMs { get; set; } = 60000;
+
+    public static long Walked { get; private set; }
+
+    public static long Cooling { get; private set; }
+
+    private static readonly Dictionary<Serial, (long Tick, string Guild)> _quit = [];
+
+    private static readonly Dictionary<Serial, long> _joined = [];
+
+    private static long _reviewed;
+
+    private static int _turn;
+
+    public static bool Cools(Mobile bot) =>
+        bot != null && _quit.TryGetValue(bot.Serial, out var when) && Core.TickCount - (when.Tick + RejoinMs) < 0;
+
+    public static bool Spurned(Mobile bot, Guild guild) =>
+        bot != null
+        && guild != null
+        && _quit.TryGetValue(bot.Serial, out var when)
+        && string.Equals(when.Guild, guild.Name, StringComparison.OrdinalIgnoreCase)
+        && Core.TickCount - (when.Tick + RejoinMs) < 0;
+
+    public static int Worth(Guild guild)
+    {
+        if (guild == null)
+        {
+            return 0;
+        }
+
+        var worth = BotEstate.Hall(guild) is { Deleted: false } ? 2 : 0;
+
+        worth += BotClaim.Holds(guild.Name);
+
+        if (BotEstate.Fund(guild) >= BotEstate.Price / 2)
+        {
+            worth++;
+        }
+
+        return worth;
+    }
+
+    public static void Review()
+    {
+        if (!Running || !Leaving || _guilds.Count == 0)
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+
+        if (now - (_reviewed + ReviewMs) < 0)
+        {
+            return;
+        }
+
+        _reviewed = now;
+
+        List<Guild> bands = [.. _guilds.Values];
+
+        if (bands.Count == 0)
+        {
+            return;
+        }
+
+        var guild = bands[_turn++ % bands.Count];
+
+        if (guild == null || guild.Disbanded || Worth(guild) > 0)
+        {
+            return;
+        }
+
+        var members = guild.Members;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            if (members[i] is not BotMobile { Deleted: false, Alive: true } bot || IsMaker(bot))
+            {
+                continue;
+            }
+
+            if (!_joined.TryGetValue(bot.Serial, out var since) || now - (since + Patience) < 0)
+            {
+                continue;
+            }
+
+            guild.RemoveMember(bot);
+            bot.DisplayGuildTitle = false;
+
+            _quit[bot.Serial] = (now, guild.Name);
+            _joined.Remove(bot.Serial);
+            Walked++;
+
+            logger.Information(
+                "{Bot} has left {Guild}: it has no hall, no ground and no purse to speak of, and {Bot} had given it {Minutes} minutes",
+                bot.Name,
+                guild.Name,
+                bot.Name,
+                (now - since) / 60000
+            );
+
+            return;
+        }
+    }
+
+    public static string Aim(Guild guild)
+    {
+        if (guild == null)
+        {
+            return "nothing";
+        }
+
+        var hall = BotEstate.Hall(guild);
+        var fund = BotEstate.Fund(guild);
+
+        if (hall is not { Deleted: false })
+        {
+            return $"a hall — {fund} of {BotEstate.Price}gp";
+        }
+
+        if (BotEstate.Merchants(hall) < BotEstate.MostMerchants)
+        {
+            return "a merchant for its counter";
+        }
+
+        var held = BotClaim.Holds(guild.Name);
+
+        if (held < BotClaim.Free)
+        {
+            return $"ground — {held} of {BotClaim.Free} free squares taken";
+        }
+
+        return $"more ground — {held} squares held, {BotClaim.Price}gp the next";
+    }
+
+    public static string Task(Guild guild)
+    {
+        if (guild == null)
+        {
+            return "nothing";
+        }
+
+        var bid = BotClaim.Making(guild);
+
+        if (bid != null)
+        {
+            return $"holding {bid.Middle.X},{bid.Middle.Y} — {BotClaim.Left(bid) / 1000}s left, {bid.Peak} gathered";
+        }
+
+        if (BotExile.Owed(guild) is { Deleted: false } winner)
+        {
+            return $"moving its hall out of the yard at {winner.X},{winner.Y}";
+        }
+
+        if (BotOffice.Busy(BotSupplier.Office, guild))
+        {
+            return "stocking its counter";
+        }
+
+        if (BotOffice.Busy(BotSteward.Office, guild))
+        {
+            return "raising its hall";
+        }
+
+        return guild.Enemies is { Count: > 0 } ? "at war" : "its own work";
+    }
+
+    public static long Hired { get; private set; }
+
+    public static long Expelled { get; private set; }
+
+    public static bool Recruit(Guild guild, BotMobile bot, string why)
+    {
+        if (!Running || guild == null || guild.Disbanded || bot is not { Deleted: false, Alive: true })
+        {
+            return false;
+        }
+
+        if (bot.Guild != null)
+        {
+            HeldElsewhere++;
+
+            return false;
+        }
+
+        if (Outside(bot))
+        {
+            Excused++;
+
+            return false;
+        }
+
+        if (guild.Members.Count >= Most)
+        {
+            Crowded++;
+
+            return false;
+        }
+
+        if (Spurned(bot, guild))
+        {
+            Cooling++;
+
+            return false;
+        }
+
+        guild.AddMember(bot);
+        Show(bot);
+        Joined(bot);
+        Hired++;
+
+        logger.Information(
+            "{Guild} has taken {Bot} the {Class} on, {Count} of {Most} now — {Why}",
+            guild.Name,
+            bot.Name,
+            bot.Class?.Name,
+            guild.Members.Count,
+            Most,
+            why ?? "no reason given"
+        );
+
+        return true;
+    }
+
+    public static bool Expel(Guild guild, BotMobile bot, string why)
+    {
+        if (!Running || guild == null || bot is not { Deleted: false })
+        {
+            return false;
+        }
+
+        if (!ReferenceEquals(bot.Guild, guild))
+        {
+            return false;
+        }
+
+        if (IsMaker(bot))
+        {
+            Spared++;
+
+            return false;
+        }
+
+        guild.RemoveMember(bot);
+        bot.DisplayGuildTitle = false;
+        _joined.Remove(bot.Serial);
+        Expelled++;
+
+        logger.Information(
+            "{Guild} has put {Bot} the {Class} out, {Count} left — {Why}",
+            guild.Name,
+            bot.Name,
+            bot.Class?.Name,
+            guild.Members.Count,
+            why ?? "no reason given"
+        );
+
+        return true;
+    }
+
+    public static long HeldElsewhere { get; private set; }
+
+    public static long Crowded { get; private set; }
+
+    public static long Spared { get; private set; }
+
+    private static void Joined(Mobile bot)
+    {
+        if (bot is { Deleted: false })
+        {
+            _joined[bot.Serial] = Core.TickCount;
+        }
+    }
+
     public static bool Same(Mobile a, Mobile b) =>
         Running && a?.Guild != null && ReferenceEquals(a.Guild, b?.Guild);
 
-    /// <summary>
-    /// What a piece of work about <paramref name="other"/> is worth to <paramref name="bot"/>, given whose
-    /// company they keep. One for a stranger, <see cref="Kinship"/> for one of your own.
-    /// </summary>
     public static double Worth(Mobile bot, Mobile other) => Same(bot, other) ? Kinship : 1.0;
 
-    /// <summary>
-    /// The best maker in this guild — the one whose trade is to keep the rest of it equipped.
-    ///
-    /// <para>
-    /// Patrick's order of 09.09.2026: <i>the crafter in a guild lives to equip its guildmates as well as it
-    /// can</i>. This is who that is. Chosen by skill rather than by seniority, so a guild with two smiths
-    /// sends orders to the better one.
-    /// </para>
-    /// </summary>
     public static BotMobile Maker(Guild guild)
     {
         if (guild?.Members == null)
@@ -448,44 +675,14 @@ public static class BotGuilds
         return best;
     }
 
-    /// <summary>
-    /// What a member keeps back when its guild stands a cost for somebody else. See <see cref="Stand"/>.
-    /// </summary>
-    public static int Keep { get; set; } = 300;
+    public static int Keep => BotEstate.Keep;
 
-    /// <summary>Coin the guilds have put into their own members' hands, and how often.</summary>
     public static long Stood { get; private set; }
 
     public static long Standings { get; private set; }
 
-    /// <summary>Times a guild was asked to stand a cost and could not.</summary>
     public static long Cannot { get; private set; }
 
-    /// <summary>
-    /// The guild pays what one of its members cannot, so the member can buy what it needs.
-    ///
-    /// <para>
-    /// <b>Patrick's order of 09.09.2026 — "the crafter in a guild lives to equip its guildmates" — carried
-    /// out through the market rather than by hand.</b> The machinery for equipping a bot already exists and
-    /// works end to end: <c>BotArmourer</c> asks what piece a bot most needs, raises an order for it, a
-    /// crafter fills it, and <c>Rearm</c> puts it on. The only thing that ever stopped it was money — half
-    /// this population has never held more than the four hundred it was born with, and armour is the first
-    /// thing a bot buys that it does not need <em>today</em>.
-    /// </para>
-    ///
-    /// <para>
-    /// So a guild stands the difference. The coin goes into the member's account and the member buys its own
-    /// armour, which means the order goes on the same board every crafter reads — and the crafter most
-    /// likely to fill it is the guild's own, because a guildmate's order is worth <see cref="Kinship"/> more
-    /// to it. The guild's money ends in the guild's maker's purse, having become a breastplate on the way.
-    /// That is the whole of it, and not a line of new economy was needed for it.
-    /// </para>
-    ///
-    /// <para>
-    /// Taken richest first, each keeping <see cref="Keep"/> back, exactly as the hall levy does — and it
-    /// never takes from the bot it is paying for, which would be a bot lending itself money.
-    /// </para>
-    /// </summary>
     public static bool Stand(BotMobile member, int need)
     {
         if (!Running || member is not { Deleted: false } || need <= 0 || member.Guild is not Guild guild)
@@ -548,8 +745,6 @@ public static class BotGuilds
 
         if (got < need)
         {
-            // Hand back whatever was taken. A guild that half-pays for a hauberk has bought nothing and is
-            // poorer, which is the one outcome worth more than the armour.
             if (got > 0)
             {
                 Banker.Deposit(member, got);
@@ -567,7 +762,6 @@ public static class BotGuilds
         return true;
     }
 
-    /// <summary>One line for the shard's own summary.</summary>
     public static string Describe()
     {
         if (!Running)
@@ -614,7 +808,10 @@ public static class BotGuilds
 
             var stood = Standings == 0
                 ? "; nothing has been stood for anybody yet"
-                : $"; {Stood}gp stood for members {Standings} times, {Cannot} times a guild could not";
+                : $"; {Stood}gp stood for members {Standings} times, {Cannot} times a guild could not"
+                  + $"; {Walked} members walked out of a guild that had nothing to show, {Cooling} refused a guild for having lately left one"
+                  + $"; {BotRoster.Describe()}"
+                  + $"; {BotCharter.Describe()}";
 
             var rule = $"{Least}-{Most} to a guild, one maker each";
             var short_ = makerless == 0 ? "" : $", {makerless} of them with nobody to make anything";
@@ -627,21 +824,28 @@ public static class BotGuilds
         }
     }
 
-    /// <summary>
-    /// A world reload is a different population.
-    ///
-    /// The guilds themselves are left alone: they are world objects, they will be found by name and revived
-    /// when the new population is dealt out, and deleting them here would throw away the one thing about
-    /// them worth keeping — that a guild on this island is older than any bot in it.
-    /// </summary>
     public static void Forget()
     {
         _guilds.Clear();
         Enrolled = 0;
+        Excused = 0;
+        Walked = 0;
+        Cooling = 0;
+        _quit.Clear();
+        _joined.Clear();
+        _reviewed = 0;
+        _turn = 0;
         Unplaced = 0;
         Stood = 0;
         Standings = 0;
         Cannot = 0;
+        Hired = 0;
+        Expelled = 0;
+        HeldElsewhere = 0;
+        Crowded = 0;
+        Spared = 0;
         _dealt = false;
+
+        BotRoster.Forget();
     }
 }

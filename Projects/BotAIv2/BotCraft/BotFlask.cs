@@ -37,91 +37,28 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotFlask
 {
-    /// <summary>The alchemy system, or null before content initialisation has built it.</summary>
     public static CraftSystem System => DefAlchemy.CraftSystem;
 
-    /// <summary>The tool. Handed out with the skill; see <see cref="BotOutfit.ToolsFor"/>.</summary>
     public static BaseTool Kit(Mobile bot) => bot?.Backpack?.FindItemByType<MortarPestle>();
 
-    /// <summary>
-    /// How many of each herb a brewer keeps on hand.
-    ///
-    /// <para>
-    /// <b>A brewer's reagents were nobody's errand.</b> <c>BotShopper</c> buys them only for a build whose kit
-    /// declares reagents, which is every caster and no crafter — so the bot carrying the mortar was never sent
-    /// for the one half of its trade it cannot gather. It read "had the glass but no herbs" 57 times in a
-    /// five-minute window with 1936 herbs on the population's own stalls.
-    /// </para>
-    ///
-    /// <para>
-    /// Five, which is one draught of each of the eight and no hoard. Bought rather than ordered by the armful:
-    /// the shopper takes a stall before a counter and only asks the board when neither has any, so this cannot
-    /// repeat what ordering glass did to this shard's trade. See <c>BotStores</c> for that.
-    /// </para>
-    /// </summary>
     public static int Herbs { get; set; } = 5;
 
-    /// <summary>How far below its own skill a bot keeps its work. The needle's figure, for the needle's reason.</summary>
     public static double Margin { get; set; } = 5.0;
 
-    /// <summary>
-    /// How many bottles are worth setting up for. Below this the walk to a counter costs more than the batch.
-    /// </summary>
     public static int LeastBottles { get; set; } = 5;
 
-    /// <summary>How many empties to buy at a time when the pack has run out of glass.</summary>
     public static int Batch { get; set; } = 20;
 
-    /// <summary>
-    /// The most of one draught a bot may hold and have out for sale at once. Five.
-    ///
-    /// <para>
-    /// <b>Patrick's order of 05.09.2026, against a trade that was drowning the market in its own output.</b>
-    /// A brewer works until its reagents or its glass run out, so one round could put twenty of a kind on a
-    /// stall — and the shard's markdown then spent hours undoing it: "Wulfric cut Lesser Heal Potion to 3gp
-    /// after 23 sat unsold", from an opening ask of sixteen. Five of a kind is a stock a buyer can clear, and
-    /// it is well over what any class carries for itself (<c>BotClass.PotionLimit</c> is two or three), so
-    /// the cap never fights the kit.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>Counted across the pack and the bot's own stall together, which is what makes it a limit on selling
-    /// as well as on making.</b> Counting the pack alone would be a cap a brewer walks out of by listing what
-    /// it has and starting again — the same hole the smith's ordering had, where a bot refused to buy iron
-    /// because it was selling iron and nothing joined the two facts up.
-    /// </para>
-    /// </summary>
     public static int Cap { get; set; } = 5;
 
-    /// <summary>
-    /// How long a bot stands off a draught after reaching the cap on it. Ten minutes.
-    ///
-    /// <para>
-    /// Per bot and per draught, so a brewer at five heal potions still brews cure. The cap alone would be
-    /// enough to stop the making; the rest is what stops the <em>asking</em> — without it the proposer offers
-    /// the same round every beat, is refused by the cap, and the population's whole decision budget goes on a
-    /// question already answered. It is the cooldown's job in <c>BotSchool.RestMs</c>, for the same reason.
-    /// </para>
-    /// </summary>
     public static int RestMs { get; set; } = 600000;
 
-    /// <summary>Times a draught was passed over because the bot was already at the cap. For the summary.</summary>
     public static long Capped { get; private set; }
 
-    /// <summary>Times a bot was stood off a draught for reaching the cap. For the summary.</summary>
     public static long Rests { get; private set; }
 
-    /// <summary>Who is standing off what, and until when. Keyed by the bot and the draught.</summary>
     private static readonly Dictionary<(Serial Who, Type What), long> _resting = new();
 
-    /// <summary>
-    /// How many of this draught the bot has between its pack and its own stall.
-    ///
-    /// <para>
-    /// Both, always. See <see cref="Cap"/>: a count that looked only at the pack would be a limit on carrying
-    /// rather than on producing, and a brewer empties its pack onto a stall at the end of every round.
-    /// </para>
-    /// </summary>
     public static int Held(IBotWilful bot, Mobile body, Type kind)
     {
         if (kind == null)
@@ -134,16 +71,6 @@ public static class BotFlask
         return Amount(body, kind) + (shelved is { IsEmpty: false } ? shelved.Amount : 0);
     }
 
-    /// <summary>
-    /// Whether every draught this bot could make stands at its cap or is resting.
-    ///
-    /// <para>
-    /// <b>Asked so that the cap does not get reported as an empty pack.</b> A bot at five of everything
-    /// answers null from <see cref="Likeliest"/>, and the alchemist reads a null there as "no glass and no
-    /// herbs either" — which put 377 well-stocked brewers into the <c>had neither</c> bucket within a quarter
-    /// of an hour of the cap going in. A new gate needs a new bucket; this is the question that fills it.
-    /// </para>
-    /// </summary>
     public static bool AtCap(IBotWilful will, Mobile bot)
     {
         if (bot == null || System == null)
@@ -171,11 +98,9 @@ public static class BotFlask
             }
         }
 
-        // A bot that can make nothing at all is not a bot that has made too much.
         return makeable > 0;
     }
 
-    /// <summary>Whether this bot is standing off this draught for having reached the cap on it.</summary>
     public static bool Resting(Mobile body, Type kind)
     {
         if (body == null || kind == null || !_resting.TryGetValue((body.Serial, kind), out var until))
@@ -183,8 +108,6 @@ public static class BotFlask
             return false;
         }
 
-        // Compared by subtraction against a stamp that was itself a real tick. See BotStipend for the host
-        // whose counter starts enormous and wraps negative.
         if (Core.TickCount - until < 0)
         {
             return true;
@@ -195,7 +118,6 @@ public static class BotFlask
         return false;
     }
 
-    /// <summary>Stands this bot off this draught for <see cref="RestMs"/>. Says nothing twice.</summary>
     public static void Rest(Mobile body, Type kind)
     {
         if (body == null || kind == null || Resting(body, kind))
@@ -203,8 +125,6 @@ public static class BotFlask
             return;
         }
 
-        // Swept here rather than on a timer: the store is only ever read and written on this one path, and a
-        // population that stops brewing stops paying for the sweep at the same moment it stops filling it.
         if (_resting.Count > 512)
         {
             Sweep();
@@ -232,7 +152,6 @@ public static class BotFlask
         }
     }
 
-    /// <summary>Forgotten with the world, like every other store in this assembly that is keyed by serial.</summary>
     public static void Forget()
     {
         _resting.Clear();
@@ -240,33 +159,13 @@ public static class BotFlask
         Rests = 0;
     }
 
-    /// <summary>
-    /// What a brewed potion opens at on the market.
-    ///
-    /// <para>
-    /// Fourteen, against the alchemist's fifteen — <c>SBAlchemist</c>, <c>GenericBuyInfo(typeof(
-    /// LesserHealPotion), 15, 10, …)</c>. A shopkeeper is the ceiling and never the preference, so an opening
-    /// ask has to be under it to be a trade at all; and it is comfortably over what the two halves cost,
-    /// which is a reagent at three or four and glass at five. See <c>BotFletching.Worth</c>, where the same
-    /// number was one gold over the shelf and the arrows therefore could not be sold.
-    /// </para>
-    /// </summary>
     public static int Worth { get; set; } = 14;
 
     public static int Amount(Mobile bot, Type stuff) =>
         stuff == null ? 0 : bot?.Backpack?.GetAmount(stuff) ?? 0;
 
-    /// <summary>Empty glass in the pack. Half of every recipe in the trade.</summary>
     public static int Bottles(Mobile bot) => Amount(bot, typeof(Bottle));
 
-    /// <summary>
-    /// Whether this is a potion recipe, and what reagent it eats.
-    ///
-    /// <para>
-    /// Asked of the recipe's own resource list rather than of a table of potions kept here to drift: exactly
-    /// two resources, one of them glass, and the other is the answer.
-    /// </para>
-    /// </summary>
     public static bool Twofold(CraftItem recipe, out Type reagent, out int units, out int glass)
     {
         reagent = null;
@@ -298,28 +197,9 @@ public static class BotFlask
         return reagent != null && glass > 0;
     }
 
-    /// <summary>What one attempt at this recipe needs, in reagent and in glass.</summary>
     public static (Type Reagent, int Units, int Glass) Costs(CraftItem recipe) =>
         Twofold(recipe, out var reagent, out var units, out var glass) ? (reagent, units, glass) : (null, 0, 0);
 
-    /// <summary>
-    /// The reagents this trade actually consumes, asked of the recipes rather than listed here.
-    ///
-    /// <para>
-    /// <b>A brewer wants two of the eight, and telling it to want all eight is telling it to shop for forty
-    /// minutes before it reaches either.</b> There are two draught families on this shard — heal and cure —
-    /// and between them they burn ginseng and garlic. The shopper's reagent list is in casting order, ash and
-    /// pearl first, and it buys one kind per errand at roughly two errands a bot in twenty minutes. So a
-    /// brewer sent after "reagents" spent its first four trips on ash and black pearl it can never use, and
-    /// the summary read "had the glass but no herbs" on a rising share the whole time — 35% of new asks in
-    /// one window, 58% in the next.
-    /// </para>
-    ///
-    /// <para>
-    /// Read from <c>Costs</c>, so adding a third draught family adds its reagent here and nowhere else. Built
-    /// once: the recipe table does not change while the shard is up.
-    /// </para>
-    /// </summary>
     public static IReadOnlyList<Type> Needs
     {
         get
@@ -354,20 +234,15 @@ public static class BotFlask
     /// </summary>
     public enum Refusal
     {
-        /// <summary>A draught can be made. Not a refusal.</summary>
         None,
 
-        /// <summary>Every recipe wants more Alchemy than this bot has, less the margin.</summary>
         Unskilled,
 
-        /// <summary>Skill enough, and not one of the reagents in the pack.</summary>
         Reagentless,
 
-        /// <summary>Every draught it could make is at its cap or resting.</summary>
         Full
     }
 
-    /// <summary>Why the last <see cref="Choose"/> came back empty. For the summary.</summary>
     public static Refusal Why { get; private set; }
 
     private static IReadOnlyList<Type> Wanted()
@@ -380,8 +255,6 @@ public static class BotFlask
 
         if (recipes == null)
         {
-            // Before content initialisation there is no table to read. Not cached in that case — see Needs,
-            // which asks again next time rather than remembering an empty answer for the life of the shard.
             return want;
         }
 
@@ -391,8 +264,6 @@ public static class BotFlask
 
             for (var j = 0; j < recipes.Count; j++)
             {
-                // Asked of the table and not of a bot: this is what the trade consumes, not what one bot's
-                // skill will carry today.
                 if (recipes[j].ItemType != kind || !Twofold(recipes[j], out var reagent, out _, out _))
                 {
                     continue;
@@ -407,14 +278,6 @@ public static class BotFlask
             }
         }
 
-        // <b>Said once, and here rather than at boot, because at boot it is a lie.</b> The first version of
-        // this line logged from BotCraftModule.Initialize and reported "0 reagents: nothing" every start —
-        // DefAlchemy.CraftSystem is an ordinary property filled during content initialisation, not a lazy
-        // one, so there is no table to read at that moment and the line said nothing about what the shard
-        // does. Said on the first real resolution instead, which is the only moment the answer is true.
-        //
-        // A derived list that comes back empty is a feature that silently does nothing, and this trade has
-        // already been exactly that once today.
         if (!_saidNeeds && want.Count > 0)
         {
             _saidNeeds = true;
@@ -427,11 +290,9 @@ public static class BotFlask
             );
         }
 
-
         return want;
     }
 
-    /// <summary>How much skill a recipe asks for. Its minimum, which is what the engine rolls against.</summary>
     public static double Requirement(CraftItem recipe)
     {
         var skills = recipe?.Skills;
@@ -439,7 +300,6 @@ public static class BotFlask
         return skills == null || skills.Count == 0 ? 0.0 : skills[0].MinSkill;
     }
 
-    /// <summary>The recipe that makes exactly this potion, or null when this bot cannot brew one.</summary>
     public static CraftItem Recipe(Mobile bot, Type wanted)
     {
         var system = System;
@@ -477,22 +337,6 @@ public static class BotFlask
         return null;
     }
 
-    /// <summary>
-    /// The best thing this bot could brew right now, or null.
-    ///
-    /// <para>
-    /// <b>Only what the population actually drinks.</b> The system carries three tiers of heal and a rack of
-    /// buffs and weapons; a bot that brewed the hardest thing it could manage would fill the market with
-    /// explosion potions nobody on this island has ever reached for. <see cref="BotArsenal.Draughts"/> is the
-    /// shard's own answer to "what is a supply" — the same list birth issues from and the same list
-    /// <c>BotShopper</c> restocks against — so brewing follows it and cannot drift from it.
-    /// </para>
-    ///
-    /// <para>
-    /// Within that, what somebody has put money down for wins outright; failing that, whichever the bot has
-    /// the most material for, so a brewer works through its own glut rather than its own bottleneck.
-    /// </para>
-    /// </summary>
     public static CraftItem Choose(IBotWilful will, Mobile bot, out Type made)
     {
         made = null;
@@ -503,7 +347,6 @@ public static class BotFlask
             return null;
         }
 
-        // Which of the three grounds the refusal rests on, if it comes to one. See Refusal.
         var anySkilled = false;
         var anyFull = false;
 
@@ -528,9 +371,6 @@ public static class BotFlask
 
             anySkilled = true;
 
-            // <b>Five of a kind is the whole of what one bot may have going, pack and stall together.</b> The
-            // draught is passed over rather than the round refused, so a brewer at its cap on heal potions
-            // goes on to cure — which is the point of counting each kind apart. See Cap and RestMs.
             if (Resting(bot, kind))
             {
                 Capped++;
@@ -570,12 +410,6 @@ public static class BotFlask
             made = kind;
         }
 
-        // <b>Why, when the answer is nothing.</b> Three quite different grounds arrive at the alchemist as
-        // one number — "had the glass but no herbs" — and it was 211 of a window's asks with a share that
-        // rose from 14% to 37% inside one run *after* the reagents were put right, which is a pattern in
-        // time rather than in supply and could not be read while the three were together. Named in the order
-        // that decides what to do: a bot that cannot make anything wants a lesson, one that is full wants
-        // nothing, and one merely out of reagents wants an errand.
         if (best == null && asked == null)
         {
             Why = anyFull ? Refusal.Full : anySkilled ? Refusal.Reagentless : Refusal.Unskilled;
@@ -591,12 +425,6 @@ public static class BotFlask
         return asked;
     }
 
-    /// <summary>
-    /// How many more of this recipe the pack could still pay for, counting both halves.
-    ///
-    /// The binding one of the two, which on this trade swaps about: glass is cheap and comes back off every
-    /// potion anybody drinks, and the reagent is the half a gatherer has to walk into a wood for.
-    /// </summary>
     public static int Possible(Mobile bot, CraftItem recipe)
     {
         var (reagent, units, glass) = Costs(recipe);
@@ -609,16 +437,6 @@ public static class BotFlask
         return Math.Min(Amount(bot, reagent) / units, Bottles(bot) / glass);
     }
 
-    /// <summary>
-    /// Which draught this bot is likeliest to be able to brew once it has glass, ignoring the glass.
-    ///
-    /// <para>
-    /// Asked by the errand that goes to a counter for bottles, and it has to be asked without them: at that
-    /// moment <see cref="Choose"/> answers null for every recipe, because every recipe wants a bottle. A
-    /// brewer that walked to the alchemist for glass and then discovered it had garlic and not ginseng would
-    /// have bought its way into the same refusal it set out to cure.
-    /// </para>
-    /// </summary>
     public static Type Likeliest(IBotWilful will, Mobile bot)
     {
         var system = System;
@@ -644,15 +462,6 @@ public static class BotFlask
                 continue;
             }
 
-            // The same cap the recipe choice keeps, on the errand that walks to a counter for glass: buying
-            // bottles to make a sixth heal potion is exactly the trip Cap exists to stop, and leaving it out
-            // here would have been a limit on brewing paid for by a walk.
-            //
-            // <b>Counted, and the counting is the point of this second look.</b> A bot with every draught at
-            // its cap answers null here, and the alchemist above reads a null from Likeliest as "no glass and
-            // no herbs either" — so within a quarter of an hour of the cap going in, the brew line read "377
-            // had neither" about brewers whose packs were full. That is the same bucket-swallowing-a-second-
-            // cause this file was corrected for earlier the same night, put back by a new gate with no name.
             if (Resting(bot, kind) || Held(will, bot, kind) >= Cap)
             {
                 continue;
@@ -687,10 +496,8 @@ public static class BotFlask
         return bestStock > 0 ? best : null;
     }
 
-    /// <summary>One attempt. The engine rolls, and the pack is counted afterwards — see BotCraftwork.Swing.</summary>
     public static bool Swing(Mobile bot, CraftItem recipe, Type reagent, BaseTool tool) =>
         BotCraftwork.Swing(bot, System, recipe, reagent, tool);
 
-    /// <summary>How many of that thing are in the pack. The only honest way to count what a swing produced.</summary>
     public static int Made(Mobile bot, Type kind) => BotCraftwork.Made(bot, kind);
 }

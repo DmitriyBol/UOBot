@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Logging;
 using Server.Mobiles;
@@ -38,167 +38,114 @@ public static class BotWill
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWill));
 
-    /// <summary>
-    /// Whether deciding is switched on, from <c>bots.will.enabled</c>. Off, bots keep whatever the rest of
-    /// the population's machinery gives them — squads still form up, movement still walks, combat still
-    /// answers — and nothing chooses anything. That is the diagnostic: half the first version's
-    /// investigations were the question "is this the brain, or is the brain covering for something else".
-    /// </summary>
     public static bool Deciding { get; internal set; }
 
-    /// <summary>
-    /// How often a bot with something on looks up to see whether anything better has appeared.
-    ///
-    /// Fifteen seconds. The number that matters is that it is not "every tick": a bot that reconsiders four
-    /// times a second cannot cross a continent, and one that reconsiders every quarter minute can.
-    /// </summary>
     public static int ReviewMs { get; set; } = 15000;
 
-    /// <summary>
-    /// How soon a bot with nothing on looks again.
-    ///
-    /// Shorter than the review, because the two are different questions: a busy bot is being asked whether to
-    /// change its mind, and an idle one is being asked whether there is anything to do at all. It is not the
-    /// beat itself, though — sweeping every proposer twice a second for a population of a hundred and fifty is
-    /// the first version's cost model, and two seconds of standing about is invisible.
-    /// </summary>
     public static int IdleMs { get; set; } = 2000;
 
-    /// <summary>
-    /// How long a fresh undertaking is safe from being swapped out whatever the numbers say.
-    ///
-    /// The floor under the margin, and it is there for a specific pathology: two pieces of work whose scores
-    /// keep crossing produce a bot that alternates between them and finishes neither. Half a minute is
-    /// enough to get somewhere and find out.
-    ///
-    /// <para>
-    /// <b>A floor now rather than the whole rule, because as the whole rule it was half a minute against a
-    /// six-minute job.</b> See <see cref="Dwell"/>.
-    /// </para>
-    /// </summary>
     public static int DwellMs { get; set; } = 30000;
 
-    /// <summary>
-    /// The most a fresh undertaking may be safe for, however long it reckons itself.
-    ///
-    /// <para>
-    /// Two minutes, and the number is chosen against <c>BotStall.PatienceMs</c> rather than against any
-    /// work: the stall detector calls a bot stuck at four minutes, so nothing here may be protected long
-    /// enough to hide from it. The cap is not tidiness — without one, an eight-minute errand that has gone
-    /// wrong is immune for eight minutes, which is the frozen-work family this project has paid for more
-    /// than once.
-    /// </para>
-    /// </summary>
     public static int DwellCapMs { get; set; } = 120000;
 
-    /// <summary>
-    /// How long this particular undertaking is safe from being swapped out: its own reckoning, floored by
-    /// <see cref="DwellMs"/> and capped by <see cref="DwellCapMs"/>.
-    ///
-    /// <para>
-    /// <b>The smith could not finish a single thing, and this is why.</b> Work is reconsidered every
-    /// <see cref="ReviewMs"/> against what it has produced so far, and a craft that yields nothing until the
-    /// item is done reads as nought a minute for as long as it takes. Mining and foraging are spared because
-    /// they yield continuously; forging is not. On 04.09.2026 Calla dropped "beating out Cutlass (2 attempts,
-    /// 0 made)" at exactly 0.5 minutes — the instant the flat dwell expired — and over that session the smith
-    /// took five errands, dropped four and finished one, against 29 sewn and 37 brewed. The ledger then
-    /// marked the trade down for failures it had itself caused: the base fell 55 → 37 → 28 across three
-    /// readings, so forging lost every later auction as well.
-    /// </para>
-    ///
-    /// <para>
-    /// Two numbers on one shelf, and the cure is the usual one — stop having the second number.
-    /// <see cref="BotDeed.Minutes"/> is already on the deed and already means "how long this takes".
-    /// </para>
-    /// </summary>
     private static int Dwell(BotDeed deed) =>
         Math.Clamp((int)Math.Round((deed?.Minutes ?? 0.0) * 60000.0), DwellMs, DwellCapMs);
 
-    /// <summary>
-    /// How long an undertaking may sit set aside — the bot dead, overloaded, dying, in a squad — before its
-    /// reason is presumed stale and it is dropped.
-    ///
-    /// Ten minutes. An undertaking is not lost the moment something interrupts it, which is the whole point
-    /// of holding one; but the market it was walking to closes, the vein it wanted is worked out, and the
-    /// bot that comes back to it after an hour is acting on a fact from an hour ago.
-    /// </summary>
     public static int AsideCapMs { get; set; } = 600000;
 
-    /// <summary>
-    /// How many beats an undertaking may hold one unchanged walk order without ever beating its own best
-    /// distance to the place, before it is given up.
-    ///
-    /// <para>
-    /// Six hundred, which is two minutes at a turn every two hundred milliseconds, and deliberately three
-    /// times what <c>BotDig</c> and <c>BotProwl</c> allow themselves. Those two measure a walk to a known
-    /// seam or a known square; this measures every walk on the shard, including a trip across Britain that
-    /// has to go round a wall, and the counter only moves on a beat where the bot failed to beat its own
-    /// record — so an honest walk resets it constantly and can never meet this at all. It sits well inside
-    /// the stall watch's four minutes on purpose: the errand should end itself and teach its own ledger,
-    /// rather than be cancelled from outside with nothing learned.
-    /// </para>
-    /// </summary>
     public static int TrekLimit { get; set; } = 600;
 
-    /// <summary>Undertakings given up for a walk that stopped closing. For the summary.</summary>
     public static long Trudges { get; private set; }
 
-    /// <summary>
-    /// How long an undertaking may answer "working" without ever answering anything else before it is taken
-    /// away as jammed.
-    ///
-    /// <para>
-    /// A quarter of an hour, which is far above any honest stretch of standing still — the longest work in
-    /// the project reckons itself at eight minutes and breaks that up with walking, and every step, finish or
-    /// failure pushes the clock forward. Nothing that is really working can reach this.
-    /// </para>
-    ///
-    /// <para>
-    /// It exists because <c>Work</c> is the one answer nothing judges, which makes it the one an undertaking
-    /// can hide behind. See the case that handles it for the two afternoons this cost.
-    /// </para>
-    /// </summary>
     public static int LabourMs { get; set; } = 900000;
 
-    /// <summary>
-    /// How much better a new want must be than what is already underway, on top of
-    /// <see cref="BotAppraisal.Inertia"/>. Together they are what makes behaviour look deliberate.
-    /// </summary>
     public static double SwitchMargin { get; set; } = 1.25;
 
-    /// <summary>How often the population's decisions are summarised in the log.</summary>
+    public static double CommitStretch { get; set; } = 1.5;
+
+    public static int CommitCapMs { get; set; } = 480000;
+
+    public static double TroubleShare { get; set; } = 0.33;
+
+    public static bool Resume { get; set; } = true;
+
+    public static double ResumeHealth { get; set; } = 0.5;
+
+    public static int ReturnMs { get; set; } = 600000;
+
+    public static long Jumped { get; private set; }
+
+    public static long Summoned { get; private set; }
+
+    public static long Outbid { get; private set; }
+
+    public static long Held { get; private set; }
+
+    public static long Troubled { get; private set; }
+
+    public static long Paused { get; private set; }
+
+    public static long Resumed { get; private set; }
+
+    public static long Unresumed { get; private set; }
+
+    public static long Returned { get; private set; }
+
+    /// <summary>What happened to one kind of work, for the census and the debugger. Written on a decision, read every five minutes.</summary>
+    private sealed class Tally
+    {
+        public long Taken;
+
+        public long Finished;
+
+        public long Failed;
+
+        public long Dropped;
+
+        public long Died;
+
+        public long Jumped;
+
+        public long Outbid;
+
+        public long Held;
+
+        public long Paused;
+
+        public long Resumed;
+
+        public long Returned;
+    }
+
+    private static readonly Dictionary<string, Tally> _tallies = new(StringComparer.OrdinalIgnoreCase);
+
+    private static Tally TallyOf(string kind)
+    {
+        kind ??= "?";
+
+        if (!_tallies.TryGetValue(kind, out var tally))
+        {
+            tally = new Tally();
+            _tallies[kind] = tally;
+        }
+
+        return tally;
+    }
+
     public static int CensusMs { get; set; } = 300000;
 
-    /// <summary>
-    /// Whether every commitment is logged as it is taken.
-    ///
-    /// On by default, because "why is this bot doing that" is the question this project exists to be able to
-    /// answer, and a commitment happens at most every <see cref="DwellMs"/> per bot. Off when the log
-    /// matters more than the answer: the first version left a 37 MB log for one session.
-    /// </summary>
     public static bool Chatty { get; set; } = true;
 
     private static readonly List<IBotProposer> _proposers = [];
 
-    /// <summary>
-    /// Scratch space for one auction. Static and reused, like the planner's path buffer: decisions are made
-    /// one bot at a time on the population's beat, and a fresh list per bot per fifteen seconds is garbage
-    /// for nothing.
-    /// </summary>
     private static readonly List<BotDeed> _offers = [];
 
     private static readonly Dictionary<string, int> _busy = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Rungs already complained about, so a missing proposer is said once and not per bot per beat.</summary>
     private static readonly HashSet<BotStanding> _mute = [];
 
     private static long _censusTick;
 
-    /// <summary>
-    /// Whether the census clock has been seeded from a real tick. Not "is the stamp zero": on some hosts the
-    /// tick count is the machine's uptime counter passed through, so it starts enormous and can wrap
-    /// negative. See <c>dev-docs/tick-counts.md</c> in the fork.
-    /// </summary>
     private static bool _censused;
 
     public static long Taken { get; private set; }
@@ -211,63 +158,16 @@ public static class BotWill
 
     public static long Deaths { get; private set; }
 
-    /// <summary>
-    /// How many times a bot looked for work and found nothing at all worth doing.
-    ///
-    /// <b>The number to watch, and it is about the world rather than the bots.</b> If work is valued by what
-    /// it actually yields, then a bot with nothing worth doing is a shard with nothing left on it that this
-    /// bot can profit from. The first version could not distinguish that from a broken motive: thirty-eight
-    /// of fifty-one bots ended up patrolling with their drive frozen, which read as a bug in the drive and
-    /// was not one.
-    /// </summary>
     public static long Barren { get; private set; }
 
-    /// <summary>
-    /// Offers not made because the bot's class is sworn to other work. A named nought: see
-    /// <see cref="Sworn"/>.
-    /// </summary>
     public static long Unsworn { get; private set; }
 
-    /// <summary>
-    /// Times a full pack put the errand that needs no step ahead of better-paid work that does - that is,
-    /// times the ordering actually overturned a price rather than merely agreeing with one.
-    ///
-    /// <b>Its own bucket, because a rank is worked out for every offer a heavy bot is made and means nothing
-    /// until it changes an answer.</b> Counting every occasion a standing errand won would fold in all the
-    /// ones where it was simply the best thing going, and the number worth watching is how often the shard
-    /// is buying its way out of a standstill at a price it can name.
-    /// </summary>
     public static long Grounded { get; private set; }
 
-    /// <summary>
-    /// Times that ordering took work out of a bot's hands mid-errand rather than filling an empty one.
-    ///
-    /// Separate from <see cref="Grounded"/> and not a subset of it: one is a gate in the auction, the other
-    /// a gate on the switching margin, and they fire on different bots. This at nought while the other
-    /// climbs means heavy bots are being caught only once they are already idle - which is exactly the half
-    /// that was never broken.
-    /// </summary>
     public static long Dislodged { get; private set; }
 
-    /// <summary>
-    /// Times better-paid work was refused because what the bot held had already spent money on itself.
-    ///
-    /// The number to read beside it is <c>BotSupplier.Trimmed</c>: this one climbing while that one stays
-    /// at nought means couriers are being saved from the auction rather than never being overloaded in the
-    /// first place, and the first repair is the one that has stopped working.
-    /// </summary>
     public static long Kept { get; private set; }
 
-    /// <summary>
-    /// Whether this proposer may be put to this bot at all.
-    ///
-    /// <para>
-    /// <b>Only the free rung is a choice.</b> Mending, flight and the answer to being hit live below the
-    /// auction and fire whether or not anything is deciding — a list that could switch those off would be a
-    /// class that has sworn not to survive. So the gate is asked of the free rung and nowhere else, and
-    /// every class but one leaves the list empty and passes in a single comparison.
-    /// </para>
-    /// </summary>
     private static bool Sworn(IBotWilful bot, BotStanding rung, IBotProposer proposer)
     {
         if (rung != BotStanding.Free)
@@ -293,11 +193,6 @@ public static class BotWill
         return false;
     }
 
-    /// <summary>
-    /// Takes a proposer. Called by the subsystem that owns the work, from its own module's start.
-    ///
-    /// Registration is not reset when the world reloads: a proposer is code, not state.
-    /// </summary>
     public static void Offer(IBotProposer proposer)
     {
         if (proposer == null)
@@ -331,18 +226,18 @@ public static class BotWill
         );
     }
 
-    /// <summary>Proposers registered, whatever rung they serve.</summary>
     public static IReadOnlyList<IBotProposer> Proposers => _proposers;
 
-    /// <summary>
-    /// One decision. Called on the bot's own beat, and it is the only entry point the bot needs.
-    ///
-    /// <para>
-    /// It does at most three things: settles anything that has ended, advances what is held, and — when the
-    /// review is due — holds an auction. Advancing is cheap and happens every beat, because an undertaking
-    /// has to be able to notice that it has arrived; choosing is not, and does not.
-    /// </para>
-    /// </summary>
+    public static double SpentMs { get; private set; }
+
+    public static long Decisions { get; private set; }
+
+    public static void Spent(long ticks)
+    {
+        SpentMs += ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        Decisions++;
+    }
+
     public static void Decide(IBotWilful bot)
     {
         if (!Deciding)
@@ -358,12 +253,6 @@ public static class BotWill
             return;
         }
 
-        // <b>Some classes are not run by this layer at all, and the King's Rangers are the first of them.</b>
-        // Everything here is an auction: proposers offer, the bot weighs, the best offer wins and displaces
-        // what it was doing. That is exactly right for a population of tradesmen and exactly wrong for a
-        // standing patrol under orders — every skirmish outbid the sweep and threw it away, every ending left
-        // the company with nothing in hand, and no amount of adjusting prices or sworn lists fixed it,
-        // because the problem was being in the auction at all. They have their own keeper: see BotRangers.
         if ((body as BotMobile)?.Class is { Bidding: false })
         {
             return;
@@ -385,8 +274,6 @@ public static class BotWill
             return;
         }
 
-        // Anything above the bot's own business. Set aside rather than abandoned — the road is still
-        // underneath, exactly as it is in the journey — unless something on this rung has work of its own.
         if (standing < BotStanding.Busy)
         {
             Aside(bot, resolve, standing, now, minutes);
@@ -407,49 +294,18 @@ public static class BotWill
             resolve.Urges.Idle(minutes);
         }
 
-        // Free to shop, on a clock. The dwell is a floor under this, and the two mean different things — one
-        // is how often it looks, the other how soon it may change its mind.
         if (resolve.Due || now - resolve.ReviewedTick >= (resolve.Deed == null ? IdleMs : ReviewMs))
         {
             Auction(bot, resolve, BotStanding.Free, now);
         }
     }
 
-    /// <summary>
-    /// The walk an undertaking asked for has ended one way or another. Called from the tick with whatever
-    /// <see cref="BotWalk.Advance"/> returned.
-    ///
-    /// <para>
-    /// Only the two endings matter here, and both are the journey saying the place cannot be worked towards:
-    /// <see cref="BotWalkResult.Refused"/> is proof there is no way, <see cref="BotWalkResult.GaveUp"/> is a
-    /// bot admitting it is getting nowhere. Arriving is not reported, because the undertaking asks the
-    /// journey itself — it is the one that knows what arriving means for its own stage.
-    /// </para>
-    /// </summary>
-    /// <summary>Creatures deferred because the road to them was refused. See <see cref="Note"/>.</summary>
     public static long Unreachable { get; private set; }
 
-    /// <summary>
-    /// Endings that were not allowed to price the ground, because the bot never got there.
-    ///
-    /// Its own number, because a gate without one either breaks a denominator or hides its own mistakes: if
-    /// this ever grows to swallow the ordinary failures, the shard would stop learning anything about what
-    /// work is worth, and the only way to see that would be this counter beside the others.
-    /// </summary>
     public static long Unpriced { get; private set; }
 
-    /// <summary>
-    /// Unreached endings that were not written into <see cref="BotRefused"/>, because what could not be
-    /// reached was somebody rather than somewhere. See <see cref="Note"/>.
-    /// </summary>
     public static long Unblamed { get; private set; }
 
-    /// <summary>
-    /// Raised whenever a piece of work is finished, for anything outside this assembly that is counting.
-    ///
-    /// Only on <see cref="BotEnding.Done"/>: a revel that counted attempts would be won by whoever failed
-    /// fastest, which is the same defect as judging a trade on takings it never had time to earn.
-    /// </summary>
     public static Action<Mobile, string> Completed { get; set; }
 
     public static void Note(IBotWilful bot, BotWalkResult result)
@@ -467,8 +323,6 @@ public static class BotWill
             return;
         }
 
-        // Kept before it is cleared: it is the only record of where the walk was actually headed, and the
-        // log line below is the whole reason anybody will know which place was refused.
         var refused = resolve.Sent;
 
         resolve.Sent = default;
@@ -486,12 +340,18 @@ public static class BotWill
 
         if (bent)
         {
+            resolve.Bent = true;
+
             if (Chatty)
             {
                 logger.Information(
                     "{Name} could not get to {Where} and is trying elsewhere for {Deed}",
                     bot.Self?.Name,
-                    refused.Follow != null ? refused.Follow.Location : refused.Where,
+                    refused.Follow != null
+                        ? refused.Follow.Name
+                        : refused.Where == Point3D.Zero
+                            ? "whatever it was following, which is gone"
+                            : refused.Where.ToString(),
                     deed
                 );
             }
@@ -499,40 +359,21 @@ public static class BotWill
             return;
         }
 
-        // <b>The one exit from an undertaking that said nothing about itself.</b> Every other failure carries
-        // a sentence — the shelf was bare, the odds were hopeless, nothing of it was in sight — and this one,
-        // which is simply "the way there does not exist and this work has no second place to try", printed
-        // the bare words "failed at mine" and stopped. Thirty-five of them in twelve minutes on the morning of
-        // 25.08.2026, across unload, mine and hunt, and the only way to find out what any of them meant was
-        // to go and read a BotWalk line somewhere above it and match up the timestamps by eye.
-        //
-        // The destination is right here and costs nothing to say. Named after the creature where there is
-        // one, because "no way through to a skeleton" is a fact about a fight and "no way through to
-        // (1424, 1468, 9)" is a fact about the ground, and they are chased down differently.
-        // <b>A follow whose target has gone prints a place that never existed.</b> The two arms below are
-        // "there is a creature" and "there is a spot", and an errand that was following something which has
-        // since been deleted is neither: Follow has gone null, Where was never set for it, and the sentence
-        // came out as "no way through to (0, 0, 0)". Nought is not a coordinate, it is the absence of one —
-        // and a message that prints it sends the next reader hunting for a coordinate bug that is not there.
-        // It cost half an hour of exactly that on 26.08.2026.
-        var where = refused.Follow != null
-            ? $"no way through to {refused.Follow.Name}"
-            : refused.Where == Point3D.Zero
-                ? "no way through to what it was following, which is gone"
-                : $"no way through to {refused.Where}";
+        var could = result switch
+        {
+            BotWalkResult.GaveUp => "could not get nearer to",
+            BotWalkResult.Stalled => "could not take a step towards",
+            _ => "no way through to"
+        };
 
-        // <b>And the creature is deferred, because no way through is no way through for anybody.</b> The same
-        // ruling BotSlay already makes about a quarry it cannot see from the tile beside it: "as true for the
-        // next bot along as for this one, which is precisely what the shared list means". A refused road was
-        // not making it. On the night of 02-03.09.2026, in two hours and three quarters, 88 of the 830
-        // hunts that ended did so on "no way through to" — a rat, a crow, a cat: creatures inside buildings
-        // in Britain that every passing bot walked to in turn and none could reach. The mark lapses in two
-        // minutes, so this defers them rather than writing them off, and a creature that wanders back out is
-        // hunted again.
-        //
-        // Creatures only. A mend that cannot reach the bot it was going to bandage is a fact about the road
-        // and about a friend, and the quarry list is not where either belongs — and the compiler settles that
-        // for us, since a bot is a PlayerMobile and can never be a BaseCreature.
+        var where = refused.Follow != null
+            ? $"{could} {refused.Follow.Name} at {refused.Follow.Location}"
+              + (refused.Follow.Region?.Name is { Length: > 0 } region ? $" in {region}" : "")
+              + (Server.Multis.BaseHouse.FindHouseAt(refused.Follow) != null ? " inside a house" : "")
+            : refused.Where == Point3D.Zero
+                ? $"{could} what it was following, which is gone"
+                : $"{could} {refused.Where}";
+
         if (refused.Follow is BaseCreature)
         {
             BotQuarry.Shun(refused.Follow);
@@ -540,28 +381,10 @@ public static class BotWill
         }
         else if (refused.Follow != null)
         {
-            // The same note about one of ours, kept on its own list because a patient is not quarry. See
-            // BotMend.Beyond: 209 of the 230 refused roads of that night were a healer walking to somebody
-            // it could not reach, and the picker had no way to know it had just tried.
             BotMend.Beyond(refused.Follow);
             Unreachable++;
         }
 
-        // <b>And the ground is blamed only when the ground was what was walked to.</b> A peddle is an errand
-        // to a person and a hunt is an errand to a creature; both of them keep walking while they are being
-        // walked to, and both already have a record of their own two arms above this one - BotQuarry.Shun
-        // and BotMend.Beyond. Aric, standing at (1323, 1372) with eighteen ribs to sell, failed to reach six
-        // different buyers in ninety seconds on 08.09.2026, every one of them standing in Britain's market;
-        // written as ground, that is the population teaching itself that its own market square cannot be
-        // reached, and BotGround.Nearest would then refuse every bot on the island its bank.
-        //
-        // The deed's Where is the place a buyer happened to be standing when the errand was written, which is
-        // a fact about a minute rather than about a road. Counted, because a gate without a bucket hides its
-        // own mistakes.
-        // <b>And never when the bot never moved.</b> A hundred attempts at stepping with the bot on the same
-        // tile is a fact about that tile and about that bot — a mount out of steps, a pack too heavy, a
-        // doorway full of people — and it is true of every destination on the island at once, so writing it
-        // against this one is writing it against the wrong thing entirely.
         var ground = refused.Follow == null && result != BotWalkResult.Stalled;
 
         if (!ground)
@@ -572,13 +395,6 @@ public static class BotWill
         Settle(bot, BotEnding.Failed, where, unreached: true, ground);
     }
 
-    /// <summary>
-    /// Something hit this bot. Called from <c>OnDamage</c>, beside <see cref="BotThreat.Decide"/>.
-    ///
-    /// <b>Told rather than observed</b>, and that is the whole of it: a caster strikes from eight tiles and
-    /// never closes, so a bot that learns it is under attack by looking for something adjacent never learns
-    /// it at all.
-    /// </summary>
     public static void Hurt(IBotWilful bot)
     {
         var resolve = bot?.Resolve;
@@ -590,14 +406,8 @@ public static class BotWill
         }
     }
 
-    /// <summary>The bot died. Called from <c>OnDeath</c>: whatever it was doing ended, and badly.</summary>
     public static void Died(IBotWilful bot) => Settle(bot, BotEnding.Died);
 
-    /// <summary>
-    /// This bot is going away for good. Called when it is deleted, and it exists for one reason: the census
-    /// counts what is being worked on, and a bot deleted mid-undertaking would leave its work in that count
-    /// for ever. A total that is never released does not look wrong — it looks like a busier population.
-    /// </summary>
     public static void Forget(IBotWilful bot)
     {
         var resolve = bot?.Resolve;
@@ -612,11 +422,9 @@ public static class BotWill
 
         resolve.Deed = null;
         resolve.Sent = default;
+        resolve.Paused = null;
     }
 
-    /// <summary>
-    /// Above the bot's own business: hold what is held, and let the rung offer something if it can.
-    /// </summary>
     private static void Aside(
         IBotWilful bot,
         BotResolve resolve,
@@ -625,12 +433,8 @@ public static class BotWill
         double minutes
     )
     {
-        // Not idle: something is happening to it. Boredom is for bots with nothing to do, not for bots in
-        // trouble.
         resolve.Urges.Held(minutes);
 
-        // A squad is not a rung with work on it — the squad *is* the work, and it rebases the journey itself.
-        // Joining one will be an undertaking when something proposes it.
         if (standing != BotStanding.Bound && Auction(bot, resolve, standing, now))
         {
             return;
@@ -638,11 +442,6 @@ public static class BotWill
 
         if (resolve.Deed == null)
         {
-            // <b>Nothing in hand and something hitting it.</b> That is not a bot too busy being attacked to
-            // go shopping — it is a bot standing in a fight with no plan at all, which is the state this rung
-            // was written to prevent rather than to produce. The rung lasts eight seconds past the last blow,
-            // so a bot that has just given a fight up spends them motionless in the middle of it, and
-            // ordinary work is what gets it out: a walk to a mine is a walk away.
             if (standing == BotStanding.Hunted)
             {
                 Auction(bot, resolve, BotStanding.Free, now);
@@ -651,17 +450,6 @@ public static class BotWill
             return;
         }
 
-        // <b>Work this rung handed out is not work set aside — it is what the bot is supposed to be doing at
-        // this instant, and it was the one thing that never happened.</b> An undertaking is only ever
-        // advanced from the Busy path, so a rung could offer a bot its own rescue and then decline to carry
-        // it out on the grounds that a bot in trouble is not busy: the medic proposed a bandage, the bandage
-        // became the bot's undertaking, and a bot at a third of its health then stood perfectly still holding
-        // a plan to heal itself until something killed it. Every rung above Busy had the same hole.
-        //
-        // Hunted is included whatever handed the work out, because that rung has never been about the work —
-        // its own note says it means "no business shopping for work right now" — and suspending a fight
-        // because a fight is happening left the whole of BotSlay unreachable for as long as anything was
-        // hitting the bot: no giving ground, no casting, no flight, no corpse gone through.
         if (standing == BotStanding.Hunted
             || resolve.Took <= standing
             || standing == BotStanding.Bound && resolve.Deed.Alongside)
@@ -673,13 +461,6 @@ public static class BotWill
             return;
         }
 
-        // <b>Here, and not before the branch above, and getting that wrong cost an afternoon of my own
-        // making.</b> The labour clock must not run on an undertaking nobody is turning the handle of —
-        // AsideCapMs is the clock for waiting, and two clocks on one deed is the project's oldest mistake.
-        // But the branch above <em>does</em> advance the deed on elevated rungs, so resetting at the top of
-        // the aside path reset it on every beat of a bot that was working perfectly normally while something
-        // hit it. Godric held a hunt for seventeen minutes with the backstop watching and rejuvenated four
-        // times a second. Only the two genuine parkings below reset it.
         if (!resolve.Aside)
         {
             resolve.Aside = true;
@@ -707,7 +488,6 @@ public static class BotWill
         Settle(bot, BotEnding.Dropped);
     }
 
-    /// <summary>Asks what is held what to do now, and does exactly that and nothing else.</summary>
     private static void Advance(IBotWilful bot, BotResolve resolve)
     {
         var deed = resolve.Deed;
@@ -719,8 +499,6 @@ public static class BotWill
         }
         catch (Exception e)
         {
-            // Loud and contained, as everywhere in this assembly: one subsystem's mistake must not take the
-            // bot's beat with it, and it must not be quiet either.
             logger.Error(e, "Undertaking {Kind} threw while being advanced; it is given up", deed.Kind);
 
             Settle(bot, BotEnding.Failed);
@@ -744,8 +522,6 @@ public static class BotWill
 
                 if (journey == null)
                 {
-                    // A wilful bot without a journey cannot be sent anywhere. A programming mistake rather
-                    // than a situation, and it is said by name instead of throwing inside the beat.
                     logger.Error(
                         "{Name} has no journey, so {Kind} cannot be walked; it is given up",
                         bot.Self?.Name,
@@ -757,14 +533,8 @@ public static class BotWill
                     return;
                 }
 
-                // Only when it is somewhere new. Rebasing throws the plan away, and an undertaking that says
-                // "walk to the forge" on every beat would otherwise buy a search on every beat and never
-                // arrive from further off than a few tiles.
                 if (!doing.Matches(resolve.Sent))
                 {
-                    // Rebase, never Begin. Begin clears the queue, which would wipe the fight the bot is in
-                    // the middle of; the bottom of the queue is where the bot belongs and the top is what is
-                    // happening to it.
                     if (doing.Follow != null)
                     {
                         journey.Rebase(doing.Map, doing.Follow, doing.Arrival, doing.Note ?? deed.Kind);
@@ -777,42 +547,24 @@ public static class BotWill
                     resolve.Sent = doing;
                     resolve.Nearest = int.MaxValue;
                     resolve.Trudged = 0;
+                    resolve.Started = -1;
 
-                    // <b>Inside the rebase, not beside it, and the difference is a bot standing still for
-                    // twenty minutes.</b> The labour clock was reset on every walk answer, on the reasoning
-                    // that a step is a sign of life. A step is; the same step is not. An undertaking that
-                    // asks for one unchanged destination beat after beat has not moved through its chain at
-                    // all, and it kept the clock young for ever — Perri held a rescue for twenty-one minutes
-                    // that way with the backstop watching and never firing.
-                    //
-                    // Here it fires only when the order actually changed, which is the same test the rebase
-                    // itself uses, and that is precisely the definition of the undertaking getting somewhere:
-                    // a new place to be, a new stage, a new leg. The longest honest journey on this shard is
-                    // a couple of minutes, so nothing that is really walking can age out.
                     resolve.StirredTick = Core.TickCount;
 
                     return;
                 }
 
-                // <b>The same order, beat after beat, with the bot no nearer than it was — and until now
-                // nothing anywhere counted that.</b> Two errands out of a dozen wrote this rule for
-                // themselves — <c>BotDig</c> and <c>BotProwl</c>, both after a night of it — and the ones
-                // that did not were left to the stall watch, which is four minutes away and cures the
-                // symptom by cancelling the work. On 04.09.2026 the whole of what was left of standing
-                // still was that: Kelda four minutes into "taking 1 Katana to Aislinn", Merrick into
-                // "taking 10 Leather to Abra", Rowan into "taking 10 Raw Ribs to Iman", none of them a
-                // company, none of them a fight, all of them a walk to a shopkeeper that had stopped
-                // closing. Written here so it is one rule rather than a twelfth copy.
-                //
-                // <b>Only a fixed place, never a follow.</b> Work that walks after something moving points
-                // at the target's own tile every beat, so "no nearer than it was" is true of it while it is
-                // winning — that is this project's oldest false alarm and it is fenced out by construction.
                 if (doing.Follow == null && bot.Self is { Deleted: false } walker && walker.Map == doing.Map)
                 {
                     var away = Math.Max(
                         Math.Abs(walker.Location.X - doing.Where.X),
                         Math.Abs(walker.Location.Y - doing.Where.Y)
                     );
+
+                    if (resolve.Started < 0)
+                    {
+                        resolve.Started = away;
+                    }
 
                     if (away < resolve.Nearest)
                     {
@@ -823,16 +575,10 @@ public static class BotWill
                     {
                         Trudges++;
 
-                        // <b>Said differently from BotProwl's own give-up on purpose.</b> That one reads
-                        // "got no nearer than N tiles to (x, y)" and this one used to read the same sentence
-                        // with one extra word, so a grep for either found both and a count of one was a count
-                        // of two trades' worth of quite different problems. This is the watchdog above every
-                        // undertaking — the walk stopped closing, whatever the work was — and the trade's own
-                        // give-up is a decision that trade made about its own ground.
                         Settle(
                             bot,
                             BotEnding.Failed,
-                            $"the walk stopped closing {away} tiles short of ({doing.Where.X}, {doing.Where.Y}) after {TrekLimit} beats"
+                            $"the walk stopped closing {away} tiles short of ({doing.Where.X}, {doing.Where.Y}) after {TrekLimit} beats, having set out {resolve.Started} off and got no nearer than {resolve.Nearest}"
                         );
                     }
                 }
@@ -840,21 +586,6 @@ public static class BotWill
                 return;
 
             case BotDoingKind.Work:
-                // Nothing at all, and that is the answer. A bot at a counter, at a forge or at a vein is
-                // standing still on purpose, its journey has no plan, and nothing judges it for progress.
-                //
-                // <b>Except that an undertaking which never answers anything else is invisible and
-                // immortal, and two of them were found in one afternoon.</b> Three tailors held a craft the
-                // engine had quietly stopped serving — CraftItem.Craft takes an action lock and returns in
-                // silence when it is already held — and stood at their benches for two hours; Merrick held a
-                // rescue for fifty-seven minutes without dying, failing, or writing a single line. Both read
-                // as "working" in every summary, because this is the answer that means exactly that.
-                //
-                // So the licence stands and gets an outer edge. Any other answer — a step, a finish, a
-                // failure — is a sign of life and pushes the clock forward; only an unbroken run of this one
-                // ages. LabourMs is set far above any honest stretch of standing still, so nothing that is
-                // really working ever meets it, and a bot the world has stopped talking to is back in the
-                // population within the quarter hour instead of at the end of the day.
                 if (Core.TickCount - resolve.StirredTick >= LabourMs)
                 {
                     Settle(bot, BotEnding.Failed, $"nothing has come of this in {LabourMs / 60000} minutes");
@@ -883,22 +614,10 @@ public static class BotWill
         }
     }
 
-    /// <summary>
-    /// Collects what is on offer for this rung, scores it, and takes the best if it is worth changing to.
-    /// Returns whether anything was taken on.
-    /// </summary>
     private static bool Auction(IBotWilful bot, BotResolve resolve, BotStanding rung, long now)
     {
         var held = resolve.Deed;
 
-        // Too soon to change our mind on purpose. Not applied to the rungs above: a bot that cannot walk
-        // needs to put something down now, not in half a minute.
-        //
-        // <b>Noted rather than returned on, and that is a change with a reason.</b> Refusing to look at all
-        // meant the dwell could not tell "a better field to dig" from "an ogre eight tiles away": both were
-        // simply not asked about for half a minute, and a bot that is not asked walks past. So the offers are
-        // collected either way and the floor is applied at the end, where the one thing that can lift it —
-        // <see cref="BotDeed.Pressing"/> — is known.
         var fresh = held != null && rung == BotStanding.Free && now - resolve.SinceTick < Dwell(held);
 
         resolve.ReviewedTick = now;
@@ -906,8 +625,6 @@ public static class BotWill
 
         _offers.Clear();
 
-        // What the free rung had for this bot, kept rather than dropped. See BotResolve.Offered: the whole
-        // list is computed here anyway, and asking a second time elsewhere is not a free question.
         var keep = rung == BotStanding.Free;
 
         if (keep)
@@ -928,15 +645,6 @@ public static class BotWill
                 continue;
             }
 
-            // <b>Work this bot's class is not allowed to be offered at all, which is not the same as work it
-            // would score badly.</b> See BotClass.Sworn: a class whose errands are chosen for reasons the
-            // arithmetic cannot see cannot be expressed by scoring, because a price high enough to win is a
-            // rigged auction and an honest one loses to every hunt on the island. So the offer is never made.
-            //
-            // Counted rather than silent, and counted here rather than inside the proposers: every proposer
-            // on this shard tallies its own refusals by reason, and a bot that is never asked would otherwise
-            // vanish from all of them at once — a Baron doing nothing would look exactly like a Baron with
-            // nothing to do.
             if (!Sworn(bot, rung, proposer))
             {
                 Unsworn++;
@@ -977,9 +685,6 @@ public static class BotWill
 
         if (asked == 0)
         {
-            // Nobody at all answers this rung. On the free rung that is the same fact as "nothing was worth
-            // doing" and has to be counted as it, or a shard with no proposers registered would report a
-            // contented population.
             if (rung == BotStanding.Free && held == null)
             {
                 Nothing(resolve, now, "nobody answers this rung at all");
@@ -990,28 +695,8 @@ public static class BotWill
             return false;
         }
 
-        // Need is what the plans on offer cost against what is in the purse. Computed here because this is
-        // the only place both halves are known, and zero when nothing on offer costs anything.
         resolve.Urges.Weigh(BotYield.Wealth(bot.Self), largestOutlay);
 
-        // <b>A bot that cannot take a step decides by order, not by price.</b> The carrying ceiling has been
-        // a factor in the score since 08.09.2026 and the factor does not reach: BotAppraisal multiplies work
-        // that needs a step by a fiftieth, and then the geometric mean takes the fifth root of the product,
-        // so a fiftieth arrives at the score as 0.46. Lysa the Woodsman on 09.09.2026 stood on one tile for
-        // three minutes with ten refused roads behind her, taking chop at "508 x 0.45 ... x load 0.02" =
-        // 229/min over the unloading that would have freed her, and the population made ninety-five such
-        // choices in the session. A multiplier is the right shape for "a poor idea" and the wrong shape for
-        // "this cannot be started", and no value of it is safe: small enough to lose is one root away from
-        // being a veto, and a veto here is the monument the factor was written to replace. See
-        // BotAppraisal.StoppedShare.
-        //
-        // So the ceiling ranks rather than prices. Work that needs no step is compared only against other
-        // work that needs no step, and everything else is compared below it - which is what the factor was
-        // meant to say and could not. The floor the factor was given is kept exactly: when nothing on the
-        // table can be done standing still, every offer is rank nought and this is the auction it has always
-        // been, so a heavy bot with nothing to sell is still given the best of what is left and still tries.
-        // Nothing changes at all for a bot under its ceiling - every rank is nought and the comparison
-        // collapses to the one it was.
         var grounded = BotLadder.Overloaded(bot.Self);
 
         BotDeed best = null;
@@ -1058,9 +743,6 @@ public static class BotWill
             }
         }
 
-        // The runner-up under this ordering is the best of everything the winner outranked, so this says
-        // "the order overturned a price" and nothing else. Counted here rather than where the rank is worked
-        // out: a rank is computed for every offer a heavy bot is made, and means nothing until one wins.
         if (bestRank > 0 && secondScore > bestScore)
         {
             Grounded++;
@@ -1082,17 +764,11 @@ public static class BotWill
             return false;
         }
 
+        string how = null;
+        var heldNow = 0.0;
+
         if (held != null)
         {
-            // <b>The same order has to apply to what is already in hand, or the ranking above does nothing
-            // for the bot that needs it.</b> Lysa was not choosing with an empty hand - she was holding the
-            // chop. Ranking the offers alone would have left the winner facing the dwell and the margin, and
-            // unloading at 74/min against a chop at 229/min with a quarter added for stubbornness loses
-            // every one of those comparisons: the ordering would have been right and unreachable. So the
-            // rank is read on both sides and settles it before the margin is consulted at all.
-            //
-            // It runs both ways on purpose. A bot that has taken the unloading does not lose it again the
-            // moment something better paid is offered, which is the same defect wearing the other face.
             var heldRank = grounded && held.Standing ? 1 : 0;
 
             if (bestRank < heldRank)
@@ -1103,22 +779,14 @@ public static class BotWill
             if (bestRank > heldRank)
             {
                 Dislodged++;
+
+                how = "dislodged";
+                heldNow = BotAppraisal.Weigh(bot, held, Share(held.Kind), out _);
             }
             else
             {
-                // Something that will not wait, and is not more of what the bot is already doing. The second
-                // half of that matters as much as the first: without it a hunter swaps quarry every time a
-                // second creature wanders inside the notice, which is the impulsive bot the margin was
-                // written against wearing the word "urgent".
                 var jumps = best.Pressing(bot) && !held.Kind.InsensitiveEquals(best.Kind);
 
-                // <b>Work with a purchase in the middle of it is not weighed against a better price at all.</b>
-                // Dropping a hunt costs some walking; dropping a guild's supply run after the shop leg has
-                // turned its coin into goods in this bot's pack, and the auction has no way to know that,
-                // because a score says what work is worth from here and never what has already been spent
-                // getting here. Only what will not wait may still take it - the survival rungs and the
-                // carrying ceiling above, both of which mean the promise cannot be kept anyway. See
-                // BotDeed.Committed for the evening this cost.
                 if (held.Committed && !jumps)
                 {
                     Kept++;
@@ -1131,20 +799,36 @@ public static class BotWill
                     return false;
                 }
 
-                // The margin, and it is the difference between a bot with intentions and a bot with
-                // impulses. Waived for what will not wait — the comparison is then a plain one, "is this
-                // worth more than what I am doing", with no bonus for stubbornness on either side.
-                var heldScore =
-                    BotAppraisal.Weigh(bot, held, Share(held.Kind), out _) * (jumps ? 1.0 : BotAppraisal.Inertia);
+                heldNow = BotAppraisal.Weigh(bot, held, Share(held.Kind), out _);
+
+                var heldScore = heldNow * (jumps ? 1.0 : BotAppraisal.Inertia);
 
                 if (bestScore <= heldScore * (jumps ? 1.0 : SwitchMargin))
                 {
                     return false;
                 }
+
+                var summoned = !jumps && best.Summons && !held.Kind.InsensitiveEquals(best.Kind);
+
+                if (!jumps && !summoned && Holding(resolve, held, rung, now))
+                {
+                    Held++;
+                    TallyOf(held.Kind).Held++;
+
+                    return false;
+                }
+
+                how = (rung, jumps, summoned) switch
+                {
+                    (not BotStanding.Free, _, _) => "interrupted",
+                    (_, true, _) => "jumped",
+                    (_, _, true) => "summoned",
+                    _ => "outbid"
+                };
             }
         }
 
-        Commit(bot, resolve, rung, best, bestWeigh, second, secondScore, now, _offers.Count, viable);
+        Commit(bot, resolve, rung, best, bestWeigh, second, secondScore, now, _offers.Count, viable, firstVeto, how, heldNow);
 
         return true;
     }
@@ -1159,16 +843,85 @@ public static class BotWill
         double insteadScore,
         long now,
         int table,
-        int viable
+        int viable,
+        string refused,
+        string how = null,
+        double heldNow = 0.0
     )
     {
         var dropped = resolve.Deed;
+        var gone = "";
 
         if (dropped != null)
         {
-            // Chosen against, not failed. The takings are recorded honestly and no blame attaches to the
-            // place — the first version's answer here was a five-minute ban on the whole activity.
-            Settle(bot, BotEnding.Dropped);
+            var heldFor = (now - resolve.SinceTick) / 60000.0;
+            var tally = TallyOf(dropped.Kind);
+
+            switch (how)
+            {
+                case "jumped":
+                    Jumped++;
+                    tally.Jumped++;
+
+                    break;
+
+                case "summoned":
+                    Summoned++;
+                    tally.Jumped++;
+
+                    break;
+
+                case "interrupted":
+                    Interrupted++;
+                    tally.Jumped++;
+
+                    break;
+
+                case "outbid":
+                    Outbid++;
+                    tally.Outbid++;
+
+                    break;
+            }
+
+            var account =
+                $"{how ?? "replaced"} by {deed.Kind} at {weigh.Score:F0}/min after {heldFor:F1} of {resolve.Expected:F1} minutes reckoned, taken at {resolve.TakenAt:F0}/min and worth {heldNow:F0}/min by then";
+
+            var pause = Resume
+                        && dropped.Steadfast
+                        && resolve.Paused == null
+                        && how is "jumped" or "summoned" or "dislodged" or "interrupted";
+
+            if (pause)
+            {
+                Pause(bot, resolve, deed.Kind, now);
+
+                gone = $"; put down {dropped} to take up again ({account})";
+            }
+            else
+            {
+                resolve.DroppedKind = dropped.Kind;
+                resolve.DroppedTick = now;
+
+                if (how == "outbid" && resolve.Paused != null)
+                {
+                    DropPaused(bot, resolve, $"the bot changed its mind to {deed.Kind}");
+                }
+
+                Settle(bot, BotEnding.Dropped, account, unpause: false);
+
+                gone = $"; dropped {dropped}";
+            }
+        }
+
+        if (resolve.DroppedKind != null
+            && deed.Kind.InsensitiveEquals(resolve.DroppedKind)
+            && now - resolve.DroppedTick < ReturnMs
+            && dropped?.Kind.InsensitiveEquals(deed.Kind) != true)
+        {
+            Returned++;
+            TallyOf(deed.Kind).Returned++;
+            resolve.DroppedKind = null;
         }
 
         resolve.Deed = deed;
@@ -1180,19 +933,22 @@ public static class BotWill
         resolve.Due = false;
         resolve.Aside = false;
         resolve.Sent = default;
-        // <b>How many were on the table, because absence of a runner-up read as a rich choice.</b> The take
-        // line named a second place only when one existed, so "chosen over five better ideas" and "the only
-        // thing anybody offered" printed identically. On 02.09.2026 Quill took acquire twelve times inside two
-        // seconds, each at 0/min, and went from 400gp to 8gp; not one of those lines said whether anything
-        // else had been offered at all, and the answer changes what the finding is.
-        resolve.Because = $"{weigh.Describe()}; {viable} of {table} offers worth anything";
+        resolve.TakenAt = weigh.Score;
+        resolve.Bent = false;
+        resolve.Expected = Math.Max(0.1, deed.Minutes)
+                           + (bot.Self is { } walker && walker.Map == deed.Map
+                               ? BotAppraisal.Travel(walker.Location, deed.Where)
+                               : 0.0);
+        resolve.Because = refused == null
+            ? $"{weigh.Describe()}; {viable} of {table} offers worth anything"
+            : $"{weigh.Describe()}; {viable} of {table} offers worth anything; refused: {refused}";
 
-        // Cleared here for the same reason Because is written here: a stale one reads as the present one.
         resolve.Empty = null;
         resolve.Urges.Fruitful();
 
         Count(deed.Kind, 1);
         Taken++;
+        TallyOf(deed.Kind).Taken++;
 
         if (!Chatty)
         {
@@ -1205,61 +961,10 @@ public static class BotWill
             deed,
             resolve.Because,
             instead == null ? "" : $"; over {instead} at {insteadScore:F0}/min",
-            dropped == null ? "" : $"; dropped {dropped}"
+            gone
         );
     }
 
-    /// <summary>
-    /// The takings are counted, the ledger is told, and the undertaking is let go. The one place an
-    /// undertaking ends, whichever of the four ways it ended.
-    /// </summary>
-    /// <param name="why">
-    /// What the undertaking said as it ended, in its own words.
-    ///
-    /// <b>It used to be thrown away, and that was a hole in the one thing this project is built to do.</b>
-    /// Every undertaking already explains itself — "the fire would not take the ore", "that stall is empty
-    /// now", "nothing left to mend with" — and the settlement logged only the arithmetic, so a hundred and
-    /// forty-five identical failures were indistinguishable from each other and from bad luck. A reason that
-    /// is written and then discarded is worse than no reason at all: it looks like the question was answered.
-    /// </param>
-    /// <summary>
-    /// Takes a piece of work off a bot that has stopped getting anywhere with it. See <c>BotStall</c>.
-    ///
-    /// <para>
-    /// <b>A work that answers "still going" for ever is immortal, and this shard has produced several.</b>
-    /// Every leg of every errand must end in done, failed, or a step — but a step that cannot be taken is
-    /// none of the three: the bot asks the same walk, the journey gives it up, the work asks for the same
-    /// walk again, and the pair of them will do that until the world reloads. A crafter stood four minutes
-    /// on "after Cloth" that way, and nothing in either subsystem was wrong on its own.
-    /// </para>
-    ///
-    /// <para>
-    /// Ended as a failure rather than quietly dropped, so the ledger learns the place was no good and the
-    /// bot is less inclined to take the same errand to the same spot again. That is the same treatment any
-    /// other unreachable destination gets, and it is what stops this from being a loop with a longer period.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>"The ledger learns the place was no good" means <c>Ledger.Note</c> here and not
-    /// <see cref="BotDeed.Bend"/>, and that distinction was worth a reverted change to find out.</b> Note
-    /// folds a nought-a-minute reading into the band; Bend writes the outright caution that
-    /// <c>Ledger.Cautious</c> reads, and it is reached only from
-    /// <see cref="Note(IBotWilful,BotWalkResult)"/> — the walker's own refusal. A journey that
-    /// <em>follows</em> a mobile never refuses, so a shopkeeper nobody can reach is followed until this
-    /// method takes the errand away, and the shop is never cautioned. Calling Bend from here looks like the
-    /// missing line and is not: this island has four fires and <b>two counters</b>, so cautioning one on a
-    /// single stall takes half of a bot's counters away for the span, and "can reach nothing from here, and
-    /// it is standing at home" went from one to three in the matched window on 05.09.2026 while nothing got
-    /// better. The claimed benefit was not there either — no bot repeats a vendor even without it, because
-    /// the queue at an unreachable shopkeeper is a different bot each time and a per-bot ledger cannot see
-    /// that. Whatever the cure for a followed mobile is, it is not a stronger mark in one bot's own book.
-    /// </para>
-    /// </summary>
-    /// <param name="unreached">
-    /// True when the errand is being taken away because the bot was not getting anywhere — the stall watch,
-    /// the debugger's shake. Those are road failures as surely as a refused plan is, and pricing the ground
-    /// on them is the same mistake. See <see cref="Settle"/>.
-    /// </param>
     public static void Abandon(IBotWilful bot, string why, bool unreached = true)
     {
         if (bot?.Resolve?.Deed == null)
@@ -1270,35 +975,9 @@ public static class BotWill
         Settle(bot, BotEnding.Failed, why, unreached);
     }
 
-    /// <summary>
-    /// Ends the undertaking in hand and writes down what it came to.
-    /// </summary>
-    /// <param name="unreached">
-    /// <b>True when the errand ended because the bot could not get there, and false when it ended on what
-    /// the work itself did.</b> The distinction is the whole of the repair made on the morning of
-    /// 08.09.2026, and it took a night of measurement to see.
-    ///
-    /// <para>
-    /// A walk that never arrived produced nothing, so <see cref="BotYield.Settle"/> hands back nought a
-    /// minute — and three separate records then wrote that nought down as a fact about the world:
-    /// <c>Ledger.Note</c> priced the ground for this bot, <c>BotCommons.Note</c> priced it for everybody,
-    /// and <c>BotCommons.Claimed</c> corrected the trade's own expectation shard-wide. Cooking was reading
-    /// <b>-309.9 gold a minute in the middle of Britain</b>; herbs failed 2940 times in one session and
-    /// dragged their own expectation towards zero, which is why the auction stopped offering them; and
-    /// "nothing was worth doing" climbed past seven thousand in a single session while the shard sat on
-    /// twenty thousand gold and full stalls.
-    /// </para>
-    ///
-    /// <para>
-    /// None of those three numbers is about money. A road that does not exist says nothing whatever about
-    /// what a fire is worth to cook at, or what a patch of woods yields, and letting it speak on those
-    /// subjects poisons a district for every trade at once — the ledger bands ground 64 tiles wide.
-    /// <see cref="BotLedger.Beware"/> is the record that <em>is</em> about roads, it is still written below,
-    /// and it is read by the samplers that choose where to go.
-    /// </para>
-    /// </param>
     private static void Settle(
-        IBotWilful bot, BotEnding ending, string why = null, bool unreached = false, bool ground = true
+        IBotWilful bot, BotEnding ending, string why = null, bool unreached = false, bool ground = true,
+        bool unpause = true
     )
     {
         var resolve = bot?.Resolve;
@@ -1315,10 +994,6 @@ public static class BotWill
         {
             Unpriced++;
 
-            // <b>And the place is written down where every chooser can read it.</b> Same test, two records:
-            // the ledger is not told what the ground is worth (above), and the shard is told that nobody
-            // could get there (here). See BotRefused for why neither of the three records that already
-            // existed could carry this.
             if (ground)
             {
                 BotRefused.Refuse(deed.Map, deed.Where);
@@ -1329,57 +1004,27 @@ public static class BotWill
             resolve.Ledger.Note(deed.Kind, deed.Map, deed.Where, takings.PerMinute);
         }
 
-        // And the same outcome on the population's board, which is a different record answering a different
-        // question: this one is what the island is like, and it is what a bot who has never been here reads.
-        // See BotCommons. The mind's flag rides along so the report can say how much of what the shard knows
-        // it was told by a bot that thinks — which is the whole of what those three are for.
         var told = bot.Self is BotMobile { Minded: true };
 
         if (!unreached)
         {
             BotCommons.Note(deed.Kind, deed.Map, deed.Where, takings.PerMinute, told);
 
-            // And what the trade claimed against what it came to, which is how the shard corrects the
-            // constants in its own source. See BotCommons.Corrected. A trade whose errands keep failing on
-            // the road would otherwise correct its own expectation to nothing and stop being offered at all,
-            // which is what happened to herbs and cooking overnight.
             BotCommons.Claimed(deed.Kind, deed.Expects, takings.PerMinute, told);
         }
 
-        // <b>Wary of a place that paid, which is the opposite of what caution is for.</b>
-        //
-        // Beware exists to stop a bot going back to somewhere the work does not happen. A great many
-        // undertakings end as failures having nonetheless done the work: a tool wears through - the engine
-        // gives one 25 to 75 uses and destroys it at zero - a seam empties, a shelf runs out, the light goes.
-        // On the night of 03.09.2026 the scribes ended 89 errands with "nothing to write with" and those 89
-        // endings carried 15358 gold of scrolls between them, at rates up to 730 a minute. Every one of them
-        // taught the bot to be wary of the shop it had just earned that in.
-        //
-        // The takings are the test and they are already in hand a few lines above. Nothing was produced is
-        // what "this place was no good" means; a death says it regardless, because coming back from one with
-        // a full pack does not make the ground safe.
         if (ending == BotEnding.Died || (ending == BotEnding.Failed && takings.Worth <= 0))
         {
             resolve.Ledger.Beware(deed.Kind, deed.Map, deed.Where);
         }
         else if (ending == BotEnding.Done)
         {
-            // Told to whoever is keeping score, if anybody is. See BotAppraisal.Revelry for why this is a
-            // hook rather than a call: the watcher lives in an assembly that depends on this one.
             Completed?.Invoke(bot.Self, deed.Kind);
 
-            // Arriving anywhere disproves a refusal of that ground, which is the property that keeps this
-            // record from swallowing the island the way the quadrant baulks did.
             BotRefused.Arrived(deed.Map, deed.Where);
 
-            // Only Done, and never Dropped: a bot that walked away from this to do something better has
-            // learned nothing whatever about the place, and letting that clear a suspicion would let a busy
-            // bot forgive the same wall over and over. See BotLedger.Worked.
             resolve.Ledger.Worked(deed.Kind, deed.Map, deed.Where);
 
-            // And whose ground it was. Per finished errand rather than per beat, which is what keeps a
-            // guild's opinion of its neighbours proportional to what they actually took out of its yard
-            // rather than to how long they loitered in it. See BotRegard.Trespassed.
             var whose = BotLand.Holder(deed.Map, deed.Where);
 
             if (whose != null && whose != bot.Self?.Guild?.Name)
@@ -1390,27 +1035,35 @@ public static class BotWill
 
         resolve.Urges.Paid(takings.Worth);
 
+        BotCalling.Worked(bot.Self, deed, takings.Minutes);
+
         Count(deed.Kind, -1);
+
+        var tallied = TallyOf(deed.Kind);
 
         switch (ending)
         {
             case BotEnding.Done:
                 Finished++;
+                tallied.Finished++;
 
                 break;
 
             case BotEnding.Failed:
                 Failed++;
+                tallied.Failed++;
 
                 break;
 
             case BotEnding.Dropped:
                 Dropped++;
+                tallied.Dropped++;
 
                 break;
 
             case BotEnding.Died:
                 Deaths++;
+                tallied.Died++;
 
                 break;
         }
@@ -1419,28 +1072,11 @@ public static class BotWill
         resolve.Sent = default;
         resolve.Aside = false;
 
-        // <b>And the road it was on, which nothing else was going to put down.</b> A journey is completed by
-        // the walker, and the walker is only asked while a bot is walking — so an undertaking that ends any
-        // other way (done on the spot, failed, dropped for something better) leaves its errand standing in
-        // the queue for ever. For a bot that immediately takes new work this is invisible: the next walk
-        // rebases the journey over it. For a bot that takes nothing it is a lie that never expires.
-        //
-        // Measured 02.09.2026: Joss the Warrior, holding no work at all for four minutes and motionless for
-        // three of them, reported as "walking to 1440,1470, 15 tiles off, set out 5m ago" — an errand from a
-        // walk home that had finished five minutes earlier. Six bots beside it were in the same state. Every
-        // instrument on this shard read them as travelling, which is exactly the sort of quiet wrong number
-        // that costs an evening to unpick.
-        //
-        // Only when there is nothing left to do: a deed that ended by handing over to another leg of its own
-        // queue still owns the rest of it, and Finish would throw that away.
         if (bot.Journey is { Active: true } road && resolve.Deed == null)
         {
             road.Finish();
         }
 
-        // Due to look again at once. A bot that has just finished a job should not stand about waiting for a
-        // review it does not need: there is nothing to change its mind about. A flag rather than a zeroed
-        // stamp, because a tick count of zero is a legitimate reading on this shard's hosts.
         resolve.Due = true;
 
         try
@@ -1463,6 +1099,318 @@ public static class BotWill
                 why == null ? "" : $" — {why}"
             );
         }
+
+        resolve.Remember(
+            why == null
+                ? $"{Word(ending)} {deed.Kind} after {takings.Minutes:F1} min at {takings.PerMinute:F0}/min"
+                : $"{Word(ending)} {deed.Kind} after {takings.Minutes:F1} min at {takings.PerMinute:F0}/min — {(why.Length > 140 ? why[..140] : why)}"
+        );
+
+        if (unpause && resolve.Paused != null && resolve.Deed == null)
+        {
+            Unpause(bot, resolve, ending, deed.Kind);
+        }
+    }
+
+    public static long Interrupted { get; private set; }
+
+    private static bool Holding(BotResolve resolve, BotDeed held, BotStanding rung, long now)
+    {
+        if (CommitStretch <= 0.0 || rung != BotStanding.Free || resolve.Took != BotStanding.Free || !held.Steadfast)
+        {
+            return false;
+        }
+
+        if (resolve.Bent || resolve.Trudged >= TrekLimit * TroubleShare)
+        {
+            Troubled++;
+
+            return false;
+        }
+
+        return now - resolve.SinceTick < HoldMs(resolve);
+    }
+
+    private static long HoldMs(BotResolve resolve) =>
+        (long)Math.Clamp(resolve.Expected * CommitStretch * 60000.0, DwellMs, CommitCapMs);
+
+    private static void Pause(IBotWilful bot, BotResolve resolve, string forKind, long now)
+    {
+        var deed = resolve.Deed;
+        var body = bot.Self;
+
+        resolve.Paused = new BotPause
+        {
+            Deed = deed,
+            Took = resolve.Took,
+            Stake = resolve.Stake,
+            Since = resolve.SinceTick,
+            At = now,
+            Because = resolve.Because,
+            TakenAt = resolve.TakenAt,
+            Expected = resolve.Expected,
+            Wealth = BotYield.Standing(body),
+            Skill = BotYield.SkillOf(body, deed.Trains),
+            For = forKind
+        };
+
+        Count(deed.Kind, -1);
+        Paused++;
+        TallyOf(deed.Kind).Paused++;
+
+        resolve.Deed = null;
+        resolve.Sent = default;
+    }
+
+    private static BotStake Moved(BotPause pause, Mobile body, long away) =>
+        new(
+            pause.Stake.Tick + away,
+            pause.Stake.Skill + (BotYield.SkillOf(body, pause.Deed.Trains) - pause.Skill),
+            pause.Stake.Wealth + (BotYield.Standing(body) - pause.Wealth),
+            pause.Stake.Made
+        );
+
+    private static void Unpause(IBotWilful bot, BotResolve resolve, BotEnding ending, string after)
+    {
+        var pause = resolve.Paused;
+
+        resolve.Paused = null;
+
+        var body = bot.Self;
+        var deed = pause.Deed;
+        var now = Core.TickCount;
+        var away = now - pause.At;
+
+        string refusal = null;
+
+        if (ending == BotEnding.Died || body is not { Deleted: false, Alive: true })
+        {
+            refusal = "the bot died while it was put down";
+        }
+        else if (away >= AsideCapMs)
+        {
+            refusal = $"it was put down for {away / 60000.0:F0} minutes";
+        }
+        else if (body.HitsMax > 0 && body.Hits < body.HitsMax * ResumeHealth)
+        {
+            refusal = $"the bot came back from {after} with {body.Hits} of {body.HitsMax} health";
+        }
+        else if (deed.Map != body.Map)
+        {
+            refusal = "the bot is on another map now";
+        }
+
+        resolve.Deed = deed;
+        resolve.Took = pause.Took;
+        resolve.Stake = Moved(pause, body, away);
+        resolve.SinceTick = pause.Since + away;
+        resolve.TakenAt = pause.TakenAt;
+        resolve.Expected = pause.Expected;
+        resolve.Because = pause.Because;
+        resolve.ReviewedTick = now;
+        resolve.StirredTick = now;
+        resolve.Sent = default;
+        resolve.Nearest = int.MaxValue;
+        resolve.Trudged = 0;
+        resolve.Started = -1;
+        resolve.Bent = false;
+        resolve.Aside = false;
+        resolve.Due = false;
+
+        Count(deed.Kind, 1);
+
+        if (refusal != null)
+        {
+            Unresumed++;
+
+            Settle(bot, BotEnding.Dropped, $"not taken up again after {after}: {refusal}", unpause: false);
+
+            return;
+        }
+
+        try
+        {
+            deed.Resumed(bot);
+        }
+        catch (Exception e)
+        {
+            logger.Error(e, "Undertaking {Kind} threw when it was taken up again; it is given up", deed.Kind);
+
+            Settle(bot, BotEnding.Failed, unpause: false);
+
+            return;
+        }
+
+        Resumed++;
+        TallyOf(deed.Kind).Resumed++;
+
+        if (Chatty)
+        {
+            logger.Information(
+                "{Name} took up {Deed} again after {After}, {Seconds:F0}s after putting it down",
+                body.Name,
+                deed,
+                after,
+                away / 1000.0
+            );
+        }
+    }
+
+    private static void DropPaused(IBotWilful bot, BotResolve resolve, string why)
+    {
+        var pause = resolve.Paused;
+
+        if (pause == null)
+        {
+            return;
+        }
+
+        resolve.Paused = null;
+        Unresumed++;
+
+        var body = bot.Self;
+        var deed = pause.Deed;
+        var takings = BotYield.Settle(bot, deed, Moved(pause, body, Core.TickCount - pause.At), BotEnding.Dropped);
+        var told = body is BotMobile { Minded: true };
+
+        resolve.Ledger.Note(deed.Kind, deed.Map, deed.Where, takings.PerMinute);
+        BotCommons.Note(deed.Kind, deed.Map, deed.Where, takings.PerMinute, told);
+        BotCommons.Claimed(deed.Kind, deed.Expects, takings.PerMinute, told);
+        resolve.Urges.Paid(takings.Worth);
+
+        Dropped++;
+        TallyOf(deed.Kind).Dropped++;
+
+        try
+        {
+            deed.Drop(bot);
+        }
+        catch (Exception e)
+        {
+            logger.Error(e, "Undertaking {Kind} threw while being let go", deed.Kind);
+        }
+
+        resolve.Remember($"dropped {deed.Kind} while it was put down — {why}");
+
+        if (Chatty)
+        {
+            logger.Information(
+                "{Name} dropped {Deed}: {Takings} — put down for {For}, and {Why}",
+                body?.Name,
+                deed,
+                takings,
+                pause.For,
+                why
+            );
+        }
+    }
+
+    public static string Explain(BotMobile bot)
+    {
+        var resolve = bot?.Resolve;
+
+        if (resolve == null)
+        {
+            return "that bot has no resolve to read.";
+        }
+
+        var now = Core.TickCount;
+        var deed = resolve.Deed;
+
+        using var line = ValueStringBuilder.Create(512);
+
+        if (deed == null)
+        {
+            line.Append($"{bot.Name} holds nothing ({resolve.Empty ?? "nothing recorded about why"})");
+        }
+        else
+        {
+            var age = (now - resolve.SinceTick) / 60000.0;
+            var worth = BotAppraisal.Weigh(bot, deed, Share(deed.Kind), out _);
+            var left = (HoldMs(resolve) - (now - resolve.SinceTick)) / 60000.0;
+
+            string hold;
+
+            if (!deed.Steadfast)
+            {
+                hold = "not steadfast work, so any offer that clears the margin takes it once the first half minute is up";
+            }
+            else if (CommitStretch <= 0.0)
+            {
+                hold = "steadfast, but holds are switched off";
+            }
+            else if (resolve.Took != BotStanding.Free)
+            {
+                hold = "handed out by a rung above the bot's own business, which holds are not for";
+            }
+            else if (resolve.Bent || resolve.Trudged >= TrekLimit * TroubleShare)
+            {
+                hold = "in trouble on its walk, so its hold is lifted";
+            }
+            else if (left > 0.0)
+            {
+                hold = $"held against ordinary offers for {left:F1} more minutes";
+            }
+            else
+            {
+                hold = "past its hold, so any offer that clears the margin takes it";
+            }
+
+            line.Append(
+                $"{bot.Name} holds {deed}: {age:F1} of {resolve.Expected:F1} minutes reckoned; {hold}; taken at {resolve.TakenAt:F0}/min, worth {worth:F0}/min now"
+            );
+        }
+
+        if (resolve.Paused is { } pause)
+        {
+            line.Append($"; put down {pause.Deed} for {pause.For} {(now - pause.At) / 1000} seconds ago");
+        }
+
+        var first = true;
+
+        foreach (var ending in resolve.Recent())
+        {
+            line.Append(first ? "; lately: " : " | ");
+            line.Append(ending);
+            first = false;
+        }
+
+        return line.ToString();
+    }
+
+    private static int Percent(long part, long whole) =>
+        whole <= 0 ? 0 : (int)Math.Round(100.0 * part / whole);
+
+    public static string DescribeResolve()
+    {
+        using var line = ValueStringBuilder.Create(1024);
+
+        var ended = Finished + Failed + Dropped + Deaths;
+
+        line.Append(
+            $"{Finished} of {ended} endings finished ({Percent(Finished, ended)}%), {Failed} failed, {Dropped} dropped, {Deaths} died; of the drops {Jumped} for something that would not wait, {Summoned} for a call from outside, {Interrupted} for a rung above, {Dislodged} for a full pack and {Outbid} outbid; {Held} better offers refused inside a hold and {Troubled} holds lifted for trouble; {Paused} put down, {Resumed} taken up again and {Unresumed} not; {Returned} kinds of work taken back within {ReturnMs / 60000} minutes of being dropped; by trade, taken: finished/dropped %, held, put down/taken up:"
+        );
+
+        var rows = new List<KeyValuePair<string, Tally>>(_tallies);
+
+        rows.Sort((a, b) => b.Value.Taken.CompareTo(a.Value.Taken));
+
+        for (var i = 0; i < rows.Count && i < 16; i++)
+        {
+            var (kind, t) = rows[i];
+            var ends = t.Finished + t.Failed + t.Dropped + t.Died;
+
+            line.Append($" {kind} {t.Taken}: {Percent(t.Finished, ends)}/{Percent(t.Dropped, ends)}");
+
+            if (t.Held > 0 || t.Paused > 0)
+            {
+                line.Append($", held {t.Held}, {t.Paused}/{t.Resumed}");
+            }
+
+            line.Append(i + 1 < rows.Count && i + 1 < 16 ? ";" : "");
+        }
+
+        return line.ToString();
     }
 
     private static string Word(BotEnding ending) =>
@@ -1474,10 +1422,6 @@ public static class BotWill
             _ => "died doing"
         };
 
-    /// <summary>
-    /// What share of the population's undertakings are this kind of work. The crowd every bot can see,
-    /// derived from a common fact rather than sent to anybody.
-    /// </summary>
     private static double Share(string kind)
     {
         if (kind == null || !_busy.TryGetValue(kind, out var mine) || mine <= 0)
@@ -1498,23 +1442,6 @@ public static class BotWill
         return total <= 0 ? 0.0 : (double)mine / total;
     }
 
-    /// <summary>
-    /// A bot looked for work and there was none.
-    ///
-    /// Counted once per drought rather than once per look, so the figure means "this many times a bot ran out
-    /// of things worth doing" and not "this many beats went by while it had nothing".
-    /// </summary>
-    /// <summary>
-    /// Nothing was taken, and the two numbers that say why.
-    ///
-    /// <para>
-    /// <b>The count alone sent whoever read it back to the raw log.</b> Until 02.09.2026 this recorded a
-    /// boolean and a tally, so fifteen idle bots in the camp — 300gp each, two minutes apiece — could be
-    /// seen but not explained: an empty table and a table nobody would pay for read identically. The words
-    /// are kept on the resolve rather than logged, because a barren bot is barren every tick and a line per
-    /// tick per bot is not a measurement, it is a flood.
-    /// </para>
-    /// </summary>
     private static void Nothing(BotResolve resolve, long now, string why)
     {
         if (!resolve.Urges.IsBarren)
@@ -1547,15 +1474,8 @@ public static class BotWill
         _busy[kind] = count;
     }
 
-    /// <summary>
-    /// A rung that should have somebody answering it and has not. Said once, by name, in the same voice the
-    /// module loader uses for a subsystem that ought to be running: silence about a missing answer is how
-    /// the first version's gaps survived whole sessions.
-    /// </summary>
     private static void Unserved(BotStanding rung)
     {
-        // Only the rungs that are meant to have somebody on them. Being hit is answered by BotThreat and a
-        // squad answers for itself, so silence on those two is the design rather than a gap.
         if (rung is not (BotStanding.Free or BotStanding.Failing) || !_mute.Add(rung))
         {
             return;
@@ -1594,14 +1514,10 @@ public static class BotWill
         _censusTick = now;
 
         logger.Information("Will: {State}", Describe());
+        logger.Information("Resolve: {State}", DescribeResolve());
+        logger.Information("Roles: {State}", BotCalling.Describe());
     }
 
-    /// <summary>
-    /// One line about what the population is up to. For the census and for the boot log.
-    ///
-    /// <see cref="ValueStringBuilder"/> rather than <c>System.Text.StringBuilder</c>, which this shard does
-    /// not use anywhere: it writes into a stack buffer and grows into a pooled one only if it has to.
-    /// </summary>
     public static string Describe()
     {
         using var line = ValueStringBuilder.Create(256);
@@ -1619,9 +1535,6 @@ public static class BotWill
                 continue;
             }
 
-            // The separator is appended on its own rather than chosen inside the interpolation: a ternary
-            // with interpolated branches is built before the call and allocates a string, which is the one
-            // thing the zero-allocation handler is for.
             if (kinds > 0)
             {
                 line.Append(",");
@@ -1636,9 +1549,6 @@ public static class BotWill
             line.Append(" nothing");
         }
 
-        // Printed on the clock rather than only when something goes wrong: a gate that lets work through
-        // needs a tally somebody can read, or the day it starts letting through too much looks exactly like
-        // the day before. See BotDeed.Unpaid.
         if (Unpriced > 0)
         {
             line.Append($"; {Unpriced} endings were not allowed to price the ground because the bot never got there, {Unblamed} of which blamed nothing because what they could not reach was somebody rather than somewhere");
@@ -1671,10 +1581,6 @@ public static class BotWill
         return line.ToString();
     }
 
-    /// <summary>
-    /// Everything about the last world back to nothing. Proposers stay — they are code — and so does the
-    /// switch; the counters and the census do not, because they describe a population that no longer exists.
-    /// </summary>
     public static void Reset()
     {
         _offers.Clear();
@@ -1694,5 +1600,18 @@ public static class BotWill
         Grounded = 0;
         Dislodged = 0;
         Kept = 0;
+        Jumped = 0;
+        Summoned = 0;
+        Interrupted = 0;
+        Outbid = 0;
+        Held = 0;
+        Troubled = 0;
+        Paused = 0;
+        Resumed = 0;
+        Unresumed = 0;
+        Returned = 0;
+
+        _tallies.Clear();
+        BotCalling.Forget();
     }
 }

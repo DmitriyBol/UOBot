@@ -68,32 +68,17 @@ public sealed class BotSeeker : IBotProposer
         var kind = BotGrimoire.ScrollFor(spell);
         var want = BotAuction.Wanted(bot, kind);
 
-        // Already bought and paid for — either waiting in the market or already handed over on its beat and
-        // sitting in the pack. Either way there is nothing to buy: it only has to go into the book, and that
-        // comes before every route that costs money.
         if (want is { Waiting: > 0 } || BotQuill.Held(body, kind) > 0)
         {
             return BotAcquire.Delivery(kind, spell, map, body.Location);
         }
 
-        // <b>One gap at a time, and asking the world about it exactly once.</b> The first draft of this walked
-        // all sixty-four spells and asked, for each one, which shopkeeper sells it — and asking that means
-        // walking every remembered shop and reading its whole stock list. Sixty-four times a beat, per bot.
-        // That is the first version's cost model wearing a new hat, and the interface this implements says so
-        // in as many words: it may be a real question of the world, it must not be an expensive one.
         BotShops.Survey(map, body.Location);
 
         var shop = BotShops.Nearest(bot, kind);
         var counter = shop == null ? 0 : BotShops.Price(shop, kind);
         var stall = BotAuction.Cheapest(kind, bot);
 
-        // Whichever is cheaper, and a shopkeeper is the ceiling: no bot can charge more than the shelf for
-        // something the shelf has. That is what keeps this market honest without a rule about it.
-        //
-        // <b>A tie goes to one of ours.</b> The two prices being equal does not make the two purchases equal:
-        // coin paid to a bot stays in the population and comes round again, while coin paid across a counter
-        // leaves the world, and the only place new coin enters is a monster's purse. Written the other way
-        // round, the shelf won every tie and the scribes' stalls sat full.
         if (stall != null && (counter <= 0 || stall.Price <= counter))
         {
             return BotAcquire.Stalled(kind, spell, stall, map, body.Location);
@@ -106,9 +91,6 @@ public sealed class BotSeeker : IBotProposer
 
         if (want != null)
         {
-            // Already asked and still unfilled. The want raises its own offer on the market's beat and gives
-            // up at the ceiling; there is nothing for the bot to do about this spell in the meantime, and
-            // asking again would only top the want up into an order for nine copies of one scroll.
             return null;
         }
 
@@ -117,6 +99,5 @@ public sealed class BotSeeker : IBotProposer
         return BotAcquire.Board(kind, spell, map, body.Location, offer);
     }
 
-    /// <summary>Lets the complaint be made again after a world reload.</summary>
     public static void Forget() => _saidNoMap = false;
 }

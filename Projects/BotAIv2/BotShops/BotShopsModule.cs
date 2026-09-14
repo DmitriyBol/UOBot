@@ -41,14 +41,9 @@ public sealed class BotShopsModule : BotModule
         BotWill.Offer(new BotShopper());
         BotWill.Offer(new BotPeddler());
 
-        // Asking the population for a replacement when something is wearing out. Until this, exactly one
-        // thing on the shard ever raised a want and the board of needs was empty — see BotUpkeep.
         BotWill.Offer(new BotUpkeep());
 
-        // A crafter with coin buys its metal instead of walking after it, which puts the order in front of
-        // every miner on the shard — see BotBullion.
         BotWill.Offer(new BotBullion());
-
 
         logger.Information(
             "Shops ready: shopkeepers swept {Reach} tiles around the first bot to ask, traded with from {Counter} tiles, a supply is restocked once it falls below {Short:P0} of what the bot was born with, and goods the market has ignored for {Peddle} minutes are carried to a counter",
@@ -59,10 +54,6 @@ public sealed class BotShopsModule : BotModule
         );
     }
 
-    /// <summary>
-    /// A world reload is a different world. Every remembered shopkeeper is a mobile of the world being
-    /// replaced, and a reference to one of those is a reference to a deleted object.
-    /// </summary>
     public override void Reset()
     {
         logger.Information("Shops, before the reload: {State}", BotShops.Describe());

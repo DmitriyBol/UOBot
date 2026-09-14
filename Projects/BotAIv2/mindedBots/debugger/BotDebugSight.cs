@@ -30,12 +30,6 @@ namespace Server.BotAI.Mind;
 /// </summary>
 public static class BotDebugSight
 {
-    /// <summary>
-    /// The standing instruction: who the debugger is, what it is for, and what it already knows.
-    ///
-    /// Built once a session rather than per call — nothing in it is situational, which is the property that
-    /// makes it safe to be this long.
-    /// </summary>
     public static string System(string who) =>
         $"""
          You are {who}, the debugger of this shard.
@@ -236,10 +230,6 @@ public static class BotDebugSight
            quiet corners are where a fault sits longest.
          """;
 
-    /// <summary>
-    /// Everything measured, as the question. Assembled by <see cref="BotVigil"/>, which does the measuring;
-    /// this only decides the words.
-    /// </summary>
     public static string Report(
         string beside,
         string census,
@@ -267,16 +257,6 @@ public static class BotDebugSight
 
             if (!string.IsNullOrWhiteSpace(subsystems))
             {
-                // The shard's own instrumentation, unedited. Every one of these lines is written by the
-                // subsystem it is about and is the sentence its author chose to be judged on; paraphrasing
-                // them here would be this file inventing a second opinion about code it cannot see.
-                // <b>Said every time, because without it these lines are read as the present tense.</b> Every
-                // counter below has been rising since the shard started and none of them decays. A fault that
-                // lasted five minutes at boot is still in them at midnight, indistinguishable from one that is
-                // happening now. On 02.09.2026 that read as "848 bots could not afford armour, the richest of
-                // them held 192gp" against a population holding 54,000 gold — both true, and the refusals had
-                // all happened in the first minutes, when the bots were newborn and poor. Everything I have
-                // measured myself, above, is about the last few minutes; this is about all of history.
                 sb.Append("\nWHAT THE SHARD'S OWN SUBSYSTEMS SAY ABOUT THEMSELVES\n");
                 sb.AppendLine(
                     "Read these as TOTALS SINCE THE SHARD STARTED, not as what is happening now. They only"
@@ -307,11 +287,6 @@ public static class BotDebugSight
                 }
             }
 
-            // <b>What it believed on other evenings, and how often.</b> Everything else in this prompt is
-            // about the last few minutes; without this the debugger began every session as though the shard
-            // had no history, which is the opposite of what a watcher is for. The count is what makes it
-            // usable: one finding is a guess, and the same finding reached nine times from nine separate sets
-            // of measurements is something a person should go and look at.
             var remembered = BotDebugMemory.Recite();
 
             if (!string.IsNullOrWhiteSpace(remembered))
@@ -337,15 +312,6 @@ public static class BotDebugSight
         }
     }
 
-    /// <summary>
-    /// The slower question, asked of an hour rather than of a minute.
-    ///
-    /// <para>
-    /// It is given the findings the debugger has already written and the session's own totals, and asked for
-    /// the thing they have in common. That is a different question from "what is wrong now", and it is the
-    /// only one that can catch a fault which shows up as three unrelated symptoms in three subsystems.
-    /// </para>
-    /// </summary>
     public static string Reflection(string census, string mine, string subsystems, IReadOnlyList<string> found, long upMs)
     {
         var sb = ValueStringBuilder.Create(4096);
@@ -413,17 +379,6 @@ public static class BotDebugSight
         }
     }
 
-    /// <summary>
-    /// What the people who run this shard have said to the debugger, put at the very top of the question.
-    ///
-    /// <para>
-    /// <b>First, above the measurements, and that placement is the whole of it.</b> Everything else in the
-    /// report is something the debugger noticed; this is something a person asked for, and a watcher that
-    /// buries it under nine sections of arithmetic will answer the question it found interesting instead of
-    /// the one it was asked. The instruction underneath is equally blunt for the same reason: a model given a
-    /// note and no direction treats it as background colour.
-    /// </para>
-    /// </summary>
     private static void Asked(ref ValueStringBuilder sb)
     {
         var notes = BotHail.Recite();
@@ -444,25 +399,17 @@ public static class BotDebugSight
         );
     }
 
-    /// <summary>How a finding is written into the log and read back to the debugger next time.</summary>
     public static string Recite(BotDebugNote note) =>
         note == null
             ? null
             : $"[{note.Kind}, {note.Confidence:P0} sure] {note.Bot}: {note.Finding} — evidence: {note.Evidence} — cause: {note.Cause} — change: {note.Fix}";
 
-    /// <summary>The population's own census, in this shard's words rather than the debugger's.</summary>
     public static string Census(IReadOnlyDictionary<string, int> rungs, IReadOnlyDictionary<string, int> holding, string will)
     {
         var sb = ValueStringBuilder.Create(512);
 
         try
         {
-            // <b>The bounds this population actually lives under, because a model that needs a number and is
-            // not given one will supply its own.</b> On 02.09.2026 the debugger wrote "beyond the
-            // population's roam bound of 200 tiles" into a finding. The bound is 500. Nothing in the report
-            // had ever said what it was — the prompt described the rule without the figure — and the model
-            // filled the hole plausibly, confidently and wrongly. The rule against quoting numbers that are
-            // not in the report only works if the numbers that matter are in the report.
             sb.Append("This population lives at ");
             sb.Append(BotPopulation.Where.X);
             sb.Append(",");
@@ -495,13 +442,6 @@ public static class BotDebugSight
         }
     }
 
-    /// <summary>
-    /// A tally written out with every case named and no bucket called "other".
-    ///
-    /// This shard's own rule, and it was bought expensively: while the population summary had a default
-    /// branch, an economy working perfectly reported itself as eighteen bots walking in circles, and the
-    /// one number that would have shown otherwise was the number hiding it.
-    /// </summary>
     private static void Tally(ref ValueStringBuilder sb, IReadOnlyDictionary<string, int> counts)
     {
         var said = 0;
@@ -525,7 +465,6 @@ public static class BotDebugSight
         }
     }
 
-    /// <summary>Minutes, said as a person would say them.</summary>
     public static string Spell(long ms) =>
         ms < 90000 ? $"{Math.Max(0, ms / 1000)}s" : $"{ms / 60000}m";
 }

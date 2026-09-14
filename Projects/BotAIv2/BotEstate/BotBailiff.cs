@@ -24,39 +24,22 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotBailiff : IBotProposer
 {
-    /// <summary>How long a claim on a trespasser lasts after the bot holding it was last heard from.</summary>
     public static int ClaimMs { get; set; } = 60000;
 
-    /// <summary>
-    /// How poorly the guild must already think of theirs before anybody is told to move.
-    ///
-    /// <para>
-    /// Below nought, which means the border drift or an earlier trespass has to have happened first. A guild
-    /// with no opinion of its neighbours does not police its yard, so the first minutes after a hall goes up
-    /// are quiet and the quarrel builds out of something rather than arriving with the building.
-    /// </para>
-    /// </summary>
     public static double Minding { get; set; } = -3.0;
 
-    /// <summary>How far a member looks for somebody who should not be there.</summary>
     public static int Watch { get; set; } = 12;
 
-    /// <summary>Bots looked at.</summary>
     public static long Asked { get; private set; }
 
-    /// <summary>Evictions offered.</summary>
     public static long Offered { get; private set; }
 
-    /// <summary>Times the bot was not on its own guild's land, which is most of them.</summary>
     public static long Elsewhere { get; private set; }
 
-    /// <summary>Times nobody was trespassing within sight.</summary>
     public static long Quiet { get; private set; }
 
-    /// <summary>Times somebody was, and the guild did not mind them enough to say anything.</summary>
     public static long Tolerated { get; private set; }
 
-    /// <summary>Times somebody else was already dealing with them.</summary>
     public static long Claimed { get; private set; }
 
     private static readonly Dictionary<Serial, long> _claims = [];
@@ -84,8 +67,6 @@ public sealed class BotBailiff : IBotProposer
 
         Asked++;
 
-        // On its own land, and that is asked of where the bot is standing rather than of where its hall is:
-        // a member across the island is not keeping anybody's yard.
         if (BotLand.Holder(body.Map, body.Location) != ours.Name)
         {
             Elsewhere++;
@@ -97,9 +78,6 @@ public sealed class BotBailiff : IBotProposer
         var lowest = Minding;
         var anybody = false;
 
-        // <b>One sweep, and the two questions asked of it together.</b> The first cut asked a second time
-        // whether anybody was there at all, which doubled the cost of the commonest answer — an area query
-        // per bot per beat, for a rule that fires almost never.
         foreach (var near in body.GetMobilesInRange<BotMobile>(Watch))
         {
             if (near == body || near.Deleted || near.Guild is not Guild theirs || theirs == ours)
@@ -107,8 +85,6 @@ public sealed class BotBailiff : IBotProposer
                 continue;
             }
 
-            // On our land specifically, not merely near us: a member of ours standing at the edge of its own
-            // yard can see well past it.
             if (BotLand.Holder(near.Map, near.Location) != ours.Name)
             {
                 continue;
@@ -129,9 +105,6 @@ public sealed class BotBailiff : IBotProposer
 
         if (worst == null)
         {
-            // Told apart, because "nobody was there" and "somebody was there and we did not mind" are the
-            // two halves of whether this rule is doing anything at all, and one nought for both would hide
-            // a threshold set so low that nothing ever fires.
             if (anybody)
             {
                 Tolerated++;
@@ -159,7 +132,6 @@ public sealed class BotBailiff : IBotProposer
         return new BotEvict(worst, ours.Name);
     }
 
-    /// <summary>The errand is alive and still on it.</summary>
     public static void Hold(Mobile them)
     {
         if (them != null)
@@ -168,7 +140,6 @@ public sealed class BotBailiff : IBotProposer
         }
     }
 
-    /// <summary>The errand is over, however it went.</summary>
     public static void Release(Mobile them)
     {
         if (them != null)

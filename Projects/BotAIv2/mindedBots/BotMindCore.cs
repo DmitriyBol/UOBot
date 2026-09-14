@@ -25,7 +25,6 @@ public static class BotMindCore
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMindCore));
 
-    /// <summary>Master switch of its own, beside the bot system's. Written back on first boot.</summary>
     public static bool Enabled { get; private set; }
 
     public static void Configure()
@@ -37,9 +36,6 @@ public static class BotMindCore
             return;
         }
 
-        // Nothing to think for if the population is switched off. Said rather than assumed: a module
-        // registered into a bot system that is not running would wait for a world phase that never comes,
-        // and "the minds never said anything" is not a diagnosis.
         if (!BotCore.Enabled)
         {
             Enabled = false;

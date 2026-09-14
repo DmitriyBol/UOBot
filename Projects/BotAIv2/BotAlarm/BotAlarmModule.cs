@@ -17,37 +17,26 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotAlarmSettings
 {
-    /// <summary>How often the rules are read, in milliseconds.</summary>
     public int? TickMs { get; set; }
 
-    /// <summary>Errors in one look before the channel is told.</summary>
     public int? ErrorsAt { get; set; }
 
-    /// <summary>The window the work rules are judged over.</summary>
     public int? WorkMs { get; set; }
 
-    /// <summary>Fewest pieces of work taken on in that window before finishing them is judged.</summary>
     public int? WorkLeast { get; set; }
 
-    /// <summary>The share of work taken on that must finish.</summary>
     public double? WorkFloor { get; set; }
 
-    /// <summary>The share of the population standing still that is worth an alarm.</summary>
     public double? StandShare { get; set; }
 
-    /// <summary>Fewest bots alive before that share means anything.</summary>
     public int? StandLeast { get; set; }
 
-    /// <summary>How long a market with stalls and wants may move nothing.</summary>
     public int? MarketMs { get; set; }
 
-    /// <summary>Deaths in one work window that count as a plague.</summary>
     public int? DeathsAt { get; set; }
 
-    /// <summary>How often the channel says that nothing is wrong.</summary>
     public int? AliveMs { get; set; }
 
-    /// <summary>How long a standing alarm waits before saying so again.</summary>
     public int? RestMs { get; set; }
 }
 
@@ -136,12 +125,9 @@ public sealed class BotAlarmModule : BotModule
         _timer = new SignsTimer(TimeSpan.FromMilliseconds(BotSigns.TickMs));
         _timer.Start();
 
-        // The thresholds it is actually running with, said once. A belief about when this will shout,
-        // formed from the defaults in the source, can be wrong by a factor of two with nothing looking odd.
         logger.Information("The alarm: {Channel}. {Rules}", BotAlarm.Describe(), BotSigns.Describe());
     }
 
-    /// <summary>What it has done, for whoever is reading the session log.</summary>
     public static string Summarise() => $"{BotAlarm.Describe()}; {BotTail.Describe()}";
 
     public override void Reset()

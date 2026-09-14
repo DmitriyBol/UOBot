@@ -49,79 +49,22 @@ public sealed class BotBaron : BotClass
 
     public override SkillName? MainSkill => SkillName.Swords;
 
-    /// <summary>Calls companies together for places, as a captain does.</summary>
     public override bool Leads => true;
 
-    /// <summary>Born holding his trade. See the note above: a learning Baron is a company's funeral.</summary>
     public override bool Seasoned => true;
 
-    /// <summary>
-    /// What he is content by, in place of a wage and an empty afternoon.
-    ///
-    /// See <c>BotMobile.Mood</c>: boredom and need are the ordinary two halves, and both of them are wrong
-    /// for a bot that is paid nothing on purpose. Need would read nought for ever because he buys almost
-    /// nothing, and boredom would climb for ever because relief comes from being paid — so the ordinary
-    /// arithmetic would have shown him as miserable while he worked and contented while he stood still,
-    /// which is exactly backwards.
-    /// </summary>
     public override bool Grieves => true;
 
-    /// <summary>
-    /// Takes no share of what the company kills. Everything off every corpse is divided among the five who
-    /// came, and that division is the whole of what he is offering them.
-    /// </summary>
     public override bool Unpaid => true;
 
-    /// <summary>
-    /// The trades he will take, and nothing else on the shard.
-    ///
-    /// <para>
-    /// Two of them are his own: the harrowing of a square that has killed people, and the walk he takes
-    /// through the town when no square has. <c>Shopper</c> is the errand that keeps him able to do the first
-    /// two — bandages and bottles — and it is here because "he needs no money" is a statement about wages,
-    /// not about supplies. <c>Mind</c> is on the list because it is not work: it is the door his own
-    /// reasoning comes through, and a Baron without it would be a thinking bot that cannot act on a thought.
-    /// </para>
-    ///
-    /// <para>
-    /// <b><c>Armoury</c> was on this list for half an hour and had to come off, which is worth writing down
-    /// rather than quietly deleting.</b> It buys attack scrolls, the order asked for scrolls, and it looked
-    /// obviously right. It is not: a scroll is cast, casting wants Magery, and this build has none — so the
-    /// very first thing he did on the shard was walk to a shop, spend twenty-two gold and be told "has
-    /// HarmScroll but the book would not take it". An errand that can only ever fail is worse than an errand
-    /// that is missing, because it looks like provision.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// The trades this class may be offered at all. See the class note: a whitelist, not a preference.
-    ///
-    /// <para>
-    /// <b>"Warden" was added on 27.08.2026 and the omission is worth writing down, because a sworn list
-    /// fails silently by construction.</b> The rounds were built, registered and reckoned, and the Baron was
-    /// never asked once — 862 answers went to bots that are not Barons and not one to the Baron, while his
-    /// harrowing, on the same rung and registered two lines above, was asked twenty times. Nothing was
-    /// broken: <c>BotWill.Sworn</c> skips a proposer this class may not take before it is ever called, so a
-    /// new office for a sworn class is inert until it is named here. Any office added to this class in
-    /// future has to be added here in the same breath, or it will look exactly like code that does not run.
-    /// </para>
-    /// </summary>
     public override string[] Sworn => ["Baron", "Warden", "Undertaker", "Stroll", "Shopper", "Mind"];
 
     protected override void Defaults()
     {
-        // A captain's budget, spent differently: the captain splits it between drawing a bow and standing in
-        // contact, and the Baron does only the second. Ninety-five carries gold plate — the engine asks sixty
-        // of a cuirass on this era — and sixty-five of dexterity is what is left of a fighter's speed once a
-        // full suit has taken its eight points off the chest and more off the rest.
         Str = 95;
         Dex = 65;
         Int = 20;
 
-        // <b>Swordsmanship is declared here as well as on the weapon, and that is deliberate duplication.</b>
-        // The kit's own roll is what sets the skill of whatever the bot actually holds, and the class list is
-        // what the birth line reads back and what the title is computed from — so a weapon skill left out of
-        // this list is a master swordsman whose own paperwork does not mention it. Both numbers are ninety-five
-        // and there is nowhere for them to drift apart to: the second one is the first one's source.
         Skills =
         [
             (SkillName.Swords, 100.0),
@@ -133,13 +76,8 @@ public sealed class BotBaron : BotClass
 
         Kit = new BotKit
         {
-            // One option rather than a list, so the roll has nothing to decide. Every other class rolls
-            // because which blade it swings is genuinely open; the halberd is not a weapon this bot happened
-            // to be issued, it is part of what makes him recognisable across a field.
             Melee = [new BotWeaponOption(typeof(BotBaronHalberd), SkillName.Swords, 95.0)],
 
-            // The whole suit and the cloak, worn at birth and bound. See BotRegalia for why they are types of
-            // their own rather than plate out of the ordinary catalogue.
             Armour =
             [
                 typeof(BotBaronHelm),
@@ -151,21 +89,12 @@ public sealed class BotBaron : BotClass
                 typeof(BotBaronCloak)
             ],
 
-            // He is the last one standing in every square he walks into and the one who patches the rest on
-            // the way home. Ninety-five in Healing with twenty bandages would be a surgeon with no thread.
             Bandages = 100
         };
 
-        // <b>What "he orders the bottles he needs" comes to.</b> Three heals rather than the shard's default
-        // of one, and two cures: he is the bot who stands in contact in every fight his company has, he never
-        // withdraws, and a single bottle is one bad thirty seconds. They are bought by BotShopper off the same
-        // list birth hands out, so this one number is the whole of the change.
         PotionLimits[BotPotionKind.Heal] = 3;
         PotionLimits[BotPotionKind.Cure] = 2;
 
-        // Ten thousand, by order, kept up whenever it falls below a tenth of that. It is not a wage and it is
-        // not savings: see BotStipend for why the one bot on the shard who is given money is also the one
-        // whose money never competes with anybody's.
         Stipend = 10000;
     }
 }

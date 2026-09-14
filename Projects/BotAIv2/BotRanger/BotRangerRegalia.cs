@@ -1,17 +1,3 @@
-// <b>All that is left of the King's Rangers, and it is left on purpose.</b>
-//
-// The company was cut from the shard on 02.09.2026 by instruction: they were five bots outside the
-// population's own economy, raised apart, never revived, walking their own ground on their own clock, and
-// they turned up in every measurement as five bots doing something nobody else did.
-//
-// Their gear could not go with them. A type whose name is in the world save cannot simply stop existing:
-// GenericEntityPersistence reads the save's type table before it reads a single object, and a name it
-// cannot resolve makes it ask the console "Delete all of those types? (y/n)" — a question a headless shard
-// cannot answer, so it hangs at boot with no error. Measured that evening: nineteen ranger item types in
-// Items.idx and ZERO objects of any of them. Nothing was being kept alive but the names.
-//
-// So the names stay and the company does not. Nothing constructs any of these any more; they exist so that
-// the world still loads, and they cost the shard one line in a type table.
 
 using ModernUO.Serialization;
 using Server.Items;
@@ -43,7 +29,6 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotRangerKit
 {
-    /// <summary>Everything the rangers wear takes the Baron's own red. One livery, one constant.</summary>
     public const int Livery = BotRegalia.RoyalRed;
 }
 
@@ -70,8 +55,6 @@ public partial class BotRangerBlade : Broadsword
             return;
         }
 
-        // Maximum first: HitPoints refuses to move while the maximum is nought, so the other order would
-        // silently do nothing. The Baron's halberd carries the same note and the same ordering.
         MaxHitPoints = max;
         HitPoints = hits;
     }
@@ -309,7 +292,6 @@ public partial class BotRangerCloak : Cloak
 [SerializationGenerator(0, false)]
 public partial class BotRangerBook : Spellbook
 {
-    /// <summary>How many circles the crown issues. Five, by order.</summary>
     public const int Circles = 5;
 
     [Constructible]
@@ -320,13 +302,6 @@ public partial class BotRangerBook : Spellbook
         LootType = LootType.Blessed;
     }
 
-    /// <summary>
-    /// Every spell in the first five circles, as the engine's own bitmask.
-    ///
-    /// Eight spells to a circle and the ids are laid out in circle order, so the first forty bits are exactly
-    /// circles one through five. Built rather than written out: a literal would be a second place to be wrong
-    /// the first time anybody changes what a circle holds.
-    /// </summary>
     private static ulong Full()
     {
         var content = 0ul;

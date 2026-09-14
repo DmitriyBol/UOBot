@@ -40,7 +40,7 @@ ROOT = "(root)"
 ORDER = [
     ROOT, "BotModules", "BotPopulation", "BotWill", "BotMovement", "BotClasses", "BotOutfit",
     "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotAuction", "BotSpells",
-    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotEstate", "BotQuad", "BotRanger",
+    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotEstate", "BotQuad", "BotRanger",
     "BotDashboard", "BotAlarm", "mindedBots", "mindedBots/debugger",
 ]
 
@@ -223,6 +223,19 @@ BLOCKS = {
         "of his own account.",
         [],
     ),
+    "BotDelve": (
+        "the dungeons",
+        "Five bots taken underground by the maker of their guild, for twenty minutes or twenty corpses. The "
+        "dungeon block has no walkable road from the island, so a party is put down and lifted back out; "
+        "which dungeon is decided by measuring what lives in each against what the band is worth. What they "
+        "take is swept into one pot as it fills and divided at the end, half to the leader.",
+        ["A refused road underground is ordinary rather than fatal — a wall between a bot and its place in "
+         "the line is what a cavern is made of — so `BotDelve.Bend` shrugs it off and moves the party. The "
+         "first party that ever went down was out again in forty-one seconds without it.",
+         "A bot left in a dungeon has no road home at all. `BotDelveParty.Watch` is the net under that, and "
+         "the count of what it lifts out is printed: a backstop doing the ordinary work has become the "
+         "design."],
+    ),
     "BotEstate": (
         "the guilds' halls",
         "The one thing this population builds that outlives it. A guild levies its members, finds ground the "
@@ -309,6 +322,7 @@ LINES = {
     "BotHunt": ["Companies:"],
     "BotDrill": ["The captain:"],
     "BotBaron": ["The Baron:"],
+    "BotDelve": ["Delving:"],
     "BotEstate": ["Estate:"],
     "BotQuad": ["The captain:"],
     "mindedBots": ["Minds:"],

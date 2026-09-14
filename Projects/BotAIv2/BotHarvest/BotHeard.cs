@@ -42,60 +42,31 @@ public static class BotHeard
     /// <summary>What the harvest system said, in the only terms it uses.</summary>
     public enum Word
     {
-        /// <summary>Nothing has been said to this bot yet, or nothing since it was last read.</summary>
         Nothing,
 
-        /// <summary>There is no metal here to mine: the vein is worked out.</summary>
         Empty,
 
-        /// <summary>Somebody has gotten to the metal before you: worked out by another hand.</summary>
         Taken,
 
-        /// <summary>You loosen some rocks but fail to find any useable ore: a missed roll.</summary>
         Missed,
 
-        /// <summary>You have moved too far away to continue: the swing was cancelled, not rolled.</summary>
         Adrift,
 
-        /// <summary>Your backpack is full, so the ore you mined is lost.</summary>
         Full,
 
-        /// <summary>You have worn out your tool.</summary>
         Broken,
 
-        /// <summary>Something else the system says, kept apart so the counters stay honest.</summary>
         Other
     }
 
-    /// <summary>Whether the ear is open at all.</summary>
     public static bool Running { get; private set; }
 
-    /// <summary>Sentences heard, by kind, for the ground's line.</summary>
     private static readonly Dictionary<Word, long> _tally = [];
 
     private static readonly Dictionary<Serial, (Word Said, long When, HarvestDefinition Of)> _last = [];
 
-    /// <summary>
-    /// How recent a sentence has to be to be acted on, in milliseconds.
-    ///
-    /// <para>
-    /// <b>Because a sentence outlives the swing that caused it, and the first cut of this let it.</b> The ear
-    /// records one row per bot; a bot that was cutting wood a minute ago and is mining now would have had its
-    /// axe's "there is no wood here" read as a verdict on the first rock it swung at. Measured within twenty
-    /// minutes of the ear being opened: <b>1,105 "there is nothing left here" against 24 rocks written
-    /// off</b> — the great majority of them were the lumberjacks, and mining was reading them.
-    /// </para>
-    ///
-    /// <para>
-    /// Two guards rather than one, because they answer different questions. This one says the sentence is
-    /// about the swing just taken; <see cref="Last"/>'s definition argument says it is about the same craft.
-    /// A little over the swing interval, so the sentence from the last swing still counts and the one before
-    /// it does not.
-    /// </para>
-    /// </summary>
     public static int FreshMs { get; set; } = 2500;
 
-    /// <summary>Opens the ear. Called once, by the harvest module.</summary>
     public static void Listen()
     {
         if (Running)
@@ -107,7 +78,6 @@ public static class BotHeard
         Running = true;
     }
 
-    /// <summary>Closes it again, so a world reload does not leave two ears on one head.</summary>
     public static void Forget()
     {
         if (Running)
@@ -136,13 +106,6 @@ public static class BotHeard
         _tally[said] = many + 1;
     }
 
-    /// <summary>
-    /// Which of the system's own sentences this was.
-    ///
-    /// Compared against the definition's own fields rather than against numbers written down here: the
-    /// clilocs differ between mining, lumberjacking and sand, and a table of them would be a second copy of
-    /// something the definition already holds.
-    /// </summary>
     private static Word Which(HarvestDefinition def, TextDefinition message)
     {
         if (message == null)
@@ -186,13 +149,6 @@ public static class BotHeard
     private static bool Same(TextDefinition said, TextDefinition mine) =>
         mine != null && (said.Number > 0 ? said.Number == mine.Number : said.String == mine.String);
 
-    /// <summary>
-    /// The last thing said to this bot, and how long ago in milliseconds.
-    ///
-    /// Read rather than consumed: the same sentence answers two questions in one beat — whether the rock is
-    /// empty and whether the swing was even rolled — and a read that cleared it would let the first caller
-    /// hide the answer from the second.
-    /// </summary>
     public static Word Last(Mobile bot, HarvestDefinition about, out long since)
     {
         since = long.MaxValue;
@@ -204,8 +160,6 @@ public static class BotHeard
 
         since = Core.TickCount - heard.When;
 
-        // The same craft, and recent enough to be about the swing just taken. See FreshMs: a bot that was
-        // cutting wood a minute ago must not have its axe's verdict read as a verdict on this rock.
         if (about != null && heard.Of != about || since > FreshMs)
         {
             Stale++;
@@ -216,10 +170,8 @@ public static class BotHeard
         return heard.Said;
     }
 
-    /// <summary>Sentences passed over as being about another craft, or about an older swing.</summary>
     public static long Stale { get; private set; }
 
-    /// <summary>Forgets what was said to this bot, once it has been acted on.</summary>
     public static void Clear(Mobile bot)
     {
         if (bot != null)
@@ -228,7 +180,6 @@ public static class BotHeard
         }
     }
 
-    /// <summary>How many of each sentence has been heard, for the ground's line.</summary>
     public static string Describe()
     {
         if (!Running)

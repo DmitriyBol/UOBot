@@ -34,80 +34,28 @@ public sealed class BotForge : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotForge));
 
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "forge";
 
-    /// <summary>What smithing is reckoned at per minute before the ledger corrects it.</summary>
-    /// <summary>
-    /// What an afternoon at an anvil is reckoned at per minute before experience corrects it.
-    ///
-    /// <para>
-    /// <b>Raised from 55 on the night of 07.09.2026, because at 55 the work was never once taken.</b> An hour
-    /// of a shard whose whole craft is held by four thinking bots produced `51 forged on spec` - fifty-one
-    /// offers - and `took on forge: 0`. Mining was reckoned at 60 to 67 and won every single time, so no bot
-    /// ever stood at an anvil, and the summary line said "no stint at an anvil has ended yet" for an hour.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>And it could not correct itself, which is the part worth remembering.</b> The ledger revises a
-    /// trade's expectation from what it actually paid - but only for work that has been done. An opening
-    /// number set too low is therefore self-sealing: the work never wins, so it never pays, so there is
-    /// nothing to revise it with. Within fifteen minutes of the dial being moved to 120 on the live shard the
-    /// first daggers were coming off the anvil at 940 and 1300 a minute, which is where the honest number
-    /// was all along - twenty times the guess that was keeping it off the menu.
-    /// </para>
-    ///
-    /// <para>
-    /// Left at 120 rather than at the measured 1000: the ledger climbs from here on its own now that the work
-    /// is being taken, and an opening number set to the best case would be the same mistake pointing the
-    /// other way.
-    /// </para>
-    /// </summary>
     public static double Prior { get; set; } = 120.0;
 
-    /// <summary>How long a stint at the anvil is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 6.0;
 
-    /// <summary>
-    /// How long between attempts.
-    ///
-    /// A second, matching what mining was given on the same day and rather faster than the three the tailor
-    /// and the scribe take. A swing at an anvil is one swing; there is no reason for it to be a stream.
-    /// </summary>
     public static int SwingMs { get; set; } = 1000;
 
-    /// <summary>How many attempts one stint may make before it takes what it has and stops.</summary>
     public static int MaxSwings { get; set; } = 24;
 
-    /// <summary>What a piece of ironwork is offered at when nothing on the shard has priced one.</summary>
     public static int Guess { get; set; } = 45;
 
-    /// <summary>
-    /// How stints at the anvil ended. Every ending apart, with the denominator, and no bucket called "other".
-    ///
-    /// <para>
-    /// Kept because the proposer's counters say what smiths were <em>offered</em> and nothing at all about
-    /// what became of it. Between them they made the shape of this trade's waste invisible: the summary read
-    /// sixteen forging on spec, and only a grep of the whole log showed that fifty-two of seventy-eight
-    /// stints ended with nothing and thirty-eight of those were out of metal. A number worth changing a
-    /// threshold over should not have to be grepped for.
-    /// </para>
-    /// </summary>
     public static long Stints { get; private set; }
 
-    /// <summary>Stints that ended with something on the anvil.</summary>
     public static long Wrought { get; private set; }
 
-    /// <summary>Pieces made across all of them.</summary>
     public static long Pieces { get; private set; }
 
-    /// <summary>Stints the metal ran out under. The one this trade was losing to. See BotAnvil.Tries.</summary>
     public static long RanOut { get; private set; }
 
-    /// <summary>Stints that used every swing they had and made nothing.</summary>
     public static long Fruitless { get; private set; }
 
-    /// <summary>Stints given up at a forge the engine would not smith at, or with no road to one.</summary>
     public static long NoPlace { get; private set; }
 
     private enum Leg
@@ -121,7 +69,6 @@ public sealed class BotForge : BotDeed
 
     private readonly Point3D _smithy;
 
-    /// <summary>What was asked for, when this stint is filling somebody's order. Null when it is speculative.</summary>
     private readonly BotWant _order;
 
     private Leg _leg;
@@ -132,7 +79,6 @@ public sealed class BotForge : BotDeed
 
     private int _swings;
 
-    /// <summary>The metal this piece is being beaten out of. See BotAnvil.Best.</summary>
     private Type _metal;
 
     private int _made;
@@ -157,19 +103,12 @@ public sealed class BotForge : BotDeed
 
     public override Point3D Where => _smithy;
 
-    /// <summary>
-    /// An order is worth more than speculation, and by exactly the amount somebody has already put down.
-    ///
-    /// Not a bonus invented here: the money is real, it is in escrow, and it is the difference between making
-    /// something that will certainly be bought and making something that might be.
-    /// </summary>
     public override double Expects => _order == null ? Prior : Prior * 1.6;
 
     public override double Minutes => WorkMinutes;
 
     public override SkillName? Trains => BotAnvil.Skill;
 
-    /// <summary>Mostly goods until they are sold, which is what Made is for.</summary>
     public override double Coin => _order == null ? 0.4 : 1.0;
 
     public override int Made => _made * BotAuction.Worth(_kind, Guess);
@@ -201,8 +140,6 @@ public sealed class BotForge : BotDeed
 
     private BotDoing Walking(IBotWilful bot, Mobile body)
     {
-        // Asked of the engine rather than of the distance to the remembered point: what matters is whether a
-        // hammer will work here, and only the engine knows that. See BotAnvil.AtASmithy.
         if (BotAnvil.AtASmithy(body))
         {
             _leg = Leg.Work;
@@ -210,15 +147,6 @@ public sealed class BotForge : BotDeed
             return BotDoing.Work("at the anvil");
         }
 
-        // <b>Standing at the remembered forge, and the engine still says no.</b> That is the end of the road
-        // for this forge and it has to be said out loud, because the alternative is what used to happen: the
-        // walk was aimed two tiles out, arriving satisfied it, the smithy test did not, and the undertaking
-        // answered the identical walk order for ever — a piece of work that is both immortal and invisible,
-        // which is the failure this project has paid for more than once.
-        //
-        // Written down under the <em>place's</em> name, "fire", which is the word BotGround.Fire asks in.
-        // Filed under the undertaking's name it would be written and never read, and the next beat would
-        // choose this same unusable forge again on distance alone.
         if (body.InRange(_smithy, 1))
         {
             Refuse(bot);
@@ -231,20 +159,11 @@ public sealed class BotForge : BotDeed
             );
         }
 
-        // Beside it, not two tiles off. The engine wants an anvil <em>and</em> a forge within
-        // BotAnvil.Reach of the body, with line of sight to both; aiming at the far edge of that was how a
-        // bot came to be told it was at a smithy while standing where no hammer would work.
         return BotDoing.Walk(_map, _smithy, BotArrival.Beside, "to a forge");
     }
 
-    /// <summary>This forge is no use to this bot. Kept off its list for a while — see BotLedger.Beware.</summary>
     private void Refuse(IBotWilful bot) => bot?.Resolve?.Ledger?.Beware(BotGround.FireKind, _map, _smithy);
 
-    /// <summary>
-    /// The way to the forge turned out not to exist. Nothing to bend to — a forge is picked as the nearest
-    /// known one, so choosing again would choose the same one — but the refusal is filed under the place's
-    /// name so that the next choice is a different forge rather than this one again.
-    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
         Refuse(bot);
@@ -277,11 +196,6 @@ public sealed class BotForge : BotDeed
 
         _kind ??= _recipe.ItemType;
 
-        // Counted out of the pack rather than believed from the attempts. See BotCraftwork.Swing: an attempt
-        // is not an item, and the first version's tally said forty-four made about a smith that had made
-        // nothing.
-        // Counted before and after, because the difference is the only thing on the shard that says a swing
-        // just worked — and that is the one moment the free craft may be asked for. See BotCraftwork.Bonus.
         var had = _made;
 
         _made = BotAnvil.Made(body, _kind);
@@ -298,24 +212,8 @@ public sealed class BotForge : BotDeed
             return Handing(bot, body);
         }
 
-        // <b>Its own iron back off the market before giving up for want of iron.</b> A smith lists the metal
-        // it is not using, and then a recipe wants more than the pack holds — so the bot that owns exactly
-        // the ingots it needs stands at the anvil and reports "out of metal", while the order it raises to
-        // replace them is refused by the market on the grounds that it is selling them. This is the tailor's
-        // leather, one trade along: see the note in BotSew.Buying. Reclaiming leaves the stall standing and
-        // empty, so the price it learned survives.
         var cost = BotCraftwork.Cost(_recipe);
 
-        // <b>Which metal, asked every beat rather than once.</b> A smith may start a piece in iron and finish
-        // it in bronze because a delivery arrived — and it should, because the same swing in a better metal
-        // is a better piece for nothing. See BotAnvil.Best: dearest the skill will take and the pack can
-        // fill, falling back to iron.
-        //
-        // <b>Asked for a round's worth first, and only then for one piece's worth.</b> Best takes the
-        // dearest metal that covers what it is given, so asking it for one piece is asking it to prefer the
-        // pile it will exhaust: a smith with thirty iron and ten bronze was sent to beat an eight-ingot
-        // cutlass out of the bronze, missed once, and reported "out of metal" standing on thirty iron. The
-        // two numbers are one number — see BotAnvil.Tries, which is what Choose picks against as well.
         _metal = BotAnvil.Best(body, cost * BotAnvil.Tries);
 
         if (BotAnvil.Ingots(body, _metal) < cost * BotAnvil.Tries)
@@ -370,15 +268,6 @@ public sealed class BotForge : BotDeed
         return BotDoing.Work($"beating out {_kind?.Name}");
     }
 
-    /// <summary>
-    /// Handing over what was made: into the order it was made for, and whatever is left onto the market.
-    ///
-    /// <para>
-    /// The order first and always. Its money is already down, and a smith that made a blade to somebody's
-    /// order and then sold it to a shopkeeper has taken payment for a thing it did not deliver — which the
-    /// market would eventually notice and nobody would enjoy.
-    /// </para>
-    /// </summary>
     private BotDoing Handing(IBotWilful bot, Mobile body)
     {
         var goods = BotAnvil.Gather(body, _kind);
@@ -393,8 +282,6 @@ public sealed class BotForge : BotDeed
 
         var filled = 0;
 
-        // Whoever wanted it — the order this was made for if there is one, and otherwise anybody who has
-        // asked the board for the same thing while the hammer was going.
         var want = _order ?? BotAuction.Demand(bot, _kind);
 
         for (var i = 0; i < goods.Count && want != null; i++)

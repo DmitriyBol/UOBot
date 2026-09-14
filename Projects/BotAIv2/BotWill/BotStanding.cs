@@ -49,28 +49,15 @@ namespace Server.BotAI.V2;
 /// </summary>
 public enum BotStanding
 {
-    /// <summary>Not alive. Nothing is decided; whatever was being done ended when the bot did.</summary>
     Dead,
 
-    /// <summary>Health is running out. Flight and mending, when there is a proposer for either.</summary>
     Failing,
 
-    /// <summary>
-    /// Something is hitting it. The reflex belongs to <see cref="BotThreat"/> and fires from
-    /// <c>OnDamage</c>; this rung only says that the bot has no business shopping for work right now.
-    /// </summary>
     Hunted,
 
-    /// <summary>
-    /// In a squad. The squad owns where the bot is — it rebases the bottom of the journey every beat — so a
-    /// private errand to somewhere else would be overwritten within the second, which is exactly how the
-    /// first version produced a bot whose status read <em>Trade</em> while it walked a graveyard.
-    /// </summary>
     Bound,
 
-    /// <summary>Holding an undertaking of its own. See <see cref="BotDeed"/>.</summary>
     Busy,
 
-    /// <summary>Free to want something. The only rung on which the auction runs.</summary>
     Free
 }

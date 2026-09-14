@@ -29,26 +29,12 @@ public sealed class BotWarden : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
-    /// <summary>What a Baron pays whoever walks with him. Nothing, by order.</summary>
     public static int Wage { get; set; }
 
-    /// <summary>How many bodies a Baron will set out with. One: himself.</summary>
     public static int Least { get; set; } = 1;
 
-    /// <summary>
-    /// How many squares one round covers before the errand ends.
-    ///
-    /// <para>
-    /// Twenty, by order, and it is the difference between a Baron who walks the island and one who looks
-    /// stuck. At one square the errand ended on arrival and the next had to win an auction he could not win,
-    /// because holding a company is itself a refusal for his own offices — so he stood where he had arrived.
-    /// A round is a route: each square read, the frontier is asked again from where he is standing, and he
-    /// walks outward until twenty are behind him or there is nothing unknown left within reach.
-    /// </para>
-    /// </summary>
     public static int Rounds { get; set; } = 20;
 
-    /// <summary>Asked of a bot that is not a Baron. Not a refusal — nearly every answer is this.</summary>
     public static long NotABaron { get; private set; }
 
     public static long Asked { get; private set; }
@@ -57,13 +43,10 @@ public sealed class BotWarden : IBotProposer
 
     public static long Unfit { get; private set; }
 
-    /// <summary>Nothing unknown within reach: the island around the population has been walked.</summary>
     public static long Charted { get; private set; }
 
-    /// <summary>Unknown ground with no way through to it that anybody has found.</summary>
     public static long Sealed { get; private set; }
 
-    /// <summary>Rounds not offered because there is ground dire enough to want a great hunt instead.</summary>
     public static long Wanted { get; private set; }
 
     public static long Offered { get; private set; }
@@ -92,12 +75,6 @@ public sealed class BotWarden : IBotProposer
             return null;
         }
 
-        // <b>Being in a company is only a refusal for those who are not leading it.</b> Written as "must have
-        // no squad", this stranded the whole company the moment a fight ended: the sweep had been dropped for
-        // the skirmish, the company outlived the skirmish, and then every one of them — the leader included —
-        // was refused a fresh sweep for already being in it. Five bots with the errand "nothing", standing in
-        // a field, which is exactly the shape of defect this keeps producing. A leader with no work in hand is
-        // the one bot who must be offered some.
         if (bot is IBotSquadMember member && member.Squad != null
             && (!ReferenceEquals(member.Squad.Leader, member) || bot.Resolve?.Deed != null))
         {
@@ -113,16 +90,6 @@ public sealed class BotWarden : IBotProposer
             return null;
         }
 
-        // <b>Dire ground outranks unknown ground, and it has to be said here rather than left to the
-        // auction.</b> A Baron walking his rounds is leading a company, and a Baron leading a company is
-        // refused a harrowing before anything is scored — see BotHarrower, which counts him as Held. So the
-        // two offices cannot be allowed to compete on price: whichever is offered first simply wins, and the
-        // rounds are offered constantly while a harrowing waits on the island going wrong. This is the same
-        // shape as a squad member having no work of its own, which this project has already paid for once.
-        // <b>And asked with the harrowing's own test, not with a bare "is there dire ground".</b> Standing
-        // aside for ground the harrowing will then refuse leaves the Baron with neither office — twenty asks
-        // on 08.09.2026, twenty stood aside here and twenty refused there, and a Baron who strolled round the
-        // town all afternoon. See BotHarrower.Takeable: one rule, asked in both places.
         if (BotQuad.Direst(map, body.Location, BotHarrower.Range, BotHarrower.Takeable(map, body.Location)) != null)
         {
             Wanted++;
@@ -144,7 +111,6 @@ public sealed class BotWarden : IBotProposer
         return new BotScout(map, where, Wage, Least, Rounds);
     }
 
-    /// <summary>Whether the ground between here and there is not already known to be closed.</summary>
     private static bool Reachable(Map map, Point3D from, Point3D at)
     {
         if (BotReach.Ask(map, from, at, BotArrival.Within(BotQuad.Side / 3)) != BotReachVerdict.Sealed)

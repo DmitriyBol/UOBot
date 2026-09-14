@@ -41,7 +41,6 @@ public static class BotTail
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTail));
 
-    /// <summary>Most bytes read in one look. A tail this far behind is skipped to the end instead.</summary>
     public static int MostBytes { get; set; } = 2000000;
 
     private static string _path;
@@ -50,25 +49,14 @@ public static class BotTail
 
     private static bool _broken;
 
-    /// <summary>Errors counted since the shard came up.</summary>
     public static long Errors { get; private set; }
 
-    /// <summary>Times the reader fell so far behind that it skipped to the end.</summary>
     public static long Skips { get; private set; }
 
-    /// <summary>The last error line read, cut short. One specimen, so the count has a face.</summary>
     public static string Worst { get; private set; }
 
-    /// <summary>Which file is being watched, or null when none was found.</summary>
     public static string Path => _path;
 
-    /// <summary>
-    /// Finds the newest session log and starts at its end.
-    ///
-    /// The newest rather than a configured name because the launcher stamps the name with the minute it
-    /// started, and a watcher pointed at a fixed name would quietly be watching the previous session for
-    /// ever — which is the same fault as a stale counter, in file form.
-    /// </summary>
     public static void Open()
     {
         _broken = false;
@@ -122,10 +110,6 @@ public static class BotTail
         }
     }
 
-    /// <summary>
-    /// Reads whatever has been appended since the last look and counts the error lines in it.
-    /// Returns how many there were.
-    /// </summary>
     public static int Since()
     {
         if (_broken || _path == null)
@@ -135,13 +119,10 @@ public static class BotTail
 
         try
         {
-            // Shared read-write: the shard's own output is redirected into this file and the handle is held
-            // open by the process that started it. Anything stricter fails on every read.
             using var file = new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
             if (file.Length < _at)
             {
-                // Shorter than last time: a different file, or one that has been rotated under us.
                 _at = 0;
             }
 
@@ -191,7 +172,6 @@ public static class BotTail
         }
     }
 
-    /// <summary>One line for the boot log and the summaries.</summary>
     public static string Describe() =>
         _broken || _path == null
             ? "errors are not being counted; no session log is being read"

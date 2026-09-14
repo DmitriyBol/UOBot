@@ -38,7 +38,6 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotSage : BotClass
 {
-    /// <summary>The last spell id of the fourth circle. Circles are eight spells each, counted from nought.</summary>
     private const int FourthCircle = 31;
 
     public override string Name => "Sage";
@@ -47,21 +46,16 @@ public sealed class BotSage : BotClass
 
     public override SkillName? MainSkill => SkillName.Magery;
 
-    /// <summary>Born holding its trade. It cannot teach what it does not have.</summary>
     public override bool Seasoned => true;
 
-    /// <summary>Born strong and still with somewhere to go. See BotClass.Seasoning.</summary>
     public override double Seasoning => 0.78;
 
-    /// <summary>Opens a class for casters, as a captain does for fighters. The one class that may.</summary>
     public override bool Tutors => true;
 
     public override bool Casts => true;
 
     protected override void Defaults()
     {
-        // A caster's build, and the intelligence is not decoration: it is the pool every one of its offices
-        // is paid out of — the spells it throws, the scrolls it writes and the demonstrations it teaches by.
         Str = 25;
         Dex = 20;
         Int = 55;
@@ -75,43 +69,19 @@ public sealed class BotSage : BotClass
             (SkillName.Meditation, 100.0)
         ];
 
-        // <b>The best staff on the shard, and it is not decoration.</b> A caster's staff pays back the one
-        // thing a caster runs out of — see BotCasterStaff — and the sage is the bot whose every office is
-        // paid out of that pool: the spells it throws, the scrolls it writes, and the demonstrations it
-        // teaches by. Five against the mage's two and the healer's four.
-        //
-        // It also settles a question that has nothing to do with mana. A class with no weapon in its kit is
-        // a class whose hands are free at birth, and the first thing that fits a free hand goes into it: the
-        // sage was issued a skinning knife with the rest of the population's tools and stood in fights
-        // holding it. Two hands full of staff is the honest answer, and BotOutfit no longer offers a hand to
-        // a tool at all.
         StaffManaTrickle = 5;
 
-        // Its own colour, so a watcher can tell the two lecterns apart at a glance.
         StaffHue = 0x4AA;
 
-        // Half an hour. Long enough that the trip is an event rather than a supply line, short enough that a
-        // shard whose shelves have nothing is never more than half an hour from casting again.
         HerbIntervalMs = 1800000;
 
         Kit = new BotKit
         {
-            // <b>The robe, which is dress and not armour, and that is why it had to be issued here.</b>
-            // BotHarness surveys the craft systems for BaseArmor and covers six layers, none of them the
-            // outer torso — so a robe cannot enter the catalogue and cannot be ordered from it, whatever a
-            // caster is willing to pay. It stops nothing and is not meant to: this era gives a robe no
-            // armour rating at all. What it is is the one garment that reads as a mage from across a
-            // street, worn from birth and bound like everything else issued, so nobody sells it at a
-            // counter with a full pack.
             Armour = [typeof(Robe)],
             Staff = true,
 
-            // Herbs enough to be worth asking for a lesson from: a teacher that runs dry in the middle of
-            // the second demonstration has taught the first one only.
             Reagents = 60,
 
-            // The first four circles, whole. Written out of the count rather than listed one by one, so
-            // that "four circles" stays a fact somebody can check rather than thirty-two literals to trust.
             Spells = Enumerable.Range(0, FourthCircle + 1).ToArray(),
 
             Bandages = 20

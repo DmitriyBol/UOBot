@@ -1,20 +1,52 @@
 {
+  "MaxHalls": 8,
   "PlotFar": 180,
   "PlotClearance": 20,
-
   "ShelfDepth": 60,
   "ShelfBatch": 20,
   "ShelfSpend": 240,
   "ShelfMarkup": 1.0,
   "ShelfFloat": 240,
-
   "Lands": true,
   "LandReach": 40,
   "LandHome": 1.25,
   "LandAbroad": 0.7,
-
   "Standing": true,
   "War": true,
   "WarBelow": -100.0,
-  "PeaceAbove": -20.0
+  "PeaceAbove": -20.0,
+  "Mend": 1.0,
+  "WarKills": 25,
+  "WarLoot": 5000,
+  "WarLeastMinutes": 15,
+  "WarLongestMinutes": 180,
+  "TruceMinutes": 1440,
+  "DeclareEveryMinutes": 1440,
+  "MostWars": 1,
+  "Defend": 250,
+  "Seats": {
+    "The Crown": [
+      1438,
+      1398
+    ],
+    "The Blade": [
+      1376,
+      1410
+    ],
+    "The Needle": [
+      1500,
+      1900
+    ],
+    "The Hammer": [
+      1800,
+      1520
+    ],
+    "The Lantern": [
+      1250,
+      1450
+    ]
+  },
+  "SeatSettled": 120,
+  "Price": 2000,
+  "Keep": 100
 }

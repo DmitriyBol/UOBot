@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using Server.BotAI.V2;
@@ -50,10 +50,6 @@ public static class BotHand
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHand));
 
-    /// <summary>
-    /// The verbs, and <c>none</c> heads them for the same reason <c>nothing</c> heads the kinds of finding:
-    /// a hand with no way to stay in its pocket is a hand that is used every time it is offered.
-    /// </summary>
     public static readonly string[] Verbs =
     [
         "none",
@@ -70,10 +66,11 @@ public static class BotHand
         "camp",
         "summon",
         "call",
-        "near"
+        "near",
+        "resolve",
+        "roles"
     ];
 
-    /// <summary>One clause each, for the prompt. Kept short because the prompt has a hard ceiling.</summary>
     public const string Manual =
         "none — do nothing, and it is the right answer most minutes. props <bot> — the engine's own view of it. "
         + "sight <bot> — whether it can see and lawfully strike what it is fighting, and from how far. "
@@ -86,47 +83,36 @@ public static class BotHand
         + "ground, here or there, to see whether the population loots it and frees its prisoner. summon <bot> "
         + "— bring one to where I stand, to watch it work. call — bring Patrick to me, when he is on the shard "
         + "and there is something he should see with his own eyes. near <x> <y> — everything alive standing "
-        + "around that spot, with its name, health and whether it would fight us.";
+        + "around that spot, with its name, health and whether it would fight us. resolve <bot> — what it is "
+        + "holding, how far into its own reckoning, whether a better offer could take it off that now and why "
+        + "not, what it put down to come back to, and how its last few pieces of work ended. roles — how each "
+        + "class spends its working minutes: its own trade, anybody's work, another class's trade.";
 
-    /// <summary>
-    /// Verbs the console may use and the model may not. <see cref="Run"/> accepts one of these when, and
-    /// only when, it is told the order came in by hand.
-    ///
-    /// <para>
-    /// <b>The model's choice is bounded by <see cref="Verbs"/> — <c>BotDebugNote</c> writes that array into
-    /// its schema as an enumeration — so a verb left out of it is a verb no mind can reach.</b> That is
-    /// where anything permanent belongs: razing the halls destroys buildings that outlive the whole
-    /// population, and an idle thought at three in the morning is not a good enough reason for it.
-    /// </para>
-    /// </summary>
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel"];
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "seats", "seat", "save", "road", "resolves"];
 
-    /// <summary>One clause each for the two above, for whoever is holding the keyboard.</summary>
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
         + "which is how an evening's building is undone. revel <trade> [<prize>] [<x> <y>] — declare one "
         + "this second instead of waiting a quarter of an hour for the watcher to think of it; naming a spot "
         + "raises a camp there, pulled into the ring around the population if it is too near or too far. "
-        + "None is offered to the minds.";
+        + "wars — every war standing, with its score and its clock. seats — where each guild lives and how far "
+        + "its hall is from it. seat <guild> <x> <y> — move a guild's seat; its hall is carried there and its "
+        + "members are born and rise there from then on. save — write the world to disk now, before the shard is "
+        + "stopped: a kill without one rolls the island back to the last autosave, five minutes of halls and moves. "
+        + "road <x1> <y1> <x2> <y2> — ask the pathfinder for a way between two tiles with a generous clock, and say "
+        + "what it found: the answer to \"why can nobody get there\". resolves — how much of what the population "
+        + "takes on it sees through, what takes it off the rest, and the same per trade. None is offered to the minds.";
 
-    /// <summary>How many of each verb this session. For the summary, and for reading the hand's own habits.</summary>
     private static readonly Dictionary<string, long> _used = [];
 
-    /// <summary>Times a verb was asked for and refused. A refusal is a measurement, so it is counted.</summary>
     public static long Refused { get; private set; }
 
-    /// <summary>Times a verb was carried out.</summary>
     public static long Used { get; private set; }
 
     private static string _path;
 
     private static bool _broken;
 
-    /// <summary>
-    /// How far a bot may be lifted in one go, in tiles. Wide enough to cross Britain and out of a pocket on
-    /// its far side, narrow enough that a hallucinated pair of coordinates moves somebody across a field
-    /// rather than across a continent.
-    /// </summary>
     public static int Reach { get; set; } = 600;
 
     public static void Open(string who)
@@ -175,18 +161,6 @@ public static class BotHand
         }
     }
 
-    /// <summary>
-    /// Runs one verb and says what came of it in one line.
-    ///
-    /// <para>
-    /// <b>Nothing happens unless the log is working.</b> The order is deliberate: a hand whose record can
-    /// fail open is a hand nobody can audit, and this file is the whole reason the hand is safe to have.
-    /// </para>
-    /// </summary>
-    /// <param name="who">Who asked — the model, the console, or the roll-call.</param>
-    /// <param name="verb">One of <see cref="Verbs"/>.</param>
-    /// <param name="tail">Whatever followed it.</param>
-    /// <param name="why">The reason given. Written beside the use, because a use without one is a twitch.</param>
     public static string Run(string who, string verb, string tail, string why, bool byHand = false)
     {
         verb = (verb ?? "").Trim().ToLowerInvariant();
@@ -197,9 +171,6 @@ public static class BotHand
             return null;
         }
 
-        // Two lists, and which one is consulted depends on who is asking. A mind may only ever pick out of
-        // Verbs — BotDebugNote writes that array into its schema as an enumeration — so anything that
-        // destroys something permanent lives in HandVerbs, where no model can reach it.
         if (Array.IndexOf(Verbs, verb) < 0 && !(byHand && Array.IndexOf(HandVerbs, verb) >= 0))
         {
             Refused++;
@@ -263,12 +234,41 @@ public static class BotHand
             case "call":
                 return Call();
 
-            // By hand only. See BotHand.ByHand: neither of these is in Verbs, so no mind can ask for them.
+            case "roles":
+                return BotCalling.Describe();
+
             case "halls":
                 return BotEstate.Describe();
 
             case "revel":
                 return Revelry(tail);
+
+            case "wars":
+                return BotWar.Describe();
+
+            case "seats":
+                return BotSeat.Tell();
+
+            case "seat":
+                return Seat(tail);
+
+            case "road":
+                return Road(tail);
+
+            case "resolves":
+                return BotWill.DescribeResolve();
+
+            case "save":
+                {
+                    if (World.Saving)
+                    {
+                        return "the world is being saved already.";
+                    }
+
+                    World.Save();
+
+                    return "the world is written to disk; it is safe to stop the shard now.";
+                }
 
             case "raze":
                 {
@@ -301,28 +301,11 @@ public static class BotHand
             "free" => Free(bot),
             "shun" => Leave(bot),
             "summon" => Summon(bot),
+            "resolve" => BotWill.Explain(bot),
             _ => $"I have no verb \"{verb}\"."
         };
     }
 
-    /// <summary>
-    /// Puts an orc camp on the ground: three orcs, a captain, a chest, a locked crate and a prisoner.
-    ///
-    /// <para>
-    /// <b>The one verb here that adds to the world, and it earns that by being the only way to test two
-    /// whole subsystems.</b> Looting chests and freeing prisoners were written on 08.09.2026 against a
-    /// world that contains no camps unless somebody spawns one, and a camp spawned by hand is gone before
-    /// anybody can walk to it: <c>OrcCamp</c> sets its own decay to five minutes and, alone among the camps,
-    /// refuses to refresh that timer when somebody walks in. A camp 129 tiles from home therefore expires
-    /// while the population is still on its way, which is exactly what happened to Patrick's.
-    /// </para>
-    ///
-    /// <para>
-    /// So the camp this puts down is given <see cref="CampMinutes"/> instead — long enough for a bot to
-    /// notice it, walk to it, fight through it and walk a prisoner home. Everything else about it is the
-    /// engine's own: the same class the world spawns, with the same contents and the same rules.
-    /// </para>
-    /// </summary>
     private static string Camp(string tail)
     {
         var here = BotVigil.Body;
@@ -336,19 +319,22 @@ public static class BotHand
         var (xs, rest) = First(tail);
         var (ys, _) = First(rest);
 
-        var where = here.Location;
+        var asked = here.Location;
 
         if (int.TryParse(xs, out var x) && int.TryParse(ys, out var y))
         {
-            if (!BotStep.Settle(map, x, y, out var z))
-            {
-                Refused++;
-
-                return $"({x}, {y}) has no floor a camp could stand on.";
-            }
-
-            where = new Point3D(x, y, z);
+            asked = new Point3D(x, y, 0);
         }
+
+        if (!BotRevel.Footing(map, asked, out var found, out var floor))
+        {
+            Refused++;
+
+            return $"({asked.X}, {asked.Y}) has no dry ground a camp could stand on, and nor does anything "
+                + $"within {BotRevel.CampSweep} tiles of it.";
+        }
+
+        var where = new Point3D(found.X, found.Y, floor);
 
         var camp = new OrcCamp();
 
@@ -361,16 +347,6 @@ public static class BotHand
             + "three orcs, a captain, an unlocked chest, a locked crate and a prisoner who wants to go to Britain.";
     }
 
-    /// <summary>
-    /// Everything alive around a spot: who it is, how hurt it is, and whether it would fight the population.
-    ///
-    /// <para>
-    /// <b>Written because "is the camp still garrisoned" had no answer.</b> The tile verb reports items and
-    /// floors; nothing reported creatures, so a chest standing unopened could not be told apart from a chest
-    /// nobody had reached — and on 08.09.2026 that was exactly the question, with 300 refusals filed under
-    /// "still held by a garrison" and no way to see what was holding it.
-    /// </para>
-    /// </summary>
     private static string Near(string tail)
     {
         var map = BotPopulation.Home;
@@ -444,27 +420,16 @@ public static class BotHand
         }
     }
 
-    /// <summary>How far around a spot the near verb looks. A camp is about a dozen tiles across.</summary>
     public static int NearReach { get; set; } = 14;
 
-    /// <summary>How long a camp put down by hand lasts. The engine's own five minutes is shorter than the walk to it.</summary>
     public static int CampMinutes { get; set; } = 45;
 
-    /// <summary>Camps put on the ground.</summary>
     public static long Camps { get; private set; }
 
-    /// <summary>Bots brought to where the watcher stands.</summary>
     public static long Summoned { get; private set; }
 
-    /// <summary>Times Patrick was called over.</summary>
     public static long Called { get; private set; }
 
-    /// <summary>
-    /// Brings one bot to where the watcher is standing, so it can be watched doing whatever it is doing.
-    ///
-    /// The same lift <see cref="Tele"/> makes and with the same warning: it is not travel, nothing prices it,
-    /// and a bot moved this way has learned nothing about the road it did not walk.
-    /// </summary>
     private static string Summon(BotMobile bot)
     {
         var here = BotVigil.Body;
@@ -499,23 +464,6 @@ public static class BotHand
         return $"there is no room beside me for {bot.Name}.";
     }
 
-    /// <summary>
-    /// Brings Patrick to the watcher, when he is logged in and there is something worth his own eyes.
-    ///
-    /// <para>
-    /// <b>Only a real person, and only one who is already here.</b> The population is made of PlayerMobiles
-    /// — that is what lets a bot die properly — so "a player" is not a test. What is a test is a network
-    /// connection: bots have none. Nothing is summoned, nothing is created; somebody already playing is
-    /// moved a few tiles, and told why.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// Declares a revel by hand, on the same terms the model gets: the trade must be one the ledger knows,
-    /// and the prize comes out of the same treasury.
-    ///
-    /// It exists because the watcher thinks about this once a quarter of an hour, and a thing that can only
-    /// be watched every fifteen minutes cannot be debugged at all.
-    /// </summary>
     private static string Revelry(string tail)
     {
         var (kind, rest) = First(tail);
@@ -535,9 +483,6 @@ public static class BotHand
             return $"the {BotRevel.Kind} revel is still running; one at a time.";
         }
 
-        // "revel mine 500 1450 1500" — the prize, then optionally where the camp stands. Parsed
-        // positionally because that is how every other verb on this console reads its tail, and a spot
-        // without a camp is accepted and ignored rather than refused: the hand-called revel raises none.
         var parts = (rest ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var prize = parts.Length > 0 && int.TryParse(parts[0], out var asked) ? asked : BotRevel.MostPrize / 2;
         var camp = parts.Length >= 3;
@@ -586,8 +531,6 @@ public static class BotHand
         return "nobody is on the shard to call.";
     }
 
-    /// <summary>The engine's own view of a bot, which is what every argument about one eventually needs.</summary>
-    /// <summary>The skill this bot's class is actually measured in, and where it has got to.</summary>
     private static string Trade(BotMobile bot)
     {
         var wanted = bot.Class?.Skills;
@@ -614,22 +557,11 @@ public static class BotHand
             + $"warmode {bot.Warmode}, fighting {bot.Combatant?.Name ?? "nobody"}; "
             + $"{bot.TotalWeight} of {bot.MaxWeight} stones; alive {bot.Alive}, frozen {bot.Frozen}; "
             + $"at ({bot.X}, {bot.Y}, {bot.Z}) on {bot.Map} in {region?.Name ?? "no named region"}; "
-            // Its trade's own skill and the two everybody has. A claim that a population "knows how to
-            // appraise" is a claim until something reads it back off a living bot, and nothing here did.
             + $"skills: {Trade(bot)}, ItemID {bot.Skills[SkillName.ItemID].Base:F0}; "
             + $"rank {bot.BotRank ?? "none"}; "
             + $"guild {(bot.Guild == null ? "none" : $"{bot.Guild.Name} [{bot.Guild.Abbreviation}]")}.";
     }
 
-    /// <summary>
-    /// The one question that decides whether a bot standing next to something is fighting it or watching it.
-    ///
-    /// <para>
-    /// The engine gates every swing on <c>InLOS</c> and returns without so much as advancing the swing clock
-    /// when the line is broken — see <c>Mobile.CheckCombatTime</c>. So "adjacent" and "able to hit" are two
-    /// different facts, and until 03.09.2026 nothing on this shard could tell them apart from the outside.
-    /// </para>
-    /// </summary>
     private static string Sight(BotMobile bot)
     {
         var foe = bot.Combatant;
@@ -656,23 +588,6 @@ public static class BotHand
         return $"{bot.Name} against {foe.Name} at ({foe.X}, {foe.Y}, {foe.Z}): {verdict}.";
     }
 
-    /// <summary>
-    /// Everything in a bot's pack, beside what it is allowed to keep of each.
-    ///
-    /// <para>
-    /// <b>Written because the question could not be asked.</b> Patrick found a bot carrying ten sewing kits
-    /// and eight heal potions on 09.09.2026, and there was no way to see a pack from outside the shard at
-    /// all: <c>props</c> gives the weight and not what makes it up, and the table that decides what a bot
-    /// keeps lived private in one file. The cause turned out to be two lines of <c>int.MaxValue</c> where a
-    /// count belonged - and the only reason it survived a month is that nothing could print it.
-    /// </para>
-    ///
-    /// <para>
-    /// The surplus is marked rather than the total, because the total is not the interesting half. A pack
-    /// holding forty cloth is fine if forty is what the trade eats and a fault if the allowance is five, and
-    /// the two look identical in any list that gives only counts.
-    /// </para>
-    /// </summary>
     private static string Packed(BotMobile bot)
     {
         var pack = bot.Backpack;
@@ -694,12 +609,6 @@ public static class BotHand
                 continue;
             }
 
-            // <b>The same two exclusions the sale itself makes, and leaving them out made this lie on its
-            // first run.</b> It reported "Gold x340 (keeps 0, 340 surplus)" and a surplus spellbook on a
-            // mage - neither of which BotUnload would ever touch, because Sell skips coin outright and
-            // BotBinding protects what a bot is bound to. An instrument that reports surplus the seller
-            // will never take is an instrument that raises an alarm about nothing, which is the failure
-            // this shard has paid for more often than any other.
             if (item is Gold || BotBinding.IsBound(item, bot.Bond))
             {
                 continue;
@@ -722,8 +631,6 @@ public static class BotHand
         {
             var allowed = keep.TryGetValue(kind, out var cap) ? cap : 0;
 
-            // A kind with no entry is merchandise outright, and saying "keeps 0" of it reads as a fault
-            // rather than as the ordinary state of a thing a bot is carrying to sell.
             if (allowed >= int.MaxValue)
             {
                 lines.Add($"{kind.Name} x{many} (kept without limit)");
@@ -773,7 +680,92 @@ public static class BotHand
             + $"{(BotPopulation.Within(map, bot.Location) ? "inside" : "outside")} the ground the population may want anything on.";
     }
 
-    /// <summary>What is on a tile and whether anybody could be. The question behind every pocket on this shard.</summary>
+    private static string Seat(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length < 3 || !int.TryParse(words[^2], out var x) || !int.TryParse(words[^1], out var y))
+        {
+            Refused++;
+
+            return "seat wants a guild and two numbers: seat <guild> <x> <y>.";
+        }
+
+        var named = string.Join(' ', words, 0, words.Length - 2);
+        Server.Guilds.Guild found = null;
+
+        foreach (var guild in BotGuilds.Standing)
+        {
+            if (string.Equals(guild.Name, named, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(BotClaim.Short(guild.Name), named.ToUpperInvariant(), StringComparison.Ordinal))
+            {
+                found = guild;
+
+                break;
+            }
+        }
+
+        if (found == null)
+        {
+            Refused++;
+
+            return $"there is no guild called \"{named}\". Standing: {BotSeat.Tell()}";
+        }
+
+        var map = BotPopulation.Home;
+
+        if (map == null || !BotStep.Settle(map, x, y, out var z))
+        {
+            Refused++;
+
+            return $"no body could stand at {x},{y}; a seat has to be ground somebody can be put down on.";
+        }
+
+        BotSeat.Set(found.Name, new Point3D(x, y, z));
+
+        return $"the seat of {found.Name} is {x},{y} now. {BotSeat.Tell()}";
+    }
+
+    private static string Road(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length < 4 || !int.TryParse(words[0], out var x1) || !int.TryParse(words[1], out var y1)
+            || !int.TryParse(words[2], out var x2) || !int.TryParse(words[3], out var y2))
+        {
+            Refused++;
+
+            return "road wants four numbers: road <x1> <y1> <x2> <y2>.";
+        }
+
+        var map = BotPopulation.Home;
+
+        if (map == null)
+        {
+            return "the population has no map, so there is no road to look for.";
+        }
+
+        var stood1 = BotStep.Settle(map, x1, y1, out var z1);
+        var stood2 = BotStep.Settle(map, x2, y2, out var z2);
+
+        map.GetAverageZ(x1, y1, out _, out var avg1, out _);
+        map.GetAverageZ(x2, y2, out _, out var avg2, out _);
+
+        var from = new Point3D(x1, y1, stood1 ? z1 : avg1);
+        var to = new Point3D(x2, y2, stood2 ? z2 : avg2);
+        var footing = (stood1 ? "" : $" (nobody could be put down at {from}, the land's height is used)")
+            + (stood2 ? "" : $" (nobody could be put down at {to}, the land's height is used)");
+        var path = new List<Point3D>();
+        var began = System.Diagnostics.Stopwatch.GetTimestamp();
+        var outcome = BotPath.Find(map, from, to, BotArrival.Within(1), path, default, BotPath.CeilingMs * 5);
+        var ms = (System.Diagnostics.Stopwatch.GetTimestamp() - began) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        var end = path.Count > 0 ? path[^1] : from;
+
+        return $"from {from} to {to}: {outcome}, {path.Count} tiles of plan ending at {end}, in {ms:F1}ms{footing}"
+            + (BotPath.LastStarved ? " (starved of clock by the population's window; ask again)" : "")
+            + $"; the far side says {BotPath.Enclose(map, to, BotArrival.Within(1))}.";
+    }
+
     private static string Tile(string tail)
     {
         var (xs, rest) = First(tail);
@@ -837,15 +829,6 @@ public static class BotHand
         }
     }
 
-    /// <summary>
-    /// The GM's cure for a pocket: lift the bot out rather than argue with the pathfinder.
-    ///
-    /// <para>
-    /// Bounded three ways, and each bound is one way a wrong pair of coordinates could do harm. Only
-    /// somewhere a body actually fits, so nobody is posted into rock. Only within <see cref="Reach"/> of
-    /// where the bot already is. And only ever a bot of ours.
-    /// </para>
-    /// </summary>
     private static string Tele(string tail)
     {
         var (name, rest) = First(tail);
@@ -893,8 +876,6 @@ public static class BotHand
 
         bot.MoveToWorld(new Point3D(x, y, z), map);
 
-        // The plan it was holding was a plan from somewhere else. Left alone, the bot walks straight back
-        // into the pocket it has just been lifted out of.
         bot.Journey?.Discard();
 
         return $"{bot.Name} lifted from ({from.X}, {from.Y}, {from.Z}) to ({x}, {y}, {z}); its plan was torn up with it.";
@@ -910,12 +891,6 @@ public static class BotHand
             return "the population has no home to send anybody to.";
         }
 
-        // <b>The configured home tile is not necessarily a tile.</b> Asked on 04.09.2026 what was at
-        // (1440, 1470) — this shard's own home — the answer was "no body fits and the floor could not be
-        // found", while all eight of its neighbours held one: a static sitting on the exact point somebody
-        // typed into the config. The population never noticed because its own birth scatters over six tiles
-        // and takes the first spot that holds a body. Anything that walks to the literal point does notice,
-        // so this does the same scatter rather than trusting the number.
         var at = Point3D.Zero;
 
         for (var ring = 0; ring <= BotPopulation.Spread && at == Point3D.Zero; ring++)
@@ -970,9 +945,6 @@ public static class BotHand
 
     private static string Free(BotMobile bot)
     {
-        // The roll-call's own two steps, in the same order and for the same reason: the plan first, so that
-        // whatever the work has learned about where it was going is written down before the work is ended.
-        // Ending it first is how the debugger spent a night deleting the shard's own lessons. See BotAudit.
         var held = bot.Resolve?.Deed?.ToString() ?? "nothing";
 
         bot.Journey?.Discard();
@@ -995,15 +967,6 @@ public static class BotHand
         return $"{foe.Name} is left alone for a while; nobody of ours will be offered it.";
     }
 
-    /// <summary>
-    /// A bot of ours by name, and nothing else, ever.
-    ///
-    /// <para>
-    /// The whole safety of this file is one line long and it is this one: the roster is the only place a
-    /// target may come from. A player's character, a shopkeeper, a staff member and a spawned creature are
-    /// all simply not findable from here, whatever the model writes.
-    /// </para>
-    /// </summary>
     private static BotMobile Find(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -1034,10 +997,6 @@ public static class BotHand
         return null;
     }
 
-    /// <summary>
-    /// First word and the rest — except that a name may hold a space now (see <c>BotPopulation.Christen</c>),
-    /// so the two-word reading is tried against the roster before the one-word split is trusted.
-    /// </summary>
     private static (string Head, string Tail) First(string text)
     {
         text = (text ?? "").Trim();

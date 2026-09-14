@@ -1,3 +1,4 @@
+﻿using System.Collections.Generic;
 using System.IO;
 using Server.Json;
 using Server.Logging;
@@ -14,89 +15,91 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotEstateSettings
 {
-    /// <summary>Whether the guilds buy halls at all.</summary>
     public bool? Running { get; set; }
 
-    /// <summary>What a hall costs the guild that raises it.</summary>
     public int? Price { get; set; }
 
-    /// <summary>What a member keeps back when the levy is called.</summary>
     public int? Keep { get; set; }
 
-    /// <summary>How many halls the island may hold.</summary>
     public int? MaxHalls { get; set; }
 
-    /// <summary>Which house goes up, by multi id.</summary>
     public int? MultiID { get; set; }
 
-    /// <summary>No nearer to the population's home than this.</summary>
     public int? PlotNear { get; set; }
 
-    /// <summary>And no further.</summary>
     public int? PlotFar { get; set; }
 
-    /// <summary>How far apart two halls must stand.</summary>
     public int? PlotApart { get; set; }
 
-    /// <summary>How wide a belt round a graveyard, or any no-housing ground, is kept clear.</summary>
     public int? PlotClearance { get; set; }
 
-    /// <summary>How many candidates one search may put through the engine's check.</summary>
     public int? PlotBudget { get; set; }
 
-    /// <summary>How often anybody may go looking for ground, in milliseconds.</summary>
     public int? LookMs { get; set; }
 
-    /// <summary>The share of the price at which a guild starts looking for somewhere to build.</summary>
     public double? LookAt { get; set; }
 
-    /// <summary>What raising a hall is reckoned at per minute before experience corrects it.</summary>
     public double? Expects { get; set; }
 
-    /// <summary>Whether a new hall is furnished with a chest and its guild's tools.</summary>
     public bool? Fittings { get; set; }
 
-    /// <summary>How many of a kind a guild counter holds before it stops being restocked.</summary>
     public int? ShelfDepth { get; set; }
 
-    /// <summary>The most units in one lot put on a guild counter.</summary>
     public int? ShelfBatch { get; set; }
 
-    /// <summary>About what one supply run may spend of the guild's money.</summary>
     public int? ShelfSpend { get; set; }
 
-    /// <summary>What a guild adds to what it paid, as a multiplier. One is at cost.</summary>
     public double? ShelfMarkup { get; set; }
 
-    /// <summary>What a guild tops its shopkeeper's purse up to, so the engine does not destroy it.</summary>
     public int? ShelfFloat { get; set; }
 
-    /// <summary>Whether a hall claims the ground round it at all.</summary>
     public bool? Lands { get; set; }
 
-    /// <summary>How far that claim reaches, in tiles.</summary>
     public int? LandReach { get; set; }
 
-    /// <summary>What work on your own guild's ground is worth, as a multiplier.</summary>
     public double? LandHome { get; set; }
 
-    /// <summary>And on somebody else's. Never nought: a claim that refuses is a claim that stops the shard.</summary>
     public double? LandAbroad { get; set; }
 
-    /// <summary>Whether guilds form opinions of each other at all.</summary>
     public bool? Standing { get; set; }
 
-    /// <summary>
-    /// Whether a bad enough opinion may become a war. Off by Patrick's own reasoning: it is the only part of
-    /// the plan that can make the population smaller, so it waits for somebody to be watching.
-    /// </summary>
     public bool? War { get; set; }
 
-    /// <summary>Below this regard, one guild declares war on another.</summary>
     public double? WarBelow { get; set; }
 
-    /// <summary>And above this, the war ends.</summary>
     public double? PeaceAbove { get; set; }
+
+    public double? Mend { get; set; }
+
+    public int? WarKills { get; set; }
+
+    public int? WarLoot { get; set; }
+
+    public int? WarLeastMinutes { get; set; }
+
+    public int? WarLongestMinutes { get; set; }
+
+    public int? TruceMinutes { get; set; }
+
+    public int? DeclareEveryMinutes { get; set; }
+
+    public int? MostWars { get; set; }
+
+    public int? Defend { get; set; }
+
+    public Dictionary<string, int[]> Seats { get; set; }
+
+    public int? SeatSettled { get; set; }
+
+    public double? Comradeship { get; set; }
+
+    public double? Aid { get; set; }
+
+    public double? Alliance { get; set; }
+
+    public double? Estrangement { get; set; }
+
+    public int? MostAllies { get; set; }
 }
 
 public static class BotEstateConfig
@@ -155,5 +158,24 @@ public static class BotEstateConfig
         BotRegard.Warring = settings.War ?? BotRegard.Warring;
         BotRegard.Enmity = settings.WarBelow ?? BotRegard.Enmity;
         BotRegard.Amity = settings.PeaceAbove ?? BotRegard.Amity;
+        BotRegard.Mend = settings.Mend ?? BotRegard.Mend;
+
+        BotWar.Kills = settings.WarKills ?? BotWar.Kills;
+        BotWar.Loot = settings.WarLoot ?? BotWar.Loot;
+        BotWar.LeastMs = settings.WarLeastMinutes * 60000 ?? BotWar.LeastMs;
+        BotWar.LongestMs = settings.WarLongestMinutes * 60000 ?? BotWar.LongestMs;
+        BotWar.TruceMs = settings.TruceMinutes * 60000 ?? BotWar.TruceMs;
+        BotWar.DeclareEveryMs = settings.DeclareEveryMinutes * 60000 ?? BotWar.DeclareEveryMs;
+        BotWar.MostWars = settings.MostWars ?? BotWar.MostWars;
+        BotFeud.Defend = settings.Defend ?? BotFeud.Defend;
+
+        BotRegard.Comradeship = settings.Comradeship ?? BotRegard.Comradeship;
+        BotRegard.Aid = settings.Aid ?? BotRegard.Aid;
+        BotRegard.Alliance = settings.Alliance ?? BotRegard.Alliance;
+        BotRegard.Estrangement = settings.Estrangement ?? BotRegard.Estrangement;
+        BotRegard.MostAllies = settings.MostAllies ?? BotRegard.MostAllies;
+
+        BotSeat.Configure(settings.Seats);
+        BotSeat.Settled = settings.SeatSettled ?? BotSeat.Settled;
     }
 }

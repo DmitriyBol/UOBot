@@ -37,7 +37,6 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotWant
 {
-    /// <summary>What has been delivered and not yet collected.</summary>
     private readonly List<Item> _holding = [];
 
     public BotWant(int id, IBotWilful buyer, Type kind, int units, int offer)
@@ -58,7 +57,6 @@ public sealed class BotWant
 
     public int Id { get; }
 
-    /// <summary>Whose want it is. A reference, so a deleted bot's want goes with it.</summary>
     public IBotWilful Buyer { get; }
 
     public Type Kind { get; }
@@ -69,25 +67,14 @@ public sealed class BotWant
 
     public int Hue { get; }
 
-    /// <summary>How many are still wanted.</summary>
     public int Amount { get; private set; }
 
-    /// <summary>Gold per unit, as this bot currently reckons it.</summary>
     public int Offer { get; private set; }
 
-    /// <summary>What it first offered. Both bounds on movement are multiples of this.</summary>
     public int Anchor { get; }
 
-    /// <summary>
-    /// Gold taken from the buyer and held here.
-    ///
-    /// <b>This, and not <see cref="Amount"/>, is what the want can actually buy.</b> Raising the offer
-    /// without putting more money down buys fewer things at a better price, which is what raising an offer
-    /// means and needs no rule of its own.
-    /// </summary>
     public int Escrow { get; private set; }
 
-    /// <summary>Units received over the life of the want, and what they came to.</summary>
     public int Filled { get; private set; }
 
     public int Paid { get; private set; }
@@ -96,25 +83,20 @@ public sealed class BotWant
 
     public long FilledTick { get; private set; }
 
-    /// <summary>When anything last happened to this want — a delivery, a top-up or a price move.</summary>
     public long TouchedTick { get; private set; }
 
     public int Raises { get; private set; }
 
     public int Cuts { get; private set; }
 
-    /// <summary>Who filled it last, and when. The whole of the rule that one supplier may not take it all.</summary>
     public IBotWilful LastSupplier { get; private set; }
 
     public long LastSupplierTick { get; private set; }
 
-    /// <summary>How many units the money on the table will actually pay for.</summary>
     public int Payable => Math.Min(Amount, Escrow / Offer);
 
-    /// <summary>Whether this want is still asking for anything it can pay for.</summary>
     public bool IsOpen => Payable > 0;
 
-    /// <summary>What is sitting here waiting to be collected.</summary>
     public int Waiting
     {
         get
@@ -135,10 +117,8 @@ public sealed class BotWant
         }
     }
 
-    /// <summary>What the want is worth to whoever can fill it: everything it can still pay for.</summary>
     public int Worth => Payable * Offer;
 
-    /// <summary>Adds money and units to an existing want. The offer already on it is not overwritten.</summary>
     public void Top(int units, int gold)
     {
         if (units > 0)
@@ -154,26 +134,9 @@ public sealed class BotWant
         TouchedTick = Core.TickCount;
     }
 
-    /// <summary>
-    /// Whether this supplier may fill this want at this moment.
-    ///
-    /// <b>The one rule here that is about fairness rather than about arithmetic.</b> A supplier with a large
-    /// stock would otherwise close a want whole the instant it appeared, and the price would never get the
-    /// chance to fall that would have told a second supplier to look elsewhere — so the first bot to own a
-    /// pile owns every want for that pile. One supplier takes at most a slice, and then the want goes back
-    /// on the board before it will take from the same one again. It is a window rather than a quota: if
-    /// nobody else is producing, the same supplier comes back and finishes the job.
-    ///
-    /// It says nothing about a want for a single indivisible thing, and cannot: one scroll goes to one
-    /// scribe.
-    /// </summary>
     public bool Yields(IBotWilful supplier, int sliceMs) =>
         !ReferenceEquals(LastSupplier, supplier) || Core.TickCount - LastSupplierTick >= sliceMs;
 
-    /// <summary>
-    /// Takes delivery of goods against this want and says what it cost. Does not move money — see
-    /// <see cref="BotAuction.Fill"/>.
-    /// </summary>
     public int Take(Item goods, IBotWilful supplier, int units, int briskMs)
     {
         var now = Core.TickCount;
@@ -197,12 +160,9 @@ public sealed class BotWant
         LastSupplier = supplier;
         LastSupplierTick = now;
 
-        // Brisk means "again, soon" here too, and it means the offer was generous: somebody was willing
-        // twice in ten minutes, so the want can afford to ask for less.
         return brisk ? bill : -bill;
     }
 
-    /// <summary>Everything delivered, handed to the buyer. Returns units collected.</summary>
     public int Collect(Container into)
     {
         var moved = 0;
@@ -238,13 +198,6 @@ public sealed class BotWant
         return moved;
     }
 
-    /// <summary>
-    /// Gives up: the money left goes back and the want is finished with. Returns what is owed to the buyer.
-    ///
-    /// Called when the offer has run out of room to rise and still nobody has filled it. That is information
-    /// rather than a failure — the shard has said, in the only language it has, that nobody can make this —
-    /// and it must not sit there holding the buyer's money for ever while saying it.
-    /// </summary>
     public int Close()
     {
         var owed = Escrow;
@@ -255,21 +208,8 @@ public sealed class BotWant
         return owed;
     }
 
-    /// <summary>Goods left here destroyed. For a world that is being replaced.</summary>
     public void Discard() => Collect(null);
 
-    /// <summary>
-    /// What a raise would make the offer, or zero when there is no room left to move.
-    ///
-    /// <para>
-    /// Split from the act of raising because <b>a raise has to be paid for</b>, and that turns out to be the
-    /// whole mechanism rather than a detail. What a want can buy is <see cref="Escrow"/> divided by
-    /// <see cref="Offer"/> — so a want for one scroll with exactly one scroll's money down, whose offer went up
-    /// fifteen per cent on its own, could suddenly pay for nothing at all. It would have raised itself out of
-    /// existence on the first beat and no supplier would ever have seen it. So the caller is told what the new
-    /// offer would be, funds it out of the buyer's own purse, and only then lifts it.
-    /// </para>
-    /// </summary>
     public int Stepped(double step, double mostMultiple)
     {
         var ceiling = Math.Max(1, (int)(Anchor * mostMultiple));
@@ -283,7 +223,6 @@ public sealed class BotWant
         return offering > Offer ? offering : 0;
     }
 
-    /// <summary>Puts the offer up to a figure that has already been funded.</summary>
     public void Lift(int offering)
     {
         if (offering <= Offer)
@@ -296,7 +235,6 @@ public sealed class BotWant
         TouchedTick = Core.TickCount;
     }
 
-    /// <summary>Offers less, within the bound. Returns whether the offer actually moved.</summary>
     public bool Cut(double step, double leastMultiple)
     {
         var floor = Math.Max(1, (int)(Anchor * leastMultiple));
@@ -319,17 +257,6 @@ public sealed class BotWant
         return true;
     }
 
-    /// <summary>
-    /// What a kind of thing looks like and is called, worked out once per type and remembered.
-    ///
-    /// <para>
-    /// A want exists before any of the thing does, so unlike a stall it has nothing to copy the art and the
-    /// name off. One throwaway instance answers both questions, and the answer is kept for the life of the
-    /// process because a type's art does not change. The alternative — a dashboard row reading
-    /// "GreaterHealScroll" with no picture — is the difference between a market you can read and a
-    /// spreadsheet.
-    /// </para>
-    /// </summary>
     private static (string Label, int ItemId, int Hue) Look(Type kind)
     {
         if (kind == null)
@@ -344,10 +271,6 @@ public sealed class BotWant
 
         var look = (Spaced(kind.Name), 0x1F4C, 0);
 
-        // The engine's own activator rather than the framework's. It fills optional constructor parameters
-        // with Type.Missing, and nearly everything worth wanting is declared <c>Foo(int amount = 1)</c> — for
-        // which plain reflection finds no parameterless constructor at all and every scroll in the game would
-        // come out as a row with no picture.
         var sample = kind.CreateInstance<Item>();
 
         if (sample != null)
@@ -366,7 +289,6 @@ public sealed class BotWant
 
     private static readonly Dictionary<Type, (string Label, int ItemId, int Hue)> _looks = [];
 
-    /// <summary>"GreaterHealScroll" as "Greater Heal Scroll". The same trick <see cref="BotListing"/> uses.</summary>
     private static string Spaced(string raw)
     {
         using var spaced = Server.Text.ValueStringBuilder.Create(raw.Length + 8);

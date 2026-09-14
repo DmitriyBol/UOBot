@@ -22,49 +22,14 @@ public static class BotOre
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOre));
 
-    /// <summary>How far a bot will look around itself for something worth swinging at.</summary>
     public static int Reach { get; set; } = 12;
 
-    /// <summary>
-    /// How near the worked tile the bot has to stand, <b>asked of the engine rather than assumed</b>.
-    ///
-    /// It is <c>MaxRange</c> on the ore definition — the same number <c>HarvestSystem.CheckRange</c> compares
-    /// against — so this cannot drift out of step with the shard the way a copy would. It is deliberately not
-    /// configurable: a settings file able to disagree with the engine about reach is a settings file able to
-    /// make every swing fail silently.
-    /// </summary>
     public static int SwingReach => Mining.System?.OreAndStone?.MaxRange ?? 2;
 
-    /// <summary>How near a forge the ore has to be to go into it.</summary>
     public static int FireReach { get; set; } = 2;
 
-    /// <summary>
-    /// Enough ore to be worth carrying to a fire.
-    ///
-    /// Smelting needs no tool, no skill and no trade — the fire does the work — so this is not a smith's
-    /// number, it is a miner's. Four, as in the first version.
-    /// </summary>
     public static int WorthSmelting { get; set; } = 4;
 
-    /// <summary>
-    /// What a patch of ground actually holds, or null where a pick would find nothing.
-    ///
-    /// <para>
-    /// <b>The fact the whole trade rests on, and it is the shard's own.</b> Ore is not the same
-    /// everywhere: <c>HarvestDefinition.GetVeinAt</c> seeds a stable draw off the bank's coordinates, so
-    /// every eight-by-eight block of mountain has a fixed kind for the life of the shard, and iron is only
-    /// about half of them. The rest is dull copper, shadow iron, copper, bronze, gold, agapite, verite and
-    /// valorite, sitting in hills where nobody has looked.
-    /// </para>
-    ///
-    /// <para>
-    /// The first version's miners only ever came home with iron, and this is the reason: they dug whatever
-    /// rock was nearest, and rock near a town is as likely as any other to be plain iron. The shard will
-    /// say what is in a hill if it is asked properly — <b>bank coordinates, not tile coordinates</b>.
-    /// <c>GetVeinAt</c> divides before it asks, so passing the tile puts the question to a bank
-    /// sixty-four times too far away, which reads as ore scattered at random instead of ore in seams.
-    /// </para>
-    /// </summary>
     public static HarvestResource VeinAt(Map map, int x, int y)
     {
         var definition = Mining.System?.OreAndStone;
@@ -79,28 +44,6 @@ public static class BotOre
             ?.PrimaryResource;
     }
 
-    /// <summary>
-    /// How much ore is left in the block this tile belongs to.
-    ///
-    /// <para>
-    /// <b>The engine's own count, and it settles a question that would otherwise be guesswork.</b> A depleted
-    /// vein looks exactly like a full one to every test that can be made from outside: what is readable from
-    /// the tile is its definition, and depletion lives in the engine's bank of resources. Without this a bot
-    /// can only notice an empty rock by swinging at it and getting nothing, six times, and it still cannot
-    /// tell a spent seam from a run of failed rolls.
-    /// </para>
-    ///
-    /// <para>
-    /// Tile coordinates here, unlike <see cref="VeinAt"/>: <c>GetBank</c> divides them itself. The two take
-    /// different coordinates and both are right, which is exactly the sort of thing that produces ore
-    /// scattered at random instead of ore in seams.
-    /// </para>
-    ///
-    /// <para>
-    /// Asking creates the block's record if it does not exist yet, so it belongs where a bot is actually
-    /// working and not in a sweep of a whole region.
-    /// </para>
-    /// </summary>
     public static int Left(Map map, int x, int y)
     {
         if (map == null || map == Map.Internal)
@@ -111,48 +54,9 @@ public static class BotOre
         return Mining.System?.OreAndStone?.GetBank(map, x, y)?.Current ?? 0;
     }
 
-    /// <summary>
-    /// The longest the engine may take to put ore back into a bank, in milliseconds.
-    ///
-    /// <para>
-    /// <b>Two numbers on one shelf that had never met.</b> <c>HarvestBank.Consume</c> sets the refill time
-    /// the first time a full bank is touched, at <c>MinRespawn + rnd * (MaxRespawn - MinRespawn)</c> — ten to
-    /// twenty minutes for ore in this era — and refills the whole bank at once. Our own
-    /// <c>BotGround.DrainedMs</c> rested a worked-out seam for ten, a number chosen here for sounding right.
-    /// So a seam came back onto the board at the earliest moment the engine could possibly have refilled it
-    /// and, most of the time, before it had: the next miner walked out, swung at eight barren rocks and
-    /// filed the seam as worked out again. On the morning of 09.09.2026 that was 112 of 122 mining failures
-    /// in one hour, and mining finished 7% of what it took on.
-    /// </para>
-    ///
-    /// <para>
-    /// Asked of the engine rather than copied from it, for the reason this whole assembly gives everywhere
-    /// else: a number written down twice is a number that drifts, and a shard configured for a different era
-    /// would move one copy and not the other.
-    /// </para>
-    /// </summary>
     public static int RespawnMs =>
         (int)(Mining.System?.OreAndStone?.MaxRespawn ?? System.TimeSpan.FromMinutes(20.0)).TotalMilliseconds;
 
-    /// <summary>
-    /// What the engine gives this bot for one swing at this tile, between nought and one.
-    ///
-    /// <para>
-    /// <b>The number every backstop in mining was implicitly guessing at.</b> <c>HarvestSystem.Harvest</c>
-    /// rolls <c>Mobile.CheckSkill(def.Skill, resource.MinSkill, resource.MaxSkill)</c>, and the engine's own
-    /// chance for that is <c>(value - min) / (max - min)</c>. For iron that is nought to a hundred, so a bot
-    /// with thirty mining misses seven swings in ten — which is not bad luck, it is the ordinary working life
-    /// of a novice miner, and the code that decided a rock was empty after six quiet swings was reading it as
-    /// an empty rock.
-    /// </para>
-    ///
-    /// <para>
-    /// The resource asked about is the one <c>MutateResource</c> would actually hand over: below the vein's
-    /// requirement the engine quietly falls back to iron, so a green miner in a valorite seam is rolling
-    /// against iron's numbers and not against valorite's. Getting that wrong would make this pessimistic in
-    /// exactly the place it matters most.
-    /// </para>
-    /// </summary>
     public static double Chance(Mobile bot, Map map, int x, int y)
     {
         var def = Mining.System?.OreAndStone;
@@ -171,8 +75,6 @@ public static class BotOre
 
         var skill = bot.Skills[def.Skill].Base;
 
-        // The engine's own fallback: below the vein's requirement it hands over iron instead, and the roll
-        // is made against iron. See HarvestSystem.MutateResource.
         var resource = skill < vein.ReqSkill || skill < vein.MinSkill
             ? def.Resources is { Length: > 0 } ? def.Resources[0] : vein
             : vein;
@@ -187,23 +89,14 @@ public static class BotOre
         return System.Math.Clamp((skill - resource.MinSkill) / span, 0.0, 1.0);
     }
 
-    /// <summary>Iron asks nothing of the miner, which is exactly what makes it common.</summary>
     public static bool IsCommon(HarvestResource vein) => vein == null || vein.ReqSkill <= 0.0;
 
-    /// <summary>
-    /// Whether this bot could actually get the good ore out of a seam of this difficulty.
-    ///
-    /// Below the requirement the engine quietly hands back iron instead, so a green miner in a valorite
-    /// seam is a green miner digging iron: the walk was wasted and nothing anywhere would have said so.
-    /// </summary>
     public static bool CanWork(Mobile bot, double required) =>
         bot != null && bot.Skills[SkillName.Mining].Value >= required;
 
-    /// <summary>How much better than iron a seam is to this bot, from zero upwards.</summary>
     public static double Worth(Mobile bot, HarvestResource vein) =>
         IsCommon(vein) || !CanWork(bot, vein.ReqSkill) ? 0.0 : vein.ReqSkill / 10.0;
 
-    /// <summary>What the seam is called. The ore's own type name is the plainest thing there is.</summary>
     public static string NameOf(HarvestResource vein)
     {
         var types = vein?.Types;
@@ -211,14 +104,6 @@ public static class BotOre
         return types is { Length: > 0 } ? types[0].Name : "rock";
     }
 
-    /// <summary>
-    /// The digging tool this bot is carrying, or null.
-    ///
-    /// <b>The tool decides who mines, not the class name.</b> A gatherer is born with a pickaxe and a
-    /// hatchet, both bound and weightless; anybody else who buys or loots a pick is a miner for as long as
-    /// it holds one. Asking about archetypes instead is how the first version ended up with a list of
-    /// which classes were allowed to work, which then had to be edited every time a class was added.
-    /// </summary>
     public static Item Tool(Mobile bot)
     {
         var pack = bot?.Backpack;
@@ -233,46 +118,10 @@ public static class BotOre
         return tool ?? pack.FindItemByType<Shovel>();
     }
 
-    /// <summary>How much unsmelted ore the bot is carrying.</summary>
     public static int Carried(Mobile bot) => bot?.Backpack?.GetAmount(typeof(BaseOre)) ?? 0;
 
-    /// <summary>How many ingots the bot is carrying.</summary>
     public static int Ingots(Mobile bot) => bot?.Backpack?.GetAmount(typeof(BaseIngot)) ?? 0;
 
-    /// <summary>
-    /// Somewhere within reach worth swinging at, or null. Returns the target the harvest system expects,
-    /// so the caller can hand it straight over.
-    ///
-    /// <para>
-    /// Outwards in rings, so the nearest workable thing is found first and anything after it is only taken
-    /// if it is better ore. Better ore beats nearer ore <b>within a pick's walk only</b> — anything
-    /// further is a journey, and journeys are weighed a level up where the road can be priced.
-    /// </para>
-    /// </summary>
-    /// <param name="skip">
-    /// Tiles already found to give nothing. <b>Not optional in practice, and the reason is not obvious:</b>
-    /// a depleted vein looks exactly like a full one to every test that can be made from outside. Depletion
-    /// lives in the engine's own bank of resources, while what is readable here is the tile's definition —
-    /// so a bot that has just emptied a rock and looks again is handed the same rock, for ever. Whoever is
-    /// digging has to remember what it has already exhausted.
-    /// </param>
-    /// <param name="anchor">
-    /// The seam this search belongs to, when the caller has one. Together with <paramref name="leash"/> it
-    /// keeps the answer inside the patch of ground the trip was taken on.
-    /// </param>
-    /// <param name="leash">
-    /// How far from <paramref name="anchor"/> a tile may lie, or zero for no limit.
-    ///
-    /// <para>
-    /// <b>Without it the search and its caller measure from two different points, and a bot walks on the
-    /// spot.</b> This looks outwards from the <em>bot</em>, so it will happily hand back a rock twelve tiles
-    /// away; whoever is digging then checks whether the bot is still near the <em>seam</em>, and a rock
-    /// twelve tiles the far side of the bot is twenty-four from the seam. One step towards the rock puts the
-    /// bot out of the seam's range, the next beat sends it back to the seam, arriving puts the rock in front
-    /// of it again, and it paces between the same two tiles for as long as the trip lasts — over ground with
-    /// no ore on it, because the ore is at neither end of the pacing.
-    /// </para>
-    /// </param>
     public static IPoint3D Find(
         Mobile bot,
         out HarvestSystem system,
@@ -302,7 +151,6 @@ public static class BotOre
             {
                 for (var dy = -radius; dy <= radius; dy++)
                 {
-                    // The edge of each ring only; the inside was covered by the ring before it.
                     if (Math.Abs(dx) != radius && Math.Abs(dy) != radius)
                     {
                         continue;
@@ -311,8 +159,6 @@ public static class BotOre
                     var x = origin.X + dx;
                     var y = origin.Y + dy;
 
-                    // Outside the seam this trip is being paid for. See the leash note above: a rock the
-                    // caller will walk away from as soon as it has walked to it is worse than no rock.
                     if (leash > 0 && (Math.Abs(x - anchor.X) > leash || Math.Abs(y - anchor.Y) > leash))
                     {
                         continue;
@@ -330,8 +176,6 @@ public static class BotOre
                         continue;
                     }
 
-                    // Emptied blocks are skipped outright rather than discovered by swinging. This is the one
-                    // place the engine can be asked a question no amount of looking at the ground answers.
                     if (Left(map, x, y) <= 0)
                     {
                         continue;
@@ -373,7 +217,6 @@ public static class BotOre
         return false;
     }
 
-    /// <summary>Whether this tile holds anything a pick can work, as the target the engine wants.</summary>
     public static IPoint3D Examine(Map map, int x, int y, HarvestSystem system)
     {
         if (map == null || system == null || x < 0 || y < 0 || x >= map.Width || y >= map.Height)
@@ -381,7 +224,6 @@ public static class BotOre
             return null;
         }
 
-        // Statics first: most stone worth swinging at is a static.
         foreach (var tile in map.Tiles.GetStaticTiles(x, y))
         {
             if (Workable(system, system.GetDefinition(tile.ID & 0x3FFF, false)))
@@ -397,22 +239,9 @@ public static class BotOre
             : null;
     }
 
-    /// <summary>
-    /// Whether a definition is one an ordinary bot can get anything at all out of.
-    ///
-    /// <b>Mining knows two kinds of ground and only one of them is mining.</b> Sand is worked by masters —
-    /// a hundred points of skill and a flag nobody but a trained sand miner has — and a bot swinging at a
-    /// beach gets a message it has no client to read and nothing in its pack. Britain is ringed with sand,
-    /// so in the first version both gatherers spent an entire night digging it: the ground looked workable
-    /// to every test the bot could make and produced not one ingot in eight hours.
-    /// </summary>
     private static bool Workable(HarvestSystem system, HarvestDefinition definition) =>
         definition != null && (system is not Mining mining || definition == mining.OreAndStone);
 
-    /// <summary>
-    /// One swing. The engine takes it from here: it rolls against the skill and either produces something
-    /// or does not, exactly as it would for a player.
-    /// </summary>
     public static bool Swing(Mobile bot, Item tool, HarvestSystem system, IPoint3D target)
     {
         if (bot == null || tool == null || system == null || target == null)
@@ -427,18 +256,6 @@ public static class BotOre
         return true;
     }
 
-    /// <summary>
-    /// Puts every pile of ore the bot is carrying into a nearby fire, and says how many ingots came out.
-    ///
-    /// <para>
-    /// <b>The forge has to be pointed at, not merely stood near, and this is why nothing was ever
-    /// smelted.</b> Ore is smelted by double-clicking it and then targeting a forge — the double-click
-    /// only opens a target and waits for a player to answer. A bot has no client, so nothing ever
-    /// answered: every pile of ore ever mined in the first version opened a target that hung there until
-    /// something replaced it, and not one ingot was produced. The answer is to supply the target
-    /// ourselves, which is exactly what a client does.
-    /// </para>
-    /// </summary>
     public static int Melt(Mobile bot)
     {
         var pack = bot?.Backpack;
@@ -457,7 +274,6 @@ public static class BotOre
 
         var before = Ingots(bot);
 
-        // A snapshot: smelting replaces the ore, which mutates the list being read.
         List<Item> carried = [.. pack.Items];
         var piles = 0;
 
@@ -497,14 +313,6 @@ public static class BotOre
         return made > 0 ? made : 0;
     }
 
-    /// <summary>
-    /// Something to melt ore in, within range, as a target the ore's own smelting will accept.
-    ///
-    /// Both kinds are looked for, and that distinction is the whole of why the first version forged
-    /// nothing: a forge placed by a player is an item and turns up in a spatial query, while every forge
-    /// in every town on this shard is a <b>static tile</b>, part of the map, which no query returns. A
-    /// smith standing directly in front of the Britain smithy concluded there was no forge in the world.
-    /// </summary>
     public static object Fire(Mobile bot, int range)
     {
         var map = bot?.Map;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
@@ -49,9 +49,6 @@ public static class BotBinding
 
     private static bool _warnedAboutEra;
 
-    /// <summary>
-    /// Binds one indivisible thing: weightless, kept through death, recorded so nothing sells it.
-    /// </summary>
     public static void Bind(Item item, BotBond bond)
     {
         if (item == null || bond == null)
@@ -59,10 +56,6 @@ public static class BotBinding
             return;
         }
 
-        // Newbied is how the pre-AOS engine keeps a thing with its owner. On an AOS-era shard the flag
-        // is inert — insurance replaced it — and the ledger below would then be the only thing standing
-        // between a bot and losing its trade to one bad fight. Said once, loudly, rather than
-        // discovered from a population of smiths with no hammers.
         if (Core.AOS)
         {
             if (!_warnedAboutEra)
@@ -80,6 +73,7 @@ public static class BotBinding
         }
 
         Weightless(item);
+        Dye(item);
 
         bond.Items.Add(item.Serial);
 
@@ -91,12 +85,6 @@ public static class BotBinding
         }
     }
 
-    /// <summary>
-    /// Binds a stack by <em>count</em>: this much of it, and no more, is the bot's own.
-    ///
-    /// The flag goes on as well, so the ordinary case costs the ledger nothing at death — but the count
-    /// is what is authoritative, because the flag on a merged stack is a coin toss.
-    /// </summary>
     public static void BindStack(Item stack, int granted, BotBond bond)
     {
         if (stack == null || bond == null || granted <= 0)
@@ -109,12 +97,6 @@ public static class BotBinding
         bond.Ammunition[stack.GetType()] = granted;
     }
 
-    /// <summary>
-    /// The flag and the weight, without touching the ledger.
-    ///
-    /// Split out for one narrow reason: <see cref="TrimAmmunition"/> re-marks a stack while walking the
-    /// ledger, and a helper that also wrote to it would be mutating a dictionary mid-enumeration.
-    /// </summary>
     private static void Mark(Item stack)
     {
         if (!Core.AOS && stack.LootType == LootType.Regular)
@@ -123,38 +105,25 @@ public static class BotBinding
         }
 
         Weightless(stack);
+        Dye(stack);
     }
 
-    /// <summary>
-    /// Whether this exact item is one the bot was given. Asked by anything that would part it from it.
-    /// </summary>
+    public static int BoundHue { get; set; } = 1152;
+
+    private static void Dye(Item item)
+    {
+        if (item is BaseWeapon && BoundHue > 0)
+        {
+            item.Hue = BoundHue;
+        }
+    }
+
     public static bool IsBound(Item item, BotBond bond) =>
         item != null && bond != null && bond.Items.Contains(item.Serial);
 
-    /// <summary>
-    /// Whether this type of ammunition is bound to the bot at all, and up to what count.
-    /// </summary>
     public static int BoundCount(Type type, BotBond bond) =>
         type != null && bond != null && bond.Ammunition.TryGetValue(type, out var granted) ? granted : 0;
 
-    /// <summary>
-    /// The death rule for ammunition: the bot keeps <c>min(carried, granted)</c> and the corpse gets
-    /// the rest.
-    ///
-    /// <para>
-    /// Called from the bot's own death hook, where the corpse already exists and already holds whatever
-    /// the engine decided to take — so both halves of "how much did it have" are readable, and the
-    /// arithmetic does not depend on which way a stack merge happened to set the loot flag. That
-    /// independence is the point: it is the one thing about stacks that cannot be relied upon.
-    /// </para>
-    ///
-    /// <para>
-    /// An archer born with a hundred and fifty arrows who has spent all but one rises with one, because
-    /// bound is a ceiling and not a refill. One who bought two hundred more rises with a hundred and
-    /// fifty and leaves the rest on the ground for whoever walks past, because a quiver is something an
-    /// archer is supposed to have to think about.
-    /// </para>
-    /// </summary>
     public static void TrimAmmunition(Mobile bot, BotBond bond, Container corpse)
     {
         var pack = bot?.Backpack;
@@ -186,8 +155,6 @@ public static class BotBinding
                 {
                     pack.DropItem(kept);
 
-                    // Marked, not re-registered: the granted count is already in the ledger and this
-                    // loop is reading it.
                     Mark(kept);
                 }
             }
@@ -216,17 +183,6 @@ public static class BotBinding
         }
     }
 
-    /// <summary>
-    /// Hands back anything bound that no longer exists on the bot. Run on resurrection.
-    ///
-    /// The check is "does the bot hold one of these", not "is that serial still alive", and the
-    /// simplification is safe because of what bound means: a bound thing weighs nothing and cannot be
-    /// sold, so there is no reason for a bot ever to put one down. If it is not on the bot, it is gone.
-    ///
-    /// Mostly a safety net — the engine keeps these through death by itself in this era — and the net
-    /// is worth having because the alternative failure is invisible: a bot that quietly stopped being
-    /// able to do its trade goes on hitting skeletons and looks like every other bot doing that.
-    /// </summary>
     public static int Restore(Mobile bot, BotBond bond)
     {
         var pack = bot?.Backpack;
@@ -264,14 +220,8 @@ public static class BotBinding
         return handed;
     }
 
-    /// <summary>
-    /// Zero weight, stated in one place so the single uncertain engine call in this folder is also in
-    /// one place. If <c>Item.Weight</c> turns out not to be settable in this fork, this is the only
-    /// line that has to change.
-    /// </summary>
     private static void Weightless(Item item) => item.Weight = 0.0;
 
-    /// <summary>Whether the bot has one of these on it — worn, wielded or in the pack.</summary>
     private static bool Holds(Mobile bot, Type type)
     {
         var worn = bot.Items;
@@ -304,18 +254,11 @@ public static class BotBinding
         return false;
     }
 
-    /// <summary>
-    /// Removes every item of this type from the container and returns how many there were in total.
-    ///
-    /// Counting and taking in one pass because the caller always wants both, and because a stack that
-    /// is counted and then looked up again is a stack that can change between the two.
-    /// </summary>
     private static int TakeAll(Container container, Type type)
     {
         var items = container.Items;
         var total = 0;
 
-        // Backwards: removing from a live list.
         for (var i = items.Count - 1; i >= 0; i--)
         {
             var item = items[i];
@@ -332,12 +275,6 @@ public static class BotBinding
         return total;
     }
 
-    /// <summary>
-    /// One item of this type, of this amount, or null if the type cannot be built.
-    ///
-    /// Null rather than throwing: a kit naming a type the shard does not have is a configuration
-    /// mistake, and it should cost that one item rather than the bot.
-    /// </summary>
     internal static Item Make(Type type, int amount)
     {
         if (type == null)
@@ -345,13 +282,6 @@ public static class BotBinding
             return null;
         }
 
-        // <b>The engine's activator, not the framework's, and this line was the whole of an archer's
-        // problem.</b> <c>Activator.CreateInstance</c> looks for a genuinely parameterless constructor, and
-        // ammunition has none: <c>Arrow(int amount = 1)</c> and <c>Bolt(int amount = 1)</c> declare an
-        // optional parameter instead. So every archer ever born threw the same warning and went out with an
-        // empty quiver — twice a boot, in every log, for a whole evening. The market's own splitter was fixed
-        // for exactly this and the kit was not. <c>Type.CreateInstance&lt;T&gt;()</c> fills optional
-        // parameters with <c>Type.Missing</c> and returns the object.
         Item item;
 
         try

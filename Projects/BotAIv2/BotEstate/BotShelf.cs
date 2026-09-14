@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Items;
@@ -45,83 +45,42 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotShelf
 {
-    /// <summary>How near the merchant a bot must stand to deal with it. The engine's own counter reach.</summary>
     public static int Reach => BotShops.CounterReach;
 
-    /// <summary>
-    /// What the guild adds to what it paid, as a multiplier.
-    ///
-    /// <para>
-    /// One, and that is a decision rather than an oversight. The member who buys here has already been given
-    /// the whole of the saving — it does not walk to Britain — so charging a premium on top would be the
-    /// guild taxing its own people twice. The shopkeeper's wages come out of the guild's purse in
-    /// <see cref="Wage"/> instead, which is the honest place for a cost the guild chose to take on.
-    /// </para>
-    ///
-    /// <para>
-    /// It is a dial because the argument for a margin is a real one and Patrick may want to see it: at 1.2
-    /// the hall shop becomes a business rather than a store cupboard, and the shopper's own comparison —
-    /// cheapest wins, ties to one of ours — will start sending members back to town when the guild gets
-    /// greedy. That is the correct behaviour, and it is worth being able to watch it happen.
-    /// </para>
-    /// </summary>
     public static double Markup { get; set; } = 1.0;
 
-    /// <summary>
-    /// What the merchant is topped up to when a member is standing at it with the guild's money.
-    ///
-    /// Twelve pay ticks of an empty shelf, which is a day of real time — long enough that a guild whose
-    /// members are all busy does not lose its merchant, short enough that the guild is not lending the
-    /// shopkeeper a fortune it could be spending on armour.
-    /// </summary>
     public static int Float { get; set; } = 240;
 
-    /// <summary>Below this in the merchant's purse, a member standing there pays it. See <see cref="Wage"/>.</summary>
     public static int Wages { get; set; } = 120;
 
-    /// <summary>How long a lot must have stood before anybody may buy it. The engine's own rule, kept.</summary>
     public static TimeSpan Settling { get; } = TimeSpan.FromMinutes(1.0);
 
-    // ---- Every gate, counted apart, because a shelf that is empty and a shelf that is refusing look the
-    // same from the outside. -----------------------------------------------------------------------------
-
-    /// <summary>Lots put on a guild counter.</summary>
     public static long Stocked { get; private set; }
 
-    /// <summary>What those lots cost the guilds that bought them.</summary>
     public static long StockedWorth { get; private set; }
 
-    /// <summary>Times the merchant's pack would not take any more.</summary>
     public static long Refused { get; private set; }
 
-    /// <summary>Lots bought off a guild counter by a member.</summary>
+    public static long Unstacked { get; private set; }
+
+    public static long Slotless { get; private set; }
+
+    public static long Lost { get; private set; }
+
+    public static long Unpriced { get; private set; }
+
     public static long Taken { get; private set; }
 
-    /// <summary>What members have paid their own guild's shop.</summary>
     public static long Paid { get; private set; }
 
-    /// <summary>Takings carried back off a merchant into the guild.</summary>
     public static long Gathered { get; private set; }
 
-    /// <summary>Coin paid to shopkeepers so that they keep standing.</summary>
     public static long Waged { get; private set; }
 
-    /// <summary>
-    /// The guild's merchant, if it has one standing.
-    ///
-    /// <para>
-    /// The hall is the register: <c>BaseHouse.PlayerVendors</c> is kept by the engine, saved with the house
-    /// and emptied when one is destroyed, so there is no second list here to fall out of step with it. The
-    /// first one is taken rather than the best one — a guild is allowed at most
-    /// <c>BotEstate.MostMerchants</c>, and while that is one the question does not arise.
-    /// </para>
-    /// </summary>
     public static PlayerVendor Of(Guild guild) => Of(BotEstate.Hall(guild));
 
-    /// <summary>The merchant in this bot's own guild's hall.</summary>
     public static PlayerVendor Of(Mobile bot) => Of(BotEstate.Hall(bot?.Guild as Guild));
 
-    /// <summary>The merchant standing in this hall.</summary>
     public static PlayerVendor Of(BaseHouse hall)
     {
         var standing = hall?.PlayerVendors;
@@ -142,7 +101,6 @@ public static class BotShelf
         return null;
     }
 
-    /// <summary>How many of a kind are standing on the shelf, over every lot.</summary>
     public static int Held(PlayerVendor merchant, Type kind)
     {
         var pack = merchant?.Backpack;
@@ -168,15 +126,6 @@ public static class BotShelf
         return many;
     }
 
-    /// <summary>
-    /// The cheapest lot of a kind on the shelf that may be bought right now, and what it costs.
-    ///
-    /// <para>
-    /// Cheapest by the lot rather than by the unit, because a lot is what changes hands: a shop sells a
-    /// packet of twenty bandages, not a bandage. A buyer wanting five and finding a packet of twenty buys
-    /// the packet, which is what happens at any counter and what the engine's own vendor does.
-    /// </para>
-    /// </summary>
     public static Item Offer(PlayerVendor merchant, Type kind, out int price)
     {
         price = 0;
@@ -202,8 +151,6 @@ public static class BotShelf
 
             var vi = merchant.GetVendorItem(lot);
 
-            // Not for sale, not valid, or not yet settled — the engine's three refusals, asked here so a
-            // buyer is never sent across a room for a lot the shopkeeper would decline at the counter.
             if (vi is not { Valid: true, IsForSale: true } || vi.Created + Settling > Core.Now)
             {
                 continue;
@@ -219,24 +166,6 @@ public static class BotShelf
         return best;
     }
 
-    /// <summary>
-    /// Puts a lot on the shelf at a price.
-    ///
-    /// <para>
-    /// The engine opens the lot itself the moment the goods land in the merchant's pack — see
-    /// <c>PlayerVendor.OnSubItemAdded</c>, which sets one at 999gp — so this drops first and prices second.
-    /// Dropped with <c>TryDropItem</c> and its stacking left on, because a second packet of bandages should
-    /// join the first rather than take up another slot on a pack that has a hundred and twenty-five.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>And the price is set after the drop for a reason that is easy to get wrong.</b> If the goods stack
-    /// onto a lot that is already there, the item the caller was holding is gone and the lot to price is the
-    /// one on the shelf. Asking the merchant which lot the goods ended up in — rather than assuming it is the
-    /// one handed over — is the difference between a shelf priced correctly and a stack of forty bandages
-    /// still marked at the price of twenty.
-    /// </para>
-    /// </summary>
     public static bool Put(PlayerVendor merchant, Item goods, int price)
     {
         var pack = merchant?.Backpack;
@@ -247,18 +176,8 @@ public static class BotShelf
         }
 
         var kind = goods.GetType();
-        // <b>The shopkeeper itself when its owner is gone, and its owner is very often gone.</b> A merchant
-        // is saved with its house and this population is rebuilt at every restart, so the bot that carried
-        // the contract last night is a deleted mobile this morning. Handing a deleted mobile to TryDropItem
-        // as the one doing the dropping is asking for trouble for no gain: nothing about the drop depends on
-        // who it was.
         var owner = merchant.Owner is { Deleted: false } held ? held : merchant;
 
-        // <b>What the shelf was already asking for this kind, taken before the drop.</b> The note below
-        // predicted the stacking case and the first cut still got it wrong in the other direction: twenty
-        // sulphurous ash went out at 60gp, a second twenty stacked onto them, and the merged lot of forty
-        // was re-priced at 60 — the guild's second purchase given away. A price is for a lot, so a lot that
-        // grows has to be priced for what it now holds.
         var standing = Lot(merchant, kind);
         var already = standing == null ? 0 : merchant.GetVendorItem(standing)?.Price ?? 0;
 
@@ -266,15 +185,25 @@ public static class BotShelf
         {
             Refused++;
 
+            if (Standing(merchant, goods))
+            {
+                Unstacked++;
+            }
+            else
+            {
+                Slotless++;
+            }
+
             return false;
         }
 
-        // Whatever the goods became — the lot itself, or the stack it merged into.
         var merged = goods.Deleted || goods.Parent != pack;
         var lot = merged ? Lot(merchant, kind) : goods;
 
         if (lot == null)
         {
+            Lost++;
+
             return false;
         }
 
@@ -282,11 +211,11 @@ public static class BotShelf
 
         if (vi == null)
         {
+            Unpriced++;
+
             return false;
         }
 
-        // Only when it actually joined the lot that was standing there: a second, separate lot of the same
-        // kind is priced on its own.
         vi.Price = merged && ReferenceEquals(lot, standing) ? already + price : price;
         vi.Description = "";
         lot.InvalidateProperties();
@@ -297,7 +226,47 @@ public static class BotShelf
         return true;
     }
 
-    /// <summary>The lot of this kind on the shelf, for the stacking case in <see cref="Put"/>.</summary>
+    public static bool Standing(PlayerVendor merchant, Item goods)
+    {
+        var pack = merchant?.Backpack;
+
+        if (pack == null || goods == null)
+        {
+            return false;
+        }
+
+        var lots = pack.Items;
+
+        for (var i = 0; i < lots.Count; i++)
+        {
+            if (lots[i] is not Container && !lots[i].Deleted && lots[i].CanStackWith(goods))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool Room(PlayerVendor merchant, Type kind)
+    {
+        var pack = merchant?.Backpack;
+
+        if (pack == null || kind == null)
+        {
+            return false;
+        }
+
+        if (Lot(merchant, kind) is { Deleted: false, Stackable: true })
+        {
+            return true;
+        }
+
+        var most = pack.MaxItems;
+
+        return most <= 0 || pack.TotalItems < most;
+    }
+
     private static Item Lot(PlayerVendor merchant, Type kind)
     {
         var lots = merchant.Backpack.Items;
@@ -313,17 +282,6 @@ public static class BotShelf
         return null;
     }
 
-    /// <summary>
-    /// A bot buys a lot off the shelf, by exactly the accounting the buy gump does.
-    ///
-    /// <para>
-    /// <b>The owner pays like anybody else, and the engine's own rule is the one being departed from here.</b>
-    /// <c>PlayerVendor.TryToBuy</c> tells an owner to help itself, and that is right for a player who put its
-    /// own goods out. It is wrong here: what stands on this shelf was bought with the guild's money, and the
-    /// one member who happened to carry the contract has no more claim on it than the other nine. Charging
-    /// everybody is what keeps the shelf a guild's store rather than one bot's larder.
-    /// </para>
-    /// </summary>
     public static int Take(Mobile buyer, PlayerVendor merchant, Item lot, out string refused)
     {
         refused = null;
@@ -372,12 +330,6 @@ public static class BotShelf
 
         var many = Math.Max(1, lot.Amount);
 
-        // <b>Paid for before it is handed over, which is not the order the gump uses.</b> The gump moves the
-        // goods first and then takes the money, and gets away with it because a client cannot be halfway
-        // through the exchange — but here a withdrawal can fail on its own, and it is not checked there at
-        // all. Moving first would mean a bot whose bank refused it walks away holding the guild's goods for
-        // nothing. Pocket first and then the account, as everywhere else on this shard; anything that fails
-        // is put straight back.
         var fromPack = pack.ConsumeUpTo(typeof(Gold), price);
         var owing = price - fromPack;
 
@@ -407,12 +359,6 @@ public static class BotShelf
         return many;
     }
 
-    /// <summary>
-    /// Money back into a bot that has been charged for something it did not get.
-    ///
-    /// Into the bank rather than the pack, because the pack is exactly the thing that may have just refused
-    /// to hold something — and a refund that can itself fail is how a bot ends up paying for nothing.
-    /// </summary>
     private static void Refund(Mobile buyer, Container pack, int coins)
     {
         if (coins <= 0 || buyer == null)
@@ -433,16 +379,6 @@ public static class BotShelf
         }
     }
 
-    /// <summary>
-    /// Carries the shopkeeper's takings back into the guild, leaving it its wages.
-    ///
-    /// <para>
-    /// Into the collecting member's own bank, which is where <see cref="BotEstate.Fund"/> looks: a guild on
-    /// this shard has no treasury of its own, only the sum of what its members are holding. Any member may
-    /// do it, and that is deliberate — a till only the hiring bot could empty is a till that fills up while
-    /// that bot is off hunting, which is the shape of half the faults this project has had.
-    /// </para>
-    /// </summary>
     public static int Collect(Mobile member, PlayerVendor merchant)
     {
         if (member == null || merchant is not { Deleted: false })
@@ -464,16 +400,6 @@ public static class BotShelf
         return given;
     }
 
-    /// <summary>
-    /// Pays the shopkeeper enough to keep it standing, out of the guild's money.
-    ///
-    /// <para>
-    /// The engine destroys a vendor the first time its bill is bigger than its purse, and the bill grows with
-    /// the value of what it is holding — so the better the guild's shop is doing, the sooner an unpaid
-    /// shopkeeper walks off with the stock. This is the one place a hall's merchant is fed, and it is asked
-    /// every time a member is standing at it anyway.
-    /// </para>
-    /// </summary>
     public static int Wage(BotMobile member, PlayerVendor merchant)
     {
         if (member == null || merchant is not { Deleted: false })
@@ -496,9 +422,6 @@ public static class BotShelf
             return 0;
         }
 
-        // The guild's money, fetched the way every guild purchase on this shard fetches it. If the guild
-        // cannot raise it the shopkeeper simply goes unpaid this time round, which is not fatal until the
-        // next tick of a two-hour timer.
         var wealth = BotYield.Wealth(member);
 
         if (wealth < owing && !BotGuilds.Stand(member, owing - wealth))
@@ -525,7 +448,6 @@ public static class BotShelf
         return owing;
     }
 
-    /// <summary>What stands on every guild counter on the island, for the estate's line.</summary>
     public static (int Shops, int Lots, int Worth, int Purse) Standing()
     {
         var shops = 0;
@@ -577,6 +499,8 @@ public static class BotShelf
 
         return $"{shops} guild counters holding {lots} lots worth {worth}gp with {purse}gp in their tills; "
             + $"{Stocked} lots put out for {StockedWorth}gp, {Refused} turned away for want of room, "
+            + $"{Lost} that went in and could not be found again, {Unpriced} the engine opened no lot for "
+            + $"({Unstacked} of the refusals had a lot standing that the engine says would have taken them, {Slotless} had neither lot nor slot), "
             + $"{Taken} bought back off them for {Paid}gp, {Gathered}gp carried into the guilds and {Waged}gp paid in wages";
     }
 
@@ -585,13 +509,16 @@ public static class BotShelf
         Stocked = 0;
         StockedWorth = 0;
         Refused = 0;
+        Lost = 0;
+        Unpriced = 0;
+        Unstacked = 0;
+        Slotless = 0;
         Taken = 0;
         Paid = 0;
         Gathered = 0;
         Waged = 0;
     }
 
-    /// <summary>Every kind a guild counter is holding, so the shopper can be asked one question per bot.</summary>
     public static void Kinds(PlayerVendor merchant, HashSet<Type> into)
     {
         var pack = merchant?.Backpack;

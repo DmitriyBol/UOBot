@@ -27,12 +27,10 @@ public sealed class BotStroll : IBotProposer
 
     public static long Asked { get; private set; }
 
-    /// <summary>Asked of somebody who is not a Baron. Not a refusal — nearly every answer is this.</summary>
     public static long NotABaron { get; private set; }
 
     public static long Held { get; private set; }
 
-    /// <summary>No counter has been surveyed yet, so nothing here knows where a town is.</summary>
     public static long Townless { get; private set; }
 
     public static long Offered { get; private set; }
@@ -56,8 +54,6 @@ public sealed class BotStroll : IBotProposer
 
         Asked++;
 
-        // A company is somewhere to be. Offering a walk to a Baron who is leading one would be offering him
-        // the chance to leave five bots standing in a wood.
         if (bot is not IBotSquadMember { Squad: null })
         {
             Held++;

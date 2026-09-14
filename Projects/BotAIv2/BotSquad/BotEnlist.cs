@@ -1,4 +1,4 @@
-using Server.Logging;
+﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -25,25 +25,34 @@ public sealed class BotEnlist : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEnlist));
 
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "enlist";
 
-    /// <summary>
-    /// What falling in is reckoned at per minute before experience corrects it.
-    ///
-    /// <para>
-    /// A little under a muster's, because it is the same work with the walk already half done by somebody
-    /// else — the fight is found, the company is formed, and what is being offered is a place in it. It has
-    /// to be worth more than prowling an empty field or nobody would ever come, and less than a hunt already
-    /// in hand or bots would abandon fights to join fights.
-    /// </para>
-    /// </summary>
     public static double Prior { get; set; } = 70.0;
 
     public static double WorkMinutes { get; set; } = 3.0;
 
-    /// <summary>How far a bot will go to fall in with a company.</summary>
-    public static int Reach { get; set; } = 40;
+    public static int Reach { get; set; } = 32;
+
+    public static double Left { get; set; } = 0.4;
+
+    public static long Ending { get; private set; }
+
+    public static void Passed() => Ending++;
+
+    public static long Lonely { get; private set; }
+
+    public static void Alone() => Lonely++;
+
+    public static long Hostile { get; private set; }
+
+    public static void Foe() => Hostile++;
+
+    public static void Forget()
+    {
+        Ending = 0;
+        Lonely = 0;
+        Hostile = 0;
+    }
 
     private readonly BotSquad _squad;
 
@@ -62,6 +71,8 @@ public sealed class BotEnlist : BotDeed
 
     public override string Kind => Trade;
 
+    public override bool Summons => true;
+
     public override Map Map => _map;
 
     public override Point3D Where => _where;
@@ -78,10 +89,6 @@ public sealed class BotEnlist : BotDeed
 
     public override bool Alongside => true;
 
-    /// <summary>
-    /// Urgent, and for the same reason a rescue is: a fight that is happening now will not be happening in
-    /// a minute, and a company that is one body short is short of it at this moment or not at all.
-    /// </summary>
     public override bool Pressing(IBotWilful bot) => Standing();
 
     public override string Stage =>
@@ -110,8 +117,6 @@ public sealed class BotEnlist : BotDeed
                 : BotDoing.Failed("the company was gone before it got there");
         }
 
-        // Already in one, possibly this one. Either way there is nothing further to do here, and the fighting
-        // itself is the squad's business from now on.
         if (member.Squad != null)
         {
             return member.Squad == _squad
@@ -128,7 +133,6 @@ public sealed class BotEnlist : BotDeed
 
         if (!BotSquads.Join(_squad, member))
         {
-            // Filled up on the way, or moved to another facet. An honest ending: somebody else got there.
             return BotDoing.Failed($"company {_squad.Id} had no room by the time it arrived");
         }
 
@@ -139,16 +143,6 @@ public sealed class BotEnlist : BotDeed
         return BotDoing.Work($"fell in with company {_squad.Id}");
     }
 
-    /// <summary>
-    /// In the company and staying in it.
-    ///
-    /// <para>
-    /// <b>Work, and the fence around it is the squad's own life rather than a clock here.</b> A member is
-    /// Bound, so its own auction is skipped and this undertaking is what stands between it and having
-    /// nothing at all; it must therefore last exactly as long as the company does and not one beat longer.
-    /// The squad disbands after eight quiet seconds, which ends this the same second.
-    /// </para>
-    /// </summary>
     private BotDoing Holding(IBotSquadMember member) =>
         member.Squad == null
             ? BotDoing.Done("the company broke up")
@@ -158,7 +152,6 @@ public sealed class BotEnlist : BotDeed
     {
     }
 
-    /// <summary>Whether the company is still a company worth walking to.</summary>
     private bool Standing() =>
         _squad is { Count: >= 2 } && _squad.Map == _map && _squad.Leader?.Self is { Deleted: false, Alive: true };
 }
@@ -187,7 +180,6 @@ public sealed class BotEnlister : IBotProposer
 
     public static long None { get; private set; }
 
-    /// <summary>Companies passed over because there is no way through to where they are fighting.</summary>
     public static long Walled { get; private set; }
 
     public static long Sent { get; private set; }
@@ -232,7 +224,6 @@ public sealed class BotEnlister : IBotProposer
         return new BotEnlist(squad, map, squad.Anchor);
     }
 
-    /// <summary>The nearest company that is in a fight, has room, and is on this bot's own facet.</summary>
     private static BotSquad Nearest(Mobile body, Map map)
     {
         var squads = BotSquads.All;
@@ -249,6 +240,20 @@ public sealed class BotEnlister : IBotProposer
                 continue;
             }
 
+            if (squad.Count < 2)
+            {
+                BotEnlist.Alone();
+
+                continue;
+            }
+
+            if (squad.Leader?.Self is Mobile lead && BotRegard.AtWar(body, lead))
+            {
+                BotEnlist.Foe();
+
+                continue;
+            }
+
             var anchor = squad.Anchor;
 
             if (anchor == Point3D.Zero || !Utility.InRange(body.Location, anchor, BotEnlist.Reach))
@@ -256,12 +261,14 @@ public sealed class BotEnlister : IBotProposer
                 continue;
             }
 
-            // <b>Near is not the same as reachable, and a company fighting on a roof is both.</b> A fight
-            // anchors wherever the fight is; this picked the nearest one by the crow's flight, so a company
-            // dealing with something one storey up was the best offer going for everybody underneath it. The
-            // reach ledger already knew — 33 enlist errands ended "no way through to (1361, 1483, 30)" in
-            // ninety minutes on 03.09.2026, one tile from a pocket of 63 filed at (1362, 1482, 30) — and it
-            // was being asked by the walker after the errand had been taken instead of by the chooser before.
+            if (squad.Count >= 3 && squad.Focus is { Deleted: false, HitsMax: > 0 } focus &&
+                focus.Hits < focus.HitsMax * BotEnlist.Left)
+            {
+                BotEnlist.Passed();
+
+                continue;
+            }
+
             if (BotReach.Ask(map, body.Location, anchor, BotArrival.Within(BotEnlist.Reach)) == BotReachVerdict.Sealed)
             {
                 Walled++;
@@ -284,7 +291,7 @@ public sealed class BotEnlister : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a place in a company"
-            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it";
+            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it, {BotEnlist.Ending} passed one over whose fight was nearly won, {BotEnlist.Lonely} passed over a company of one, {BotEnlist.Hostile} passed over the enemy's";
 
     public static void Forget()
     {
@@ -294,5 +301,6 @@ public sealed class BotEnlister : IBotProposer
         Unfit = 0;
         None = 0;
         Sent = 0;
+        BotEnlist.Forget();
     }
 }

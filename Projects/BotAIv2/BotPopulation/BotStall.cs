@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Server.Logging;
 using Server.Mobiles;
 
@@ -35,19 +35,10 @@ public static class BotStall
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStall));
 
-    /// <summary>
-    /// How long a bot may neither move nor change what it is doing before it is called stuck.
-    ///
-    /// Four minutes. Long enough that a genuine long errand — a lesson runs ten, a harrowing thirty — is not
-    /// slandered for standing at a station, because those change their stage as they go. Short enough that a
-    /// person watching does not find it first.
-    /// </summary>
     public static int PatienceMs { get; set; } = 240000;
 
-    /// <summary>How often one bot is looked at. Cheap: two comparisons and a dictionary entry.</summary>
     public static int EveryMs { get; set; } = 30000;
 
-    /// <summary>How long after complaining about a bot before it may be complained about again.</summary>
     public static int SayEveryMs { get; set; } = 600000;
 
     private sealed class Watch
@@ -64,70 +55,39 @@ public static class BotStall
 
         public bool Stuck;
 
-        /// <summary>Where it has been standing, kept apart from what it is doing. See the churn test.</summary>
         public Point3D Anchor;
 
         public long AnchorSince;
 
-        /// <summary>Errands swapped without the bot moving a tile.</summary>
         public int Swaps;
 
         public long Churned;
 
+        public object Deed;
     }
 
     private static readonly Dictionary<Serial, Watch> _watched = [];
 
-    /// <summary>Bots currently stuck, and how many stalls have been reported all told.</summary>
     public static int Stuck { get; private set; }
 
     public static long Reported { get; private set; }
 
-    /// <summary>Stalls that were also a piece of work taken off a bot that could not finish it.</summary>
     public static long Freed { get; private set; }
 
-    /// <summary>Bots carried out of a pocket that had already stalled somebody. See the escalation in Report.</summary>
     public static long Carried { get; private set; }
 
-    /// <summary>Looks passed over because the work stands still on purpose. See <see cref="BotDeed.Still"/>.</summary>
     public static long Steady { get; private set; }
 
-    /// <summary>
-    /// How long a bot may hold one tile while its errands come and go before that counts as stuck.
-    ///
-    /// Twice the ordinary patience on purpose: this test is about a bot that looks busy, and the cost of
-    /// firing it early is cancelling work that was about to move.
-    /// </summary>
     public static int ChurnMs { get; set; } = 480000;
 
-    /// <summary>How many errands must come and go on that one tile before it means anything.</summary>
-    public static int ChurnAt { get; set; } = 3;
+    public static int ChurnAt { get; set; } = 6;
 
-    /// <summary>Bots caught swapping errands without moving. For the summary.</summary>
     public static long Churn { get; private set; }
 
-    /// <summary>How long a spot is remembered as having stalled somebody.</summary>
     public static int PocketMs { get; set; } = 1800000;
 
     private static readonly List<(Point3D Where, long Until)> _pockets = [];
 
-    /// <summary>
-    /// Whether this spot has already stalled somebody, and records it if it has not.
-    ///
-    /// Half an hour, and within <see cref="Elbow"/> tiles: a pocket is a place a bot can walk into and not
-    /// out of, and those do not move.
-    ///
-    /// <para>
-    /// <b>How many of them there are is reported, because the count is the question this answers next.</b>
-    /// On 03.09.2026 the rule fired as designed in its first window — 5 bots carried out in nineteen
-    /// minutes, one of them Doran from 1757,976, the very spot that had held nine bots in turn — and that
-    /// rate is fifteen an hour, not the handful a night the change predicted. Carrying them out is a cure
-    /// for the symptom; a population that keeps walking into ground it cannot walk out of is the illness,
-    /// and it became visible only once the roam was doubled to a thousand tiles on 02.09.2026 and the bots
-    /// began reaching terrain the pathing had never been asked about. The size of this list is the measure
-    /// of that, and it belongs beside the count of rescues rather than inside a comment.
-    /// </para>
-    /// </summary>
     private static bool Pocket(Point3D where)
     {
         var now = Core.TickCount;
@@ -156,7 +116,6 @@ public static class BotStall
         return false;
     }
 
-    /// <summary>The worst one seen: name, what it was doing, and for how long.</summary>
     public static string Worst { get; private set; }
 
     public static void Look(BotMobile bot)
@@ -173,22 +132,8 @@ public static class BotStall
             return;
         }
 
-        // The stage rather than the deed's name: "walking to (1395, 1425)" and "scouting (1425, 1455)" are
-        // the same errand and different progress, and progress is the thing being tested for.
         var deed = bot.Resolve?.Deed;
 
-        // <b>A parked errand is not what the bot is doing, and quoting its stage is quoting the wrong
-        // thing.</b> A squad member sits on the Bound rung, where BotWill skips the auction and sets aside
-        // anything that is not Alongside — so the errand it happens to be holding is frozen by construction
-        // and its stage cannot change however well the bot is doing. Every remaining stall report on the
-        // morning of 04.09.2026 was that: five bots reported four minutes into "taking 2 Raw Ribs to Iman"
-        // while they were in a company fighting, and the log said so itself two lines later — "gave up
-        // peddle: set aside 10 minutes while Bound".
-        //
-        // Said rather than silenced. A bot really can be frozen inside a company — that was the whole of the
-        // night's worst defect — so the test still runs and still reports; what changes is that it now
-        // quotes the company, which is the thing that actually owns this bot, and therefore moves when the
-        // bot's situation moves instead of standing still by definition.
         var parked = bot.Squad != null && deed is not (null or { Alongside: true });
 
         var doing = parked
@@ -201,6 +146,7 @@ public static class BotStall
             {
                 Where = bot.Location,
                 Doing = doing,
+                Deed = deed,
                 Since = now,
                 Looked = now
             };
@@ -210,19 +156,10 @@ public static class BotStall
 
         watch.Looked = now;
 
-        // <b>Work that stands still on purpose is not standing still.</b> See BotDeed.Still: a student in
-        // the ranks and a captain calling a class both look exactly like a bot in a pocket to the two tests
-        // below, and both already have a clock of their own. Cancelling one of those is not half a repair,
-        // it is a repair of nothing done to a bot that had paid for what it was doing. Counted rather than
-        // silently skipped, because a category quietly excused from every test becomes the majority — this
-        // shard has done that once already, with 28 of 38 bots filtered out of the stuck count by a test
-        // that required a work of some kind.
-        //
-        // <b>Below the throttle and below the first sighting, and putting it above them inflated its own
-        // count by a factor of three.</b> A bot with no watch entry is never throttled, so a check that
-        // returns before one is made is asked on every beat rather than every EveryMs — 1482 passes in five
-        // minutes against a possible 540. A number that measures how often it was consulted rather than how
-        // many bots it excused is the sort of thing this project files under "the instrument lies first".
+        var swapped = !ReferenceEquals(deed, watch.Deed);
+
+        watch.Deed = deed;
+
         if (deed is { Still: true })
         {
             Steady++;
@@ -240,17 +177,6 @@ public static class BotStall
             return;
         }
 
-        // <b>A bot that stands on one tile while its errands come and go is stuck, and the test below could
-        // not see it.</b> That test clears its clock whenever the errand changes, which is right for a bot
-        // making progress and exactly wrong for one that cannot move: Joss the Gatherer held a single tile
-        // for thirteen minutes on 07.09.2026 at 247 of 236 stones with no stamina, taking and dropping
-        // thirty-two errands - each one asking for a step it could not take, each one resetting the clock
-        // that was supposed to notice. Two conditions that each look like progress, and between them nothing
-        // was watching.
-        //
-        // Kept as its own clock, anchored to the tile and cleared only by moving off it. The errand count is
-        // required as well as the time, so a smith standing at an anvil for ten minutes - one errand, no
-        // swaps - is not touched by this.
         if (bot.Location != watch.Anchor)
         {
             watch.Anchor = bot.Location;
@@ -259,7 +185,7 @@ public static class BotStall
         }
         else
         {
-            if (!string.Equals(doing, watch.Doing, System.StringComparison.Ordinal))
+            if (swapped)
             {
                 watch.Swaps++;
             }
@@ -323,9 +249,6 @@ public static class BotStall
             Stuck++;
         }
 
-        // Said at most once per bot per SayEveryMs. A bot stuck for an hour is one defect, not a hundred and
-        // twenty lines of log — and a log that scrolls is a log nobody reads, which is how the thing got
-        // missed in the first place.
         if (watch.Said != 0 && now - watch.Said < SayEveryMs)
         {
             return;
@@ -334,55 +257,16 @@ public static class BotStall
         watch.Said = now;
         Reported++;
 
-        // <b>And the work is taken off it, because reporting a stall and leaving it standing is half a
-        // repair.</b> What produces these is almost always an errand that cannot finish and will not fail —
-        // a walk to somewhere unreachable, asked again every beat for ever. Ended as a failure so the ledger
-        // learns the place was no good, which is what stops the same bot taking the same errand to the same
-        // spot a second time. A bot with no work in hand is offered some on its very next beat, so this
-        // costs it nothing but the errand it was never going to finish.
         if (bot.Resolve?.Deed != null)
         {
             BotWill.Abandon(bot, "it had stopped getting anywhere");
             Freed++;
         }
 
-        // <b>And if the ground itself has done this before, the bot is carried out of it.</b>
-        // BotPopulation.Rescue exists for exactly this and fires on a dozen refused roads with no step in
-        // between — which is the trapped bot that stands still. It is not the trapped bot that paces: a step
-        // of any kind clears that count, so a bot walking circles inside a pocket it cannot leave never
-        // reaches the limit.
-        //
-        // <b>Kept against the place rather than against the bot, and the first attempt at this was kept
-        // against the bot and never fired once.</b> It waited for one bot to be reported twice in the same
-        // spot; what actually happens is a queue of different bots each reported once. On 03.09.2026 the
-        // pocket at 1755-1758, 970-977 took Merrick, Torvin, Kerrin, Perri, Edda 2, Bryn, Ilsa, Calla,
-        // Doran and four more in eighteen minutes, one report apiece, with 0 carried out. Their
-        // destinations differed and the elbow count showed one or two of ours nearby rather than a knot, so
-        // the only thing they had in common was the ground — which is the rule this project has now written
-        // down four times: what one bot proves about a place is true for the next one along.
-        //
-        // The first bot to stall somewhere still just loses its errand. The second one there is lifted out.
-        // <b>Read before the rescue, because the rescue moves the bot.</b> Every line below used
-        // bot.Location, and Rescue had already carried the bot home by the time they read it — so a bot
-        // that spent six minutes trapped at (1757, 976) was reported as standing still at the population's
-        // own doorstep. On 03.09.2026 that sent an hour of this session looking at the wrong subsystem: the
-        // errand named was "taking a full pack to the counter", the place named was three tiles from the
-        // counter, and neither had anything to do with it. The place a bot stalled in is the whole finding.
         var stalledAt = bot.Location;
 
-        // The crowd, for the same reason and it was the same bug one line further down. Three of the four
-        // bots knotted together at (1344, 878) on 03.09.2026 reported "0 of ours within 2 tiles" because they
-        // had been carried home before this was counted, and the one that was not rescued reported four. The
-        // knot was the finding and the instrument hid it from itself.
         var crowd = Elbows(bot);
 
-        // <b>Two facts that decide between the three reasons a bot stands still with no errand, and neither
-        // was in the line.</b> A bot in a company sits on the Bound rung with the auction switched off, so it
-        // is not offered work and its barren clock never starts — which is also why BotHomer never sends it
-        // home, since that is offered on the Free rung and measured by that clock. A bot not in a company
-        // whose clock reads four minutes is a different fault entirely: the auction is running and finding
-        // nothing. Four bots stood at (1297-1299, 1081-1085) on 03.09.2026 reading "nothing" for four
-        // minutes, and the line could not tell those two apart.
         var company = bot is IBotSquadMember { Squad: not null };
         var barren = bot.Resolve?.Urges?.BarrenMinutes(now) ?? 0.0;
 
@@ -396,10 +280,6 @@ public static class BotStall
 
         Worst = $"{bot.Name} the {bot.Class?.Name}, {held / 60000} minutes on \"{doing}\" at {stalledAt}";
 
-        // The load is in the line because it is the first thing worth ruling out: the engine charges stamina
-        // for every step over the ceiling and refuses the step outright at nought, so an overloaded bot is
-        // stuck in a way no subsystem above it can see or fix. "Full pack" errands stalling three at a time
-        // is exactly what that looks like.
         logger.Error(
             "{Name} the {Class} has not moved or changed what it is doing for {Held} minutes: \"{Doing}\" at {Where}, carrying {Load} of {Ceiling} stones with {Stam} stamina, with {Crowd} of ours within {Elbow} tiles, {Company} and out of work for {Barren:F1} minutes by its own clock",
             bot.Name,
@@ -417,7 +297,6 @@ public static class BotStall
         );
     }
 
-    /// <summary>A bot that is gone should not be watched, or the table grows for the life of the shard.</summary>
     public static void Forget(BotMobile bot)
     {
         if (bot != null && _watched.Remove(bot.Serial, out var watch) && watch.Stuck)
@@ -429,7 +308,7 @@ public static class BotStall
     public static string Describe() =>
         Reported == 0 && Churn == 0
             ? $"nobody has stood still for {PatienceMs / 60000} minutes ({Steady} looks passed over as work that stands still on purpose)"
-            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of {_pockets.Count} known pockets, {Churn} caught swapping errands without moving a tile, {Steady} looks passed over as work that stands still on purpose, {BotPopulation.Rescued} carried home for reaching nothing at all and {BotPopulation.Boxedin} of those put down with no way off the tile; worst: {Worst}";
+            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of {_pockets.Count} known pockets, {Churn} caught swapping errands without moving a tile, {Steady} looks passed over as work that stands still on purpose, {BotPopulation.Rescued} carried home for reaching nothing at all ({BotPopulation.Delving} more were left alone for being down a dungeon and {BotPopulation.Unbound} let go of their company instead) and {BotPopulation.Boxedin} of those put down with no way off the tile; worst: {Worst}";
 
     public static void Forget()
     {
@@ -442,21 +321,8 @@ public static class BotStall
         Worst = null;
     }
 
-    /// <summary>How close another of ours has to be to be in this one's way. Two tiles: a doorway is one.</summary>
     public static int Elbow { get; set; } = 2;
 
-    /// <summary>
-    /// How many of ours are standing within <see cref="Elbow"/> of this one.
-    ///
-    /// <para>
-    /// <b>The other thing worth ruling out, and it was not in the line.</b> On 03.09.2026 four bots stalled
-    /// together at 1756-1758, 973-974, all on "taking a full pack to the counter", and the load and stamina
-    /// printed beside them were 30 of 219 stones at 25 to 45 stamina — nothing wrong with either, so the
-    /// message pointed away from the one fact all four had in common. Bots do not walk through one another;
-    /// a knot of them in a doorway is a different fault from a bot too heavy to lift its feet, and without
-    /// this the two read identically.
-    /// </para>
-    /// </summary>
     private static int Elbows(BotMobile bot)
     {
         var map = bot?.Map;
@@ -478,5 +344,4 @@ public static class BotStall
 
         return near;
     }
-
 }

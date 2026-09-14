@@ -33,7 +33,6 @@ namespace Server.BotAI.V2;
 [SerializationGenerator(0, false)]
 public partial class BotCasterStaff : QuarterStaff
 {
-    /// <summary>Below the weakest build in the nine, so no caster is ever refused its own staff.</summary>
     private const int CasterStrRequirement = 10;
 
     [Constructible]

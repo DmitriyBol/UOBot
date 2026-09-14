@@ -22,21 +22,12 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotReclaim : BotDeed
 {
-    /// <summary>The ledger key.</summary>
     public const string Trade = "reclaim";
 
-    /// <summary>
-    /// What going back for your own things is reckoned at per minute before experience corrects it.
-    ///
-    /// High, and honestly so: what is in there was bought with work already done, and the alternative is
-    /// buying all of it a second time. The measurement will be real — recovered coin lands in the takings as
-    /// coin — so the ledger settles this to the truth within a few deaths.
-    /// </summary>
     public static double Prior { get; set; } = 80.0;
 
     public static double WorkMinutes { get; set; } = 1.5;
 
-    /// <summary>How near the corpse the bot has to be to go through it.</summary>
     public static int Reach { get; set; } = 2;
 
     private readonly Corpse _corpse;
@@ -66,12 +57,10 @@ public sealed class BotReclaim : BotDeed
 
     public override double Minutes => WorkMinutes;
 
-    /// <summary>Nothing. Picking your own things back up teaches you nothing at all.</summary>
     public override SkillName? Trains => null;
 
     public override int Outlay => 0;
 
-    /// <summary>Whatever coin was in it comes back as coin, which the takings measure by themselves.</summary>
     public override double Coin => 1.0;
 
     public override int Made => 0;
@@ -90,8 +79,6 @@ public sealed class BotReclaim : BotDeed
 
         if (_corpse == null || _corpse.Deleted || _corpse.Map != _map)
         {
-            // Decayed, or somebody else was there first. Not a failure worth marking the ground for: the
-            // place did nothing wrong.
             Forget(bot);
 
             return BotDoing.Done("there was nothing left of it");
@@ -104,8 +91,6 @@ public sealed class BotReclaim : BotDeed
 
         Empty(body);
 
-        // Straight back on. Everything recovered arrives in the pack, and a bot that walks away from its own
-        // corpse with its weapon stowed is a bot walking to its next one.
         (bot as BotMobile)?.Rearm();
 
         Forget(bot);
@@ -113,12 +98,6 @@ public sealed class BotReclaim : BotDeed
         return BotDoing.Done($"{_taken} things and {_coins}gp back off its own corpse");
     }
 
-    /// <summary>
-    /// Everything the bot can carry, back into the pack.
-    ///
-    /// Weight is the limit here as it is on any corpse: what does not fit stays, and the bot may well come
-    /// back for it, because the corpse goes on being remembered until it is empty.
-    /// </summary>
     private void Empty(Mobile body)
     {
         var pack = body.Backpack;
@@ -130,7 +109,6 @@ public sealed class BotReclaim : BotDeed
 
         var ceiling = BotLadder.Ceiling(body) * 0.8;
 
-        // A snapshot: moving things out mutates the list being read.
         List<Item> lying = [.. _corpse.Items];
 
         for (var i = 0; i < lying.Count; i++)
@@ -204,8 +182,6 @@ public sealed class BotUndertaker : IBotProposer
             return null;
         }
 
-        // Nothing left in it. Emptied by somebody, or it only ever held bound gear, which came back with the
-        // bot when it rose.
         if (corpse.Items.Count == 0)
         {
             mobile.Remains = null;

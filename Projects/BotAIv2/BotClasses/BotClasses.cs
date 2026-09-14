@@ -45,8 +45,6 @@ public static class BotClasses
     {
         for (var i = 0; i < _all.Length; i++)
         {
-            // Numbers are filled in here rather than in a constructor, so that the same call can put
-            // them back later. See BotClass.Defaults.
             _all[i].Reset();
 
             _byName[_all[i].Name] = _all[i];
@@ -58,26 +56,13 @@ public static class BotClasses
         }
     }
 
-    /// <summary>Every class, in the order they are meant to be read.</summary>
     public static IReadOnlyList<BotClass> All => _all;
 
-    /// <summary>
-    /// How many classes cast at all, which is deliberately not the same as how many are casters. The
-    /// warrior-mage and the healer both throw spells and neither fills the caster's place in a group.
-    /// </summary>
     public static int Casting { get; private set; }
 
-    /// <summary>
-    /// The class of that name, or null.
-    ///
-    /// Null rather than a fallback on purpose. A configuration file naming a class that does not exist
-    /// is a typo, and quietly substituting a warrior would produce a population that is wrong in a way
-    /// nobody can see — which is how the first version ended up with smiths that had no hammer.
-    /// </summary>
     public static BotClass Find(string name) =>
         name != null && _byName.TryGetValue(name, out var found) ? found : null;
 
-    /// <summary>How many classes fill this role. For musters, and for reading the config back.</summary>
     public static int Count(BotRole role)
     {
         var count = 0;
@@ -93,19 +78,6 @@ public static class BotClasses
         return count;
     }
 
-    /// <summary>
-    /// Applies whatever <c>bots.json</c> had to say about the classes.
-    ///
-    /// Code carries the defaults and configuration moves them; nothing here is required to be present.
-    /// The reason this exists at all is practical rather than architectural: this shard is designed on
-    /// one machine and built on another, so a number that needs a compiler to change is a number that
-    /// needs a person to change. Balance passes should not need a person.
-    ///
-    /// Structure is deliberately not overridable — which weapons a class may roll, what tools it gets,
-    /// what is in its book. Those are what the class <em>is</em>, they cannot be expressed as a number,
-    /// and a config file that could empty a smith's tool list would be a config file that can produce
-    /// the first version's central defect on purpose.
-    /// </summary>
     public static void Override(IReadOnlyDictionary<string, BotClassOverride> overrides)
     {
         if (overrides == null)
@@ -113,12 +85,6 @@ public static class BotClasses
             return;
         }
 
-        // Back to the code's own numbers first, so that this is the same operation whether it is the
-        // first time or the fifth. Applying on top of a previous pass would accumulate: a potion limit
-        // lifted by a config that is later corrected would stay lifted, because nothing removes a key.
-        //
-        // The instances themselves are kept — bots hold references to them, so replacing them would
-        // leave a living population pointing at classes nobody is configuring any more.
         for (var i = 0; i < _all.Length; i++)
         {
             _all[i].Reset();
@@ -161,14 +127,8 @@ public sealed class BotClassOverride
 
     public int? Int { get; set; }
 
-    /// <summary>
-    /// Skill targets, by skill name. Replaces the class's list outright rather than merging into it: a
-    /// half-stated build is harder to reason about than a fully stated one, and the whole list is four
-    /// or five lines.
-    /// </summary>
     public Dictionary<string, double> SkillTargets { get; set; }
 
-    /// <summary>Potion families this class may carry more than one of. Merged, not replaced.</summary>
     public Dictionary<string, int> PotionLimits { get; set; }
 
     public bool? NeedsMeditation { get; set; }
@@ -193,7 +153,6 @@ public sealed class BotClassOverride
 
     public int? BrewIntervalMs { get; set; }
 
-    /// <summary>Gold the crown keeps this class at. Nought for everybody who lives on what it earns.</summary>
     public int? Stipend { get; set; }
 
     internal void ApplyTo(BotClass target)

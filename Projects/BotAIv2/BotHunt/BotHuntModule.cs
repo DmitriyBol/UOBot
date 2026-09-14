@@ -27,10 +27,6 @@ public sealed class BotHuntModule : BotModule
 
     public override BotPhase Phase => BotPhase.World;
 
-    /// <summary>
-    /// <c>Spells</c> joins the list because a fight now casts: the book a caster throws from is that
-    /// subsystem's, and asking it anything before it has started is asking an empty shelf.
-    /// </summary>
     public override string[] Requires => ["Classes", "Will", "Auction", "Spells"];
 
     public override void Start()
@@ -39,40 +35,20 @@ public sealed class BotHuntModule : BotModule
 
         BotWill.Offer(new BotHunter());
 
-        // Picking spent arrows back up. Priced low on purpose: it is what an archer does when there is
-        // nothing better in front of it.
         BotWill.Offer(new BotGleaner());
 
-        // The missing end of a fight nobody chose. See BotPickings: since self-defence became a reflex, a bot
-        // kills things without an undertaking attached, and an undertaking is what used to empty the body.
         BotWill.Offer(new BotPicker());
 
-        // Going through a chest standing out in the world — a camp's, a ruin's. Patrick's order of
-        // 08.09.2026: an orc camp is worth clearing and the chest in it was worth nothing to a population
-        // that had no notion of a container which is not a corpse, a stall or its own pack. See BotPlunder.
         BotWill.Offer(new BotPlunderer());
 
-        // Walking a prisoner out of a camp and home. Patrick's order of 08.09.2026. Offered to anybody: a
-        // prisoner does not care what trade its escort practises. See BotFreedom.
         BotWill.Offer(new BotLiberator());
 
-        // Calling a company against what one bot must refuse. This is the caller the squad subsystem has been
-        // waiting for since it was written — see BotMuster.
         BotWill.Offer(new BotMuster());
 
-        // Going to somebody's aid, and hitting back at whatever is on you. The second of these is the first
-        // thing ever offered on the Hunted rung, which BotWill has been complaining is unserved since it was
-        // written — a bot with something chewing on it simply held whatever it was doing.
         BotWill.Offer(new BotRescuer());
         BotWill.Offer(new BotDefender());
 
         logger.Information(
-            // <b>One name per hole, and using {Reach} twice made this line report 8 where the shard runs
-            // 50.</b> Serilog binds by name, not by position: two tokens with the same name take the same
-            // value, the last one written wins, and the argument meant for the token further along is left
-            // over with nothing to fill. The result rendered as a sentence that read perfectly and was wrong
-            // about the single number the whole hunt is built on — in the one place this project treats as
-            // the source of truth about what the shard is actually running.
             "The hunt is on: quarry looked for {Reach} tiles out and taken up to ×{Daring} of our own power, anything inside {Notice} tiles worth dropping other work for, set out above {Fit:P0} health and given up below {Flee:P0} or when outnumbered; ground to look over is picked beyond {Beyond} tiles and walked to within {Arrive}",
             BotQuarry.Reach,
             BotQuarry.Daring,
@@ -105,9 +81,6 @@ public sealed class BotHuntModule : BotModule
             BotMuster.Least
         );
 
-        // Every number that decides whether a chest is opened, because a rule that silently refuses is a
-        // rule nobody can argue with: three of the four gates below are admissions that this population has
-        // no Lockpicking and no Remove Trap, and the day it has either, these lines are where that shows.
         logger.Information(
             "Chests are worth going through: looked for {Reach} tiles out once a minute, reached into from {Touch} tiles, broken off when something living is within {Danger}; locked ones, trapped ones and any standing inside a town are passed over, and an emptied one is left alone {Emptied}ms",
             BotPlunder.Reach,
@@ -126,7 +99,6 @@ public sealed class BotHuntModule : BotModule
         );
     }
 
-    /// <summary>What the population has learned about who is worth fighting.</summary>
     public static string Summarise() =>
         $"{BotQuarry.Describe()}; {BotPlunder.Describe()}; {BotFreedom.Describe()}";
 
@@ -138,17 +110,13 @@ public sealed class BotHuntModule : BotModule
         BotArms.Forget();
         BotSlay.ForgetBows();
 
-        // Cries name bots of a population that is being replaced.
         BotCry.Forget();
 
-        // Claims name creatures of the world being replaced.
         BotQuarry.Forget();
 
-        // And chests are items of it.
         BotPlunder.Forget();
         BotPlunderer.Reset();
 
-        // And prisoners are mobiles of it.
         BotFreedom.Forget();
         BotLiberator.Reset();
     }

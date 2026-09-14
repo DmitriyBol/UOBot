@@ -19,7 +19,6 @@ public sealed class BotWarrior : BotClass
 
     public override BotRole Role => BotRole.Melee;
 
-    /// <summary>Settled by the roll: this class's trade is fighting, and the blade is the roll's business.</summary>
     public override SkillName? MainSkill => null;
 
     protected override void Defaults()

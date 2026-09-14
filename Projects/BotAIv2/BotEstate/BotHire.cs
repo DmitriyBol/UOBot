@@ -31,16 +31,12 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotHire : BotDeed
 {
-    /// <summary>The ledger key.</summary>
     public const string Trade = "hire";
 
-    /// <summary>What hiring is reckoned at per minute before experience corrects it.</summary>
     public static double Prior { get; set; } = 300.0;
 
-    /// <summary>How long the hiring itself takes once the bot is standing in the hall.</summary>
     public static double WorkMinutes { get; set; } = 1.0;
 
-    /// <summary>How near the shopkeeper the bot must be to buy. The engine's own counter reach.</summary>
     public static int Reach => BotShops.CounterReach;
 
     private readonly Guilds.Guild _guild;
@@ -75,76 +71,22 @@ public sealed class BotHire : BotDeed
 
     public override SkillName? Trains => null;
 
-    /// <summary>Nothing out of this bot's own pocket: the guild is buying. See <c>BotHall.Outlay</c>.</summary>
     public override int Outlay => 0;
 
     public override double Coin => 0.0;
 
-    /// <summary>Not about money, and not to be refused for failing to earn any.</summary>
     public override bool Unpaid => true;
 
-    /// <summary>
-    /// What the bot's own purse put into this, handed straight back as takings.
-    ///
-    /// <para>
-    /// <b>Every errand a guild pays for was teaching the shard that guild errands lose money.</b> Takings are
-    /// <c>coin + made</c>, coin is measured as the change in the bot's own purse, and these errands are paid
-    /// for by a levy that comes partly out of that purse — so the ledger recorded "raised The Lantern for
-    /// 5000gp: -20 in 0.4 min (-50/min)", "set an oven up: -33", "hired a merchant: -148", "left 20 ash on
-    /// the counter: -60". <c>BotCommons.Corrected</c> then drags the trade's whole estimate towards those
-    /// numbers, which is why <c>BotHall.Prior</c> carries a note about having to be raised from ninety to
-    /// four hundred before anybody would take one.
-    /// </para>
-    ///
-    /// <para>
-    /// The fix is the one <c>BotRestock</c> has always used and says in as many words: goods are worth what
-    /// they cost. A hall, a bench, a shopkeeper and a shelf of reagents are all worth what was paid for them,
-    /// and the bot's share of the price is a contribution to something the guild now owns rather than money
-    /// that left the world. So the errand comes out at about nothing a minute — never punished, never
-    /// preferred over work that actually produces something, which is the right place for it.
-    /// </para>
-    /// </summary>
     public override int Made => _mine;
 
-    /// <summary>Coin out of this bot's own purse, measured across the payment rather than assumed.</summary>
     private int _mine;
 
-    /// <summary>
-    /// How many beats a leg of this errand may go without getting nearer before it is given up.
-    ///
-    /// <para>
-    /// <b>An errand that only ever answers "walk" is immortal, and this one was.</b> Measured 09.09.2026:
-    /// Quill held a hiring errand for eleven minutes, reported every time as "walking to somewhere 1 tile off",
-    /// and never finished, failed or dropped it — because the bot had been taken onto the Bound rung by a
-    /// company on the way, and a bound bot's auction is switched off, so nothing was ever going to replace
-    /// the errand it was holding. The whole time it held its guild's supplier claim, so no other member could
-    /// be sent either. See <c>bot-frozen-work-family</c>: work that answers Work, or the same walk, for ever
-    /// is work that never ends.
-    /// </para>
-    ///
-    /// <para>
-    /// Measured as progress rather than as attempts, which is the distinction <c>BotDig.TrekLimit</c> pays
-    /// for at length: a long walk across the island is legitimate, and what is not legitimate is a walk that
-    /// stops getting closer.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>Two hundred, and forty was wrong by five times over — the same units mistake this file's neighbour
-    /// was opened to fix.</b> A bot is beaten once per step, not once per tick, so forty beats is eight to
-    /// sixteen seconds of not gaining ground: an ordinary detour round a building. Measured within ten
-    /// minutes of it going in — five supply runs failed with "the walk to Delano stopped closing" while the
-    /// shops were perfectly reachable. Two hundred is <c>BotDig.TrekLimit</c>, which carries the reasoning
-    /// and the measurement, and taking its number rather than choosing a second one is the point.
-    /// </para>
-    /// </summary>
     public static int TrekLimit { get; set; } = 200;
 
-    /// <summary>The nearest this errand has got to what it is currently walking at.</summary>
     private int _nearest = int.MaxValue;
 
     private int _stalled;
 
-    /// <summary>Whether the walk is still closing. Resets when the errand changes what it is walking at.</summary>
     private bool Closing(Mobile body, Point3D at)
     {
         var gap = System.Math.Max(System.Math.Abs(body.X - at.X), System.Math.Abs(body.Y - at.Y));
@@ -160,13 +102,11 @@ public sealed class BotHire : BotDeed
         return ++_stalled < TrekLimit;
     }
 
-    /// <summary>A new leg, so the old leg's best distance means nothing. Called when the target changes.</summary>
     private void Fresh()
     {
         _nearest = int.MaxValue;
         _stalled = 0;
     }
-
 
     public override string Stage =>
         _hired ? $"hired a merchant for {_guild?.Name}"
@@ -221,8 +161,6 @@ public sealed class BotHire : BotDeed
                 return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(Reach), $"to {_shop.Name} for a contract");
             }
 
-            // The guild pays, and it pays into the buyer's own account because that is where a shopkeeper
-            // takes it from. Same seam as the armour a guild stands for its members. See BotGuilds.Stand.
             var wealth = BotYield.Wealth(body);
             var mine = wealth;
 
@@ -236,12 +174,10 @@ public sealed class BotHire : BotDeed
                 return BotDoing.Failed(refused ?? "the shopkeeper would not sell a contract");
             }
 
-            // This bot's own share of the price, handed back as takings. See Made.
             _mine += System.Math.Max(0, mine - BotYield.Wealth(body));
 
             _bought = true;
 
-            // A different place to be walking at. See Closing.
             Fresh();
 
             return BotDoing.Work("a contract of employment bought");
@@ -249,11 +185,6 @@ public sealed class BotHire : BotDeed
 
         _bought = true;
 
-        // <b>Inside the hall, not beside it.</b> The engine finds the house under the bot's own feet, so a
-        // merchant cannot be set up from the doorstep however plainly the hall is in front of it.
-        // <b>In the room, not merely in the multi.</b> FindHouseAt says yes on the front steps, so asking it
-        // alone put the first merchant this shard hired in the doorway — the porch trap, a second time. What
-        // counts is the tile the flood reaches. See BotFittings.InRoom.
         if (!BotFittings.InRoom(_hall, body.Location))
         {
             var spot = BotFittings.Spot(_hall);
@@ -289,7 +220,7 @@ public sealed class BotHire : BotDeed
         };
 
         merchant.MoveToWorld(body.Location, body.Map);
-        merchant.SayTo(body, 503246); // Ah! it feels good to be working again.
+        merchant.SayTo(body, 503246);
 
         contract.Delete();
 

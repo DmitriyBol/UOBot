@@ -35,8 +35,6 @@ public sealed class BotMovementModule : BotModule
 
         BotWalk.Walking = true;
 
-        // Every number that decides behaviour is in this line, because the config file silently wins over the
-        // code and a threshold nobody can read is a threshold nobody can argue with.
         logger.Information(
             "Movement ready: a search is charged {PerTile}ms a tile of distance, never less than {Short}ms and never more than {Ceiling}ms, the population {Window}ms a second, floor {Floor}ms; a plan is trusted {Stale}ms and a journey is given up after {Stall} fruitless attempts at stepping or {NoCloser} plans that get no closer; after {FarSide} of those the far side of the destination is looked at, at most every {Gap}ms, for a pocket of up to {Cells} tiles costing at most {Look}ms",
             BotPath.MsPerTile,
@@ -53,9 +51,6 @@ public sealed class BotMovementModule : BotModule
             BotPath.EnclosureCeilingMs
         );
 
-        // Its own line, because it is the shard's newest record of the ground and the one whose numbers are
-        // least settled: a refusal rests a square {RestMs} and doubles per refusal to {MostRestMs}, and
-        // whether those are right is a question the morning after answers.
         logger.Information(
             "Refused ground: one entry per {Grain} tiles, resting {RestMs}ms doubling to {MostRestMs}ms, at most {MostPlaces} squares remembered; arriving anywhere clears one",
             BotRefused.Grain,
@@ -63,12 +58,10 @@ public sealed class BotMovementModule : BotModule
             BotRefused.MostRestMs,
             BotRefused.MostPlaces
         );
+
+        BotBarred.Announce();
     }
 
-    /// <summary>
-    /// A world reload is a different world. The reach ledger describes ground that may not be there any
-    /// more, and the counters describe a population that is about to be rebuilt.
-    /// </summary>
     public override void Reset()
     {
         BotWalk.Walking = false;
@@ -86,7 +79,6 @@ public sealed class BotMovementModule : BotModule
         BotRefused.Forget();
     }
 
-    /// <summary>Everything the summary wants to say about getting about, in three clauses.</summary>
     public static string Summarise() =>
         $"{BotPath.Describe()}; {BotWalk.Describe()}; {BotReach.Describe()}; {BotRefused.Describe()}";
 }

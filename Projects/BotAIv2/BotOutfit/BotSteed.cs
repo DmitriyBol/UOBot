@@ -32,23 +32,14 @@ namespace Server.BotAI.V2;
 [SerializationGenerator(0, false)]
 public partial class BotSteed : EtherealMount
 {
-    /// <summary>The statuette as it sits in the pack, and the horse it becomes. The engine's own two art ids.</summary>
     private const int Statuette = 0x20DD;
 
     private const int Mounted = 0x3EAA;
 
-    /// <summary>What one costs at a stablemaster.</summary>
     public static int Price { get; set; } = 500;
 
     [Constructible]
     public BotSteed() : base(Statuette, Mounted) => Name = "a saddled horse";
 
-    /// <summary>
-    /// The ordinary colour of a horse rather than the ghostly blue an ethereal wears.
-    ///
-    /// This one is a real animal that happens to travel in a pack, and a watcher should be able to tell a
-    /// bought horse from a prize at a glance — the same reasoning that gives the two casters' staves their
-    /// own hues.
-    /// </summary>
     public override int EtherealHue => 0;
 }

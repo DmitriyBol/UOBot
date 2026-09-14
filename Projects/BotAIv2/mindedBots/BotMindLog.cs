@@ -30,10 +30,8 @@ public static class BotMindLog
 
     private static bool _broken;
 
-    /// <summary>Lines written this session.</summary>
     public static long Lines { get; private set; }
 
-    /// <summary>Where the file is, once it is known.</summary>
     public static string Path => _path;
 
     public static void Open()
@@ -43,8 +41,6 @@ public static class BotMindLog
 
         try
         {
-            // Beside the session logs rather than inside the distribution: that is where the shard's own
-            // logs are, and a file nobody finds is a file nobody reads.
             var folder = System.IO.Path.GetFullPath(System.IO.Path.Combine(Core.BaseDirectory, "..", "logs"));
 
             Directory.CreateDirectory(folder);
@@ -61,7 +57,6 @@ public static class BotMindLog
         }
     }
 
-    /// <summary>One line, stamped. Failure switches the file off rather than complaining every few seconds.</summary>
     public static void Write(string line)
     {
         if (_broken || _path == null || line == null)
@@ -82,7 +77,6 @@ public static class BotMindLog
         }
     }
 
-    /// <summary>A paragraph under a heading, for the things that are paragraphs.</summary>
     public static void Write(string who, string heading, string body)
     {
         Write($"{who} — {heading}");

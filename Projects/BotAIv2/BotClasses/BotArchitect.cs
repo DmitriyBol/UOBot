@@ -36,35 +36,18 @@ public sealed class BotArchitect : BotClass
 
     public override BotRole Role => BotRole.Producer;
 
-    /// <summary>The forge. Mining is the higher number and the smaller half of the trade.</summary>
     public override SkillName? MainSkill => SkillName.Blacksmith;
 
-    /// <summary>Born holding both trades. See the class note for why this one is allowed to.</summary>
     public override bool Seasoned => true;
 
-    /// <summary>Born strong and still with somewhere to go. See BotClass.Seasoning.</summary>
     public override double Seasoning => 0.78;
 
-    /// <summary>A hundredth of every sale, out of the seller's share. The one class that takes one.</summary>
     public override bool Levies => true;
 
-    /// <summary>
-    /// Buys a horse, for the same reason the gatherer does: half its trade is at the far end of a walk.
-    ///
-    /// <para>
-    /// <b>The riding flag went on the class that digs and was not put on the other one that digs.</b> This
-    /// bot mines its own ore — see the note above on why both halves of the chain are one class — so the
-    /// two hundred and forty tiles out to the cave are its walk as much as the gatherer's, and then it has
-    /// to carry the ore back to a forge that is in town. It arguably needs the horse more: the gatherer
-    /// banks at the counter it passes, while this one's day is a round trip by construction.
-    /// </para>
-    /// </summary>
     public override bool Rides => true;
 
     protected override void Defaults()
     {
-        // A smith's build: it swings a hammer all day and carries ore up out of a hole, and it is not
-        // expected to win a fight. The intelligence is there because tinkering wants it.
         Str = 65;
         Dex = 20;
         Int = 15;
@@ -81,8 +64,6 @@ public sealed class BotArchitect : BotClass
 
         Kit = new BotKit
         {
-            // Carried because everything on this island does, and trained where a crafter's is: it goes to
-            // the forge, not to the graveyard.
             Melee = BotArsenal.Melee(100.0),
 
             Tools = [typeof(SmithHammer), typeof(Pickaxe), typeof(SewingKit), typeof(TinkerTools)],

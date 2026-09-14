@@ -25,24 +25,6 @@ public sealed class BotPatrol : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPatrol));
 
-    /// <summary>
-    /// How far a captain will march a company from where it is standing.
-    ///
-    /// <para>
-    /// <b>It follows how far the population may go, and pinning it to a number of its own is what stopped
-    /// this working.</b> Bots die where they roam; a rescuer that cannot reach as far as the population
-    /// wanders is a rescuer with a map of somewhere else. On 27.08.2026 <c>Roam</c> was raised to five
-    /// hundred to spread the hunting out, and within the hour every death on the island was at x≈1865 —
-    /// four hundred and twenty tiles from home — while this said three hundred. The Baron was asked a
-    /// hundred times in a row and answered "nowhere has taken anybody" a hundred times, with three bodies on
-    /// the board and two of them in one square. Two thresholds on one shelf, and the second one nobody moved.
-    /// </para>
-    ///
-    /// <para>
-    /// Nought means "as far as the population goes", which is the default and the only value that cannot go
-    /// stale. Configuration may still pin a real number when a shorter leash is actually wanted.
-    /// </para>
-    /// </summary>
     public static int Range
     {
         get => _range > 0 ? _range : BotPopulation.Roam;
@@ -57,7 +39,6 @@ public sealed class BotPatrol : IBotProposer
 
     public static long Asked { get; private set; }
 
-    /// <summary>Asked of a bot that is not a captain. Not a refusal — fifteen of sixteen answers are this.</summary>
     public static long NotACaptain { get; private set; }
 
     public static long Held { get; private set; }
@@ -68,18 +49,8 @@ public sealed class BotPatrol : IBotProposer
 
     public static long TooFewNear { get; private set; }
 
-    /// <summary>
-    /// Dangerous squares turned down because the ground between here and there is known to be closed.
-    ///
-    /// A named nought of its own, because "the island is quiet" and "the worst of it is across water" are
-    /// different facts about an evening and <see cref="Peaceful"/> would have reported both as the first.
-    /// </summary>
     public static long Sealed { get; private set; }
 
-    /// <summary>
-    /// Offers made. <b>Not marches</b>, and it used to be printed as though it were: most offers lose the
-    /// auction and are thrown away. What actually set out is <see cref="BotSweep.Marches"/>.
-    /// </summary>
     public static long Offered { get; private set; }
 
     public BotDeed Propose(IBotWilful bot)
@@ -92,8 +63,6 @@ public sealed class BotPatrol : IBotProposer
             return null;
         }
 
-        // Counted before the class check so that "nobody is a captain" and "the captain never gets an offer"
-        // are different numbers rather than the same silence.
         if (body is not BotMobile { Class.Leads: true })
         {
             NotACaptain++;
@@ -122,14 +91,6 @@ public sealed class BotPatrol : IBotProposer
             return null;
         }
 
-        // <b>Asked with a refusal in hand, so that one unreachable square is not the whole map.</b> The worst
-        // square is an opinion about where blood is being spilt and knows nothing about whether a company can
-        // get there; without this the captain is shown that one square, is shown it again the instant the
-        // patrol fails, and the next four places on the list are never offered at all.
-        //
-        // A dictionary lookup and it must stay one — the reach ledger answers from pockets already proved by
-        // searches that failed, and a real search per candidate per captain per beat is the price the hunt's
-        // proposer paid once and wrote down. See BotHunter.Hunting.
         var square = BotPeril.Worst(
             map,
             body.Location,
@@ -157,7 +118,6 @@ public sealed class BotPatrol : IBotProposer
         return new BotSweep(map, square, reading);
     }
 
-    /// <summary>Whether the ground between the captain and a square is not already known to be closed.</summary>
     private static bool Reachable(Map map, Point3D from, Point3D square)
     {
         if (BotReach.Ask(map, from, square, BotArrival.Within(BotPeril.Side / 3)) != BotReachVerdict.Sealed)
@@ -170,7 +130,6 @@ public sealed class BotPatrol : IBotProposer
         return false;
     }
 
-    /// <summary>Bots near enough to be called on, who are able to fight and are not already in a company.</summary>
     private static int Free(Mobile body, int range)
     {
         var map = body.Map;

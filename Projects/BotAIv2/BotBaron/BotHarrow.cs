@@ -40,125 +40,30 @@ public sealed class BotHarrow : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHarrow));
 
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "harrow";
 
-    /// <summary>
-    /// How many tiles across the ground the company walks.
-    ///
-    /// <para>
-    /// Seventy-five, by order, and it is three times a peril square on purpose. The square is where the
-    /// deaths were recorded and it is only twenty-four tiles across — the resolution at which "a place"
-    /// means something to a map, not the resolution at which a wood empties. What actually killed people
-    /// there lives in the wood around it, so the errand is the neighbourhood and the square is only its
-    /// centre.
-    /// </para>
-    /// </summary>
     public static int Side { get; set; } = 75;
 
-    /// <summary>How many bodies march, the Baron included. The floor: a square that has eaten a company asks
-    /// for more. See <see cref="BotQuad.Levy"/>.</summary>
     public static int Company { get; set; } = 6;
 
-    /// <summary>
-    /// How many grandmasters a damned square asks for before anybody marches on it.
-    ///
-    /// <para>
-    /// Fifteen, by Patrick's order on 02.09.2026: ground that has swallowed thirty may be gathered against
-    /// "only from fifteen grandmasters and from four thousand of strength". It is a different kind of rule
-    /// from the levy above — that one is about how many, this one is about who — and a square earns it by
-    /// killing a company whole rather than by any amount of ordinary bad luck.
-    /// </para>
-    /// </summary>
     public static int Grandmasters { get; set; } = 15;
 
-    /// <summary>
-    /// The fighting power each of them must have, not the company's between them.
-    ///
-    /// <para>
-    /// Four thousand a head, by Patrick's correction on 02.09.2026: "four thousand per person, that is,
-    /// properly trained and equipped bots, and the mages must have their reagents." Power on this shard is
-    /// health times what a body hits for — see <c>BotThreat.Power</c> — so four thousand is not a figure a
-    /// bot reaches by being handed a sword: it is a bot that has grown and has been outfitted. Which is the
-    /// point. Damned ground is ground the population is not yet good enough for, and it should say so by
-    /// standing empty rather than by swallowing another company.
-    /// </para>
-    /// </summary>
     public static double Might { get; set; } = 4000.0;
 
-    /// <summary>
-    /// Reagents a caster must be carrying to count towards the company.
-    ///
-    /// <para>
-    /// By the same correction. A mage with an empty pack casts nothing from its book — <c>BotStrike.Ready</c>
-    /// refuses the spell — so on damned ground it is a body with a staff, and counting it is how a company
-    /// of fifteen arrives as a company of nine. Anybody carrying a spellbook is asked; everybody else is not.
-    /// </para>
-    /// </summary>
     public static int Reagents { get; set; } = 10;
 
-    /// <summary>The skill at which a bot counts as a grandmaster. The era's own ceiling.</summary>
     public static double GrandmasterAt { get; set; } = 100.0;
 
-    /// <summary>
-    /// Fewest worth setting out with once the muster has run its course.
-    ///
-    /// <para>
-    /// <b>Three, and the number moved because the rule around it did.</b> It was the full six, and six was
-    /// read as a gate: no six standing near, no harrowing, refused on the spot. That produced a Baron who
-    /// never left town while the graveyard filled up — the volunteers a shard has at any one instant are
-    /// whoever happens to be idle in that second, and asking for five of them at once is asking for a
-    /// coincidence. The order is now a muster: he stands in the square and calls for <see cref="MusterMs"/>,
-    /// and what this number does is decide whether what turned up is a company or an escort.
-    /// </para>
-    ///
-    /// <para>
-    /// Still separate from <see cref="Company"/>, which is what the squad will hold. One is the target, the
-    /// other is the floor, and they are different statements even when they happen to agree.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// <b>No longer the floor under a march, by Patrick's protocol of 05.09.2026.</b> A muster that has
-    /// not raised its full company when the clock runs out is dropped and rested, not set out with. Kept
-    /// because a floor is the kind of number this file may want again, and deleting it would take the
-    /// argument above with it.
-    /// </summary>
     public static int Least { get; set; } = 3;
 
-    /// <summary>
-    /// How long he stands in the square calling for volunteers before setting out with whoever came.
-    ///
-    /// <para>
-    /// Five minutes, by order. It ends early the moment <see cref="Company"/> have gathered — a muster that
-    /// waited out its clock with a full company would be five bots standing about for no reason.
-    /// </para>
-    /// </summary>
     public static int MusterMs { get; set; } = 300000;
 
-    /// <summary>
-    /// How long a Baron leaves the whole idea alone after a muster that came to nothing. Five minutes.
-    ///
-    /// <para>
-    /// <b>Patrick's order of 05.09.2026, and what it is against is a Baron who never stops asking.</b> A
-    /// muster levies bots — nobody volunteers, <see cref="Levy"/> takes them — so a call that fails and is
-    /// posted again on the next beat is a standing tax on the population's working time. Three musters in
-    /// four minutes called up 1837 bots and marched none of them.
-    /// </para>
-    ///
-    /// <para>
-    /// Kept against the Baron rather than against the square, because the order was "he leaves the idea and
-    /// comes back to it in ten minutes". A rest per square would let him work through a list of dire ground
-    /// one square at a time and never rest at all, which is the same tax under a longer name.
-    /// </para>
-    /// </summary>
     public static int RestMs { get; set; } = 600000;
 
-    /// <summary>Musters given up on, after which the Baron stands off the whole idea for <see cref="RestMs"/>.</summary>
     public static long Rested { get; private set; }
 
     private static readonly Dictionary<Serial, long> _resting = new();
 
-    /// <summary>Whether this Baron is standing off the idea of a harrowing altogether.</summary>
     public static bool Resting(Mobile body)
     {
         if (body == null || !_resting.TryGetValue(body.Serial, out var until))
@@ -166,7 +71,6 @@ public sealed class BotHarrow : BotDeed
             return false;
         }
 
-        // By subtraction against a stamp that was itself a real tick, never against a nought default.
         if (Core.TickCount - until < 0)
         {
             return true;
@@ -177,7 +81,6 @@ public sealed class BotHarrow : BotDeed
         return false;
     }
 
-    /// <summary>Stands this Baron off the idea for <see cref="RestMs"/>.</summary>
     public static void Rest(Mobile body)
     {
         if (body == null)
@@ -189,151 +92,42 @@ public sealed class BotHarrow : BotDeed
         Rested++;
     }
 
-    /// <summary>
-    /// Where the company forms up, or nought for the population's own home.
-    ///
-    /// <para>
-    /// <b>It was the bank counter, and a bank counter is not a square.</b> <c>BotGround.Counter</c> is the
-    /// only thing on this shard that knows where a town is at all, so it was the obvious anchor — and what it
-    /// actually answers is "where is the nearest place to put money", which put a Baron in full plate
-    /// standing in the queue at the bank while he called for a company. The two questions look alike and are
-    /// not: one is about coin and one is about assembly.
-    /// </para>
-    ///
-    /// <para>
-    /// The population's home is the honest default. It is where every bot on the island was raised, it is
-    /// what <c>bot-population.json</c> already calls the middle of things, and it needs no survey to be
-    /// known. Configuration may name somewhere else — the drill field was moved the same way.
-    /// </para>
-    /// </summary>
     public static Point3D Square { get; set; }
 
-    /// <summary>
-    /// How near the muster point he has to be to count as standing in the square.
-    ///
-    /// Not called <c>Post</c>, which is the name of the method that picks corners of the box a few dozen
-    /// lines down. Two things in one class that are both "a place to stand" and mean different places is the
-    /// kind of name collision the compiler catches today and a reader trips over for ever.
-    /// </summary>
     public static int Station { get; set; } = 2;
 
-    /// <summary>
-    /// How close a volunteer has to be standing to the muster point to count as having turned up.
-    ///
-    /// <para>
-    /// By Patrick's order on 02.09.2026: the Baron gathers the party in the square, waits until everybody has
-    /// come, and only then sets out for the quadrant. Until now the call ended when enough had <em>joined</em>
-    /// — and joining is instant while walking across Britain is not, so the company set off as a list of
-    /// names and reached the ground in single file, which is how six bots get killed one at a time by
-    /// something six of them together could beat.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>The five-minute call is no longer a backstop that marches short.</b> Patrick's protocol of
-    /// 05.09.2026: the company is the company, and a call that cannot raise it is dropped and rested. See
-    /// RestMs.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>Widened from eight to twenty-four on Patrick's order of 05.09.2026, and eight was not a zone, it
-    /// was a doorstep.</b> A company here can be twenty-one bodies — BotQuad.Levy raises the ask every time
-    /// a company is lost — and twenty-one bots do not fit in a circle eight tiles across without standing
-    /// on each other; the squad's own formation then places them where its stations are, which is further
-    /// out than that. So the count of who had turned up kept losing people who were standing perfectly well
-    /// at the muster: the recorded tally read "11 of 21 standing in it, 21 in the company" at 02:17, and
-    /// the eight tiles were the whole of the difference. Twenty-four is three squad stations deep and still
-    /// plainly one gathering rather than a district.
-    /// </para>
-    /// </summary>
     public static int Assembly { get; set; } = 24;
 
-    /// <summary>Corpses that finish the errand.</summary>
     public static int Quota { get; set; } = 20;
 
-    /// <summary>
-    /// The longest one harrowing may last, when the quota is never reached.
-    ///
-    /// Forty minutes, by order — a third again as long as a patrol's half hour, which is right for an errand
-    /// that has a count to fill rather than a reading to wait out.
-    /// </summary>
     public static int CapMs { get; set; } = 1800000;
 
-    /// <summary>
-    /// How far around the muster point he calls people up.
-    ///
-    /// <para>
-    /// <b>Forty tiles was a shout, and what is wanted is a summons.</b> At forty he was calling to whoever
-    /// happened to be crossing the same street, and on 27.08.2026 he stood in the square for the full five
-    /// minutes and nobody came at all. The population is spread over five hundred tiles by design; a call
-    /// that only reaches the next block is a call to an empty street.
-    /// </para>
-    /// </summary>
     public static int Reach { get; set; } = 200;
 
-    /// <summary>
-    /// How often the island is swept for bodies while the call is open.
-    ///
-    /// Two seconds. The sweep is a spatial query over two hundred tiles and the errand is asked ten times a
-    /// second; done every beat it would be two hundred sweeps for every one that could possibly find anybody
-    /// new, which is the shape of cost this project has paid for twice in the movement budget alone.
-    /// </summary>
     public static int SweepMs { get; set; } = 2000;
 
-    /// <summary>
-    /// The company he wants, by role: two who stand in the line, two who shoot, one who mends.
-    ///
-    /// <para>
-    /// <b>A want, not a requirement, and the difference is what keeps this from being another gate that
-    /// never opens.</b> The quota is filled first and by distance, so a Baron with three warriors and no
-    /// healer within reach still marches with three warriors — the alternative is the rule that stopped him
-    /// leaving town in the first place. What it buys is that the nearest five are not five of the same thing.
-    /// </para>
-    /// </summary>
     public static int Melee { get; set; } = 2;
 
     public static int Ranged { get; set; } = 2;
 
     public static int Medics { get; set; } = 1;
 
-    /// <summary>How far the company looks for something to kill, from wherever the Baron is standing.</summary>
     public static int Sight { get; set; } = 20;
 
-    /// <summary>
-    /// How long the company spends walking to one corner of the box before trying the next.
-    ///
-    /// Longer than a patrol's, because the box is three times as wide and a corner is twenty-five tiles out
-    /// rather than eight.
-    /// </summary>
     public static int RoundMs { get; set; } = 90000;
 
-    /// <summary>How many corners may turn out to be unwalkable before the ground is given up.</summary>
     public static int MaxBends { get; set; } = 4;
 
-    /// <summary>
-    /// What a harrowing is reckoned at per minute before experience corrects it.
-    ///
-    /// <para>
-    /// A company of six working ground that has been killing people, and the figure it is measured against
-    /// is what the five of them actually carried away. High, and it is meant to be: this is six bots' worth
-    /// of hunting concentrated on the one place that has proved it holds something. Nothing else the Baron
-    /// may take comes near it, which is what makes him walk the town only when there is nowhere to go.
-    /// </para>
-    /// </summary>
     public static double Prior { get; set; } = 150.0;
 
-    /// <summary>How long a harrowing is expected to take, walk and all.</summary>
     public static double WorkMinutes { get; set; } = 25.0;
 
-    /// <summary>Companies that formed and set out.</summary>
     public static long Marches { get; private set; }
 
-    /// <summary>Musters that ran their full course and still could not raise <see cref="Least"/> bodies.</summary>
     public static long Undermanned { get; private set; }
 
-    /// <summary>Musters called. Not marches: see <see cref="Undermanned"/> for the ones that came to nothing.</summary>
     public static long Musters { get; private set; }
 
-    /// <summary>Squares finished by filling the quota, and squares finished by the clock. Never one number.</summary>
     public static long Emptied { get; private set; }
 
     public static long Timedout { get; private set; }
@@ -368,41 +162,28 @@ public sealed class BotHarrow : BotDeed
 
     private Mobile _quarry;
 
-    /// <summary>Whether the company has been raised and is on its way. Never "is the squad null".</summary>
     private bool _marching;
 
-    /// <summary>How many this square asks for. See <see cref="BotQuad.Levy"/> — nought until the muster sets it.</summary>
     private int _wanted;
 
-    /// <summary>The levy, or the ordinary company before the muster has asked the map.</summary>
     private int Wanted => _wanted > 0 ? _wanted : Company;
 
-    /// <summary>How many marched, so that a company lost whole can be reported as the size it was.</summary>
     private int _marched;
 
-    /// <summary>How many of the called are standing in the square this moment. See <see cref="Assembly"/>.</summary>
     private int _here;
 
-    /// <summary>
-    /// Whether the call has been opened. A flag rather than "is the squad null", because the squad may be
-    /// replaced underneath this errand and the call has still been running the whole time — which is the
-    /// distinction the first version of this got wrong and paid for in every march it made.
-    /// </summary>
     private bool _mustering;
 
     private long _musteredTick;
 
-    /// <summary>Whether he has reached the muster point. The clock does not start until he has.</summary>
     private bool _atMuster;
 
-    /// <summary>The last muster tally written down, so that only changes are said. See Advance.</summary>
     private int _said0 = -1;
 
     private int _said1 = -1;
 
     private Point3D _muster;
 
-    /// <summary>When the island was last swept for bodies to call up. See <see cref="SweepMs"/>.</summary>
     private long _sweptTick;
 
     public BotHarrow(Map map, Point3D square, int dead)
@@ -426,20 +207,10 @@ public sealed class BotHarrow : BotDeed
 
     public override double Minutes => WorkMinutes;
 
-    /// <summary>
-    /// Nothing. The fights inside a harrowing are the shard's ordinary combat and are already credited where
-    /// they happen; naming a skill here would be claiming the same gain twice.
-    /// </summary>
     public override SkillName? Trains => null;
 
     public override int Outlay => 0;
 
-    /// <summary>
-    /// What the five of them have carried away since the company formed.
-    ///
-    /// See the note at the top: the Baron's own pack is empty at the end of every harrowing by design, and a
-    /// measure that read his pack would teach the ledger that this work is worthless.
-    /// </summary>
     public override int Made => _squad == null ? 0 : (int)Math.Max(0, _squad.Won - _won);
 
     public override bool Alongside => true;
@@ -468,25 +239,6 @@ public sealed class BotHarrow : BotDeed
         return _marching ? Harrowing(member, body) : Calling(member, body);
     }
 
-    /// <summary>
-    /// Standing in the square and calling, for five minutes, and then going with whoever came.
-    ///
-    /// <para>
-    /// <b>A muster, not a headcount, and the difference is the whole of why this class does anything at
-    /// all.</b> The first version of this asked how many free bots were standing within forty tiles at the
-    /// instant the offer was weighed, and refused outright if that was fewer than six. Read as arithmetic
-    /// that is correct; read as behaviour it is a Baron who never leaves town, because "five idle bots in one
-    /// place in one second" is a coincidence and not a state a working population is often in. Nobody was
-    /// asked. Nobody was given the chance to finish what they were doing and come.
-    /// </para>
-    ///
-    /// <para>
-    /// So he goes to the square, and he calls, and the population walks past him — to the bank, to the
-    /// shops, home from a hunt — and whoever is free when they pass falls in. Five minutes of that is worth
-    /// more than any instant's census. It ends early on a full company, because five bots standing about
-    /// waiting for a clock is exactly the waste this was meant to avoid.
-    /// </para>
-    /// </summary>
     private BotDoing Calling(IBotSquadMember member, Mobile body)
     {
         var squad = member.Squad ?? BotSquads.Form(member);
@@ -498,22 +250,12 @@ public sealed class BotHarrow : BotDeed
 
         var now = Core.TickCount;
 
-        // <b>Re-adopted every beat rather than remembered once.</b> A squad is an object, and the one this
-        // errand started with can be thrown away underneath it — that is what happened for the whole of
-        // 27.08.2026, and the symptom was a march that ended in the same second it began. Holding the
-        // reference from the first beat is the bug even now that the cause is fixed: an errand that can only
-        // work while nothing else touches the world is an errand waiting for the next thing that does.
         if (!ReferenceEquals(squad, _squad))
         {
-            // A different company means a different tally of what has been divided, so the mark it is
-            // measured from moves with it. Left behind, Made would read a new squad's takings against an old
-            // squad's baseline.
             _squad = squad;
             _won = squad.Won;
         }
 
-        // What this square asks for, which is the ordinary company until one has been lost here. The ladder
-        // is the square's own and it is kept by the map, so it survives a night and a restart.
         _wanted = BotQuad.Levy(_map, _square, Company);
 
         squad.Ceiling = _wanted;
@@ -548,10 +290,6 @@ public sealed class BotHarrow : BotDeed
         _called = squad.Count;
         _here = Gathered(squad);
 
-        // <b>The five minutes begin when he is standing in the square, not when he thought of it.</b>
-        // Patrick's protocol of 05.09.2026: declare, walk, and only then start counting. A clock started at
-        // the declaration is spent on the road — the muster point can be most of a town away — so a call
-        // that looked like five minutes of asking was however much of it was left when he arrived.
         if (!body.InRange(_muster, Station))
         {
             return BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"to the muster at ({_muster.X}, {_muster.Y})");
@@ -574,14 +312,6 @@ public sealed class BotHarrow : BotDeed
             );
         }
 
-        // <b>Every change in the tally is written down, because a count read off a screen is not evidence.</b>
-        // Patrick watched a muster read 1 of 21, then 6, then 24, then 1 again on 05.09.2026, and none of
-        // those numbers could be got out of the log: Gathered counts company members inside Assembly tiles
-        // of the point, squad.Ceiling is set to the same _wanted every beat, and BotSquads.Join refuses
-        // anybody over it — so twenty-four of twenty-one cannot come from this pair. Which means the screen
-        // is showing some other pair, and the way to find out which is to have this one on the record with
-        // all three populations named apart: who is standing here, who is in the company at all, and what
-        // was asked for. Said on change only, so a five-minute muster is a handful of lines.
         if (_here != _said0 || _called != _said1)
         {
             _said0 = _here;
@@ -600,35 +330,17 @@ public sealed class BotHarrow : BotDeed
             );
         }
 
-        // <b>The instant the company is whole, it marches.</b> No waiting out the clock with a full company,
-        // which is what the early exit has always been for; the change is what happens when the clock runs
-        // out instead. See below.
         if (_here < _wanted && now - _musteredTick < MusterMs)
         {
-            // Waiting is not walking. A walk to the tile the bot is already standing on never shortens, so
-            // the walker gave the journey up after about two minutes and the errand failed with "it got no
-            // nearer than 1 tiles" — 3 musters, 1837 bots called up, 0 marched, at 01:50 on 05.09.2026. The
-            // jam detector is safe on Work here: BotWill.LabourMs is fifteen minutes and this cannot outlive
-            // MusterMs.
             return BotDoing.Work($"calling at ({_muster.X}, {_muster.Y}): {_here} of {_wanted} gathered");
         }
 
-        // <b>Short at the bell means no march at all, and that is a change of rule made on Patrick's order.</b>
-        // This used to set out with whoever came down to Least — three — on the reasoning that a Baron who
-        // waits for a coincidence never leaves town. The order of 05.09.2026 is the other way about: the
-        // company is the company, and a call that cannot raise it is dropped for RestMs rather than answered
-        // with an escort. What made the old reasoning necessary was a muster that could not survive its own
-        // clock; with the clock fixed, five real minutes of levying is a fair test of whether the bodies
-        // exist, and marching six-strong work with three is how a harrowing becomes three more deaths on the
-        // square that is already on the board for having killed people.
         if (_here < _wanted)
         {
             Undermanned++;
 
             Rest(body);
 
-            // Let go rather than held. A Baron standing about with one volunteer is two bots not working, and
-            // the ground is still on the board for the next review.
             BotSquads.Leave(member);
 
             _squad = null;
@@ -639,18 +351,12 @@ public sealed class BotHarrow : BotDeed
             );
         }
 
-        // <b>Damned ground, and who may walk on it.</b> By order: a square that has swallowed thirty is
-        // gathered against only by fifteen grandmasters and four thousand of strength between them. Checked
-        // here rather than at the muster because it is a fact about who turned up, and the call stays open
-        // while it is not met — a Baron who cannot raise the company he needs waits for it, and the ground is
-        // still on the board either way.
         if (BotQuad.Damning(_map, _square) && !Fit(squad, out var ready, out var unarmed))
         {
             Unfit++;
 
             if (now - _musteredTick < MusterMs)
             {
-                // Waiting, not walking — the same correction as the muster above, for the same reason.
                 return body.InRange(_muster, Station)
                     ? BotDoing.Work($"calling for grandmasters at ({_muster.X}, {_muster.Y}): {ready} of {Grandmasters} fit")
                     : BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"calling for grandmasters at ({_muster.X}, {_muster.Y})");
@@ -674,20 +380,10 @@ public sealed class BotHarrow : BotDeed
 
         Marches++;
 
-        // Its own finder, because the ordinary one refuses anything a single bot could handle — which is
-        // correct for a muster and is the exact opposite of this errand. Set now rather than at the muster,
-        // so that a company standing in a town square is not quietly hunting the town.
         squad.Quarry = Prey;
 
-        // Stamped when the company actually sets out. The forty minutes are the harrowing's, and a clock that
-        // started when the call opened would spend a eighth of them standing in a square.
         _began = now;
 
-        // <b>Both numbers, because the rule between them is the one that changed.</b> The Baron now waits for
-        // bodies standing in the square rather than for names on a list — see Assembly — and a line that
-        // printed only one of the two could not show whether he waited or whether nobody was late. On
-        // 02.09.2026 the first march after the change read "6 of them" and told nobody that all six had
-        // spawned on the muster point a second earlier, which is a true sentence about an untested rule.
         logger.Information(
             "{Name} is marching {Count} of the {Called} called on ({X}, {Y}), where {Dead} have died, after {Waited:F1} minutes of calling",
             body.Name,
@@ -715,10 +411,6 @@ public sealed class BotHarrow : BotDeed
 
         if (_called < 2)
         {
-            // <b>Lost whole, and the map is told the size of what it took.</b> The next levy climbs by
-            // BotQuad.Reinforcement and a loss of BotQuad.DireLoss damns the ground outright — Patrick's
-            // order of 02.09.2026, that the crown keeps calling five more until the victory is won. Counted
-            // from what marched rather than from what is standing, because what is standing is the point.
             if (_marched > 0)
             {
                 BotQuad.LostCompany(_map, _square, _marched);
@@ -742,17 +434,9 @@ public sealed class BotHarrow : BotDeed
         {
             Timedout++;
 
-            // Cleared even so, and that is the order rather than an oversight. Half an hour of six bots
-            // walking a box seventy-five tiles across is the ground having been dealt with as thoroughly as
-            // this shard knows how; leaving the dead on the count afterwards would send the same company
-            // back to the same coordinates for ever, because the dead are the one number that never fades.
             return Finish(squad, $"{CapMs / 60000} minutes on ({_square.X}, {_square.Y}) was enough at {_kills} down", cleared: true);
         }
 
-        // Two distances rather than one, and the gap is what keeps the company on the ground. Arriving is a
-        // third of a side; leaving is the whole of it, because a Baron who steps out of the box after
-        // something that hit him has not abandoned the errand. Judged on one number this flaps, and the
-        // patrol paid for that lesson on 26.08.2026 — see BotSweep.
         var away = _standing ? Side : Side / 2;
 
         if (!body.InRange(_square, away))
@@ -777,12 +461,6 @@ public sealed class BotHarrow : BotDeed
             );
         }
 
-        // It walks rather than standing in the middle, for the two reasons the patrol has: a box this wide is
-        // not covered by a company parked at its centre, and an errand that only ever answers Work is
-        // invisible to BotWill.LabourMs, which fails anything that has done nothing else for a quarter of an
-        // hour. This errand's own cap is forty minutes, so the two clocks could not both be obeyed — and a
-        // failure marks the ground with caution, which would teach the whole population to avoid the very
-        // square the company was sent to empty.
         if (now - _steppedTick >= RoundMs || body.InRange(_post, 1))
         {
             _steppedTick = now;
@@ -798,17 +476,6 @@ public sealed class BotHarrow : BotDeed
         );
     }
 
-    /// <summary>
-    /// Corpses, counted off the company's own focus.
-    ///
-    /// <para>
-    /// <b>A kill is the thing the company was fighting ceasing to exist, and nothing else.</b> Counted per
-    /// beat while in contact, one skirmish reads as hundreds — the patrol reported 1064 fights for a single
-    /// half hour on 25.08.2026 and the number could not be acted on. Counted on the focus changing, a
-    /// creature that simply walked away counts as dead. So the remembered focus is only ever credited when
-    /// it is gone or down, and a focus that is replaced while still alive is replaced silently.
-    /// </para>
-    /// </summary>
     private void Count(BotSquad squad)
     {
         if (_quarry != null && (_quarry.Deleted || !_quarry.Alive))
@@ -826,23 +493,8 @@ public sealed class BotHarrow : BotDeed
         }
     }
 
-    /// <summary>
-    /// Where the company forms up: the named square, or the population's home when none is named.
-    ///
-    /// Not called <c>Where</c>: that name is already the undertaking's own — the place the work happens —
-    /// and for the whole of the muster the two are different places.
-    ///
-    /// Settled on the ground rather than taken as written, because a coordinate out of a configuration file
-    /// is two numbers and a guess at the third — the fault that put <c>(x, y, 0)</c> across the whole peril
-    /// map and failed ten patrols in a night.
-    /// </summary>
     private Point3D Rally(Mobile body)
     {
-        // <b>The edge of the town in the direction of the ground, before the town square.</b> Patrick's
-        // order of 03.09.2026, and the reason is the march: calling the levy on Britain's square puts six
-        // bots in the middle of a town they must then cross before they have gone anywhere. The gate on the
-        // right side is the shortest honest place to meet, and more of the population passes it. Outside a
-        // town Gate answers with nothing and the named square stands, exactly as it did.
         var gate = BotPopulation.Gate(_map, body.Location, _square);
 
         if (gate != Point3D.Zero)
@@ -860,31 +512,6 @@ public sealed class BotHarrow : BotDeed
         return named != Point3D.Zero ? named : body.Location;
     }
 
-    /// <summary>
-    /// Calls up the nearest bodies that can fight, whatever they were doing.
-    ///
-    /// <para>
-    /// <b>Nobody is asked, and this is the one place on the shard where that is true.</b> Every other company
-    /// here is made of bots that were free and came because they were free — the patrol says so at length and
-    /// it is right to. A harrowing cannot be built that way and the evening of 27.08.2026 proved it: the
-    /// Baron stood in the square for the full five minutes and not one bot was idle at the moment he looked.
-    /// A population that is working well is a population with no volunteers in it.
-    /// </para>
-    ///
-    /// <para>
-    /// So it is a levy. What the bot was doing is set aside rather than thrown away — being in a company puts
-    /// it on the <c>Bound</c> rung and its own errand is still underneath when the company ends — which is
-    /// the same thing that happens to anybody who joins a muster, and is why this costs the population an
-    /// interruption rather than a job.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>The producers are exempt, by order, and it is the right exemption.</b> A smith, a miner and the
-    /// Architect are the three trades whose work is a chain — ore to ingots to armour, on the board, for
-    /// somebody else — and breaking one link idles everything downstream of it. They are also the three worst
-    /// at the thing they would be called up to do.
-    /// </para>
-    /// </summary>
     private void Levy(BotSquad squad, Mobile body)
     {
         if (squad.Count >= Wanted)
@@ -894,8 +521,6 @@ public sealed class BotHarrow : BotDeed
 
         _muster = _muster != Point3D.Zero ? _muster : Rally(body);
 
-        // The quota first, nearest of each, then anybody at all to fill the rest. Two passes over one
-        // gathered list rather than four spatial sweeps: the sweep is the expensive half.
         _called0.Clear();
 
         foreach (var mobile in _map.GetMobilesInRange<Mobile>(_muster, Reach))
@@ -926,36 +551,6 @@ public sealed class BotHarrow : BotDeed
         Take(squad, null, Wanted);
     }
 
-    /// <summary>
-    /// Whether this company may walk on ground the map has damned: grandmasters enough, and strength enough.
-    ///
-    /// <para>
-    /// A grandmaster is a bot with any skill at the era's own ceiling, which is what the word means on this
-    /// shard and is not a number this file gets to invent. Strength is the population's own reckoning of
-    /// fighting power — see <c>BotThreat.Power</c>, health times what it hits for — added up across whoever
-    /// answered, because that is the thing the ground will be measured against.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// How many bots alive on this shard could walk on damned ground, asked of the whole population.
-    ///
-    /// <para>
-    /// <b>The test existed and was applied after the company had been raised, which is the wrong end of
-    /// it.</b> A square at the bleakest reading may be walked only by <see cref="Grandmasters"/> of them —
-    /// and on 05.09.2026 the Baron muster</see>ed twenty-one bots against (855, 1695) at -1.00, failed that
-    /// test because a population four hours old has no grandmasters at all, went on calling because the
-    /// clock had not run out, and had the company taken apart under him by its own beat for having nowhere
-    /// to be. The recorded tally reads 2 of 21, then 21 of 21, then 2, then 21, once a second: nineteen bots
-    /// pulled off their work and handed back every second for five minutes.
-    /// </para>
-    ///
-    /// <para>
-    /// So it is asked before anybody is called. The same rule <c>BotArmourer</c> states about the board — a
-    /// want nobody can fill is worse than an empty one — said about a company nobody can raise. Counted over
-    /// the population rather than over a squad, which is the only honest way to ask "could this island field
-    /// one at all".
-    /// </para>
-    /// </summary>
     public static int Musterable()
     {
         var bots = BotPopulation.Bots;
@@ -1007,8 +602,6 @@ public sealed class BotHarrow : BotDeed
                 continue;
             }
 
-            // Each of the three, of the same bot. A company that averages the requirement is a company where
-            // six carry the other nine, and the ground has already shown what it does to those nine.
             if (!Master(body) || BotThreat.Power(body) < Might)
             {
                 continue;
@@ -1027,7 +620,6 @@ public sealed class BotHarrow : BotDeed
         return ready >= Grandmasters;
     }
 
-    /// <summary>How many of the company are actually standing in the square. See <see cref="Assembly"/>.</summary>
     private int Gathered(BotSquad squad)
     {
         if (squad == null || _muster == Point3D.Zero)
@@ -1051,7 +643,6 @@ public sealed class BotHarrow : BotDeed
         return here;
     }
 
-    /// <summary>Whether any of this bot's skills stands at the era's ceiling.</summary>
     private static bool Master(Mobile body)
     {
         var skills = body?.Skills;
@@ -1072,8 +663,6 @@ public sealed class BotHarrow : BotDeed
         return false;
     }
 
-
-    /// <summary>How many reagents of any kind are in the pack. One type check covers every herb in the era.</summary>
     private static int Herbs(Mobile body)
     {
         var pack = body?.Backpack;
@@ -1096,10 +685,8 @@ public sealed class BotHarrow : BotDeed
         return held;
     }
 
-    /// <summary>Musters turned away from damned ground for want of grandmasters. See <see cref="Fit"/>.</summary>
     public static long Unfit { get; private set; }
 
-    /// <summary>Fills up to <paramref name="most"/> places from the gathered list, nearest first.</summary>
     private void Take(BotSquad squad, BotRole? role, int most)
     {
         var taken = 0;
@@ -1124,32 +711,10 @@ public sealed class BotHarrow : BotDeed
     private static int Apart(Mobile a, Mobile b) =>
         Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
 
-    /// <summary>
-    /// Bodies gathered by one sweep. Static and reused: the levy runs on the population's beat and a fresh
-    /// list every two seconds is garbage for nothing.
-    /// </summary>
     private static readonly System.Collections.Generic.List<BotMobile> _called0 = [];
 
-    /// <summary>Bots called up, all told. What a harrowing costs the rest of the island.</summary>
     public static long Called { get; private set; }
 
-    /// <summary>
-    /// Everything alive inside the box that is not a bot, a shopkeeper, somebody's pet or standing on
-    /// guarded ground.
-    ///
-    /// <para>
-    /// <b>Nearest, not strongest, and that is the order as given.</b> Everything that moves, so there is
-    /// nothing to rank: the company works outwards from wherever it stands and the box empties from the
-    /// inside. Bots need no exclusion of their own — they are players to the engine and this only ever asks
-    /// about creatures — which is a far better guarantee than a rule somebody has to remember to write.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>The town is excluded on the creature rather than on the leader.</b> Asked of the Baron, the answer
-    /// would be "he is outside a town, so anything goes" — and a thing standing three tiles inside the gate
-    /// would be attacked by six bots in front of the guards. Asked of the creature, the gate is the line.
-    /// </para>
-    /// </summary>
     private BaseCreature Prey(Mobile leader)
     {
         var map = leader?.Map;
@@ -1175,8 +740,6 @@ public sealed class BotHarrow : BotDeed
                 continue;
             }
 
-            // Outside the ground the company was sent to. Without this the box is a suggestion: one thing
-            // running north takes six bots with it and the square is never walked.
             if (Math.Abs(creature.X - _square.X) > edge || Math.Abs(creature.Y - _square.Y) > edge)
             {
                 continue;
@@ -1206,14 +769,6 @@ public sealed class BotHarrow : BotDeed
         return nearest;
     }
 
-    /// <summary>
-    /// The next place inside the box to walk to: the middle and the four corners, in turn, each on its own
-    /// ground.
-    ///
-    /// A corner's height is looked up rather than carried sideways from the middle — a box this wide crosses
-    /// hillsides, and a walk to a corner at the middle's height is a walk to nowhere. That fault put
-    /// <c>(x, y, 0)</c> on the whole peril map and failed ten patrols in one night.
-    /// </summary>
     private Point3D Post(int round)
     {
         var reach = Math.Max(2, Side / 3);
@@ -1237,15 +792,8 @@ public sealed class BotHarrow : BotDeed
     {
         if (cleared)
         {
-            // The whole box, not the cell at its middle. The company walked all of it; clearing one cell
-            // would offer the Baron the next cell of the ground he has just spent the afternoon on.
             BotPeril.Cleared(_map, _square, Side / 2);
 
-            // <b>And the standing reputation of the ground, which is the map the Baron is now sent by.</b>
-            // The square he was sent to and the eight around it, because the box he walks is Side tiles
-            // across and a quadrant is BotQuad.Side — so the neighbours are ground his company genuinely
-            // covered, not ground being cleared on his behalf. Set to nothing rather than to safe: what a
-            // company killed everything in is not safe, nobody has walked it since. See BotQuad.Cleared.
             var quad = BotQuad.Known(_map, _square);
 
             if (quad != null)
@@ -1264,7 +812,6 @@ public sealed class BotHarrow : BotDeed
         return BotDoing.Done($"{why} — {_called} of us, {Made}gp between them");
     }
 
-    /// <summary>The way to the next corner does not exist. Somewhere else inside the same box, or give up.</summary>
     public override bool Bend(IBotWilful bot)
     {
         if (!_standing || ++_bends > MaxBends)
@@ -1280,13 +827,6 @@ public sealed class BotHarrow : BotDeed
         return true;
     }
 
-    /// <summary>
-    /// Everything the charge switched on, switched off, whichever way the errand ended.
-    ///
-    /// Left set, a company whose Baron died would stand in a wood until the world was reloaded: the quiet
-    /// clock is the only thing that disbands a squad nobody is fighting, and the charge is exactly what
-    /// turns it off.
-    /// </summary>
     public override void Drop(IBotWilful bot)
     {
         Release(_squad);

@@ -39,124 +39,43 @@ public static class BotVigil
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotVigil));
 
-    /// <summary>How often the population is measured. Cheap: a pass over the roll and no allocation worth naming.</summary>
     public static int SampleMs { get; set; } = 2000;
 
-    /// <summary>How often the debugger moves to stand beside somebody else.</summary>
     public static int HoverMs { get; set; } = 20000;
 
-    /// <summary>
-    /// How often it is asked what the worst thing in front of it is.
-    ///
-    /// <para>
-    /// <b>Ten minutes, and it used to be two.</b> The debugger is not here to keep up with the shard; it is
-    /// here to think about it. Every question it asks costs the population its model — see
-    /// <see cref="Model"/> — so asking rarely and answering well is strictly better than asking often and
-    /// answering fast, which is the opposite of the trade the three minds make.
-    /// </para>
-    /// </summary>
     public static int ReportMs { get; set; } = 600000;
 
-    /// <summary>
-    /// How often it is asked the expensive question, with thinking switched on.
-    ///
-    /// Half an hour. One of these holds the card for a cold load, a long think and another cold load back,
-    /// and the three minds decide nothing throughout. That is worth paying twice an hour for the one question
-    /// nothing else on this shard asks, and is not worth paying twenty times.
-    /// </summary>
     public static int ReflectMs { get; set; } = 1800000;
 
-    /// <summary>
-    /// The model the debugger thinks with, which is deliberately not the one the population thinks with.
-    ///
-    /// <para>
-    /// <b>The three minds and the debugger want opposite things, and one graphics card cannot give both.</b>
-    /// A mind is asked every twenty seconds and must answer in a second or two, so it needs the fastest model
-    /// that can name a trade. The debugger is asked twice an hour and is asked to explain several symptoms at
-    /// once, which is the hardest question anything on this shard is asked; how long it takes matters not at
-    /// all.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>Measured rather than assumed, on 01.09.2026, on the real reflection question.</b> The population's
-    /// own <c>qwen3.5:9b</c> thought for 116 seconds, produced 24,000 characters of reasoning and returned an
-    /// empty answer — it fails this question outright, and nobody would have known because the reflection had
-    /// never yet run. <c>qwen3:14b</c> answered in 32 seconds, correctly, and named one symptom.
-    /// <c>deepseek-r1:14b</c> answered in 44 seconds and did what was actually asked: tied the idle bots, the
-    /// abandoned errands and the path counters into one account, and gave a falsifiable test for it.
-    /// </para>
-    ///
-    /// <para>
-    /// Nine gigabytes against the card's twelve, so it cannot be resident beside the population's model and
-    /// every question the debugger asks costs two cold loads. That is what <see cref="KeepAlive"/> and the
-    /// cadences above are for: it must let go of the card the moment it has finished.
-    /// </para>
-    /// </summary>
     public static string Model { get; set; } = "deepseek-r1:14b";
 
-    /// <summary>
-    /// How long the debugger's model stays in video memory after it has answered.
-    ///
-    /// <para>
-    /// <b>Seconds, not minutes, and this is the setting that keeps the debugger from ruining the shard.</b>
-    /// The population's model holds the card for half an hour at a time by design. If the debugger's held it
-    /// for the same, every one of the three minds' questions for the next half hour would evict a nine-
-    /// gigabyte model and load a six-gigabyte one back, twice a minute, and the population would stop
-    /// thinking altogether — because of the thing watching it.
-    /// </para>
-    /// </summary>
     public static string KeepAlive { get; set; } = "10s";
 
-    /// <summary>
-    /// How long the debugger will wait for its own answer. Longer than the minds', because it has to cover a
-    /// cold load of nine gigabytes and a long think on top of it.
-    /// </summary>
     public static int TimeoutMs { get; set; } = 420000;
 
-    /// <summary>
-    /// How long a bot may hold no work at all before it is worth a number of its own.
-    ///
-    /// Three minutes: the auction comes round every fifteen seconds, so a bot that has been offered nothing
-    /// twelve times running is not between jobs.
-    /// </summary>
     public static int LoiterMs { get; set; } = 180000;
 
-    /// <summary>How many bots are described in full in one report. The rest are in the counts.</summary>
     public static int Rows { get; set; } = 6;
 
-    /// <summary>How many past findings are recited back at a reflection.</summary>
     public static int Recall { get; set; } = 6;
 
-    /// <summary>How much of the shard's own instrumentation is quoted, in characters.</summary>
     public static int SubsystemBudget { get; set; } = 1800;
 
-    /// <summary>
-    /// The most a question may be, in characters, before it is cut.
-    ///
-    /// <para>
-    /// <b>Every question the debugger asked between three in the morning and nine went unanswered, and this
-    /// is why.</b> The prompt grows on its own: findings accumulate, the long memory accumulates, the
-    /// session's own history accumulates. Measured over one night it went 14780 → 17467 → 19981 characters,
-    /// which against a context of 8192 tokens leaves a thinking model no room to think in — so it thinks,
-    /// runs out, and returns an empty answer. Forty-two reports and twelve reflections came back unreadable
-    /// and the only symptom was silence, which is exactly what a healthy quiet night looks like.
-    /// </para>
-    ///
-    /// <para>
-    /// Cut here rather than by raising the context, and the reasoning is the card again: this model is nine
-    /// gigabytes of a twelve-gigabyte card, and doubling the context adds gigabytes of key-value cache that
-    /// would push it onto the processor. A bound that cannot be exceeded is also worth more than a bigger
-    /// bound that can: this one cannot grow silently, because what is cut is said in the prompt itself.
-    /// </para>
-    /// </summary>
     public static int MostChars { get; set; } = 9000;
 
-    /// <summary>What it is called. Its findings are written under this name.</summary>
     public static string Name { get; set; } = "Argus";
 
-    private static readonly Dictionary<Serial, BotWatch> _watch = [];
+    public static string[] Helpers { get; set; } = ["Lynceus", "Heimdall"];
 
-    private static readonly List<string> _found = [];
+    public static int[] Hues { get; set; } = [33, 99, 63];
+
+    public static readonly List<BotWatcher> Squad = [];
+
+    public static BotWatcher Lead => Squad.Count > 0 ? Squad[0] : null;
+
+    private static int _reflectTurn;
+
+    private static readonly Dictionary<Serial, BotWatch> _watch = [];
 
     private static readonly Dictionary<string, int> _rungs = [];
 
@@ -170,32 +89,105 @@ public static class BotVigil
 
     private static long _hoveredTick;
 
-    private static long _reportedTick;
-
     private static long _reflectedTick;
 
     private static long _wokeTick;
 
     private static bool _asking;
 
-    private static string _wanted;
+    public static BotDebugger Body => Lead?.Body;
 
-    private static string _because = "it was the first bot I saw";
+    public static BotDebugNote Last => Lead?.Last;
 
-    /// <summary>The body, or null while it has none.</summary>
-    public static BotDebugger Body { get; private set; }
+    public static long Asked
+    {
+        get
+        {
+            var n = 0L;
 
-    /// <summary>The last thing it claimed, recited back to it next time.</summary>
-    public static BotDebugNote Last { get; private set; }
+            for (var i = 0; i < Squad.Count; i++)
+            {
+                n += Squad[i].Asked;
+            }
 
-    /// <summary>Questions asked, findings written, and times it looked and said the shard was fine.</summary>
-    public static long Asked { get; private set; }
+            return n;
+        }
+    }
 
-    public static long Findings { get; private set; }
+    public static long Findings
+    {
+        get
+        {
+            var n = 0L;
 
-    public static long Quiet { get; private set; }
+            for (var i = 0; i < Squad.Count; i++)
+            {
+                n += Squad[i].Findings;
+            }
 
-    public static long Reflections { get; private set; }
+            return n;
+        }
+    }
+
+    public static long Quiet
+    {
+        get
+        {
+            var n = 0L;
+
+            for (var i = 0; i < Squad.Count; i++)
+            {
+                n += Squad[i].Quiet;
+            }
+
+            return n;
+        }
+    }
+
+    public static long Reflections
+    {
+        get
+        {
+            var n = 0L;
+
+            for (var i = 0; i < Squad.Count; i++)
+            {
+                n += Squad[i].Reflections;
+            }
+
+            return n;
+        }
+    }
+
+    public static BotWatcher Called(string name)
+    {
+        for (var i = 0; i < Squad.Count; i++)
+        {
+            if (string.Equals(Squad[i].Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return Squad[i];
+            }
+        }
+
+        return null;
+    }
+
+    public static IReadOnlyList<(string Name, Map Map, Point3D At)> Standing()
+    {
+        List<(string, Map, Point3D)> rows = [];
+
+        for (var i = 0; i < Squad.Count; i++)
+        {
+            var body = Squad[i].Body;
+
+            if (body is { Deleted: false } && body.Map != null && body.Map != Map.Internal)
+            {
+                rows.Add((Squad[i].Name, body.Map, body.Location));
+            }
+        }
+
+        return rows;
+    }
 
     public static bool Running => _timer != null;
 
@@ -204,28 +196,41 @@ public static class BotVigil
         Stop();
 
         _watch.Clear();
-        _found.Clear();
 
         BotAudit.Reset();
 
-        Asked = 0;
-        Findings = 0;
-        Quiet = 0;
-        Reflections = 0;
-        Last = null;
         _asking = false;
-        _wanted = null;
+        _reflectTurn = 0;
 
         var now = Core.TickCount;
 
         _wokeTick = now;
         _sampledTick = now;
         _hoveredTick = now;
-        _reportedTick = now;
         _reflectedTick = now;
 
+        Squad.Clear();
+        Squad.Add(new BotWatcher(Name, Hues.Length > 0 ? Hues[0] : BotDebugger.RobeHue, 0));
+
+        for (var i = 0; i < Helpers.Length; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(Helpers[i]))
+            {
+                Squad.Add(new BotWatcher(Helpers[i].Trim(), Hues.Length > i + 1 ? Hues[i + 1] : BotDebugger.RobeHue, i + 1));
+            }
+        }
+
+        for (var i = 0; i < Squad.Count; i++)
+        {
+            Squad[i].ReportedTick = now - ReportMs * i / Math.Max(1, Squad.Count);
+        }
+
         Purge();
-        Embody();
+
+        for (var i = 0; i < Squad.Count; i++)
+        {
+            Embody(Squad[i]);
+        }
 
         _timer = new VigilTimer(TimeSpan.FromMilliseconds(Math.Max(250, SampleMs)));
         _timer.Start();
@@ -237,28 +242,19 @@ public static class BotVigil
         _timer = null;
     }
 
-    /// <summary>The body goes with the world it stood in. Called on a reload.</summary>
     public static void Reset()
     {
         Stop();
 
-        Body?.Delete();
-        Body = null;
+        for (var i = 0; i < Squad.Count; i++)
+        {
+            Squad[i].Body?.Delete();
+            Squad[i].Body = null;
+        }
 
         _watch.Clear();
     }
 
-    /// <summary>
-    /// Deletes any debugger that came back from the world save.
-    ///
-    /// <para>
-    /// <b>The same decision the population made, for the same reason.</b> Nothing about this body is worth
-    /// keeping — it holds no state, its whole memory is in this file and its log — and a saved one would
-    /// come back beside the fresh one every restart until there were a dozen invisible figures standing in
-    /// Britain. It is written into the save at all only because the engine writes every mobile; being read
-    /// back and deleted is the cheapest way to be sure of that.
-    /// </para>
-    /// </summary>
     private static void Purge()
     {
         List<BotDebugger> stale = [];
@@ -282,8 +278,7 @@ public static class BotVigil
         }
     }
 
-    /// <summary>Raises the body, next to the population, or says why it could not.</summary>
-    private static void Embody()
+    private static void Embody(BotWatcher w)
     {
         var map = BotPopulation.Home;
 
@@ -294,16 +289,18 @@ public static class BotVigil
             return;
         }
 
-        Body = new BotDebugger();
-        Body.Awaken(Name);
-        Body.Hover(map, BotPopulation.Where);
+        w.Body = new BotDebugger();
+        w.Body.Awaken(w.Name, w.Hue);
+        w.Body.Hover(map, BotPopulation.Where);
 
         logger.Information(
-            "{Name} the debugger is awake at {Where} on {Map}, invisible to everyone below {Rank}, and writing to {Log}",
-            Name,
+            "{Name} the watcher is awake at {Where} on {Map} in a robe of hue {Hue}, invisible to everyone below {Rank}, charged with {Charge}; it writes to {Log}",
+            w.Name,
             BotPopulation.Where,
             map,
+            w.Hue,
             BotDebugger.SeenBy,
+            w.Charge,
             BotDebugLog.Path ?? "nowhere"
         );
     }
@@ -320,25 +317,21 @@ public static class BotVigil
 
         _sampledTick = now;
 
-        if (Body is not { Deleted: false })
+        for (var i = 0; i < Squad.Count; i++)
         {
-            // The body can be lost — a reload, a stray delete — and a debugger without one measures nothing
-            // and says nothing about it. Raising a new one is cheap and the alternative is silence.
-            Embody();
-
-            if (Body == null)
+            if (Squad[i].Body is not { Deleted: false })
             {
-                return;
+                Embody(Squad[i]);
             }
+        }
+
+        if (Lead?.Body == null)
+        {
+            return;
         }
 
         Sample(now, since);
 
-        // <b>Before anything that needs the model, and never gated on it.</b> The roll-call is arithmetic
-        // and must fire on its own clock whatever the card is doing: a check that only runs when a model is
-        // free is a check that stops exactly when the shard is busiest.
-        // The door, before anything else and never gated on the model: a question that can be answered from
-        // measurements already taken should not wait behind one that cannot.
         BotConsole.Listen(now);
 
         if (BotAudit.Due(now))
@@ -346,27 +339,31 @@ public static class BotVigil
             BotAudit.Sweep(now, Rollcall());
         }
 
+        BotHalls.Beat(BotPopulation.Home, now);
+
         if (now - _hoveredTick >= HoverMs)
         {
             _hoveredTick = now;
 
-            Follow();
+            for (var i = 0; i < Squad.Count; i++)
+            {
+                var w = Squad[i];
+
+                if (i == 0 && !BotHalls.Charted && BotHalls.Probing != Point3D.Zero && w.Body is { Deleted: false })
+                {
+                    w.Body.Hover(BotPopulation.Home, BotHalls.Probing);
+                }
+                else
+                {
+                    Follow(w);
+                }
+            }
         }
 
-        // World.Saving as well as the slot: the transport answers "no" to both by calling straight back with
-        // nothing, and a debugger that treats that as an unreadable answer writes a warning to the log every
-        // two seconds for the length of a save.
-        // Judged first and on every beat, because a revel whose time is up should pay before anything else
-        // is thought about. Costs a tick comparison when none is running, which is nearly always.
         BotRevel.Settle();
 
-        // And the other half of a hunt: something to hunt. Called every beat for the same reason as the line
-        // above — a wave that is dead should be followed by the next one, and a revel that has ended should
-        // leave nothing behind. See BotWaves.
         BotWaves.Muster();
 
-        // The crown's own income, on the same beat and just as cheap when it is not due: two ticks compared.
-        // See BotRevel.Tax — the prize money has to come from somewhere, and it comes from the guilds.
         BotRevel.Tax();
 
         if (_asking || !BotOllama.Free || World.Saving)
@@ -374,8 +371,6 @@ public static class BotVigil
             return;
         }
 
-        // A person's question first of all, for the reason Consider gives at length: it is the rarest thing
-        // that ever wants this slot and the only one with somebody waiting on the answer.
         if (_pending != null)
         {
             var question = _pending;
@@ -389,8 +384,6 @@ public static class BotVigil
             return;
         }
 
-        // Something for the population to do, when the quarter of an hour is up and the model is free. Asked
-        // before the ordinary look because it is rarer and would otherwise never get the slot. See BotRevel.
         if (BotRevel.Due())
         {
             Revel();
@@ -398,27 +391,42 @@ public static class BotVigil
             return;
         }
 
-        if (now - _reflectedTick >= ReflectMs)
+        if (now - _reflectedTick >= ReflectMs && Squad.Count > 0)
         {
             _reflectedTick = now;
-            _reportedTick = now;
 
-            Reflect(now);
+            var thinker = Squad[_reflectTurn % Squad.Count];
+
+            _reflectTurn++;
+            thinker.ReportedTick = now;
+
+            Reflect(thinker, now);
 
             return;
         }
 
-        var waited = now - _reportedTick;
+        BotWatcher due = null;
 
-        if (waited >= ReportMs)
+        for (var i = 0; i < Squad.Count; i++)
         {
-            _reportedTick = now;
+            var w = Squad[i];
 
-            Look(now, waited);
+            if (now - w.ReportedTick >= ReportMs && (due == null || w.ReportedTick < due.ReportedTick))
+            {
+                due = w;
+            }
+        }
+
+        if (due != null)
+        {
+            var waited = now - due.ReportedTick;
+
+            due.ReportedTick = now;
+
+            Look(due, now, waited);
         }
     }
 
-    /// <summary>One pass over the population. Everything this file later says was measured here.</summary>
     private static void Sample(long now, long since)
     {
         var bots = BotPopulation.Bots;
@@ -441,8 +449,6 @@ public static class BotVigil
             watch.Sample(now, since);
         }
 
-        // Bots deleted since the last pass leave rows behind that would go on being reported for ever, and a
-        // report about a bot that no longer exists is the purest kind of false finding.
         if (_watch.Count <= bots.Count)
         {
             return;
@@ -464,112 +470,82 @@ public static class BotVigil
         }
     }
 
-    /// <summary>
-    /// Goes and stands beside whoever most wants looking at.
-    ///
-    /// <para>
-    /// <b>Standing there changes nothing and that is the point of the body.</b> The measurements are taken
-    /// off the whole population from anywhere; being beside a bot buys the region it is in, what is around
-    /// it, and a person watching over the debugger's shoulder being able to see what it is talking about.
-    /// If a place ever mattered to a measurement, that measurement would be wrong.
-    /// </para>
-    ///
-    /// <para>
-    /// The model's own request comes first when it made one, then whoever scores worst, and failing both it
-    /// keeps moving round the population rather than standing still: a watcher parked beside the one healthy
-    /// bot on the shard is worse than one that wanders.
-    /// </para>
-    /// </summary>
-    private static void Follow()
+    private static void Follow(BotWatcher w)
     {
         BotWatch pick = null;
-        var worst = 0.0;
 
-        foreach (var (_, watch) in _watch)
+        if (w.Wanted != null)
         {
-            if (watch.Bot is not { Deleted: false })
+            foreach (var (_, watch) in _watch)
             {
-                continue;
-            }
+                if (watch.Bot is { Deleted: false } && string.Equals(watch.Name, w.Wanted, StringComparison.OrdinalIgnoreCase))
+                {
+                    pick = watch;
+                    w.Because = "you asked to watch this one";
 
-            if (_wanted != null && string.Equals(watch.Name, _wanted, StringComparison.OrdinalIgnoreCase))
-            {
-                pick = watch;
-                _because = "you asked to watch this one";
-                _wanted = null;
-
-                break;
-            }
-
-            if (watch.Suspicion > worst)
-            {
-                worst = watch.Suspicion;
-                pick = watch;
+                    break;
+                }
             }
         }
+
+        w.Wanted = null;
 
         if (pick == null)
         {
-            // Nobody has a symptom. Move anyway, to whoever has come least far in its trade: that is the bot
-            // a question about development is most likely to be answerable beside.
-            var least = double.MaxValue;
+            List<BotWatch> sorted = [];
 
             foreach (var (_, watch) in _watch)
             {
-                if (watch.Bot is { Deleted: false } && watch.Progress < least)
+                if (watch.Bot is { Deleted: false })
                 {
-                    least = watch.Progress;
-                    pick = watch;
+                    sorted.Add(watch);
                 }
             }
 
-            if (pick != null)
+            if (sorted.Count == 0)
             {
-                _because = $"nobody has a symptom, so I went to the least developed of them at {pick.Progress:P0}";
+                return;
+            }
+
+            sorted.Sort((a, b) => b.Suspicion.CompareTo(a.Suspicion));
+
+            var slot = Math.Min(w.Rank, sorted.Count - 1);
+
+            if (sorted[slot].Suspicion > 0.0)
+            {
+                pick = sorted[slot];
+                w.Because = string.IsNullOrWhiteSpace(pick.Symptoms)
+                    ? "it was among the worst of an untroubled population"
+                    : pick.Symptoms;
+            }
+            else
+            {
+                sorted.Sort((a, b) => a.Progress.CompareTo(b.Progress));
+                pick = sorted[slot];
+                w.Because = $"nobody has a symptom, so I went to one of the least developed of them at {pick.Progress:P0}";
             }
         }
-        else if (worst > 0.0 && _wanted == null)
-        {
-            _because = string.IsNullOrWhiteSpace(pick.Symptoms)
-                ? "it was the worst of an untroubled population"
-                : pick.Symptoms;
-        }
-
-        // Cleared whether or not it was found. A request for a bot that has since died would otherwise be
-        // retried on every hop for the rest of the session, and the debugger would spend its life trying to
-        // reach somebody who is not there while the suspicion ranking sat unused.
-        _wanted = null;
 
         var bot = pick?.Bot;
 
-        if (bot is not { Deleted: false } || bot.Map == null || bot.Map == Map.Internal)
+        if (bot is not { Deleted: false } || bot.Map == null || bot.Map == Map.Internal || w.Body is not { Deleted: false })
         {
             return;
         }
 
-        Body.Hover(bot.Map, bot.Location);
+        w.Body.Hover(bot.Map, bot.Location);
     }
 
-    /// <summary>The frequent question. No thinking: this one is mostly reading, and it must not hold the slot.</summary>
-    /// <summary>
-    /// Asks the model to think of something for the population to do, and declares whatever comes back.
-    ///
-    /// <para>
-    /// It is handed the same picture of the shard the ordinary look gets — what is being taken on, what is
-    /// short, who is idle, what the market holds — because the whole point is that the revel should answer
-    /// the shard's actual state rather than be a random party. "nothing" is an allowed and expected answer.
-    /// </para>
-    /// </summary>
     private static void Revel()
     {
         _asking = true;
 
         var report = BotDebugSight.Report(
-            Beside(),
+            Beside(Lead),
             Census(),
             "",
             [],
-            Subsystems(SubsystemBudget),
+            Subsystems(null, SubsystemBudget),
             "",
             0
         );
@@ -586,7 +562,6 @@ public static class BotVigil
         );
     }
 
-    /// <summary>What came back, bounded by this shard's own rules before any of it touches the world.</summary>
     private static void Revelled(string json, long waited)
     {
         _asking = false;
@@ -607,8 +582,6 @@ public static class BotVigil
             return;
         }
 
-        // A trade no proposer answers to would be a price rise on nothing, and nothing about that is
-        // visible: the bonus applies, nobody notices, nobody is paid. Said aloud instead. See BotRevel.Known.
         if (!BotRevel.Known(plan.Kind))
         {
             logger.Warning(
@@ -624,7 +597,7 @@ public static class BotVigil
         BotDebugLog.Write($"revel after {waited}ms — {said}");
     }
 
-    private static void Look(long now, long waited)
+    private static void Look(BotWatcher w, long now, long waited)
     {
         var roster = Roster();
 
@@ -634,60 +607,93 @@ public static class BotVigil
         }
 
         _asking = true;
-        Asked++;
+        w.Asked++;
 
-        // <b>When the question was asked, kept, because the answer's own stamp is the wrong one.</b> The
-        // model takes seconds to answer and a thinking call takes up to a minute and a half, and the shard
-        // does not stop while it does: on 01.09.2026 a report saying "116 undertakings taken on" was written
-        // into the log at a moment when the true figure was 141, because twenty-five had been taken during
-        // the seven seconds the answer was in flight. Both numbers were right. Only one of them was about
-        // the moment the log line is stamped with, and reading this file beside the session log is the whole
-        // reason it is stamped in local time at all.
         var asked = DateTime.Now;
 
-        // Measured once and kept, so that the digest written under the answer is the digest the answer was
-        // made from. Re-measuring when the reply arrives would put a different set of numbers under the
-        // claim than the one it was reasoning about, which is the same defect as the stamp above and harder
-        // to notice: the counts would look plausible and would quietly not support the sentence over them.
-        // The roll-call's verdicts go in beside the measurements, and they are the better half of the report:
-        // every other number here describes a moment, and these describe two minutes of what a bot did with
-        // itself. They also tell the model what the debugger has done with its own hands, which it is asked
-        // to be suspicious of.
-        var mine = Measured(now)
+        var mine = Brief(w)
+                   + Measured(now)
                    + "\nTHE LAST ROLL-CALL, TWO MINUTES OF IT, ASKED OF EVERY BOT\n"
                    + BotAudit.Last
                    + "\nWhat the roll-calls have done all session: "
                    + BotAudit.Describe()
-                   + ".\nWhat your own hands have done all session: "
+                   + ".\nWhat the squad's hands have done all session: "
                    + BotHand.Describe()
                    + ".";
 
         var report = BotDebugSight.Report(
-            Beside(),
+            Beside(w),
             Census(),
             mine,
-            Suspects(now),
-            Subsystems(SubsystemBudget),
-            BotDebugSight.Recite(Last),
+            Suspects(w, now),
+            Subsystems(w, SubsystemBudget),
+            BotDebugSight.Recite(w.Last),
             waited
         );
 
-        // Thinking on the cheap question too. It is not cheap any more and is not meant to be: the whole
-        // point of this bot is that it thinks about what it sees, and it now asks six times an hour instead
-        // of thirty.
         BotOllama.Ask(
-            BotDebugSight.System(Name),
+            BotDebugSight.System(w.Name),
             Bounded(report),
             BotDebugNote.Schema(roster),
             true,
-            (json, waited) => Answered(json, waited, report, mine, asked),
+            (json, waited) => Answered(w, json, waited, report, mine, asked),
             Model,
             KeepAlive,
             TimeoutMs
         );
     }
 
-    private static void Answered(string json, long waited, string report, string mine, DateTime asked)
+    private static string Brief(BotWatcher w)
+    {
+        var sb = ValueStringBuilder.Create(1024);
+
+        try
+        {
+            sb.Append("YOUR CHARGE, ");
+            sb.Append(w.Name);
+            sb.Append(": you are one of ");
+            sb.Append(Squad.Count);
+            sb.Append(" watchers, and yours is ");
+            sb.Append(w.Charge);
+            sb.AppendLine(". Look there first and hardest; the rest is context. The subsystem lines below are the ones under your charge.");
+
+            var any = false;
+
+            for (var i = 0; i < Squad.Count; i++)
+            {
+                var other = Squad[i];
+
+                if (ReferenceEquals(other, w) || other.Last == null
+                    || string.Equals(other.Last.Kind, "nothing", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!any)
+                {
+                    sb.AppendLine("WHAT YOUR SQUAD-MATES CLAIMED AT THEIR LAST LOOK. These are conjectures, not facts: check each against your own numbers below and say whether you agree, with the number that decides it. Do not repeat a claim you cannot support from your own charge.");
+                    any = true;
+                }
+
+                sb.Append("- ");
+                sb.Append(other.Name);
+                sb.Append(", charged with ");
+                sb.Append(other.Charge);
+                sb.Append(": ");
+                sb.AppendLine(BotDebugSight.Recite(other.Last));
+            }
+
+            sb.AppendLine("");
+
+            return sb.ToString();
+        }
+        finally
+        {
+            sb.Dispose();
+        }
+    }
+
+    private static void Answered(BotWatcher w, string json, long waited, string report, string mine, DateTime asked)
     {
         _asking = false;
 
@@ -695,44 +701,36 @@ public static class BotVigil
 
         if (note == null)
         {
-            logger.Warning("The debugger looked at the population and the model said nothing that could be read");
+            logger.Warning("{Name} looked at the population and the model said nothing that could be read", w.Name);
 
             return;
         }
 
-        Last = note;
+        w.Last = note;
 
         if (string.Equals(note.Kind, "nothing", StringComparison.OrdinalIgnoreCase))
         {
-            Quiet++;
+            w.Quiet++;
 
-            BotDebugLog.Write($"nothing worth reporting — measured at {asked:HH:mm:ss}, answered {waited}ms later — {note.Finding}");
+            BotDebugLog.Write($"{w.Name}: nothing worth reporting — measured at {asked:HH:mm:ss}, answered {waited}ms later — {note.Finding}");
 
-            // <b>The counts go under a clean bill of health too, and leaving them out was the first thing
-            // this log got wrong.</b> "Nothing is wrong" is a claim like any other and is the one most worth
-            // being able to check afterwards: a watcher that has quietly stopped measuring says exactly this,
-            // in exactly these words, for hours. The rows are left out — they are only interesting when
-            // something is — but the aggregate is what would show the silence to be false.
             BotDebugLog.Block("  the counts it said that about:", mine);
 
             if (!string.IsNullOrWhiteSpace(note.Watch) && note.Watch != "-")
             {
-                _wanted = note.Watch;
+                w.Wanted = note.Watch;
             }
 
-            // A clean bill of health is allowed a hand too, and it is the most honest use of one: looking at
-            // a bot with props or sight is how "I think everything is fine" gets checked before it is said
-            // again next minute.
-            Reach(note);
+            Reach(w, note);
 
             return;
         }
 
-        Findings++;
+        w.Findings++;
 
         BotDebugLog.Rule();
         BotDebugLog.Write(
-            $"FINDING {Findings} — {note.Kind}, about {note.Bot}, {note.Confidence:P0} sure. "
+            $"FINDING {Findings} by {w.Name} — {note.Kind}, about {note.Bot}, {note.Confidence:P0} sure. "
             + $"Everything below was measured at {asked:HH:mm:ss}; the answer came {waited}ms later"
         );
         BotDebugLog.Block("  claim:", note.Finding);
@@ -741,45 +739,37 @@ public static class BotVigil
         BotDebugLog.Block("  change it suggests (CONJECTURE):", note.Fix);
         BotDebugLog.Block("  its last claim:", note.Last);
 
-        // The measurements the claim was made from, under it, unedited. Without this the log is a series of
-        // confident paragraphs nobody can check, and a claim nobody can check is worse than none because it
-        // gets acted on.
         BotDebugLog.Block("  measured, and this is what it was reasoning from:", report);
         BotDebugLog.Rule();
 
-        Remember(BotDebugSight.Recite(note));
+        Remember(w, BotDebugSight.Recite(note));
 
-        // Into the long memory, merged with anything it has said before. The count of how often the same
-        // thing has been found from fresh measurements is the only reason to weigh one finding above another.
         BotDebugMemory.Believe(note);
 
-        if (string.Equals(note.Last, "gone", StringComparison.OrdinalIgnoreCase) && Last != null)
+        if (string.Equals(note.Last, "gone", StringComparison.OrdinalIgnoreCase) && w.Last != null)
         {
-            BotDebugMemory.Doubt(Last.Finding);
+            BotDebugMemory.Doubt(w.Last.Finding);
         }
 
         if (!string.IsNullOrWhiteSpace(note.Watch) && note.Watch != "-")
         {
-            _wanted = note.Watch;
+            w.Wanted = note.Watch;
         }
 
-        Reach(note);
+        Reach(w, note);
 
         logger.Information(
-            "The debugger has a finding ({Kind}, {Sure:P0}) about {Who}: {What}",
+            "{Name} has a finding ({Kind}, {Sure:P0}) about {Who}: {What}",
+            w.Name,
             note.Kind,
             note.Confidence,
             note.Bot,
             note.Finding
         );
 
-        // Onto the alarm channel as well, so that one file is enough to watch. Marked a conjecture in the
-        // sentence itself: everything else on that channel is a count the shard took, and this is a model's
-        // opinion about counts — ten of the first dozen were artefacts of the instrument rather than defects
-        // of the shard, and a reader who cannot tell the two apart at a glance will act on the wrong ones.
         BotAlarm.Note(
             "finding",
-            $"CONJECTURE from {Name} ({note.Kind}, {(int)Math.Round(note.Confidence * 100)}% sure) about"
+            $"CONJECTURE from {w.Name} ({note.Kind}, {(int)Math.Round(note.Confidence * 100)}% sure) about"
             + $" {note.Bot}: {note.Finding}",
             Findings,
             0,
@@ -787,67 +777,53 @@ public static class BotVigil
         );
     }
 
-    /// <summary>
-    /// Carries out whatever command the answer asked for, if it asked for one.
-    ///
-    /// <para>
-    /// <b>Written into the debugger's own log as well as the command log, and on purpose.</b> The command
-    /// log is the record of what the hand did; this line is the record of what the hand did <em>to this
-    /// finding</em>, sitting under the claim it was meant to test. Read apart, either one is half a story:
-    /// a finding whose check is somewhere else cannot be audited by reading it, and a command whose reason
-    /// is somewhere else is a twitch.
-    /// </para>
-    /// </summary>
-    private static void Reach(BotDebugNote note)
+    private static void Reach(BotWatcher w, BotDebugNote note)
     {
         if (note == null)
         {
             return;
         }
 
-        var answer = BotHand.Run("the model", note.Probe, note.At, note.Finding);
+        var answer = BotHand.Run(w.Name, note.Probe, note.At, note.Finding);
 
         if (answer == null)
         {
             return;
         }
 
-        BotDebugLog.Block($"  it used its hands — {note.Probe} {note.At}:", answer);
+        BotDebugLog.Block($"  {w.Name} used its hands — {note.Probe} {note.At}:", answer);
 
-        // Kept where the next report can quote it. A command whose answer the model never sees is a command
-        // it will ask for again next minute, and again after that.
-        Remember($"{note.Probe} {note.At} -> {answer}");
+        Remember(w, $"{note.Probe} {note.At} -> {answer}");
     }
 
-    /// <summary>The slow question, with thinking switched on. Rare, and it costs the minds their slot while it runs.</summary>
-    private static void Reflect(long now)
+    private static void Reflect(BotWatcher w, long now)
     {
         _asking = true;
-        Asked++;
+        w.Asked++;
 
         var asked = DateTime.Now;
 
         var question = BotDebugSight.Reflection(
             Census(),
-            Measured(now),
-            Subsystems(SubsystemBudget * 2),
-            _found,
+            Brief(w) + Measured(now),
+            Subsystems(w, SubsystemBudget * 2),
+            w.Found,
             now - _wokeTick
         );
 
         BotOllama.Ask(
-            BotDebugSight.System(Name),
+            BotDebugSight.System(w.Name),
             Bounded(question),
             BotDebugThought.Schema,
             true,
-            (json, waited) => Thought(json, waited, question, asked),
+            (json, waited) => Thought(w, json, waited, question, asked),
             Model,
             KeepAlive,
             TimeoutMs
         );
     }
 
-    private static void Thought(string json, long waited, string question, DateTime asked)
+    private static void Thought(BotWatcher w, string json, long waited, string question, DateTime asked)
     {
         _asking = false;
 
@@ -855,16 +831,16 @@ public static class BotVigil
 
         if (thought == null)
         {
-            logger.Warning("The debugger thought about the shard for a while and the answer could not be read");
+            logger.Warning("{Name} thought about the shard for a while and the answer could not be read", w.Name);
 
             return;
         }
 
-        Reflections++;
+        w.Reflections++;
 
         BotDebugLog.Rule();
         BotDebugLog.Write(
-            $"REFLECTION {Reflections} — measured at {asked:HH:mm:ss}, thought for {waited / 1000}s, {thought.Confidence:P0} sure"
+            $"REFLECTION {Reflections} by {w.Name} — measured at {asked:HH:mm:ss}, thought for {waited / 1000}s, {thought.Confidence:P0} sure"
         );
         BotDebugLog.Block("  what most blocks these bots (CONJECTURE):", thought.Blocking);
         BotDebugLog.Block("  evidence:", thought.Evidence);
@@ -874,37 +850,28 @@ public static class BotVigil
         BotDebugLog.Block("  everything it was given:", question);
         BotDebugLog.Rule();
 
-        Remember($"[reflection] {thought.Blocking} — change: {thought.Change}");
+        Remember(w, $"[reflection] {thought.Blocking} — change: {thought.Change}");
 
         BotDebugMemory.Learn($"{thought.Blocking} (the change worth making: {thought.Change})");
 
-        logger.Information("The debugger has thought about the shard: {What}", thought.Blocking);
+        logger.Information("{Name} has thought about the shard: {What}", w.Name, thought.Blocking);
     }
 
-    private static void Remember(string line)
+    private static void Remember(BotWatcher w, string line)
     {
         if (string.IsNullOrWhiteSpace(line))
         {
             return;
         }
 
-        _found.Add(line);
+        w.Found.Add(line);
 
-        while (_found.Count > Recall)
+        while (w.Found.Count > Recall)
         {
-            _found.RemoveAt(0);
+            w.Found.RemoveAt(0);
         }
     }
 
-    /// <summary>
-    /// The question, cut to something the model can still think inside, and told what was cut.
-    ///
-    /// <para>
-    /// Never silently: a prompt that has quietly lost its last third produces an answer about the part that
-    /// survived, and there is no way to tell that from an answer about all of it. The line at the bottom is
-    /// what makes a truncated question honest.
-    /// </para>
-    /// </summary>
     private static string Bounded(string question)
     {
         if (question == null || question.Length <= MostChars)
@@ -921,27 +888,9 @@ public static class BotVigil
         );
     }
 
-    /// <summary>
-    /// The whole of what is measured this moment, for whoever asks through the door.
-    ///
-    /// The same text the model is given, deliberately: a person debugging the debugger needs to see what it
-    /// sees, not a second rendering that could differ from it.
-    /// </summary>
     public static string Digest() =>
         Census() + "\n" + Measured(Core.TickCount) + "\nTHE LAST ROLL-CALL\n" + BotAudit.Last + Tampered();
 
-    /// <summary>
-    /// Dials a person has moved by hand since the shard came up, said at the foot of every digest — the
-    /// model's as well as the door's.
-    ///
-    /// <para>
-    /// <b>Because the alternative is an observer explaining the consequence of a deliberate change as a
-    /// defect.</b> A threshold moved at half past seven is invisible in every measurement afterwards: the
-    /// numbers simply are what they are, and nothing in them says a hand was on them. That is the same trap
-    /// as a configuration file overriding the source — the value is real and the reason for it is nowhere
-    /// near it. Said plainly, and said as an act rather than a measurement, because it is one.
-    /// </para>
-    /// </summary>
     private static string Tampered()
     {
         var note = BotDials.Note();
@@ -951,18 +900,6 @@ public static class BotVigil
             : $"\n\nCHANGED BY HAND SINCE THE SHARD CAME UP — these are deliberate, not faults: {note}";
     }
 
-    /// <summary>
-    /// One bot in full, by name, or the roster if that is not one of them.
-    ///
-    /// <para>
-    /// <b>Takes back the label it hands out.</b> On 02.09.2026 every listing here named a bot as
-    /// "Vance the Archer" — <see cref="Loitering"/> and this very row both print name and class that way —
-    /// and asking "bot Vance the Archer" answered "No bot called". Two of the first three questions put to
-    /// the debugger in that watch were spent on it. An instrument that will not accept its own output back
-    /// costs a round trip on every question, and each round trip here is twelve seconds of the shard's life.
-    /// A leading "- " is dropped for the same reason: rows are printed with it.
-    /// </para>
-    /// </summary>
     public static string Row(string name)
     {
         if (!string.IsNullOrWhiteSpace(name))
@@ -974,7 +911,6 @@ public static class BotVigil
                 asked = asked[2..].Trim();
             }
 
-            // "Vance the Archer" -> "Vance". Bot names on this shard are one word, or a word and a number.
             var joint = asked.IndexOf(" the ", StringComparison.OrdinalIgnoreCase);
             var bare = joint > 0 ? asked[..joint].Trim() : asked;
 
@@ -994,17 +930,6 @@ public static class BotVigil
         return $"No bot called \"{name}\". There are {roster.Count}: {string.Join(", ", roster)}";
     }
 
-    /// <summary>
-    /// Who is holding no work at all, with their class and how long, worst first.
-    ///
-    /// <para>
-    /// <b>Built because the aggregate could not answer the question it raised.</b> On 02.09.2026 the counts
-    /// said 16 of 38 had held nothing for over three minutes and 540 bot-minutes had gone barren — about
-    /// half of all the time the population had — and there was no way to ask which bots or of what class
-    /// without grepping a log by hand. A number that names a problem and cannot name a subject sends
-    /// whoever reads it back to the raw log, which is the state this whole debugger exists to end.
-    /// </para>
-    /// </summary>
     public static string Loitering()
     {
         List<BotWatch> idle = [];
@@ -1055,8 +980,6 @@ public static class BotVigil
                 sb.Append(watch.Progress * 100.0, "F0");
                 sb.Append("%.");
 
-                // 02.09.2026: this list could say fifteen bots held nothing and never say why, so every
-                // reading of it cost a second question per bot at twelve seconds a turn. The auction knows.
                 if (!string.IsNullOrWhiteSpace(watch.Empty))
                 {
                     sb.Append(" ");
@@ -1107,42 +1030,12 @@ public static class BotVigil
         }
     }
 
-    /// <summary>
-    /// Puts one question of somebody's own to the model, with everything measured attached.
-    ///
-    /// <para>
-    /// <b>It waits its turn like everything else.</b> If the card is busy the question is refused rather than
-    /// queued: whoever asked can ask again in ten seconds, and a queue would let one careless hand hold the
-    /// model against the three minds indefinitely.
-    /// </para>
-    /// </summary>
-    /// <summary>A question from the keyboard that the model was too busy to take, waiting for the next slot.</summary>
     private static string _pending;
 
     private static Action<string> _pendingReply;
 
-    /// <summary>Questions from the keyboard that had to wait for the model. For the summary.</summary>
     public static long Held { get; private set; }
 
-    /// <summary>
-    /// A question from somebody at the keyboard.
-    ///
-    /// <para>
-    /// <b>It used to be dropped whenever the model was busy, which was nearly always.</b> One Ollama slot
-    /// serves four thinking crafters and the watcher's own quarter-hourly work, and the crafters ask
-    /// several times a minute — so the one verb a person has for asking Argus anything lost every race it
-    /// entered. Three questions in a row on 10.09.2026 came back "the model is busy", while the prompt this
-    /// method builds opens with the words "SOMEBODY AT THE KEYBOARD IS ASKING YOU THIS, AND IT COMES BEFORE
-    /// ANYTHING ELSE HERE". The sentence promised first place and the gate gave last.
-    /// </para>
-    ///
-    /// <para>
-    /// So it is held instead of dropped, and <see cref="Update"/> asks it the moment the slot frees — ahead
-    /// of the revel and ahead of the ordinary look, on the same argument the revel already makes for itself:
-    /// it is rarer, so it would otherwise never get the slot. One question is held at a time; a second
-    /// replaces it, because a person who asks twice means the second one.
-    /// </para>
-    /// </summary>
     public static bool Consider(string question, Action<string> reply)
     {
         if (string.IsNullOrWhiteSpace(question) || reply == null)
@@ -1162,7 +1055,11 @@ public static class BotVigil
         }
 
         _asking = true;
-        Asked++;
+
+        if (Lead != null)
+        {
+            Lead.Asked++;
+        }
 
         var asked = DateTime.Now;
 
@@ -1207,7 +1104,6 @@ public static class BotVigil
         {"type":"object","properties":{"answer":{"type":"string","minLength":120},"evidence":{"type":"string","minLength":60},"confidence":{"type":"number"}},"required":["answer","evidence","confidence"]}
         """;
 
-    /// <summary>Everybody being watched, in one list, for the roll-call.</summary>
     private static List<BotWatch> Rollcall()
     {
         List<BotWatch> roll = [];
@@ -1223,7 +1119,6 @@ public static class BotVigil
         return roll;
     }
 
-    /// <summary>Everybody who exists, by name. What the answer's bot fields are constrained to.</summary>
     private static List<string> Roster()
     {
         List<string> names = [];
@@ -1239,9 +1134,9 @@ public static class BotVigil
         return names;
     }
 
-    private static string Beside()
+    private static string Beside(BotWatcher w)
     {
-        var body = Body;
+        var body = w?.Body;
 
         if (body is not { Deleted: false })
         {
@@ -1263,11 +1158,10 @@ public static class BotVigil
         var where = $"I am standing at {body.Location.X},{body.Location.Y} in {body.Region?.Name ?? "nowhere"}";
 
         return here == null
-            ? $"{where}. Nobody is on this tile. I moved here because {_because}."
-            : $"{where}, on the same tile as {here.Name} the {here.Class}. I came here because {_because}.";
+            ? $"{where}. Nobody is on this tile. I moved here because {w.Because}."
+            : $"{where}, on the same tile as {here.Name} the {here.Class}. I came here because {w.Because}.";
     }
 
-    /// <summary>The population as the shard itself counts it, with every case named.</summary>
     private static string Census()
     {
         _rungs.Clear();
@@ -1290,13 +1184,6 @@ public static class BotVigil
         return BotDebugSight.Census(_rungs, _holding, BotWill.Describe());
     }
 
-    /// <summary>
-    /// What the debugger has measured for itself, as counts with denominators.
-    ///
-    /// Each line answers one question and none of them has a bucket called "other". A count with no
-    /// denominator cannot say whether nought means "it never happens" or "nobody ever got as far as the
-    /// check", and telling those two apart is most of this job.
-    /// </summary>
     private static string Measured(long now)
     {
         var sb = ValueStringBuilder.Create(1024);
@@ -1448,19 +1335,12 @@ public static class BotVigil
             sb.Append(BotWatch.FrozenMs / 1000);
             sb.AppendLine("s while their own journey wanted them somewhere else.");
 
-            // Counted apart from being frozen, and the pair is the point: one is a bot that cannot take a
-            // step and the other is a bot taking one every beat and ending each no nearer. Merged into
-            // "stuck", the second disappears — it moves, so nothing else here notices it.
             sb.Append("Getting nowhere: ");
             sb.Append(nowhere);
             sb.Append(" have been walking somewhere for more than ");
             sb.Append(BotWatch.FrozenMs / 1000);
             sb.AppendLine("s without ever getting one tile closer to it.");
 
-            // <b>Its own row, and it is the one row here that nothing else on the shard could ever produce.</b>
-            // A bot treading two tiles moves every beat, so every measure that watches for stillness reads it
-            // as healthy; it often has no destination at all, so every measure that watches distance reads it
-            // as healthy too. It is invisible in exactly the way that matters.
             sb.Append("Treading the same ground: ");
             sb.Append(pacing);
             sb.Append(" have spent more than ");
@@ -1511,10 +1391,6 @@ public static class BotVigil
             sb.Append(ghosts);
             sb.AppendLine(" have been dead for more than three minutes and are not back on their feet.");
 
-            // <b>Pack and bank apart, and never summed into one figure.</b> The engine pays out of the pack;
-            // the bank buys nothing at all until a bot has walked to one. A single total reads as wealth
-            // while the shard behaves as though it were destitute, and there is no way to tell the two apart
-            // from a sum.
             sb.Append("Money in hand: ");
             sb.Append(pack);
             sb.Append(" gold in their packs between them, which is what they can actually spend; ");
@@ -1544,13 +1420,6 @@ public static class BotVigil
             sb.Append(stalled);
             sb.AppendLine(" have gained no ground on their trade in the last twenty minutes.");
 
-            // <b>And the same question asked of the whole watch, because the twenty-minute figure alone reads
-            // as a verdict it cannot support.</b> Skill arrives in bursts here — a bot can pay a lesson fee,
-            // gain four points in one go, and then earn nothing for half an hour — so a window that catches
-            // the pause between bursts reports a healthy bot as stalled. Measured 02.09.2026: "16 of 38 have
-            // gained no ground" stood in the same report as a population whose middle vector had risen from
-            // 74% to 82% within the hour. Both true, about different spans. The pair is the answer; either
-            // one alone is a wrong one.
             sb.Append("Against the whole time I have been watching, the middle of the population has gone from ");
             sb.Append(began[began.Count / 2] * 100.0, "F0");
             sb.Append("% to ");
@@ -1569,15 +1438,6 @@ public static class BotVigil
         }
     }
 
-    /// <summary>
-    /// What the fighting is actually doing, as opposed to how much of it there is.
-    ///
-    /// <para>
-    /// Every other count of combat on this shard counts bots that are in one. This counts bots whose blows
-    /// are landing, and names the two reasons they might not be: too far for the weapon, or on the other
-    /// side of a floor. The second is the one nothing else looks for and the one that costs whole parties.
-    /// </para>
-    /// </summary>
     private static void Fighting(ref ValueStringBuilder sb)
     {
         var fighting = 0;
@@ -1637,17 +1497,6 @@ public static class BotVigil
         sb.AppendLine(" are beside it, in reach, and still landing nothing.");
     }
 
-    /// <summary>
-    /// What each trade has actually come to, which is a different question from how often it is chosen.
-    ///
-    /// <para>
-    /// <b>The gold is the column that matters and it is the one nothing else on the shard prints.</b> A
-    /// trade taken forty times reads as a busy trade; the same forty with nothing earned reads as a defect,
-    /// and negative reads as a trade that costs the population money every time somebody picks it. Crafting
-    /// and the market are exactly where that goes wrong — buy cloth, sew, never sell — and every count of
-    /// attempts in the world will call it healthy.
-    /// </para>
-    /// </summary>
     private static void Trades(ref ValueStringBuilder sb)
     {
         Dictionary<string, (int Taken, int Quick, long HeldMs, int Gained, int Made, int Learned, int Bots)> tally = [];
@@ -1667,20 +1516,6 @@ public static class BotVigil
             return;
         }
 
-        // <b>The two figures are labelled in capitals and separated by bars, and that is not decoration.</b>
-        // Written as prose — "and -3897 gold and 718 worth of goods between them all told" — the second
-        // figure was read straight past: on 02.09.2026 the debugger reported "acquire shows -3897 gold and no
-        // goods, bots are buying without producing, draining the economy" about a row whose goods column read
-        // 718. The column had been added a day earlier for exactly that mistake and it did not help, because
-        // a number a sentence has to be parsed to find is a number that gets missed.
-        //
-        // <b>And GOLD is not what the trade earned.</b> It is how much the bot's purse and bank moved over
-        // the wall-clock it held that work, sampled every two seconds — so a short piece of work that begins
-        // and ends between two samples has its spending charged to whichever trade the sampler saw on either
-        // side of it. Measured: prowl showed -1116 gold over 78 goes while the shard's own settlement said
-        // "0 coin, 0 made" for every single one of them. The shard is right and this column is smeared. It is
-        // still worth having — a trade that is genuinely bleeding shows here first — but it is evidence, not
-        // a verdict, and the shard's own per-deed figure in the session log is what settles an argument.
         sb.AppendLine(
             "What each trade has come to since I began watching. TWO SEPARATE FIGURES PER ROW, NEVER ADDED"
             + " TOGETHER AND NEVER READ AS ONE. Read BOTH before saying anything about a trade.\n"
@@ -1721,43 +1556,18 @@ public static class BotVigil
             sb.Append(" | SKILL ");
             sb.Append(row.Learned / 10.0, "F1");
 
-            // <b>The row says what it is, because saying it in the header three times did not work.</b> The
-            // reading that has to be made here is arithmetic — negative coin beside positive goods is a
-            // purchase, and a purchase is supposed to look like that — and it is a reading the model got
-            // wrong three windows running on the same trade. On 02.09.2026 at 12:59 it wrote
-            // "GOLD -3081 | GOODS 702 | SKILL 0.9" into its own evidence and concluded, in the same
-            // paragraph, "negative gold, zero goods, zero skill ... unproductive and drains resources". It
-            // quoted the number and denied it in the next clause.
-            //
-            // A column was added for this, then labelled in capitals, then explained in the header. All
-            // three were sentences, and a sentence can be reinterpreted. This is not: the verdict any
-            // arithmetic can reach is reached here, in the row, and what is left for the model is the part
-            // only it can do.
-            sb.AppendLine(Verdict(row.Gained, row.Made, row.Learned, row.Taken));
+            sb.AppendLine(Verdict(row.Gained, row.Made, row.Learned, row.Taken, BotAppraisal.IsUnpaid(kind)));
         }
     }
 
-    /// <summary>
-    /// What a row of the trade table amounts to, decided by arithmetic rather than left to be inferred.
-    ///
-    /// <para>
-    /// Only the calls that cannot be got wrong are made here. Whether a trade is worth having, whether its
-    /// rate is good, whether the shard should offer it less — none of that is arithmetic and none of it is
-    /// decided in this method. What is decided is the one thing that kept being misread: coin going down
-    /// while goods go up is a purchase working, not an economy bleeding.
-    /// </para>
-    /// </summary>
-    private static string Verdict(int gold, int goods, int skill, int taken) =>
-        gold < 0 && (goods > 0 || skill > 0)
+    private static string Verdict(int gold, int goods, int skill, int taken, bool unpaid) =>
+        unpaid
+            ? " — PAID NOTHING ON PURPOSE: a guild duty (a war, a claim, a hall, a hire). The shard does not judge"
+              + " it on gold and neither should you; its GOLD is only what the bot happened to spend meanwhile."
+              + " This row is not a drain."
+            : gold < 0 && (goods > 0 || skill > 0)
             ? " — A PURCHASE OR A CRAFT WORKING AS INTENDED: coin was turned into goods or skill. This row is not a drain."
             : gold <= 0 && goods <= 0 && skill <= 0 && taken >= 10
-                // <b>Stated as an ambiguity, because the three columns genuinely cannot resolve it.</b> An
-                // hour after this verdict was written it fired on `unload` — 37 takings by 32 bots, nothing
-                // in any column — and unload's whole job is carrying gold to the bank, which moves value
-                // without creating any and is measured here as nought by construction. Calling that "the
-                // shape worth looking at" was a false alarm produced by the very line meant to prevent them.
-                // Work that moves value and work that wastes time look identical from these three numbers,
-                // and the honest thing is to say so rather than to pick one.
                 ? " — NOTHING GAINED IN ANY COLUMN over many takings. That is EITHER wasted time OR work whose"
                   + " job is to move value rather than make it (banking, carrying, posting an order, walking"
                   + " somewhere to be ready). These three columns cannot tell those apart — say which you"
@@ -1766,8 +1576,7 @@ public static class BotVigil
                     ? " — this row gained something."
                     : " — too few takings to say anything yet.";
 
-    /// <summary>The worst bots, worst first, in full.</summary>
-    private static List<string> Suspects(long now)
+    private static List<string> Suspects(BotWatcher w, long now)
     {
         List<BotWatch> sorted = [];
 
@@ -1783,35 +1592,17 @@ public static class BotVigil
 
         List<string> rows = [];
 
-        for (var i = 0; i < sorted.Count && rows.Count < Rows; i++)
+        var from = Math.Min(sorted.Count > Rows ? (w?.Rank ?? 0) * (Rows / 2) : 0, Math.Max(0, sorted.Count - Rows));
+
+        for (var i = from; i < sorted.Count && rows.Count < Rows; i++)
         {
-            // A row for anybody with a symptom, and if nobody has one, rows anyway: the report has to be
-            // able to show a healthy population, or "nothing is wrong" is an answer the model can never
-            // support with anything.
             rows.Add(sorted[i].Row(now));
         }
 
         return rows;
     }
 
-    /// <summary>
-    /// Every line the shard writes about itself, gathered from the subsystems by asking them.
-    ///
-    /// <para>
-    /// <b>Found by reflection rather than listed here, and the reason is the same one that keeps the minds'
-    /// menu off a hard-written list.</b> A list of subsystems in this file would be right on the day it was
-    /// written and silently short by one the first time somebody adds a folder — and a debugger that has
-    /// never heard of a subsystem will never find a defect in it, while looking exactly like a debugger that
-    /// checked. Every subsystem here already writes one line about itself for the boot log and the census;
-    /// this asks all of them at once.
-    /// </para>
-    ///
-    /// <para>
-    /// Wrapped one at a time: a summary that throws is a subsystem with a defect in its own instrumentation,
-    /// which is worth a line in the log and is not worth losing the other forty for.
-    /// </para>
-    /// </summary>
-    private static string Subsystems(int budget)
+    private static string Subsystems(BotWatcher w, int budget)
     {
         _describers ??= Gather();
 
@@ -1824,6 +1615,12 @@ public static class BotVigil
             for (var i = 0; i < _describers.Length && spent < budget; i++)
             {
                 var method = _describers[i];
+
+                if (w != null && !w.Watches(method.DeclaringType?.Name))
+                {
+                    continue;
+                }
+
                 string said;
 
                 try
@@ -1886,18 +1683,48 @@ public static class BotVigil
         return [.. found];
     }
 
-    /// <summary>The two that are already quoted in the census, said twice for no benefit.</summary>
     private static bool Skipped(string type) =>
         type is "BotWill" or "BotPopulation";
 
-    /// <summary>One line about what the debugger has done, for the shard's own log.</summary>
-    public static string Describe() =>
-        Body is not { Deleted: false }
-            ? "the debugger has no body"
-            : $"{Name} at {Body.Location.X},{Body.Location.Y} after {Body.Hops} hops, watching {_watch.Count} bots; "
-              + $"{Asked} questions asked, {Findings} findings, {Quiet} looks that found nothing, {Reflections} reflections; "
-              + BotDebugMemory.Describe() + "; "
-              + BotAudit.Describe();
+    public static string Describe()
+    {
+        if (Squad.Count == 0)
+        {
+            return "the debugger has no body";
+        }
+
+        var sb = ValueStringBuilder.Create(512);
+
+        try
+        {
+            sb.Append("a squad of ");
+            sb.Append(Squad.Count);
+            sb.Append(" watching ");
+            sb.Append(_watch.Count);
+            sb.Append(" bots: ");
+
+            for (var i = 0; i < Squad.Count; i++)
+            {
+                if (i > 0)
+                {
+                    sb.Append("; ");
+                }
+
+                sb.Append(Squad[i].Describe());
+            }
+
+            sb.Append("; ");
+            sb.Append(BotDebugMemory.Describe());
+            sb.Append("; ");
+            sb.Append(BotAudit.Describe());
+
+            return sb.ToString();
+        }
+        finally
+        {
+            sb.Dispose();
+        }
+    }
 
     private sealed class VigilTimer : Timer
     {

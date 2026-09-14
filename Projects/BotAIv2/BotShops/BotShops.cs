@@ -28,13 +28,10 @@ public static class BotShops
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotShops));
 
-    /// <summary>How far around a bot one sweep looks for shopkeepers.</summary>
     public static int Reach { get; set; } = 160;
 
-    /// <summary>How near a shopkeeper a bot has to stand to trade with it.</summary>
     public static int CounterReach { get; set; } = 3;
 
-    /// <summary>How many shopkeepers the population may remember.</summary>
     public static int MaxShops { get; set; } = 96;
 
     private static readonly List<BaseVendor> _shops = [];
@@ -49,13 +46,10 @@ public static class BotShops
 
     public static long Sold { get; private set; }
 
-    /// <summary>Gold this population has brought into the world over a counter. The only faucet there is.</summary>
     public static long Earned { get; private set; }
 
-    /// <summary>Shopkeepers passed over because the shard has already proved there is no way through to them.</summary>
     public static long Walled { get; private set; }
 
-    /// <summary>Whether this patch of the world has already been swept for shopkeepers.</summary>
     public static bool Swept(Map map, Point3D around)
     {
         for (var i = 0; i < _swept.Count; i++)
@@ -69,10 +63,6 @@ public static class BotShops
         return false;
     }
 
-    /// <summary>
-    /// Writes down every shopkeeper within reach. One spatial query — shopkeepers are mobiles, so unlike
-    /// forges they answer one.
-    /// </summary>
     public static int Survey(Map map, Point3D around)
     {
         if (map == null || map == Map.Internal || Swept(map, around))
@@ -112,26 +102,8 @@ public static class BotShops
         return found;
     }
 
-    /// <summary>
-    /// What the town's shelves have run out of, by kind, and how often somebody was turned away.
-    ///
-    /// <para>
-    /// <b>A shortage the shard felt everywhere and recorded nowhere.</b> <c>BotShopper</c> keeps a tally of
-    /// what bots are short of, and it is a good one — but it only ever sees a bot's <em>kit</em>: bandages,
-    /// reagents, tools, bottles it wears. A crafter's raw material goes through <c>BotStores</c> and
-    /// <c>BotBullion</c> instead, so "the shelf holds no Bottle at any price" was written eight times in ten
-    /// minutes, over and over, into a tally that had no row for it. Anything reading shortages to decide what
-    /// to stock — the guild counters do — was therefore blind to exactly the shortages that stop a craft.
-    /// </para>
-    ///
-    /// <para>
-    /// Counted here, at the counter, where the refusal actually happens and whatever the errand was called.
-    /// It is a fact about the town rather than about the bot: an empty shelf is empty for everybody.
-    /// </para>
-    /// </summary>
     private static readonly Dictionary<Type, long> _dry = [];
 
-    /// <summary>What the town has run out of, commonest first. See <see cref="_dry"/>.</summary>
     public static List<(Type Kind, long Times)> Dry()
     {
         List<(Type Kind, long Times)> found = [];
@@ -146,7 +118,6 @@ public static class BotShops
         return found;
     }
 
-    /// <summary>The commonest of them, for the shops line.</summary>
     private static string Driest()
     {
         Type worst = null;
@@ -164,43 +135,14 @@ public static class BotShops
         return worst == null ? "nothing" : $"{worst.Name} ({most} times)";
     }
 
-    /// <summary>How often the shelves are looked at to see whether any is due a refill.</summary>
     public static int KeepEveryMs { get; set; } = 60000;
 
-    /// <summary>Shelves refilled because their hour had come round. See <see cref="Keep"/>.</summary>
     public static long Refills { get; private set; }
 
     private static long _kept;
 
     private static bool _everKept;
 
-    /// <summary>
-    /// Refills any shelf whose hour has come round, whether or not anybody is standing at it.
-    ///
-    /// <para>
-    /// <b>A shop that has sold out can only be refilled by somebody buying from it, and nobody is sent to a
-    /// shop that has sold out.</b> The engine refills on two events and this population causes neither:
-    /// <c>OnOpenShop</c>, which is a player opening the window, and <c>BotShops.Buy</c>, which requires a bot
-    /// already standing at the counter with money out. But <see cref="Sells"/> answers false once
-    /// <c>info.Amount</c> reaches nought, and <see cref="Nearest"/> only ever offers a shop that
-    /// <see cref="Sells"/> approved — so the last bottle bought off a shelf is the last bottle that shelf
-    /// ever holds, unless some other bot happens to want something else from the same vendor.
-    /// </para>
-    ///
-    /// <para>
-    /// That is the self-blocking shape this project has paid for before: a mechanism that switches itself off
-    /// exactly when it is needed. Measured 09.09.2026: nine failures of "the shelf holds no Bottle at any
-    /// price" in ten minutes, against a shard whose alchemists refill hourly and whose engine doubles a
-    /// sold-out entry's stock at the next refill — demand the population was generating and could not reach.
-    /// </para>
-    ///
-    /// <para>
-    /// A shelf refilling on its own clock is nearer the engine's intent than one refilling on footfall, not
-    /// further from it: the shop-window check exists because that is the only moment a refill matters to a
-    /// human. For this population the equivalent moment is any moment at all, so it is asked once a minute
-    /// and <c>Restock</c> itself does nothing until the vendor's own hour is up.
-    /// </para>
-    /// </summary>
     public static void Keep()
     {
         var now = Core.TickCount;
@@ -232,12 +174,6 @@ public static class BotShops
         }
     }
 
-    /// <summary>
-    /// Whether this shopkeeper sells the thing, and what it is asking.
-    ///
-    /// The entry is needed rather than only the price, because buying wants the serial of the display object
-    /// the shopkeeper matches an order against — the same object a player's shop window shows a picture of.
-    /// </summary>
     public static bool Sells(BaseVendor vendor, Type wanted, out GenericBuyInfo entry)
     {
         entry = null;
@@ -264,21 +200,8 @@ public static class BotShops
         return false;
     }
 
-    /// <summary>
-    /// The ledger's key for "I could not get to this shop".
-    ///
-    /// <para>
-    /// Per bot, for the reason the forges taught: a counter behind a river is behind a river only for whoever
-    /// is on the wrong bank. A tailor whose nearest cloth shop cannot be reached used to be handed that same
-    /// shop every time it asked — fourteen failed sewing trips in ten minutes, each one a walk that ended in a
-    /// refusal.
-    /// </para>
-    /// </summary>
     public const string ShopKind = "shop";
 
-    /// <summary>
-    /// The nearest shopkeeper selling this that this bot has not lately failed to reach.
-    /// </summary>
     public static BaseVendor Nearest(IBotWilful bot, Type wanted)
     {
         var body = bot?.Self;
@@ -312,9 +235,6 @@ public static class BotShops
                 continue;
             }
 
-            // The caution above is this bot's own and forgets in five minutes. This is the shard's, it costs
-            // a dictionary lookup, and it does not forget: no way through is no way through for anybody. See
-            // the twin of this line in the overload below for what it was costing.
             if (BotReach.Ask(map, body.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
             {
                 Walled++;
@@ -336,7 +256,6 @@ public static class BotShops
         return best;
     }
 
-    /// <summary>The nearest remembered shopkeeper that sells this, or null.</summary>
     public static BaseVendor Nearest(Mobile bot, Type wanted)
     {
         var map = bot?.Map;
@@ -363,16 +282,6 @@ public static class BotShops
                 continue;
             }
 
-            // <b>A shopkeeper behind something is still the nearest shopkeeper.</b> This ranks by the crow's
-            // flight and asked nothing about the road, so a counter on an upper floor or across water was
-            // chosen by everybody underneath it — and the deed that took it walked, failed and was offered
-            // the same shop again. Thirty-one peddling errands ended "no way through" in ninety minutes on
-            // 03.09.2026, and the same chooser answers for restocking, acquiring, inscribing and sewing.
-            //
-            // The overload above already declines a shop this bot has lately failed to reach; that is a
-            // private opinion with a five-minute memory. This is the shard's own, it costs a dictionary
-            // lookup, and no way through is no way through for anybody. See BotGround.Nearest, which has
-            // asked exactly this of every forge and counter for a fortnight.
             if (BotReach.Ask(map, bot.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
             {
                 Walled++;
@@ -394,28 +303,8 @@ public static class BotShops
         return best;
     }
 
-    /// <summary>What this shopkeeper is asking for one of those, or zero if it does not sell them.</summary>
     public static int Price(BaseVendor vendor, Type wanted) => Sells(vendor, wanted, out var entry) ? entry.Price : 0;
 
-    /// <summary>
-    /// What a bot's own goods of this kind should open at: the shelf price where a shopkeeper in reach
-    /// stocks it, and only then the trade's own guess.
-    ///
-    /// <para>
-    /// <b>An opening ask above the shelf is an ask nobody on this island can rationally take.</b>
-    /// <see cref="BotShopper"/> compares stall against counter and gives a tie to one of ours, so a reagent
-    /// listed at five where a herbalist sells garlic at three is a reagent that never moves: 1986 of them sat
-    /// on stalls in one window while every caster that wanted one walked past and paid the world instead. The
-    /// fletcher already carries this lesson about arrows; this is where the rest of the shard asks it.
-    /// </para>
-    ///
-    /// <para>
-    /// Measured off the engine rather than declared, like the loot floor in <c>BotSlay.Rifle</c> — there is no
-    /// table here to go stale. The fallback is only ever reached where nothing within reach stocks the thing
-    /// at all, which is exactly where a bot's stall is the only supply there is.
-    /// </para>
-    /// </summary>
-    /// <param name="survey">The caller sweeps for counters once, before its own loop, and passes false.</param>
     public static int Shelf(IBotWilful bot, Type kind, int fallback, bool survey = false)
     {
         var body = bot?.Self;
@@ -436,15 +325,6 @@ public static class BotShops
         return price > 0 ? price : fallback;
     }
 
-    /// <summary>
-    /// Whether this shopkeeper will <em>buy</em> this thing, and what it pays for one.
-    ///
-    /// <para>
-    /// Asked of an actual item rather than of a type, because that is the only question the engine answers:
-    /// <c>IsSellable</c> looks at the object, and a shopkeeper that buys daggers is being asked about this
-    /// dagger. So a caller with nothing in hand has to find something to show.
-    /// </para>
-    /// </summary>
     public static bool Buys(BaseVendor vendor, Item item, out int price)
     {
         price = 0;
@@ -473,23 +353,6 @@ public static class BotShops
         return false;
     }
 
-    /// <summary>
-    /// The nearest shopkeeper that buys this and that <b>this bot</b> has not lately failed to reach.
-    ///
-    /// <para>
-    /// <b>The selling side had no such question and the buying side did, which is the whole of why one
-    /// shopkeeper could swallow an afternoon.</b> Gus buys iron ingots and stands on a plateau at height
-    /// thirty; Calla walked at him thirty-one times in one hour on 26.08.2026 and Alden eight, because the
-    /// nearest buyer was chosen on distance alone and nothing about the last thirty attempts entered into
-    /// it. <see cref="Nearest(IBotWilful, Type)"/> has asked this since the counters were fixed; this side
-    /// simply never grew the same overload.
-    /// </para>
-    ///
-    /// <para>
-    /// The bot's own note, not the shard's — another bot on the right side of the hill reaches Gus perfectly
-    /// well, and telling everybody otherwise would close the only ingot buyer on the island.
-    /// </para>
-    /// </summary>
     public static BaseVendor Buyer(IBotWilful bot, Item item, out int price)
     {
         price = 0;
@@ -546,12 +409,6 @@ public static class BotShops
         return best;
     }
 
-    /// <summary>
-    /// The nearest remembered shopkeeper that buys this, and what it pays for one.
-    ///
-    /// <b>Distance only.</b> For asking what a thing is worth, where reachability is beside the point — see
-    /// the overload above for choosing somewhere to walk to.
-    /// </summary>
     public static BaseVendor Buyer(Mobile bot, Item item, out int price)
     {
         price = 0;
@@ -595,42 +452,9 @@ public static class BotShops
         return best;
     }
 
-    /// <summary>
-    /// Sells things over a counter and says how much gold came back.
-    ///
-    /// <para>
-    /// <b>This is the only place in the project where gold enters the world.</b> Trade between bots moves coin
-    /// about; a shopkeeper's purse creates it. That is why the first version drained its world by 110,900 in a
-    /// night — every bot was pointed at the one faucet — and it is why nothing here decides on its own to come
-    /// here: see <see cref="BotPeddle"/> for the one condition under which it is allowed, which is that the
-    /// population has already been offered the goods and refused them.
-    /// </para>
-    ///
-    /// <para>
-    /// The takings are <b>measured rather than added up</b>, because the engine decides how much of the order
-    /// it honours: it refuses anything not in the seller's own pack, anything immovable, anything not standard
-    /// loot — which is a free guarantee that <em>bound gear cannot be sold</em>, since the bind marks it
-    /// <c>Newbied</c> — and anything above its own per-visit limit. Believing the asking prices would be
-    /// counting an intention.
-    /// </para>
-    /// </summary>
     public static int Sell(IBotWilful bot, BaseVendor vendor, List<Item> goods) =>
         Sell(bot, vendor, goods, out _);
 
-    /// <summary>
-    /// The same, saying how many <em>units</em> actually crossed the counter.
-    ///
-    /// <para>
-    /// <b>Every sale on this shard was reported against a denominator that did not belong to it.</b> The
-    /// count said here was the number of stacks, and the peddler's own line used the number it had reclaimed
-    /// from a stall — while the goods handed over are everything of that kind in the pack, stall stock and
-    /// carried stock together. So "sold 4 Iron Ingot for 316gp" was four off a stall, seventy-five out of the
-    /// pack and 316gp for all seventy-nine: four gold an ingot, the ordinary price, printed as seventy-nine.
-    /// A person reading the log for what iron is worth on this island got a number an order of magnitude out,
-    /// in the one place prices are read. Units are counted before the sale, because the engine deletes the
-    /// stacks as it takes them.
-    /// </para>
-    /// </summary>
     public static int Sell(IBotWilful bot, BaseVendor vendor, List<Item> goods, out int units)
     {
         units = 0;
@@ -699,12 +523,6 @@ public static class BotShops
         Sold += order.Count;
         Earned += earned;
 
-        // <b>The number changed and the shape did not, and that is deliberate.</b> watch-shard.sh reads this
-        // line for the whole shard's income — the awk that sums it wants "sold N things to Somebody for Ngp"
-        // with the gold as a clean field. Saying the stack count as well, in any position, either breaks the
-        // match or leaves a comma stuck to the gold: it read nought gold entering the world beside forty-six
-        // sales at 21:12 on 04.09.2026. A log line another tool parses is an interface. The stack count is
-        // not worth a reader's attention anyway — units and gold are the two numbers a price is made of.
         logger.Information(
             "{Name} sold {Units} things to {Vendor} for {Gold}gp",
             body.Name,
@@ -716,31 +534,9 @@ public static class BotShops
         return earned;
     }
 
-    /// <summary>
-    /// Buys up to <paramref name="amount"/> of something, and says how many were actually bought.
-    ///
-    /// <para>
-    /// The affordability is worked out here rather than left to the shopkeeper, because the engine takes an
-    /// order whole or not at all: an order for ten when the purse holds eight buys nothing and says nothing.
-    /// </para>
-    /// </summary>
     public static int Buy(IBotWilful bot, BaseVendor vendor, Type wanted, int amount) =>
         Buy(bot, vendor, wanted, amount, out _);
 
-    /// <summary>
-    /// The same purchase, and <paramref name="refused"/> says which gate closed when nothing was bought.
-    ///
-    /// <para>
-    /// <b>Six ways to come away empty were printed as one sentence, and it hid the largest fault on the
-    /// shard.</b> "The shop would not sell it" was written knowing there were three cases — the comment
-    /// beside it says "sold out, priced out, or refused" — and reasoned that all three were the shop's
-    /// business rather than the bot's. That is true of what to do next and false of what to log: on the night
-    /// of 25.08.2026 this sentence appeared 1929 times in half an hour, against nought successful purchases
-    /// of a bandage ever, and there was no way to tell an empty shelf from an empty purse without reading the
-    /// source. A branch nobody can count is a branch nobody can fix — the same rule that governs the
-    /// heartbeat lines governs this.
-    /// </para>
-    /// </summary>
     public static int Buy(IBotWilful bot, BaseVendor vendor, Type wanted, int amount, out string refused)
     {
         refused = null;
@@ -762,14 +558,11 @@ public static class BotShops
             return 0;
         }
 
-        // Shelves empty as they are bought from and refill on a timer that is only wound when somebody opens
-        // the shop window. Bots never open one, so without this a shop a bot has cleaned out stays empty.
         if (Core.Now - vendor.LastRestock > vendor.RestockDelay)
         {
             vendor.Restock();
         }
 
-        // Prices carry the shard's own scalars and are only brought up to date on demand.
         vendor.UpdateBuyInfo();
 
         if (!Sells(vendor, wanted, out var entry) || entry.Price <= 0)
@@ -802,17 +595,6 @@ public static class BotShops
             return 0;
         }
 
-        // <b>Money in the bank is only money if something fetches it, and nothing did.</b> The engine pays a
-        // bill under two thousand gold out of the backpack and never looks at the account — while five places
-        // in this project put coin <em>into</em> an account and not one takes any out, the sole withdrawal on
-        // the shard being the bot market charging its own buyers. So the population's takings drained one way
-        // into the bank and stayed there.
-        //
-        // <see cref="BotYield.Wealth"/> counts the account and the pocket together, and every affordability
-        // judgement a bot makes rests on that sum. Either the sum is a lie or the money is reachable; this
-        // makes it reachable, which is the half that keeps a rich bot able to buy a bandage. Withdrawn first
-        // and carried second, and put straight back if the pack will not take it — the account is debited by
-        // the withdrawal itself, so the other order would mint gold out of nothing.
         var bill = affordable * price;
         var carried = pack.GetAmount(typeof(Gold));
 
@@ -864,10 +646,6 @@ public static class BotShops
         return affordable;
     }
 
-    /// <summary>
-    /// Everything forgotten. Shopkeepers are mobiles of a world that is being replaced, and a reference to
-    /// one of those is a reference to a deleted object.
-    /// </summary>
     public static void Reset()
     {
         _shops.Clear();

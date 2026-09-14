@@ -16,64 +16,44 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotBaronSettings
 {
-    /// <summary>Tiles across the ground one harrowing walks.</summary>
     public int? Side { get; set; }
 
-    /// <summary>How many march, the Baron included.</summary>
     public int? Company { get; set; }
 
-    /// <summary>Fewest he will set out with once the call has run its course.</summary>
     public int? Least { get; set; }
 
-    /// <summary>How long he stands in the square calling for volunteers.</summary>
     public int? MusterMs { get; set; }
 
-    /// <summary>Corpses that finish the errand.</summary>
     public int? Quota { get; set; }
 
-    /// <summary>The longest one harrowing may last.</summary>
     public int? CapMs { get; set; }
 
-    /// <summary>How far around the muster point he calls people up.</summary>
     public int? Reach { get; set; }
 
-    /// <summary>Where the company forms up, as X, Y, Z. Absent means the population's own home.</summary>
     public int[] Square { get; set; }
 
-    /// <summary>How many of the company should stand in the line.</summary>
     public int? Melee { get; set; }
 
-    /// <summary>How many should shoot.</summary>
     public int? Ranged { get; set; }
 
-    /// <summary>How many should mend.</summary>
     public int? Medics { get; set; }
 
-    /// <summary>How far the company looks for something to kill.</summary>
     public int? Sight { get; set; }
 
-    /// <summary>How long the company spends on one corner of the box.</summary>
     public int? RoundMs { get; set; }
 
-    /// <summary>How far he will march a company.</summary>
     public int? Range { get; set; }
 
-    /// <summary>What a harrowing is reckoned at per minute before experience corrects it.</summary>
     public double? Prior { get; set; }
 
-    /// <summary>How many people a square must have taken before it is worth harrowing.</summary>
     public int? Deadly { get; set; }
 
-    /// <summary>What a walk through the town is reckoned at per minute.</summary>
     public double? StrollPrior { get; set; }
 
-    /// <summary>How far from the counter he wanders.</summary>
     public int? StrollReach { get; set; }
 
-    /// <summary>How low the account may fall before the crown makes it up.</summary>
     public int? StipendFloor { get; set; }
 
-    /// <summary>What he carries in his pocket.</summary>
     public int? StipendFloat { get; set; }
 }
 
@@ -107,13 +87,6 @@ public sealed class BotBaronModule : BotModule
 
     public override string[] Requires => ["Squads", "Classes"];
 
-    /// <summary>
-    /// How often his two offices are summed up in the shard's own log.
-    ///
-    /// Printed on a clock rather than only on a reload, for the reason <c>BotBeat.Summarise</c> carries:
-    /// numbers printed only when the world reloads are numbers never printed, and "the Baron is not
-    /// harrowing" and "the Baron harrows and you have not been watching" would otherwise be the same log.
-    /// </summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _timer;
@@ -124,8 +97,6 @@ public sealed class BotBaronModule : BotModule
 
         BotWill.Offer(new BotHarrower());
 
-        // His own rounds: the nearest ground nobody has stood in, walked for nothing and alone if need be.
-        // See BotWarden — reckoned low on purpose, so a great hunt or a rescue outbids it every time.
         BotWill.Offer(new BotWarden());
         BotWill.Offer(new BotStroll());
 
