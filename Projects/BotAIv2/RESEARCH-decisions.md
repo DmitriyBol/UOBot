@@ -256,6 +256,15 @@ write with", "nothing to brew with", "nothing to dig with", "the shelf holds no 
 move; supplies and spells do not. This is the most important *logic* defect found in this pass and it is not yet
 repaired — see §6.
 
+**What pricing a trip at its claim cost, measured the same evening.** Build 35 made restocking `Unpaid`, and an unpaid
+deed learns nothing from failing: its proposer is its only gate. At 16:38 Hale's pack went past the engine's cap of 125
+things — oil cloths nobody bought, handed back by the market without asking the pack — after which every coin drawn to
+pay at a counter bounced, and the trip failed 8,719 times in half an hour. The shard's alarm read 11% of work finished
+while the rest of the population finished as it had all day. Build 37 asks the question the counter fails on before
+the work is weighed (`BotDeed.AtCounter`, `BotYield.Pocket`), stops the market handing goods back past the cap
+(`BotListing.Return`), and offers the trip that makes room unpaid to a jammed pack. Taking the price off a piece of work
+also takes away the one thing that stopped it repeating, so a gate has to arrive with the flag.
+
 ### 3.3 A rule nobody sets reads exactly like a rule that holds
 
 Gaia's role model separates a role's *liveness* responsibilities (what it must eventually do) from its *safety*

@@ -131,7 +131,7 @@ ollama pull deepseek-r1:14b
 
 The first is the crafters' model, chosen for latency; the second is the observers'.
 
-**The thinking crafters** — `Distribution/Configuration/bot-mind.json`. They think only if they are named:
+**The thinking crafters** — `Distribution/Configuration/bot-mind.json`. Which crafters think is a list of names:
 
 ```json
 {
@@ -141,8 +141,10 @@ The first is the crafters' model, chosen for latency; the second is the observer
 }
 ```
 
-The shipped file names nobody, so every crafter is an ordinary bot. `bot-minds.json` holds the rules each mind has
-written for itself; it starts empty and the shard writes it.
+The shipped file leaves `CrafterNames` out, so the five named in `BotMinds.CrafterNames` think — Roderic, Emeric,
+Ulric, Wulfric and Alaric; `"CrafterNames": []` makes every crafter an ordinary bot. Without Ollama nothing breaks: the
+calls fail and those crafters choose by arithmetic. `bot-minds.json` holds the rules each mind has written for itself;
+it starts empty and the shard writes it.
 
 **The observers** — `"bots.debugger.enabled": "True"`, and optionally `Distribution/Configuration/bot-debugger.json`
 for the helpers' names, their robes and the thresholds. In game, `[argus` brings the lead observer to you; from the

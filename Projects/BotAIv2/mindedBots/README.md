@@ -1,8 +1,9 @@
 # BotMindAI
 
-**The four crafters think, and nothing else on this shard does.** Patrick's order of 07.09.2026: the
-Captain, the Architect, the Sage and the Baron were stood down, and the whole of the Crafter class — four
-bodies, `Roderic`, `Emeric`, `Ulric` and `Wulfric` — is held by minds. There are no unthinking crafters.
+**The five crafters think, and nothing else on this shard does.** Patrick's order of 07.09.2026: the
+Captain, the Architect, the Sage and the Baron were stood down, and the whole of the Crafter class — five
+bodies since 11.09.2026, `Roderic`, `Emeric`, `Ulric`, `Wulfric` and `Alaric` — is held by minds. There are no
+unthinking crafters.
 
 This is the first office where thinking is not a supplement to the arithmetic but the whole of how the trade
 is run, and the reason is the shape of the work. A crafter's job is a chain: a want on the board, a material

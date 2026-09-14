@@ -372,12 +372,13 @@ the shard's own tables for this expansion.
 
 ## The bots that think
 
-**Four crafters may think, and in the shipped configuration none do.** On 07.09.2026 the office minds — the
-captain's, the architect's, the sage's and the Baron's — were stood down, and thinking was given to the crafter
-trade alone, where the work is a chain the auction cannot see: a want on the board, a material that may not exist
-yet, a skill that may not be high enough, a price that has to beat buying the thing outright. On 13.09.2026 the
-crafters were made ordinary bots again; `CrafterNames` in `bot-mind.json` is empty. The minds, and the state they are
-shown, are described in `mindedBots/README.md`.
+**Five crafters think, and nothing else on this shard does.** On 07.09.2026 the office minds — the captain's, the
+architect's, the sage's and the Baron's — were stood down, and thinking was given to the crafter trade alone, where
+the work is a chain the auction cannot see: a want on the board, a material that may not exist yet, a skill that may
+not be high enough, a price that has to beat buying the thing outright. By Patrick's order the crafters were ordinary
+bots for the night of 13→14.09.2026, and at his word they had their minds back on the evening of 14.09.2026:
+`bot-mind.json` leaves `CrafterNames` out, so the five in `BotMinds.CrafterNames` think — Roderic, Emeric, Ulric,
+Wulfric and Alaric. The minds, and the state they are shown, are described in `mindedBots/README.md`.
 
 A thinking bot is otherwise an ordinary bot: the model names a trade from a fixed list, the choice runs as an
 ordinary undertaking under the same auction and the same commitment, and its forecast is measured rather than
@@ -390,9 +391,9 @@ believed — so it can only win a place by being right.
    ollama pull qwen3.5:9b
    ```
 2. Leave it serving on `http://127.0.0.1:11434`.
-3. Name the crafters that should think in `Distribution/Configuration/bot-mind.json`, for example
-   `"CrafterNames": ["Roderic", "Emeric", "Ulric", "Wulfric"]`, and keep at least that many crafters in
-   `bot-population.json`.
+3. Choose the crafters that think in `Distribution/Configuration/bot-mind.json`. Without the key the five in
+   `BotMinds.CrafterNames` do; a list such as `"CrafterNames": ["Roderic", "Emeric"]` names others, and `[]` makes
+   every crafter an ordinary bot. Keep at least as many crafters in `bot-population.json` as there are names.
 4. `"bots.mind.enabled": "True"` and `"bots.mind.thinking": "True"` in `modernuo.json`.
 
 Their thinking goes to `logs/bot-minds.log`, and the `Minds:` summary line carries how many decisions each made, how

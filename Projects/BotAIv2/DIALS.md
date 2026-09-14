@@ -509,6 +509,7 @@ changed without a rebuild.
 | `BotAccompany` | `MeansEveryMs` | `5000` | *code only* |
 | `BotAccompany` | `Prior` | `45.0` | *code only* |
 | `BotAccompany` | `Reach` | `60` | *code only* |
+| `BotAccompany` | `ShunMs` | `300000` | *code only* |
 | `BotAccompany` | `Stay` | `5` | *code only* |
 | `BotMend` | `BeyondMs` | `10000` | *code only* |
 | `BotMend` | `Cast` | `8` | `Cast` |

@@ -149,6 +149,14 @@ the brain had of its own, and nothing recorded that it had lost, so it spent the
 finished with 0 of 119 predictions borne out. A model proposing through this interface bids in the same units,
 loses on the same arithmetic, and has its actual takings written into the same ledger.
 
+**Some refusals are about whether the work can happen at all, and those are vetoes, not factors.** Among the refusals
+`BotAppraisal.Weigh` names are another map, an outlay the bot cannot afford, and — since 14.09.2026 — work that changes
+money over a shopkeeper's counter offered to a bot whose pack has no room for a coin (`BotDeed.AtCounter`,
+`BotYield.Pocket`). A factor under a fifth root cannot say "cannot": a fiftieth still comes out at 0.46. The third was
+needed because of `Unpaid`: a deed paid nothing on purpose learns nothing from failing, so the reasons it fails must be
+asked before it is offered. Restocking, made unpaid that morning, failed 8,719 times in half an hour for one bot whose
+pack had gone past the cap.
+
 ---
 
 ## What bends and what does not

@@ -151,6 +151,14 @@ decision layer counts the same price in its own units (`BotYield.DeathMinutes`);
 
 ## Known rough edges
 
+**A pack is full by count as well as by weight.** The porter sends a bot to the counter when its pack is heavy, rich,
+wanted, worth losing or hoarding — and, since 14.09.2026, when it has no room for a coin (`BotYield.Pocket`). A pack at
+the engine's cap of 125 things cannot pay or be paid at a counter, so every trade that does either is refused to it,
+and the trip is offered unpaid, as it is to a bot too heavy to walk. Loot, spoils and deliveries off the board still
+go into a pack without asking it, which is how a pack gets there. The `Will:` line counts the refusals and the offers
+of the trip; both are counted once a review while the state lasts, so they measure how long it lasted, not how many
+bots were in it.
+
 **Nobody musters a squad.** `BotSquads.Form` is still called by nothing, so formation, scouting and sharing are
 written and do not run. That is the next proposer, not a defect.
 

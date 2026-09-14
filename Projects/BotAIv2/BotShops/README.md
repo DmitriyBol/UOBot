@@ -121,6 +121,15 @@ where an errand to the shops belongs.
 The one number that does real work there is `Outlay`: the brain measures need against it. A bot that cannot
 afford its own bandages feels short of money, and stops the moment it can.
 
+**Both directions go through the pack, and a pack has a cap on things as well as on weight.** The engine takes a
+bill under two thousand gold out of the backpack and puts a shopkeeper's payment into it, so a pack at
+`Container.GlobalMaxItems` (125 things) with no pile of gold on top can neither pay nor be paid: the coin bounces at
+the counter. Every errand that changes money over a counter says so (`BotDeed.AtCounter`: restocking at a shop,
+sewing, brewing, fletching, inscribing, a scroll bought at a counter, a contract, a guild's batch, peddling), and the
+appraisal refuses it to such a pack before it is weighed (`BotYield.Pocket`); the porter offers that bot the trip that
+makes room instead. Found on 14.09.2026, when one bot jammed that way failed a trip to the shops 8,719 times in half
+an hour.
+
 **Selling: at what the load is actually worth, per minute.** The proposer knows both numbers exactly — how many
 there are and what this shopkeeper pays for one — so a guess would be strictly worse than the truth, and twenty
 ingots outranking three is the behaviour anybody would want. `Coin` is 1.0, and this is the only obligation in

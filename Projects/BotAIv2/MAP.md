@@ -860,6 +860,14 @@ twelve days after the only class that set it was deleted, and healers spent a qu
 fights under it. A flag read in one file and set in another can lose its setter without a compile error or a log
 line. **Check who sets a safety rule, not only who reads it.**
 
+**Taking the price off a piece of work takes its brake off too.** The auction learns from what work pays, and that
+learning is also what stops a failing errand being chosen again: a trip that fails at nought a minute prices itself
+out within a few reviews. `BotDeed.Unpaid` switches the pricing off and the learning with it, so an unpaid deed repeats
+a failure for as long as its proposer keeps offering it. Restocking was made unpaid on 14.09.2026 so that it would stop
+being refused for costing money; five hours later one bot whose pack had gone past the engine's cap of 125 things
+failed it 8,719 times in half an hour, and the shard's alarm read 11% of work finished. **Every `Unpaid` needs the
+reasons it fails asked before it is offered**, the way `BotYield.Pocket` now asks the one a counter fails on.
+
 **Instrument before you fix.** Both of the entries above were first diagnosed wrong, on theories that were
 plausible and had the shape of defects this project has really had. What settled them was making the sentence
 in the log say which of its four ways it had failed. A guess costs a rebuild and a restart; a named counter

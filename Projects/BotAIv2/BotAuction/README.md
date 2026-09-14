@@ -51,6 +51,12 @@ The opening ask comes from whoever is listing, and it asks `BotAuction.Worth` fi
 shard reckons the thing is worth, and falls back to its own stand-in only when the shard has never had an
 opinion. From there it is the market's business.
 
+**A stall that has stood at its lowest price for `StuckMs` goes back to its seller, and only as far as the pack will
+take it** (`BotListing.Return`, by the engine's own `TryDropItem`); the rest stays on the stall and is counted as
+`Unreclaimed`. Until 14.09.2026 the goods were dropped into the pack without asking it, and a tailor's 197 unsold oil
+cloths took a pack that holds 125 things past its cap, after which no coin could be paid into it or drawn into it. A
+stall withdrawn into the bank box is still emptied whole.
+
 ---
 
 ## Money is not printed

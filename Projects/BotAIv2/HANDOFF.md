@@ -16,6 +16,38 @@ together, `ARCHITECTURE.md`. For what it is at all, `README.md`.
 
 ---
 
+## 14.09.2026, evening — the night's settings put back, a loop closed at the shared question, and a decision log
+
+**The night's settings are back to the code's values** at Patrick's word: `Price`, `Keep`, `TaxShare` and
+`CrafterNames` are out of `bot-estate.json`, `bot-debugger.json` and `bot-mind.json` — a hall at 5,000 with 300 kept
+back per member, the crown's tax at 0.06, five crafter minds. Checked on the boot lines and through the door.
+
+**What the alarm was.** From 16:38 the channel held `work-not-finishing`, down to 11–17% per half hour. It was one bot.
+Hale's pack held 197 oil cloths nobody bought, handed back by the market with `DropItem` past the engine's cap of 125
+things; after that no coin could be drawn into the pack to pay at a counter, or paid into it for a sale, and restocking —
+made unpaid that morning, so learning nothing from failing — failed 8,719 times in half an hour. It was the third time
+this failure line had been seen: the guild's courier on 09.09 (1,955 of 2,012 failures) and on 10.09 (1,222 in eight
+hours), each time gated in one proposer only.
+
+**Build 37** asks the question at the shared level. `BotDeed.AtCounter` marks work that changes money over a counter;
+`BotAppraisal.Weigh` refuses it when `BotYield.Pocket` says the pack has no room for a coin (`Pocketless`);
+`BotListing.Return` hands a stall's goods back only as far as `TryDropItem` allows; the porter offers a jammed pack the
+trip that makes room, unpaid (`BotUnload.Jammed`, which counts offers). A healer that could not keep up with a fighter is
+not sent after the same fighter for five minutes (`BotAccompany.ShunMs`; Otho had been sent after Maeve 48 times).
+**Build 38** gives Argus a keyboard-only verb, `jam <bot>`, that puts a bot into Hale's state. Measured on Hale at 19:35:
+the counter work was refused, unload was taken at 103/min, 113 cloths went into the bank box within 75 seconds, and sewing
+was weighed normally again the same second — one failure (the work already in hand) against thousands. Build 38 after
+20 minutes: 78% of endings finished, no "pack would not hold" line, no escort failures.
+
+**Not deployed yet:** the `Will:` line still calls `Jammed` "trips begun" although it counts offers; the corrected
+wording is in source and goes out with the next build.
+
+**`DECISIONS.md` exists from tonight, at Patrick's order:** the mechanisms and their invariants, twelve defect classes with
+every recorded instance, the month's decisions with what they answered and how they ended, and the structural remedies
+that would close classes rather than instances. It is read before a mechanism is touched.
+
+---
+
 ## 14.09.2026 — a choice kept, a role played, and the research behind both
 
 Patrick's order that morning: the price of a choice and whether a bot keeps to it; research into how autonomous
@@ -56,8 +88,9 @@ the first of them); role-true work for fighters and casters, whose own trade is 
 a nearer opportunity during a walk; a census of the safety rules and whom they bind; weighted randomness among
 near-equal offers; minds that name how long they mean to keep a choice.
 
-**Decisions still Patrick's from the night before:** `bot-estate.json` Price 2000 and Keep 100 (the recommendation
-is Keep back to 300); `bot-debugger.json` TaxShare 0.0; `bot-mind.json` CrafterNames empty; the Crown and Blade seats
+**The night's settings, put back at Patrick's word on the evening of 14.09.2026:** the keys are out of
+`bot-estate.json`, `bot-debugger.json` and `bot-mind.json`, so the code's own values apply again — a hall at 5,000 with
+300 kept back per member, the crown's tax at 0.06, and five crafter minds. Still Patrick's: the Crown and Blade seats
 62 tiles apart against a radius of 40; whether losing a war should also cool the loser's clock for declaring one.
 
 ---

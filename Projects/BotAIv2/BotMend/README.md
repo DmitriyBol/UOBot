@@ -188,6 +188,13 @@ Measured over the following half hour: 2,962 askings, 227 sent — 2,702 found n
 — 45 stints, 40 of them ended by the fight being over, 95 times a healer fell behind and walked on, and one stint put
 down for a wound and taken up again. Healers' own trade went from 23% of their minutes to 40%.
 
+**A healer that could not keep up is not sent after the same fighter at once.** By the evening of 14.09.2026 Otho had
+been sent after Maeve 48 times and after Faron 16, every stint bending six times after a fighter it never closed on
+and ending "could not get nearer", and every failure put the same fighter back on offer at the next review. Unpaid work
+learns nothing from failing, so its proposer has to remember for it: a stint given up for falling behind sets the pair
+aside for `BotAccompany.ShunMs` (five minutes), and `BotAttendant` passes that fighter over for that healer. The `Arms:`
+line counts both — stints ended because the healer could not keep up, and fighters passed over.
+
 ## What is not here
 
 **Resurrection.** A dead bot is raised by the population's clock a minute later; a healer standing next to the

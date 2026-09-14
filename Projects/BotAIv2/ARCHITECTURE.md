@@ -402,6 +402,7 @@ claims above before anybody noticed.
 | what a dial is set to, and whether a config file can reach it | `DIALS.md` |
 | what the project is, what the bots do, how the economy works | `README.md` |
 | how a bot keeps a choice, plays its role, and what the field knows about both | `RESEARCH-decisions.md` |
+| why a decision was taken, what was tried, what it cost, and every instance of a defect that keeps coming back — **read before changing a mechanism** | `DECISIONS.md` |
 | the guilds, their halls, their land and their wars | `GUILDS.md`, `PLAN-wars-and-seats.md` |
 | the state of the work and what is open | `HANDOFF.md` |
 | how to install and build it | `INSTALL.md`, `BUILD.md` |
