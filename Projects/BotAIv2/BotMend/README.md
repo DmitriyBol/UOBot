@@ -9,6 +9,7 @@ the ladder was written and was empty the whole time.
 | `BotSalve.cs` | an obligation: get there → cast, bandage or drink → until whole |
 | `BotMedic.cs` | the `Failing` proposer: mend yourself, above everything else |
 | `BotSurgeon.cs` | the `Free` proposer: mend whoever is worst off — **including yourself** |
+| `BotAccompany.cs` | a healer standing by one of ours who is fighting, and `BotAttendant`, which offers it to healers only |
 | `BotMendConfig.cs` | `Configuration/bot-mend.json` |
 | `BotMendModule.cs` | module, phase `World`, requires `Classes` and `Will` |
 
@@ -163,6 +164,29 @@ otherwise the ledger would learn that the mine is dangerous because somebody ban
    `bought 1 LesserHealPotion ... for 15gp`.
 9. Wound a bot to 50 % and check that it **does not go digging**: mending at that wound estimates around 55
    against the mine's 45. Before the wound-scaled estimate it went digging.
+
+## Standing by a fighter, when nobody is hurt yet
+
+Until 14.09.2026 a healer with nobody to mend did whatever else the auction offered, and what it offered most was a
+walk to look for a fight: healers spent 26% of their working minutes on that and 10% on their own trade. Two changes
+turned that round. `BotHealer` keeps the medic's rule again (`DefendsOnly`, lost with the rangers on 02.09.2026), so
+no hunt and no prowl is offered to a healer at all. And `BotAttendant` offers a healer something that is its own
+trade: stand by the nearest fighter of ours who is engaged and has nobody else standing by it.
+
+`BotAccompany` walks after the fighter and keeps within five tiles (`Stay`) until the fight has been over for twenty
+seconds (`GraceMs`) or five minutes have passed (`LeaseMs`). One healer per fighter, by a claim the stint renews every
+beat (`ClaimMs`). It is **steadfast**, so when the fighter is hurt the salve — a summons — puts the stint down, and
+when the wound is bound the healer walks back; and it is **unpaid**, because what it earns is the Healing and Magery
+of the mending it makes possible, which is booked to the mending. The `Arms:` line reports how often healers were
+asked, sent, and why the rest were not, and how the stints ended.
+
+**Falling behind is ordinary, and the first version did not know it.** A fighter on a hunt walks away from whoever
+follows it, and the chase planner gives up after a dozen plans that do not close; a deed that says nothing when its walk
+fails is given up. All three stints of the first build ended that way inside ten seconds. The stint now bends up to
+`KeepUp` (6) times before admitting it cannot keep up, and a healer looks `BotAttendant.Reach` (60) tiles for a fighter.
+Measured over the following half hour: 2,962 askings, 227 sent — 2,702 found nobody of ours fighting within sixty tiles
+— 45 stints, 40 of them ended by the fight being over, 95 times a healer fell behind and walked on, and one stint put
+down for a wound and taken up again. Healers' own trade went from 23% of their minutes to 40%.
 
 ## What is not here
 

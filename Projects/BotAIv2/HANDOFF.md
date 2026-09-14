@@ -11,6 +11,55 @@ together, `ARCHITECTURE.md`. For what it is at all, `README.md`.
 > **One engine patch is now required.** `engine-patches/CraftItem-heat-source.patch` — seventeen lines
 > exposing two questions `CraftItem` already answers privately. Without it this assembly does not compile.
 
+> **Newest first.** The section directly below is 14.09.2026. Everything after it is the state on 05.09.2026 and
+> the nights that followed, kept as it was written.
+
+---
+
+## 14.09.2026 — a choice kept, a role played, and the research behind both
+
+Patrick's order that morning: the price of a choice and whether a bot keeps to it; research into how autonomous
+characters decide, aimed at decisions that are correct, logical and true to a bot's role; and this repository
+brought up to date with the code carrying only its class summaries. The research, the measurements and the
+reasoning are in **`RESEARCH-decisions.md`**; this is the state it left.
+
+**What was measured first** (build 33, 108 minutes): 31% of all dropped work was dropped at exactly the two-minute
+protection cap, and four bots in five took the same trade up again within ten minutes; mining finished 52% of its
+trips and abandoned 28%. The stall watch read a pick's swing counter as errands swapped. A woodcutter could swing
+293 times at nothing. Members holding a claimed square were cancelled for standing still. Healers spent 26% of their
+time looking for fights, because the medic's rule had gone with the rangers. The auction refused 1,008 unloads and
+721 restocks for "costing money".
+
+**Build 34 — commitment.** `BotDeed.Steadfast` work is held for its own reckoning (`CommitStretch` ×1.5, capped at
+eight minutes); only events get through a hold — `Pressing`, `BotDeed.Summons`, or trouble in the work; what an
+event displaces is put down and taken up again (`BotPause`); every drop says what it cost; the census writes
+`Resolve:`; Argus has `resolve <bot>` and `resolves`. Same build: churn counted by identity, woodcutting given up by
+swings, the muster `Still`. First twenty-two minutes against the same age of build 33: drops 12% → 8%, mining
+44/37 → 74/5 (finished/dropped %), cooking 63/21 → 79/7, unloading 75/19 → 97/3.
+
+**Build 35 — roles and logic.** `BotCalling` prices a class's own trade ×1.3 and another class's ×0.6 and writes
+`Roles:`; healers keep `DefendsOnly` again and have a place to be (`BotAccompany`, standing by an engaged fighter);
+getting a spell and standing for the guild are steadfast; a trip to the shops is unpaid work, no longer refused for
+what it costs. Argus has `roles`.
+
+**Build 36 — a class's own book, and a healer that keeps up.** A class names the spells it learns first
+(`BotClass.BookFirst`): a healer with fifteen gold had been measured buying six curses while short of Greater Heal.
+Standing by a fighter bends up to six times when the fighter walks away (`BotAccompany.KeepUp`) — the first three
+stints on build 35 had all ended inside ten seconds — and healers look sixty tiles for one. First thirty minutes:
+healers' own trade 40% of their minutes against 23% in the morning, 45 stints standing by (40 ended with the fight),
+the rest of the population as before; commitment 79% of endings finished, 154 better offers refused inside a hold.
+One healer was found fighting bare-handed with no staff in its pack at 11:43 and killed — the first such report of
+the day, on a supply run rather than beside a fighter; the `Arms:` line counts them, and it is worth watching.
+
+**Open, in the order `RESEARCH-decisions.md` §6 gives:** enabling work priced by what it enables (restock is only
+the first of them); role-true work for fighters and casters, whose own trade is 10–16% of their minutes; reacting to
+a nearer opportunity during a walk; a census of the safety rules and whom they bind; weighted randomness among
+near-equal offers; minds that name how long they mean to keep a choice.
+
+**Decisions still Patrick's from the night before:** `bot-estate.json` Price 2000 and Keep 100 (the recommendation
+is Keep back to 300); `bot-debugger.json` TaxShare 0.0; `bot-mind.json` CrafterNames empty; the Crown and Blade seats
+62 tiles apart against a radius of 40; whether losing a war should also cool the loser's clock for declaring one.
+
 ---
 
 ## What is running

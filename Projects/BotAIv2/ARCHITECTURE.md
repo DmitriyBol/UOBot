@@ -175,6 +175,9 @@ Everything else lives in the subsystem READMEs. These are the ones that change w
 | `BotAppraisal.CrowdBite` | 0.8 | how much a want is worth less because others are already doing it |
 | `BotAppraisal.Inertia` / `SwitchMargin` | ×1.25 / ×1.25 | how much better a new thing must be to be worth switching to |
 | `BotWill.ReviewMs` / `DwellMs` | 15 s / 30 s | how often a busy bot looks up; how long fresh work is untouchable |
+| `BotWill.CommitStretch` / `CommitCapMs` | ×1.5 / 8 min | how long steadfast work is held against ordinary offers — its own reckoning, stretched and capped; 0 switches holds off |
+| `BotWill.Resume` / `ResumeHealth` | on / 0.5 | whether work displaced by something that would not wait is taken up again afterwards, and not below what health |
+| `BotCalling.OwnTrade` / `OtherTrade` | ×1.3 / ×0.6 | what a class's own trade and another class's trade are worth against their bare price |
 | `BotLadder.FailingFraction` | 0.35 | when a bot stops weighing options and looks after itself |
 | `BotThreat.Tolerance` | 1.5 | how much stronger the opposition may be before walking beats standing |
 | `BotPopulation.Roam` | 200 | the boundary on **wanting**, not on walking. Temporary |
@@ -202,9 +205,9 @@ honest rather than broken — the bot keeps what it is doing and the shortage is
 | `Dead` | not alive | the population's clock (raises the fallen) |
 | `Failing` | health below `FailingFraction` | `BotMedic` — mend yourself, above all else |
 | `Hunted` | being hit | nobody: "don't go looking for new work mid-fight" |
-| `Bound` | obligations to a squad | nobody (squads are unwired — §11) |
-| `Busy` | holding an obligation | the obligation itself |
-| `Free` | none of the above | seven proposers, by appraisal |
+| `Bound` | obligations to a squad | the company itself: squads are formed from hunts, patrols, harrows and wars, and own where their members stand |
+| `Busy` | holding an obligation | the obligation itself — and, if it is steadfast, a hold against ordinary offers for as long as it reckoned it would take |
+| `Free` | none of the above | forty-eight proposers, by appraisal |
 
 Two deliberate departures from v1, both fixing measured defects: **flight outranks the social** (v1 put "call
 for help" above "I am dying", so a bot on its last points announced a company it could not join, found nobody
@@ -377,9 +380,11 @@ tile every half minute.
 
 **Ground pockets are not written to disk.** On purpose: a wrong "impossible" would be invisible and permanent.
 
-**It has never been run.** The development machine has no client files, so everything about behaviour in these
-documents is reasoning rather than observation. What *is* verified is that it builds clean against the fork,
-and that every engine call was read out of the fork's source first.
+**It has run, and this section was written before it did.** From the end of August the shard has run for days at
+a time with a population of eighty, and every behaviour claim that matters is now a measurement in `HANDOFF.md`,
+`NIGHT-2026-09-13.md` or `RESEARCH-decisions.md` rather than reasoning here. What was true when this was written
+still is: it builds clean against the fork with warnings as errors, and every engine call was read out of the fork's
+source first.
 
 ---
 
@@ -396,7 +401,9 @@ claims above before anybody noticed.
 | where a file, a number or a log line lives | `MAP.md` |
 | what a dial is set to, and whether a config file can reach it | `DIALS.md` |
 | what the project is, what the bots do, how the economy works | `README.md` |
+| how a bot keeps a choice, plays its role, and what the field knows about both | `RESEARCH-decisions.md` |
+| the guilds, their halls, their land and their wars | `GUILDS.md`, `PLAN-wars-and-seats.md` |
 | the state of the work and what is open | `HANDOFF.md` |
-| how to build it and what the boot log should say | `BUILD.md` |
+| how to install and build it | `INSTALL.md`, `BUILD.md` |
 | why one subsystem decides what it decides | `<Subsystem>/README.md` |
 | **why the whole thing is shaped like this** | you are reading it |

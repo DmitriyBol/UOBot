@@ -19,7 +19,7 @@ produced, less what was spent.
 | `BotLedger.cs` | what has paid this bot, and where. All the memory of work there is |
 | `BotYield.cs` | the takings: the skill-to-gold rate, the price of death, the measurement ceiling |
 | `BotAppraisal.cs` | the appraisal: estimate × considerations, geometric mean, inertia |
-| `BotResolve.cs` | state on the bot: feelings, ledger, what was taken on and why |
+| `BotResolve.cs` | state on the bot: feelings, ledger, what was taken on and why, what it scored then and how long it reckoned; and `BotPause`, work put down for something that would not wait |
 | `BotWill.cs` | the decision itself: settle → advance → auction. And the census |
 | `BotWillConfig.cs` | `Configuration/bot-will.json` |
 | `BotWillModule.cs` | module, phase `World`, requires `Classes` |
@@ -100,6 +100,33 @@ An interruption does not lose the work: a higher rung puts the obligation **asid
 way the journey in `BotJourney` waits under a fight. After `AsideCapMs` (10 minutes) what was set aside is dropped
 after all: the market has closed, the vein is worked out, and a bot returning to a task an hour later acts on an
 hour-old fact.
+
+### And since 14.09.2026, held until something happens
+
+Those three mechanisms stopped a bot changing its mind every tick; they did not stop it changing its mind at two
+minutes. Fresh work was protected for its own reckoning but never longer than `DwellCapMs`, and past that any offer
+worth about half as much again took the bot off — whether it was half a minute into a trip or half a trip. On the
+morning of 14.09.2026, 224 of 734 drops happened between 1.95 and 2.25 minutes in, and four bots in five took the
+same trade up again within ten minutes. Mining finished 52% of its trips and dropped 28%, thirty-one of them on
+the walk to the fire with the ore already in the pack.
+
+The repair follows Kinny and Georgeff's reactive bold agent (see `RESEARCH-decisions.md` §2):
+
+| Mechanism | What it does |
+|---|---|
+| `BotDeed.Steadfast` | work a bot sees through: mining, woodcutting, herbs, cooking, peddling, unloading, getting a spell, standing for the guild |
+| `CommitStretch` ×1.5, `CommitCapMs` 8 min | a steadfast deed is held against ordinary offers for its own reckoning — the walk it expected plus its `Minutes` — stretched and capped |
+| `BotDeed.Summons` | what gets through a hold besides `Pressing`: a comrade in trouble, a wound to bind, the guild's muster, a war company, a paid lesson, a prisoner |
+| trouble | a walk told its way is blocked, or one that has stopped closing for `TroubleShare` of the trek limit, lifts the hold |
+| `BotPause`, `Resume`, `ResumeHealth` 0.5 | work displaced by something that would not wait is put down and taken up again when that ends, unless the bot died, came back too hurt, changed map or was away past `AsideCapMs`; its stake is moved so the interruption's takings are not booked to it |
+
+The watchdogs — the trek limit, the labour clock, the stall watch — run whether a hold stands or not, which is
+what makes a hold of eight minutes safe: nothing stuck can hide behind one. `CommitStretch` 0 puts the auction back
+exactly as it was, and the `Resolve:` census line and Argus's `resolve <bot>` / `resolves` say what the holds did.
+
+Measured over the first twenty-two minutes of a shard, the hold off against the hold on: drops 12% → 8% of all
+endings; mining 44% finished / 37% dropped → 74% / 5%; cooking 63/21 → 79/7; unloading 75/19 → 97/3; woodcutting
+62/10 → 100/0; herbs 79/17 → 92/4. Work the hold does not touch — looking for a fight, hunting — was unchanged.
 
 ---
 

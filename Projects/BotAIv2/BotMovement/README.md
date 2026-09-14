@@ -16,6 +16,7 @@ The analysis all of this is built on is in `RESEARCH.md`. This file is only what
 | `BotPath.cs` | a tile A\* with a ceiling in **time**. Three outcomes |
 | `BotReach.cs` | sealed pockets of ground, harvested out of failures. Refusal in one comparison |
 | `BotRefused.cs` | places the population could not get to, remembered for everybody and cleared by anyone arriving |
+| `BotBarred.cs` | ground nobody may ever choose: stated rather than measured, never expiring, never cleared by arriving |
 | `BotJourney.cs` | the A→B obligation. Lives on the bot |
 | `BotWalk.cs` | the moment of the step: doors, occupied tiles, casting, a last line of defence |
 | `BotMovementConfig.cs` | `Configuration/bot-movement.json` — budgets and deadlines only |

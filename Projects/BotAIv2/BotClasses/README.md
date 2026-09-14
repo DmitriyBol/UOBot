@@ -17,6 +17,7 @@ about the world.
 | `BotArsenal.cs` | the weapons of the era, the spell ids and the potion types, named once |
 | `BotClasses.cs` | the registry of nine, and applying the configuration overrides |
 | `BotClassConfig.cs` | reading `Configuration/bot-classes.json` |
+| `BotCalling.cs` | whether a piece of work is the class's own trade, another class's, or anybody's; what that does to its price; how each class's minutes divide |
 | `BotArcher.cs` | the bow and nothing else, and the only class that can triple a hit |
 | `BotArchitect.cs` | the bot that is paid by the health of the market rather than by any errand in it |
 | `BotBaron.cs` | the one bot on the shard that is not trying to make a living |
@@ -81,6 +82,38 @@ check, so a smith with low mining burns the ore and never reaches the anvil at a
 26 turned two ore in a hundred into ingots. So mining has to come first. But while the trade was inferred from
 the largest target, the champion of smiths came out a grandmaster **miner** holding an apprentice's hammer. So
 `MainSkill` is declared outright rather than derived.
+
+## What a class is for, and what that does to a price
+
+A class never commands a bot, and it still has to be visible in what the bot does: a healer that spends its
+day looking for fights is not a healer, whatever its skills say. Two mechanisms carry that, and both read only
+what the classes already declare.
+
+**The calling** (`BotCalling`, 14.09.2026). A class names the skills it works towards (`BotClass.Wants`); a piece
+of work names the skill it trains (`BotDeed.Trains`). Work that trains one of the class's skills is its *own
+trade* and is worth ×1.3; work that trains a skill some other class is for is *another's trade* and is worth ×0.6;
+work that trains nothing, or a skill no class claims — selling, carrying, looking for a fight, standing for the
+guild, cooking — is *anybody's* and is left alone. The multiplier sits outside the appraisal's fifth root, because
+inside it a statement about who the bot is would be flattened like a consideration about a place. Both numbers
+are dials (`OwnTrade`, `OtherTrade`, in `bot-will.json`), and the five-minute `Roles:` line and Argus's `roles`
+verb report how every class's working minutes actually divide.
+
+Measured before it existed, on the morning of 14.09.2026: crafters spent 73% of their working minutes on their own
+trade and gatherers 67%, healers 10%, warriors 12%, mages 15%. Almost none of the gap was another class's work; it
+was anybody's work, above all looking for a fight and not finding one. The calling fixes the smaller half of that.
+The larger half — giving fighters and healers something role-true to do — is open; see `RESEARCH-decisions.md` §6.
+
+**What a class learns first** (`BookFirst`, 14.09.2026). A caster's book used to be filled cheapest gap first, and
+because spell ids run by circle that meant Clumsy, Create Food and Feeblemind before anything a healer or a mage
+fights or mends with — a healer with fifteen gold was measured spending it on six curses while short of Greater Heal.
+Now a class names the spells it wants first: the healer cures, protection and the greater heals, the mage the direct
+damage of each circle and protection, the warrior-mage a short list of the same. The rest of the book is still filled
+cheapest first.
+
+**The safety rules** — `Sworn` (the only trades a class may be offered) and `DefendsOnly` (a medic does not go
+looking for a fight). The second was written for the King's Rangers' healer and went with the rangers on
+02.09.2026, which left the rule enforced by `BotHunter` and set by nobody. `BotHealer` answers it again now,
+through the `BotHealer.Defends` dial.
 
 ## What the configuration may change
 

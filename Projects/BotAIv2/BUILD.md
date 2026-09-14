@@ -3,16 +3,17 @@
 For anybody with a clone of the engine fork to hand. Everything below was **read out of the fork itself**
 (`github.com/DmitriyBol/ModernUO-fork`, branch `main`) rather than guessed or copied from the first version.
 
-> **What to expect, honestly.** After these steps the shard builds, starts, **and fifty-three bots appear
-> outside Britain** who dress themselves, take on work and go and do it: they mine, cut wood, pick reagents,
-> forge, sew, brew, fletch, cook, write scrolls, trade over counters and with each other, bind wounds, hunt,
-> form companies, teach each other for a fee, and harrow ground that has killed somebody. Four of them think
-> through a local model if Ollama is running, and one invisible observer watches the rest.
+> **What to expect, honestly.** After these steps the shard builds, starts, **and eighty bots in five guilds
+> appear around Britain** who dress themselves, take on work and see it through: they mine, cut wood, pick
+> reagents, forge, sew, brew, fletch, cook, write scrolls, trade over counters and with each other, bind wounds,
+> hunt, form companies, teach each other for a fee, raise halls, claim land, go to war under rules that end the
+> war, and take parties into dungeons. A squad of three invisible observers watches the rest if Ollama is running,
+> and four crafters can be made to think through a local model.
 >
-> Everything in this box was written in August and described a much smaller shard — four bots, no squads, no
-> armour, roaming two hundred tiles. All four of those are now wrong, which is the standing hazard with these
-> documents: the numbers that matter live in `Distribution/Configuration/bot-*.json` and in the boot log, and
-> `MAP.md` is generated from the source. Trust those over prose.
+> **This file was first written in August, before the shard had ever run, and its later sections still read that
+> way.** Since then it has run for weeks on end. The numbers that matter live in
+> `Distribution/Configuration/bot-*.json` and in the boot log, `MAP.md` and `DIALS.md` are generated from the
+> source, and `INSTALL.md` is the short, current version of §2 below. Trust those over prose.
 
 ---
 
@@ -114,37 +115,61 @@ ModernUO-fork\Projects\BotAIv2\BotModules\ ...
 The paths in the `.csproj` are relative and assume exactly that depth — the folder must sit **beside**
 `UOContent`, `Server` and `Logger`. One level deeper and every path needs another `..\`.
 
-**2. Add it to the solution** (needed if you run `dotnet build` from the root; optional if you build the csproj
-directly). In `ModernUO.slnx`, alphabetically among the others:
+**2. Apply the two engine patches** from the fork root, before building:
+`git apply Projects/BotAIv2/engine-patches/CraftItem-heat-source.patch` and
+`git apply Projects/BotAIv2/engine-patches/HarvestDefinition-said.patch`. The first is required to compile; the
+second lets a bot hear what the harvest system says about a swing. `INSTALL.md` describes both.
+
+**3. Add both projects to the solution** (needed if you run `dotnet build` from the root). In `ModernUO.slnx`,
+alphabetically among the others:
 
 ```xml
   <Project Path="Projects/BotAIv2/BotAIv2.csproj" />
+  <Project Path="Projects/BotAIv2/mindedBots/BotMindAI.csproj" />
 ```
 
-**3. Build.**
+**4. Build.**
 
 ```bash
-dotnet build Projects/BotAIv2/BotAIv2.csproj -c Release
+dotnet build ModernUO.slnx -c Release
 ```
 
-The result lands in `Distribution\Assemblies\BotAIv2.dll`.
+The results land in `Distribution\Assemblies\BotAIv2.dll` and `BotMindAI.dll`.
 
-**4. Register the assembly.** `Distribution\Data\assemblies.json` currently holds one line; it should become:
+**5. Register the assemblies.** `Distribution\Data\assemblies.json` should read:
 
 ```json
 [
   "UOContent.dll",
-  "BotAIv2.dll"
+  "BotAIv2.dll",
+  "BotMindAI.dll"
 ]
 ```
 
-**5. Start the shard** however this machine normally does it (`Projects\Application` is the entry point).
+**6. Switch the modules on** in `Configuration/modernuo.json`: `bots.enabled` and one `bots.<module>.enabled` per
+module. The list is in `INSTALL.md`.
 
-**6. Read the log** and compare it with §3. The configuration files create themselves on the first start.
+**7. Start the shard** with `./start-shard-detached.ps1` from the fork root, which outlives the shell that ran it.
+
+**8. Read the log** — `logs/session-<yyyy-MM-dd_HH-mm>.log` — and compare it with §3. The configuration files create
+themselves on the first start.
 
 ---
 
 ## 3. What the log should say
+
+> **The lines below were written before the first run and are a guide to the shape, not a transcript.** On a
+> current build these are the lines worth finding first, in `logs/session-<date>.log`:
+>
+> - `Will ready: … steadfast work is held for ×1.5 its own reckoning up to 480000ms … a bot's own trade is worth ×1.3
+>   and another class's ×0.6 …` — the decision layer and the numbers it will judge work by
+> - `Proposer <Name> offers work on the <Rung> rung`, once per proposer — forty-eight of them, `Attendant` among them
+> - `Mending ready: …` and `Flight ready: …`
+> - `Population raised: 80 bots at (1440, 1470, 0) on Felucca`
+> - `Argus is listening at …\argus-in.txt`, if the debugger is on
+>
+> and, five minutes in, the first summary block: `Will:`, `Resolve:`, `Roles:`, `Arms:` and the rest, each prefix
+> listed in `MAP.md` §1.
 
 At startup, before the world loads:
 

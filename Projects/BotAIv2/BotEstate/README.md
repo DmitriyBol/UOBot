@@ -1,4 +1,4 @@
-# `BotEstate/` — the guilds' halls
+﻿# `BotEstate/` — the guilds' halls
 
 Ordered by Patrick on 08.09.2026 as the second stage of `PLAN-guilds-houses-sparring.md`: houses, with
 chests and workbenches, and eventually a private place to spar in. This folder is that stage.
@@ -58,11 +58,23 @@ design silently if it had gone the other way.
 | `BotShelf.cs` | the guild's counter: stocking it, buying off it, paying its wages, emptying its till |
 | `BotSupply.cs` | the undertaking: fetch a batch of what the population runs short of and shelve it |
 | `BotSupplier.cs` | whether the guild's shelf is short of something, and which member is away buying it |
+| `BotWar.cs` | the wars themselves: who is fighting whom, the score, and the rules that begin, end and forbid one (13.09.2026) |
+| `BotRally.cs` | falling in with the guild's war company and fighting with it as a company until the company is done; the company is formed on the first beat of the rally that won its auction, not in the proposer (13–14.09.2026) |
+| `BotWarStore.cs` | keeps the war ledger across restarts under `Saves/BotWars`: wars with their run time, kills and plunder, truces and declaration clocks as time left, and the halls a lost war still owes a move; before it every restart was an amnesty (14.09.2026) |
+| `BotSeat.cs` | where each guild lives: the point its hall is raised near, its members rise at, and "home" means; hand-set seats kept in `Saves/BotSeats` |
 | `BotOffice.cs` | one guild, one officer, one errand — and offering is not the same as being on it |
 | `BotLand.cs` | which guild the ground belongs to, and what that does to what work is worth |
 | `BotRegard.cs` | what one guild thinks of another, and the two thresholds that make it a war |
 | `BotEvict.cs` | the undertaking: walk over to somebody on your land and tell them to move along |
 | `BotBailiff.cs` | whether anybody is on this guild's land who should not be, and who says so |
+| `BotFeud.cs` | the board of the war: who each guild has called its members onto, and the four engine facts that let a blow land |
+| `BotQuarrel.cs` | the undertaking: close with a member of a guild yours is at war with, and fight them |
+| `BotFeuder.cs` | offers a member of a guild at war somebody of the enemy — the guild's standing call before its own eyes |
+| `BotExile.cs` | who won a war, and the debt the loser owes: its hall goes outside the winner's yard |
+| `BotRemove.cs` | the undertaking and its offer: carry a beaten guild's hall out of the winner's yard and put it down again |
+| `BotClaim.cs` | what a guild has claimed of the island square by square, what a claim costs, and how one is won |
+| `BotHold.cs` | the undertaking and its offer: declare a claim on a quadrant and stand in it until it is yours |
+| `BotClaimStore.cs` | keeps who owns which square across restarts — the one board on this shard that survives, because it was paid for |
 | `BotEstateConfig.cs` | what `Configuration/bot-estate.json` is allowed to say |
 | `BotEstateModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Population` |
 
