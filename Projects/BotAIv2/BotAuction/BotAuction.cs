@@ -968,7 +968,7 @@ public static class BotAuction
         var pack = seller?.Self?.Backpack;
         var stall = Find(seller, kind);
 
-        return pack == null || stall == null ? 0 : stall.Reclaim(pack);
+        return pack == null || stall == null ? 0 : stall.Return(seller.Self);
     }
 
     public static int Withdraw(IBotWilful seller)
@@ -1396,7 +1396,7 @@ public static class BotAuction
             }
 
             var pack = seller.Backpack;
-            var back = pack == null ? 0 : stall.Reclaim(pack);
+            var back = pack == null ? 0 : stall.Return(seller);
 
             if (back <= 0)
             {

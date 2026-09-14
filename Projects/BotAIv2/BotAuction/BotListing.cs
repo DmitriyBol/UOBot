@@ -261,6 +261,45 @@ public sealed class BotListing
         return moved;
     }
 
+    public int Return(Mobile owner)
+    {
+        var pack = owner?.Backpack;
+
+        if (pack == null)
+        {
+            return 0;
+        }
+
+        var moved = 0;
+
+        for (var i = _stock.Count - 1; i >= 0; i--)
+        {
+            var item = _stock[i];
+
+            if (item == null || item.Deleted)
+            {
+                _stock.RemoveAt(i);
+
+                continue;
+            }
+
+            if (!pack.TryDropItem(owner, item, false))
+            {
+                break;
+            }
+
+            _stock.RemoveAt(i);
+            moved++;
+        }
+
+        if (moved > 0)
+        {
+            TouchedTick = Core.TickCount;
+        }
+
+        return moved;
+    }
+
     public void Discard() => Reclaim(null);
 
     public bool Note(int units, int gold, int briskMs)

@@ -38,6 +38,8 @@ public abstract class BotDeed
 
     public virtual int Outlay => 0;
 
+    public virtual bool AtCounter => false;
+
     public virtual double Coin => 1.0;
 
     public virtual double Minutes => 5.0;

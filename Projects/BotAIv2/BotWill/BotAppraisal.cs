@@ -107,6 +107,8 @@ public static class BotAppraisal
 
     public static long Stopped { get; private set; }
 
+    public static long Pocketless { get; private set; }
+
     public static double StoppedShare { get; set; } = 0.02;
 
     public static Func<string, double> Revelry { get; set; }
@@ -155,6 +157,15 @@ public static class BotAppraisal
         if (deed.Outlay > 0 && BotYield.Wealth(body) < deed.Outlay)
         {
             veto = $"{deed.Kind} costs {deed.Outlay}gp and it has {BotYield.Wealth(body)}gp";
+
+            return 0.0;
+        }
+
+        if (deed.AtCounter && !BotYield.Pocket(body))
+        {
+            Pocketless++;
+
+            veto = $"{deed.Kind} goes through a counter and the pack has no room for a coin, at {body.Backpack?.TotalItems ?? 0} of {body.Backpack?.MaxItems ?? 0} things";
 
             return 0.0;
         }

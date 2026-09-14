@@ -47,6 +47,8 @@ public sealed class BotAccompany : BotDeed
 
     public static int KeepUp { get; set; } = 6;
 
+    public static int ShunMs { get; set; } = 300000;
+
     public static long Stood { get; private set; }
 
     public static long Over { get; private set; }
@@ -60,6 +62,10 @@ public sealed class BotAccompany : BotDeed
     public static long Lagged { get; private set; }
 
     private static readonly Dictionary<Serial, (Serial Healer, long Tick)> _escorted = [];
+
+    private static readonly Dictionary<(Serial Healer, Serial Fighter), long> _behind = [];
+
+    public static long Outrun { get; private set; }
 
     private readonly BotMobile _companion;
 
@@ -138,6 +144,23 @@ public sealed class BotAccompany : BotDeed
         return claim.Healer != healer.Serial;
     }
 
+    public static bool Behind(Mobile healer, Mobile companion)
+    {
+        if (healer == null || companion == null || !_behind.TryGetValue((healer.Serial, companion.Serial), out var tick))
+        {
+            return false;
+        }
+
+        if (Core.TickCount - tick >= ShunMs)
+        {
+            _behind.Remove((healer.Serial, companion.Serial));
+
+            return false;
+        }
+
+        return true;
+    }
+
     public override BotDoing Advance(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -207,6 +230,12 @@ public sealed class BotAccompany : BotDeed
     {
         if (++_lagged > KeepUp)
         {
+            if (_companion != null && bot?.Self is { } body)
+            {
+                _behind[(body.Serial, _companion.Serial)] = Core.TickCount;
+                Outrun++;
+            }
+
             return false;
         }
 
@@ -239,7 +268,9 @@ public sealed class BotAccompany : BotDeed
         Lost = 0;
         Spent = 0;
         Lagged = 0;
+        Outrun = 0;
         _escorted.Clear();
+        _behind.Clear();
     }
 }
 
@@ -270,6 +301,8 @@ public sealed class BotAttendant : IBotProposer
     public static long Bare { get; private set; }
 
     public static long Nobody { get; private set; }
+
+    public static long Passed { get; private set; }
 
     public string Name => "Attendant";
 
@@ -346,6 +379,13 @@ public sealed class BotAttendant : IBotProposer
                 continue;
             }
 
+            if (BotAccompany.Behind(body, m))
+            {
+                Passed++;
+
+                continue;
+            }
+
             var away = body.GetDistanceToSqrt(m);
 
             if (away >= bestAway)
@@ -368,7 +408,7 @@ public sealed class BotAttendant : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "no healer has been offered anybody to stand by"
-            : $"{Asked} times a healer was asked: {Offered} sent to stand by a fighter, {Held} in a company, {Unfit} too hurt, {Pressed} with something on it, {Bare} with nothing to heal with, {Nobody} with nobody of ours fighting within {Reach} tiles; {BotAccompany.Stood} beats stood by, {BotAccompany.Lagged} times a healer fell behind and walked on; stints ended {BotAccompany.Over} when the fight was over, {BotAccompany.Leased} at the end of the lease, {BotAccompany.Lost} when the fighter was gone, {BotAccompany.Spent} with nothing left to heal with";
+            : $"{Asked} times a healer was asked: {Offered} sent to stand by a fighter, {Held} in a company, {Unfit} too hurt, {Pressed} with something on it, {Bare} with nothing to heal with, {Nobody} with nobody of ours fighting within {Reach} tiles; {BotAccompany.Stood} beats stood by, {BotAccompany.Lagged} times a healer fell behind and walked on; stints ended {BotAccompany.Over} when the fight was over, {BotAccompany.Leased} at the end of the lease, {BotAccompany.Lost} when the fighter was gone, {BotAccompany.Spent} with nothing left to heal with, {BotAccompany.Outrun} when the healer could not keep up; {Passed} fighters passed over because their healer had lately fallen behind them";
 
     public static void Forget()
     {
@@ -379,6 +419,7 @@ public sealed class BotAttendant : IBotProposer
         Pressed = 0;
         Bare = 0;
         Nobody = 0;
+        Passed = 0;
 
         BotAccompany.Forget();
     }

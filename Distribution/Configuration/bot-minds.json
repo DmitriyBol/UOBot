@@ -27,8 +27,8 @@
       "Reject all Miner work regardless of forecast value unless it is on the active shortage list.",
       "Reject staker work with zero or negative forecast; actual earnings are negative.",
       "Staker work at zero forecast guarantees -400+ loss per minute; reject regardless of shortage status.",
-      "Reject all Tailor work with a forecast of zero or less.",
-      "Reject all Tailor work; actual earnings are negative even at zero forecast on this shard."
+      "Reject all Tailor work; actual earnings are negative even at zero forecast on this shard.",
+      "Reject all Tailor work regardless of forecast value or shortage status; forecasts are false on this shard."
     ],
     "Wulfric": [
       "If Smith forecast is zero, switch crafts immediately without waiting for a cycle check.",

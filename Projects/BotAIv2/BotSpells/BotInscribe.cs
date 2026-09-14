@@ -109,6 +109,8 @@ public sealed class BotInscribe : BotDeed
 
     public override int Outlay => Batch * _price;
 
+    public override bool AtCounter => _shop != null;
+
     public override double Coin => 0.0;
 
     public override int Made => _made + Math.Max(0, _scrolls - _placed) * _worth;

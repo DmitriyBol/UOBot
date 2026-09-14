@@ -81,6 +81,8 @@ public sealed class BotPeddle : BotDeed
 
     public override int Outlay => 0;
 
+    public override bool AtCounter => true;
+
     public override double Coin => 1.0;
 
     public override int Made => 0;
@@ -123,7 +125,9 @@ public sealed class BotPeddle : BotDeed
 
         if (taken <= 0)
         {
-            return BotDoing.Failed("the stall was empty by the time it got here");
+            return BotDoing.Failed(
+                BotYield.Pocket(body) ? "the stall was empty by the time it got here" : "the pack had no room to take the goods back off the stall"
+            );
         }
 
         var goods = Gather(body, _kind);

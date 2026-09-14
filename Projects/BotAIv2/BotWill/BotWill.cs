@@ -1561,6 +1561,13 @@ public static class BotWill
             );
         }
 
+        if (BotAppraisal.Pocketless > 0 || BotUnload.Jammed > 0)
+        {
+            line.Append(
+                $"; {BotAppraisal.Pocketless} offers refused because the work goes through a counter and the pack had no room for a coin, and {BotUnload.Jammed} times the trip that makes that room was offered"
+            );
+        }
+
         if (Grounded > 0 || Dislodged > 0)
         {
             line.Append(

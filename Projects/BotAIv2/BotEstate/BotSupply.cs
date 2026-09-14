@@ -88,6 +88,8 @@ public sealed class BotSupply : BotDeed
 
     public override int Outlay => 0;
 
+    public override bool AtCounter => _shop != null && _bought <= 0;
+
     public override double Coin => 0.0;
 
     public override bool Unpaid => true;

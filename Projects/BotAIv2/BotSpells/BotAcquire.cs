@@ -143,6 +143,8 @@ public sealed class BotAcquire : BotDeed
 
     public override int Outlay => _route == Route.Delivered ? 0 : Ask * _price;
 
+    public override bool AtCounter => _route == Route.Counter;
+
     public override double Coin => 0.0;
 
     public override int Made => _paid;

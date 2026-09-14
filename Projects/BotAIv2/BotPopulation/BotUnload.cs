@@ -54,17 +54,20 @@ public sealed class BotUnload : BotDeed
 
     private readonly int _expected;
 
-    public BotUnload(Map map, Point3D counter, int expected = 0, bool immobile = false)
+    public BotUnload(Map map, Point3D counter, int expected = 0, bool immobile = false, bool jammed = false)
     {
         _map = map;
         _counter = counter;
         _expected = expected;
         _immobile = immobile;
+        _jammed = jammed;
     }
 
     private readonly bool _immobile;
 
-    public override bool Unpaid => _immobile;
+    private readonly bool _jammed;
+
+    public override bool Unpaid => _immobile || _jammed;
 
     public override string Kind => Trade;
 
@@ -280,6 +283,10 @@ public sealed class BotUnload : BotDeed
     public static long Exposed { get; private set; }
 
     public static void Expose() => Exposed++;
+
+    public static long Jammed { get; private set; }
+
+    public static void Jam() => Jammed++;
 
     public static long Cornered { get; private set; }
 
@@ -833,6 +840,8 @@ public sealed class BotPorter : IBotProposer
 
         var immobile = BotLadder.Load(body) > BotLadder.Ceiling(body);
 
+        var jammed = !immobile && !BotYield.Pocket(body);
+
         var worth = BotUnload.Sellable(bot, body, out var spare);
 
         if (worth <= 0 && !immobile)
@@ -849,7 +858,7 @@ public sealed class BotPorter : IBotProposer
 
         var hoarding = spare >= BotUnload.Hoard;
 
-        if (!laden && !flush && !bespoken && !exposed && !hoarding && !immobile)
+        if (!laden && !flush && !bespoken && !exposed && !hoarding && !immobile && !jammed)
         {
             return null;
         }
@@ -881,6 +890,11 @@ public sealed class BotPorter : IBotProposer
             BotUnload.Hoarded();
         }
 
-        return new BotUnload(map, counter, worth, immobile);
+        if (jammed)
+        {
+            BotUnload.Jam();
+        }
+
+        return new BotUnload(map, counter, worth, immobile, jammed);
     }
 }

@@ -88,7 +88,7 @@ public static class BotHand
         + "not, what it put down to come back to, and how its last few pieces of work ended. roles — how each "
         + "class spends its working minutes: its own trade, anybody's work, another class's trade.";
 
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "seats", "seat", "save", "road", "resolves"];
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "seats", "seat", "save", "road", "resolves", "jam"];
 
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
@@ -101,7 +101,10 @@ public static class BotHand
         + "stopped: a kill without one rolls the island back to the last autosave, five minutes of halls and moves. "
         + "road <x1> <y1> <x2> <y2> — ask the pathfinder for a way between two tiles with a generous clock, and say "
         + "what it found: the answer to \"why can nobody get there\". resolves — how much of what the population "
-        + "takes on it sees through, what takes it off the rest, and the same per trade. None is offered to the minds.";
+        + "takes on it sees through, what takes it off the rest, and the same per trade. jam <bot> — bank the coin in its "
+        + "pack and fill the pack to the engine's cap with oil cloths that weigh next to nothing, the state Hale was found "
+        + "in on 14.09.2026, to watch the bot refused work at a counter and offered the trip that makes room. None is "
+        + "offered to the minds.";
 
     private static readonly Dictionary<string, long> _used = [];
 
@@ -302,8 +305,45 @@ public static class BotHand
             "shun" => Leave(bot),
             "summon" => Summon(bot),
             "resolve" => BotWill.Explain(bot),
+            "jam" => Jam(bot),
             _ => $"I have no verb \"{verb}\"."
         };
+    }
+
+    private static string Jam(BotMobile bot)
+    {
+        var pack = bot.Backpack;
+
+        if (pack == null || pack.MaxItems <= 0)
+        {
+            return $"{bot.Name} has no pack with a cap to fill.";
+        }
+
+        var coin = pack.GetAmount(typeof(Gold));
+        var banked = 0;
+
+        if (coin > 0 && pack.ConsumeTotal(typeof(Gold), coin))
+        {
+            if (Banker.Deposit(bot, coin))
+            {
+                banked = coin;
+            }
+            else
+            {
+                pack.DropItem(new Gold(coin));
+            }
+        }
+
+        var added = 0;
+        var most = pack.MaxItems;
+
+        while (pack.TotalItems < most && added < most)
+        {
+            pack.DropItem(new OilCloth { Weight = 0.1 });
+            added++;
+        }
+
+        return $"{bot.Name}: {banked}gp banked, {added} oil cloths added, {pack.TotalItems} of {most} things in the pack, room for a coin: {BotYield.Pocket(bot)}.";
     }
 
     private static string Camp(string tail)

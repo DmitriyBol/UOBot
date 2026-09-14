@@ -111,6 +111,35 @@ public static class BotYield
         return purse + Banker.GetBalance(bot);
     }
 
+    public static bool Pocket(Mobile bot)
+    {
+        var pack = bot?.Backpack;
+
+        if (pack == null)
+        {
+            return false;
+        }
+
+        var most = pack.MaxItems;
+
+        if (most <= 0 || pack.TotalItems < most)
+        {
+            return true;
+        }
+
+        var items = pack.Items;
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i] is Gold { Deleted: false })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static int Standing(Mobile bot) => bot == null ? 0 : Wealth(bot) + BotAuction.Escrowed(bot);
 
     public static double SkillOf(Mobile bot, SkillName? which) =>

@@ -138,6 +138,8 @@ public sealed class BotSew : BotDeed
 
     public override int Outlay => _take * _price;
 
+    public override bool AtCounter => _shop != null;
+
     public override double Coin => 0.0;
 
     public override int Made => _made;
