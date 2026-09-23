@@ -6,6 +6,25 @@ they will go, do the research, and build a behaviour model like a social circle.
 This document is the reasoning. The rules themselves live in `BotPopulation/BotGuilds.cs` and the numbers in
 `DIALS.md`; where the two disagree, the code is right and this file is out of date.
 
+> **Amended 21.09.2026 (builds 170–171), on Patrick's order: anybody may found a guild.** What changed, and
+> everything below should be read with it in mind:
+>
+> - **Rule 2 is lifted.** A guild no longer needs a crafter to be founded, so the cap of five guilds is gone;
+>   the cap is the pool of eight names. The summary still counts guilds with nobody to make anything.
+> - **Guilds are founded while the shard runs** (`BotGuilds.Gather`, one bot without a guild every five
+>   seconds): it joins the smallest guild under ten, or founds its own with the four nearest bots that have
+>   none. Rule 1 is kept by taking the five at once — still a rule about a group applied to a group.
+> - **The muster no longer deals the roster out.** Bots survive a restart with their guild, so the muster
+>   adopts what the save returned. §4's "dealt by role" describes the old boot.
+> - **A guild's fixed point is its head, not its maker**: the head neither walks out nor can be put out, and
+>   it is the head that may lead a delve.
+> - **Every guild carries a guildstone**, on the internal map. In this era the engine disbands any guild
+>   without one the first time it is read back from a save; that is what emptied all five on 20.09.2026.
+> - **Leaving means crossing over.** A member of a guild with nothing to show leaves only for a guild that has
+>   something to show and room for it, where it used to walk out into nothing and be barred for two days.
+>
+> The full reasoning and the measurements are in `DECISIONS.md`, entries for builds 170 and 171.
+
 ---
 
 ## 1. What went wrong with the first version, and why it is worth stating first

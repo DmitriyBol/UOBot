@@ -7,13 +7,13 @@ bots' market that is itself a bot.
 |---|---|
 | `BotGrimoire.cs` | what a book holds, what it lacks, and how a scroll becomes a spell in it |
 | `BotQuill.cs` | inscription: what can be written, with what, and onto what |
-| `BotInscribe.cs` | the scribe's obligation: buy paper → write → keep it or sell it |
+| `BotInscribe.cs` | the scribe's obligation: buy paper → write → keep it or sell it; a pen that wears through after the first attempt ends the batch at the market rather than failing it |
 | `BotScribe.cs` | the proposer: whoever is carrying a pen |
 | `BotAcquire.cs` | the caster's obligation: get one spell — off a shelf, off a stall, or by asking |
 | `BotSeeker.cs` | the proposer: whose book is short |
 | `BotSpellsConfig.cs` | `Configuration/bot-spells.json` |
 | `BotSpellsModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Shops`, `Auction` |
-| `BotArmoury.cs` | offers any bot with a mana pool the chance to lay in a few attack scrolls |
+| `BotArmoury.cs` | offers any bot with a mana pool the chance to lay in a few attack scrolls; `Kept` names the scroll and is the same question `BotUnload.Keeps` asks, so the stock is not sold back at the next counter |
 | `BotStrike.cs` | casting at something, as opposed to casting at somebody who is hurt |
 
 ---

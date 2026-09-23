@@ -40,7 +40,7 @@ ROOT = "(root)"
 ORDER = [
     ROOT, "BotModules", "BotPopulation", "BotWill", "BotMovement", "BotClasses", "BotOutfit",
     "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotAuction", "BotSpells",
-    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotEstate", "BotQuad", "BotRanger",
+    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotEstate", "BotQuest", "BotQuad", "BotRanger",
     "BotDashboard", "BotAlarm", "mindedBots", "mindedBots/debugger",
 ]
 
@@ -172,6 +172,16 @@ BLOCKS = {
         "crafting worth doing come from.",
         ["A stall and a want can both be healthy and never meet. When trade is low the question is not "
          "whether either side works but whether there is an edge between them."],
+    ),
+    "BotQuest": (
+        "the board of errands",
+        "What the door and the marshal of events ask of the population, for a price: kill so many of a "
+        "creature near a place, bring so many of a thing to a place, scout a place. The reward is held by "
+        "the treasury from the moment of posting and paid to whichever bot does the errand; an errand "
+        "untaken for two hours lapses and gives the money back. One board instead of a list and a verb for "
+        "each thing somebody wants done; the marshal who posts on his own lives with the watchers.",
+        ["An offer is not an errand: the board marks an errand taken in the deed's Taken, never in the "
+         "proposer, so a bot that loses the auction has not taken anything."],
     ),
     "BotSpells": (
         "a book that grows",
@@ -324,6 +334,7 @@ LINES = {
     "BotBaron": ["The Baron:"],
     "BotDelve": ["Delving:"],
     "BotEstate": ["Estate:"],
+    "BotQuest": ["Quests:"],
     "BotQuad": ["The captain:"],
     "mindedBots": ["Minds:"],
 }

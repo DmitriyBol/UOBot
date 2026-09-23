@@ -7,8 +7,8 @@ the brain works at all.
 |---|---|
 | `BotOre.cs` | ore: what is in a hill, what digs it, one swing, and what ore becomes in a fire |
 | `BotHeard.cs` | what the harvest system last said to each bot, and which sentence means what |
-| `BotGround.cs` | what the population knows about places: one sweep yields veins, fires and counters |
-| `BotDig.cs` | an obligation with three legs: vein → fire → counter |
+| `BotGround.cs` | what the population knows about places: one sweep yields veins, fires and counters; a seam struck off leaves the cached answers (`Untell`), and a hearth a cook found cold rests for every cook (`Cold`), a forge whose anvil the engine refused for every smith (`Unfit`); a seam on ground that has lately refused somebody is not chosen (`Unwalked`, build 51); nor one whose every rock in reach the engine has emptied — asked of the winner with the trip's own rings (`BotOre.Stocked`), rested as the trip would rest it, and chosen again (`Hollow`, build 63) |
+| `BotDig.cs` | an obligation with three legs: vein → fire → counter; a pickaxe worn through with ore worth melting still goes to the fire; the seam is held from the first step of the walk, and a miner whose seam another holds goes on to a free one; a seam whose rocks are all there and worked out rests rather than being struck off |
 | `BotMiner.cs` | the proposer: one offer to whoever has a pickaxe |
 | `BotHarvestConfig.cs` | `Configuration/bot-harvest.json` |
 | `BotHarvestModule.cs` | module, phase `World`, requires `Classes` and `Will` |
@@ -16,7 +16,7 @@ the brain works at all.
 | `BotForage.cs` | picking up the reagents the world leaves lying about, and putting them on the board |
 | `BotHerbs.cs` | a walk into the woods that comes back with herbs |
 | `BotProspect.cs` | a walk out past the last swept ground, so that there is rock on the board somewhere nobody has been |
-| `BotTimber.cs` | what a woodcutter needs to know: the axe, the trees within reach, and how much wood is worth a trip |
+| `BotTimber.cs` | what a woodcutter needs to know: an axe the body can hold, the trees within reach, and how much wood is worth a trip |
 | `BotWoodsman.cs` | offers a bot with an axe a trip to the woods, and only when somebody wants the wood |
 
 ---
@@ -264,6 +264,18 @@ N trees given up because the engine said they were cut out against N given up by
 
 First ten minutes after: **462 against 0.** Chopping finished 76% of what it took on, against 42–52% earlier
 the same day.
+
+### An axe the body can hold
+
+`BotTimber.Tool` used to hand over any axe in the pack, and the engine will not put a weapon in the hand of a
+player weaker than the weapon asks. A healer with strength 25 carrying a double axe (45) was offered the woods and
+failed on the first beat, *"it cannot get the axe into its hand"*, five times in one second. The tool is now an
+axe `BotMobile.Suits` says the body can hold — the re-arm's own question, so the two cannot disagree — and the
+proposer counts the rest apart from the bots with no axe at all:
+
+```
+N asked to cut wood (N not asked for carrying only an axe too heavy to hold): ...
+```
 
 ### Scoping, which the ear needed and did not have
 

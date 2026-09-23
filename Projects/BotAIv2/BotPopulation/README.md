@@ -5,7 +5,7 @@ project first does anything at all.**
 
 | File | What is in it |
 |---|---|
-| `BotMobile.cs` | the bot itself: a `PlayerMobile` that holds the bond, the journey and the resolve, and can take one turn |
+| `BotMobile.cs` | the bot itself: a `PlayerMobile` that holds the bond, the journey and the resolve, and can take one turn; its re-arm wears the best of each place and wields the better weapon of its own kind, keeping the bound one in the pack (build 55), never the same weapon twice within five minutes (build 59) |
 | `BotBeat.cs` | the population's clock: one timer, each bot with its own due time |
 | `BotPopulation.cs` | who exists: purging saved bots, birth, placement, raising the fallen |
 | `BotPopulationConfig.cs` | `Configuration/bot-population.json` — the only configuration file with working values in it |
@@ -14,8 +14,9 @@ project first does anything at all.**
 | `BotGuilds.cs` | which of the four guilds a bot belongs to, by its trade, and what a guildmate is worth |
 | `BotCharter.cs` | what a guild's maker has charged its band with: a trade to gather at, one to make at, and somewhere to be |
 | `BotRoster.cs` | who a guild's leader may put out and who it may take in, and how often |
-| `BotProgress.cs` | what a bot has become, kept across restarts: its skills, its fame, its karma and its savings |
-| `BotPurse.cs` | what a bot keeps in its pocket, and what it puts away the moment it is standing somewhere it can |
+| `BotProgress.cs` | what a bot has become, kept across restarts: its skills, its fame, its karma and its savings; kept by name and class since build 65, so a class-mix edit no longer wipes a bot's levelling |
+| `BotPurse.cs` | what a bot keeps in its pocket, and what it puts away the moment it is standing somewhere it can; `KeepBack`, the one reserve the buying proposers keep (build 64) |
+| `BotTidy.cs` | what a bot carries and wears kept in order on its beat: an unidentified magic weapon or armour identified with Item Identification's check (every bot has it at 100) — off a corpse before it is listed, and in the pack or worn, and the death robe the engine dresses a risen body in cut into bandages with scissors or thrown away (build 98) |
 | `BotReclaim.cs` | going back for what death took |
 | `BotStall.cs` | notices a bot that has stopped getting anywhere, and says so as an error |
 | `BotUnload.cs` | going to the counter when the pack is getting heavy: coin into the account, everything spare onto the market |

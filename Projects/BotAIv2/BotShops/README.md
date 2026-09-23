@@ -6,17 +6,17 @@ buys cloth to work with — and whatever the population refused goes back over t
 | File | What is in it |
 |---|---|
 | `BotShops.cs` | where the shopkeepers are, what they sell, what they buy, and both transactions |
-| `BotRestock.cs` | an obligation: go and buy what has run out — off a shelf or off another bot's stall |
-| `BotShopper.cs` | the proposer: who is short of what |
-| `BotPeddle.cs` | an obligation: take what nobody wanted to somebody who will buy it |
+| `BotRestock.cs` | an obligation: go and buy what has run out — off a shelf or off another bot's stall; a guild shelf bought out on arrival sends it on to a shopkeeper |
+| `BotShopper.cs` | the proposer: who is short of what; keeps back `BotPurse.KeepBack` (build 64) |
+| `BotPeddle.cs` | an obligation: take what nobody wanted to somebody who will buy it; a load bought off its stall on the way ends finished, and one the market handed back into the pack on the way is sold from the pack |
 | `BotPeddler.cs` | the proposer: whose stall the population has ignored |
 | `BotShopsConfig.cs` | `Configuration/bot-shops.json` |
 | `BotShopsModule.cs` | module, phase `World`, requires `Classes` and `Will` |
-| `BotBullion.cs` | a crafter with money buys its metal instead of going and digging it |
+| `BotBullion.cs` | a crafter with money buys its metal instead of going and digging it; keeps back `BotPurse.KeepBack` (build 64) |
 | `BotNeeds.cs` | how often a bot reconsiders what it is short of |
-| `BotOrder.cs` | putting an order on the board, and going back for it when somebody has filled it |
-| `BotStores.cs` | a crafter short of the raw material of its trade, putting the order to the population |
-| `BotUpkeep.cs` | asking the population, by name, for a replacement for something that is wearing out |
+| `BotOrder.cs` | putting an order on the board, and going back for it when somebody has filled it; paperwork, taken at the next choice rather than over work in hand (build 50) |
+| `BotStores.cs` | a crafter short of the raw material of its trade, putting the order to the population; keeps back `BotPurse.KeepBack` (build 64) |
+| `BotUpkeep.cs` | asking the population, by name, for a replacement for something that is wearing out; keeps back `BotPurse.KeepBack` (build 64) |
 
 ---
 
@@ -99,6 +99,14 @@ something is hitting it, and the last makes it useful.
 `BotAuction.Cheapest` and takes whichever is cheaper — so a shopkeeper is the **ceiling** on what a bot can
 charge and never the preference. That ordering is where a crafter's living comes from: a fighter's gold came off
 a monster, and it goes to a smith rather than out of the world whenever the smith asks less than the shelf.
+
+**Then the guild's own counter, asked the same two questions as a shopkeeper.** A shopkeeper this bot lately failed to
+reach is skipped (its caution is filed under `BotShops.ShopKind` at the counter's place, which is the word
+`BotShops.Nearest` asks in), and so is one the shard's reach ledger has proved there is no way to. The hall's merchant
+came later and was offered on price alone, and `BotRestock.Bend` wrote nothing for it: on 14.09.2026 Edda Ashdown was
+sent to The Needle's counter six times in two seconds, "no way from here", until `BotBreaker` rested the work. The
+merchant route now files the same caution, the hall is passed over on either answer (`BotShopper.HallWalled`), and the
+supply is sought at a shopkeeper instead.
 
 **Who sells what** (read out of `SBInfo`): pickaxe 22 at the blacksmith, miner, tinker and weaponsmith;
 **hatchet 25 at the weaponsmith only** — the narrowest supply on the shard; sewing kit 3 at the tailor and

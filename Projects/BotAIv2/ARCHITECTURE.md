@@ -331,6 +331,8 @@ shaped the way it is. This list exists so that nobody has to rediscover them.
 | A vein's remaining ore is readable, and the swing radius comes from the definition | `HarvestDefinition.GetBank(...).Current`, `MaxRange` | emptiness is read, not guessed from failed swings |
 | Optional-parameter constructors defeat `Activator.CreateInstance`; the engine's `Type.CreateInstance<T>()` fills them with `Type.Missing` | `ActivatorExtensions` | almost every stackable in the game — ore, herbs, scrolls, bandages |
 | Past `40 + 3.5 × Str` stones the engine charges 5+ stamina **per step** and refuses the step at zero | `StaminaSystem` | why issued gear is weightless; three v1 bots stood still for a whole session |
+| A rider **cannot mine** (or fish); the refusal goes through `SendLocalizedMessage`, outside the harvest system's own sentences | `Mining.CheckHarvest`, `Fishing.CheckHarvest` | a gatherer is put on foot before the swing and the horse is not called back while it works (`BotDeed.Afoot`) |
+| A backpack — a bot's, a merchant's — asks its **125-item cap before it tries any stack**: `BaseContainer.TryDropItem` overrides the server's `Container.TryDropItem`, which stacks first | `BaseContainer.TryDropItem`, `Container.CheckHold` | a full guild counter takes nothing, not even goods that would join a lot already on it (`BotShelf.Room`) |
 
 ---
 

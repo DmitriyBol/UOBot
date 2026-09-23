@@ -7,7 +7,9 @@ on the table**, and move their own prices by what actually sells and what actual
 |---|---|
 | `BotListing.cs` | one stall: what, how much, at what price, what has gone and how the price moved |
 | `BotWant.cs` | one want: the same thing with the sign turned round, plus the escrow |
-| `BotAuction.cs` | the market itself: list, ask, buy, fill, move a price, forget |
+| `BotAuction.cs` | the market itself: list, ask, buy, fill, move a price, forget; a want's raise waits `RaiseMs`, which follows `StaleMs` unless dialled apart (build 64) |
+| `BotCity.cs` | the city's treasury: the one purse that mints, on a clock and up to a cap; buys whole lots off the longest-standing stalls, stands orders served tick by tick, and is in Argus's hands through the door because a purse with a cap is a lever a model may hold (build 75) |
+| `BotCityStore.cs` | keeps the treasury, its standing orders and its bounties across restarts; every restart used to open the purse at its opening sum again (build 89) |
 | `BotAuctionConfig.cs` | `Configuration/bot-auction.json` — speeds, not prices |
 | `BotAuctionModule.cs` | module, phase `World`, depends on nothing |
 | `BotHaggle.cs` | a seller looking at what buyers are offering for what it has out, and moving its price towards them |

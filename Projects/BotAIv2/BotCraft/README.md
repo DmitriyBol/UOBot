@@ -9,24 +9,25 @@ put it out, which is still the shape of every one of them.
 | File | What is in it |
 |---|---|
 | `BotThread.cs` | sewing: what can be made from a material, and the attempt itself |
-| `BotSew.cs` | an obligation with three legs: shop → work → counter |
+| `BotSew.cs` | an obligation with three legs: shop → work → counter; a kit worn through after the first attempt ends the batch at the counter |
 | `BotTailor.cs` | the proposer: whoever is carrying a sewing kit |
 | `BotCraftConfig.cs` | `Configuration/bot-craft.json` |
 | `BotCraftModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Shops` |
 | `BotAlchemist.cs` | offers the mortar to anybody carrying one, and offers the board's orders first |
 | `BotAnvil.cs` | what the smith's trade knows that no other trade does: its system, its skill, its hammer, its metal, and the one thing about black |
-| `BotBake.cs` | one turn at the skillet: raw meat in the pack becomes suppers, and what the cook does not keep goes out to the market |
-| `BotBrew.cs` | brewing: buy the glass if it is short of it, work the mortar, and hand the bottles to whoever put the money down |
+| `BotBake.cs` | one turn at the skillet: raw meat in the pack becomes suppers, and what the cook does not keep goes out to the market; a hearth found cold is rested for every cook |
+| `BotBrew.cs` | brewing: buy the glass if it is short of it, work the mortar, and hand the bottles to whoever put the money down; a mortar worn through takes what was brewed to market |
 | `BotCook.cs` | offers a turn at the skillet to anybody carrying one and some meat |
 | `BotCraftwork.cs` | the part of making things that is the same whatever is being made |
 | `BotFlask.cs` | brewing: what a potion is made of, and the swing that makes it |
 | `BotFletch.cs` | making arrows: buy the wood if it is short of it, cut the shafts, feather them, and hand them to whoever put the money down |
 | `BotFletcher.cs` | offers a bot with a fletching tool and a handful of feathers a turn at making arrows, and offers it the board's orders first |
 | `BotFletching.cs` | what a fletcher needs to know: the craft system, the tool, and the two-step chain that turns a log and a feather into an arrow |
-| `BotForge.cs` | beating iron into something, at a forge, and handing it to whoever asked for it |
+| `BotForge.cs` | beating iron into something, at a forge, and handing it to whoever asked for it; a forge whose anvil the engine refuses rests for every smith (`BotGround.Unfit`) |
 | `BotMeal.cs` | a bot eating a cooked meal: what it does to the bot, and for how long |
 | `BotOven.cs` | cooking: what a meal is made of, and who can make one |
 | `BotSmith.cs` | offers a bot with a hammer and some metal a turn at an anvil, and offers it the board's orders first |
+| `BotCraftEar.cs` | what the craft system last told each bot, and how often it has said each thing, heard through the `CraftItem.Said` engine patch |
 
 ---
 

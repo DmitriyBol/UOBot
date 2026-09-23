@@ -12,18 +12,20 @@ produced, less what was spent.
 |---|---|
 | `BotStanding.cs` | the ladder's rungs, top to bottom. The order *is* the content |
 | `BotLadder.cs` | the rung from facts: alive, overloaded, health, being hit, in a squad |
-| `BotDeed.cs` | an obligation: work with its own stages. The subclass is written by the subsystem |
+| `BotDeed.cs` | an obligation: work with its own stages. The subclass is written by the subsystem; `Taken` is told when it wins, `Foe` names what it fights, `Paperwork` never takes a bot off work in hand (build 50), `Guess` is not turned round for another guess of the same kind (build 56) |
 | `BotDoing.cs` | what the obligation wants done now: walk, work, done, failed |
 | `IBotProposer.cs` | offer work. The extension point, and the slow tier's vote |
 | `BotUrges.cs` | boredom and need — all that is left of motives-as-deficits |
 | `BotLedger.cs` | what has paid this bot, and where. All the memory of work there is |
-| `BotYield.cs` | the takings: the skill-to-gold rate, the price of death, the measurement ceiling |
-| `BotAppraisal.cs` | the appraisal: estimate × considerations, geometric mean, inertia |
+| `BotYield.cs` | the takings: the skill-to-gold rate, the price of death, the measurement ceiling, and the aside ledger — money moved by somebody else's decision, kept out of the work in hand |
+| `BotAppraisal.cs` | the appraisal: estimate × considerations, geometric mean, inertia; the work in hand is not asked the price of starting (build 50); the root is the dial `Root`, 5, named on the take line (build 64) |
+| `BotBreaker.cs` | work one bot keeps failing for the same reason is not offered to that bot for a while; and the loudest loop of an alarm window, for the alarm (`Loudest`, build 64) |
 | `BotResolve.cs` | state on the bot: feelings, ledger, what was taken on and why, what it scored then and how long it reckoned; and `BotPause`, work put down for something that would not wait |
-| `BotWill.cs` | the decision itself: settle → advance → auction. And the census |
+| `BotWill.cs` | the decision itself: settle → advance → auction. And the census. A refused road the work in hand never sent — a company's station — is not charged to that work (`Foreign`, build 52); a prowl displaced by the fighting it went for is settled finished without crediting its place (`Met`, switch `MetCounts`, build 65) |
 | `BotWillConfig.cs` | `Configuration/bot-will.json` |
 | `BotWillModule.cs` | module, phase `World`, requires `Classes` |
 | `BotCommons.cs` | what the population as a whole has found out about what pays where |
+| `BotCommonsStore.cs` | keeps what pays where across restarts — every patch, trade and seam written with its age so the half-life goes on from where it was; a restart used to be an hour of relearning (build 74) |
 | `IBotWilful.cs` | what deciding needs a bot to be |
 
 ---
@@ -156,6 +158,22 @@ money over a shopkeeper's counter offered to a bot whose pack has no room for a 
 needed because of `Unpaid`: a deed paid nothing on purpose learns nothing from failing, so the reasons it fails must be
 asked before it is offered. Restocking, made unpaid that morning, failed 8,719 times in half an hour for one bot whose
 pack had gone past the cap.
+
+Two more since that evening, both of them the auction reading a record that already existed:
+
+- **A rest after a loop** (`BotBreaker`). Six failures of one kind of work for one bot, for the same reason with its
+  numbers taken out, inside five minutes and since the bot last finished that work, rest that kind for that bot for five
+  minutes, doubled at every further trip up to forty and lifted by a finish. It is a backstop for the class of defect
+  this project has met most — a failure offered again unchanged — and it logs every trip with the bot, the work and the
+  reason, because the loop it stops still has to be mended where it starts. Replayed over the logs of 14.09.2026 before
+  it was written, it stopped every loop of the day and tripped at most once in a session without one.
+- **Ground where bots have been dying** (`BotPeril.Lethal`). The danger map held every death and was read only by
+  captains; the appraisal's caution was the bot's own ledger, keyed by trade. Work whose place lies in or beside squares
+  where two bots have died lately is refused, unless it goes where the fighting is on purpose (`BotDeed.Braves`: hunt,
+  prowl, sweep, pickings, plunder, band, harrow, delve, escort, scout, flee) or is a call from outside (`Summons`) —
+  those are how such ground is dealt with. Twenty-eight bots died in one field in twenty minutes on 14.09.2026 on
+  offers that read "safe 1.00". The map lives in memory, so after a restart it starts empty and the refusal begins
+  again only after new deaths.
 
 ---
 

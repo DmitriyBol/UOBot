@@ -15,8 +15,9 @@ The analysis all of this is built on is in `RESEARCH.md`. This file is only what
 | `BotAvoid.cs` | ground this plan works around: somebody else's tile, and a dangerous square |
 | `BotPath.cs` | a tile A\* with a ceiling in **time**. Three outcomes |
 | `BotReach.cs` | sealed pockets of ground, harvested out of failures. Refusal in one comparison |
-| `BotRefused.cs` | places the population could not get to, remembered for everybody and cleared by anyone arriving |
-| `BotBarred.cs` | ground nobody may ever choose: stated rather than measured, never expiring, never cleared by arriving |
+| `BotRefused.cs` | places the population could not get to, remembered for everybody and cleared by anyone arriving; written when an errand ends unreached and, since build 51, when a proven refusal sends the work elsewhere (`BotWill.Rerouted`); read by the seam chooser too |
+| `BotBarred.cs` | ground nobody may ever choose: stated rather than measured, never expiring, never cleared by arriving; four boxes since build 64 — the walled pocket east of Britain, the traps north and south-west of it (sized from where bots were carried home), and the plague beast's bog until groups of thirty to fifty can go there (Patrick's order) |
+| `BotRoads.cs` | the road distance from home to every tile within `Reach` (640) each way, drawn once per world load by a breadth-first flood that steps as the planner does, a slice of the loop at a time; proves a lower bound on any bot's road to a place, counted by the hunt's darts (`BotHunter.Roundabout`, dial `ReadsRoads`, build 63) |
 | `BotJourney.cs` | the A→B obligation. Lives on the bot |
 | `BotWalk.cs` | the moment of the step: doors, occupied tiles, casting, a last line of defence |
 | `BotMovementConfig.cs` | `Configuration/bot-movement.json` — budgets and deadlines only |
@@ -166,6 +167,13 @@ deeper waits its turn and goes nowhere.
 
 **Nobody "remembers" the destination.** It does not go into a variable and get restored — it simply stays in the
 queue under the fight, and returning to it is not code. It is what happens when there is nothing left on top.
+
+**True only while the bottom of the queue has one owner, and it has two.** The decision layer puts a bot's own work
+there and a company puts its station there, both with `Rebase`, which overwrites the slot. `BotWill` remembers the
+last walk it sent and sends again only when the order changes, so a company that overwrote the slot and then let the
+bot go left the bot standing on the company's errand for as long as the stall watch allowed — a "sweep" one tile away
+is arrived at on every beat. `BotJourney.Bottom` lets the will ask what the slot actually holds, and it sends its walk
+again when the answer is not that walk (14.09.2026, `BotWill.Resent`).
 
 **Fleeing has stopped being a goal.** In v1 it was a goal and it overwrote the errand, so a bot stood in a field
 after a fight with no memory of what it had set out to do. Here fleeing and going to market are the same action

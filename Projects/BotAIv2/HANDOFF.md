@@ -1,3 +1,30 @@
+## Two days unattended, from the evening of 18.09.2026
+
+The shard was left running on build 168 at 20:38 with a fresh population of novices. **What to read when it is picked up again**, one grep per thing decided that day — every one of these prints on the five-minute cycle, so a run of any length has them.
+
+| What was decided | What proves it | Where |
+|---|---|---|
+| **Bots survive a restart** (163, 166) | `came back from the world save` — with how many, against how many deleted. `Population raised: 0` means nothing had to be built. | boot line |
+| and that they **work** afterwards (166) | `took on` in the first minute. Zero of these with bots standing is the `Map.Internal` defect returning. | boot + 1 min |
+| **The ambush** (162, 165) | `sees .* come by, N tiles off, and holds still` → `struck .* out of hiding` or `backstabbed` → `held 5s` / `held 6s` | as it happens |
+| | `sprung on a mark that walked into the wait` and `of them already in plain sight` | robbery summary |
+| **The mark's choice** (155, 168) | `is down to N of M and` — the sentence ends `fights on`, `runs for the town` or `throws Xgp and Y things` | as it happens |
+| | `marks beaten to a quarter and given the choice` | robbery summary |
+| **Patience and the chase** (158, 160, 161) | `could not get near .*, N tiles off and gaining nothing, set on from M` — the two numbers say whether `OpenWithin` is right | as it happens |
+| | `set on the mark openly when patience ran out` / `were outwalked` / `of them by a mounted mark` | robbery summary |
+| **Who is passed over as prey** (156, 159) | `stood too near a town`, `were walking into one`, `stood under a roof` | robbery summary |
+| **The boot settles first** (164) | `sweeps passed over while the island settled after a boot` — 12 is the whole of `SettleMs`; more than that means the clock is wrong | robbery summary |
+| **Confiscation** (136, 137) | `stripped at the cell door` | as it happens |
+| **The band's chest** (154) | `at the chest: the band asked for` … `and put down N` | as it happens |
+| **Headless crafters** (167) | `No minds are running` at boot; no `has a mind of its own` lines at all | boot |
+| **The dashboard** (157) | nothing in the log: it is looked at with a client |  |
+
+**The shard's own alarms** are in `logs/alerts.ndjson` — `"state":"raised"` is the first thing to read, before any of the above. The previous file was moved aside to `alerts-before-0918-2day.ndjson`.
+
+**Housekeeping done at the same time:** session logs before 18.09 deleted (1.2GB → 91MB), `bot-debugger.log` (86MB) and `bot-minds.log` (70MB) removed — the second will not grow again, since nothing but Argus thinks now. The session log grows about **5MB an hour**, so two days is roughly 250MB.
+
+**The scheduled task was replaced.** `start-shard-detached.ps1` registers a ONCE trigger at 23:59, which on a run meant to last days would have started a **second shard over the same save** that night. It is now the watchdog from `install-shard-autostart.ps1`: a minute after logon, restarted if it exits badly, no time limit.
+
 # Handoff: the state of BotAI v2 on 05.09.2026
 
 Twenty-three folders, 212 source files, about 70,000 lines. **It builds clean against the fork** —
@@ -11,8 +38,461 @@ together, `ARCHITECTURE.md`. For what it is at all, `README.md`.
 > **One engine patch is now required.** `engine-patches/CraftItem-heat-source.patch` — seventeen lines
 > exposing two questions `CraftItem` already answers privately. Without it this assembly does not compile.
 
-> **Newest first.** The section directly below is 14.09.2026. Everything after it is the state on 05.09.2026 and
-> the nights that followed, kept as it was written.
+> **Newest first.** The section directly below is 18.09.2026. Everything after it is older, down to the state on
+> 05.09.2026 and the nights that followed, kept as it was written.
+
+---
+
+## Day of 18.09.2026 — builds 135–146: what a catch costs, the keeper's other half, and a thought with nowhere to go
+
+Patrick's night order of 17→18.09 built the band — a hideout with a fire and a chest, a keeper, prices on heads, the
+ambush out of hiding. This day answered the five questions that were left open at the end of it, and every answer
+turned into a defect nobody had seen. The full entries are in `DECISIONS.md`; the reasoning lives in
+`BotHunt/README.md` under "What a catch costs, and what the keeper keeps".
+
+**A catch had never taken anything (135, 137).** The confiscation written the night before ran at the cell door, over
+the backpack of a bot that was already dead — every catch here is a kill, so the purse and the gear are in a corpse by
+then and the hunter opens it a minute later. It now empties the corpse from inside the death hook, docks
+`BotOutlaw.BankFine` from the account, and strikes out the bond, without which nothing would change:
+`BotBinding.Restore` hands a bot its gear back when it rises, so taking a bandit's sword without striking it off
+`bond.Issued` hands it a new sword at the cell door. What the bond keeps is the *roll* — the weapon and ammunition the
+body was made with — because that is made once, at birth, and clearing it would leave a stripped bandit unable to buy
+a weapon for the rest of the session. First proof at 10:26:25: "Hale was stripped at the cell door: 120gp off the
+body, 0gp out of its bank, 21 things and 4 of its own kit forfeit."
+
+**Buying a witness off had never once been possible (137, 138).** The ledger read `0 witnesses bought off` over every
+session since the rule existed. A witness asks half of what it carries with a floor of 500gp; the fence paid out of
+its backpack; and **every seller on this shard is paid by deposit**, so the keeper was asked for five hundred while
+holding a hundred. The ask is now capped at `BotFence.Most` and the bill is settled out of the pocket first and the
+account for the rest, the way the guild's dues, a horse and a hall's levy already are.
+
+**The keeper lived in a cell (139, 140).** Three catches in the four-hour 06:30 session, all of them the fence: 78% of
+that session in a cell by the one member whose whole purpose is to mind the band's business. Two causes. It had no
+answer to a price on its head, so `BotHoleUp` sends it to the hideout to sit the price out — not hidden, a Sage has no
+Hiding worth the name, but away, because the hideout is 250 to 500 road steps from anywhere anybody lives. And
+`CompanyWithin` was 12, the same distance as the witness's sight: Patrick's rule names two distances, not one, and at
+twelve tiles the keeper was in the company of thieves whenever it was at home at all. The telling now names the place
+it happened, which is how that was found — "seen at (1445, 1465)", the population's own home. Company is four tiles
+now, and must hold for `DwellMs` before a witness can make anything of it.
+
+**The keeper's other half (136, 142, 143, 145).** Patrick's keeper "looks after the band's goods and orders" and only
+the goods half existed. The order is read off the band rather than written down — the most any one member keeps of a
+kind, times `Spares`, less what the chest holds — and `BotShopper` asks it last, which puts the whole of the island's
+buying machinery behind it. Three things had to be true before a single bandage moved: the errand had to be claimed at
+the band's price rather than the shops' 12/min or it lost every auction; the keeper had to buy *on top of* its own kit
+or the purchase vanished into its own allowance; and the counting had to be by kind rather than by stack, because
+bound gear is dyed and will not merge, so fifty bandages sit in two piles of thirty and twenty and neither is bigger
+than the allowance of thirty. That last one had also quietly eaten the first supply run, which rode four hundred tiles
+and put down nothing.
+
+**And a thought of robbery with nowhere to go (146).** No robbery happened all day, and not because of the rate: "193
+rolls, 7 came up, 4 sent to practise hiding first, 3 found nobody alone with 50gp outside a town, 0 pressed". All
+three were thieves able to rob, and where they stood decided it — one of them in the middle of Britain. `BotWaylay`
+sends such a thief to the nearest place `BotCommons` says work pays, outside a town and beyond `FromTown` of a ward,
+to wait there hidden for five minutes. The rarity of the thought is untouched; what changes is that it can land.
+
+**Instruments added:** `do band` through Argus's door — the band, its hideout, the chest's contents by kind, the
+unfilled order and where the keeper is standing with how much on it. And every gate of `BotUnderworld.Stash` counted
+apart, which is what finally named the stack-against-kind defect after four wrong guesses read against the code.
+
+**What is open at the end of the day:** whether exposure of the keeper is now too rare to be the danger Patrick built
+(both numbers are dials); whether the treasury needs a tax, which he has asked to be watched rather than solved; and
+the Band tab, which has still never been opened with a client.
+
+---
+
+## Night of 14→15.09.2026 — builds 39–42: deaths the auction could not see, a failure breaker, watchers reciting their own prompt, and the road's bottom slot
+
+Patrick left the shard running for the night with one instruction: monitor, fix, read the watchers' reports and do not
+trust their assumptions. Each build ran 45 minutes before the next; each attempt went into `DECISIONS.md` before it was
+deployed and its result after it was measured.
+
+**Build 39 (21:17).** At 20:59 the `dying` alarm: 28 of 29 deaths in twenty minutes in one field north-east of Britain,
+filled with plague beasts after the watchers declared a prowl revel. `BotPeril` held every death and only captains read
+it; the auction's caution was each bot's own ledger, so every offer into the field read "safe 1.00". `BotPeril.Lethal`
+now keeps the dead apart from the blows and the appraisal refuses ordinary work where two have died lately
+(`BotDeed.Braves` for the work that deals with such ground). No death followed in the next 45 minutes, but the veto
+never fired either — the danger map is empty after a restart — so it is **untested live**. The same build carried the
+failure breaker (§5 S1, `BotBreaker`): six failures of one kind for one reason in five minutes rest that work for that
+bot. Its first trip found a loop nobody had seen: Edda Ashdown sent to her own guild's counter six times in two seconds.
+
+**Build 40 (22:05).** Every one of the watchers' 26 findings that evening was one run-together label, `SameTwoTiles…`,
+about five different bots. The prompt quoted that word as its example of a bad finding, beside example sentences with bot
+names and coordinates; the schema's minimum length made the model pad it; the long memory counted each repetition as a
+fresh sighting, so "SameTwoTiles" (102 times) was the strongest belief recited into every prompt. The examples are
+rewritten, labels are dropped and never believed, and a label or a word-for-word echo is turned away before it is filed.
+In 45 minutes: 0 labels, 6 echoes turned away, 6 findings in sentences — one of them true (Gwendra's evict loop). The
+premise under the label is still there: work that produces no goods is read as a loop. Also here: scenario checks through
+the door (§5 S2, `scenarios.py`, verbs `trip` and `breaks`), and the stall line now says what the road holds.
+
+**The finding of the night (build 40 → build 41).** All twenty four-minute stalls of build 40 were bots on their own, and
+nineteen of them had a company's "station" or "sweep" on top of the road, one tile away and so arrived on every beat.
+`BotJourney.Rebase` writes one bottom slot, and the decision layer and a company both use it: a company overwrote a
+member's own walk, let the member go, and `BotWill` never sent the unchanged walk again. The "stalls on the stables' roofs"
+of the afternoon were this — a bot parked within eight tiles of a stablemaster buys a horse inside two seconds, so every
+stall began with a purchase. **Build 41 (22:53)** sends a walk again when the bottom of the road is not that walk
+(`BotWill.Resent`), asks the guild's own counter the shopkeepers' two questions (`BotShopper.HallWalled`), and takes prowl
+off the list of trades a revel may name.
+
+**Build 41 measured (22:53–23:38):** 85% of 4,269 endings finished, against 81% on builds 39 and 40 counted the same
+way; 2 stalls against 20, neither under a company's station; one death, underground. **Build 42 (23:40).** `BotStable.Unfetch` takes an arrived walk to a stablemaster off the road (Aric,
+mounted, stood on "a horse"); `BotBailiff.ShunMs` stops a member being sent after a trespasser it just failed to reach.
+Two more came out of build 41's first half hour. Heimdall said Nessa's "acquire" was a loop; the reason he gave was the
+old premise, but the repetition was real — `BotArmoury` kept three attack scrolls and `BotUnload.Keeps` kept none, so
+the next counter sold what the armoury had just bought (471 harm scrolls in the night, 59–80 a session bought over a
+shopkeeper's counter); both now ask `BotArmoury.Kept`. And the breaker's next two trips, Quill and Torvin on mine, were
+`BotGround.Seam`'s 2.5-second cache handing back a seam struck off a beat earlier; `BotGround.Untell` takes it out.
+
+**Build 42 measured (23:40–00:26):** 84% of 3,835 endings, no real breaker trip, no stall under "a horse", no run of
+empty seams; the scrolls stay in the pack now, though the counter purchases were a boot's all along. **Build 43 (00:28).**
+Patrick's aim for the night is 95% of work finished, and build 41's census of 292 failures and
+132 drops in half an hour gave the order: a worn tool ends the batch instead of failing it (46 failures, most with the
+goods already made); a prowl's company is counted at the edge of the town where it is raised (24 given up against 16
+raised); a prowl that stops closing names the tile it stopped on (49, the largest group, unreadable until now), and a
+seam found barren says from how far it was looked at. And from build 42's first stalls: a company is no longer handed a
+creature swimming where nobody can stand — Squad 18 stood four minutes on a beach being handed water elementals and a
+kraken one after another, and "we never got near it" had run 47 to 131 a session all night. And a company takes in only
+bots within 400 tiles of its leader: Faron Ashdown, by Britain, was a member of Roderic's party in the Orc Caves, was sent
+to its stations ten times and carried home — `BotSquads.Join` asked the facet, and the dungeons are on the island's.
+Last, a fire a cook stands beside and finds cold is rested for every cook for twenty minutes: each session had one
+near home that a dozen or two bots walked to one after another, each learning it only for itself.
+
+**Build 43 measured (00:28–01:14):** 86% of 4,179 endings against 84% and 85% on the two builds before; not one
+worn-tool failure left, 1 death, no stall; the prowl companies were not helped (15 raised against 33 given up), and the
+400-tile door counted 391 refusals in one five-minute window — a Baron's harrow asking every beat while the Baron was
+still walking to its own muster, 80 seconds, not a loop. **Build 44 (01:15).** A gatherer that buys a horse stops mining: the engine refuses a rider "You can't mine while
+riding" in a sentence no bot hears, and `BotDig` read every refused swing as a miss — Hale and Ulla fourteen failed trips
+in a row after midnight, iron included, and Kerrin, Hale and Lysa before them. The miner now gets off before the swing
+and the horse is not called back while it works. Also an errand whose shelf was emptied by the herd after a boot goes on
+to the next shopkeeper instead of failing. And a full guild counter is full for every kind: by 01:04 "the merchant would
+not take any more on its shelf" was the commonest failure on the shard (22 in 39 minutes, each courier having already
+spent the guild's money in town), and the shelf's own instrument had been saying why since 10.09 — every refusal had a
+lot of the kind standing. A backpack is a `BaseContainer`, whose `TryDropItem` asks the 125-item cap before it tries a
+stack; `BotShelf.Room` had read the server's class, which stacks first. It now asks for a free slot alone.
+
+**Build 44 measured (01:15–02:01):** 87% of 4,001 endings against 86%; every target gone — "missed too often" 0 (20),
+"would not take any more on its shelf" 0 (34), "holds no Bottle" 1 (19), prowl companies 54 raised against 6 given up
+(15 against 33); 1 death, 1 stall. **Build 45 (02:03).** Money a bot's work did not move is kept out of that work's takings: a signed
+ledger in `BotYield`, booked by every place that moves a bot's money on somebody else's decision — levies and the
+crown's tax, a guild's stand, a counter's wages and takings, a horse — and moved with a paused errand's stake. And
+the largest cause of dropped work on builds 42 and 43 goes: a hunt or a company's band hit back by its own quarry was
+offered "hitting back at" that same creature as a rescue, which outbid it — 45 of build 43's 204 drops were a hunt or
+band "interrupted by rescue" for the fight already in hand. The defender now asks the work's `Foe` first. And the
+largest failure, a prowl standing at a riverbank for two hundred beats and failing "got no nearer" (69 of 388), looks
+once for ground within forty tiles on its own side that a search proves it can walk to, before it gives up. Last, a
+miner holds its seam from the first step of the walk rather than from the first swing: six miners reached one bronze
+seam inside 35 seconds at 01:23 on build 44, and five of them arrived after the first had struck it off. And a
+creature found unreachable again where it stood is left alone twice as long each time: a zombie on top of something in
+Britain Graveyard was handed to eight hunters in 22 minutes, one every two minutes — the length of the shun.
+Build 45's own boot, 02:03:26: the roof at (1362, 1457, 30) by Britain Graveyard was proved a pocket seven seconds in,
+and 59 errands of companies fighting a spectre on it failed at once — not a regression (02:04–02:07 ran at 89.8%
+against build 44's 89.3% for the same span), but the case for persisting pockets, which is Patrick's (§6).
+
+**Build 46 (02:53).** A lesson taken speaks for its place on the roll at the moment it wins
+(`BotDeed.Taken`, called by the Will when work is chosen): after both boots a class of six drew 18 bots and turned
+8 and 18 away at a closed roll. By the same hook a band claims its quarry when chosen — eleven squads of five had
+formed against one spectre six seconds after build 45's boot. A forge whose anvil the engine refuses rests for every smith for an hour (ten of eleven
+refusals on build 44 were one forge). A load bought off its stall while it was being carried to a shopkeeper ends
+finished — the coin arrived, and "the stall was empty by the time it got here" (16) had been marking the shopkeeper.
+And ground where bots have lately died is prowled only by a company: build 45's 45 minutes measured 89% of 4,159
+endings (87% on build 44) with every one of its five changes doing what it was for, but 7 deaths against 1 — five of
+them lone prowls sent by the noise itself into a plague beast's field at (1854, 1062), where a company was killing its
+spawn; the auction's lethal-ground veto exempts prowls as the work that deals with such ground, and alone they are not.
+Build 46's boot confirmed both commit-time claims: six pupils took six places, and one company to a creature.
+**Build 46 measured (02:53–03:38):** 90% of 4,076 endings against 89% and 87% on the two builds before; closed rolls 0
+(18), one company to a creature, three forges rested one smith each, deaths 2 (7). The stall bought out on the way
+answered only 3 of 14 empty stalls — most emptied without a sale the errand could see; open.
+
+**Build 47 (03:40).** A captain walks past a post of the drill ring it cannot reach instead of ending the class:
+on every build tonight Faron's lesson failed three or four times at the corner posts (1462–1464, 1497–1498), and 6–14
+students a build who had paid 60gp ended their lesson under a point. And a restock that finds its guild's shelf
+bought out goes on to a shopkeeper selling the thing, at that shopkeeper's price, instead of failing (8 on build 45).
+And a bot that has just got clear of something is not offered flight again for eight seconds unless it is hit: on
+build 46 Rhiannon, hurt, in a company whose fight kept crossing the fourteen-tile edge, dropped her bandage for flight
+32 times in fifteen minutes — the same loop as Harlan and Joss before, and it was her own company's fight, not a
+pursuer.
+
+**Build 47 measured (03:40–04:25):** 90% of 3,980 endings; lessons failed at the corner 0 (3–4 a build), the guild
+shelf found bare 0 (8 and 6), "mend interrupted by flee" 6 (36 and 24); but 14 deaths, all but one in the plague beast's
+field, four of them mending — whether the flight's quiet seconds cost any of those cannot be told from the field yet.
+
+**Build 48 (04:26).** A paid student whose station on that same corner has no road is taught where it stands
+(Quenna at build 47's boot). And a load the market hands back into the pack while a peddle is carrying it to a
+shopkeeper is sold from the pack: nine of the eleven empty stalls build 46 could not explain were the market's
+thirty-minute take-back meeting the peddle on the road.
+
+**Build 48 measured (04:26–05:11):** 86% of 3,897 endings with a war standing for 29 of the 45 minutes (The Blade on
+The Crown from 04:41, The Hammer beside it; The Blade won 25:3 at 05:10:31): 121 failures were the war companies' door
+loop described under build 49, and 43 deaths, 31 of them rallies, all round the two guilds' seats north-west of
+Britain. Loads handed back into the pack and sold from it 15, stalls empty on arrival 1 (11 on build 46); no student
+needed teaching where it stood; the closed-ground rule refused 6,888 offers round the war's dead and met no plague
+field, so it is still untested against the case it was written for. Self-mends put down "interrupted by mend" 31
+times by five bots. The Crown owes a hall move, begun at 05:10:44 by Harlan — build 49 waits for it.
+
+**Build 49 (05:14, after the war and The Crown's hall move).** A seam whose rocks are all there and worked out rests instead of being struck off for the
+session: "no rock worth swinging at" was build 47's commonest mining failure (21), and the finder could not tell no rock
+from rock the engine had emptied; the line now says which, and where. And a war company keeps the enemy it is on: the
+war declared at 04:41 on build 48 (The Blade on The Crown, The Hammer beside it) showed every rally re-aiming its
+guild's company at the enemy that member had been sent after — The Hammer's went through four enemies in 47 seconds
+and broke off with its nearest member 669 tiles short — while the members answering were refused at the door for
+standing more than 400 tiles from the leader (build 43's `JoinReach`), which neither the rally's proposer nor the
+enlistment's asked: 48 rallies failed "the war company had no room by the time it arrived" between 04:46 and 04:51,
+as many as the door counted bots too far from their leader, and at 04:55 13 rallies and 29 enlistments into The
+Hammer's company failed the same way, each bot up to six times in a second until the breaker rested it. A rally now
+leaves a company on a living enemy (`BotRally.Kept`), and neither is offered to a bot too far from the company's
+leader (`BotFeud.Beyond`, `BotEnlist.Remote`; one predicate with the door, `BotSquads.Reaches`); a rally refused so
+quarrels where it stands. And a bot mending itself mends where it stands: in the same war Wynn's own bandaging was put
+down "interrupted by mend" nine times in 47 seconds, seven at "worth 0/min" — its place was the square it began in, and
+build 48's closed ground spares only the square a bot stands in. A drop line now names the veto behind a nought.
+
+**Build 49 measured (05:14–06:00):** 90.4% of 4,256 endings, no war. Every mining failure of the old shape came back as
+rock the engine had worked out (8, and those seams rest), none as no rock at all; no self-mend put down for another; the
+drop line named eight vetoes, five of them the start price asked of work in hand. The war fixes were not exercised, and
+the enlister's new counter read 33,016 because it was asked before the distance to the fight (moved in build 50).
+Sixteen deaths, nearly all in the plague beast's field — eight of them mending, seven fleeing — and rescues into it
+failed "too many of them around" a plague spawn 14 times and a plague beast 7.
+
+**Build 50 (06:04).** Paperwork waits for the work in hand. An order is a few seconds of posting a want, its escrow
+counted as made so the ledger does not read ordering as a loss — and 96gp in a fifth of a minute reads as ~480 a
+minute, so it outbid everything: ten brewers put their batches down in one second two minutes after build 49's boot
+(twenty such drops in 05:16–05:17; 1–17 a session all night). Orders are now taken at the bot's next choice.
+And the price of starting is no longer asked of work already started: Ulwin's inscription, taken at 328 a minute with
+51gp already spent on it, was put down for an acquire at 7 because "inscribe costs 100gp and it has 66gp".
+And Argus gets `peril <x> <y>`: what the death map (from the boot) and the quadrant record (across restarts) hold about
+a place, and whether work may go there — so the next field that kills is read before anything is changed. (On build 50
+the door refused it: by-hand verbs pass only through `BotHand.HandVerbs`, which was not told; in for build 51.)
+
+**Build 50 measured (06:04–06:50):** 91.8% of 4,376 endings, the best peaceful share of the night (90.4% and 89.7% on
+the builds before), and 3 deaths against 16. Nothing put down for an order (20 on build 49) while 144 orders were still
+posted; nothing put down for the price of starting; the eight drops that named a veto were prowls whose ground the
+ledger now expects to pay below nothing — the next thing that line shows. Mining walks refused on the ridge west of
+Britain became the top failure (24 "no way through" by 11 miners), which is build 51's.
+
+**Build 51 (06:52).** A blow is not answered with a fight the odds already call off: `BotDefender` offered the fight
+when a bot was hit, and its `BotSlay` called it off on the first beat for the crowd round the bot — 49 times on build
+49, most against plague spawns, every one in the ledger's shortest span, 11–33 a session all night — because the
+proposer read only the per-creature mark that the failure writes, and a plague beast keeps making new creatures. It
+now asks the same odds itself (`BotDefender.Outnumbered`). And `peril` is in `HandVerbs`. And a seam that refused a
+miner is not handed to the next: build 50 turned miners away from seams 53 times in 21 minutes, 47 on the ridge west of
+Britain, three seams four times each, because a refusal the errand bent away from was written only into the bot's own
+ledger and the seam chooser read no shared record. Bends now write `BotRefused` (`BotWill.Rerouted`) and the seam
+chooser reads it (`BotGround.Unwalked`).
+
+**Build 51 measured (06:52–07:38):** 92.1% of 4,315 endings (91.8% on build 50). Blows answered with a fight the odds
+had already called off: 1 (49 on build 49), 53 declined. Seam swaps 13 (52) and mining "no way through" 1 (24), with
+mining taken 304 and finished 270 against 279 and 209. Nine deaths, all in the plague beast's field. Prowls "got no
+nearer" 30 and "no way through" 18 (15 and 5) at the same riverbank stops west and south of Britain as on the build
+before — a spread between sessions, not the defender rule. Nessa Ashdown's seven failed self-mends under a company's
+refused station are build 52's.
+
+**Build 52 (07:40).** A company's refused station is not charged to the work in hand. `BotWill.Note` is handed the
+result of whatever leg the journey advanced, and when that was a company's station it failed the bot's own work — a
+mend, an acquire, a brew — "no way through to what it was following, which is gone", in the same second as the
+station's drop 60 times in 61 on build 45 and 9 in 9 on build 51; Nessa Ashdown, in the Orc Caves, lost her own
+bandaging seven times in fourteen seconds that way. Work that sent no walk is no longer failed for one (`BotWill.Foreign`).
+
+**Build 52 measured (07:40–08:26):** 92.0% of 4,314 endings (92.1%, 91.8% on the two before), 4 deaths and none of them
+in the plague beast's field. "Which is gone" 0 (9 on build 51), `Foreign` 13, no real breaker trip. Prowls "got no
+nearer" 32 and "no way through" 22, still the largest failures, at the riverbank stops west and south of Britain.
+At 08:25:06 The Lantern declared war on The Blade, The Needle beside it — the first war since build 49's company fixes,
+so no restart while it stands, and those fixes get their measurement. Five minutes in: 35 rallies taken and none
+failed, 12 left their company on the enemy it had, 12 not called to a company whose leader stood more than 400 tiles
+off, the door's `Distant` 0 (build 48's war had dozens of "no room" in its first ten minutes). The dying alarm at 08:30
+(20 of 80) was the war itself; 62 died in the quarter hour to 08:38, at The Blade's seat, at The Lantern's, and at the
+inn in Britain, where at 08:36:35 seven of The Blade's company fell in one second to company 108, eight strong — a
+battle between two companies, not guards.
+Open, found in the same war: a bot past its carrying ceiling held in a company. Elspeth (186 of 131 stones), Kerrin
+(319 of 250) and Roderic (232 of 229) stood four minutes at The Lantern's seat with their company's stations in Britain
+on the road — the engine refuses an overloaded bot the step, a refused step is not a refused road, so the company's
+release after twelve refusals (`BotPopulation.Rescue`) never counted them; and Kerrin's rally failed "no way through"
+at 08:32:14 with the membership left standing, since neither `BotRally` nor `BotEnlist` lets a member go when its
+errand ends. Five such stalls all night, three of them in this war — not changed.
+
+**The war of 08:25 measured (08:25–08:48):** The Blade won by blood, 25 to 22, and The Lantern's hall was carried out of
+the winner's yard to 1190,1476 by Marek (08:48:33–08:50:13). Build 49's company fixes in their first war: "had no room" 0 against 121 in build 48's war; companies
+breaking off "never got near" a bot 18 times, 42 tiles short on average and twice past a hundred, against 30, 189 and
+15 (the worst 669); `Kept` 61, `Beyond` 20. 97 died in 23 minutes, which is what a war to 25 dead with resurrections
+costs.
+
+**Build 53 (08:51, after the war and The Lantern's hall move).** Nobody is called to a company fighting in a proved pocket: the roof
+at (1376, 1465, 30) by Britain Graveyard was proved a pocket at 08:27:59, The Lantern's company fought on it, and 8
+rallies failed "no way through" into it — Jarek six in two seconds — because `BotFeud.Rally` never asked the reach
+ledger about the company's anchor, which the enlistment asks. Now it does (`BotFeud.Pocketed`).
+
+**Build 53 measured (08:51–09:37):** 91.8% of 4,330 endings, 6 deaths (five in the plague beast's field). No war, so its
+one rule waits for the next. Build 52's `Foreign` read 197 in a session full of companies, and "which is gone" stayed
+at 0. The largest failures are unchanged in kind: prowls stopping at the riverbanks west and south of Britain (23 "got
+no nearer", 9 "no way through"), worked-out seams resting (16), and healers putting a bandage down to run (15 by four).
+Build 49's own run woke the plague beast field north-east of Britain again: nine deaths between 05:25 and 05:37 — five
+in flight to refuges a few tiles further into the same field (Gerda Ashdown, Corwin, Emrys twice, Pell), two mending
+themselves in it (Aric, Lorcan), two setting out of it with potions for Delano (Fendrel, Ulwin) — after companies took
+on bog things (13,860), an acid elemental (17,003) and plague beasts (22,000) from 05:25, and Faron's sweep walked
+(2004, 996) from 05:29. The lethal veto refused from 05:29 and the closed ground from 05:34 (reclaims going back to
+their own corpses the commonest refused), but both learn only from deaths since the boot, and with a restart every
+45 minutes the field is new ground every time; the quadrant record survives a restart and marked the deaths, but it
+gates a lone bot's strength and lets a company through. Only one of the five flights had two deaths lately round its
+refuge, so refusing killing ground as a refuge would not have saved the rest. Open, and tied to S6 (Patrick's).
+And the record that does survive a restart says the field is safe: `peril 2004 996` on build 51 read its quadrant
+positive 0.93 on 435 blows and 24 dead, asking a lone bot for no strength — a death is worth what twenty-five quiet
+crossings buy back, and the reading is clamped at −1, so the road past it erased the deaths. Put to Patrick in
+`DECISIONS.md` §6: the dials carry his orders.
+The new drop line already shows one more thing to look at: sewing put down at "worth 0/min" because the ledger expects
+sewing on that ground to lose money (−1.8 and −5.1 a minute) while the round itself is 36 a minute up.
+Still open: a hurt healer (Harlan, Rhiannon, Joss) leaving its own company's fight and mending in between, 23–24 drops
+a build; prowls hit on the way and dropped for a rescue (15) or jumped by a band (33) — how those count is put to
+Patrick in `DECISIONS.md` §6; healers with nothing to do standing at their hall for four minutes (Ivo and Nyla at The
+Needle's, 03:02 on build 46), which is the role-work question already his — three more at 04:00 on build 47 (Harlan,
+Marek, Ivo). The plague beast's field north-east of Britain (1968, 1000) kills again whenever a company wakes it: 04:01
+on build 47, Emrys in flight, Fenna mending, and Brannoc on a peddle to Delano whose road crossed it — the lethal-ground
+veto reads the destination's square, never the road there; open. Then 04:07–04:20: nine more deaths in that field while
+two companies fought the beast (19,162) and its spawn — so build 48 also closes ground with four deaths lately to every
+kind of work but flight, companies and rescues included (`BotPeril.Closes`).
+
+**Build 54 (10:16, the morning).** An axe the body cannot lift is not offered as a woodcutter's tool. Marek, a healer
+with strength 25, carried a double axe (strength 45), was offered the woods and failed "it cannot get the axe into its
+hand" five times in one second at 09:46:43: `BotTimber.Tool` took any axe in the pack, and the engine refuses a weapon
+below its strength requirement — the question `BotMobile.Suits` already answers for the re-arm. The same line is in
+the logs 54 times since 10.09, 34 of them Kelda's in one session (her axe is not named, so likely rather than proved).
+`Tool` asks `Suits` now, and `BotWoodsman.TooHeavy` counts what it turns away.
+
+**Build 55 (prepared, to follow build 54's window).** Patrick's order at about 10:10: bots put on better weapons and
+armour even when already dressed, and a bound weapon stays in the pack, so that a bot stripped in a war is not left
+defenceless. Armour already moved for anything that stops more, but `Pick` handed `Upgrade` the first piece the pack
+held for that place rather than the best; a weapon in the hand was never changed at all. `BotMobile.Rewield` wields a
+better weapon of the bot's own kind — the birth weapon's skill, distance and ammunition; a class whose staff gives
+back mana keeps its staff — when it lands at least 5% more a second by the engine's own pre-AOS arithmetic, and the old
+weapon goes into the pack, where a bound one stays: weightless, kept through death, never sold. With the bound weapon
+riding in the pack, a peddle a shopkeeper turned down would have listed it with the rest of its kind, so the market's
+doors (`BotAuction.List`, `Fill`) now refuse bound things and count them (`BotBinding.Refused`), and the peddle's and
+the guild courier's choosers pass them over.
+
+**Build 55 measured (11:03–11:49):** 91.9% of 4,396 endings, 2 deaths; nine pieces of armour swapped for better, no
+bound thing refused at a door — and no weapon swapped, because after a boot nobody carries a better weapon of their own
+kind, and the refusal line that used to show one in a pack was the one this build turned into a skip. So build 56 brought
+a hand verb to make the state: `do arm <bot>` puts a vanquishing copy of the bot's own weapon in its pack. At 11:57 the
+scenario `rewield` gave one to Ilsa Ashdown, and the re-arm put her bound bow away for it within ten seconds, saying the
+bound one stays in the pack. One more "it cannot get the axe into its hand" on build 55 (Nessa, 11:33:21) was not the
+strength refusal build 54 closed; build 56 makes the line name the engine's reason.
+
+**Build 56 (11:56).** A prowl is not turned round for another prowl: on build 54 all 32 "outbid by prowl" drops came
+between 2.0 and 2.9 minutes in, fourteen at exactly 2.0 — the end of the dwell — for another dart often hundreds of tiles
+away, 242 across the day. A guess about ground is not an event; the walk ends on arriving, on a quarry in reach or on the
+road refusing, as before (`BotDeed.Guess`, `BotWill.SecondGuesses`, switch `BotWill.GuessHolds`). How a prowl displaced
+by the fight it found is counted stays Patrick's (§6).
+
+**Build 57 (prepared, to follow build 56's window).** Build 56's boot sent the whole population to one cage: at
+11:56:36 all 68 bots took on "liberate: after Ida" in the same second and all 68 failed — 66 of the window's first 108
+failures, so build 56's window has to be read without liberation. The boot of 04:38 on 14.09 did the same (54 taken, 52
+failed). A prisoner is now the chooser's from the commit (`BotFreedom.Taken`), the nearest-prisoner search passes over
+one somebody else has set out for, and `BotLiberator.Spoken` counts those — build 46's cure for lessons and companies,
+applied to the one proposer it had not reached.
+
+**Build 56 measured (11:56–12:42), with a caveat that matters more than the share.** 91.8% of 4,292 endings, 93.3%
+without the liberation herd; no "outbid by prowl", 17 second guesses turned down, prowl drops 168 against 225. But
+hunts finished fell to 260 in the window, below all seven windows of builds 49–55 (337–432), and prowls ending
+"something worth fighting" fell from 5.3 to 4.2 a minute while "nothing here" held. A second dart is thrown from where
+the bot stands on what is alive now, and it seems to have found fights the first dart did not — so the rule may have
+bought share by fighting less. Build 57 runs `BotWill.GuessHolds` off, on and off in 22-minute windows (12:46–13:52);
+the rule stays only if its window hunts no less than both of the others.
+**The switch test answered it (12:46–13:52):** hunts 191 off, 223 on, 215 off; prowls finding a fight 117, 124, 89;
+prowl drops 98, 62, 102. The on window was the best of the three for fighting and for dropped work, at the price of a
+few more riverbank failures, so the rule stays — and the 260 hunts of build 56 were one session's spread. Without the
+return to off it would have been reverted on one window.
+
+**Build 57 (12:45).** At its own boot another prisoner, Alala, stood near home, and one bot took her on where 68 had
+taken Ida. **Build 58 (prepared, after the switch test).** That one bot, Emeric, walked Alala home in 0.9 minutes and
+"failed … it is no longer following" with 936 coin in his pack: no liberation has ever been recorded finished. The
+engine pays, clears the destination, lets go of the escorter and deletes the prisoner a few seconds later, and the
+errand read those seconds as a lost escort — twelve such failures on 14–15.09, each with the engine's pay. A prisoner
+following nobody with no destination left is now delivered.
+
+**Build 58 measured (13:54–14:40):** 91.8% of 4,223 endings; three liberations finished out of four taken, the first
+ever recorded, and hunts finished 440, the most of any window today. Two findings under it. Build 55's weapon rule has
+a second hand on it: Maeve put her bound bow away for a better one eleven times in eight minutes, every fifteen seconds
+with the same numbers, so something silently puts the bound bow back between swaps — reading the equipping code did
+not find it. And the lone hunter never asked the reach ledger about its quarry: after two roofs of Britain Graveyard
+were proved pockets, six more hunts walked into them and failed, while the company's choice asked and a comment claimed
+the hunter's did. **Build 59 (14:54):** the hunter asks both of the company's questions (`BotQuarry.Penned`); a weapon
+is not swapped into the same hand again within five minutes (`BotMobile.Reverted`); and the first time a weapon of a
+bot's own kind goes into its hand with a better one in its pack, the call stack is written once, so the other hand can
+be named.
+
+**Build 59 measured (14:54–15:40):** 91.9%, graveyard hunt failures 3 (16 before) — but one hunter still walked at a
+zombie on the tile a roof pocket had been proved around, because the reach ledger was asked about the ground within two
+tiles of it and the street under the roof's edge answered Unknown; and hunts dipped to 316 in the build that added the
+refusal. **Build 60 (15:44)** asks about the creature's own cell, for hunter and company alike, and counts the hunter's
+two refusals apart. **Measured (15:44–16:30): 92.8%, the best session of the day** — no graveyard failure after a proof,
+the refusal memory turned no hunter away (`Unwelcome` 0), hunts back to 372, no deaths. The weapon flip has not shown
+again in three windows; the five-minute guard and the one-time stack trace stay in.
+
+**Build 61 (17:21)** rests a square for a guild after its muster there fails (`BotClaim.Resting`, thirty minutes doubling
+to four hours) and sends no member to a square a walk to it lately gave up on (`BotHolder.Refused`): on build 60 The
+Lantern re-claimed 1065,1395 the second each claim ran out, 22 failed holds a minute. **Measured (17:21–18:07): 91.5%**,
+one death. The claim came back after the boot (neither memory survives one) and failed once; the guild then claimed the
+neighbouring square, 1065,1455, in the same ground, failed there too, and took 1275,1605 at 17:46:50. Holds failed 7 in
+the window, two a minute at most; 516 members were not sent and 3,283 looks passed over a rested square. Look time read
+23 ms against 15, and all of it is walking — deciding was the same on builds 59–61, about 8.4 s at twenty-five minutes —
+and walking follows the prowls stuck at banks (116 stops in 45 minutes and 21.7 ms on build 58, 105 on build 61, about
+65 on build 60): the session, not the build. The ground behind those banks is one region. Prowls into x < 1140,
+1050 < y < 1420 arrived once in 44 sessions, against some 450 failures on 15.09 alone, and the door says why: from the
+banks at (1161, 1345) and (1242, 1239) there is no road at five times the ceiling, while from reachable ground in the
+south-west, (1006, 1641), the same region is 520 tiles of road. The way in is round by the south, about 1,100 tiles from
+Britain against 440 in a straight line, and no funded search goes away from its goal for that long. Replayed over 14–15.09,
+reading the quadrant baulk in the random darts would have caught 130 of 1,889 prowl failures and turned away 228 walks that
+arrived or found a fight; a per-session note at 30, 60 or 90 tiles does no better. A dart wants the road distance, not the
+straight one.
+
+**Build 62 (18:32)** gives a prowl whose road is refused on the way the same one look on its own side that a stalled
+prowl has had since build 45 (`BotProwl.Turned`). **Measured (18:32–19:17): 93.6%, the best session of the day**, one
+death, no stalls, look 12 ms against 23, prowl "no way through" 2 against 32, 515 hunts — but the rule fired four times.
+Darts into the ground north-west of the banks were a third as many as on build 61, and that, not the rule, is most of
+the difference; per dart there, failures fell from 32% to 9%. **Build 63 (ready)** draws a road map from home once per
+boot (`BotRoads`, a sliced breadth-first flood stepping as the planner steps) and counts, without acting on it, the
+darts whose road runs more than `Detour` past the straight line (`BotHunter.Roundabout`, dial `ReadsRoads` off); the
+hand verb `roads` gives the steps of road from home for any tiles, and 20,070 logged prowls are to be replayed against
+it before the dial is turned. It also stops offering a seam whose every rock in reach the engine has emptied
+(`BotOre.Stocked`, `BotGround.Hollow`): the same six seams failed "worked out" every half hour on build 61. And a limit
+of the map, shown by Brannoc at 18:58: a bot on the far bank, sent to upstairs hearths in Britain, failed three walks in
+twelve seconds, and a map drawn from home proves nothing about a road that starts on the far side.
+
+**Build 63 measured (19:21–20:07): 93.1%**, two deaths. The seam check did what it was for: "worked out" failures 0
+against 8–10 a window, `Hollow` 7, 206 mining trips finished. The road map cost 2.6 s of the loop over 25 s at boot. The
+dial-off half hour was the worst walking of the day — 60 of 416 darts into the north-west ground, look 29 ms — so
+`ReadsRoads` went on at 19:46:13, off at 20:09 and on at 20:31: prowl stalls 33 / 7 / 28 / 4 and north-west failures
+7 / 0 / 10 / 0 across off, on, off, on, so the rule is on by default from build 64 (the last window carries the bog's dead). In its first ten minutes walking
+per look fell from 23–28 ms to 15–16 and prowl stalls from 13–24 to 4–10 a five minutes, while more hunters were left
+with nowhere to walk.
+
+**The evening's decisions.** Patrick had Fable (`claude-fable-5-1`) propose options for everything in DECISIONS §6 and
+took all its recommendations; the result is §6's "Decided" block. Claude checked the paper against the logs before acting
+and departed from it three times: the trap boxes are sized from the rescue origins (Fable's south-west box took in ground
+bots had worked, its north box missed five of twelve rescues); `BotPlot.Apart` stays 40, because a hall with no plot after
+a lost war would owe its move for ever and forbid restarts; and no number went into a comment unchecked. Two things stay
+Patrick's alone: the mirror push, and whether `PerPass`/`PerBlows` are his 25 and 5 or the three and two the comments
+say. **Build 64 (ready)** is the small half: the two trap boxes, seat spacing, the loser's clock, deaths against crossings,
+`RaiseMs`, one `KeepBack`, `BotAppraisal.Root`, the alarm naming the loudest loop, and the school's ceilings. Build 65 is
+the half that changes what numbers mean — a prowl displaced by the fighting it went for counted finished, progress keyed
+by name and class — and after it persisted pockets, a floor while the dead are recent, and sparring.
+
+**Open:** the lethal-ground veto untested; reach pockets and the danger map lost at every restart (C6); the watchers'
+"no goods" premise (still filing Nessa's acquire as a loop; a revel cannot name acquire, so it is noise); a fighting
+company's station on another dungeon floor (`BotFormation.PressStation`) — Wynn died of it in the Orc Caves at 23:30 and
+was then offered the same station six times in two seconds; companies chasing imps and wisps that never let them close
+(45 and 21 break-offs in two sessions); every bot answering the same first question in the first second after a boot
+(16 companies against one wraith, 13 alchemists at one shelf); a prowl "jumped by" a fight counted as dropped while the
+same event seen first by the prowl is counted as finished (considered, not done — see build 43's instrument entry).
+Prowls stopping at the same few riverbanks west and south of Britain ("got no nearer", 99 on build 42): build 44 records
+where they stop (`BotBarrier`) but leaves the rule off, because replayed as points it caught as many good walks as bad
+ones — the barrier wants drawing as a line.
+Money taken from a bot by somebody else's decision is charged to whatever work the bot is doing at that moment: Lysa, the
+richest bot on the shard, was levied for The Lantern's claim on (1245, 1485) at 00:49:06 in the middle of a mining trip,
+and the trip settled at −2,902 coin, "−2,000 a minute", into her ledger for mining; a horse bought during a dig does the
+same (−517 on the trip before). The mirror of it inflates the other way: a courier standing at its guild's counter
+carries the merchant's takings into the guild, and the supply errand is credited with them (Joss, 380 coin and
+522 a minute for one scribe's pen). Build 45 books those apart (above); a captain's wages stay the captain's errand,
+and goods bought off the board still land on whatever errand is in hand when the order fills — open.
+**For Patrick:** where a prowl's company gathers — at the edge of the town, as ordered on 03.09 and kept by build 43, or
+where the bot stands and marching out together (`DECISIONS.md` §6). Nothing is pushed to the public mirror.
 
 ---
 
@@ -39,8 +519,8 @@ the counter work was refused, unload was taken at 103/min, 113 cloths went into 
 was weighed normally again the same second — one failure (the work already in hand) against thousands. Build 38 after
 20 minutes: 78% of endings finished, no "pack would not hold" line, no escort failures.
 
-**Not deployed yet:** the `Will:` line still calls `Jammed` "trips begun" although it counts offers; the corrected
-wording is in source and goes out with the next build.
+**Deployed with build 39 that night:** the `Will:` line's corrected wording for `Jammed`, which counts offers of the trip
+that makes room rather than trips begun.
 
 **`DECISIONS.md` exists from tonight, at Patrick's order:** the mechanisms and their invariants, twelve defect classes with
 every recorded instance, the month's decisions with what they answered and how they ended, and the structural remedies
