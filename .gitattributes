@@ -5,3 +5,7 @@
 *.json text
 *.ps1  text
 *.cmd  text eol=crlf
+
+# git apply refuses a diff whose lines end in CRLF, and bash refuses a script that does
+*.patch text eol=lf
+*.sh    text eol=lf
