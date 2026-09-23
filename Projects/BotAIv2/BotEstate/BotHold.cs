@@ -112,9 +112,22 @@ public sealed class BotHold : BotDeed
         }
 
         _standing = true;
+        _arrived = true;
         Stood++;
 
         return BotDoing.Work($"standing for {_guild.Name} on {_middle.X},{_middle.Y}");
+    }
+
+    private bool _arrived;
+
+    public override void Drop(IBotWilful bot)
+    {
+        if (!_arrived && bot?.Self is Mobile body && BotClaim.Making(_guild) != null)
+        {
+            BotHolder.Missed(body, _middle);
+        }
+
+        base.Drop(bot);
     }
 
     public static string Describe() =>
@@ -161,6 +174,20 @@ public sealed class BotHolder : IBotProposer
 
     public static int Spare { get; set; } = 1;
 
+    public static int MissedMs { get; set; } = 600000;
+
+    public static long Shy { get; private set; }
+
+    private static readonly Dictionary<Serial, (Point3D Middle, long Tick)> _missed = [];
+
+    public static void Missed(Mobile body, Point3D middle)
+    {
+        if (body != null)
+        {
+            _missed[body.Serial] = (middle, Core.TickCount);
+        }
+    }
+
     public static long Enough { get; private set; }
 
     private static int Holding(Guild ours, Point3D middle)
@@ -193,6 +220,10 @@ public sealed class BotHolder : IBotProposer
 
     public static long Unreachable { get; private set; }
 
+    public static long Rested { get; private set; }
+
+    public static long Refused { get; private set; }
+
     public string Name => "staker";
 
     public BotStanding Rung => BotStanding.Free;
@@ -215,6 +246,11 @@ public sealed class BotHolder : IBotProposer
             return null;
         }
 
+        if (BotUnderworld.Band(ours))
+        {
+            return null;
+        }
+
         Asked++;
 
         var bid = BotClaim.Making(ours);
@@ -224,6 +260,21 @@ public sealed class BotHolder : IBotProposer
             if (BotReach.Ask(body.Map, body.Location, bid.Middle, BotArrival.Within(BotHold.Reach)) == BotReachVerdict.Sealed)
             {
                 Walled++;
+
+                return null;
+            }
+
+            if (BotRefused.Refusing(body.Map, bid.Middle))
+            {
+                Refused++;
+
+                return null;
+            }
+
+            if (_missed.TryGetValue(body.Serial, out var miss) && miss.Middle == bid.Middle
+                && Core.TickCount - miss.Tick < MissedMs)
+            {
+                Shy++;
 
                 return null;
             }
@@ -305,6 +356,13 @@ public sealed class BotHolder : IBotProposer
                 continue;
             }
 
+            if (BotClaim.Resting(ours.Name, BotQuad.Key(map, at)))
+            {
+                Rested++;
+
+                continue;
+            }
+
             var kind = owner == null
                 ? BotClaim.Kind.Settle
                 : fund >= BotClaim.Ousting || !BotClaim.Bought(map, at)
@@ -359,7 +417,7 @@ public sealed class BotHolder : IBotProposer
             ? "nobody has been looked at for a claim"
             : $"the staker looked {Asked} times: {Opened} claims opened, {Sent} sent to stand on one, "
             + $"{Enough} not sent because the square already had its muster of {BotClaim.Gather} and {Spare} to spare, {Landless} guilds had no hall to want ground near, {Nothing} found no square worth claiming within "
-            + $"{Look} tiles, {Poor} could not pay for the one they wanted, {Unreachable} passed over a square the hall cannot reach; {Walled} members were not sent because they cannot reach it from where they stand; {BotHold.Describe()}";
+            + $"{Look} tiles, {Poor} could not pay for the one they wanted, {Unreachable} passed over a square the hall cannot reach; {Walled} members were not sent because they cannot reach it from where they stand, {Refused} because a walk to it lately gave up and {Shy} because their own walk to it lately ended somewhere else; {Rested} squares passed over where the guild lately failed to muster; {BotHold.Describe()}";
 
     public static void Forget()
     {
@@ -371,5 +429,9 @@ public sealed class BotHolder : IBotProposer
         Poor = 0;
         Walled = 0;
         Unreachable = 0;
+        Rested = 0;
+        Refused = 0;
+        Shy = 0;
+        _missed.Clear();
     }
 }

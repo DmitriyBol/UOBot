@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Server.Items;
 using Server.Mobiles;
 
@@ -19,12 +20,13 @@ public enum BotEnding
 /// <summary>Where a bot stood when it took work on. Everything the takings are measured against.</summary>
 public readonly struct BotStake
 {
-    public BotStake(long tick, double skill, int wealth, int made)
+    public BotStake(long tick, double skill, int wealth, int made, long aside)
     {
         Tick = tick;
         Skill = skill;
         Wealth = wealth;
         Made = made;
+        Aside = aside;
     }
 
     public long Tick { get; }
@@ -34,6 +36,8 @@ public readonly struct BotStake
     public int Wealth { get; }
 
     public int Made { get; }
+
+    public long Aside { get; }
 }
 
 /// <summary>What a finished piece of work came to.</summary>
@@ -142,6 +146,51 @@ public static class BotYield
 
     public static int Standing(Mobile bot) => bot == null ? 0 : Wealth(bot) + BotAuction.Escrowed(bot);
 
+    private static readonly Dictionary<Serial, long> _aside = [];
+
+    public static long AsideTaken { get; private set; }
+
+    public static long AsideGiven { get; private set; }
+
+    public static void Aside(Mobile bot, long amount)
+    {
+        if (bot == null || amount == 0)
+        {
+            return;
+        }
+
+        _aside[bot.Serial] = _aside.GetValueOrDefault(bot.Serial) + amount;
+
+        if (amount > 0)
+        {
+            AsideTaken += amount;
+        }
+        else
+        {
+            AsideGiven -= amount;
+        }
+    }
+
+    public static long AsideOf(Mobile bot) => bot == null ? 0 : _aside.GetValueOrDefault(bot.Serial);
+
+    public static void Forget(Mobile bot)
+    {
+        if (bot != null)
+        {
+            _aside.Remove(bot.Serial);
+        }
+    }
+
+    public static string DescribeAside() =>
+        $"{AsideTaken}gp taken out of bots and {AsideGiven}gp handed to them by decisions outside their work, left out of what that work came to";
+
+    public static void Reset()
+    {
+        _aside.Clear();
+        AsideTaken = 0;
+        AsideGiven = 0;
+    }
+
     public static double SkillOf(Mobile bot, SkillName? which) =>
         bot == null || which == null ? 0.0 : bot.Skills[which.Value].Base;
 
@@ -153,7 +202,8 @@ public static class BotYield
             Core.TickCount,
             SkillOf(body, deed?.Trains),
             Standing(body),
-            deed?.Made ?? 0
+            deed?.Made ?? 0,
+            AsideOf(body)
         );
     }
 
@@ -173,7 +223,7 @@ public static class BotYield
             minutes = LeastMinutes;
         }
 
-        var coin = body == null ? 0 : Standing(body) - stake.Wealth;
+        var coin = body == null ? 0 : (int)(Standing(body) - stake.Wealth + (AsideOf(body) - stake.Aside));
         var made = Math.Max(0, (deed?.Made ?? 0) - stake.Made);
 
         var skill = 0.0;

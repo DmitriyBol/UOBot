@@ -32,6 +32,8 @@ public sealed class BotWoodsman : IBotProposer
 
     public static long NoAxe { get; private set; }
 
+    public static long TooHeavy { get; private set; }
+
     public static long NoCall { get; private set; }
 
     public static long Stocked { get; private set; }
@@ -54,9 +56,16 @@ public sealed class BotWoodsman : IBotProposer
             return null;
         }
 
-        if (BotTimber.Tool(body) == null || BotTimber.System == null)
+        if (BotTimber.Tool(body, out var heavy) == null || BotTimber.System == null)
         {
-            NoAxe++;
+            if (heavy)
+            {
+                TooHeavy++;
+            }
+            else
+            {
+                NoAxe++;
+            }
 
             return null;
         }
@@ -129,14 +138,15 @@ public sealed class BotWoodsman : IBotProposer
 
     public static string Describe() =>
         Asked == 0
-            ? $"nobody has been offered wood ({NoAxe} answers went to bots with no axe)"
-            : $"{Asked} asked to cut wood: {Sent} sent to a tree, {NoCall} found nobody asking for wood or arrows, {Stocked} were carrying enough already, {NoTree} had no tree within {BotTimber.Reach} tiles ({BotTimber.Townbound} passed over for standing inside a town and {BotTimber.Fenced} on ground that has refused the population); {BotChop.Spoken} trees given up because the engine said they were cut out against {BotChop.Silent} given up by the clock alone, {BotChop.Unreached} for the engine calling every swing out of range; "
+            ? $"nobody has been offered wood ({NoAxe} answers went to bots with no axe, {TooHeavy} to bots whose only axe was too heavy to hold)"
+            : $"{Asked} asked to cut wood ({TooHeavy} not asked for carrying only an axe too heavy to hold):{Sent} sent to a tree, {NoCall} found nobody asking for wood or arrows, {Stocked} were carrying enough already, {NoTree} had no tree within {BotTimber.Reach} tiles ({BotTimber.Townbound} passed over for standing inside a town and {BotTimber.Fenced} on ground that has refused the population); {BotChop.Spoken} trees given up because the engine said they were cut out against {BotChop.Silent} given up by the clock alone, {BotChop.Unreached} for the engine calling every swing out of range; "
               + $"{BotTimber.Ordered} logs went straight into somebody's order and {BotTimber.Listed} onto a stall, above the {BotTimber.Keeps} a cutter that can fletch keeps back";
 
     public static void Forget()
     {
         Asked = 0;
         NoAxe = 0;
+        TooHeavy = 0;
         NoCall = 0;
         Stocked = 0;
         NoTree = 0;

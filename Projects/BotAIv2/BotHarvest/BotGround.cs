@@ -142,6 +142,8 @@ public static class BotGround
 
     public static long Walled { get; private set; }
 
+    public static long Unwalked { get; private set; }
+
     public static bool IsForgeId(int id) => id is 4017 or (>= 6522 and <= 6569) or 11736;
 
     public static bool IsHearthId(int id) => CraftItem.IsHeatSource(id);
@@ -612,7 +614,7 @@ public static class BotGround
         }
     }
 
-    private static bool Told(Mobile body, Point3D except, out BotSeam seam)
+    private static bool Told(IBotWilful bot, Mobile body, Point3D except, out BotSeam seam)
     {
         seam = default;
 
@@ -626,10 +628,42 @@ public static class BotGround
             return false;
         }
 
+        if (last.Seam.Exists
+            && (bot.Resolve?.Ledger?.Cautious(BotDig.Trade, last.Seam.Map, last.Seam.Where) == true || !Free(body, last.Seam.Where)))
+        {
+            _told.Remove(body.Serial);
+            Stale++;
+
+            return false;
+        }
+
         seam = last.Seam;
         Spared++;
 
         return true;
+    }
+
+    public static long Stale { get; private set; }
+
+    private static readonly List<Serial> _untold = [];
+
+    private static void Untell(Point3D where)
+    {
+        foreach (var (serial, told) in _told)
+        {
+            if (told.Seam.Exists && told.Seam.Where == where)
+            {
+                _untold.Add(serial);
+            }
+        }
+
+        for (var i = 0; i < _untold.Count; i++)
+        {
+            _told.Remove(_untold[i]);
+            Stale++;
+        }
+
+        _untold.Clear();
     }
 
     public static BotSeam Seam(IBotWilful bot, Point3D except)
@@ -642,11 +676,32 @@ public static class BotGround
             return default;
         }
 
-        if (Told(body, except, out var lately))
+        if (Told(bot, body, except, out var lately))
         {
             return lately;
         }
 
+        var best = Choose(bot, body, map, except);
+
+        for (var pass = 0; pass < StockPasses && best.Exists && !BotOre.Stocked(map, best.Where); pass++)
+        {
+            Drained(best.Where);
+            Hollow++;
+
+            best = Choose(bot, body, map, except);
+        }
+
+        _told[body.Serial] = (Core.TickCount, except, best);
+
+        return best;
+    }
+
+    public static int StockPasses { get; set; } = 2;
+
+    public static long Hollow { get; private set; }
+
+    private static BotSeam Choose(IBotWilful bot, Mobile body, Map map, Point3D except)
+    {
         var ledger = bot.Resolve?.Ledger;
         var best = default(BotSeam);
         var bestScore = 0.0;
@@ -680,6 +735,13 @@ public static class BotGround
                 continue;
             }
 
+            if (BotRefused.Refusing(map, seam.Where))
+            {
+                Unwalked++;
+
+                continue;
+            }
+
             if (BotReach.Ask(map, body.Location, seam.Where, BotArrival.Within(BotOre.Reach)) == BotReachVerdict.Sealed)
             {
                 Walled++;
@@ -701,8 +763,6 @@ public static class BotGround
             best = seam;
             bestScore = score;
         }
-
-        _told[body.Serial] = (Core.TickCount, except, best);
 
         return best;
     }
@@ -769,13 +829,71 @@ public static class BotGround
     {
         _drained[where] = Core.TickCount;
         Dry++;
+        Untell(where);
     }
 
     public static bool Draining(Point3D where) =>
         _drained.TryGetValue(where, out var when) && Core.TickCount - when < DrainedMs;
 
+    public static int ColdMs { get; set; } = 1200000;
+
+    public static long Cooled { get; private set; }
+
+    private static readonly Dictionary<Point3D, long> _cold = [];
+
+    public static void Cold(Point3D where)
+    {
+        _cold[where] = Core.TickCount;
+        Cooled++;
+    }
+
+    public static bool Cooling(Point3D where) =>
+        _cold.TryGetValue(where, out var when) && Core.TickCount - when < ColdMs;
+
+    public static int UnfitMs { get; set; } = 3600000;
+
+    public static long Unfitted { get; private set; }
+
+    private static readonly Dictionary<Point3D, long> _unfit = [];
+
+    public static void Unfit(Point3D where)
+    {
+        _unfit[where] = Core.TickCount;
+        Unfitted++;
+    }
+
+    public static bool Unfitting(Point3D where) =>
+        _unfit.TryGetValue(where, out var when) && Core.TickCount - when < UnfitMs;
+
+    public static int ShiedLimit { get; set; } = 3;
+
+    public static long Shied { get; private set; }
+
+    private static readonly Dictionary<Point3D, int> _shied = [];
+
+    public static bool Shy(Map map, Point3D where)
+    {
+        _shied.TryGetValue(where, out var times);
+        times++;
+
+        if (times >= ShiedLimit)
+        {
+            _shied.Remove(where);
+
+            return Barren(where);
+        }
+
+        _shied[where] = times;
+        Shied++;
+        BotRefused.Refuse(map, where);
+
+        return false;
+    }
+
     public static bool Barren(Point3D where)
     {
+        _shied.Remove(where);
+
         for (var i = 0; i < _seams.Count; i++)
         {
             if (_seams[i].Where != where)
@@ -786,6 +904,7 @@ public static class BotGround
             _seams.RemoveAt(i);
             _digging.Remove(where);
             Emptied++;
+            Untell(where);
 
             return true;
         }
@@ -904,6 +1023,11 @@ public static class BotGround
                 continue;
             }
 
+            if (choosy && (ReferenceEquals(places, _hearths) && Cooling(where) || ReferenceEquals(places, _fires) && Unfitting(where)))
+            {
+                continue;
+            }
+
             var away = Math.Sqrt(
                 (double)(where.X - from.X) * (where.X - from.X) + (double)(where.Y - from.Y) * (where.Y - from.Y)
             );
@@ -930,16 +1054,24 @@ public static class BotGround
         _digging.Clear();
         _told.Clear();
         _drained.Clear();
+        _cold.Clear();
+        _unfit.Clear();
+        _shied.Clear();
+        Shied = 0;
         Dry = 0;
+        Cooled = 0;
+        Unfitted = 0;
         Spared = 0;
+        Stale = 0;
         Upstairs = 0;
         Unfooted = 0;
         Refused = 0;
         Anyway = 0;
+        Unwalked = 0;
 
         _saidCapped = false;
     }
 
     public static string Describe() =>
-        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_hearths.Count} hearths, {_counters.Count} counters; {Walled} seams passed over with no way through, {Townbound} for being inside the walls, {Emptied} struck off as barren and {Dry} rested after being worked out, {BotMiner.Sent} sent out past the frontier and {Prospected} seams found there over {Fruitless} empty walks, {BotMiner.Burdened} seams not offered to a pack with no room for ore, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {BotDig.Drained} rocks given up with the engine's bank under them empty against {BotDig.Fumbled} still holding ore the miner kept missing and {BotDig.Allowanced} trips that stopped on their own allowance of eight (the miners that gave up on full rock were being given {(BotDig.Fumbled > 0 ? BotDig.FumbledChance / BotDig.Fumbled : 0.0):P0} a swing by the engine, {BotDig.Locked} swings were taken with the pickaxe still locked by the one before, and {BotDig.Stirred} quiet swings were taken by a bot that had moved since the last one, {BotDig.Adrift} swings the engine cancelled for that and {BotDig.Laden} whose ore was lost to a full pack), {Spared} asks answered out of the last scan, {Unfooted} workshops never filed for having no floor at them, {Upstairs} passed over for standing on another floor and {Refused} for ground that has refused the population ({Anyway} choices then had to be made with the resting rule off, or there would have been nowhere at all), patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y}); {BotHeard.Describe()}";
+        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_hearths.Count} hearths, {_counters.Count} counters; {Walled} seams passed over with no way through, {Unwalked} for standing on ground that had lately refused somebody, {Townbound} for being inside the walls, {Emptied} struck off as barren, {Shied} left on the board because the walk gave up far short of them, and {Dry} rested after being worked out ({Hollow} of them found so as they were about to be chosen, before anybody walked there),{Cooled} hearths rested after a cook stood beside one and found it cold, {Unfitted} forges rested after a smith stood at one and the engine accepted no anvil, {BotMiner.Sent} sent out past the frontier and {Prospected} seams found there over {Fruitless} empty walks, {BotMiner.Burdened} seams not offered to a pack with no room for ore, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {BotDig.FarSide} rocks found only by looking again from the middle of a seam, {BotDig.Repicked} trips sent on to another seam because another miner already held theirs and {BotDig.Beaten} given up for finding no other free, {BotDig.WorkedOut} rested rather than struck off because every rock in reach was there and worked out,{BotDig.Drained} rocks given up with the engine's bank under them empty against {BotDig.Fumbled} still holding ore the miner kept missing and {BotDig.Allowanced} trips that stopped on their own allowance of eight (the miners that gave up on full rock were being given {(BotDig.Fumbled > 0 ? BotDig.FumbledChance / BotDig.Fumbled : 0.0):P0} a swing by the engine, {BotDig.Locked} swings were taken with the pickaxe still locked by the one before, and {BotDig.Stirred} quiet swings were taken by a bot that had moved since the last one, {BotDig.Adrift} swings the engine cancelled for that and {BotDig.Laden} whose ore was lost to a full pack), {Spared} asks answered out of the last scan and {Stale} answers taken back out of it for a seam gone or feared since, {Unfooted} workshops never filed for having no floor at them, {Upstairs} passed over for standing on another floor and {Refused} for ground that has refused the population ({Anyway} choices then had to be made with the resting rule off, or there would have been nowhere at all), patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y}); {BotHeard.Describe()}";
 }

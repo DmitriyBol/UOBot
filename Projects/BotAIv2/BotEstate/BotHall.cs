@@ -121,13 +121,13 @@ public sealed class BotHall : BotDeed
 
         var paid = new List<BotEstate.Contribution>();
         var mine = BotYield.Wealth(body);
-        var got = BotEstate.Levy(_guild, BotEstate.Price, paid);
+        var got = BotEstate.Levy(_guild, BotEstate.Price, paid, body);
 
         _mine += System.Math.Max(0, mine - BotYield.Wealth(body));
 
         if (got < BotEstate.Price)
         {
-            BotEstate.Refund(paid);
+            BotEstate.Refund(paid, body);
             BotEstate.Lost();
 
             return BotDoing.Failed($"{_guild.Name} could only raise {got} of {BotEstate.Price}gp");
@@ -139,7 +139,7 @@ public sealed class BotHall : BotDeed
 
         if (house.Deleted)
         {
-            BotEstate.Refund(paid);
+            BotEstate.Refund(paid, body);
             BotEstate.Lost();
 
             return BotDoing.Failed("the house would not be built");

@@ -49,6 +49,8 @@ public static class BotOllama
 
     public static int MostInFlight { get; set; } = 1;
 
+    public static int ThinkingMostTokens { get; set; } = 4500;
+
     private static readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
 
     private static int _inFlight;
@@ -219,6 +221,12 @@ public static class BotOllama
 
             writer.WriteNumber("temperature", 0.4);
             writer.WriteNumber("num_ctx", 8192);
+
+            if (think && ThinkingMostTokens > 0)
+            {
+                writer.WriteNumber("num_predict", ThinkingMostTokens);
+            }
+
             writer.WriteEndObject();
 
             writer.WriteEndObject();

@@ -57,7 +57,13 @@ public static class BotStores
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStores));
 
-    public static int Reserve { get; set; } = 150;
+    public static int Reserve
+    {
+        get => _reserve ?? BotPurse.KeepBack;
+        set => _reserve = value;
+    }
+
+    private static int? _reserve;
 
     public static int Enough { get; set; } = 20;
 

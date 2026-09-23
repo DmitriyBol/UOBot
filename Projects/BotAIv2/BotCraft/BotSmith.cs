@@ -203,7 +203,7 @@ public sealed class BotSmith : IBotProposer
         Asked == 0
             ? "nobody with a hammer has been asked to forge"
             : $"{Asked} asked: {ToOrder} took an order off the board, {ShortOfMetal} passed one over for want of iron, {OnSpec} forged on spec, "
-              + $"{NoMetal} short of metal ({Fetched} ingots fetched back off their own stalls to stop being it), {NothingAffordable} with metal but not enough for any recipe they can work, {NoForge} with no forge in reach; the board's metal reads {BotAnvil.Reading}, so an empty smith orders {BotAnvil.Metal.Name}; "
+              + $"{NoMetal} short of metal ({Fetched} ingots fetched back off their own stalls to stop being it), {NothingAffordable} with metal but not enough for any recipe they can work, {NoForge} with no forge in reach; {BotCraftwork.Unlikely} recipes passed over across the crafts for less than {BotCraftwork.LeastChance:P0} of making them; the board's metal reads {BotAnvil.Reading}, so an empty smith orders {BotAnvil.Metal.Name}; "
               + $"{BotForge.Describe()}";
 
     public static void Forget()

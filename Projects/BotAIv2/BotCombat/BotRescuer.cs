@@ -92,7 +92,11 @@ public sealed class BotRescuer : IBotProposer
         logger.Information("{Name} is the first to go to somebody's aid: {Friend} called", body.Name, friend.Name);
     }
 
-    public static void Forget() => _said = false;
+    public static void Forget()
+    {
+        _said = false;
+        BotDefender.Forget();
+    }
 }
 
 /// <summary>
@@ -120,6 +124,22 @@ public sealed class BotDefender : IBotProposer
 
     public BotStanding Rung => BotStanding.Hunted;
 
+    public static long Already { get; private set; }
+
+    public static long Outnumbered { get; private set; }
+
+    public static long Leading { get; private set; }
+
+    public static long Assailed { get; private set; }
+
+    public static void Forget()
+    {
+        Already = 0;
+        Outnumbered = 0;
+        Leading = 0;
+        Assailed = 0;
+    }
+
     public BotDeed Propose(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -130,10 +150,42 @@ public sealed class BotDefender : IBotProposer
             return null;
         }
 
+        var assailant = BotOutlaw.Assailant(body, Reach);
+
+        if (assailant != null && bot.Resolve?.Deed is not BotBrawl)
+        {
+            if (body.HitsMax > 0 && body.Hits < body.HitsMax * BotSlay.FleeAt)
+            {
+                return null;
+            }
+
+            Assailed++;
+
+            var against = bot.Bond?.Weapon?.Skill ?? SkillName.Wrestling;
+
+            return new BotBrawl(
+                assailant,
+                BotBrawl.Defence,
+                against,
+                (b, w) => assailant is not { Deleted: false, Alive: true }
+                    ? $"{assailant?.Name} is down"
+                    : !BotOutlaw.Assailing(assailant, b?.Self) && w.Elapsed > 15000
+                        ? $"{assailant.Name} broke off"
+                        : null
+            );
+        }
+
         var foe = BotThreat.Hunter(body, Reach);
 
         if (foe == null)
         {
+            return null;
+        }
+
+        if (bot is IBotSquadMember { Squad: { } company } member && ReferenceEquals(company.Leader, member))
+        {
+            Leading++;
+
             return null;
         }
 
@@ -151,7 +203,23 @@ public sealed class BotDefender : IBotProposer
             return null;
         }
 
+        if (BotThreat.Decide(body, BotMobile.NoticeRange) == BotStand.Outmatched)
+        {
+            BotQuarry.Crowd(foe);
+            Outnumbered++;
+            BotCry.Raise(body, foe);
+
+            return null;
+        }
+
         BotCry.Raise(body, foe);
+
+        if (ReferenceEquals(bot.Resolve?.Deed?.Foe, foe))
+        {
+            Already++;
+
+            return null;
+        }
 
         var trains = bot.Bond?.Weapon?.Skill ?? SkillName.Wrestling;
 

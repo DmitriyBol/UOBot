@@ -34,7 +34,7 @@ public static class BotSchool
 
     public static int Rank { get; set; } = 3;
 
-    public static int Most { get; set; } = 6;
+    public static int Most { get; set; } = 10;
 
     public static int GatherMs { get; set; } = 90000;
 
@@ -58,7 +58,7 @@ public static class BotSchool
 
     public static double MagicFee { get; set; } = 1.5;
 
-    public static int RestMs { get; set; } = 1200000;
+    public static int RestMs { get; set; } = 720000;
 
     private static readonly Dictionary<Serial, long> _taught = [];
 
@@ -107,6 +107,47 @@ public static class BotSchool
         Gathering && _everOpened ? Math.Max(0, GatherMs - (int)(Core.TickCount - _openedTick)) : 0;
 
     private static readonly List<BotMobile> _students = [];
+
+    private static readonly Dictionary<Serial, long> _coming = [];
+
+    public static int PromiseMs { get; set; } = 30000;
+
+    public static void Promise(BotMobile student)
+    {
+        if (student != null && Gathering && !_students.Contains(student))
+        {
+            _coming[student.Serial] = Core.TickCount;
+        }
+    }
+
+    public static int Coming(BotMobile except)
+    {
+        var count = 0;
+        var now = Core.TickCount;
+
+        _lapsed.Clear();
+
+        foreach (var (serial, tick) in _coming)
+        {
+            if (now - tick >= PromiseMs)
+            {
+                _lapsed.Add(serial);
+            }
+            else if (except == null || serial != except.Serial)
+            {
+                count++;
+            }
+        }
+
+        for (var i = 0; i < _lapsed.Count; i++)
+        {
+            _coming.Remove(_lapsed[i]);
+        }
+
+        return count;
+    }
+
+    private static readonly List<Serial> _lapsed = [];
 
     public static IReadOnlyList<BotMobile> Students => _students;
 
@@ -169,6 +210,7 @@ public static class BotSchool
         _openedTick = Core.TickCount;
         _everOpened = true;
         _students.Clear();
+        _coming.Clear();
 
         Sessions++;
 
@@ -197,6 +239,7 @@ public static class BotSchool
         Master = null;
         Gathering = false;
         _students.Clear();
+        _coming.Clear();
     }
 
     public static bool Teachable(BotMobile student) => Teachable(Master, student);
@@ -304,13 +347,23 @@ public static class BotSchool
         }
 
         _students.Add(student);
+        _coming.Remove(student.Serial);
 
         _students.Sort(static (a, b) => a.Serial.Value.CompareTo(b.Serial.Value));
 
         return true;
     }
 
-    public static void Leave(BotMobile student) => _students.Remove(student);
+    public static void Leave(BotMobile student)
+    {
+        if (student == null)
+        {
+            return;
+        }
+
+        _students.Remove(student);
+        _coming.Remove(student.Serial);
+    }
 
     public static bool Holds(BotMobile student) => _students.Contains(student);
 

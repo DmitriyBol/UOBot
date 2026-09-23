@@ -45,6 +45,8 @@ public sealed class BotScoutmaster : IBotProposer
 
     public static long Charted { get; private set; }
 
+    public static long Resurveyed { get; private set; }
+
     public static long Sealed { get; private set; }
 
     public static long TooFewNear { get; private set; }
@@ -108,6 +110,13 @@ public sealed class BotScoutmaster : IBotProposer
         }
 
         var where = Unknown(map, body.Location, BotScout.Range);
+        var again = false;
+
+        if (where == Point3D.Zero)
+        {
+            where = BotQuad.Stalest(map, body.Location, BotScout.Range, at => Reachable(map, body.Location, at));
+            again = where != Point3D.Zero;
+        }
 
         if (where == Point3D.Zero)
         {
@@ -142,11 +151,16 @@ public sealed class BotScoutmaster : IBotProposer
 
         Offered++;
 
+        if (again)
+        {
+            Resurveyed++;
+        }
+
         return new BotScout(map, where);
     }
 
     private static Point3D Unknown(Map map, Point3D from, int within) =>
-        BotQuad.Frontier(map, from, within, at => Reachable(map, from, at));
+        BotQuad.Frontier(map, from, within, at => BotScout.Roadworthy(map, at) && Reachable(map, from, at));
 
     private static bool Reachable(Map map, Point3D from, Point3D at)
     {
@@ -186,7 +200,7 @@ public sealed class BotScoutmaster : IBotProposer
             ? $"no captain has ever been offered a scouting party ({NotACaptain} answers went to bots that are not captains)"
             : $"{Asked} times a captain was asked to scout: {Offered} were offered unknown ground, {Held} were already in a company, "
               + $"{Unfit} were too hurt, {Poor} could not pay {BotScout.Wage}gp and keep {BotScout.Solvent} (the fattest purse among them held {Richest}gp), "
-              + $"{Charted} found everything within {BotScout.Range} tiles already walked, {Sealed} found no way through to it and were struck off the frontier, {Cramped} could not be looked at for want of clock, "
+              + $"{Charted} found everything within {BotScout.Range} tiles already walked and counted lately, {Resurveyed} were sent back to ground uncounted for {BotQuad.StaleMs / 3600000} hours, {Sealed} found no way through to it and were struck off the frontier, {Cramped} could not be looked at for want of clock, "
               + $"{TooFewNear} had too few free bots near; {BotScout.Describe()}";
 
     public static void Forget()
@@ -198,6 +212,7 @@ public sealed class BotScoutmaster : IBotProposer
         Poor = 0;
         Richest = 0;
         Charted = 0;
+        Resurveyed = 0;
         Sealed = 0;
         Cramped = 0;
         TooFewNear = 0;

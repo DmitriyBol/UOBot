@@ -115,7 +115,7 @@ public static class BotSquads
     {
         var bound = Bound;
 
-        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {Rescues} times one of them was set upon ({Friendly} more by a bot of a guild not at war with it, passed over as friendly fire, {Inside} from inside the company itself, {Enemies} bots refused a place for being at war with the leader), {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing, {Rebuffs} times one of them was handed back something it had already given up on, {BotSquad.Unowned} charges taken back because the errand holding them had ended; {BotSquad.Blinded} beats stood near enough to fight with no line to the thing, {BotSquad.Refused} refused the blow by the engine and {BotSquad.Unsteadied} were shooters that had moved too recently to fire, {BotSquad.Blindfights} fights given up because nobody could land one at all, {BotFormation.Unanchored} stations answered with standing fast because nothing round the enemy could be walked to, {BotSquad.Conjured} spells thrown by the back ranks and {BotSquad.Mended} heals landed by their medics, against {BotSquad.Dry} beats with nothing they could pay for; {BotSpoils.Describe()}";
+        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {BotSquad.Sundered} stations withheld for lying across a dungeon's edge from the member, {Rescues} times one of them was set upon ({Friendly} more by a bot of a guild not at war with it, passed over as friendly fire, {Inside} from inside the company itself, {Enemies} bots refused a place for being at war with the leader, {Distant} for standing more than {JoinReach} tiles from it), {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing, {Rebuffs} times one of them was handed back something it had already given up on, {BotSquad.Unowned} charges taken back because the errand holding them had ended; {BotSquad.Blinded} beats stood near enough to fight with no line to the thing, {BotSquad.Refused} refused the blow by the engine and {BotSquad.Unsteadied} were shooters that had moved too recently to fire, {BotSquad.Blindfights} fights given up because nobody could land one at all, {BotFormation.Unanchored} stations answered with standing fast because nothing round the enemy could be walked to, {BotSquad.Conjured} spells thrown by the back ranks and {BotSquad.Mended} heals landed by their medics, against {BotSquad.Dry} beats with nothing they could pay for; {BotSpoils.Describe()}";
     }
 
     public static BotSquad Form(IBotSquadMember leader)
@@ -164,6 +164,13 @@ public static class BotSquads
 
         if (member.Squad != null || squad.Count >= squad.Ceiling || squad.Map != member.Self.Map)
         {
+            return false;
+        }
+
+        if (!Reaches(squad, member.Self))
+        {
+            Distant++;
+
             return false;
         }
 
@@ -237,6 +244,13 @@ public static class BotSquads
 
     public static long Rebuffs { get; private set; }
 
+    public static int JoinReach { get; set; } = 400;
+
+    public static long Distant { get; private set; }
+
+    public static bool Reaches(BotSquad squad, Mobile body) =>
+        body != null && (squad?.Leader?.Self is not Mobile head || body.InRange(head.Location, JoinReach));
+
     public static long Friendly { get; private set; }
 
     public static int Reach { get; set; } = 12;
@@ -304,13 +318,23 @@ public static class BotSquads
             logger.Information("Companies: {Standing}; {Muster}; {Enlist}", Describe(), BotMuster.Describe(), BotEnlister.Describe());
 
             logger.Information(
-                "Arms: {Cries}; {Hands}; {Scrolls}; {Mending}; {Standing}",
+                "Arms: {Cries}; {Hands}; {Scrolls}; {Mending}; {Salve}; {Standing}; {Hire}; {Flight}; {Brawls}; {Outlaws}; {Robbers}; {Patrols}; {Assailed} times a bot set upon by a red hit back",
                 BotCry.Describe(),
                 BotArms.Describe(),
                 BotArmoury.Describe(),
                 BotMedic.Describe(),
-                BotAttendant.Describe()
+                BotSalve.Describe() + ", " + BotSurgeon.Describe() + "; " + BotMend.Describe(),
+                BotAttendant.Describe() + "; " + BotHouseCalls.Describe(),
+                BotRetainer.Describe(),
+                BotFugitive.Describe(),
+                BotBrawl.Describe(),
+                BotOutlaw.Describe(),
+                BotRobber.Describe(),
+                BotManhunt.Describe(),
+                BotDefender.Assailed
             );
+
+            logger.Information("Underworld: {Underworld}", BotUnderworld.Describe());
 
             logger.Information("Bows: {Kites}", BotSlay.Bows());
 

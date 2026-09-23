@@ -104,6 +104,19 @@ public static class BotDungeon
 
     public static IReadOnlyList<Deep> All => _deeps;
 
+    public static bool Under(Point3D where)
+    {
+        for (var i = 0; i < _deeps.Length; i++)
+        {
+            if (_deeps[i].Holds(where))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static bool Surveyed { get; private set; }
 
     public static int Rooms { get; private set; }

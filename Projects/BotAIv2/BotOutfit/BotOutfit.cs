@@ -76,11 +76,74 @@ public static class BotOutfit
             return;
         }
 
-        var chosen = options[Utility.Random(options.Count)];
+        var start = Utility.Random(options.Count);
+        var chosen = options[start];
+        Item weapon = null;
+        Item lightest = null;
+        var lightestOption = chosen;
+        var least = int.MaxValue;
+
+        for (var i = 0; i < options.Count; i++)
+        {
+            var option = options[(start + i) % options.Count];
+            var made = BotBinding.Make(option.Weapon, 1);
+
+            if (made == null)
+            {
+                continue;
+            }
+
+            var need = made is BaseWeapon arm ? arm.StrRequirement : 0;
+
+            if (bot.Str >= need)
+            {
+                weapon = made;
+                chosen = option;
+
+                if (i > 0)
+                {
+                    Refitted++;
+                }
+
+                break;
+            }
+
+            if (need < least)
+            {
+                lightest?.Delete();
+                lightest = made;
+                lightestOption = option;
+                least = need;
+            }
+            else
+            {
+                made.Delete();
+            }
+        }
+
+        if (weapon == null)
+        {
+            if (lightest == null)
+            {
+                return;
+            }
+
+            weapon = lightest;
+            chosen = lightestOption;
+            lightest = null;
+            Overborn++;
+
+            if (bot.RawStr < least)
+            {
+                bot.RawStr = least;
+            }
+        }
+
+        lightest?.Delete();
 
         bond.Weapon = chosen;
 
-        Hand(bot, BotBinding.Make(chosen.Weapon, 1), bond, pack: false);
+        Hand(bot, weapon, bond, pack: false);
 
         if (chosen.Ammunition == null || chosen.AmmunitionCount <= 0)
         {
@@ -323,8 +386,14 @@ public static class BotOutfit
     {
         Outfitted = 0;
         Bound = 0;
+        Refitted = 0;
+        Overborn = 0;
     }
 
     public static string Describe() =>
-        $"{Outfitted} bots outfitted, {Bound} things bound to their owners";
+        $"{Outfitted} bots outfitted, {Bound} things bound to their owners, {Refitted} born to a lighter weapon than the roll for want of strength, {Overborn} given the strength for the lightest";
+
+    public static long Refitted { get; private set; }
+
+    public static long Overborn { get; private set; }
 }

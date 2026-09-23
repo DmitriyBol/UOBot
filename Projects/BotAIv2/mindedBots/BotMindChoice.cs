@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
+using Server.BotAI.V2;
 
 namespace Server.BotAI.Mind;
 
@@ -40,7 +41,13 @@ public sealed class BotMindChoice
 
     public string Recruit { get; init; }
 
-    public static string Schema(IReadOnlyList<string> trades, IReadOnlyList<string> ours = null, IReadOnlyList<string> theirs = null)
+    public string Take { get; init; }
+
+    public string Want { get; init; }
+
+    public int WantAmount { get; init; }
+
+    public static string Schema(IReadOnlyList<string> trades, IReadOnlyList<string> ours = null, IReadOnlyList<string> theirs = null, IReadOnlyList<string> orders = null, IReadOnlyList<string> band = null)
     {
         var buffer = new System.IO.MemoryStream();
 
@@ -79,6 +86,8 @@ public sealed class BotMindChoice
             writer.WriteString("type", "string");
             writer.WriteEndObject();
 
+            var named = band ?? trades;
+
             for (var g = 0; g < 2; g++)
             {
                 writer.WriteStartObject(g == 0 ? "gather" : "make");
@@ -86,9 +95,9 @@ public sealed class BotMindChoice
                 writer.WriteStartArray("enum");
                 writer.WriteStringValue("none");
 
-                for (var i = 0; i < trades.Count; i++)
+                for (var i = 0; i < named.Count; i++)
                 {
-                    writer.WriteStringValue(trades[i]);
+                    writer.WriteStringValue(named[i]);
                 }
 
                 writer.WriteEndArray();
@@ -105,6 +114,13 @@ public sealed class BotMindChoice
 
             Names(writer, "expel", ours);
             Names(writer, "recruit", theirs);
+
+            Names(writer, "take", orders);
+            Names(writer, "want", BotCharter.Materials);
+
+            writer.WriteStartObject("wantamount");
+            writer.WriteString("type", "number");
+            writer.WriteEndObject();
 
             writer.WriteEndObject();
 
@@ -201,7 +217,10 @@ public sealed class BotMindChoice
                 MarchX = Whole(root, "marchx"),
                 MarchY = Whole(root, "marchy"),
                 Expel = Order(root, "expel"),
-                Recruit = Order(root, "recruit")
+                Recruit = Order(root, "recruit"),
+                Take = Order(root, "take"),
+                Want = Order(root, "want"),
+                WantAmount = Whole(root, "wantamount")
             };
         }
         catch (Exception)

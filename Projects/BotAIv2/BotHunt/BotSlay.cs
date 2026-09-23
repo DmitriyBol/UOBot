@@ -48,7 +48,13 @@ public sealed class BotSlay : BotDeed
 
     public static long Slipped { get; private set; }
 
+    public static long Begun { get; private set; }
+
+    public static long Undaring { get; private set; }
+
     private Point3D _began;
+
+    private int _outward;
 
     private bool _begun;
 
@@ -143,6 +149,10 @@ public sealed class BotSlay : BotDeed
 
     public override string Kind => Trade;
 
+    public override bool Braves => true;
+
+    public override Mobile Foe => _quarry;
+
     public override Map Map => _map;
 
     public override Point3D Where => _found;
@@ -212,16 +222,25 @@ public sealed class BotSlay : BotDeed
         {
             _begun = true;
             _began = body.Location;
+            _outward = Math.Max(Math.Abs(_found.X - _began.X), Math.Abs(_found.Y - _began.Y));
+            Begun++;
+
+            var asked = BotQuad.Muscle(_map, _found);
+
+            if (asked > 0.0 && asked > BotQuad.Strength(body))
+            {
+                Undaring++;
+            }
         }
 
         var drawn = Math.Max(Math.Abs(body.X - _began.X), Math.Abs(body.Y - _began.Y));
 
-        if (drawn > Leash)
+        if (drawn > Leash + _outward)
         {
             BotQuarry.Crowd(_quarry);
             Slipped++;
 
-            return BotDoing.Failed($"{_quarry.Name} drew it {drawn} tiles and was let go");
+            return BotDoing.Failed($"{_quarry.Name} drew it {drawn - _outward} tiles past where it was found and was let go");
         }
 
         _fell = _quarry.Location;
@@ -654,6 +673,8 @@ public sealed class BotSlay : BotDeed
 
             taken++;
 
+            BotTidy.Appraise(body, item, from is Corpse ? "off a corpse" : "as it took it");
+
             if (item.GetType() == bot.Bond?.Weapon?.Ammunition)
             {
                 continue;
@@ -696,6 +717,7 @@ public sealed class BotSlay : BotDeed
         {
             closer.Draw(melee: false);
         }
+
     }
 
     public static long Asked { get; private set; }

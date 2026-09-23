@@ -45,6 +45,8 @@ public enum BotSquadStance
 /// </summary>
 public sealed class BotSquad
 {
+    public static long Sundered { get; private set; }
+
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSquad));
 
     public static int NoProgressMs => SlowestBlowMs * Blows;
@@ -1029,6 +1031,13 @@ public sealed class BotSquad
 
             if (where == Point3D.Zero)
             {
+                continue;
+            }
+
+            if (member.Self is { } self && BotDungeon.Under(self.Location) != BotDungeon.Under(where))
+            {
+                Sundered++;
+
                 continue;
             }
 

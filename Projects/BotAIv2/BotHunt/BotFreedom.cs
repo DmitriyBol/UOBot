@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Server.Mobiles;
 
 namespace Server.BotAI.V2;
@@ -60,7 +61,7 @@ public sealed class BotFreedom : BotDeed
         }
     }
 
-    public static long Taken { get; private set; }
+    public static long Uncaged { get; private set; }
 
     public static long Freed { get; private set; }
 
@@ -80,6 +81,10 @@ public sealed class BotFreedom : BotDeed
 
     private bool _delivered;
 
+    public static int ClaimMs { get; set; } = 90000;
+
+    private static readonly Dictionary<Serial, (Serial By, long Tick)> _claims = [];
+
     public BotFreedom(Map map, BaseEscortable prisoner)
     {
         _map = map;
@@ -88,6 +93,46 @@ public sealed class BotFreedom : BotDeed
     }
 
     public override string Kind => Trade;
+
+    public override void Taken(IBotWilful bot)
+    {
+        if (bot?.Self is { } body && _prisoner != null)
+        {
+            _claims[_prisoner.Serial] = (body.Serial, Core.TickCount);
+        }
+    }
+
+    public override void Drop(IBotWilful bot)
+    {
+        base.Drop(bot);
+
+        Release(bot?.Self, _prisoner);
+    }
+
+    public static bool Claimed(Mobile body, BaseEscortable prisoner)
+    {
+        if (body == null || prisoner == null || !_claims.TryGetValue(prisoner.Serial, out var claim))
+        {
+            return false;
+        }
+
+        if (Core.TickCount - claim.Tick >= ClaimMs)
+        {
+            _claims.Remove(prisoner.Serial);
+
+            return false;
+        }
+
+        return claim.By != body.Serial;
+    }
+
+    private static void Release(Mobile body, BaseEscortable prisoner)
+    {
+        if (body != null && prisoner != null && _claims.TryGetValue(prisoner.Serial, out var claim) && claim.By == body.Serial)
+        {
+            _claims.Remove(prisoner.Serial);
+        }
+    }
 
     public override bool Summons => true;
 
@@ -121,6 +166,8 @@ public sealed class BotFreedom : BotDeed
 
         if (_prisoner == null || _prisoner.Deleted)
         {
+            Release(body, _prisoner);
+
             if (_taken)
             {
                 _delivered = true;
@@ -154,18 +201,28 @@ public sealed class BotFreedom : BotDeed
             if (!_prisoner.AcceptEscorter(body))
             {
                 Refused++;
+                Release(body, _prisoner);
 
                 return BotDoing.Failed("it would not come");
             }
 
             _taken = true;
-            Taken++;
+            Uncaged++;
 
             return BotDoing.Work("freeing it");
         }
 
         if (_prisoner.GetEscorter() != body)
         {
+            if (_prisoner.GetDestination() == null)
+            {
+                Release(body, _prisoner);
+                _delivered = true;
+                Freed++;
+
+                return BotDoing.Done("delivered, and paid for it");
+            }
+
             Lost++;
 
             return BotDoing.Failed("it is no longer following");
@@ -190,8 +247,10 @@ public sealed class BotFreedom : BotDeed
         return region == null ? Point3D.Zero : region.GoLocation;
     }
 
-    public static BaseEscortable Nearest(Mobile body, int range)
+    public static BaseEscortable Nearest(Mobile body, int range, out bool spoken)
     {
+        spoken = false;
+
         var map = body?.Map;
 
         if (map == null || map == Map.Internal)
@@ -206,6 +265,13 @@ public sealed class BotFreedom : BotDeed
         {
             if (near.Deleted || !near.Alive || !near.IsPrisoner || !near.CantWalk)
             {
+                continue;
+            }
+
+            if (Claimed(body, near))
+            {
+                spoken = true;
+
                 continue;
             }
 
@@ -239,7 +305,8 @@ public sealed class BotFreedom : BotDeed
 
     public static void Forget()
     {
-        Taken = 0;
+        _claims.Clear();
+        Uncaged = 0;
         Freed = 0;
         Refused = 0;
         Lost = 0;
@@ -247,7 +314,7 @@ public sealed class BotFreedom : BotDeed
     }
 
     public static string Describe() =>
-        $"{Taken} prisoners taken out of cages and {Freed} walked home, {Lost} lost on the way, "
+        $"{Uncaged} prisoners taken out of cages and {Freed} walked home, {Lost} lost on the way, "
         + $"{Refused} refused by the engine, {TooFar} passed over for living further than {Roam} tiles from {Town}";
 }
 
@@ -273,6 +340,8 @@ public sealed class BotLiberator : IBotProposer
 
     public static long Offered { get; private set; }
 
+    public static long Spoken { get; private set; }
+
     public BotDeed Propose(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -292,11 +361,18 @@ public sealed class BotLiberator : IBotProposer
             return null;
         }
 
-        var prisoner = BotFreedom.Nearest(body, BotFreedom.Reach);
+        var prisoner = BotFreedom.Nearest(body, BotFreedom.Reach, out var spoken);
 
         if (prisoner == null)
         {
-            None++;
+            if (spoken)
+            {
+                Spoken++;
+            }
+            else
+            {
+                None++;
+            }
 
             return null;
         }
@@ -307,7 +383,7 @@ public sealed class BotLiberator : IBotProposer
     }
 
     public static string Describe() =>
-        $"{Asked} asked to walk somebody home: {Offered} sent to a cage, {None} heard nobody, {Soon} had listened too recently";
+        $"{Asked} asked to walk somebody home: {Offered} sent to a cage, {None} heard nobody, {Spoken} heard only prisoners another bot had set out for, {Soon} had listened too recently";
 
     public static void Reset()
     {
@@ -315,5 +391,6 @@ public sealed class BotLiberator : IBotProposer
         Soon = 0;
         None = 0;
         Offered = 0;
+        Spoken = 0;
     }
 }

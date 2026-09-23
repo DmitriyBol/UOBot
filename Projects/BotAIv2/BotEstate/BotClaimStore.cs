@@ -6,7 +6,7 @@ namespace Server.BotAI.V2;
 /// Keeps who owns which square of the island across restarts.
 ///
 /// <para>
-/// <b>Patrick's order of 10.09.2026: "притязания надо записывать, ибо за них боты платят".</b> Every other
+/// <b>Patrick's order of 10.09.2026: "claims must be written down, because the bots pay for them".</b> Every other
 /// board on this shard is cleared on a world reload and that is right — a market stall, a want, an errand
 /// and a squad are all about a moment. Ground is not. A guild spends four free claims and then five thousand
 /// gold a square, stands three of its members in a field for five minutes to earn each one, and until this

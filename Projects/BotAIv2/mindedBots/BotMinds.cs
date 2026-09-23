@@ -57,7 +57,7 @@ public static class BotMinds
 
     public static string BaronName { get; set; } = "Baldric";
 
-    public static string[] CrafterNames { get; set; } = ["Roderic", "Emeric", "Ulric", "Wulfric", "Alaric"];
+    public static string[] CrafterNames { get; set; } = [];
 
     public static bool Running => _timer != null;
 
@@ -334,7 +334,7 @@ public static class BotMinds
         {
             _saidTick = Core.TickCount;
 
-            logger.Information("Minds: {What}", $"{Describe()}; {BotOllama.Describe()}; {BotMindTalk.Lines} lines said between them; the state they read last ran to {BotMindSight.LastChars} characters");
+            logger.Information("Minds: {What}", $"{Describe()}; {BotWill.MindsMet()}; {BotOllama.Describe()}; {BotMindTalk.Lines} lines said between them; {BotMindClaims.Describe()}; the state they read last ran to {BotMindSight.LastChars} characters");
         }
 
         if (_trades.Count == 0)

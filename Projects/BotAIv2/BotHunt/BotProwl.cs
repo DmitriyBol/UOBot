@@ -42,13 +42,73 @@ public sealed class BotProwl : BotDeed
 
     public static long Baulked { get; private set; }
 
+    public static bool ByRoad { get; set; } = true;
+
+    public static long RoadKept { get; private set; }
+
+    public static int Redarts { get; set; } = 1;
+
+    public static int RedartReach { get; set; } = 40;
+
+    public static int RedartSamples { get; set; } = 8;
+
+    public static int RedartVets { get; set; } = 2;
+
+    public static double RedartVetMs { get; set; } = 300.0;
+
+    public static long Redarted { get; private set; }
+
+    public static long Unredarted { get; private set; }
+
+    public static long Turned { get; private set; }
+
+    public static long Unturned { get; private set; }
+
     private readonly Map _map;
 
-    private readonly Point3D _where;
+    private Point3D _where;
+
+    private int _redarts;
+
+    private static readonly List<Point3D> _candidates = [];
 
     private int _nearest = int.MaxValue;
 
+    private int _plans = -1;
+
+    private int _planLeast = int.MaxValue;
+
+    private bool Along(Mobile body)
+    {
+        if (!ByRoad || body is not BotMobile { Journey: { Current: { } errand } journey } || errand.Follow != null
+            || errand.Where.X != _where.X || errand.Where.Y != _where.Y || journey.Remaining <= 0)
+        {
+            return false;
+        }
+
+        if (journey.Plans != _plans)
+        {
+            _plans = journey.Plans;
+            _planLeast = journey.Remaining;
+
+            return false;
+        }
+
+        if (journey.Remaining >= _planLeast)
+        {
+            return false;
+        }
+
+        _planLeast = journey.Remaining;
+
+        return true;
+    }
+
     private int _stalled;
+
+    private Point3D _setOut;
+
+    private static readonly List<Mobile> _recruits = [];
 
     public BotProwl(Map map, Point3D where) : this(map, where, false)
     {
@@ -91,6 +151,10 @@ public sealed class BotProwl : BotDeed
     private static void Claim(Map map, Point3D where) => _raising[BotQuad.Key(map, where)] = Core.TickCount;
 
     public override string Kind => Trade;
+
+    public override bool Braves => true;
+
+    public override bool Guess => true;
 
     public override Map Map => _map;
 
@@ -142,15 +206,22 @@ public sealed class BotProwl : BotDeed
 
                 if (squad != null)
                 {
+                    _recruits.Clear();
+
                     foreach (var mobile in _map.GetMobilesInRange<Mobile>(body.Location, BotMuster.Reach))
                     {
-                        if (squad.Count >= squad.Ceiling)
+                        if (mobile != body && mobile is IBotSquadMember { Squad: null } && mobile is IBotAlly { AbleToFight: true }
+                            && mobile is { Deleted: false, Alive: true })
                         {
-                            break;
+                            _recruits.Add(mobile);
                         }
+                    }
 
-                        if (mobile != body && mobile is IBotSquadMember { Squad: null } other
-                            && mobile is IBotAlly { AbleToFight: true })
+                    _recruits.Sort((a, b) => BotThreat.Power(b).CompareTo(BotThreat.Power(a)));
+
+                    for (var i = 0; i < _recruits.Count && squad.Count < squad.Ceiling; i++)
+                    {
+                        if (_recruits[i] is IBotSquadMember other)
                         {
                             BotSquads.Join(squad, other);
                         }
@@ -165,7 +236,9 @@ public sealed class BotProwl : BotDeed
             {
                 Unraised++;
 
-                return BotDoing.Failed($"could not raise enough strength for ({_where.X}, {_where.Y})");
+                return BotDoing.Failed(
+                    $"could not raise enough strength for ({_where.X}, {_where.Y}): {BotQuad.Strength(body):F0} of the {BotQuad.Muscle(_map, _where):F0} it asks, gathered at ({body.X}, {body.Y})"
+                );
             }
 
             Raised++;
@@ -195,14 +268,23 @@ public sealed class BotProwl : BotDeed
 
         if (body.InRange(_where, ArriveWithin))
         {
+            BotHunter.FoundEmpty(body, _where);
+
             return BotDoing.Done("nothing here");
         }
 
         var gap = System.Math.Max(System.Math.Abs(body.X - _where.X), System.Math.Abs(body.Y - _where.Y));
 
-        if (gap < _nearest)
+        var along = Along(body);
+
+        if (gap < _nearest || along)
         {
-            _nearest = gap;
+            if (gap >= _nearest)
+            {
+                RoadKept++;
+            }
+
+            _nearest = System.Math.Min(_nearest, gap);
             _stalled = 0;
         }
         else if (++_stalled >= TrekLimit)
@@ -212,10 +294,92 @@ public sealed class BotProwl : BotDeed
             BotQuad.Baulk(_map, _where);
             Baulked++;
 
-            return BotDoing.Failed($"got no nearer than {gap} tiles to ({_where.X}, {_where.Y})");
+            if (_setOut != Point3D.Zero && !body.InRange(_setOut, 2 * BotBarrier.Near))
+            {
+                BotBarrier.Stopped(_map, body.Location, _where);
+            }
+
+            if (!_company && _redarts < Redarts)
+            {
+                _redarts++;
+
+                var next = Redart(body);
+
+                if (next != Point3D.Zero)
+                {
+                    Redarted++;
+
+                    _where = next;
+                    _nearest = int.MaxValue;
+                    _plans = -1;
+                    _stalled = 0;
+                    _setOut = Point3D.Zero;
+
+                    return BotDoing.Walk(_map, _where, BotArrival.Within(ArriveWithin), "looking for a fight on this side instead");
+                }
+
+                Unredarted++;
+            }
+
+            return BotDoing.Failed($"got no nearer than {gap} tiles to ({_where.X}, {_where.Y}) from ({body.X}, {body.Y}, {body.Z})");
+        }
+
+        if (_setOut == Point3D.Zero)
+        {
+            _setOut = body.Location;
         }
 
         return BotDoing.Walk(_map, _where, BotArrival.Within(ArriveWithin), "looking for a fight");
+    }
+
+    private Point3D Redart(Mobile body)
+    {
+        _candidates.Clear();
+
+        for (var i = 0; i < RedartSamples; i++)
+        {
+            var x = body.X + Utility.RandomMinMax(-RedartReach, RedartReach);
+            var y = body.Y + Utility.RandomMinMax(-RedartReach, RedartReach);
+
+            if (!BotStep.Settle(_map, x, y, out var z))
+            {
+                continue;
+            }
+
+            var where = new Point3D(x, y, z);
+
+            if (Utility.InRange(body.Location, where, 2 * ArriveWithin)
+                || Region.Find(where, _map)?.IsPartOf<TownRegion>() == true
+                || BotRefused.Refusing(_map, where)
+                || BotReach.Ask(_map, body.Location, where, BotArrival.Within(ArriveWithin)) == BotReachVerdict.Sealed
+                || !BotQuad.Dares(body, _map, where))
+            {
+                continue;
+            }
+
+            _candidates.Add(where);
+        }
+
+        var map = _map;
+
+        _candidates.Sort(
+            (a, b) =>
+            {
+                var noise = BotPeril.Reading(map, b).CompareTo(BotPeril.Reading(map, a));
+
+                return noise != 0 ? noise : BotQuad.Safety(map, a).CompareTo(BotQuad.Safety(map, b));
+            }
+        );
+
+        for (var i = 0; i < _candidates.Count && i < RedartVets; i++)
+        {
+            if (BotPath.CanReach(_map, body.Location, _candidates[i], BotArrival.Within(ArriveWithin), RedartVetMs))
+            {
+                return _candidates[i];
+            }
+        }
+
+        return Point3D.Zero;
     }
 
     public override bool Bend(IBotWilful bot)
@@ -223,7 +387,33 @@ public sealed class BotProwl : BotDeed
         BotPeril.Baulked(_map, _where);
         BotQuad.Baulk(_map, _where);
 
-        return false;
+        var body = bot?.Self;
+
+        if (body == null || _company || _redarts >= Redarts || body.Map != _map)
+        {
+            return false;
+        }
+
+        _redarts++;
+
+        var next = Redart(body);
+
+        if (next == Point3D.Zero)
+        {
+            Unturned++;
+
+            return false;
+        }
+
+        Turned++;
+
+        _where = next;
+        _nearest = int.MaxValue;
+        _plans = -1;
+        _stalled = 0;
+        _setOut = Point3D.Zero;
+
+        return true;
     }
 
     public override void Drop(IBotWilful bot)

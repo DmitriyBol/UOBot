@@ -68,6 +68,51 @@ public sealed class BotLedger
 
     public int Places => _tallies.Count;
 
+    public void Save(IGenericWriter writer)
+    {
+        writer.Write(_tallies.Count);
+
+        foreach (var (key, tally) in _tallies)
+        {
+            writer.Write(key.Kind ?? "");
+            writer.Write(key.Map);
+            writer.Write(key.X);
+            writer.Write(key.Y);
+            writer.Write(tally.Measured);
+            writer.Write(tally.Settled);
+            writer.Write(tally.Spins);
+            writer.Write(tally.Cautions);
+        }
+    }
+
+    public void Load(IGenericReader reader)
+    {
+        var many = reader.ReadInt();
+        var now = Core.TickCount;
+
+        for (var i = 0; i < many; i++)
+        {
+            var kind = reader.ReadString();
+            var map = reader.ReadInt();
+            var x = reader.ReadInt();
+            var y = reader.ReadInt();
+
+            var tally = new Tally
+            {
+                Measured = reader.ReadDouble(),
+                Settled = reader.ReadInt(),
+                Spins = reader.ReadDouble(),
+                Cautions = reader.ReadInt(),
+                TouchedTick = now
+            };
+
+            if (!string.IsNullOrEmpty(kind) && _tallies.Count < MaxPlaces)
+            {
+                _tallies[(kind, map, x, y)] = tally;
+            }
+        }
+    }
+
     public double Expect(string kind, Map map, Point3D where, double prior)
     {
         if (prior <= 0.0)

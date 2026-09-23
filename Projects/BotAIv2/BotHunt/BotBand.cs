@@ -27,7 +27,7 @@ public sealed class BotBand : BotDeed
 {
     public const string Trade = "band";
 
-    public static double Prior { get; set; } = 90.0;
+    public static double Prior { get; set; } = 30.0;
 
     public static double WorkMinutes { get; set; } = 4.0;
 
@@ -51,6 +51,12 @@ public sealed class BotBand : BotDeed
     }
 
     public override string Kind => Trade;
+
+    public override bool Braves => true;
+
+    public override Mobile Foe => _quarry;
+
+    public override void Taken(IBotWilful bot) => BotQuarry.Claim(bot?.Self, _quarry);
 
     public override Map Map => _map;
 

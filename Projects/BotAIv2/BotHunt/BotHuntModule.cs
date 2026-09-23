@@ -48,6 +48,8 @@ public sealed class BotHuntModule : BotModule
         BotWill.Offer(new BotRescuer());
         BotWill.Offer(new BotDefender());
 
+        BotOutlaw.Start();
+
         logger.Information(
             "The hunt is on: quarry looked for {Reach} tiles out and taken up to ×{Daring} of our own power, anything inside {Notice} tiles worth dropping other work for, set out above {Fit:P0} health and given up below {Flee:P0} or when outnumbered; ground to look over is picked beyond {Beyond} tiles and walked to within {Arrive}",
             BotQuarry.Reach,
@@ -107,6 +109,15 @@ public sealed class BotHuntModule : BotModule
         BotHunter.Forget();
         BotMuster.Forget();
         BotRescuer.Forget();
+        BotOutlaw.Stop();
+        BotOutlaw.Forget();
+        BotRobber.Forget();
+        BotManhunt.Forget();
+        BotLawful.Forget();
+        BotRaid.Forget();
+        BotInquest.Forget();
+        BotBrawl.Forget();
+        BotDuel.Forget();
         BotArms.Forget();
         BotSlay.ForgetBows();
 

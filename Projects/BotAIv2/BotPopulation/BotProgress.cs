@@ -39,7 +39,23 @@ public sealed class BotProgress : GenericPersistence
 
     private const int Oldest = 1;
 
-    private static readonly Dictionary<string, Learned> _saved = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<(string Name, string Class), Learned> _saved = new(NameAndClass.Instance);
+
+    /// <summary>A name and a class compared without regard to case, as the name alone was.</summary>
+    private sealed class NameAndClass : IEqualityComparer<(string Name, string Class)>
+    {
+        public static readonly NameAndClass Instance = new();
+
+        public bool Equals((string Name, string Class) a, (string Name, string Class) b) =>
+            string.Equals(a.Name, b.Name, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(a.Class, b.Class, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode((string Name, string Class) key) =>
+            HashCode.Combine(
+                StringComparer.OrdinalIgnoreCase.GetHashCode(key.Name ?? ""),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(key.Class ?? "")
+            );
+    }
 
     private static BotProgress _store;
 
@@ -57,26 +73,25 @@ public sealed class BotProgress : GenericPersistence
 
     public static bool Savings { get; set; }
 
+    private static bool _wiped;
+
+    public static int Wipe()
+    {
+        var gone = _saved.Count;
+
+        _saved.Clear();
+        _wiped = true;
+
+        return gone;
+    }
+
     public static bool Restore(BotMobile bot)
     {
         var name = bot?.Name;
+        var calling = bot?.Class?.Name;
 
-        if (string.IsNullOrEmpty(name) || !_saved.TryGetValue(name, out var learned))
+        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(calling) || !_saved.TryGetValue((name, calling), out var learned))
         {
-            return false;
-        }
-
-        if (!string.Equals(learned.Class, bot.Class?.Name, StringComparison.OrdinalIgnoreCase))
-        {
-            logger.Information(
-                "{Name} was a {Was} and is now a {Is}, so what it had learned is dropped",
-                name,
-                learned.Class,
-                bot.Class?.Name ?? "bot"
-            );
-
-            _saved.Remove(name);
-
             return false;
         }
 
@@ -148,20 +163,28 @@ public sealed class BotProgress : GenericPersistence
                 }
             }
 
-            _saved[bot.Name] = learned;
+            _saved[(bot.Name, bot.Class.Name)] = learned;
         }
     }
 
     public override void Serialize(IGenericWriter writer)
     {
+        if (_wiped)
+        {
+            writer.WriteEncodedInt(Shape);
+            writer.WriteEncodedInt(0);
+
+            return;
+        }
+
         Gather();
 
         writer.WriteEncodedInt(Shape);
         writer.WriteEncodedInt(_saved.Count);
 
-        foreach (var (name, learned) in _saved)
+        foreach (var (key, learned) in _saved)
         {
-            writer.Write(name);
+            writer.Write(key.Name);
             writer.Write(learned.Class);
             writer.WriteEncodedInt(learned.Fame);
             writer.WriteEncodedInt(learned.Karma);
@@ -181,6 +204,7 @@ public sealed class BotProgress : GenericPersistence
     public override void Deserialize(IGenericReader reader)
     {
         _saved.Clear();
+        _wiped = false;
 
         var shape = reader.ReadEncodedInt();
 
@@ -220,7 +244,7 @@ public sealed class BotProgress : GenericPersistence
 
             if (!string.IsNullOrEmpty(name))
             {
-                _saved[name] = learned;
+                _saved[(name, learned.Class)] = learned;
             }
         }
     }

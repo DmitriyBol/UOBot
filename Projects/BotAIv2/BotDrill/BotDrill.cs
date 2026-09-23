@@ -123,7 +123,7 @@ public sealed class BotDrill : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "no captain has ever been offered a class to hold"
-            : $"{Asked} offers to a captain: {Called} classes called for, {Held} were in a company, {Busy} found the field already held, {TooFar} were too far from it, {Nobody} found nobody worth teaching who could pay; {BotSchool.Describe()}";
+            : $"{Asked} offers to a captain: {Called} classes called for, {Held} were in a company, {Busy} found the field already held, {TooFar} were too far from it, {Nobody} found nobody worth teaching who could pay; {BotLesson.Skipped} posts of the ring walked past for having no road, {BotAttend.Unstationed} students taught where they stood because their station had none; {BotSchool.Describe()}";
 
     public static void Forget()
     {
@@ -174,6 +174,8 @@ public sealed class BotStudent : IBotProposer
 
     public static long Full { get; private set; }
 
+    public static long Spoken { get; private set; }
+
     public static long Came { get; private set; }
 
     public static long Sealed { get; private set; }
@@ -206,8 +208,15 @@ public sealed class BotStudent : IBotProposer
             return null;
         }
 
-        if (BotSchool.Students.Count >= BotSchool.Most)
+        var coming = BotSchool.Coming(body as BotMobile);
+
+        if (BotSchool.Students.Count + coming >= BotSchool.Most)
         {
+            if (BotSchool.Students.Count < BotSchool.Most)
+            {
+                Spoken++;
+            }
+
             Full++;
 
             return null;
@@ -283,7 +292,7 @@ public sealed class BotStudent : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a place in a class"
-            : $"{Asked} asked: {Came} offered a place, {NoClass} found no class open, {Closed} came after the roll closed, {Full} found it full, {WrongSort} were neither warrior nor archer, {NothingToLearn} had nothing left to learn from the master, {Broke} could not afford the fee (the fattest purse among them held {Richest}gp), {Sealed} could not have walked there at all, {Belated} could not have got there before the roll closed";
+            : $"{Asked} asked: {Came} offered a place, {NoClass} found no class open, {Closed} came after the roll closed, {Full} found it full ({Spoken} of them with every place left spoken for by bots on their way), {WrongSort} were neither warrior nor archer, {NothingToLearn} had nothing left to learn from the master, {Broke} could not afford the fee (the fattest purse among them held {Richest}gp), {Sealed} could not have walked there at all, {Belated} could not have got there before the roll closed";
 
     public static void Forget()
     {

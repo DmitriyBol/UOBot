@@ -40,7 +40,7 @@ public sealed class BotForge : BotDeed
 
     public static double WorkMinutes { get; set; } = 6.0;
 
-    public static int SwingMs { get; set; } = 1000;
+    public static int SwingMs { get; set; } = 1300;
 
     public static int MaxSwings { get; set; } = 24;
 
@@ -151,6 +151,8 @@ public sealed class BotForge : BotDeed
         {
             Refuse(bot);
 
+            BotGround.Unfit(_smithy);
+
             Stints++;
             NoPlace++;
 
@@ -251,7 +253,7 @@ public sealed class BotForge : BotDeed
                 RanOut++;
             }
 
-            return BotDoing.Failed(_swings >= MaxSwings ? "nothing came of the iron" : "out of metal");
+            return BotDoing.Failed((_swings >= MaxSwings ? "nothing came of the iron" : "out of metal") + BotCraftEar.Why(body));
         }
 
         if (_swung && Core.TickCount - _swungTick < SwingMs)
@@ -327,7 +329,7 @@ public sealed class BotForge : BotDeed
         Stints == 0
             ? "no stint at an anvil has ended yet"
             : $"{Stints} stints at an anvil ended: {Wrought} with {Pieces} pieces beaten out, {RanOut} out of metal, "
-              + $"{Fruitless} that used every swing and made nothing, {NoPlace} that found no anvil the engine would take";
+              + $"{Fruitless} that used every swing and made nothing, {NoPlace} that found no anvil the engine would take; {BotCraftEar.Describe()}";
 
     public static void Forget()
     {

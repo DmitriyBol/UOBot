@@ -49,7 +49,9 @@ public sealed class BotFletch : BotDeed
 
     private readonly Point3D _where;
 
-    private readonly BaseVendor _shop;
+    private BaseVendor _shop;
+
+    private int _repicks;
 
     private readonly int _price;
 
@@ -190,6 +192,15 @@ public sealed class BotFletch : BotDeed
 
         if (BotShops.Buy(bot, _shop, typeof(Log), _take, out var refused) <= 0)
         {
+            var next = BotShops.Next(bot, _shop, typeof(Log), ref _repicks);
+
+            if (next != null)
+            {
+                _shop = next;
+
+                return BotDoing.Walk(next.Map, next, BotArrival.Within(BotShops.CounterReach), $"on to {next.Name} for wood");
+            }
+
             return BotDoing.Failed(refused ?? "no wood to be had");
         }
 

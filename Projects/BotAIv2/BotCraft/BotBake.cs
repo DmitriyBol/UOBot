@@ -226,7 +226,11 @@ public sealed class BotBake : BotDeed
         return BotDoing.Walk(_map, _where, BotArrival.Beside, "to a fire");
     }
 
-    private void Refuse(IBotWilful bot) => bot?.Resolve?.Ledger?.Beware(BotGround.HearthKind, _map, _where);
+    private void Refuse(IBotWilful bot)
+    {
+        bot?.Resolve?.Ledger?.Beware(BotGround.HearthKind, _map, _where);
+        BotGround.Cold(_where);
+    }
 
     public override bool Bend(IBotWilful bot)
     {

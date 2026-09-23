@@ -69,6 +69,18 @@ public sealed class BotDig : BotDeed
 
     private HarvestSystem _system;
 
+    public override bool Afoot => _leg == Leg.Seam && _tile != null;
+
+    public static long FarSide { get; private set; }
+
+    public static int RepickLimit { get; set; } = 2;
+
+    public static long Repicked { get; private set; }
+
+    public static long Beaten { get; private set; }
+
+    public static long WorkedOut { get; private set; }
+
     private Point3D _fire;
 
     private Point3D _counter;
@@ -79,13 +91,19 @@ public sealed class BotDig : BotDeed
 
     private int _nearest = int.MaxValue;
 
+    private int _setOut;
+
     private int _stalled;
+
+    private int _repicks;
 
     private int _walled;
 
     public static int ApproachLimit { get; set; } = 40;
 
     public static int TrekLimit { get; set; } = 200;
+
+    public static int StrikeWithin { get; set; } = 48;
 
     public static int WalledLimit { get; set; } = 3;
 
@@ -223,12 +241,48 @@ public sealed class BotDig : BotDeed
 
         if (tool == null)
         {
+            if (carried >= BotOre.WorthSmelting)
+            {
+                _leg = Leg.Fire;
+
+                return default;
+            }
+
             return BotDoing.Failed("nothing to dig with");
         }
 
         if (_tile == null && !body.InRange(_seam.Where, BotOre.Reach))
         {
+            if (!BotGround.Free(body, _seam.Where))
+            {
+                var other = _repicks < RepickLimit ? BotGround.Seam(bot, _seam.Where) : default;
+
+                if (!other.Exists)
+                {
+                    Beaten++;
+
+                    return BotDoing.Failed($"another miner holds the {_seam.Ore}, and no other seam is free");
+                }
+
+                _repicks++;
+                Repicked++;
+
+                _seam = other;
+                _tile = null;
+                _dry = 0;
+                _spent.Clear();
+                _nearest = int.MaxValue;
+                _stalled = 0;
+            }
+
+            BotGround.Working(body, _seam.Where);
+
             var gap = System.Math.Max(System.Math.Abs(body.X - _seam.Where.X), System.Math.Abs(body.Y - _seam.Where.Y));
+
+            if (_nearest == int.MaxValue)
+            {
+                _setOut = gap;
+            }
 
             if (gap < _nearest)
             {
@@ -237,6 +291,24 @@ public sealed class BotDig : BotDeed
             }
             else if (++_stalled >= TrekLimit)
             {
+                BotAppraisal.Becalm(bot.Resolve, body.Location, _setOut, _nearest);
+
+                if (gap > StrikeWithin)
+                {
+                    var third = BotGround.Shy(_map, _seam.Where);
+
+                    if (third)
+                    {
+                        Unwalkable++;
+                    }
+
+                    return BotDoing.Failed(
+                        third
+                            ? $"the walk to the {_seam.Ore} stopped closing {gap} tiles short, the {BotGround.ShiedLimit}rd to do so, and the seam is struck off"
+                            : $"the walk to the {_seam.Ore} stopped closing {gap} tiles short, which says nothing of the seam; it rests and stays on the board"
+                    );
+                }
+
                 var struck = BotGround.Barren(_seam.Where);
 
                 if (struck)
@@ -257,6 +329,16 @@ public sealed class BotDig : BotDeed
         if (_tile == null && _spent.Count < MaxSpent)
         {
             _tile = BotOre.Find(body, out _system, _spent, _seam.Where, BotOre.Reach);
+
+            if (_tile == null && !body.InRange(_seam.Where, 2))
+            {
+                _tile = BotOre.Find(body, out _system, _spent, _seam.Where, BotOre.Reach, _seam.Where);
+
+                if (_tile != null)
+                {
+                    FarSide++;
+                }
+            }
         }
 
         if (_tile == null || _system == null)
@@ -287,13 +369,27 @@ public sealed class BotDig : BotDeed
                 bot?.Resolve?.Ledger?.Beware(Trade, _map, _seam.Where);
 
                 return BotDoing.Failed(
-                    $"missed too often on {_missed} of {_spent.Count} rocks that still hold ore; the seam keeps its place"
+                    $"missed too often on {_missed} of {_spent.Count} rocks that still hold ore, at Mining {body.Skills[SkillName.Mining].Value:F1} (base {body.Skills[SkillName.Mining].Base:F1}); the seam keeps its place"
                 );
             }
 
-            BotGround.Barren(_seam.Where);
+            var off = System.Math.Max(System.Math.Abs(body.X - _seam.Where.X), System.Math.Abs(body.Y - _seam.Where.Y));
 
-            return BotDoing.Failed("no rock worth swinging at, and the seam is struck off");
+            if (BotOre.LastRocks > 0 && BotOre.LastEmpty >= BotOre.LastRocks)
+            {
+                BotGround.Drained(_seam.Where);
+                WorkedOut++;
+
+                return BotDoing.Failed(
+                    $"every one of the {BotOre.LastRocks} rocks in reach of the seam at ({_seam.Where.X}, {_seam.Where.Y}) is worked out, and the seam rests (looked from {off} tiles off it)"
+                );
+            }
+
+            return BotDoing.Failed(
+                BotGround.Barren(_seam.Where)
+                    ? $"no rock worth swinging at, and the seam at ({_seam.Where.X}, {_seam.Where.Y}) is struck off (looked from {off} tiles off it, {BotOre.LastRocks} rocks seen)"
+                    : $"no rock worth swinging at; somebody had already struck the seam off (looked from {off} tiles off it)"
+            );
         }
 
         var at = new Point3D(_tile.X, _tile.Y, _tile.Z);
@@ -456,6 +552,11 @@ public sealed class BotDig : BotDeed
         }
 
         _swungFrom = body.Location;
+
+        if (body.Mounted)
+        {
+            BotStable.Alight(body);
+        }
 
         BotOre.Swing(body, tool, _system, _tile);
 

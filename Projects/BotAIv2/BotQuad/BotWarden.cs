@@ -97,7 +97,7 @@ public sealed class BotWarden : IBotProposer
             return null;
         }
 
-        var where = BotQuad.Frontier(map, body.Location, BotScout.Range, at => Reachable(map, body.Location, at));
+        var where = BotQuad.Frontier(map, body.Location, BotScout.Range, at => BotScout.Roadworthy(map, at) && Reachable(map, body.Location, at));
 
         if (where == Point3D.Zero)
         {

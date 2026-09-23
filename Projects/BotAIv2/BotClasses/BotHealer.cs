@@ -60,6 +60,8 @@ public sealed class BotHealer : BotClass
 
         NeedsMeditation = true;
 
+        HerbIntervalMs = 1800000;
+
         StaffManaTrickle = 4;
         StaffHue = 0x48F;
 

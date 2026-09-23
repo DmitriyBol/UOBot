@@ -70,6 +70,8 @@ public sealed class BotSweep : BotDeed
 
     private bool _standing;
 
+    private Mobile _focus;
+
     private BotSquad _squad;
 
     private int _called;
@@ -98,6 +100,8 @@ public sealed class BotSweep : BotDeed
         $"{Marches} companies actually marched, {Undermanned} could not raise {Least} bodies once chosen";
 
     public override string Kind => Trade;
+
+    public override bool Braves => true;
 
     public override Map Map => _map;
 
@@ -263,6 +267,21 @@ public sealed class BotSweep : BotDeed
         if (now - _stoodTick >= HoldMs && BotPeril.Reading(_map, _square) < BotPeril.Worrying)
         {
             return Finish(squad, $"({_square.X}, {_square.Y}) has gone quiet");
+        }
+
+        if (fighting && squad.Focus is { Deleted: false, Alive: true } focus)
+        {
+            if (!ReferenceEquals(focus, _focus))
+            {
+                _focus = focus;
+
+                if (member is IBotWilful wilful && wilful.Resolve != null)
+                {
+                    wilful.Resolve.StirredTick = now;
+                }
+            }
+
+            return BotDoing.Work($"fighting {focus.Name} with the company on ({_square.X}, {_square.Y}), {_fights} fights so far");
         }
 
         if (now - _steppedTick >= RoundMs || body.InRange(_post, 1))

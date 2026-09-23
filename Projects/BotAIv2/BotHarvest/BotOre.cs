@@ -44,6 +44,10 @@ public static class BotOre
             ?.PrimaryResource;
     }
 
+    public static int LastRocks { get; private set; }
+
+    public static int LastEmpty { get; private set; }
+
     public static int Left(Map map, int x, int y)
     {
         if (map == null || map == Map.Internal)
@@ -52,6 +56,49 @@ public static class BotOre
         }
 
         return Mining.System?.OreAndStone?.GetBank(map, x, y)?.Current ?? 0;
+    }
+
+    public static bool Stocked(Map map, Point3D seam)
+    {
+        var system = Mining.System;
+
+        if (system == null || map == null || map == Map.Internal)
+        {
+            return true;
+        }
+
+        var rocks = 0;
+
+        for (var radius = 1; radius <= Reach; radius++)
+        {
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                for (var dy = -radius; dy <= radius; dy++)
+                {
+                    if (Math.Abs(dx) != radius && Math.Abs(dy) != radius)
+                    {
+                        continue;
+                    }
+
+                    var x = seam.X + dx;
+                    var y = seam.Y + dy;
+
+                    if (Examine(map, x, y, system) == null)
+                    {
+                        continue;
+                    }
+
+                    if (Left(map, x, y) > 0)
+                    {
+                        return true;
+                    }
+
+                    rocks++;
+                }
+            }
+        }
+
+        return rocks == 0;
     }
 
     public static int RespawnMs =>
@@ -118,7 +165,34 @@ public static class BotOre
         return tool ?? pack.FindItemByType<Shovel>();
     }
 
-    public static int Carried(Mobile bot) => bot?.Backpack?.GetAmount(typeof(BaseOre)) ?? 0;
+    private const int SmallPile = 0x19B7;
+
+    public static bool TooLittle(BaseOre ore) => ore != null && ore.ItemID == SmallPile && ore.Amount < 2;
+
+    public static long Dust { get; private set; }
+
+    public static int Carried(Mobile bot)
+    {
+        var pack = bot?.Backpack;
+
+        if (pack == null)
+        {
+            return 0;
+        }
+
+        var carried = 0;
+        var items = pack.Items;
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i] is BaseOre { Deleted: false } ore && !TooLittle(ore))
+            {
+                carried += ore.Amount;
+            }
+        }
+
+        return carried;
+    }
 
     public static int Ingots(Mobile bot) => bot?.Backpack?.GetAmount(typeof(BaseIngot)) ?? 0;
 
@@ -127,7 +201,8 @@ public static class BotOre
         out HarvestSystem system,
         List<Point3D> skip = null,
         Point3D anchor = default,
-        int leash = 0
+        int leash = 0,
+        Point3D from = default
     )
     {
         system = Mining.System;
@@ -139,11 +214,14 @@ public static class BotOre
             return null;
         }
 
-        var origin = bot.Location;
+        var origin = from == Point3D.Zero ? bot.Location : from;
 
         IPoint3D nearest = null;
         IPoint3D richest = null;
         var bestWorth = 0.0;
+
+        LastRocks = 0;
+        LastEmpty = 0;
 
         for (var radius = 1; radius <= Reach; radius++)
         {
@@ -176,8 +254,12 @@ public static class BotOre
                         continue;
                     }
 
+                    LastRocks++;
+
                     if (Left(map, x, y) <= 0)
                     {
+                        LastEmpty++;
+
                         continue;
                     }
 
@@ -276,11 +358,19 @@ public static class BotOre
 
         List<Item> carried = [.. pack.Items];
         var piles = 0;
+        var dust = 0;
 
         for (var i = 0; i < carried.Count; i++)
         {
             if (carried[i] is not BaseOre ore || ore.Deleted)
             {
+                continue;
+            }
+
+            if (TooLittle(ore))
+            {
+                dust++;
+
                 continue;
             }
 
@@ -298,15 +388,17 @@ public static class BotOre
         }
 
         var made = Ingots(bot) - before;
+        Dust += dust;
 
         if (piles > 0)
         {
             logger.Information(
-                "{Name} put {Piles} piles of ore into the fire at {Where} and got {Ingots} ingots",
+                "{Name} put {Piles} piles of ore into the fire at {Where} and got {Ingots} ingots, {Dust} single ore left as too little to smelt",
                 bot.Name,
                 piles,
                 bot.Location,
-                made
+                made,
+                dust
             );
         }
 

@@ -49,8 +49,58 @@ public sealed class BotHerbs : BotDeed
 
     public static int Keeps { get; set; } = 5;
 
-    private static int KeptBy(Mobile bot) =>
-        BotGrimoire.Book(bot) != null || BotFlask.Kit(bot) != null ? Keeps : 0;
+    public static readonly Type[] Healing = [typeof(Garlic), typeof(Ginseng), typeof(SpidersSilk), typeof(MandrakeRoot)];
+
+    public static int HealerKeeps { get; set; } = 25;
+
+    public static long ForHealing { get; private set; }
+
+    private static bool Medic(Mobile bot) => bot is BotMobile { Class.Role: BotRole.Medic };
+
+    private static int KeptBy(Mobile bot, Type kind)
+    {
+        if (Medic(bot) && Array.IndexOf(Healing, kind) >= 0)
+        {
+            return HealerKeeps;
+        }
+
+        return BotGrimoire.Book(bot) != null || BotFlask.Kit(bot) != null ? Keeps : 0;
+    }
+
+    private static Type Fewest(Container pack, Type[] kinds)
+    {
+        Type worst = null;
+        var least = int.MaxValue;
+        var seen = 0;
+
+        for (var i = 0; i < kinds.Length; i++)
+        {
+            var held = pack?.GetAmount(kinds[i]) ?? 0;
+
+            if (held > least)
+            {
+                continue;
+            }
+
+            if (held < least)
+            {
+                least = held;
+                seen = 1;
+                worst = kinds[i];
+
+                continue;
+            }
+
+            seen++;
+
+            if (Utility.Random(seen) == 0)
+            {
+                worst = kinds[i];
+            }
+        }
+
+        return worst ?? kinds[Utility.Random(kinds.Length)];
+    }
 
     public static long Ordered { get; private set; }
 
@@ -134,13 +184,19 @@ public sealed class BotHerbs : BotDeed
 
         BotShops.Survey(body.Map, body.Location);
 
+        var medic = Medic(body);
         var handful = klass is { ForageYieldMax: > 0 };
-        var kinds = handful ? 1 : Utility.RandomMinMax(LeastKinds, MostKinds);
+        var kinds = handful ? 1 : medic ? 2 : Utility.RandomMinMax(LeastKinds, MostKinds);
         var picked = 0;
+
+        if (medic)
+        {
+            ForHealing++;
+        }
 
         for (var i = 0; i < kinds; i++)
         {
-            var kind = Scarcest();
+            var kind = medic ? Fewest(pack, Healing) : Scarcest();
 
             var amount = handful
                 ? Utility.RandomMinMax(Math.Max(1, klass.ForageYieldMin), klass.ForageYieldMax)
@@ -218,7 +274,7 @@ public sealed class BotHerbs : BotDeed
             }
 
             var held = Math.Max(1, stack.Amount);
-            var spare = held - KeptBy(body);
+            var spare = held - KeptBy(body, stack.GetType());
 
             if (spare <= 0)
             {
@@ -285,6 +341,7 @@ public sealed class BotHerbs : BotDeed
     {
         Ordered = 0;
         Listed = 0;
+        ForHealing = 0;
     }
 }
 
@@ -410,7 +467,8 @@ public sealed class BotHerbalist : IBotProposer
         Asked == 0
             ? $"nobody on this shard may go looking for herbs ({NotAGatherer} answers went to bots that may not)"
             : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go, {Refused} patches passed over as already refused; "
-              + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker that can cast or brew keeps back";
+              + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker that can cast or brew keeps back; "
+              + $"{BotHerbs.ForHealing} of the trips were healers' own, for the four herbs a heal spends, of which each keeps {BotHerbs.HealerKeeps}";
 
     public static void Forget()
     {

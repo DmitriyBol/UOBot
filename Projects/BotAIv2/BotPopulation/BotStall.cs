@@ -174,6 +174,10 @@ public static class BotStall
             watch.Doing = doing;
             watch.Since = now;
 
+            watch.Anchor = bot.Location;
+            watch.AnchorSince = now;
+            watch.Swaps = 0;
+
             return;
         }
 
@@ -257,6 +261,8 @@ public static class BotStall
         watch.Said = now;
         Reported++;
 
+        var road = Road(bot);
+
         if (bot.Resolve?.Deed != null)
         {
             BotWill.Abandon(bot, "it had stopped getting anywhere");
@@ -281,7 +287,7 @@ public static class BotStall
         Worst = $"{bot.Name} the {bot.Class?.Name}, {held / 60000} minutes on \"{doing}\" at {stalledAt}";
 
         logger.Error(
-            "{Name} the {Class} has not moved or changed what it is doing for {Held} minutes: \"{Doing}\" at {Where}, carrying {Load} of {Ceiling} stones with {Stam} stamina, with {Crowd} of ours within {Elbow} tiles, {Company} and out of work for {Barren:F1} minutes by its own clock",
+            "{Name} the {Class} has not moved or changed what it is doing for {Held} minutes: \"{Doing}\" at {Where}, carrying {Load} of {Ceiling} stones with {Stam} stamina, with {Crowd} of ours within {Elbow} tiles, {Company} and out of work for {Barren:F1} minutes by its own clock; {Road}",
             bot.Name,
             bot.Class?.Name,
             held / 60000,
@@ -293,8 +299,21 @@ public static class BotStall
             crowd,
             Elbow,
             company ? "in a company" : "on its own",
-            barren
+            barren,
+            road
         );
+    }
+
+    private static string Road(BotMobile bot)
+    {
+        var journey = bot.Journey;
+        var errand = journey?.Current;
+
+        var road = errand == null
+            ? "no errand on the road"
+            : $"the road holds \"{errand.Reason}\" to {journey.Target} ({errand.Arrival}), {(journey.Walking ? "walking a plan" : "no plan being walked")}, {journey.Plans} plans drawn and {journey.PlansSinceCloser} since it last got closer";
+
+        return $"{road}; mounted {bot.Mounted}, casting {bot.Spell?.GetType().Name ?? "nothing"}";
     }
 
     public static void Forget(BotMobile bot)
@@ -344,4 +363,5 @@ public static class BotStall
 
         return near;
     }
+
 }

@@ -90,6 +90,8 @@ public sealed class BotMindDeed : BotDeed
 
     public override bool AtCounter => _work.AtCounter;
 
+    public override bool Braves => _work.Braves;
+
     public override double Coin => _work.Coin;
 
     public override int Made => _work.Made;

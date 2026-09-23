@@ -42,8 +42,12 @@ public static class BotTimber
 
     public static HarvestSystem System => Lumberjacking.System;
 
-    public static Item Tool(Mobile bot)
+    public static Item Tool(Mobile bot) => Tool(bot, out _);
+
+    public static Item Tool(Mobile bot, out bool heavy)
     {
+        heavy = false;
+
         if (bot == null)
         {
             return null;
@@ -63,10 +67,27 @@ public static class BotTimber
             return null;
         }
 
-        Item tool = pack.FindItemByType<Hatchet>();
+        var hatchet = pack.FindItemByType<Hatchet>();
 
-        return tool ?? pack.FindItemByType<BaseAxe>();
+        if (hatchet != null && Lifts(bot, hatchet))
+        {
+            return hatchet;
+        }
+
+        var axe = pack.FindItemByType<BaseAxe>();
+
+        if (axe == null || Lifts(bot, axe))
+        {
+            return axe;
+        }
+
+        axe = pack.FindItemByType<BaseAxe>(true, each => Lifts(bot, each));
+        heavy = axe == null;
+
+        return axe;
     }
+
+    private static bool Lifts(Mobile bot, Item axe) => bot is not BotMobile body || body.Suits(axe);
 
     public static int Logs(Mobile bot) => bot?.Backpack?.GetAmount(typeof(Log)) ?? 0;
 

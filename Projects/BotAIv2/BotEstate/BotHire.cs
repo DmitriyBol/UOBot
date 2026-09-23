@@ -209,7 +209,14 @@ public sealed class BotHire : BotDeed
             return BotDoing.Failed("the hall will not take a merchant");
         }
 
-        BaseHouse.IsThereVendor(body.Location, body.Map, out var standing, out var rental);
+        var stand = BotFittings.Spot(_hall);
+
+        if (stand == Point3D.Zero)
+        {
+            return BotDoing.Failed($"there is nowhere in the hall of {_guild.Name} to stand a merchant");
+        }
+
+        BaseHouse.IsThereVendor(stand, body.Map, out var standing, out var rental);
 
         if (standing || rental)
         {
@@ -221,7 +228,7 @@ public sealed class BotHire : BotDeed
             Direction = body.Direction & Direction.Mask
         };
 
-        merchant.MoveToWorld(body.Location, body.Map);
+        merchant.MoveToWorld(stand, body.Map);
         merchant.SayTo(body, 503246);
 
         contract.Delete();

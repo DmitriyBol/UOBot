@@ -56,7 +56,9 @@ public sealed class BotAcquire : BotDeed
 
     private readonly int _spell;
 
-    private readonly BaseVendor _shop;
+    private BaseVendor _shop;
+
+    private int _repicks;
 
     private readonly BotListing _stall;
 
@@ -64,7 +66,7 @@ public sealed class BotAcquire : BotDeed
 
     private readonly Point3D _where;
 
-    private readonly int _price;
+    private int _price;
 
     private int _paid;
 
@@ -230,6 +232,14 @@ public sealed class BotAcquire : BotDeed
         }
 
         var bought = BotShops.Buy(bot, _shop, _kind, Ask, out var refused);
+
+        if (bought <= 0 && BotShops.Next(bot, _shop, _kind, ref _repicks) is { } next)
+        {
+            _shop = next;
+            _price = Math.Max(1, BotShops.Price(next, _kind));
+
+            return BotDoing.Walk(next.Map, next, BotArrival.Within(BotShops.CounterReach), $"on to {next.Name} for a scroll");
+        }
 
         if (bought <= 0)
         {

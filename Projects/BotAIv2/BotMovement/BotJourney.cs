@@ -111,6 +111,8 @@ public sealed class BotJourney
 
     public BotErrand Current => _errands.Count > 0 ? _errands[^1] : null;
 
+    public BotErrand Bottom => _errands.Count > 0 ? _errands[0] : null;
+
     public bool Active => _errands.Count > 0;
 
     public int Queued => _errands.Count;

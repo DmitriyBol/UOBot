@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Server.Logging;
 using Server.Mobiles;
 
 namespace Server.BotAI.V2;
@@ -57,6 +59,8 @@ public sealed class BotAccompany : BotDeed
 
     public static long Lost { get; private set; }
 
+    public static long Turned { get; private set; }
+
     public static long Spent { get; private set; }
 
     public static long Lagged { get; private set; }
@@ -67,31 +71,51 @@ public sealed class BotAccompany : BotDeed
 
     public static long Outrun { get; private set; }
 
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAccompany));
+
     private readonly BotMobile _companion;
 
     private readonly Map _map;
 
     private readonly long _began;
 
+    private readonly int _wage;
+
     private long _quietTick;
 
     private long _meansTick;
+
+    private long _paidTick;
+
+    private int _earned;
+
+    private bool _stoodOnce;
 
     private int _lagged;
 
     private bool _standing;
 
-    public BotAccompany(BotMobile companion, Map map)
+    private Point3D _aim;
+
+    public static long Reaimed { get; private set; }
+
+    private string _escortedBy;
+
+    public BotAccompany(BotMobile companion, Map map, int wage = 0)
     {
         _companion = companion;
         _map = map;
+        _wage = Math.Max(0, wage);
         _began = Core.TickCount;
         _quietTick = _began;
+        _paidTick = _began;
 
         _meansTick = _began - MeansEveryMs;
     }
 
     public override string Kind => Trade;
+
+    public override bool Braves => true;
 
     public override bool Steadfast => true;
 
@@ -103,7 +127,7 @@ public sealed class BotAccompany : BotDeed
 
     public override Point3D Where => _companion?.Location ?? Point3D.Zero;
 
-    public override double Expects => Prior;
+    public override double Expects => Prior + _wage;
 
     public override double Minutes => LeaseMs / 60000.0;
 
@@ -111,12 +135,13 @@ public sealed class BotAccompany : BotDeed
 
     public override int Outlay => 0;
 
-    public override double Coin => 0.0;
+    public override double Coin => _wage > 0 ? 1.0 : 0.0;
 
     public override int Made => 0;
 
     public override string Stage =>
-        _standing ? $"standing by {_companion?.Name}" : $"on the way to stand by {_companion?.Name}";
+        (_standing ? $"standing by {_companion?.Name}" : $"on the way to stand by {_companion?.Name}")
+        + (_wage > 0 ? $" in its pay at {_wage}gp a minute, {_earned}gp so far" : "");
 
     public static bool Engaged(BotMobile m) =>
         m is { Deleted: false, Alive: true }
@@ -179,13 +204,47 @@ public sealed class BotAccompany : BotDeed
             return BotDoing.Done($"{name} is gone");
         }
 
+        if (BotMend.ShunsOutlaws && BotMend.Abetting(body, _companion) is { } crime)
+        {
+            Turned++;
+
+            return Settled($"{name} is {crime}, and standing by it would be abetting");
+        }
+
         var now = Core.TickCount;
 
         if (now - _began >= LeaseMs)
         {
             Leased++;
 
-            return BotDoing.Done($"stood by {name} for {LeaseMs / 60000} minutes");
+            return Settled($"stood by {name} for {LeaseMs / 60000} minutes");
+        }
+
+        var served = body.InRange(_companion, BotRetainer.Near);
+
+        if (served && !_stoodOnce)
+        {
+            _stoodOnce = true;
+            _paidTick = now;
+        }
+
+        if (_wage > 0 && _stoodOnce && now - _paidTick >= BotRetainer.PayEveryMs)
+        {
+            _paidTick = now;
+
+            if (served)
+            {
+                if (!BotRetainer.Pay(_companion, body, _wage))
+                {
+                    return Settled($"{name} could not pay the next minute's wage");
+                }
+
+                _earned += _wage;
+            }
+            else
+            {
+                BotRetainer.Unserved++;
+            }
         }
 
         if (now - _meansTick >= MeansEveryMs)
@@ -202,28 +261,69 @@ public sealed class BotAccompany : BotDeed
 
         _escorted[_companion.Serial] = (body.Serial, now);
 
-        if (Engaged(_companion))
+        var busy = _wage > 0 ? BotRetainer.Afield(_companion) : Engaged(_companion);
+        var grace = _wage > 0 ? BotRetainer.GraceMs : GraceMs;
+
+        if (busy)
         {
             _quietTick = now;
         }
-        else if (now - _quietTick >= GraceMs)
+        else if (now - _quietTick >= grace)
         {
             Over++;
 
-            return BotDoing.Done($"{name}'s fight is over");
+            return Settled(_wage > 0 ? $"{name} went home" : $"{name}'s fight is over");
         }
 
         if (!body.InRange(_companion, Stay))
         {
             _standing = false;
 
-            return BotDoing.Walk(_map, _companion, BotArrival.Within(Stay - 1), $"to stand by {name}");
+            if (_aim == Point3D.Zero || !Utility.InRange(_companion.Location, _aim, BotBrawl.Restride) || body.InRange(_aim, Stay - 1))
+            {
+                if (_aim != Point3D.Zero)
+                {
+                    Reaimed++;
+                }
+
+                _aim = _companion.Location;
+            }
+
+            return BotDoing.Walk(_map, _aim, BotArrival.Within(Stay - 1), $"to stand by {name}");
         }
 
         _standing = true;
         Stood++;
 
         return BotDoing.Work($"standing by {name}");
+    }
+
+    private BotDoing Settled(string why)
+    {
+        if (_wage > 0)
+        {
+            logger.Information(
+                "{Healer} stood by {Fighter} for {Minutes:F1} minutes at {Wage}gp a minute and was paid {Earned}gp — {Why}",
+                _escortedBy ?? "a healer",
+                _companion?.Name,
+                (Core.TickCount - _began) / 60000.0,
+                _wage,
+                _earned,
+                why
+            );
+        }
+
+        return BotDoing.Done(why);
+    }
+
+    public override void Taken(IBotWilful bot)
+    {
+        _escortedBy = bot?.Self?.Name;
+
+        if (_wage > 0)
+        {
+            BotRetainer.Began(bot?.Self, _companion, _wage);
+        }
     }
 
     public override bool Bend(IBotWilful bot)
@@ -266,8 +366,10 @@ public sealed class BotAccompany : BotDeed
         Over = 0;
         Leased = 0;
         Lost = 0;
+        Turned = 0;
         Spent = 0;
         Lagged = 0;
+        Reaimed = 0;
         Outrun = 0;
         _escorted.Clear();
         _behind.Clear();
@@ -352,6 +454,16 @@ public sealed class BotAttendant : IBotProposer
             return null;
         }
 
+        var hirer = Hiring(body, map, out var wage);
+
+        if (hirer != null)
+        {
+            Offered++;
+            HiredOffered++;
+
+            return new BotAccompany(hirer, map, wage);
+        }
+
         var companion = Nearest(body, map);
 
         if (companion == null)
@@ -364,6 +476,61 @@ public sealed class BotAttendant : IBotProposer
         Offered++;
 
         return new BotAccompany(companion, map);
+    }
+
+    public static long HiredOffered { get; private set; }
+
+    private static BotMobile Hiring(BotMobile body, Map map, out int wage)
+    {
+        wage = 0;
+
+        BotMobile best = null;
+        var bestAway = double.MaxValue;
+
+        foreach (var m in map.GetMobilesInRange<BotMobile>(body.Location, BotRetainer.Reach))
+        {
+            if (m == body || m.Class?.Role == BotRole.Medic || BotAccompany.Taken(m, body) || BotRegard.AtWar(body, m))
+            {
+                continue;
+            }
+
+            var offered = BotRetainer.Hiring(m);
+
+            if (offered <= 0)
+            {
+                continue;
+            }
+
+            if (BotAccompany.Behind(body, m))
+            {
+                Passed++;
+
+                continue;
+            }
+
+            var away = body.GetDistanceToSqrt(m);
+
+            if (away >= bestAway)
+            {
+                continue;
+            }
+
+            if (BotMend.Abetting(body, m) != null)
+            {
+                continue;
+            }
+
+            if (BotReach.Ask(map, body.Location, m.Location, BotArrival.Within(BotAccompany.Stay)) == BotReachVerdict.Sealed)
+            {
+                continue;
+            }
+
+            best = m;
+            bestAway = away;
+            wage = offered;
+        }
+
+        return best;
     }
 
     private static BotMobile Nearest(BotMobile body, Map map)
@@ -393,6 +560,11 @@ public sealed class BotAttendant : IBotProposer
                 continue;
             }
 
+            if (BotMend.Abetting(body, m) != null)
+            {
+                continue;
+            }
+
             if (BotReach.Ask(map, body.Location, m.Location, BotArrival.Within(BotAccompany.Stay)) == BotReachVerdict.Sealed)
             {
                 continue;
@@ -408,7 +580,7 @@ public sealed class BotAttendant : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "no healer has been offered anybody to stand by"
-            : $"{Asked} times a healer was asked: {Offered} sent to stand by a fighter, {Held} in a company, {Unfit} too hurt, {Pressed} with something on it, {Bare} with nothing to heal with, {Nobody} with nobody of ours fighting within {Reach} tiles; {BotAccompany.Stood} beats stood by, {BotAccompany.Lagged} times a healer fell behind and walked on; stints ended {BotAccompany.Over} when the fight was over, {BotAccompany.Leased} at the end of the lease, {BotAccompany.Lost} when the fighter was gone, {BotAccompany.Spent} with nothing left to heal with, {BotAccompany.Outrun} when the healer could not keep up; {Passed} fighters passed over because their healer had lately fallen behind them";
+            : $"{Asked} times a healer was asked: {Offered} sent to stand by a fighter ({HiredOffered} of them hired), {Held} in a company, {Unfit} too hurt, {Pressed} with something on it, {Bare} with nothing to heal with, {Nobody} with nobody of ours fighting within {Reach} tiles; {BotAccompany.Stood} beats stood by, {BotAccompany.Lagged} times a healer fell behind and walked on, {BotAccompany.Reaimed} walks re-aimed at the fighter's new tile; stints ended {BotAccompany.Over} when the fight was over, {BotAccompany.Leased} at the end of the lease, {BotAccompany.Lost} when the fighter was gone, {BotAccompany.Spent} with nothing left to heal with, {BotAccompany.Outrun} when the healer could not keep up; {Passed} fighters passed over because their healer had lately fallen behind them";
 
     public static void Forget()
     {
@@ -420,6 +592,7 @@ public sealed class BotAttendant : IBotProposer
         Bare = 0;
         Nobody = 0;
         Passed = 0;
+        HiredOffered = 0;
 
         BotAccompany.Forget();
     }

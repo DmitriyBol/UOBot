@@ -79,7 +79,10 @@ public static class BotBarred
 
     private static readonly List<Bar> _bars =
     [
-        new(2155, 1352, 2230, 1405, "a walled pocket east of Britain with no way in — Patrick's order, 11.09.2026")
+        new(2155, 1352, 2230, 1405, "a walled pocket east of Britain with no way in — Patrick's order, 11.09.2026"),
+        new(1312, 1035, 1382, 1120, "the trap north of Britain round the trolls at (1318–1320, 1047): twelve bots carried home out of (1320–1378, 1048–1116) and 72 hunts refused a road to the trolls on 14–15.09.2026 — Patrick's word, 15.09.2026"),
+        new(1020, 2110, 1240, 2295, "the water trap south-west of Britain: 32 bots carried home out of (1031–1230, 2119–2284) on 14–15.09.2026 — Patrick's word, 15.09.2026"),
+        new(1905, 960, 2100, 1140, "the plague beast's bog north-east of Britain, until groups of thirty to fifty can be raised for it: about twelve bots died in it between 20:30 and 20:42 on 15.09.2026 while the quadrant record read it safe — Patrick's order, 15.09.2026")
     ];
 
     public static IReadOnlyList<Bar> Bars => _bars;

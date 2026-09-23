@@ -49,6 +49,10 @@ public static class BotClaim
 
     public static int Price { get; set; } = 5000;
 
+    public static int Cheap { get; set; } = 10;
+
+    public static int Step { get; set; } = 1000;
+
     public static int Ousting { get; set; } = 5000;
 
     public static int Stripping { get; set; } = 2500;
@@ -64,6 +68,24 @@ public static class BotClaim
     public static long Won { get; private set; }
 
     public static long Unmustered { get; private set; }
+
+    public static int UnmusteredRestMs { get; set; } = 1800000;
+
+    public static int MostUnmusteredRestMs { get; set; } = 14400000;
+
+    private static readonly Dictionary<(string Guild, (int Map, int X, int Y) Key), (int Failures, long Tick)> _unmustered = [];
+
+    public static bool Resting(string guild, (int Map, int X, int Y) key)
+    {
+        if (guild == null || !_unmustered.TryGetValue((guild, key), out var row))
+        {
+            return false;
+        }
+
+        var rest = Math.Min((long)UnmusteredRestMs << Math.Min(row.Failures - 1, 10), MostUnmusteredRestMs);
+
+        return Core.TickCount - row.Tick < rest;
+    }
 
     public static long Beaten { get; private set; }
 
@@ -159,7 +181,14 @@ public static class BotClaim
     {
         if (!_held.TryGetValue(key, out var held))
         {
-            return Holds(guild) < Free ? 0 : Price;
+            var nth = Holds(guild) + 1;
+
+            if (nth <= Free)
+            {
+                return 0;
+            }
+
+            return nth <= Cheap ? Price : Price + (nth - Cheap) * Step;
         }
 
         if (!held.Bought)
@@ -205,6 +234,8 @@ public static class BotClaim
             }
 
             Paid += price;
+
+            BotCity.Tax(price);
         }
 
         var bid = new Bid
@@ -341,6 +372,10 @@ public static class BotClaim
         if (bid.Peak < Gather)
         {
             Unmustered++;
+            _unmustered[(bid.Guild, bid.Key)] = (
+                _unmustered.TryGetValue((bid.Guild, bid.Key), out var was) ? was.Failures + 1 : 1,
+                Core.TickCount
+            );
 
             logger.Information(
                 "{Guild} never gathered on the square at {X},{Y}: {Peak} of them at most, {Gather} wanted",
@@ -377,6 +412,7 @@ public static class BotClaim
         };
 
         Won++;
+        _unmustered.Remove((bid.Guild, bid.Key));
 
         logger.Warning(
             "The square at {X},{Y} is {Guild}'s{From}",
@@ -503,14 +539,25 @@ public static class BotClaim
         !Running
             ? "guilds claim no ground"
             : $"{_held.Count} squares are spoken for and {_bids.Count} being claimed now ({Free} free to a guild, "
-            + $"then {Price}gp; {Ousting}gp to take one, {Stripping}gp to strike a name off it); {Declared} claims made, "
+            + $"then {Price}gp up to {Cheap}, then {Step}gp more each; {Ousting}gp to take one, {Stripping}gp to strike a name off it); {Declared} claims made, "
             + $"{Won} won, {Stripped} that only struck a name off, {Unmustered} where the guild never gathered "
             + $"{Gather} of itself, {Beaten} driven off by somebody who came; {Paid}gp paid for ground";
+
+    public static int Wipe()
+    {
+        var gone = _held.Count;
+
+        _held.Clear();
+        Forget();
+
+        return gone;
+    }
 
     public static void Forget()
     {
         _bids.Clear();
         _byGuild.Clear();
+        _unmustered.Clear();
         Declared = 0;
         Won = 0;
         Unmustered = 0;

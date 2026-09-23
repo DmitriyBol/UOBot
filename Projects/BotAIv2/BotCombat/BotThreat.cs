@@ -51,6 +51,8 @@ public static class BotThreat
 
     private const double SecondaryWeight = 0.4;
 
+    public static double Secondary => SecondaryWeight;
+
     public static double Power(Mobile m)
     {
         if (m == null || m.Deleted)
@@ -59,6 +61,16 @@ public static class BotThreat
         }
 
         return Math.Max(1, m.HitsMax) * AverageDamage(m);
+    }
+
+    public static double Now(Mobile m)
+    {
+        if (m == null || m.Deleted || m.HitsMax <= 0)
+        {
+            return Power(m);
+        }
+
+        return Power(m) * Math.Clamp(m.Hits / (double)m.HitsMax, 0.1, 1.0);
     }
 
     private static double AverageDamage(Mobile m)

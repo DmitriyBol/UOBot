@@ -68,7 +68,13 @@ public static class BotHand
         "call",
         "near",
         "resolve",
-        "roles"
+        "roles",
+        "pays",
+        "gaps",
+        "city",
+        "post",
+        "unpost",
+        "quests"
     ];
 
     public const string Manual =
@@ -86,9 +92,27 @@ public static class BotHand
         + "around that spot, with its name, health and whether it would fight us. resolve <bot> — what it is "
         + "holding, how far into its own reckoning, whether a better offer could take it off that now and why "
         + "not, what it put down to come back to, and how its last few pieces of work ended. roles — how each "
-        + "class spends its working minutes: its own trade, anybody's work, another class's trade.";
+        + "class spends its working minutes: its own trade, anybody's work, another class's trade. pays [<trade>] — what "
+        + "the population has found each kind of work pays, and where, best first: the board the auction reads for a bot "
+        + "that has never been somewhere; kept across restarts. gaps — each trade's claim against what it turned out to "
+        + "pay, worst overstatement first: a claim far above the payment is a number in the source that stopped being "
+        + "true, with the whole population chasing it. city — the treasury: what it holds, what it has spent, its "
+        + "standing orders. city buy [<lots>] — the city buys that many whole lots off the stalls, the longest-standing "
+        + "first, for what is in the treasury and not a coin more: the outside demand that clears what the population "
+        + "cannot sell to itself. city want <Thing> <amount> <price> — a standing order: the city takes that thing off "
+        + "the stalls whenever it is offered at or under the price, until the amount is bought. city forget <Thing> — "
+        + "the order withdrawn. city bounty <x> <y> <gp> — a price on a square: the Baron marches there before "
+        + "anywhere else, and the company that clears it is paid from the treasury, split evenly. city head <bot> <gp> — "
+        + "a price on a murderer's head, paid to whoever catches it. city fair [<minutes>] [<percent>] — a fair: for an "
+        + "hour the city takes what is on the stalls at 80% of the asking price, twenty lots a minute, out of the treasury; "
+        + "the clock declares one every six hours when the treasury allows. The treasury fills on a clock and never faster; "
+        + "spend it where the market is stuck or the ground is bad. "
+        + "post kill <Creature> <n> <gp> [<x> <y>] / post gather <Thing> <n> <gp> [<x> <y>] / post scout <x> <y> <gp> — "
+        + "an errand on the board, its reward held by the treasury from now and paid to whichever bot does it; a kill "
+        + "counts near the place named or anywhere, goods are brought to the place or to home. unpost <id> — the errand "
+        + "withdrawn and its reward back. quests — the board and what came of it.";
 
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "seats", "seat", "save", "road", "resolves", "jam"];
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "band", "reset", "forgive"];
 
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
@@ -99,12 +123,27 @@ public static class BotHand
         + "its hall is from it. seat <guild> <x> <y> — move a guild's seat; its hall is carried there and its "
         + "members are born and rise there from then on. save — write the world to disk now, before the shard is "
         + "stopped: a kill without one rolls the island back to the last autosave, five minutes of halls and moves. "
+        + "census — one line per bot into logs/bot-census.log: class, band, work in hand, health, purse, place, company. "
+        + "tourney [stop|state] — hold the championship now instead of waiting for the week: the strongest thirty, one against "
+        + "one in the ring, the winner's name yellow and a prize in its pack; stop calls it off, state says where it stands. "
+        + "reset — the population back to novices: halls razed, claims and hand-set seats let go, wars and opinions forgotten, "
+        + "everybody's learning wiped, the world saved; restart after it. "
+        + "forgive <kind> — strike out what the population has learned about one kind of work (its patches and its "
+        + "correction), so the next bot asked judges it on its promise; for a memory that was true of the doer, not the work. "
         + "road <x1> <y1> <x2> <y2> — ask the pathfinder for a way between two tiles with a generous clock, and say "
-        + "what it found: the answer to \"why can nobody get there\". resolves — how much of what the population "
+        + "what it found: the answer to \"why can nobody get there\". peril <x> <y> — what the death map, which learns "
+        + "from the boot, and the quadrant record, which survives a restart, hold about one place, and whether work may "
+        + "go there. resolves — how much of what the population "
         + "takes on it sees through, what takes it off the rest, and the same per trade. jam <bot> — bank the coin in its "
         + "pack and fill the pack to the engine's cap with oil cloths that weigh next to nothing, the state Hale was found "
-        + "in on 14.09.2026, to watch the bot refused work at a counter and offered the trip that makes room. None is "
-        + "offered to the minds.";
+        + "in on 14.09.2026, to watch the bot refused work at a counter and offered the trip that makes room. breaks — "
+        + "which bots have a kind of work resting after failing it the same way too often, for how long and after what. "
+        + "trip <bot> <kind> — put in as many failures of that work for that bot, for one reason, as trip the breaker, "
+        + "to watch the rest and the refusals it causes; the rest lapses on its own clock. arm <bot> — put a vanquishing "
+        + "copy of the weapon the bot was born with in its pack, to watch the re-arm wield the better one and put the bound "
+        + "one away; the copy is not bound and goes with the bot at the next restart. roads [<x> <y> ...] — how far the road "
+        + "map from home has reached and what it cost, or for each tile named the steps of road from home against the "
+        + "straight line: the answer to \"is that ground far, or only far round\". None is offered to the minds.";
 
     private static readonly Dictionary<string, long> _used = [];
 
@@ -240,6 +279,24 @@ public static class BotHand
             case "roles":
                 return BotCalling.Describe();
 
+            case "pays":
+                return Pays(tail);
+
+            case "gaps":
+                return Gaps();
+
+            case "city":
+                return City(tail);
+
+            case "post":
+                return Post(tail);
+
+            case "unpost":
+                return Unpost(tail);
+
+            case "quests":
+                return $"{BotQuests.Describe()}.";
+
             case "halls":
                 return BotEstate.Describe();
 
@@ -248,6 +305,35 @@ public static class BotHand
 
             case "wars":
                 return BotWar.Describe();
+
+            case "census":
+                return Census();
+
+            case "arms" when string.IsNullOrWhiteSpace(tail):
+                return Quivers();
+
+            case "reset":
+                return ResetPopulation();
+
+            case "forgive":
+                if (string.IsNullOrWhiteSpace(tail))
+                {
+                    Refused++;
+
+                    return "forgive wants a kind of work: forgive drill-in.";
+                }
+
+                return $"{BotCommons.Forgive(tail.Trim())} records of \"{tail.Trim()}\" struck out of what the population knows; the next bot asked judges it on its promise";
+
+            case "tourney":
+                return tail.StartsWith("stop", StringComparison.OrdinalIgnoreCase)
+                    ? BotTourney.Stop()
+                    : tail.StartsWith("state", StringComparison.OrdinalIgnoreCase)
+                        ? BotTourney.Describe()
+                        : BotTourney.Start("the keyboard");
+
+            case "band":
+                return Band();
 
             case "seats":
                 return BotSeat.Tell();
@@ -258,8 +344,17 @@ public static class BotHand
             case "road":
                 return Road(tail);
 
+            case "roads":
+                return Roads(tail);
+
+            case "peril":
+                return Peril(tail);
+
             case "resolves":
                 return BotWill.DescribeResolve();
+
+            case "breaks":
+                return BotBreaker.List();
 
             case "save":
                 {
@@ -270,7 +365,9 @@ public static class BotHand
 
                     World.Save();
 
-                    return "the world is written to disk; it is safe to stop the shard now.";
+                    Timer.DelayCall(TimeSpan.FromMilliseconds(500), Settled, 0);
+
+                    return "the world is saved and the snapshot is being written; wait for \"the snapshot is on disk\" here before stopping the shard.";
                 }
 
             case "raze":
@@ -283,7 +380,7 @@ public static class BotHand
                 }
         }
 
-        var (name, _) = First(tail);
+        var (name, rest) = First(tail);
         var bot = Find(name);
 
         if (bot == null)
@@ -306,8 +403,36 @@ public static class BotHand
             "summon" => Summon(bot),
             "resolve" => BotWill.Explain(bot),
             "jam" => Jam(bot),
+            "trip" => Trip(bot, rest),
+            "arm" => Arm(bot),
+            "arms" => Arms(bot),
             _ => $"I have no verb \"{verb}\"."
         };
+    }
+
+    private static string Trip(BotMobile bot, string rest)
+    {
+        var kind = (rest ?? "").Trim().Split(' ', 2)[0].ToLowerInvariant();
+
+        if (kind.Length == 0)
+        {
+            return "trip wants a bot and a kind of work: trip <bot> <kind>.";
+        }
+
+        if (!BotBreaker.Running)
+        {
+            return "the breaker is switched off (BotBreaker.Running), so nothing can trip it.";
+        }
+
+        var times = Math.Max(2, BotBreaker.Failures);
+        var before = BotBreaker.Trips;
+
+        for (var i = 0; i < times; i++)
+        {
+            BotBreaker.Failed(bot, kind, "a failure put in by hand to test the breaker");
+        }
+
+        return $"{bot.Name}: {times} failures of {kind} put in, the breaker tripped {BotBreaker.Trips - before} times, and {kind} rests {BotBreaker.RestLeftMs(bot, kind) / 1000}s more.";
     }
 
     private static string Jam(BotMobile bot)
@@ -344,6 +469,240 @@ public static class BotHand
         }
 
         return $"{bot.Name}: {banked}gp banked, {added} oil cloths added, {pack.TotalItems} of {most} things in the pack, room for a coin: {BotYield.Pocket(bot)}.";
+    }
+
+    private static string Census()
+    {
+        var bots = BotPopulation.Bots;
+        var stamp = DateTime.Now.ToString("HH:mm:ss");
+        using var sb = ValueStringBuilder.Create(8192);
+        var alive = 0;
+        var idle = 0;
+
+        for (var i = 0; i < bots.Count; i++)
+        {
+            var bot = bots[i];
+
+            if (bot is not { Deleted: false })
+            {
+                continue;
+            }
+
+            var deed = bot.Resolve?.Deed;
+
+            if (bot.Alive)
+            {
+                alive++;
+            }
+
+            if (deed == null)
+            {
+                idle++;
+            }
+
+            var map = bot.Map;
+            var region = map == null || map == Map.Internal ? null : Region.Find(bot.Location, map);
+            var guild = bot.Guild is Server.Guilds.Guild g ? g.Abbreviation : "-";
+            var company = bot.Squad == null ? "no company" : $"company {bot.Squad.Id} {bot.Squad.Stance}";
+            var flags = (bot.Murderer ? " | RED" : "") + (bot.NameHue >= 0 ? $" | name hue {bot.NameHue}" : "");
+
+            sb.Append($"[{stamp}] {bot.Name} | {bot.Class?.Name ?? "?"} | {guild} | {(bot.Alive ? "alive" : "dead")} | {deed?.Kind ?? "nothing"}: {deed?.Stage ?? "-"} | hits {bot.Hits}/{bot.HitsMax} mana {bot.Mana}/{bot.ManaMax} | pack {bot.Backpack?.GetAmount(typeof(Gold)) ?? 0}gp bank {Banker.GetBalance(bot)}gp | at ({bot.X}, {bot.Y}, {bot.Z}) {region?.Name ?? "open ground"} | {company}{flags}");
+            sb.Append(Environment.NewLine);
+        }
+
+        try
+        {
+            var folder = Path.GetFullPath(Path.Combine(Core.BaseDirectory, "..", "logs"));
+            Directory.CreateDirectory(folder);
+            File.AppendAllText(Path.Combine(folder, "bot-census.log"), sb.ToString());
+        }
+        catch (Exception e)
+        {
+            return $"the census could not be written: {e.Message}";
+        }
+
+        return $"{bots.Count} bots written to logs/bot-census.log at {stamp}: {alive} alive, {idle} holding nothing.";
+    }
+
+    private static string ResetPopulation()
+    {
+        var halls = BotEstate.Raze();
+        var claims = BotClaim.Wipe();
+
+        BotChest.Wipe();
+        var seats = BotSeat.Wipe();
+
+        BotWar.Forget();
+        BotRegard.Forget();
+
+        var learned = BotProgress.Wipe();
+
+        var bodies = BotPopulation.PurgeSaved();
+
+        BotAuction.Reset();
+        BotQuests.Wipe();
+        BotOutlaw.Forget();
+        BotUnderworld.Forget();
+        BotGuilds.Forget();
+        BotGround.Reset();
+
+        BotQuad.Forget();
+        BotCommons.Forget();
+
+        if (!World.Saving)
+        {
+            World.Save();
+            Timer.DelayCall(TimeSpan.FromMilliseconds(500), Settled, 0);
+        }
+
+        return $"reset: {halls} halls razed, {claims} claims let go, {seats} hand-set seats forgotten, wars, truces and opinions forgotten, "
+               + $"{learned} bots' learning wiped and {bodies} bodies deleted with everything they were carrying, "
+               + $"the market, the wants and the board of errands emptied, every crime and the band forgotten, the guilds disbanded, "
+               + $"the island's danger map and everything known about what pays where wiped; the world is being saved — wait for \"the snapshot is on disk\", then restart the shard and the population rises as novices.";
+    }
+
+    private static void Settled(int tries)
+    {
+        if (World.WorldState == WorldState.Running)
+        {
+            BotConsole.Say("the snapshot is on disk; it is safe to stop the shard now.");
+
+            return;
+        }
+
+        if (tries >= 240)
+        {
+            BotConsole.Say($"the snapshot is STILL being written after two minutes (state {World.WorldState}); do not stop the shard.");
+
+            return;
+        }
+
+        Timer.DelayCall(TimeSpan.FromMilliseconds(500), Settled, tries + 1);
+    }
+
+    private static string Arms(BotMobile bot)
+    {
+        var pack = bot.Backpack;
+
+        if (pack == null)
+        {
+            return $"{bot.Name} has no pack.";
+        }
+
+        var held = bot.Weapon as Item;
+
+        if (held != null && held.Parent != bot)
+        {
+            held = null;
+        }
+
+        List<string> weapons = [];
+
+        foreach (var item in pack.Items)
+        {
+            if (item is BaseWeapon { Deleted: false } weapon)
+            {
+                var bound = BotBinding.IsBound(weapon, bot.Bond) ? ", bound" : "";
+
+                weapons.Add($"{weapon.GetType().Name} ({weapon.Skill}{(weapon is BaseRanged ? ", ranged" : "")}{bound})");
+            }
+        }
+
+        var takes = held is BaseRanged bow ? bow.AmmoType : null;
+        var loaded = takes == null ? -1 : pack.GetAmount(takes);
+
+        return $"{bot.Name} the {bot.Class?.Name}: holding {(held == null ? "nothing" : held.GetType().Name)}"
+               + (takes == null ? "" : $", which takes {takes.Name} and has {loaded} of them to fire")
+               + $"; Arrow x{pack.GetAmount(typeof(Arrow))}, Bolt x{pack.GetAmount(typeof(Bolt))}"
+               + $"; its class's bows have something to fire: {BotArms.Stocked(bot, bot.Class)}"
+               + $"; weapons in the pack: {(weapons.Count == 0 ? "none" : string.Join(", ", weapons))}"
+               + $"; archery {bot.Skills.Archery.Base:F1}, fencing {bot.Skills.Fencing.Base:F1}, swords {bot.Skills.Swords.Base:F1}, macing {bot.Skills.Macing.Base:F1}.";
+    }
+
+    private static string Quivers()
+    {
+        var bots = BotPopulation.Bots;
+        List<string> dry = [];
+        List<string> fine = [];
+
+        for (var i = 0; i < bots.Count; i++)
+        {
+            var bot = bots[i];
+
+            if (bot is not { Deleted: false } || bot.Class?.Kit.Ranged is not { Count: > 0 } || bot.Backpack == null)
+            {
+                continue;
+            }
+
+            var held = bot.Weapon as Item;
+
+            if (held != null && held.Parent != bot)
+            {
+                held = null;
+            }
+
+            var pack = bot.Backpack;
+            var takes = held is BaseRanged bow ? bow.AmmoType : null;
+            var loaded = takes == null ? 0 : pack.GetAmount(takes);
+            var blade = false;
+
+            foreach (var item in pack.Items)
+            {
+                if (item is BaseWeapon and not BaseRanged and not SkinningKnife and not ButcherKnife and not Cleaver)
+                {
+                    blade = true;
+
+                    break;
+                }
+            }
+
+            var say = $"{bot.Name} ({bot.Class.Name}) {(held == null ? "bare" : held.GetType().Name)} A{pack.GetAmount(typeof(Arrow))} B{pack.GetAmount(typeof(Bolt))}{(blade ? "" : " no-blade")}";
+
+            if (takes != null && loaded == 0)
+            {
+                dry.Add(say);
+            }
+            else
+            {
+                fine.Add(say);
+            }
+        }
+
+        return $"{dry.Count} of {dry.Count + fine.Count} shooters hold a bow with nothing for it to fire: {(dry.Count == 0 ? "nobody" : string.Join("; ", dry))}. "
+               + $"The rest: {string.Join("; ", fine)}";
+    }
+
+    private static string Arm(BotMobile bot)
+    {
+        if (bot.Bond?.Weapon is not { Weapon: { } kind })
+        {
+            return $"{bot.Name} was born with no weapon to copy.";
+        }
+
+        var pack = bot.Backpack;
+
+        if (pack == null)
+        {
+            return $"{bot.Name} has no pack.";
+        }
+
+        if (kind.CreateInstance<Item>() is not BaseWeapon copy)
+        {
+            return $"a {kind.Name} could not be made.";
+        }
+
+        copy.DamageLevel = WeaponDamageLevel.Vanq;
+
+        if (!pack.TryDropItem(bot, copy, false))
+        {
+            copy.Delete();
+
+            return $"{bot.Name}'s pack would not take a {kind.Name}.";
+        }
+
+        var held = bot.FindItemOnLayer(Layer.TwoHanded) as BaseWeapon ?? bot.FindItemOnLayer(Layer.OneHanded) as BaseWeapon;
+
+        return $"{bot.Name}: a vanquishing {kind.Name} is in the pack, holding {held?.GetType().Name ?? "nothing"}; the re-arm looks every {BotMobile.DressEveryMs / 1000}s.";
     }
 
     private static string Camp(string tail)
@@ -385,6 +744,349 @@ public static class BotHand
 
         return $"an orc camp is standing at ({where.X}, {where.Y}, {where.Z}) and will last {CampMinutes} minutes: "
             + "three orcs, a captain, an unlocked chest, a locked crate and a prisoner who wants to go to Britain.";
+    }
+
+    private static string City(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length == 0)
+        {
+            return $"{BotCity.Describe()}.";
+        }
+
+        switch (words[0].ToLowerInvariant())
+        {
+            case "buy":
+                {
+                    var lots = words.Length > 1 && int.TryParse(words[1], out var n) ? Math.Clamp(n, 1, 50) : 10;
+                    var (taken, units, paid) = BotCity.Buy(lots, "the door");
+
+                    return taken <= 0
+                        ? $"the city sent for {lots} lots and bought nothing: {(BotCity.Purse <= 0 ? "the treasury is empty" : "nothing on offer it could pay for")}; {BotCity.Describe()}."
+                        : $"the city bought {units} things from {taken} stalls for {paid}gp; {BotCity.Purse}gp left in the treasury.";
+                }
+
+            case "want":
+                if (words.Length < 4 || !int.TryParse(words[2], out var amount) || !int.TryParse(words[3], out var price))
+                {
+                    Refused++;
+
+                    return "city want wants a thing, an amount and a price: city want Leather 50 4.";
+                }
+
+                return BotCity.Want(words[1], amount, price, "the door");
+
+            case "forget":
+                if (words.Length < 2)
+                {
+                    Refused++;
+
+                    return "city forget wants a thing: city forget Leather.";
+                }
+
+                return BotCity.Forget(words[1]);
+
+            case "bounty":
+                {
+                    if (words.Length < 4 || !int.TryParse(words[1], out var x) || !int.TryParse(words[2], out var y) || !int.TryParse(words[3], out var gold))
+                    {
+                        Refused++;
+
+                        return "city bounty wants two numbers and a price: city bounty 1995 1395 500.";
+                    }
+
+                    var map = BotPopulation.Home;
+
+                    return map == null ? "the population has no map to put a bounty on." : BotCity.Bounty(map, x, y, gold, "the door");
+                }
+
+            case "fair":
+                {
+                    var minutes = words.Length > 1 && int.TryParse(words[1], out var m) ? m : Math.Max(1, BotCity.FairMs / 60000);
+                    var share = words.Length > 2 && int.TryParse(words[2], out var percent) ? percent / 100.0 : BotCity.FairShare;
+                    return BotCity.Fair(minutes, share, "the door");
+                }
+            case "head":
+                {
+                    if (words.Length < 3 || !int.TryParse(words[^1], out var gold))
+                    {
+                        Refused++;
+
+                        return "city head wants a bot and a price: city head Fendrel 300.";
+                    }
+
+                    var name = string.Join(' ', words, 1, words.Length - 2);
+                    var red = Find(name);
+
+                    return red == null ? $"no bot of ours is called {name}." : BotCity.Head(red, gold, "the door");
+                }
+
+            default:
+                Refused++;
+
+                return "city knows: city, city buy [<lots>], city want <Thing> <amount> <price>, city forget <Thing>, city bounty <x> <y> <gp>, city head <bot> <gp>, city fair [<minutes>] [<percent>].";
+        }
+    }
+
+    private static string Post(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length == 0)
+        {
+            Refused++;
+            return "post wants an errand: post kill <Creature> <n> <gp> [<x> <y>], post gather <Thing> <n> <gp> [<x> <y>], or post scout <x> <y> <gp>.";
+        }
+
+        var map = BotPopulation.Home;
+
+        if (map == null)
+        {
+            return "the population has no map, so there is no board.";
+        }
+
+        var kind = words[0].ToLowerInvariant();
+
+        if (kind == "scout")
+        {
+            if (words.Length < 4 || !int.TryParse(words[1], out var sx) || !int.TryParse(words[2], out var sy) || !int.TryParse(words[3], out var sgp))
+            {
+                Refused++;
+                return "post scout wants a place and a reward: post scout 1875 855 200.";
+            }
+
+            return BotQuests.PostByName(kind, null, 1, sgp, map, sx, sy, "the door");
+        }
+
+        if (words.Length < 4 || !int.TryParse(words[2], out var amount) || !int.TryParse(words[3], out var gold))
+        {
+            Refused++;
+            return "post wants a thing, an amount and a reward: post kill Ogre 5 300 [x y] or post gather Leather 50 200 [x y].";
+        }
+
+        var x = -1;
+        var y = -1;
+
+        if (words.Length >= 6 && int.TryParse(words[4], out var px) && int.TryParse(words[5], out var py))
+        {
+            x = px;
+            y = py;
+        }
+
+        return BotQuests.PostByName(kind, words[1], amount, gold, map, x, y, "the door");
+    }
+
+    private static string Unpost(string tail)
+    {
+        if (!int.TryParse((tail ?? "").Trim().TrimStart('#'), out var id))
+        {
+            Refused++;
+            return "unpost wants the errand's number: unpost 3.";
+        }
+
+        return BotQuests.Unpost(id, "the door");
+    }
+
+    private static string Band()
+    {
+        if (!BotUnderworld.Exists)
+        {
+            return "There is no band: The Shadow has not been founded.";
+        }
+
+        var say = ValueStringBuilder.Create(2048);
+
+        try
+        {
+            say.Append(BotUnderworld.Describe());
+
+            var chest = BotLair.Chest;
+
+            if (chest == null)
+            {
+                say.Append(" — and no chest at all.");
+            }
+            else
+            {
+                var at = chest.GetWorldLocation();
+                Dictionary<string, int> tally = [];
+                var coin = 0;
+
+                for (var i = 0; i < chest.Items.Count; i++)
+                {
+                    if (chest.Items[i] is not { Deleted: false } item)
+                    {
+                        continue;
+                    }
+
+                    if (item is Gold gold)
+                    {
+                        coin += gold.Amount;
+
+                        continue;
+                    }
+
+                    var name = item.GetType().Name;
+                    tally.TryGetValue(name, out var had);
+                    tally[name] = had + Math.Max(1, item.Amount);
+                }
+
+                say.Append($" — the chest at ({at.X}, {at.Y}) holds {coin}gp");
+
+                foreach (var (name, many) in tally)
+                {
+                    say.Append($", {many} {name}");
+                }
+
+                if (coin == 0 && tally.Count == 0)
+                {
+                    say.Append(" and nothing else at all");
+                }
+            }
+
+            var wants = BotFence.Wants();
+
+            if (wants.Count == 0)
+            {
+                say.Append(". The band's order is filled");
+            }
+            else
+            {
+                say.Append(". The band still wants");
+
+                foreach (var (kind, many) in wants)
+                {
+                    say.Append($" {many} {kind.Name},");
+                }
+            }
+
+            if (BotFence.Who is { Deleted: false } fence)
+            {
+                say.Append(
+                    $" and {fence.Name} carries {fence.Backpack?.GetAmount(typeof(Gold)) ?? 0}gp of hush money at ({fence.X}, {fence.Y}), doing {fence.Resolve?.Deed?.Kind ?? "nothing"}"
+                );
+            }
+
+            say.Append('.');
+
+            return say.ToString();
+        }
+        finally
+        {
+            say.Dispose();
+        }
+    }
+
+    private static string Pays(string tail)
+    {
+        var kind = (tail ?? "").Trim();
+        var best = BotCommons.Best(kind.Length == 0 ? 16 : 200);
+        var say = ValueStringBuilder.Create(1024);
+
+        try
+        {
+            var shown = 0;
+
+            for (var i = 0; i < best.Count && shown < 16; i++)
+            {
+                var (trade, _, where, perMinute, settled, minded) = best[i];
+
+                if (kind.Length > 0 && !trade.InsensitiveEquals(kind))
+                {
+                    continue;
+                }
+
+                if (shown > 0)
+                {
+                    say.Append("; ");
+                }
+
+                say.Append(trade);
+                say.Append(" at (");
+                say.Append(where.X);
+                say.Append(", ");
+                say.Append(where.Y);
+                say.Append(") pays ");
+                say.Append((int)perMinute);
+                say.Append("/min on ");
+                say.Append(settled);
+                say.Append(" outcomes");
+
+                if (minded > 0)
+                {
+                    say.Append(", ");
+                    say.Append(minded);
+                    say.Append(" of them minded");
+                }
+
+                shown++;
+            }
+
+            if (shown == 0)
+            {
+                return kind.Length == 0
+                    ? "the population has not found out what pays where yet."
+                    : $"nothing is known yet about what {kind} pays anywhere.";
+            }
+
+            return $"what pays where, best first ({BotCommons.Describe()}): {say.ToString()}.";
+        }
+        finally
+        {
+            say.Dispose();
+        }
+    }
+
+    private static string Gaps()
+    {
+        var gaps = BotCommons.Gaps(24);
+
+        if (gaps.Count == 0)
+        {
+            return "no trade has been measured against its own claim yet.";
+        }
+
+        var say = ValueStringBuilder.Create(1024);
+
+        try
+        {
+            for (var i = 0; i < gaps.Count; i++)
+            {
+                var (kind, claimed, measured, settled, minded) = gaps[i];
+
+                if (i > 0)
+                {
+                    say.Append("; ");
+                }
+
+                say.Append(kind);
+                say.Append(" claims ");
+                say.Append((int)claimed);
+                say.Append("/min and pays ");
+                say.Append((int)measured);
+                say.Append("/min over ");
+                say.Append(settled);
+
+                if (minded > 0)
+                {
+                    say.Append(" (");
+                    say.Append(minded);
+                    say.Append(" minded)");
+                }
+
+                if (settled >= BotCommons.TradeConfidence && measured * 1.5 < claimed)
+                {
+                    say.Append(" — OVERSTATED");
+                }
+            }
+
+            return $"each trade's claim against what it paid, worst overstatement first: {say.ToString()}.";
+        }
+        finally
+        {
+            say.Dispose();
+        }
     }
 
     private static string Near(string tail)
@@ -761,14 +1463,82 @@ public static class BotHand
             return $"no body could stand at {x},{y}; a seat has to be ground somebody can be put down on.";
         }
 
-        BotSeat.Set(found.Name, new Point3D(x, y, z));
+        var seat = new Point3D(x, y, z);
+
+        if (BotSeat.TooNear(found.Name, seat, out var other, out var gap))
+        {
+            Refused++;
+
+            return $"{x},{y} is {gap} tiles from the seat of {other}, and guilds nearer than {BotRegard.Neighbouring} sour on each other; choose ground further off. {BotSeat.Tell()}";
+        }
+
+        if (BotSeat.Roadless(seat, out var roadless))
+        {
+            Refused++;
+            return $"{roadless}; a seat has to be ground with a road from home, or everybody put down there is carried home. {BotSeat.Tell()}";
+        }
+
+        BotSeat.Set(found.Name, seat);
 
         return $"the seat of {found.Name} is {x},{y} now. {BotSeat.Tell()}";
+    }
+
+    private static string Peril(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length < 2 || !int.TryParse(words[0], out var x) || !int.TryParse(words[1], out var y))
+        {
+            Refused++;
+
+            return "peril wants two numbers: peril <x> <y>.";
+        }
+
+        var map = BotPopulation.Home;
+
+        if (map == null)
+        {
+            return "the population has no map, so there is no danger to read.";
+        }
+
+        var where = new Point3D(x, y, 0);
+
+        return $"{BotPeril.Tell(map, where)}; {BotQuad.Tell(map, where)}.";
     }
 
     private static string Road(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length >= 3 && !int.TryParse(words[0], out _)
+            && int.TryParse(words[^2], out var gx) && int.TryParse(words[^1], out var gy))
+        {
+            var who = Find(string.Join(' ', words[..^2]));
+
+            if (who?.Map == null || who.Map == Map.Internal)
+            {
+                Refused++;
+
+                return $"there is no bot called \"{string.Join(' ', words[..^2])}\" standing anywhere.";
+            }
+
+            var goal = BotStep.Settle(who.Map, gx, gy, out var gz) ? new Point3D(gx, gy, gz) : new Point3D(gx, gy, who.Map.GetAverageZ(gx, gy));
+            var plan = new List<Point3D>();
+            var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            var found = BotPath.Find(who.Map, who.Location, goal, BotArrival.Within(1), plan, default, BotPath.CeilingMs * 5);
+            var took = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            var firsts = new List<string>();
+
+            for (var i = 0; i < plan.Count && i < 6; i++)
+            {
+                firsts.Add($"({plan[i].X},{plan[i].Y},{plan[i].Z})");
+            }
+
+            return $"from {who.Name} at {who.Location} to {goal}: {found}, {plan.Count} tiles of plan"
+                + (plan.Count > 0 ? $" beginning {string.Join(" ", firsts)} and ending at {plan[^1]}" : "")
+                + $", in {took:F1}ms; its own tile {(BotStep.Ground(who.Map, who.X, who.Y, who.Z, BotStep.StandingReach, out var fz) ? $"has a floor at {fz}" : "has no floor the step checker can find")}"
+                + (BotPath.LastStarved ? " (starved of clock by the population's window; ask again)" : "") + ".";
+        }
 
         if (words.Length < 4 || !int.TryParse(words[0], out var x1) || !int.TryParse(words[1], out var y1)
             || !int.TryParse(words[2], out var x2) || !int.TryParse(words[3], out var y2))
@@ -804,6 +1574,55 @@ public static class BotHand
         return $"from {from} to {to}: {outcome}, {path.Count} tiles of plan ending at {end}, in {ms:F1}ms{footing}"
             + (BotPath.LastStarved ? " (starved of clock by the population's window; ask again)" : "")
             + $"; the far side says {BotPath.Enclose(map, to, BotArrival.Within(1))}.";
+    }
+
+    private static string Roads(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length == 0)
+        {
+            return $"{BotRoads.Describe()}.";
+        }
+
+        if (words.Length % 2 != 0)
+        {
+            Refused++;
+
+            return "roads wants pairs of numbers: roads <x> <y> [<x> <y> ...].";
+        }
+
+        var map = BotPopulation.Home;
+        var home = BotPopulation.Where;
+
+        if (map == null)
+        {
+            return "the population has no map, so there are no roads to read.";
+        }
+
+        if (!BotRoads.Ready)
+        {
+            return $"{BotRoads.Describe()}; ask again when it is drawn.";
+        }
+
+        var said = new List<string>(words.Length / 2);
+
+        for (var i = 0; i + 1 < words.Length; i += 2)
+        {
+            if (!int.TryParse(words[i], out var x) || !int.TryParse(words[i + 1], out var y))
+            {
+                Refused++;
+
+                return $"roads wants whole numbers, and \"{words[i]} {words[i + 1]}\" is not two of them.";
+            }
+
+            var road = BotRoads.FromHome(map, x, y);
+            var straight = Math.Max(Math.Abs(x - home.X), Math.Abs(y - home.Y));
+
+            said.Add(road < 0 ? $"({x}, {y}) no road from home, {straight} straight" : $"({x}, {y}) {road} by road, {straight} straight");
+        }
+
+        return $"{string.Join("; ", said)}.";
     }
 
     private static string Tile(string tail)

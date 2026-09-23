@@ -179,9 +179,9 @@ public static class BotEstate
         public int Paid { get; }
     }
 
-    public static int Levy(Guild guild, int want, List<Contribution> paid)
+    public static int Levy(Guild guild, int want, List<Contribution> paid, Mobile except = null)
     {
-        var got = Take(guild, want, paid);
+        var got = Take(guild, want, paid, except);
 
         Levied += got;
 
@@ -190,7 +190,7 @@ public static class BotEstate
 
     public static int Tax(Guild guild, int want)
     {
-        var got = Take(guild, want, null);
+        var got = Take(guild, want, null, null);
 
         Taxed += got;
 
@@ -201,7 +201,7 @@ public static class BotEstate
 
     public static long Taxpayers { get; private set; }
 
-    private static int Take(Guild guild, int want, List<Contribution> paid)
+    private static int Take(Guild guild, int want, List<Contribution> paid, Mobile except)
     {
         if (guild?.Members == null || want <= 0)
         {
@@ -221,6 +221,8 @@ public static class BotEstate
         members.Sort((a, b) => BotYield.Wealth(b).CompareTo(BotYield.Wealth(a)));
 
         var got = 0;
+
+        got += BotChest.Draw(guild.Name, want);
 
         for (var i = 0; i < members.Count && got < want; i++)
         {
@@ -261,6 +263,11 @@ public static class BotEstate
             got += spare;
             paid?.Add(new Contribution(member, spare));
 
+            if (!ReferenceEquals(member, except))
+            {
+                BotYield.Aside(member, spare);
+            }
+
             if (paid == null)
             {
                 Taxpayers++;
@@ -274,7 +281,7 @@ public static class BotEstate
         return got;
     }
 
-    public static void Refund(List<Contribution> paid)
+    public static void Refund(List<Contribution> paid, Mobile except = null)
     {
         if (paid == null)
         {
@@ -290,6 +297,11 @@ public static class BotEstate
                 Banker.Deposit(back.Who, back.Paid);
                 Levied -= back.Paid;
                 Payers--;
+
+                if (!ReferenceEquals(back.Who, except))
+                {
+                    BotYield.Aside(back.Who, -back.Paid);
+                }
             }
         }
     }
@@ -436,6 +448,17 @@ public static class BotEstate
         Unlock(house);
         house.RefreshDecay();
 
+        var cleared = BotFittings.Unblock(house);
+
+        if (cleared > 0)
+        {
+            logger.Information(
+                "{Count} merchant in the hall of {Guild} stood in its doorway and was moved to the far end of the room",
+                cleared,
+                guild.Name
+            );
+        }
+
         for (var i = 0; i < house.PlayerVendors.Count; i++)
         {
             if (house.PlayerVendors[i] is { Deleted: false } merchant && guild.Leader is BotMobile keeper)
@@ -554,7 +577,7 @@ public static class BotEstate
             var owed = wanting.Length == 0 ? "every guild has one" : wanting.ToString();
 
             return
-                $"{halls}; {ledger}; {owed}; {BotSteward.Describe()}; {BotFitter.Describe()}; {BotHirer.Describe()}; {Merchanted} merchants hired for {Contracts}gp; {BotSupplier.Describe()}; {BotOffice.Describe()}; {BotShelf.Describe()}; {BotLand.Describe()}; {BotRegard.Describe()}; {BotBailiff.Describe()}; {BotFeuder.Describe()}; {BotExile.Describe()}; {BotRemover.Describe()}; {BotHolder.Describe()}; {Barred} times a workshop was passed over as somebody else's; {BotPlot.Describe()}";
+                $"{halls}; {ledger}; {owed}; {BotSteward.Describe()}; {BotFitter.Describe()}; {BotHirer.Describe()}; {Merchanted} merchants hired for {Contracts}gp; {BotSupplier.Describe()}; {BotOffice.Describe()}; {BotShelf.Describe()}; {BotLand.Describe()}; {BotRegard.Describe()}; {BotBailiff.Describe()}; {BotFeuder.Describe()}; {BotExile.Describe()}; {BotRemover.Describe()}; {BotHolder.Describe()}; {BotReeve.Describe()}; {BotChest.Describe()}; {Barred} times a workshop was passed over as somebody else's; {BotPlot.Describe()}";
         }
         finally
         {

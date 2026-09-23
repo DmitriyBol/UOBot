@@ -43,6 +43,15 @@ namespace Server.BotAI.V2;
 /// into groups that cannot help each other, which is the same defect as a muster that could find nobody. So
 /// guild membership multiplies what help is worth; it never refuses it. See <see cref="Kinship"/>.
 /// </para>
+///
+/// <para>
+/// <b>Patrick's order of 21.09.2026: anybody may found a guild.</b> Until then a guild existed only if the
+/// boot's muster dealt one out around a crafter, and the only door in afterwards was a leader's mind taking
+/// somebody on — and the minds were switched off on 18.09, so a bot outside a guild stayed outside for ever.
+/// Founding is now something a bot does while the shard runs: see <see cref="Gather"/>. The rule of five and
+/// the ceiling of fifteen stand; the rule that one of the five must be a maker is the one that was lifted,
+/// and with it the guild's fixed point moved from its maker to its <see cref="Head"/>.
+/// </para>
 /// </summary>
 public static class BotGuilds
 {
@@ -143,8 +152,8 @@ public static class BotGuilds
         }
 
         var roster = BotPopulation.Bots;
-        var makers = new List<BotMobile>();
-        var rest = new List<BotMobile>();
+        var kept = 0;
+        var free = 0;
 
         for (var i = 0; i < roster.Count; i++)
         {
@@ -162,100 +171,316 @@ public static class BotGuilds
                 continue;
             }
 
-            if (IsMaker(bot))
+            if (bot.Guild is not Guild { Disbanded: false } guild || !Ours(guild.Name))
             {
-                makers.Add(bot);
-            }
-            else
-            {
-                rest.Add(bot);
-            }
-        }
-
-        var all = makers.Count + rest.Count;
-
-        if (all < Least || makers.Count == 0)
-        {
-            logger.Warning(
-                "No guild can be formed: {All} bots and {Makers} of them able to make anything, against a rule of {Least} with at least one maker",
-                all,
-                makers.Count,
-                Least
-            );
-
-            return;
-        }
-
-        var bands = Math.Max(1, (int)Math.Round(all / (double)Band));
-
-        bands = Math.Min(bands, makers.Count);
-        bands = Math.Min(bands, Names.Length);
-        bands = Math.Min(bands, all / Least);
-        bands = Math.Max(bands, (all + Most - 1) / Most);
-        bands = Math.Min(bands, Math.Min(makers.Count, Names.Length));
-
-        if (bands < 1)
-        {
-            return;
-        }
-
-        rest.Sort((a, b) => ((int)(a.Class?.Role ?? BotRole.Producer)).CompareTo((int)(b.Class?.Role ?? BotRole.Producer)));
-
-        var bench = new List<BotMobile>[bands];
-
-        for (var i = 0; i < bands; i++)
-        {
-            bench[i] = [makers[i]];
-        }
-
-        for (var i = bands; i < makers.Count; i++)
-        {
-            rest.Add(makers[i]);
-        }
-
-        var into = 0;
-
-        for (var i = 0; i < rest.Count; i++)
-        {
-            var tries = 0;
-
-            while (bench[into % bands].Count >= Most && tries++ < bands)
-            {
-                into++;
-            }
-
-            if (bench[into % bands].Count >= Most)
-            {
-                Unplaced++;
+                free++;
 
                 continue;
             }
 
-            bench[into++ % bands].Add(rest[i]);
+            _guilds[guild.Name] = guild;
+
+            Show(bot);
+            Joined(bot);
+            kept++;
         }
 
-        for (var i = 0; i < bands; i++)
+        foreach (var guild in _guilds.Values)
         {
-            Form(Names[i], bench[i]);
+            Stone(guild);
+
+            for (var i = guild.Members.Count - 1; i >= 0; i--)
+            {
+                if (guild.Members[i] is not { Deleted: false })
+                {
+                    guild.RemoveMember(guild.Members[i]);
+                }
+            }
         }
 
         _dealt = true;
+        _gathered = Core.TickCount;
+        _cursor = roster.Count == 0 ? 0 : Utility.Random(roster.Count);
 
         logger.Information(
-            "Guilds mustered: {Bands} of them out of {All} bots, {Makers} makers, {Unplaced} left out, {Excused} whose class stands outside the bands — {What}",
-            bands,
-            all,
-            makers.Count,
-            Unplaced,
+            "Guilds mustered: {Guilds} came back from the world save holding {Kept} bots, {Free} bots belong to none and {Excused} stand outside the bands by class — {What}",
+            _guilds.Count,
+            kept,
+            free,
             Excused,
             Describe()
         );
 
         logger.Information(
-            "Guild membership: a member gives a guild with nothing to show {Patience} minutes before it may walk out, one a minute at most, and is then barred from every guild for {Rejoin} hours; a leader may put one member out and take one bot on every {Roster} minutes, and may not take back somebody who walked out of its own guild",
+            "Guild membership: founding is {Founding} — every {Gather}s one bot without a guild joins the smallest guild under {Band}, or founds its own with the {Fellows} nearest bots without one if no guild is under {Band}, {Names} names to go round, {Most} the ceiling; a member gives a guild with nothing to show {Patience} minutes before it may leave, one a minute at most, {Defecting}, and is then barred from joining any guild for {Rejoin} hours, though not from founding one; a leader may put one member out and take one bot on every {Roster} minutes, and may not take back somebody who walked out of its own guild; the head of a guild neither leaves nor is put out",
+            Founding ? "ON" : "OFF",
+            GatherMs / 1000,
+            Band,
+            Least - 1,
+            Band,
+            Names.Length,
+            Most,
             Patience / 60000,
+            Defecting ? "and only for a guild that has something to show and room" : "into no guild at all",
             RejoinMs / 3600000,
             BotRoster.EveryMs / 60000
+        );
+    }
+
+    private static bool Ours(string name)
+    {
+        for (var i = 0; i < Names.Length; i++)
+        {
+            if (string.Equals(Names[i].Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static void Stone(Guild guild)
+    {
+        if (guild is not { Disbanded: false } || Guild.NewGuildSystem || guild.Guildstone is { Deleted: false })
+        {
+            return;
+        }
+
+        guild.Guildstone = new Guildstone(guild);
+        Stones++;
+    }
+
+    public static long Stones { get; private set; }
+
+    public static bool Founding { get; set; } = true;
+
+    public static int GatherMs { get; set; } = 5000;
+
+    public static long Founded { get; private set; }
+
+    public static long Gathered { get; private set; }
+
+    public static long TooFew { get; private set; }
+
+    public static long Nameless { get; private set; }
+
+    public static long Barred48 { get; private set; }
+
+    private static long _gathered;
+
+    private static int _cursor;
+
+    public static BotMobile Head(Guild guild) =>
+        guild is { Disbanded: false } && guild.Leader is BotMobile { Deleted: false } head ? head : null;
+
+    public static bool IsHead(BotMobile bot) =>
+        bot?.Guild is Guild guild && ReferenceEquals(Head(guild), bot);
+
+    private static bool Loose(BotMobile bot) =>
+        bot is { Deleted: false, Alive: true, Guild: null, Class: not null }
+        && bot.Map != null
+        && bot.Map != Map.Internal
+        && !Outside(bot);
+
+    public static void Gather()
+    {
+        if (!Running || !Founding || !_dealt)
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+
+        if (now - (_gathered + GatherMs) < 0)
+        {
+            return;
+        }
+
+        _gathered = now;
+
+        List<string> dead = null;
+
+        foreach (var (name, guild) in _guilds)
+        {
+            if (guild.Disbanded)
+            {
+                (dead ??= []).Add(name);
+            }
+        }
+
+        if (dead != null)
+        {
+            for (var i = 0; i < dead.Count; i++)
+            {
+                _guilds.Remove(dead[i]);
+
+                logger.Information("{Guild} is no more: its last member is gone, and the name is free to be taken again", dead[i]);
+            }
+        }
+
+        var roster = BotPopulation.Bots;
+        BotMobile bot = null;
+
+        for (var looked = 0; looked < roster.Count && bot == null; looked++)
+        {
+            var next = roster[_cursor++ % roster.Count];
+
+            if (Loose(next))
+            {
+                bot = next;
+            }
+        }
+
+        if (bot == null)
+        {
+            return;
+        }
+
+        var cooling = Cools(bot);
+
+        if (!cooling && Roomiest(Band) is { } small)
+        {
+            Admit(small, bot);
+
+            return;
+        }
+
+        if (FreeName(out var named))
+        {
+            var fellows = Nearest(bot, Least - 1);
+
+            if (fellows.Count >= Least - 1)
+            {
+                List<BotMobile> band = [bot];
+
+                band.AddRange(fellows);
+                Form(named, band);
+                Founded++;
+
+                var names = new string[fellows.Count];
+
+                for (var i = 0; i < fellows.Count; i++)
+                {
+                    names[i] = $"{fellows[i].Name} the {fellows[i].Class?.Name}";
+                }
+
+                logger.Information(
+                    "{Founder} the {Class} has founded {Guild} [{Abbrev}] at ({X}, {Y}) with {Fellows} — {Count} guilds stand now",
+                    bot.Name,
+                    bot.Class?.Name,
+                    named.Name,
+                    named.Abbrev,
+                    bot.X,
+                    bot.Y,
+                    string.Join(", ", names),
+                    _guilds.Count
+                );
+
+                return;
+            }
+
+            TooFew++;
+        }
+        else
+        {
+            Nameless++;
+        }
+
+        if (cooling)
+        {
+            Barred48++;
+
+            return;
+        }
+
+        if (Roomiest(Most) is { } any)
+        {
+            Admit(any, bot);
+
+            return;
+        }
+
+        Unplaced++;
+    }
+
+    private static Guild Roomiest(int under)
+    {
+        Guild smallest = null;
+
+        foreach (var guild in _guilds.Values)
+        {
+            if (guild.Disbanded || guild.Members.Count >= under)
+            {
+                continue;
+            }
+
+            if (smallest == null || guild.Members.Count < smallest.Members.Count)
+            {
+                smallest = guild;
+            }
+        }
+
+        return smallest;
+    }
+
+    private static bool FreeName(out (string Name, string Abbrev) named)
+    {
+        for (var i = 0; i < Names.Length; i++)
+        {
+            if (!_guilds.TryGetValue(Names[i].Name, out var guild) || guild.Disbanded)
+            {
+                named = Names[i];
+
+                return true;
+            }
+        }
+
+        named = default;
+
+        return false;
+    }
+
+    private static List<BotMobile> Nearest(BotMobile founder, int many)
+    {
+        List<BotMobile> found = [];
+        var roster = BotPopulation.Bots;
+
+        for (var i = 0; i < roster.Count; i++)
+        {
+            var other = roster[i];
+
+            if (!ReferenceEquals(other, founder) && Loose(other) && other.Map == founder.Map)
+            {
+                found.Add(other);
+            }
+        }
+
+        found.Sort((a, b) => founder.GetDistanceToSqrt(a.Location).CompareTo(founder.GetDistanceToSqrt(b.Location)));
+
+        if (found.Count > many)
+        {
+            found.RemoveRange(many, found.Count - many);
+        }
+
+        return found;
+    }
+
+    private static void Admit(Guild guild, BotMobile bot)
+    {
+        guild.AddMember(bot);
+        Show(bot);
+        Joined(bot);
+        Gathered++;
+
+        logger.Information(
+            "{Bot} the {Class} has joined {Guild}, {Count} of {Most} now, under {Head}",
+            bot.Name,
+            bot.Class?.Name,
+            guild.Name,
+            guild.Members.Count,
+            Most,
+            Head(guild)?.Name ?? "nobody"
         );
     }
 
@@ -291,6 +516,8 @@ public static class BotGuilds
         }
 
         _guilds[named.Name] = guild;
+
+        Stone(guild);
 
         for (var i = 0; i < band.Count; i++)
         {
@@ -407,6 +634,46 @@ public static class BotGuilds
         return worth;
     }
 
+    public static bool Defecting { get; set; } = true;
+
+    public static long Crossed { get; private set; }
+
+    public static long Nowhere { get; private set; }
+
+    private static Guild Worthier(Guild than)
+    {
+        Guild best = null;
+        var bestWorth = 0;
+
+        foreach (var other in _guilds.Values)
+        {
+            if (other == null || ReferenceEquals(other, than) || other.Disbanded || other.Members.Count >= Most)
+            {
+                continue;
+            }
+
+            if (than.Enemies != null && than.Enemies.Contains(other))
+            {
+                continue;
+            }
+
+            var worth = Worth(other);
+
+            if (worth <= 0)
+            {
+                continue;
+            }
+
+            if (best == null || worth > bestWorth || (worth == bestWorth && other.Members.Count < best.Members.Count))
+            {
+                best = other;
+                bestWorth = worth;
+            }
+        }
+
+        return best;
+    }
+
     public static void Review()
     {
         if (!Running || !Leaving || _guilds.Count == 0)
@@ -437,11 +704,20 @@ public static class BotGuilds
             return;
         }
 
+        var better = Defecting ? Worthier(guild) : null;
+
+        if (Defecting && better == null)
+        {
+            Nowhere++;
+
+            return;
+        }
+
         var members = guild.Members;
 
         for (var i = 0; i < members.Count; i++)
         {
-            if (members[i] is not BotMobile { Deleted: false, Alive: true } bot || IsMaker(bot))
+            if (members[i] is not BotMobile { Deleted: false, Alive: true } bot || IsHead(bot))
             {
                 continue;
             }
@@ -449,6 +725,42 @@ public static class BotGuilds
             if (!_joined.TryGetValue(bot.Serial, out var since) || now - (since + Patience) < 0)
             {
                 continue;
+            }
+
+            if (Cools(bot))
+            {
+                continue;
+            }
+
+            if (better != null)
+            {
+                if (Spurned(bot, better))
+                {
+                    continue;
+                }
+
+                better.AddMember(bot);
+                Show(bot);
+
+                _quit[bot.Serial] = (now, guild.Name);
+                Joined(bot);
+                Walked++;
+                Crossed++;
+
+                logger.Information(
+                    "{Bot} the {Class} has left {Guild} for {Better}: it has no hall, no ground and no purse to speak of after {Minutes} minutes, and {Better} is {Showing} with {Count} of {Most}",
+                    bot.Name,
+                    bot.Class?.Name,
+                    guild.Name,
+                    better.Name,
+                    (now - since) / 60000,
+                    better.Name,
+                    Worth(better) >= 2 ? "holding a hall" : "holding ground or a purse",
+                    better.Members.Count,
+                    Most
+                );
+
+                return;
             }
 
             guild.RemoveMember(bot);
@@ -601,7 +913,7 @@ public static class BotGuilds
             return false;
         }
 
-        if (IsMaker(bot))
+        if (IsHead(bot))
         {
             Spared++;
 
@@ -741,6 +1053,8 @@ public static class BotGuilds
             }
 
             got += spare;
+
+            BotYield.Aside(mate, spare);
         }
 
         if (got < need)
@@ -748,6 +1062,8 @@ public static class BotGuilds
             if (got > 0)
             {
                 Banker.Deposit(member, got);
+
+                BotYield.Aside(member, -got);
             }
 
             Cannot++;
@@ -779,6 +1095,7 @@ public static class BotGuilds
         try
         {
             var makerless = 0;
+            var held = 0;
 
             foreach (var (name, guild) in _guilds)
             {
@@ -793,30 +1110,59 @@ public static class BotGuilds
                 say.Append("] ");
                 say.Append((guild.Members?.Count ?? 0).ToString());
 
-                var maker = Maker(guild);
+                held += guild.Members?.Count ?? 0;
 
-                if (maker == null)
+                if (guild.Disbanded)
+                {
+                    say.Append(" DISBANDED");
+
+                    continue;
+                }
+
+                var head = Head(guild);
+
+                if (head != null)
+                {
+                    say.Append(" under ");
+                    say.Append(head.Name);
+                    say.Append(" the ");
+                    say.Append(head.Class?.Name ?? "?");
+                }
+
+                if (Maker(guild) == null)
                 {
                     makerless++;
                 }
-                else
+            }
+
+            var loose = 0;
+            var roster = BotPopulation.Bots;
+
+            for (var i = 0; i < roster.Count; i++)
+            {
+                if (roster[i] is { Deleted: false, Guild: null } bot && !Outside(bot))
                 {
-                    say.Append(" under ");
-                    say.Append(maker.Name);
+                    loose++;
                 }
             }
 
-            var stood = Standings == 0
-                ? "; nothing has been stood for anybody yet"
-                : $"; {Stood}gp stood for members {Standings} times, {Cannot} times a guild could not"
-                  + $"; {Walked} members walked out of a guild that had nothing to show, {Cooling} refused a guild for having lately left one"
-                  + $"; {BotRoster.Describe()}"
-                  + $"; {BotCharter.Describe()}";
+            var stood = (Standings == 0
+                    ? "; nothing has been stood for anybody yet"
+                    : $"; {Stood}gp stood for members {Standings} times, {Cannot} times a guild could not")
+                + $"; {Walked} members left a guild that had nothing to show ({Crossed} of them for a guild that had, {Nowhere} looks found no guild worth leaving for), {Cooling} refused a guild for having lately left one"
+                + $"; {BotRoster.Describe()}"
+                + $"; {BotCharter.Describe()}";
 
-            var rule = $"{Least}-{Most} to a guild, one maker each";
+            var founding = !Founding
+                ? "founding is OFF"
+                : $"{Founded} founded and {Gathered} joined since the shard came up, {Stones} given the stone the engine wants; "
+                  + $"looks that placed nobody: {TooFew} found fewer than {Least - 1} others without a guild to found with, "
+                  + $"{Nameless} found every name taken, {Barred48} were inside the bar for walking out, {Unplaced} found every guild full";
+
+            var rule = $"{Least} to found and {Most} at most, anybody may found";
             var short_ = makerless == 0 ? "" : $", {makerless} of them with nobody to make anything";
 
-            return $"{_guilds.Count} guilds holding the population ({rule}{short_}), a guildmate worth ×{Kinship:F2}: {say.ToString()}{stood}";
+            return $"{_guilds.Count} guilds holding {held} bots with {loose} outside them ({rule}{short_}), a guildmate worth ×{Kinship:F2}: {say.ToString()}; {founding}{stood}";
         }
         finally
         {
@@ -844,6 +1190,15 @@ public static class BotGuilds
         HeldElsewhere = 0;
         Crowded = 0;
         Spared = 0;
+        Crossed = 0;
+        Nowhere = 0;
+        Founded = 0;
+        Gathered = 0;
+        TooFew = 0;
+        Nameless = 0;
+        Barred48 = 0;
+        Stones = 0;
+        _cursor = 0;
         _dealt = false;
 
         BotRoster.Forget();

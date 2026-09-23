@@ -41,6 +41,10 @@ public sealed class BotSurgeon : IBotProposer
 
     public static int Reach { get; set; } = 20;
 
+    public static int MovingMs { get; set; } = 1500;
+
+    public static long Moving { get; private set; }
+
     private static bool _said;
 
     public string Name => "Surgeon";
@@ -111,6 +115,18 @@ public sealed class BotSurgeon : IBotProposer
                 continue;
             }
 
+            if (BotMend.Abetting(bot, mobile) != null)
+            {
+                continue;
+            }
+
+            if (OnTheMove(bot, mobile))
+            {
+                Moving++;
+
+                continue;
+            }
+
             worst = mobile;
             lowest = share;
         }
@@ -118,5 +134,17 @@ public sealed class BotSurgeon : IBotProposer
         return worst;
     }
 
-    public static void Forget() => _said = false;
+    private static bool OnTheMove(Mobile healer, Mobile patient) =>
+        MovingMs > 0
+        && Core.TickCount - patient.LastMoveTime < MovingMs
+        && !healer.InRange(patient.Location, BotMend.Cast)
+        && !BotMend.Embattled(patient);
+
+    public static string Describe() => $"{Moving} times the worst-hurt was passed over for walking on out of a heal's reach";
+
+    public static void Forget()
+    {
+        _said = false;
+        Moving = 0;
+    }
 }

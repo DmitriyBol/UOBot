@@ -67,6 +67,12 @@ public sealed class BotMind
 
     public static int LeastMenu { get; set; } = 3;
 
+    public static int LosesBeforeRest { get; set; } = 3;
+
+    public static int RestMs { get; set; } = 300000;
+
+    public static int MostRests { get; set; } = 6;
+
     public static int MostPerTrade { get; set; } = 2;
 
     public static int BarrenHoldsMs { get; set; } = 240000;
@@ -80,6 +86,8 @@ public sealed class BotMind
     private readonly List<BotMindOutcome> _past = [];
 
     private readonly List<(string Trade, long Tick, int Strikes)> _barren = [];
+
+    private readonly Dictionary<string, (int Lost, int Rests, long Tick)> _losing = new(StringComparer.OrdinalIgnoreCase);
 
     private IReadOnlyList<string> _trades = [];
 
@@ -116,11 +124,23 @@ public sealed class BotMind
 
     public BotMindChoice Choice { get; private set; }
 
+    public List<string> Orders { get; } = [];
+
+    public long Took { get; private set; }
+
+    public long Asked { get; private set; }
+
     public long Chose { get; private set; }
 
     public long Taken { get; private set; }
 
     public long Passed { get; private set; }
+
+    public long Agreed { get; private set; }
+
+    public long Rested { get; private set; }
+
+    public long Spared { get; private set; }
 
     public long Barren { get; private set; }
 
@@ -151,13 +171,16 @@ public sealed class BotMind
                 return;
             }
 
+            var holding = body.Resolve?.Deed;
+
             BotMindLog.Write(
                 Name,
-                $"its choice of {Choice.Intent} was not taken up; the auction is holding {body.Resolve?.Deed?.Kind ?? "nothing"} instead",
+                $"its choice of {Choice.Intent} was not taken up; the auction is holding {holding?.Kind ?? "nothing"} instead",
                 null
             );
 
             Passed++;
+            Outbid(Choice.Intent, holding);
             Choice = null;
         }
 
@@ -206,17 +229,18 @@ public sealed class BotMind
 
         _asking = true;
 
-        var menu = Menu(live);
+        var open = Menu(live);
+        var menu = Rest(open);
 
         var system = BotMindSight.System(this);
-        var state = BotMindSight.State(this, body, menu);
+        var state = BotMindSight.State(this, body, menu, open);
 
         var (ours, theirs) = Roster(body);
 
         BotOllama.Ask(
             system,
             state,
-            BotMindChoice.Schema(menu, ours, theirs),
+            BotMindChoice.Schema(menu, ours, theirs, Orders, open),
             false,
             (json, waited) => Answered(json, waited, menu)
         );
@@ -240,6 +264,90 @@ public sealed class BotMind
         }
 
         return menu.Count < LeastMenu ? trades : menu;
+    }
+
+    private IReadOnlyList<string> Rest(IReadOnlyList<string> open)
+    {
+        if (_losing.Count == 0)
+        {
+            return open;
+        }
+
+        List<(string Trade, int Rests)> resting = null;
+
+        for (var i = 0; i < open.Count; i++)
+        {
+            if (_losing.TryGetValue(open[i], out var losing) && losing.Rests > 0
+                && Core.TickCount - losing.Tick < RestFor(losing.Rests))
+            {
+                (resting ??= []).Add((open[i], losing.Rests));
+            }
+        }
+
+        if (resting == null)
+        {
+            return open;
+        }
+
+        resting.Sort((a, b) => b.Rests.CompareTo(a.Rests));
+
+        List<string> menu = [..open];
+
+        for (var i = 0; i < resting.Count; i++)
+        {
+            if (menu.Count <= LeastMenu)
+            {
+                Spared++;
+
+                continue;
+            }
+
+            menu.Remove(resting[i].Trade);
+        }
+
+        return menu;
+    }
+
+    private static long RestFor(int rests) => (long)RestMs * Math.Min(rests, MostRests);
+
+    private void Outbid(string trade, BotDeed holding)
+    {
+        if (trade == null)
+        {
+            return;
+        }
+
+        var work = holding is BotMindDeed minded ? minded.Work : holding;
+
+        if (work != null && BotWill.OfferedAs(work.Kind, trade))
+        {
+            Agreed++;
+            _losing.Remove(trade);
+
+            return;
+        }
+
+        _losing.TryGetValue(trade, out var losing);
+        losing.Lost++;
+
+        if (losing.Lost < LosesBeforeRest)
+        {
+            _losing[trade] = losing;
+
+            return;
+        }
+
+        losing.Lost = 0;
+        losing.Rests = Math.Min(losing.Rests + 1, MostRests);
+        losing.Tick = Core.TickCount;
+        _losing[trade] = losing;
+        Rested++;
+
+        BotMindLog.Write(
+            Name,
+            $"lost {trade} {LosesBeforeRest} times running with the bot at other work ({work?.Kind ?? "nothing"} now), so {trade} rests for {RestFor(losing.Rests) / 60000} minutes",
+            null
+        );
     }
 
     private bool Empty(string trade)
@@ -386,6 +494,18 @@ public sealed class BotMind
 
         Roll(choice);
 
+        if (choice.Take != null && BotMindClaims.Claim(Name, choice.Take))
+        {
+            Took++;
+            BotMindLog.Write(Name, $"takes the order for {choice.Take}", choice.Why);
+        }
+
+        if (choice.Want != null && choice.WantAmount > 0 && Body?.Guild is Server.Guilds.Guild band)
+        {
+            Asked++;
+            BotCharter.Want(band, choice.Want, choice.WantAmount, Name, choice.Why);
+        }
+
         BotMindLog.Write(Name, "could have taken", string.Join(", ", trades));
         BotMindLog.Write(Name, "and", BotMindSight.Brief(this, Body));
 
@@ -435,6 +555,7 @@ public sealed class BotMind
 
         Choice = null;
         Taken++;
+        _losing.Remove(choice.Intent ?? "");
 
         return true;
     }
@@ -736,5 +857,5 @@ public sealed class BotMind
     }
 
     public string Describe() =>
-        $"{Name} the {Trade}: {Chose} decisions, {Taken} taken up, {Passed} outbid, {Barren} on empty trades, {Idle} beats with no work anywhere, {Over} predictions too high against {Under} not too high, {_lessons.Count} rules held";
+        $"{Name} the {Trade}: {Chose} decisions, {Taken} taken up, {Passed} outbid ({Agreed} with the bot at that trade anyway), {Rested} rests for losing {LosesBeforeRest} running ({Spared} held back to keep {LeastMenu} on the menu), {Barren} on empty trades, {Idle} beats with no work anywhere, {Over} predictions too high against {Under} not too high, {_lessons.Count} rules held";
 }

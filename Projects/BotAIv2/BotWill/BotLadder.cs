@@ -33,7 +33,16 @@ public static class BotLadder
     public static bool Overloaded(Mobile bot) => bot != null && Load(bot) > Ceiling(bot);
 
     public static bool Failing(Mobile bot) =>
-        bot != null && bot.HitsMax > 0 && bot.Hits <= bot.HitsMax * FailingFraction;
+        bot != null && bot.HitsMax > 0 && bot.Hits <= bot.HitsMax * Fraction(bot);
+
+    public static double NoviceSkill { get; set; } = 50.0;
+
+    public static double NoviceFraction { get; set; } = 0.5;
+
+    public static bool Novice(Mobile bot) =>
+        bot is BotMobile { Class.MainSkill: { } main } body && body.Skills[main].Value < NoviceSkill;
+
+    public static double Fraction(Mobile bot) => Novice(bot) ? NoviceFraction : FailingFraction;
 
     public static bool Hunted(BotResolve resolve) =>
         resolve is { Struck: true } && Core.TickCount - resolve.HurtTick < HuntedMs;

@@ -111,6 +111,8 @@ public sealed class BotScout : BotDeed
 
     public override string Kind => Trade;
 
+    public override bool Braves => true;
+
     public override Map Map => _map;
 
     public override Point3D Where => _where;
@@ -448,6 +450,36 @@ public sealed class BotScout : BotDeed
     private static bool Reachable(Map map, Point3D from, Point3D at) =>
         BotReach.Ask(map, from, at, BotArrival.Within(BotQuad.Side / 3)) != BotReachVerdict.Sealed;
 
+    public static int RoadLimit { get; set; } = 600;
+
+    public static long Roadless { get; private set; }
+
+    internal static bool Roadworthy(Map map, Point3D at)
+    {
+        if (!BotRoads.Ready)
+        {
+            return true;
+        }
+
+        if (!BotRoads.Covers(map, at.X, at.Y))
+        {
+            Roadless++;
+
+            return false;
+        }
+
+        var road = BotRoads.FromHome(map, at.X, at.Y);
+
+        if (road >= 0 && road <= RoadLimit)
+        {
+            return true;
+        }
+
+        Roadless++;
+
+        return false;
+    }
+
     private Point3D NextSquare(Mobile body)
     {
         for (var tries = 0; tries < Vets; tries++)
@@ -456,7 +488,7 @@ public sealed class BotScout : BotDeed
                 _map,
                 body.Location,
                 Range,
-                at => Within(at) && Reachable(_map, body.Location, at)
+                at => Within(at) && Roadworthy(_map, at) && Reachable(_map, body.Location, at)
             );
 
             if (next == Point3D.Zero)
@@ -510,7 +542,7 @@ public sealed class BotScout : BotDeed
 
     public static string Describe() =>
         $"{Parties} scouting parties set out, {Undermanned} could not raise {Least} bodies, {Surveyed} squares read, {Baulked} stepped past as unreachable, "
-        + $"{Unreached} never stood in and retired off the frontier, {Timedout} ran out of time; {Wages}gp paid to {Paid} volunteers";
+        + $"{Unreached} never stood in and retired off the frontier, {Roadless} passed over for lying past {RoadLimit} tiles of road from home, {Timedout} ran out of time; {Wages}gp paid to {Paid} volunteers";
 
     public static void Forget()
     {
@@ -519,6 +551,7 @@ public sealed class BotScout : BotDeed
         Surveyed = 0;
         Baulked = 0;
         Unreached = 0;
+        Roadless = 0;
         Timedout = 0;
         Wages = 0;
         Paid = 0;

@@ -29,6 +29,29 @@ public static class BotCraftwork
 
     public static double Margin { get; set; } = 5.0;
 
+    public static double LeastChance { get; set; } = 0.35;
+
+    public static long Unlikely { get; private set; }
+
+    private static bool Likely(Mobile bot, CraftSystem system, CraftItem recipe, Type material)
+    {
+        if (LeastChance <= 0.0)
+        {
+            return true;
+        }
+
+        var chance = recipe.GetSuccessChance(bot, material, system, false, out var all);
+
+        if (all && chance >= LeastChance)
+        {
+            return true;
+        }
+
+        Unlikely++;
+
+        return false;
+    }
+
     public static CraftItem Choose(Mobile bot, CraftSystem system, SkillName skill, Type material, int stock = 0)
     {
         if (bot == null || system == null || material == null)
@@ -63,6 +86,11 @@ public static class BotCraftwork
                 continue;
             }
 
+            if (!Likely(bot, system, recipe, material))
+            {
+                continue;
+            }
+
             best = recipe;
             bestNeeds = needs;
         }
@@ -89,7 +117,7 @@ public static class BotCraftwork
                 continue;
             }
 
-            return Requirement(recipe, skill) <= able - Margin ? recipe : null;
+            return Requirement(recipe, skill) <= able - Margin && Likely(bot, system, recipe, material) ? recipe : null;
         }
 
         return null;

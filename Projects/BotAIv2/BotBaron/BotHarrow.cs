@@ -112,7 +112,7 @@ public sealed class BotHarrow : BotDeed
 
     public static int Medics { get; set; } = 1;
 
-    public static int Sight { get; set; } = 20;
+    public static int Sight { get; set; } = 40;
 
     public static int RoundMs { get; set; } = 90000;
 
@@ -151,6 +151,8 @@ public sealed class BotHarrow : BotDeed
     private int _kills;
 
     private bool _standing;
+
+    private Mobile _fighting;
 
     private long _steppedTick;
 
@@ -195,9 +197,15 @@ public sealed class BotHarrow : BotDeed
     }
 
     public static string Describe() =>
-        $"{Musters} musters called and {Called} bots called up, {Marches} of them marched, {Undermanned} could not raise the company asked for in {MusterMs / 60000} minutes of calling ({Rested} times the idea was then left alone for {RestMs / 60000} minutes), {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them";
+        $"{Musters} musters called and {Called} bots called up, {Marches} of them marched, {Undermanned} could not raise the company asked for in {MusterMs / 60000} minutes of calling ({Rested} times the idea was then left alone for {RestMs / 60000} minutes), {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them, {FellBack} times the leader put the harrow down and the company fell back with him, {TookUp} of them taken up again";
 
     public override string Kind => Trade;
+
+    public override bool Still => !_marching;
+
+    public override bool Braves => true;
+
+    public override bool Steadfast => true;
 
     public override Map Map => _map;
 
@@ -459,6 +467,21 @@ public sealed class BotHarrow : BotDeed
                 _square.X,
                 _square.Y
             );
+        }
+
+        if (squad.Stance == BotSquadStance.Fighting && squad.Focus is { Deleted: false, Alive: true } fighting)
+        {
+            if (!ReferenceEquals(fighting, _fighting))
+            {
+                _fighting = fighting;
+
+                if (member is IBotWilful wilful && wilful.Resolve != null)
+                {
+                    wilful.Resolve.StirredTick = now;
+                }
+            }
+
+            return BotDoing.Work($"fighting {fighting.Name} with the company on ({_square.X}, {_square.Y}), {_kills} of {Quota} down");
         }
 
         if (now - _steppedTick >= RoundMs || body.InRange(_post, 1))
@@ -750,7 +773,7 @@ public sealed class BotHarrow : BotDeed
                 continue;
             }
 
-            if (!leader.CanBeHarmful(creature, false))
+            if (!BotThreat.Hostile(leader, creature))
             {
                 continue;
             }
@@ -805,6 +828,8 @@ public sealed class BotHarrow : BotDeed
                     BotQuad.Cleared(around[i]);
                 }
             }
+
+            BotCity.Claim(_map, _square, squad.Members);
         }
 
         Release(squad);
@@ -825,6 +850,53 @@ public sealed class BotHarrow : BotDeed
         _post = Post(++_round);
 
         return true;
+    }
+
+    public static long FellBack { get; private set; }
+
+    public static long TookUp { get; private set; }
+
+    public override void Paused(IBotWilful bot)
+    {
+        FellBack++;
+
+        if (_squad == null)
+        {
+            return;
+        }
+
+        _squad.Disengage("the leader has put the harrow down");
+
+        logger.Information(
+            "{Name} put the harrow of ({X}, {Y}) down; the company of {Count} falls back with him",
+            bot?.Self?.Name,
+            _square.X,
+            _square.Y,
+            _squad.Count
+        );
+    }
+
+    public override void Resumed(IBotWilful bot)
+    {
+        TookUp++;
+
+        var now = Core.TickCount;
+
+        _steppedTick = now;
+        _sweptTick = now;
+
+        if (_mustering)
+        {
+            _musteredTick = now;
+        }
+
+        logger.Information(
+            "{Name} took the harrow of ({X}, {Y}) up again with {Count} in the company",
+            bot?.Self?.Name,
+            _square.X,
+            _square.Y,
+            _squad?.Count ?? 0
+        );
     }
 
     public override void Drop(IBotWilful bot)
@@ -864,5 +936,7 @@ public sealed class BotHarrow : BotDeed
         Emptied = 0;
         Timedout = 0;
         Killed = 0;
+        FellBack = 0;
+        TookUp = 0;
     }
 }

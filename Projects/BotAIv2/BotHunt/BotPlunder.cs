@@ -59,6 +59,8 @@ public sealed class BotPlunder : BotDeed
 
     public static long Townbound { get; private set; }
 
+    public static long Theirs { get; private set; }
+
     public static long Bare { get; private set; }
 
     public static long Emptied { get; private set; }
@@ -91,6 +93,8 @@ public sealed class BotPlunder : BotDeed
     }
 
     public override string Kind => Trade;
+
+    public override bool Braves => true;
 
     public override Map Map => _map;
 
@@ -232,6 +236,13 @@ public sealed class BotPlunder : BotDeed
                 continue;
             }
 
+            if (BotLair.Theirs(box) && !BotUnderworld.Member(body))
+            {
+                Theirs++;
+
+                continue;
+            }
+
             if (box is LockableContainer { Locked: true })
             {
                 Locked++;
@@ -287,6 +298,7 @@ public sealed class BotPlunder : BotDeed
 
     public static void Forget()
     {
+        Theirs = 0;
         _emptied.Clear();
         Locked = 0;
         Trapped = 0;
@@ -302,7 +314,7 @@ public sealed class BotPlunder : BotDeed
     public static string Describe() =>
         $"{Emptied} chests emptied of {Taken} things and {Coins}gp, {Bare} held nothing worth carrying, "
         + $"{Interrupted} broken off for something living standing over them; {Locked} of them were locked and "
-        + $"{Trapped} trapped; passed over: {Held} still held by a garrison, {Townbound} standing inside a town";
+        + $"{Trapped} trapped; passed over: {Held} still held by a garrison, {Townbound} standing inside a town and {Theirs} belonging to The Shadow";
 }
 
 /// <summary>

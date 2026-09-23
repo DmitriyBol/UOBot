@@ -69,6 +69,11 @@ public sealed class BotSteward : IBotProposer
             return null;
         }
 
+        if (BotUnderworld.Band(guild))
+        {
+            return null;
+        }
+
         if (BotEstate.Hall(guild) != null)
         {
             return null;

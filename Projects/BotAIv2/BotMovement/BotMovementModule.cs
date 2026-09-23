@@ -1,3 +1,4 @@
+using System;
 using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -24,6 +25,8 @@ namespace Server.BotAI.V2;
 public sealed class BotMovementModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMovementModule));
+
+    private static RoadsTimer _roads;
 
     public override string Name => "Movement";
 
@@ -60,25 +63,51 @@ public sealed class BotMovementModule : BotModule
         );
 
         BotBarred.Announce();
+
+        _roads?.Stop();
+        _roads = new RoadsTimer(TimeSpan.FromMilliseconds(Math.Max(10, BotRoads.SliceEveryMs)));
+        _roads.Start();
     }
 
     public override void Reset()
     {
         BotWalk.Walking = false;
 
-        logger.Information("Movement, before the reload: {Paths}; {Walk}; {Reach}; {Refused}",
+        logger.Information("Movement, before the reload: {Paths}; {Walk}; {Reach}; {Refused}; {Roads}",
             BotPath.Describe(),
             BotWalk.Describe(),
             BotReach.Describe(),
-            BotRefused.Describe()
+            BotRefused.Describe(),
+            BotRoads.Describe()
         );
+
+        _roads?.Stop();
+        _roads = null;
 
         BotPath.Reset();
         BotWalk.Reset();
         BotReach.Reset();
         BotRefused.Forget();
+        BotRoads.Forget();
     }
 
     public static string Summarise() =>
         $"{BotPath.Describe()}; {BotWalk.Describe()}; {BotReach.Describe()}; {BotRefused.Describe()}";
+
+    private sealed class RoadsTimer : Timer
+    {
+        public RoadsTimer(TimeSpan interval) : base(interval, interval)
+        {
+        }
+
+        protected override void OnTick()
+        {
+            BotRoads.Slice();
+
+            if (BotRoads.Ready || BotRoads.Failed)
+            {
+                Stop();
+            }
+        }
+    }
 }

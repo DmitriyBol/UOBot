@@ -84,7 +84,12 @@ public sealed class BotEvict : BotDeed
     public override string Stage =>
         _said ? $"waiting to see whether {_them?.Name} moves" : $"to {_them?.Name}, who is working our land";
 
-    public override bool Bend(IBotWilful bot) => false;
+    public override bool Bend(IBotWilful bot)
+    {
+        BotBailiff.Unreached(bot?.Self, _them);
+
+        return false;
+    }
 
     public override void Drop(IBotWilful bot) => BotBailiff.Release(_them);
 
@@ -149,6 +154,7 @@ public sealed class BotEvict : BotDeed
 
         Stayed++;
         BotRegard.Defied(_them.Guild?.Name, _ours);
+        BotBailiff.Told(_them);
 
         return BotDoing.Done($"{_them.Name} was told to leave the land of {_ours} and stayed");
     }

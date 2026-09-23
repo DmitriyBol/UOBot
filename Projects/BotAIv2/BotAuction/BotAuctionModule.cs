@@ -30,14 +30,17 @@ public sealed class BotAuctionModule : BotModule
 
         BotAuction.Start();
 
+        BotCity.Start();
+
         logger.Information(
-            "The market is open on both sides: prices rise {Raise:P0} when the same goods sell inside {Brisk}ms, fall {Cut:P0} after {Stale}ms untouched, and stay between ×{Least} and ×{Most} of the opening ask — a want moves the same way with the sign turned round, and one supplier may fill at most {Slice} units of it at a time; it has room for {Stalls} stalls and {Wants} wants; produced goods {Listed}",
+            "The market is open on both sides: prices rise {Raise:P0} when the same goods sell inside {Brisk}ms, fall {Cut:P0} after {Stale}ms untouched, and stay between ×{Least} and ×{Most} of the opening ask — a want moves the same way with the sign turned round, rising after {RaiseMs}ms unanswered, and one supplier may fill at most {Slice} units of it at a time; it has room for {Stalls} stalls and {Wants} wants; produced goods {Listed}",
             BotAuction.RaiseStep,
             BotAuction.BriskMs,
             BotAuction.CutStep,
             BotAuction.StaleMs,
             BotAuction.LeastMultiple,
             BotAuction.MostMultiple,
+            BotAuction.RaiseMs,
             BotAuction.Slice,
             BotAuction.MaxListings,
             BotAuction.MaxWants,
@@ -50,6 +53,8 @@ public sealed class BotAuctionModule : BotModule
         logger.Information("The market, before the reload: {State}", BotAuction.Describe());
 
         BotAuction.Reset();
+        BotCity.Stop();
+        BotCity.Forget();
     }
 
     public static string Summarise() => BotAuction.Describe();

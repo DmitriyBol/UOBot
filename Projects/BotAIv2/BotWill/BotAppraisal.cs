@@ -72,9 +72,23 @@ public readonly struct BotWeigh
 
         var called = Calling == 1.0 ? "" : $"; × {Calling:F2} for {BotCalling.Word(Calling)}";
 
-        return $"{Score:F0}/min = {Estimate:F0} × {bend:F2}, that being the fifth root of "
+        return $"{Score:F0}/min = {Estimate:F0} × {bend:F2}, that being the {Nth(BotAppraisal.Root)} root of "
                + $"near {Nearness:F2} × new {Novelty:F2} × room {Room:F2} × safe {Caution:F2} × purse {Purse:F2}{extra}{called}";
     }
+
+    private static string Nth(int root) =>
+        root switch
+        {
+            2 => "square",
+            3 => "cube",
+            4 => "fourth",
+            5 => "fifth",
+            6 => "sixth",
+            7 => "seventh",
+            8 => "eighth",
+            9 => "ninth",
+            _ => $"{root}th"
+        };
 
     public override string ToString() => Describe();
 }
@@ -105,15 +119,56 @@ public static class BotAppraisal
 
     public static bool IsUnpaid(string kind) => kind != null && _unpaidKinds.Contains(kind);
 
+    private static readonly HashSet<string> _postedKinds = [];
+
+    public static bool IsPosted(string kind) => kind != null && _postedKinds.Contains(kind);
+
+    public static double Reads(string kind, double claim) =>
+        IsUnpaid(kind) ? claim
+        : IsPosted(kind) ? BotCommons.Realised(kind, claim)
+        : BotCommons.Corrected(kind, claim);
+
     public static long Stopped { get; private set; }
 
     public static long Pocketless { get; private set; }
+
+    public static int BecalmedMs { get; set; } = 600000;
+
+    public static int BecalmedStay { get; set; } = 24;
+
+    public static int BecalmedGain { get; set; } = 8;
+
+    public static int BecalmedFar { get; set; } = 64;
+
+    public static double RestlessAfter { get; set; } = 2.0;
+
+    public static long Restless { get; private set; }
+
+    public static long Undergroundish { get; private set; }
+
+    public static long Becalmed { get; private set; }
+
+    public static long Calms { get; private set; }
+
+    internal static void Becalm(BotResolve resolve, Point3D at, int setOut, int nearest)
+    {
+        if (resolve == null || setOut < BecalmedFar || setOut - nearest >= BecalmedGain)
+        {
+            return;
+        }
+
+        resolve.BecalmedAt = at;
+        resolve.BecalmedOff = setOut;
+        resolve.BecalmedTick = Core.TickCount;
+        resolve.Becalmed = true;
+        Calms++;
+    }
 
     public static double StoppedShare { get; set; } = 0.02;
 
     public static Func<string, double> Revelry { get; set; }
 
-    public const int Considerations = 5;
+    public static int Root { get; set; } = 5;
 
     public static double CrowdBite { get; set; } = 0.8;
 
@@ -130,7 +185,10 @@ public static class BotAppraisal
     public static double Weigh(IBotWilful bot, BotDeed deed, double share, out BotWeigh weigh) =>
         Weigh(bot, deed, share, out weigh, out _);
 
-    public static double Weigh(IBotWilful bot, BotDeed deed, double share, out BotWeigh weigh, out string veto)
+    public static double Weigh(IBotWilful bot, BotDeed deed, double share, out BotWeigh weigh, out string veto) =>
+        Weigh(bot, deed, share, out weigh, out veto, false);
+
+    public static double Weigh(IBotWilful bot, BotDeed deed, double share, out BotWeigh weigh, out string veto, bool inHand)
     {
         weigh = default;
         veto = null;
@@ -154,7 +212,18 @@ public static class BotAppraisal
             return 0.0;
         }
 
-        if (deed.Outlay > 0 && BotYield.Wealth(body) < deed.Outlay)
+        if (!deed.Standing && BotDungeon.Under(body.Location) != BotDungeon.Under(deed.Where))
+        {
+            Undergroundish++;
+
+            veto = BotDungeon.Under(body.Location)
+                ? $"{deed.Kind} is on the island and this bot is underground"
+                : $"{deed.Kind} is underground and this bot is on the island";
+
+            return 0.0;
+        }
+
+        if (!inHand && deed.Outlay > 0 && BotYield.Wealth(body) < deed.Outlay)
         {
             veto = $"{deed.Kind} costs {deed.Outlay}gp and it has {BotYield.Wealth(body)}gp";
 
@@ -170,11 +239,66 @@ public static class BotAppraisal
             return 0.0;
         }
 
-        var claim = deed.Unpaid ? deed.Expects : BotCommons.Corrected(deed.Kind, deed.Expects);
+        if (BotBreaker.Resting(body, deed.Kind, out var restedAfter, out var restLeftMs))
+        {
+            veto = $"{deed.Kind} failed {Math.Max(2, BotBreaker.Failures)} times running for the same reason and rests {restLeftMs / 1000}s more, after \"{restedAfter}\"";
+
+            return 0.0;
+        }
+
+        if (!inHand && !deed.Standing && resolve.Becalmed)
+        {
+            if (Core.TickCount - resolve.BecalmedTick >= BecalmedMs || !Utility.InRange(body.Location, resolve.BecalmedAt, BecalmedStay))
+            {
+                resolve.Becalmed = false;
+            }
+            else
+            {
+                var off = Tiles(body.Location, deed.Where);
+
+                if (off * 2 >= resolve.BecalmedOff && off > BecalmedStay)
+                {
+                    Becalmed++;
+
+                    veto = $"{deed.Kind} is {off} tiles off, and a walk of {resolve.BecalmedOff} from about here closed nothing {(Core.TickCount - resolve.BecalmedTick) / 1000}s ago";
+
+                    return 0.0;
+                }
+            }
+        }
+
+        if (deed is not BotBolt && BotPeril.Closes(map, deed.Where, body.Location, out var deadThere))
+        {
+            veto = $"{deed.Kind} lies in or beside ground where {deadThere:F1} bots have died lately, against {BotPeril.CloseDeaths:F1} that close it to everything but running";
+
+            return 0.0;
+        }
+
+        if (!deed.Braves && !deed.Summons && BotPeril.Lethal(map, deed.Where, body.Location, out var deadLately))
+        {
+            veto = $"{deed.Kind} lies in or beside ground where {deadLately:F1} bots have died lately, against {BotPeril.KeepOutDeaths:F1} that keep ordinary work out";
+
+            return 0.0;
+        }
+
+        if (deed is not BotBolt && deed is not BotSentence && BotOutlaw.Keeps(body, map, deed.Where))
+        {
+            veto = $"{deed.Kind} lies in a guarded town and {body.Name} is red";
+
+            return 0.0;
+        }
+
+        var claim = deed.Unpaid ? deed.Expects
+            : deed.Posted ? BotCommons.Realised(deed.Kind, deed.Expects)
+            : BotCommons.Corrected(deed.Kind, deed.Expects);
 
         if (deed.Unpaid)
         {
             _unpaidKinds.Add(deed.Kind);
+        }
+        else if (deed.Posted)
+        {
+            _postedKinds.Add(deed.Kind);
         }
 
         var estimate = deed.Unpaid ? claim : resolve.Ledger.Expect(deed.Kind, map, deed.Where, claim);
@@ -184,6 +308,12 @@ public static class BotAppraisal
             if (deed.Unpaid)
             {
                 Unpaid++;
+
+                estimate = 0.01;
+            }
+            else if (deed.Kind == BotProwl.Trade && resolve.Urges.BarrenMinutes(Core.TickCount) >= RestlessAfter)
+            {
+                Restless++;
 
                 estimate = 0.01;
             }
@@ -238,7 +368,7 @@ public static class BotAppraisal
 
         var calling = BotCalling.Worth(body, deed);
 
-        var score = estimate * Math.Pow(product, 1.0 / Considerations) * calling;
+        var score = estimate * Math.Pow(product, 1.0 / Math.Max(1, Root)) * calling;
 
         weigh = new BotWeigh(estimate, nearness, novelty, room, caution, purse, score, stopped, revel, charter, ground, calling);
 

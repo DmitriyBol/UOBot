@@ -1,4 +1,5 @@
 using System;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -103,6 +104,8 @@ public sealed class BotHomeward : BotDeed
 /// </summary>
 public sealed class BotHomer : IBotProposer
 {
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHomer));
+
     public static long Asked { get; private set; }
 
     public static long Near { get; private set; }
@@ -143,10 +146,30 @@ public sealed class BotHomer : IBotProposer
             return null;
         }
 
+        if (body is BotMobile below && BotDungeon.Under(body.Location) && !BotDelveParty.Delving(body))
+        {
+            if (BotPopulation.Carry(below))
+            {
+                below.Journey?.Finish();
+                Surfaced++;
+
+                logger.Information(
+                    "{Name} was underground with no party to bring it up and no work for {Minutes:F1} minutes, and has been put back on the island at {Where}",
+                    body.Name,
+                    BotHomeward.BarrenFor,
+                    body.Location
+                );
+            }
+
+            return null;
+        }
+
         Sent++;
 
         return new BotHomeward(home, hearth);
     }
+
+    public static long Surfaced { get; private set; }
 
     public static void Forget()
     {
@@ -154,9 +177,11 @@ public sealed class BotHomer : IBotProposer
         Near = 0;
         Busy = 0;
         Sent = 0;
+        Surfaced = 0;
     }
 
     public static string Describe() =>
         $"{Asked} asked whether to go home: {Near} were already within {BotHomeward.Away} tiles of it, "
-        + $"{Busy} were far but had not been out of work for {BotHomeward.BarrenFor:F1} minutes yet, {Sent} were sent back";
+        + $"{Busy} were far but had not been out of work for {BotHomeward.BarrenFor:F1} minutes yet, {Sent} were sent back"
+        + $" and {Surfaced} were underground with no party and were brought up instead";
 }

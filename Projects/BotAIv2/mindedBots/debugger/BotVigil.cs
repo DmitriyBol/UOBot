@@ -209,6 +209,8 @@ public static class BotVigil
         _hoveredTick = now;
         _reflectedTick = now;
 
+        BotTourney.Load();
+
         Squad.Clear();
         Squad.Add(new BotWatcher(Name, Hues.Length > 0 ? Hues[0] : BotDebugger.RobeHue, 0));
 
@@ -218,6 +220,17 @@ public static class BotVigil
             {
                 Squad.Add(new BotWatcher(Helpers[i].Trim(), Hues.Length > i + 1 ? Hues[i + 1] : BotDebugger.RobeHue, i + 1));
             }
+        }
+
+        BotMarshal.Standing = null;
+
+        if (BotMarshal.Running && !string.IsNullOrWhiteSpace(BotMarshal.Name))
+        {
+            var marshal = new BotWatcher(BotMarshal.Name.Trim(), BotMarshal.Hue, Squad.Count) { Organiser = true };
+
+            Squad.Add(marshal);
+            BotMarshal.Standing = marshal;
+            BotMarshal.Woke(now);
         }
 
         for (var i = 0; i < Squad.Count; i++)
@@ -334,6 +347,8 @@ public static class BotVigil
 
         BotConsole.Listen(now);
 
+        BotTourney.Beat(now);
+
         if (BotAudit.Due(now))
         {
             BotAudit.Sweep(now, Rollcall());
@@ -384,7 +399,16 @@ public static class BotVigil
             return;
         }
 
-        if (BotRevel.Due())
+        if (BotMarshal.Standing != null)
+        {
+            if (BotMarshal.Due(now))
+            {
+                Organise(now);
+
+                return;
+            }
+        }
+        else if (BotRevel.Due())
         {
             Revel();
 
@@ -398,6 +422,12 @@ public static class BotVigil
             var thinker = Squad[_reflectTurn % Squad.Count];
 
             _reflectTurn++;
+
+            if (thinker.Organiser && Squad.Count > 1)
+            {
+                thinker = Squad[_reflectTurn % Squad.Count];
+                _reflectTurn++;
+            }
             thinker.ReportedTick = now;
 
             Reflect(thinker, now);
@@ -411,7 +441,7 @@ public static class BotVigil
         {
             var w = Squad[i];
 
-            if (now - w.ReportedTick >= ReportMs && (due == null || w.ReportedTick < due.ReportedTick))
+            if (!w.Organiser && now - w.ReportedTick >= ReportMs && (due == null || w.ReportedTick < due.ReportedTick))
             {
                 due = w;
             }
@@ -597,6 +627,87 @@ public static class BotVigil
         BotDebugLog.Write($"revel after {waited}ms — {said}");
     }
 
+    private static void Organise(long now)
+    {
+        var marshal = BotMarshal.Standing;
+
+        if (marshal == null)
+        {
+            return;
+        }
+
+        BotMarshal.Woke(now);
+        _asking = true;
+        marshal.Asked++;
+
+        var report = BotDebugSight.Report(
+            Beside(marshal),
+            Census(),
+            "",
+            [],
+            Subsystems(null, SubsystemBudget),
+            "",
+            0
+        );
+
+        var sight = BotMarshal.Sight();
+        var room = Math.Max(MostChars / 3, MostChars - sight.Length - 2);
+        var question = Bounded(report, room) + "\n\n" + sight;
+
+        _marshalQuestion = question;
+
+        BotDebugLog.Write(
+            $"{marshal.Name} is asked in {question.Length} characters: the report {report.Length}{(report.Length > room ? $", cut to {room}" : "")}, its own sight {sight.Length}"
+        );
+
+        BotOllama.Ask(
+            BotMarshal.System(marshal.Name),
+            question,
+            BotMarshal.Schema,
+            true,
+            (json, waited) => Organised(json, waited),
+            Model,
+            KeepAlive,
+            TimeoutMs
+        );
+    }
+
+    private static string _marshalQuestion;
+
+    public static int UnansweredWritten { get; private set; }
+
+    public static int MostUnansweredWritten { get; set; } = 3;
+
+    private static void Organised(string json, long waited)
+    {
+        _asking = false;
+
+        var plan = BotMarshalPlan.Read(json);
+        var said = BotMarshal.Act(plan, BotPopulation.Home);
+
+        if (said == null)
+        {
+            logger.Warning("The marshal was asked for an event and said nothing that could be read");
+
+            if (UnansweredWritten < MostUnansweredWritten && _marshalQuestion != null)
+            {
+                UnansweredWritten++;
+                BotDebugLog.Write($"{BotMarshal.Name}'s question that came to nothing, whole ({_marshalQuestion.Length} characters):\n{_marshalQuestion}");
+            }
+
+            return;
+        }
+
+        BotDebugLog.Write($"{BotMarshal.Name} after {waited}ms — {said}");
+
+        var kind = (plan.Event ?? "nothing").Trim().ToLowerInvariant();
+
+        if (plan.Say is { Length: > 0 } say && kind is not ("nothing" or "revel" or "camp"))
+        {
+            BotMarshal.Standing?.Body?.Say(say.Length > 180 ? say[..180] : say);
+        }
+    }
+
     private static void Look(BotWatcher w, long now, long waited)
     {
         var roster = Roster();
@@ -693,6 +804,38 @@ public static class BotVigil
         }
     }
 
+    public static long Labels { get; private set; }
+
+    public static long Echoes { get; private set; }
+
+    private static string Echoed(BotWatcher w, BotDebugNote note)
+    {
+        var said = Flat(note.Finding);
+
+        for (var i = 0; i < Squad.Count; i++)
+        {
+            var other = Squad[i];
+            var last = other.Last;
+
+            if (last == null || string.Equals(last.Kind, "nothing", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(Flat(last.Finding), said, StringComparison.Ordinal))
+            {
+                return ReferenceEquals(other, w) ? "its own" : $"{other.Name}'s";
+            }
+        }
+
+        return null;
+    }
+
+    private static string Flat(string text) =>
+        string.IsNullOrWhiteSpace(text)
+            ? ""
+            : string.Join(' ', text.ToLowerInvariant().Split((char[])null, StringSplitOptions.RemoveEmptyEntries));
+
     private static void Answered(BotWatcher w, string json, long waited, string report, string mine, DateTime asked)
     {
         _asking = false;
@@ -704,6 +847,42 @@ public static class BotVigil
             logger.Warning("{Name} looked at the population and the model said nothing that could be read", w.Name);
 
             return;
+        }
+
+        if (!string.Equals(note.Kind, "nothing", StringComparison.OrdinalIgnoreCase))
+        {
+            if (BotDebugMemory.Label(note.Finding))
+            {
+                w.Labels++;
+                Labels++;
+
+                BotDebugLog.Write($"{w.Name}: a label rather than a finding, not filed — [{note.Kind}] about {note.Bot}: {note.Finding}");
+                logger.Information(
+                    "{Name} answered with a label rather than a sentence about {Who}, and it is not filed",
+                    w.Name,
+                    note.Bot
+                );
+
+                return;
+            }
+
+            var whose = Echoed(w, note);
+
+            if (whose != null)
+            {
+                w.Echoes++;
+                Echoes++;
+
+                BotDebugLog.Write($"{w.Name}: repeated {whose} last claim about {note.Bot} word for word, not filed — {note.Finding}");
+                logger.Information(
+                    "{Name} repeated {Whose} last claim about {Who} word for word, and it is not filed",
+                    w.Name,
+                    whose,
+                    note.Bot
+                );
+
+                return;
+            }
         }
 
         w.Last = note;
@@ -872,17 +1051,19 @@ public static class BotVigil
         }
     }
 
-    private static string Bounded(string question)
+    private static string Bounded(string question) => Bounded(question, MostChars);
+
+    private static string Bounded(string question, int most)
     {
-        if (question == null || question.Length <= MostChars)
+        if (question == null || question.Length <= most)
         {
             return question;
         }
 
-        var cut = question.Length - MostChars;
+        var cut = question.Length - most;
 
         return string.Concat(
-            question.AsSpan(0, MostChars),
+            question.AsSpan(0, most),
             $"\n\n[{cut} characters of this report were cut to leave you room to think. What was cut came from"
             + " the end: the older findings and the subsystem summaries. Everything above is complete.]"
         );
@@ -1717,6 +1898,8 @@ public static class BotVigil
             sb.Append(BotDebugMemory.Describe());
             sb.Append("; ");
             sb.Append(BotAudit.Describe());
+            sb.Append("; ");
+            sb.Append(BotTourney.Describe());
 
             return sb.ToString();
         }

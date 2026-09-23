@@ -257,11 +257,6 @@ public static class BotShelf
             return false;
         }
 
-        if (Lot(merchant, kind) is { Deleted: false, Stackable: true })
-        {
-            return true;
-        }
-
         var most = pack.MaxItems;
 
         return most <= 0 || pack.TotalItems < most;
@@ -397,6 +392,8 @@ public static class BotShelf
 
         Gathered += given;
 
+        BotYield.Aside(member, -given);
+
         return given;
     }
 
@@ -433,11 +430,15 @@ public static class BotShelf
 
         if (carried < owing && !Banker.Withdraw(member, owing - carried))
         {
+            SetAside(member, wealth);
+
             return 0;
         }
 
         if (!pack.ConsumeTotal(typeof(Gold), owing))
         {
+            SetAside(member, wealth);
+
             return 0;
         }
 
@@ -445,8 +446,12 @@ public static class BotShelf
 
         Waged += owing;
 
+        SetAside(member, wealth);
+
         return owing;
     }
+
+    private static void SetAside(Mobile member, int before) => BotYield.Aside(member, before - BotYield.Wealth(member));
 
     public static (int Shops, int Lots, int Worth, int Purse) Standing()
     {
@@ -500,7 +505,7 @@ public static class BotShelf
         return $"{shops} guild counters holding {lots} lots worth {worth}gp with {purse}gp in their tills; "
             + $"{Stocked} lots put out for {StockedWorth}gp, {Refused} turned away for want of room, "
             + $"{Lost} that went in and could not be found again, {Unpriced} the engine opened no lot for "
-            + $"({Unstacked} of the refusals had a lot standing that the engine says would have taken them, {Slotless} had neither lot nor slot), "
+            + $"({Unstacked} of the refusals had a lot of the kind standing, which a pack at its item cap will not let them join, {Slotless} had neither lot nor slot), "
             + $"{Taken} bought back off them for {Paid}gp, {Gathered}gp carried into the guilds and {Waged}gp paid in wages";
     }
 

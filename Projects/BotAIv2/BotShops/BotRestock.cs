@@ -28,7 +28,9 @@ public sealed class BotRestock : BotDeed
 
     public static double WorkMinutes { get; set; } = 2.0;
 
-    private readonly BaseVendor _shop;
+    private BaseVendor _shop;
+
+    private int _repicks;
 
     private readonly BotListing _stall;
 
@@ -36,7 +38,9 @@ public sealed class BotRestock : BotDeed
 
     private readonly int _amount;
 
-    private readonly int _price;
+    private int _price;
+
+    public static long FellThrough { get; private set; }
 
     private int _bought;
 
@@ -68,7 +72,7 @@ public sealed class BotRestock : BotDeed
         _price = Math.Max(1, price);
     }
 
-    private readonly PlayerVendor _merchant;
+    private PlayerVendor _merchant;
 
     private readonly Map _map;
 
@@ -80,7 +84,9 @@ public sealed class BotRestock : BotDeed
 
     public override Point3D Where => _shop?.Location ?? _merchant?.Location ?? _where;
 
-    public override double Expects => Prior;
+    public double? Claim { get; set; }
+
+    public override double Expects => Claim ?? Prior;
 
     public override double Minutes => WorkMinutes;
 
@@ -100,6 +106,13 @@ public sealed class BotRestock : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+        if (_merchant != null)
+        {
+            bot?.Resolve?.Ledger?.Beware(BotShops.ShopKind, _merchant.Map, _merchant.Location);
+
+            return false;
+        }
+
         if (_shop == null)
         {
             return false;
@@ -161,6 +174,24 @@ public sealed class BotRestock : BotDeed
 
             if (lot == null)
             {
+                var next = BotShops.Nearest(bot, _wanted);
+
+                if (next != null)
+                {
+                    FellThrough++;
+
+                    _merchant = null;
+                    _shop = next;
+                    _price = Math.Max(1, BotShops.Price(next, _wanted));
+
+                    return BotDoing.Walk(
+                        _shop.Map,
+                        _shop,
+                        BotArrival.Within(BotShops.CounterReach),
+                        $"on to {_shop.Name} for {_wanted?.Name}"
+                    );
+                }
+
                 return BotDoing.Failed($"the guild's shelf has no {_wanted?.Name} left on it");
             }
 
@@ -192,6 +223,16 @@ public sealed class BotRestock : BotDeed
 
         if (_bought <= 0)
         {
+            var next = BotShops.Next(bot, _shop, _wanted, ref _repicks);
+
+            if (next != null)
+            {
+                _shop = next;
+                _price = Math.Max(1, BotShops.Price(next, _wanted));
+
+                return BotDoing.Walk(next.Map, next, BotArrival.Within(BotShops.CounterReach), $"on to {next.Name} for {_wanted?.Name}");
+            }
+
             return BotDoing.Failed(refused ?? "the shop would not sell it");
         }
 

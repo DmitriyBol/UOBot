@@ -182,6 +182,8 @@ public sealed class BotDelve : BotDeed
 
     public override string Kind => Trade;
 
+    public override bool Braves => true;
+
     public override Map Map => _map;
 
     public override Point3D Where => _muster;

@@ -24,6 +24,8 @@ public sealed class BotAuctionSettings
 
     public int? StaleMs { get; set; }
 
+    public int? RaiseMs { get; set; }
+
     public double? MostMultiple { get; set; }
 
     public double? LeastMultiple { get; set; }
@@ -71,6 +73,11 @@ public static class BotAuctionConfig
         BotAuction.CutStep = settings.CutStep ?? BotAuction.CutStep;
         BotAuction.BriskMs = settings.BriskMs ?? BotAuction.BriskMs;
         BotAuction.StaleMs = settings.StaleMs ?? BotAuction.StaleMs;
+
+        if (settings.RaiseMs is { } raiseMs)
+        {
+            BotAuction.RaiseMs = raiseMs;
+        }
         BotAuction.MostMultiple = settings.MostMultiple ?? BotAuction.MostMultiple;
         BotAuction.LeastMultiple = settings.LeastMultiple ?? BotAuction.LeastMultiple;
         BotAuction.ForgetMs = settings.ForgetMs ?? BotAuction.ForgetMs;

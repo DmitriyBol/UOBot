@@ -142,6 +142,58 @@ public sealed class BotChop : BotDeed
         (body as BotMobile)?.Rearm();
     }
 
+    private static string Refusal(Mobile body, Item tool)
+    {
+        if (body.Spell != null)
+        {
+            return "a spell is going up";
+        }
+
+        if (tool is BaseWeapon weapon)
+        {
+            if (body.Str < weapon.StrRequirement)
+            {
+                return $"strength {body.Str} against {weapon.StrRequirement}";
+            }
+
+            if (body.Dex < weapon.DexRequirement)
+            {
+                return $"dexterity {body.Dex} against {weapon.DexRequirement}";
+            }
+
+            if (body.Int < weapon.IntRequirement)
+            {
+                return $"intelligence {body.Int} against {weapon.IntRequirement}";
+            }
+
+            if (!body.CanBeginAction<BaseWeapon>())
+            {
+                return "the engine is holding weapons out of its hands for a moment";
+            }
+        }
+
+        var onLayer = body.FindItemOnLayer(tool.Layer);
+
+        if (onLayer != null && onLayer != tool)
+        {
+            return $"{onLayer.GetType().Name} is still on the {tool.Layer} layer";
+        }
+
+        var worn = body.Items;
+
+        for (var i = 0; i < worn.Count; i++)
+        {
+            var other = worn[i];
+
+            if (other != tool && (other.CheckConflictingLayer(body, tool, tool.Layer) || tool.CheckConflictingLayer(body, other, other.Layer)))
+            {
+                return $"{other.GetType().Name} on the {other.Layer} layer is in the way";
+            }
+        }
+
+        return null;
+    }
+
     public override void Drop(IBotWilful bot)
     {
         base.Drop(bot);
@@ -167,7 +219,9 @@ public sealed class BotChop : BotDeed
 
         if (!Wield(body, tool))
         {
-            return BotDoing.Failed("it cannot get the axe into its hand");
+            var why = Refusal(body, tool);
+
+            return BotDoing.Failed(why == null ? "it cannot get the axe into its hand" : $"it cannot get the axe into its hand: {why}");
         }
 
         if (_cut >= _want)

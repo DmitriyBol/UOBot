@@ -39,6 +39,8 @@ public static class BotPopulation
 
     public static int Roam { get; set; } = 200;
 
+    public static int Scatter { get; set; } = 350;
+
     public static bool Within(Map map, Point3D where) =>
         Home == null || map == Home && Utility.InRange(Where, where, Roam);
 
@@ -48,7 +50,7 @@ public static class BotPopulation
 
     public static long Gates { get; private set; }
 
-    public static Point3D Gate(Map map, Point3D from, Point3D toward)
+    public static Point3D Gate(Map map, Point3D from, Point3D toward, bool counted = true)
     {
         if (map == null || map == Map.Internal || Region.Find(from, map)?.IsPartOf<GuardedRegion>() != true)
         {
@@ -86,7 +88,10 @@ public static class BotPopulation
                 continue;
             }
 
-            Gates++;
+            if (counted)
+            {
+                Gates++;
+            }
 
             return here;
         }
@@ -124,6 +129,44 @@ public static class BotPopulation
         }
     }
 
+    public static int Reclaim(IReadOnlyDictionary<string, int> mix, out Dictionary<string, int> kept)
+    {
+        List<BotMobile> saved = [];
+        kept = [];
+
+        foreach (var mobile in World.Mobiles.Values)
+        {
+            if (mobile is BotMobile bot)
+            {
+                saved.Add(bot);
+            }
+        }
+
+        var deleted = 0;
+
+        for (var i = 0; i < saved.Count; i++)
+        {
+            var bot = saved[i];
+            var name = bot.Was;
+            var klass = name == null ? null : BotClasses.Find(name);
+
+            if (klass == null || mix == null || !mix.TryGetValue(klass.Name, out var want)
+                || kept.GetValueOrDefault(klass.Name) >= want || !bot.Revive(klass))
+            {
+                bot.Delete();
+                deleted++;
+
+                continue;
+            }
+
+            kept[klass.Name] = kept.GetValueOrDefault(klass.Name) + 1;
+
+            Enlist(bot);
+        }
+
+        return deleted;
+    }
+
     public static int PurgeSaved()
     {
         List<BotMobile> stale = [];
@@ -144,7 +187,9 @@ public static class BotPopulation
         return stale.Count;
     }
 
-    public static int Raise(IReadOnlyDictionary<string, int> mix)
+    public static int Raise(IReadOnlyDictionary<string, int> mix) => Raise(mix, null);
+
+    public static int Raise(IReadOnlyDictionary<string, int> mix, IReadOnlyDictionary<string, int> already)
     {
         if (mix == null || mix.Count == 0)
         {
@@ -166,7 +211,11 @@ public static class BotPopulation
                 continue;
             }
 
-            for (var i = 0; i < count; i++)
+            var wanted = already != null && already.TryGetValue(klass.Name, out var standing)
+                ? count - standing
+                : count;
+
+            for (var i = 0; i < wanted; i++)
             {
                 if (Raise(klass) != null)
                 {
@@ -456,12 +505,16 @@ public static class BotPopulation
             BotSeat.Placed();
         }
 
-        for (var pass = 0; pass < 2; pass++)
+        var span = at == Where && Scatter > Spread ? Scatter : Spread;
+
+        for (var pass = 0; pass < 3; pass++)
         {
+            var reach = pass < 2 ? span : Spread;
+
             for (var attempt = 0; attempt < Attempts; attempt++)
             {
-                var x = at.X + Utility.RandomMinMax(-Spread, Spread);
-                var y = at.Y + Utility.RandomMinMax(-Spread, Spread);
+                var x = at.X + Utility.RandomMinMax(-reach, reach);
+                var y = at.Y + Utility.RandomMinMax(-reach, reach);
 
                 if (!map.CanSpawnMobile(x, y, at.Z - 8, at.Z + 8, false, false, out var z))
                 {

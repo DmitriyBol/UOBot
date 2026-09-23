@@ -24,7 +24,7 @@ public sealed class BotRescue : BotDeed
 {
     public const string Trade = "rescue";
 
-    public static double Prior { get; set; } = 400.0;
+    public static double Prior { get; set; } = 200.0;
 
     private readonly BotSlay _fight;
 
@@ -46,6 +46,8 @@ public sealed class BotRescue : BotDeed
 
     public bool Own => _own;
 
+    public override Mobile Foe => _foe;
+
     public override string Kind => Trade;
 
     public override bool Summons => true;
@@ -58,7 +60,7 @@ public sealed class BotRescue : BotDeed
 
     private Mobile _rescuer;
 
-    public static double Steady { get; set; } = 150.0;
+    public static double Steady { get; set; } = 100.0;
 
     private bool Failing =>
         _friend is { Deleted: false, Alive: true, HitsMax: > 0 } friend

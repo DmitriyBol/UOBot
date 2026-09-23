@@ -52,6 +52,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
     public static int NoticeRange { get; set; } = 10;
 
+    public static int ChampionHue { get; set; } = 0x35;
+
     public static bool Runs { get; set; }
 
     public BotMobile(Serial serial) : base(serial)
@@ -82,6 +84,14 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
     public BotBond Bond { get; private set; }
 
+    public string Was { get; private set; }
+
+    public string WasDoing { get; private set; }
+
+    public Map WasDoingOn { get; private set; }
+
+    public Point3D WasDoingAt { get; private set; }
+
     public bool AbleToFight =>
         !Deleted && Alive && Map != null && Map != Map.Internal && Hits >= HitsMax * FitFraction;
 
@@ -90,6 +100,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     public bool Scheduled { get; internal set; }
 
     public bool Fallen { get; private set; }
+
+    public static long BackAsGhost { get; private set; }
 
     public bool ReviveComplained { get; set; }
 
@@ -297,6 +309,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         BotMeal.Keep(this);
 
+        BotTidy.Keep(this);
+
         BotStable.Keep(this);
         BotStable.Ride(this);
 
@@ -451,6 +465,9 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         );
     }
 
+    public override bool IsHarmfulCriminal(Mobile target) =>
+        !BotDuel.Between(this, target) && base.IsHarmfulCriminal(target);
+
     public override void OnDamage(int amount, Mobile from, bool willKill)
     {
         base.OnDamage(amount, from, willKill);
@@ -569,6 +586,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         }
     }
 
+    public override bool Move(Direction d) => BotOutlaw.Steps(this, d) && base.Move(d);
+
     public override void OnDeath(Container c)
     {
         base.OnDeath(c);
@@ -578,6 +597,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         ReviveComplained = false;
 
         Remains = c as Corpse;
+
+        BotOutlaw.Fell(this, LastKiller);
 
         logger.Information(
             "{Name} the {Class} was killed at {Where}; it should rise again in {Wait}s",
@@ -590,6 +611,9 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         BotBinding.TrimAmmunition(this, Bond, c);
 
         BotWill.Died(this);
+
+        BotKept.Fell(this);
+
         BotSquads.Leave(this);
 
         if ((c as Corpse)?.Killer is BotMobile { Deleted: false } slayer && slayer != this)
@@ -658,7 +682,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     public static double RunAbove { get; set; } = 0.2;
 
     public bool Running =>
-        Runs && StamMax > 0 && Stam > StamMax * RunAbove && (Resolve.Deed?.Hurries ?? true);
+        Runs && StamMax > 0 && Stam > StamMax * RunAbove && (Resolve.Deed?.Hurries ?? true) && !Hidden;
 
     private const int RankEveryMs = 30000;
 
@@ -762,6 +786,50 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
             item.GetType().Name,
             new StackTrace(false)
         );
+    }
+
+    private static bool _saidWorse;
+
+    public override void OnItemAdded(Item item)
+    {
+        base.OnItemAdded(item);
+
+        if (_saidWorse || Deleted || !Alive || World.Loading || item is not BaseWeapon weapon
+            || weapon.Layer is not (Layer.OneHanded or Layer.TwoHanded) || Rank(weapon) != 2)
+        {
+            return;
+        }
+
+        var pack = Backpack;
+
+        if (pack == null)
+        {
+            return;
+        }
+
+        var bar = Worth(weapon) * WeaponMargin;
+        var carried = pack.Items;
+
+        for (var i = 0; i < carried.Count; i++)
+        {
+            if (carried[i] is not BaseWeapon other || (other is BaseRanged) != (weapon is BaseRanged)
+                || Rank(other) != 2 || !Suits(other) || Worth(other) <= bar)
+            {
+                continue;
+            }
+
+            _saidWorse = true;
+
+            logger.Information(
+                "{Name} has had a {Worse} put in its hands with a better {Better} in its pack. Whatever did it is here: {Where}",
+                Name,
+                weapon.GetType().Name,
+                other.GetType().Name,
+                new StackTrace(false)
+            );
+
+            return;
+        }
     }
 
     public override void OnAfterResurrect()
@@ -916,6 +984,10 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
     private long _dressedTick;
 
+    internal bool Appraised;
+
+    internal long AppraisedTick;
+
     private void Dress()
     {
         var now = Core.TickCount;
@@ -978,6 +1050,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         Unhand(taken, carried);
 
+        Rewield(taken, carried);
+
         for (var pass = 0; pass < 2; pass++)
         {
             for (var i = 0; i < carried.Count; i++)
@@ -1000,6 +1074,11 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
                 }
 
                 if (item.Layer == Layer.OneHanded && taken.Contains(Layer.TwoHanded))
+                {
+                    continue;
+                }
+
+                if (item is BaseWeapon && item.Layer == Layer.TwoHanded && taken.Contains(Layer.OneHanded))
                 {
                     continue;
                 }
@@ -1096,10 +1175,178 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         );
     }
 
+    public static double WeaponMargin { get; set; } = 1.05;
+
+    public static long Rewielded { get; private set; }
+
+    public static int RewieldRestMs { get; set; } = 300000;
+
+    public static long Reverted { get; private set; }
+
+    private Serial _rewielded;
+
+    private long _rewieldedTick;
+
+    private void Rewield(HashSet<Layer> taken, List<Item> carried)
+    {
+        var held = FindItemOnLayer(Layer.TwoHanded) as BaseWeapon ?? FindItemOnLayer(Layer.OneHanded) as BaseWeapon;
+
+        if (held == null || Rank(held) != 2)
+        {
+            return;
+        }
+
+        var ranged = held is BaseRanged;
+        var was = Worth(held);
+        var bar = was * WeaponMargin;
+        BaseWeapon better = null;
+
+        for (var i = 0; i < carried.Count; i++)
+        {
+            if (carried[i] is not BaseWeapon weapon || weapon.Deleted || weapon.Parent != Backpack)
+            {
+                continue;
+            }
+
+            if (weapon is BaseRanged != ranged || Rank(weapon) != 2 || !Suits(weapon))
+            {
+                continue;
+            }
+
+            if (weapon.Layer == Layer.TwoHanded && held.Layer == Layer.OneHanded && taken.Contains(Layer.TwoHanded))
+            {
+                continue;
+            }
+
+            var worth = Worth(weapon);
+
+            if (worth <= bar)
+            {
+                continue;
+            }
+
+            better = weapon;
+            bar = worth;
+        }
+
+        if (better == null)
+        {
+            return;
+        }
+
+        if (better.Serial == _rewielded && Core.TickCount - _rewieldedTick < RewieldRestMs)
+        {
+            Reverted++;
+
+            return;
+        }
+
+        var pack = Backpack;
+
+        if (pack == null || !pack.TryDropItem(this, held, false))
+        {
+            return;
+        }
+
+        if (!EquipItem(better))
+        {
+            EquipItem(held);
+
+            return;
+        }
+
+        taken.Remove(held.Layer);
+        taken.Add(better.Layer);
+        Rewielded++;
+        _rewielded = better.Serial;
+        _rewieldedTick = Core.TickCount;
+
+        logger.Information(
+            "{Name} put {Old} away for {New}, worth {Worth:F0} to it against {Was:F0} by damage, skill and swing{Kept}",
+            Name,
+            held.GetType().Name,
+            better.GetType().Name,
+            bar,
+            was,
+            BotBinding.IsBound(held, Bond) ? "; the old one is bound and stays in the pack" : ""
+        );
+    }
+
+    private bool OwnKind(Item item)
+    {
+        if (item is not BaseWeapon weapon || Bond?.Weapon is not { } own || Class is not { StaffManaTrickle: 0 })
+        {
+            return false;
+        }
+
+        if (weapon.Skill != own.Skill)
+        {
+            return false;
+        }
+
+        return weapon is BaseRanged bow ? bow.AmmoType == own.Ammunition : own.Ammunition == null;
+    }
+
+    private double Worth(BaseWeapon weapon)
+    {
+        if (weapon == null)
+        {
+            return 0.0;
+        }
+
+        var delay = weapon.GetDelay(this).TotalSeconds;
+
+        if (delay <= 0.0)
+        {
+            return 0.0;
+        }
+
+        var damage = (weapon.MinDamage + weapon.MaxDamage) / 2.0;
+        var level = (int)weapon.DamageLevel;
+
+        if (!Core.AOS && level > 0)
+        {
+            damage += Core.T2A ? 2 * level - 1 : level;
+        }
+
+        var tactics = Skills.Tactics.Base;
+
+        if (weapon.UseSkillMod && weapon.AccuracySkill == SkillName.Tactics)
+        {
+            tactics += 5 * (int)weapon.AccuracyLevel;
+        }
+
+        damage += damage * ((tactics - 50.0) / 100.0);
+
+        var modifiers = Str / 5.0 / 100.0 + Skills.Anatomy.Value / 5.0 / 100.0 + weapon.VirtualDamageBonus / 100.0;
+
+        if (Core.UOR && weapon.Type == WeaponType.Axe)
+        {
+            modifiers += Skills.Lumberjacking.Value / 5.0 / 100.0;
+        }
+
+        if (weapon.Quality != WeaponQuality.Regular)
+        {
+            modifiers += ((int)weapon.Quality - 1) * 0.2;
+        }
+
+        damage += damage * modifiers;
+
+        if (weapon.MaxHitPoints > 0 && weapon.HitPoints < weapon.MaxHitPoints)
+        {
+            damage *= (50.0 + 50.0 * weapon.HitPoints / weapon.MaxHitPoints) / 100.0;
+        }
+
+        var lands = Math.Max(0.1, Skills[weapon.Skill].Value + 50.0);
+
+        return damage * lands / delay;
+    }
+
     private Item Pick(List<Item> carried, Layer layer, int pass)
     {
         Item best = null;
         var bestRank = -1;
+        var bestScore = 0.0;
 
         for (var i = 0; i < carried.Count; i++)
         {
@@ -1124,19 +1371,29 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
             var rank = Rank(item);
 
-            if (rank < 0 || rank <= bestRank)
+            if (rank < 0)
+            {
+                continue;
+            }
+
+            var score = Score(item);
+
+            if (rank < bestRank || rank == bestRank && score <= bestScore)
             {
                 continue;
             }
 
             best = item;
             bestRank = rank;
+            bestScore = score;
         }
 
         return best;
     }
 
-    private bool Suits(Item item) =>
+    private double Score(Item item) => item is BaseWeapon weapon ? Worth(weapon) : Guards(item);
+
+    public bool Suits(Item item) =>
         item switch
         {
             BaseArmor armour =>
@@ -1214,7 +1471,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
             }
         }
 
-        return 1;
+        return OwnKind(item) ? 2 : 1;
     }
 
     public bool Draw(bool melee)
@@ -1243,22 +1500,36 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         List<Item> carried = [.. pack.Items];
 
         var bestRank = 0;
+        var bestWorth = 0.0;
 
         for (var i = 0; i < carried.Count; i++)
         {
-            if (carried[i] is not BaseWeapon weapon || weapon is BaseRanged != melee)
+            if (carried[i] is not BaseWeapon weapon || weapon is BaseRanged == melee || !Suits(weapon))
+            {
+                continue;
+            }
+
+            if (weapon is BaseRanged shooter && (shooter.AmmoType == null || pack.GetAmount(shooter.AmmoType) <= 0))
             {
                 continue;
             }
 
             var rank = Rank(weapon);
 
-            if (rank <= 0 || rank <= bestRank)
+            if (rank <= 0)
+            {
+                continue;
+            }
+
+            var worth = Worth(weapon);
+
+            if (rank < bestRank || rank == bestRank && worth <= bestWorth)
             {
                 continue;
             }
 
             bestRank = rank;
+            bestWorth = worth;
             wanted = weapon;
         }
 
@@ -1321,13 +1592,90 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     {
         base.Serialize(writer);
 
-        writer.Write(0);
+        writer.Write(1);
+
+        writer.Write(Class?.Name ?? "");
+
+        writer.Write(Bond != null);
+        Bond?.Save(writer);
+
+        Resolve.Ledger.Save(writer);
+
+        var deed = Resolve.Deed;
+
+        writer.Write(deed?.Kind ?? "");
+        writer.Write(deed?.Map ?? Map.Internal);
+        writer.Write(deed?.Where ?? Point3D.Zero);
     }
 
     public override void Deserialize(IGenericReader reader)
     {
         base.Deserialize(reader);
 
-        reader.ReadInt();
+        var version = reader.ReadInt();
+
+        if (version < 1)
+        {
+            return;
+        }
+
+        var was = reader.ReadString();
+
+        Was = string.IsNullOrWhiteSpace(was) ? null : was;
+
+        if (reader.ReadBool())
+        {
+            var bond = new BotBond();
+
+            bond.Load(reader);
+            Bond = bond;
+        }
+
+        Resolve.Ledger.Load(reader);
+
+        var doing = reader.ReadString();
+
+        WasDoing = string.IsNullOrWhiteSpace(doing) ? null : doing;
+        WasDoingOn = reader.ReadMap();
+        WasDoingAt = reader.ReadPoint3D();
+    }
+
+    public bool Revive(BotClass klass)
+    {
+        if (klass == null || Deleted || Backpack == null)
+        {
+            return false;
+        }
+
+        if (!Alive)
+        {
+            Fallen = true;
+            FellTick = Core.TickCount;
+            ReviveComplained = false;
+            BackAsGhost++;
+        }
+
+        Player = true;
+
+        if ((Map == null || Map == Map.Internal) && LogoutMap != null && LogoutMap != Map.Internal)
+        {
+            MoveToWorld(LogoutLocation, LogoutMap);
+        }
+
+        if (Map == null || Map == Map.Internal)
+        {
+            return false;
+        }
+
+        Class = klass;
+
+        Bond ??= BotOutfit.Give(this, klass);
+
+        if (Guild == null)
+        {
+            BotGuilds.Enrol(this);
+        }
+
+        return true;
     }
 }

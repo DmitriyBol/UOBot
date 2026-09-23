@@ -50,9 +50,17 @@ public abstract class BotDeed
 
     public virtual bool Bend(IBotWilful bot) => false;
 
+    public virtual bool BendIsTrouble => true;
+
+    public virtual double HoldsFor => 0.0;
+
     public virtual bool Pressing(IBotWilful bot) => false;
 
+    public virtual bool Repeats(BotDeed other) => false;
+
     public virtual bool Unpaid => false;
+
+    public virtual bool Posted => false;
 
     public virtual bool Standing => false;
 
@@ -60,11 +68,29 @@ public abstract class BotDeed
 
     public virtual bool Committed => false;
 
+    public virtual bool Paperwork => false;
+
+    public virtual bool Guess => false;
+
     public virtual bool Still => false;
 
     public virtual bool Steadfast => false;
 
     public virtual bool Summons => false;
+
+    public virtual bool Braves => false;
+
+    public virtual Mobile Foe => null;
+
+    public virtual bool Afoot => false;
+
+    public virtual void Taken(IBotWilful bot)
+    {
+    }
+
+    public virtual void Paused(IBotWilful bot)
+    {
+    }
 
     public virtual void Resumed(IBotWilful bot)
     {

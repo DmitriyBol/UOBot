@@ -44,6 +44,12 @@ public sealed class BotLesson : BotDeed
 
     private int _lessons;
 
+    private int _bends;
+
+    public static int MostBends { get; set; } = 8;
+
+    public static long Skipped { get; private set; }
+
     public BotLesson(Map map)
     {
         _map = map;
@@ -70,6 +76,12 @@ public sealed class BotLesson : BotDeed
     public override bool Alongside => true;
 
     public override bool Still => _opened;
+
+    public override bool Steadfast => _opened;
+
+    public override bool BendIsTrouble => !_teaching;
+
+    public override double HoldsFor => _opened ? Minutes + 1.0 : 0.0;
 
     public override string Stage =>
         !_teaching
@@ -228,6 +240,20 @@ public sealed class BotLesson : BotDeed
             3 => reached > 0 ? "Better. Do that when something is trying to kill you." : "Nobody is learning anything from over there.",
             _ => "Breathe out when you strike. You will live longer for it."
         };
+
+    public override bool Bend(IBotWilful bot)
+    {
+        if (!_teaching || _bends >= MostBends)
+        {
+            return false;
+        }
+
+        _bends++;
+        _turn++;
+        Skipped++;
+
+        return true;
+    }
 
     public override void Drop(IBotWilful bot)
     {

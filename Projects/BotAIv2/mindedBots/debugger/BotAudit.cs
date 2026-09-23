@@ -97,6 +97,8 @@ public static class BotAudit
 
     public static long StillStuck { get; private set; }
 
+    public static long OnPurpose { get; private set; }
+
     public static string Last { get; private set; } = "No window has closed yet.";
 
     public static void Reset()
@@ -114,6 +116,7 @@ public static class BotAudit
         LeftCapped = 0;
         Freed = 0;
         StillStuck = 0;
+        OnPurpose = 0;
         Last = "No window has closed yet.";
     }
 
@@ -254,6 +257,12 @@ public static class BotAudit
 
                 var wedged = !reached && !over && !stirred && !gained && !watch.Fighting && !watch.Following
                              && mark.Kind != "-";
+
+                if (wedged && bot.Resolve?.Deed is { Still: true })
+                {
+                    OnPurpose++;
+                    wedged = false;
+                }
 
                 var current = Take(watch, now, mark);
 
@@ -517,5 +526,5 @@ public static class BotAudit
             ? "no roll-call has run yet"
             : $"{Windows} roll-calls, {Stuck} times a bot answered no to all three questions; "
               + $"{Reminded} reminded, {Shaken} shaken, {LeftFighting} left fighting, {LeftResting} resting, {LeftCapped} over the cap; "
-              + $"{Freed} were going again by the next window and {StillStuck} were not";
+              + $"{Freed} were going again by the next window and {StillStuck} were not; {OnPurpose} left to work that stands still on purpose";
 }

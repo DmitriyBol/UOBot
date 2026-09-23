@@ -54,6 +54,14 @@ public static class BotAuction
 
     public static int StaleMs { get; set; } = 600000;
 
+    public static int RaiseMs
+    {
+        get => _raiseMs ?? StaleMs;
+        set => _raiseMs = value;
+    }
+
+    private static int? _raiseMs;
+
     public static int Floor { get; set; } = 2;
 
     public static long Stood { get; private set; }
@@ -238,6 +246,11 @@ public static class BotAuction
             return null;
         }
 
+        if (BotBinding.Refuses(item, seller.Bond))
+        {
+            return null;
+        }
+
         if (price < Floor)
         {
             Cheap++;
@@ -397,20 +410,33 @@ public static class BotAuction
         return null;
     }
 
-    public static (int Lots, int Units, int Paid) Crown(int lots)
+    public static (int Lots, int Units, int Paid) Crown(int lots, int budget = int.MaxValue, bool stuckFirst = false, double share = 1.0)
     {
-        if (lots <= 0 || _listings.Count == 0)
+        if (lots <= 0 || budget <= 0 || _listings.Count == 0)
         {
             return (0, 0, 0);
         }
 
         List<BotListing> open = [];
+        List<BotListing> stuck = [];
+        var now = Core.TickCount;
 
         for (var i = 0; i < _listings.Count; i++)
         {
-            if (!_listings[i].IsEmpty)
+            var stall = _listings[i];
+
+            if (stall.IsEmpty)
             {
-                open.Add(_listings[i]);
+                continue;
+            }
+
+            if (stuckFirst && now - stall.ListedTick >= StuckMs)
+            {
+                stuck.Add(stall);
+            }
+            else
+            {
+                open.Add(stall);
             }
         }
 
@@ -418,55 +444,131 @@ public static class BotAuction
         var units = 0;
         var paid = 0;
 
-        for (var i = 0; i < lots && open.Count > 0; i++)
+        for (var i = 0; i < lots && (stuck.Count > 0 || open.Count > 0); i++)
         {
-            var pick = Utility.Random(open.Count);
-            var stall = open[pick];
+            var from = stuck.Count > 0 ? stuck : open;
+            var pick = Utility.Random(from.Count);
+            var stall = from[pick];
 
-            open.RemoveAt(pick);
+            from.RemoveAt(pick);
 
             var price = stall.Price;
-            var wanted = stall.Amount;
 
-            if (price <= 0 || wanted <= 0)
+            if (price <= 0 || stall.Amount <= 0)
             {
                 continue;
             }
 
-            var crate = new Backpack();
-            var given = stall.Deliver(wanted, crate);
+            var each = Math.Max(1, (int)Math.Ceiling(price * share));
+            var wanted = Math.Min(stall.Amount, (budget - paid) / each);
 
-            crate.Delete();
+            if (wanted <= 0)
+            {
+                continue;
+            }
+
+            var (given, bill) = Purchase(stall, wanted, share);
 
             if (given <= 0)
             {
                 continue;
             }
 
-            var bill = given * price;
-            var seller = stall.Seller?.Self;
-
-            Settle(seller, bill);
-
-            Sales++;
-            Turnover += bill;
-
-            stall.Note(given, bill, BriskMs);
-
             taken++;
             units += given;
             paid += bill;
-
-            logger.Information(
-                "The city bought {Units} {Item} from {Seller} for {Paid}gp",
-                given,
-                stall.Label,
-                seller?.Name ?? "nobody",
-                bill
-            );
         }
 
         return (taken, units, paid);
+    }
+
+    public static (int Units, int Paid) CrownWant(Type kind, int wanted, int maxPrice, int budget)
+    {
+        if (kind == null || wanted <= 0 || maxPrice <= 0 || budget <= 0 || _listings.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        List<BotListing> offers = [];
+
+        for (var i = 0; i < _listings.Count; i++)
+        {
+            var stall = _listings[i];
+
+            if (!stall.IsEmpty && stall.Kind == kind && stall.Price > 0 && stall.Price <= maxPrice)
+            {
+                offers.Add(stall);
+            }
+        }
+
+        if (offers.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        offers.Sort(static (a, b) => a.Price.CompareTo(b.Price));
+
+        var units = 0;
+        var paid = 0;
+
+        for (var i = 0; i < offers.Count && units < wanted; i++)
+        {
+            var stall = offers[i];
+            var take = Math.Min(Math.Min(stall.Amount, wanted - units), (budget - paid) / stall.Price);
+
+            if (take <= 0)
+            {
+                break;
+            }
+
+            var (given, bill) = Purchase(stall, take);
+
+            if (given <= 0)
+            {
+                continue;
+            }
+
+            units += given;
+            paid += bill;
+        }
+
+        return (units, paid);
+    }
+
+    private static (int Given, int Bill) Purchase(BotListing stall, int wanted, double share = 1.0)
+    {
+        var price = stall.Price;
+
+        var crate = new Backpack();
+        var given = stall.Deliver(wanted, crate);
+
+        crate.Delete();
+
+        if (given <= 0)
+        {
+            return (0, 0);
+        }
+
+        var bill = share >= 1.0 ? given * price : Math.Max(1, (int)Math.Ceiling(given * price * share));
+        var seller = stall.Seller?.Self;
+
+        Settle(seller, bill);
+
+        Sales++;
+        Turnover += bill;
+
+        stall.Note(given, given * price, BriskMs);
+
+        logger.Information(
+            "The city bought {Units} {Item} from {Seller} for {Paid}gp, {Share:P0} of the asking price",
+            given,
+            stall.Label,
+            seller?.Name ?? "nobody",
+            bill,
+            share
+        );
+
+        return (given, bill);
     }
 
     public static int Buy(Mobile buyer, BotListing stall, int units)
@@ -714,6 +816,11 @@ public static class BotAuction
         var body = supplier?.Self;
 
         if (body == null || want == null || goods == null || goods.Deleted)
+        {
+            return 0;
+        }
+
+        if (BotBinding.Refuses(goods, supplier.Bond))
         {
             return 0;
         }
@@ -1191,7 +1298,7 @@ public static class BotAuction
                 continue;
             }
 
-            if (now - want.TouchedTick < StaleMs)
+            if (now - want.TouchedTick < RaiseMs)
             {
                 continue;
             }

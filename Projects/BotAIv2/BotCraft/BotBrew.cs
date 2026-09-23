@@ -47,7 +47,9 @@ public sealed class BotBrew : BotDeed
 
     private readonly Point3D _where;
 
-    private readonly BaseVendor _shop;
+    private BaseVendor _shop;
+
+    private int _repicks;
 
     private readonly int _price;
 
@@ -192,6 +194,15 @@ public sealed class BotBrew : BotDeed
 
         if (BotShops.Buy(bot, _shop, typeof(Bottle), _take, out var refused) <= 0)
         {
+            var next = BotShops.Next(bot, _shop, typeof(Bottle), ref _repicks);
+
+            if (next != null)
+            {
+                _shop = next;
+
+                return BotDoing.Walk(next.Map, next, BotArrival.Within(BotShops.CounterReach), $"on to {next.Name} for glass");
+            }
+
             return BotDoing.Failed(refused ?? "no glass to be had");
         }
 
@@ -204,7 +215,7 @@ public sealed class BotBrew : BotDeed
     {
         var tool = BotFlask.Kit(body);
 
-        if (tool == null)
+        if (tool == null && _swings == 0)
         {
             return BotDoing.Failed("nothing to brew with");
         }
@@ -222,6 +233,16 @@ public sealed class BotBrew : BotDeed
             _bottled += have - _had;
             _had = have;
             _made = _bottled * BotFlask.Worth;
+        }
+
+        if (tool == null)
+        {
+            if (_swung && Core.TickCount - _swungTick < SwingMs)
+            {
+                return BotDoing.Work($"brewing, {_bottled} bottles so far");
+            }
+
+            return Finish("the mortar wore through");
         }
 
         var recipe = BotFlask.Recipe(body, _potion);

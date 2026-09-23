@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Server.Items;
+using Server.Logging;
 using Server.Spells;
 
 namespace Server.BotAI.V2;
@@ -29,6 +30,77 @@ public static class BotMend
     public static int BeyondMs { get; set; } = 10000;
 
     private static readonly Dictionary<Serial, long> _beyond = [];
+
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMend));
+
+    public static bool ShunsOutlaws { get; set; } = true;
+
+    public static int CriminalSayMs { get; set; } = 120000;
+
+    public static long Robbing { get; private set; }
+
+    public static long Red { get; private set; }
+
+    public static long Criminal { get; private set; }
+
+    private static readonly Dictionary<Serial, long> _criminalSaid = [];
+
+    public static string Abetting(Mobile healer, Mobile other)
+    {
+        if (healer == null || other == null || other == healer)
+        {
+            return null;
+        }
+
+        string why;
+
+        if (other is BotMobile { Resolve.Deed: BotRob })
+        {
+            Robbing++;
+            why = "at a robbery";
+        }
+        else if (BotOutlaw.Outlaw(other) || BotOutlaw.Jailed(other))
+        {
+            Red++;
+            why = "red";
+        }
+        else if (healer.IsBeneficialCriminal(other))
+        {
+            Criminal++;
+            why = "a criminal";
+
+            var now = Core.TickCount;
+
+            if (!_criminalSaid.TryGetValue(other.Serial, out var said) || now - said >= CriminalSayMs)
+            {
+                _criminalSaid[other.Serial] = now;
+
+                logger.Information(
+                    "{Healer} leaves {Other} alone: the engine counts helping it a crime ({Notoriety}), though it is neither at a robbery nor red",
+                    healer.Name,
+                    other.Name,
+                    other.Murderer ? "a murderer" : "a criminal"
+                );
+            }
+        }
+        else
+        {
+            return null;
+        }
+
+        return ShunsOutlaws ? why : null;
+    }
+
+    public static string Describe() =>
+        $"{Robbing + Red + Criminal} looks at which a healer {(ShunsOutlaws ? "left alone" : "only counted")} somebody it would have been a crime to help ({Robbing} at a robbery, {Red} red, {Criminal} a criminal by the engine alone), {BotAccompany.Turned} stints and {BotSalve.Turned} mendings of another ended when the one helped turned";
+
+    public static void Forget()
+    {
+        Robbing = 0;
+        Red = 0;
+        Criminal = 0;
+        _criminalSaid.Clear();
+    }
 
     public static void Beyond(Mobile patient)
     {
@@ -89,6 +161,28 @@ public static class BotMend
         var resolve = bot?.Resolve;
 
         return resolve is { Struck: true } && Core.TickCount - resolve.HurtTick < UnderFireMs;
+    }
+
+    public static bool Embattled(Mobile patient)
+    {
+        if (patient is not { Deleted: false, Alive: true } || patient.Map == null || patient.Map == Map.Internal)
+        {
+            return false;
+        }
+
+        if (patient.Combatant is { Deleted: false, Alive: true })
+        {
+            return true;
+        }
+
+        if (patient is BotMobile bot
+            && (bot.Squad is { Stance: BotSquadStance.Fighting }
+                || (bot.Resolve is { Struck: true } && Core.TickCount - bot.Resolve.HurtTick < UnderFireMs)))
+        {
+            return true;
+        }
+
+        return BotThreat.Anything(patient, Peril);
     }
 
     public static BasePotion Draught(Mobile bot)

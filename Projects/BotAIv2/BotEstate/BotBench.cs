@@ -103,20 +103,20 @@ public sealed class BotBench : BotDeed
 
         var paid = new List<BotEstate.Contribution>();
         var mine = BotYield.Wealth(body);
-        var got = BotEstate.Levy(_guild, _bench.Price, paid);
+        var got = BotEstate.Levy(_guild, _bench.Price, paid, body);
 
         _mine += System.Math.Max(0, mine - BotYield.Wealth(body));
 
         if (got < _bench.Price)
         {
-            BotEstate.Refund(paid);
+            BotEstate.Refund(paid, body);
 
             return BotDoing.Failed($"{_guild.Name} could only raise {got} of {_bench.Price}gp for {_bench.Name}");
         }
 
         if (!BotFittings.Install(_hall, _bench))
         {
-            BotEstate.Refund(paid);
+            BotEstate.Refund(paid, body);
 
             return BotDoing.Failed($"there is nowhere in the hall to put {_bench.Name}");
         }

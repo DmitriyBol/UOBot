@@ -121,6 +121,8 @@ public sealed class BotAlarmModule : BotModule
         BotAlarm.Open();
         BotSigns.Start();
 
+        BotBoot.Check();
+
         _timer?.Stop();
         _timer = new SignsTimer(TimeSpan.FromMilliseconds(BotSigns.TickMs));
         _timer.Start();
@@ -128,7 +130,7 @@ public sealed class BotAlarmModule : BotModule
         logger.Information("The alarm: {Channel}. {Rules}", BotAlarm.Describe(), BotSigns.Describe());
     }
 
-    public static string Summarise() => $"{BotAlarm.Describe()}; {BotTail.Describe()}";
+    public static string Summarise() => $"{BotAlarm.Describe()}; {BotTail.Describe()}; {BotBoot.Describe()}";
 
     public override void Reset()
     {

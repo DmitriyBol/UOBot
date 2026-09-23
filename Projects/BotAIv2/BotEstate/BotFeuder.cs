@@ -70,6 +70,11 @@ public sealed class BotFeuder : IBotProposer
             return null;
         }
 
+        if (BotUnderworld.Band(ours))
+        {
+            return null;
+        }
+
         Asked++;
 
         if (!AnyWar(ours))

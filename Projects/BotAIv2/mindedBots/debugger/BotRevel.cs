@@ -59,6 +59,8 @@ public static class BotRevel
 
     public static int MostPrize { get; set; } = 1200;
 
+    public static int EnoughForPrize { get; set; } = 20;
+
     public static double Bonus { get; set; } = 3.0;
 
     public static long Declared { get; private set; }
@@ -198,6 +200,16 @@ public static class BotRevel
             return "no trade named, so nothing was declared.";
         }
 
+        if (Running)
+        {
+            return $"a revel of {Kind} is already on for {Math.Max(1, (HoldsMs - (Core.TickCount - _startedTick)) / 60000)} more minutes; nothing was declared.";
+        }
+
+        if (Kind != null)
+        {
+            Settle();
+        }
+
         var body = BotVigil.Body;
         var map = body?.Map;
 
@@ -228,7 +240,7 @@ public static class BotRevel
 
         if (camp)
         {
-            var at = where == Point3D.Zero ? Where : Ring(Where, where);
+            var at = Ring(Where, where == Point3D.Zero ? Where : where);
 
             if (where != Point3D.Zero)
             {
@@ -300,8 +312,12 @@ public static class BotRevel
         Mobile best = null;
         var bestDid = 0;
 
+        var done = 0;
+
         foreach (var (serial, did) in _tally)
         {
+            done += did;
+
             if (did <= bestDid)
             {
                 continue;
@@ -331,6 +347,11 @@ public static class BotRevel
         }
 
         Won++;
+
+        if (EnoughForPrize > 0 && done < EnoughForPrize)
+        {
+            prize = prize * done / EnoughForPrize;
+        }
 
         var was2 = _ledger.TryGetValue(was, out var seen2) ? seen2 : default;
 
@@ -362,10 +383,11 @@ public static class BotRevel
         _bands.Clear();
 
         logger.Information(
-            "The revel for {Kind} is won by {Name} with {Did} of them, and {Prize}gp is paid; {Left}gp left in the treasury",
+            "The revel for {Kind} is won by {Name} with {Did} of them, {Done} done in all, and {Prize}gp is paid; {Left}gp left in the treasury",
             was,
             best.Name,
             bestDid,
+            done,
             prize,
             Math.Max(0, Treasury - (int)Paid)
         );
@@ -639,7 +661,7 @@ public static class BotRevel
 
     public static readonly string[] Trades =
     [
-        "mine", "chop", "hunt", "prowl", "cook", "sew", "forge", "brew",
+        "mine", "chop", "hunt", "cook", "sew", "forge", "brew",
         "inscribe", "herbs", "forage", "peddle", "plunder", "liberate"
     ];
 

@@ -61,7 +61,7 @@ public sealed class BotStroll : IBotProposer
             return null;
         }
 
-        var town = BotGround.Counter(map, body.Location);
+        var town = BotGround.Counter(map, BotPopulation.Where);
 
         if (town == Point3D.Zero)
         {

@@ -31,6 +31,8 @@ public sealed class BotCraftModule : BotModule
     {
         BotCraftConfig.Load();
 
+        BotCraftEar.Listen();
+
         BotWill.Offer(new BotTailor());
 
         BotWill.Offer(new BotSmith());
@@ -58,6 +60,7 @@ public sealed class BotCraftModule : BotModule
             BotFlask.Batch,
             BotFlask.Worth
         );
+
     }
 
     public override void Reset()

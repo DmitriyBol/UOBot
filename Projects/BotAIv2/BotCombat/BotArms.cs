@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -42,6 +44,8 @@ public static class BotArms
 
     public static long Empty { get; private set; }
 
+    public static long Casting { get; private set; }
+
     public static long Dressed { get; private set; }
 
     public static long Declined { get; private set; }
@@ -52,7 +56,7 @@ public static class BotArms
         Declined += refused;
     }
 
-    private static bool _said;
+    private static readonly HashSet<Serial> _saidFor = [];
 
     public static bool Armed(Mobile body, BotClass klass) =>
         body?.Weapon is not (null or Fists) || klass?.Name == Brawler;
@@ -79,16 +83,19 @@ public static class BotArms
     {
         var pack = bot?.Backpack;
 
-        if (pack == null || klass?.Kit.Ranged is not { Count: > 0 } options)
+        if (pack == null || klass?.Kit.Ranged is not { Count: > 0 })
         {
             return false;
         }
 
-        for (var i = 0; i < options.Count; i++)
+        if (bot.Weapon is BaseRanged { Deleted: false } held && held.Parent == bot && Loaded(pack, held))
         {
-            var ammo = options[i].Ammunition;
+            return true;
+        }
 
-            if (ammo != null && pack.GetAmount(ammo) > 0)
+        foreach (var item in pack.Items)
+        {
+            if (item is BaseRanged { Deleted: false } carried && bot.Suits(carried) && Loaded(pack, carried))
             {
                 return true;
             }
@@ -96,6 +103,9 @@ public static class BotArms
 
         return false;
     }
+
+    private static bool Loaded(Container pack, BaseRanged bow) =>
+        bow.AmmoType != null && pack.GetAmount(bow.AmmoType) > 0;
 
     public static void Quiver(Mobile body, BotClass klass)
     {
@@ -147,6 +157,13 @@ public static class BotArms
 
         Caught++;
 
+        if (body.Spell != null)
+        {
+            Casting++;
+
+            return false;
+        }
+
         var worn = (body as BotMobile)?.Rearm() ?? 0;
 
         if (worn > 0 && Armed(body, klass))
@@ -165,32 +182,107 @@ public static class BotArms
 
     private static void Once(Mobile body, BotClass klass)
     {
-        if (_said)
+        if (body == null || !_saidFor.Add(body.Serial))
         {
             return;
         }
 
-        _said = true;
-
         logger.Error(
-            "{Name} the {Class} is fighting bare-handed and has nothing in its pack to put on; only a {Brawler} may do that",
+            "{Name} the {Class} is fighting bare-handed and has nothing in its pack to put on; only a {Brawler} may do that; its bound things: {Where}",
             body.Name,
             klass?.Name ?? "bot",
-            Brawler
+            Brawler,
+            Whereabouts(body)
         );
+    }
+
+    private static string Whereabouts(Mobile body)
+    {
+        if (body is not BotMobile { Bond: { } bond })
+        {
+            return "no bond to read";
+        }
+
+        var say = ValueStringBuilder.Create(512);
+
+        try
+        {
+            var found = 0;
+
+            foreach (var serial in bond.Items)
+            {
+                if (found++ > 0)
+                {
+                    say.Append("; ");
+                }
+
+                var item = World.FindItem(serial);
+
+                if (item == null || item.Deleted)
+                {
+                    say.Append(serial.ToString());
+                    say.Append(" gone from the world");
+
+                    continue;
+                }
+
+                say.Append(item.GetType().Name);
+
+                switch (item.RootParent)
+                {
+                    case Mobile holder when ReferenceEquals(holder, body):
+                        say.Append(item.Parent is Mobile ? " in hand" : " in its own pack");
+
+                        break;
+
+                    case Mobile holder:
+                        say.Append(" carried by ");
+                        say.Append(holder.Name ?? "somebody");
+
+                        break;
+
+                    case Item box:
+                        say.Append(" inside ");
+                        say.Append(box.GetType().Name);
+                        say.Append(" at (");
+                        say.Append(box.X);
+                        say.Append(", ");
+                        say.Append(box.Y);
+                        say.Append(")");
+
+                        break;
+
+                    default:
+                        say.Append(" on the ground at (");
+                        say.Append(item.X);
+                        say.Append(", ");
+                        say.Append(item.Y);
+                        say.Append(")");
+
+                        break;
+                }
+            }
+
+            return found == 0 ? "nothing was ever bound to it" : say.ToString();
+        }
+        finally
+        {
+            say.Dispose();
+        }
     }
 
     public static string Describe() =>
         Caught == 0
             ? $"nobody has been caught bare-handed; {Dry} found with an empty quiver and {Restrung} took the bow back up; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body"
-            : $"{Caught} found bare-handed: {Rearmed} had one in the pack, {Empty} had nothing at all; {Dry} found with an empty quiver and {Restrung} took the bow back up; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body";
+            : $"{Caught} found bare-handed: {Rearmed} had one in the pack, {Empty} had nothing at all, {Casting} had a spell going up; {Dry} found with an empty quiver and {Restrung} took the bow back up; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body, {BotMobile.Rewielded} weapons put away for a better one of the bot's own kind, {BotMobile.Reverted} not put in a hand again so soon, {BotBinding.Refused} bound things turned away from a stall or a want";
 
     public static void Forget()
     {
-        _said = false;
+        _saidFor.Clear();
         Caught = 0;
         Rearmed = 0;
         Empty = 0;
+        Casting = 0;
         Dressed = 0;
         Declined = 0;
         Dry = 0;

@@ -121,6 +121,22 @@ public static class BotBinding
     public static bool IsBound(Item item, BotBond bond) =>
         item != null && bond != null && bond.Items.Contains(item.Serial);
 
+    public static long Refused { get; private set; }
+
+    public static long Forfeited { get; private set; }
+
+    public static bool Refuses(Item item, BotBond bond)
+    {
+        if (!IsBound(item, bond))
+        {
+            return false;
+        }
+
+        Refused++;
+
+        return true;
+    }
+
     public static int BoundCount(Type type, BotBond bond) =>
         type != null && bond != null && bond.Ammunition.TryGetValue(type, out var granted) ? granted : 0;
 
@@ -218,6 +234,56 @@ public static class BotBinding
         }
 
         return handed;
+    }
+
+    public static int Forfeit(Mobile bot, BotBond bond)
+    {
+        if (bond == null)
+        {
+            return 0;
+        }
+
+        var taken = 0;
+
+        if (bot is { Deleted: false })
+        {
+            List<Item> gone = [];
+            var worn = bot.Items;
+
+            for (var i = 0; i < worn.Count; i++)
+            {
+                if (IsBound(worn[i], bond))
+                {
+                    gone.Add(worn[i]);
+                }
+            }
+
+            if (bot.Backpack is { } pack)
+            {
+                for (var i = 0; i < pack.Items.Count; i++)
+                {
+                    if (IsBound(pack.Items[i], bond))
+                    {
+                        gone.Add(pack.Items[i]);
+                    }
+                }
+            }
+
+            for (var i = 0; i < gone.Count; i++)
+            {
+                gone[i].Delete();
+                taken++;
+            }
+        }
+
+        var entitled = bond.Issued.Count;
+
+        bond.Items.Clear();
+        bond.Issued.Clear();
+
+        Forfeited += taken + entitled;
+
+        return taken + entitled;
     }
 
     private static void Weightless(Item item) => item.Weight = 0.0;

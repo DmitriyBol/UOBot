@@ -58,6 +58,11 @@ public sealed class BotHirer : IBotProposer
             return null;
         }
 
+        if (BotUnderworld.Band(guild))
+        {
+            return null;
+        }
+
         var hall = BotEstate.Hall(guild);
 
         if (hall is not { Deleted: false } || hall.Map != body.Map)

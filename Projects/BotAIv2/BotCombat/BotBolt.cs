@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
@@ -51,13 +52,22 @@ public sealed class BotBolt : BotDeed
 
     private int _legs;
 
+    private readonly int _least;
+
     public BotBolt(Map map, Point3D from)
     {
         _map = map;
         _from = from;
     }
 
+    public BotBolt(Map map, Point3D from, int leastMs) : this(map, from)
+    {
+        _least = Math.Max(0, leastMs);
+    }
+
     public override string Kind => Trade;
+
+    public override bool Braves => true;
 
     public override Map Map => _map;
 
@@ -99,14 +109,16 @@ public sealed class BotBolt : BotDeed
 
         var worst = BotThreat.Strongest(body, Watch);
 
-        if (worst == null)
+        if (worst == null && now - _begun >= _least)
         {
+            BotFugitive.Cleared(body);
+
             return BotDoing.Done(_legs > 0 ? $"clear of it after {_legs} legs" : "nothing following");
         }
 
         if (now - _begun >= GiveUpMs)
         {
-            return BotDoing.Done($"could not shake {worst.Name}");
+            return BotDoing.Done(worst == null ? $"ran for {(now - _begun) / 1000}s" : $"could not shake {worst.Name}");
         }
 
         if (_to == Point3D.Zero || body.InRange(_to, 1))
@@ -123,6 +135,8 @@ public sealed class BotBolt : BotDeed
         return BotDoing.Walk(_map, _to, BotArrival.Within(1), $"away from {worst.Name}");
     }
 
+    private readonly List<Point3D> _refused = [];
+
     public override bool Bend(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -132,19 +146,40 @@ public sealed class BotBolt : BotDeed
             return false;
         }
 
-        var home = Homeward(_map, body);
-
-        if (home == Point3D.Zero || home == _to)
+        if (_to != Point3D.Zero)
         {
-            return false;
+            _refused.Add(_to);
         }
 
-        _to = home;
+        var worst = BotThreat.Strongest(body, Watch);
+        var next = worst == null ? Point3D.Zero : Retreat(_map, body, worst, _refused);
+
+        if (next == Point3D.Zero)
+        {
+            next = Homeward(_map, body);
+
+            if (next == Point3D.Zero || _refused.Contains(next))
+            {
+                return false;
+            }
+        }
+
+        _to = next;
+        Bent++;
 
         return true;
     }
 
-    public static Point3D Retreat(Map map, Mobile body, Mobile from)
+    public static long Bent { get; private set; }
+
+    public static Point3D Retreat(Map map, Mobile body, Mobile from) => Retreat(map, body, from, null);
+
+    private static readonly (int X, int Y)[] _ways =
+    [
+        (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)
+    ];
+
+    public static Point3D Retreat(Map map, Mobile body, Mobile from, List<Point3D> not)
     {
         if (map == null || map == Map.Internal || body == null || from == null)
         {
@@ -157,21 +192,59 @@ public sealed class BotBolt : BotDeed
 
         if (step > 0)
         {
-            var x = body.X + dx * Bound / step;
-            var y = body.Y + dy * Bound / step;
+            var under = BotDungeon.Under(body.Location);
 
-            if (BotStep.Settle(map, x, y, out var z))
+            var best = Point3D.Zero;
+            var bestScore = 0;
+
+            for (var i = 0; i < _ways.Length; i++)
             {
+                var (wx, wy) = _ways[i];
+                var score = wx * dx + wy * dy;
+
+                if (score <= 0 || score <= bestScore)
+                {
+                    continue;
+                }
+
+                var x = body.X + wx * Bound;
+                var y = body.Y + wy * Bound;
+
+                if (!BotStep.Settle(map, x, y, out var z))
+                {
+                    continue;
+                }
+
                 var back = new Point3D(x, y, z);
 
-                if (BotPopulation.Within(map, back) && !BotBarred.Barred(map, back))
+                if (not != null && not.Contains(back))
                 {
-                    return back;
+                    continue;
                 }
+
+                if (under ? !BotDungeon.Under(back) : !BotPopulation.Within(map, back) || BotBarred.Barred(map, back))
+                {
+                    continue;
+                }
+
+                best = back;
+                bestScore = score;
+            }
+
+            if (best != Point3D.Zero)
+            {
+                return best;
+            }
+
+            if (under)
+            {
+                return Point3D.Zero;
             }
         }
 
-        return Homeward(map, body);
+        var home = Homeward(map, body);
+
+        return not != null && not.Contains(home) ? Point3D.Zero : home;
     }
 
     private static Point3D Homeward(Map map, Mobile body)

@@ -42,7 +42,29 @@ public sealed class BotBailiff : IBotProposer
 
     public static long Claimed { get; private set; }
 
+    public static int ShunMs { get; set; } = 300000;
+
+    public static long Passed { get; private set; }
+
     private static readonly Dictionary<Serial, long> _claims = [];
+
+    public static int ToldMs { get; set; } = 300000;
+
+    public static long Warned { get; private set; }
+
+    private static readonly Dictionary<Serial, long> _told = [];
+
+    public static void Told(Mobile them)
+    {
+        if (them != null)
+        {
+            _told[them.Serial] = Core.TickCount + ToldMs;
+        }
+    }
+
+    private static readonly Dictionary<(Serial Bot, Serial Them), long> _unreached = [];
+
+    private static readonly List<(Serial Bot, Serial Them)> _lapsed = [];
 
     public string Name => "bailiff";
 
@@ -65,6 +87,11 @@ public sealed class BotBailiff : IBotProposer
             return null;
         }
 
+        if (BotUnderworld.Band(ours))
+        {
+            return null;
+        }
+
         Asked++;
 
         if (BotLand.Holder(body.Map, body.Location) != ours.Name)
@@ -77,6 +104,8 @@ public sealed class BotBailiff : IBotProposer
         BotMobile worst = null;
         var lowest = Minding;
         var anybody = false;
+        var passed = false;
+        var looked = Core.TickCount;
 
         foreach (var near in body.GetMobilesInRange<BotMobile>(Watch))
         {
@@ -87,6 +116,22 @@ public sealed class BotBailiff : IBotProposer
 
             if (BotLand.Holder(near.Map, near.Location) != ours.Name)
             {
+                continue;
+            }
+
+            if (_unreached.TryGetValue((body.Serial, near.Serial), out var shunned) && looked - shunned < 0)
+            {
+                Passed++;
+                passed = true;
+
+                continue;
+            }
+
+            if (_told.TryGetValue(near.Serial, out var told) && looked - told < 0)
+            {
+                Warned++;
+                passed = true;
+
                 continue;
             }
 
@@ -109,7 +154,7 @@ public sealed class BotBailiff : IBotProposer
             {
                 Tolerated++;
             }
-            else
+            else if (!passed)
             {
                 Quiet++;
             }
@@ -148,11 +193,41 @@ public sealed class BotBailiff : IBotProposer
         }
     }
 
+    public static void Unreached(Mobile bot, Mobile them)
+    {
+        if (bot == null || them == null)
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+
+        if (_unreached.Count >= 256)
+        {
+            foreach (var (key, until) in _unreached)
+            {
+                if (now - until >= 0)
+                {
+                    _lapsed.Add(key);
+                }
+            }
+
+            for (var i = 0; i < _lapsed.Count; i++)
+            {
+                _unreached.Remove(_lapsed[i]);
+            }
+
+            _lapsed.Clear();
+        }
+
+        _unreached[(bot.Serial, them.Serial)] = now + ShunMs;
+    }
+
     public static string Describe() =>
         Asked == 0
             ? "nobody has been looked at for keeping a guild's yard"
             : $"the bailiff looked {Asked} times and sent {Offered}: {Elsewhere} were not on their own land, {Quiet} saw nobody on it, "
-              + $"{Tolerated} saw somebody and did not mind them enough, {Claimed} found somebody already dealing with it; {BotEvict.Describe()}";
+              + $"{Tolerated} saw somebody and did not mind them enough, {Claimed} found somebody already dealing with it, {Passed} passed over somebody they had lately failed to get near, {Warned} passed over somebody already told and minded; {BotEvict.Describe()}";
 
     public static void Forget()
     {
@@ -162,7 +237,11 @@ public sealed class BotBailiff : IBotProposer
         Quiet = 0;
         Tolerated = 0;
         Claimed = 0;
+        Passed = 0;
+        Warned = 0;
         _claims.Clear();
+        _unreached.Clear();
+        _told.Clear();
         BotEvict.Forget();
     }
 }

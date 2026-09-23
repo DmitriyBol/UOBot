@@ -64,6 +64,32 @@ public sealed class BotSalve : BotDeed
 
     private long _triedTick;
 
+    private bool _reasoned;
+
+    public static long ForFight { get; private set; }
+
+    public static long ForCalm { get; private set; }
+
+    public static long UnderFire { get; private set; }
+
+    public static long Bare { get; private set; }
+
+    public static long Turned { get; private set; }
+
+    public static string Describe() =>
+        ForFight + ForCalm + UnderFire + Bare == 0
+            ? "no mending has been begun"
+            : $"{ForFight + ForCalm + UnderFire + Bare} mendings begun: {ForFight} by spell for a patient in a fight, {ForCalm} by cloth out of one, {UnderFire} by cloth with the healer under fire, {Bare} with only one means to hand";
+
+    public static void Forget()
+    {
+        ForFight = 0;
+        ForCalm = 0;
+        UnderFire = 0;
+        Bare = 0;
+        Turned = 0;
+    }
+
     public BotSalve(Mobile patient, Map map, bool onSelf, SkillName trains)
     {
         _patient = patient;
@@ -79,7 +105,7 @@ public sealed class BotSalve : BotDeed
 
     public override Map Map => _map;
 
-    public override Point3D Where => _found;
+    public override Point3D Where => _onSelf && _patient is { Deleted: false } ? _patient.Location : _found;
 
     public override double Expects
     {
@@ -126,6 +152,13 @@ public sealed class BotSalve : BotDeed
             return Ending("the patient is past mending");
         }
 
+        if (!_onSelf && BotMend.ShunsOutlaws && BotMend.Abetting(body, _patient) is { } crime)
+        {
+            Turned++;
+
+            return BotDoing.Done($"{_patient.Name} is {crime}, and mending it would be a crime");
+        }
+
         if (BotMend.Whole(_patient))
         {
             return _casts + _cloths + _draughts > 0
@@ -145,7 +178,34 @@ public sealed class BotSalve : BotDeed
             }
         }
 
-        var cloth = BotMend.UnderFire(bot) || BotMend.Spell(body, _patient) < 0;
+        var spell = BotMend.Spell(body, _patient);
+        var fired = BotMend.UnderFire(bot);
+        var embattled = !fired && BotMend.Embattled(_patient);
+        var hasCloth = BotMend.Cloth(body) > 0;
+        var cloth = fired || spell < 0 || (!embattled && hasCloth);
+
+        if (!_reasoned)
+        {
+            _reasoned = true;
+
+            if (spell < 0 || !hasCloth)
+            {
+                Bare++;
+            }
+            else if (fired)
+            {
+                UnderFire++;
+            }
+            else if (embattled)
+            {
+                ForFight++;
+            }
+            else
+            {
+                ForCalm++;
+            }
+        }
+
         var near = cloth ? BotMend.Touch : BotMend.Cast;
 
         if (!_onSelf && !body.InRange(_patient.Location, near))
@@ -203,8 +263,6 @@ public sealed class BotSalve : BotDeed
         }
         else
         {
-            var spell = BotMend.Spell(body, _patient);
-
             if (spell >= 0 && BotMend.Begin(body, spell))
             {
                 _awaiting = true;

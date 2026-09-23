@@ -129,6 +129,8 @@ public sealed class BotArmourer : IBotProposer
             if (BotGuilds.Stand(wearer, owing))
             {
                 Guilded++;
+
+                BotYield.Aside(wearer, -owing);
             }
             else
             {

@@ -53,6 +53,10 @@ public static class BotWar
 
     public static int DeclareEveryMs { get; set; } = 1800000;
 
+    public static bool LoserCools { get; set; } = true;
+
+    public static long LosersCooled { get; private set; }
+
     public static int MostWars { get; set; } = 1;
 
     public static int LookMs { get; set; } = 10000;
@@ -201,7 +205,7 @@ public static class BotWar
         if (_declared.TryGetValue(mine, out var last) && now - (last + DeclareEveryMs) < 0)
         {
             Cooling++;
-            why = $"{mine} declared one {(now - last) / 60000} minutes ago";
+            why = $"{mine} declared or lost a war {(now - last) / 60000} minutes ago";
 
             return false;
         }
@@ -596,6 +600,12 @@ public static class BotWar
 
         var loser = war.Against(winner);
         var (wonKills, wonLoot) = war.Score(winner);
+
+        if (LoserCools && loser != null)
+        {
+            _declared[loser] = Core.TickCount;
+            LosersCooled++;
+        }
         var (lostKills, lostLoot) = war.Score(loser);
 
         logger.Warning(
@@ -645,7 +655,7 @@ public static class BotWar
             ? "wars are not ruled"
             : $"{_wars.Count} wars standing ({Tell()}); won at {Kills} dead or {Loot}gp of plunder, no peace before {LeastMs / 60000} minutes, "
             + $"judged at {LongestMs / 60000}, a truce of {TruceMs / 60000} after, one declaration a guild per {DeclareEveryMs / 60000} minutes and {MostWars} at a time; "
-            + $"{Declared} declared, {Truced} refused for a truce, {Cooling} for declaring too soon, {Busy} for a guild already at war; "
+            + $"{Declared} declared, {Truced} refused for a truce, {Cooling} for declaring too soon ({LosersCooled} clocks started by a defeat), {Busy} for a guild already at war; "
             + $"{WonByBlood} won by blood, {WonByPlunder} by plunder, {TimedOut} judged by the clock, {Peaced} ended in peace, {Drawn} of those drawn; "
             + $"{Counted} kills and {Plundered}gp of plunder counted";
 

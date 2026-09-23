@@ -121,6 +121,27 @@ public static class BotDebugMemory
         _recall.Lessons ??= [];
         _recall.Notes ??= [];
 
+        for (var i = _recall.Beliefs.Count - 1; i >= 0; i--)
+        {
+            var belief = _recall.Beliefs[i];
+
+            if (!Label(belief.Finding))
+            {
+                continue;
+            }
+
+            logger.Information(
+                "The debugger drops a belief that was a label rather than a sentence, found {Seen} times from {First} to {Last}: [{Kind}] {Finding}",
+                belief.Seen,
+                belief.First,
+                belief.Last,
+                belief.Kind,
+                belief.Finding
+            );
+
+            _recall.Beliefs.RemoveAt(i);
+        }
+
         _recall.Sessions++;
 
         Save();
@@ -148,7 +169,7 @@ public static class BotDebugMemory
 
     public static void Believe(BotDebugNote note)
     {
-        if (note == null || string.IsNullOrWhiteSpace(note.Finding) || note.Kind == "nothing")
+        if (note == null || string.IsNullOrWhiteSpace(note.Finding) || note.Kind == "nothing" || Label(note.Finding))
         {
             return;
         }
@@ -307,9 +328,18 @@ public static class BotDebugMemory
                 sb.Append(_recall.Sessions);
                 sb.AppendLine(" sessions of watching this shard, these are the things you have found more than once. The count is how many separate times you reached the same conclusion from fresh measurements, which is the only reason to weigh one above another.");
 
-                for (var i = 0; i < sorted.Count && i < Recall; i++)
+                var recited = 0;
+
+                for (var i = 0; i < sorted.Count && recited < Recall; i++)
                 {
                     var belief = sorted[i];
+
+                    if (Label(belief.Finding))
+                    {
+                        continue;
+                    }
+
+                    recited++;
 
                     sb.Append("- found ");
                     sb.Append(belief.Seen);
@@ -351,6 +381,35 @@ public static class BotDebugMemory
         {
             sb.Dispose();
         }
+    }
+
+    public static int LongestWord { get; set; } = 32;
+
+    public static bool Label(string finding)
+    {
+        if (string.IsNullOrWhiteSpace(finding) || finding.IndexOf(' ') < 0)
+        {
+            return true;
+        }
+
+        var run = 0;
+
+        for (var i = 0; i < finding.Length; i++)
+        {
+            if (char.IsWhiteSpace(finding[i]))
+            {
+                run = 0;
+
+                continue;
+            }
+
+            if (++run > LongestWord)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static BotDebugBelief Alike(string finding)

@@ -24,7 +24,7 @@ public sealed class BotReclaim : BotDeed
 {
     public const string Trade = "reclaim";
 
-    public static double Prior { get; set; } = 80.0;
+    public static double Prior { get; set; } = 20.0;
 
     public static double WorkMinutes { get; set; } = 1.5;
 

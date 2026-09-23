@@ -1,54 +1,54 @@
 {
   "Lessons": {
     "Roderic": [
-      "For Tailor, reject wants forecasting under 30 gold per minute; actual earnings often negative despite positive forecast.",
-      "For Smith, reject any want where actual time exceeds forecast by more than 25%.",
-      "For Tailor, reject wants forecasting over 40 gold per minute; high forecasts on this shard consistently yield earnings significantly below the projection.",
-      "For Miner, reject any want forecasting above 60 gold per minute; actual earnings on this shard rarely exceed half the projected value.",
-      "For Miner, reject any want forecasting above 40 gold/min; actual earnings on this shard rarely sustain below the forecast for longer than two minutes.",
-      "For Hunter, zero-forecast wants yield neutral earnings; reject them unless they fill a critical slot or material shortage.",
-      "For Hunter, reject any want forecasting zero gold per minute unless it fills an empty slot for a bot currently without ammunition or armor.",
-      "On this shard, reject any want forecasting zero gold per minute; it yields negative earnings unless filling a critical slot."
+      "On this shard, reject any want forecasting zero gold per minute; it yields negative earnings unless filling a critical slot.",
+      "For Shopper, reject any want forecasting above 100 gold per minute; actual earnings rarely exceed one-fifth of the projected value unless filling a critical slot.",
+      "For Tailor, reject every want unless it fills an empty armor slot; all other work burns coin regardless of forecast.",
+      "For Hunter, take any want forecasting zero gold per minute; actual earnings exceed forecasts by a factor of ten on this shard.",
+      "For Hunter, reject zero gold wants unless filling a bare armor slot; actual earnings match forecast exactly here.",
+      "For Tailor, reject any want forecasting positive gold per minute; actual earnings are negative unless filling a bare armor slot.",
+      "For Miner, reject any want forecasting above 60 gold per minute; forecasts over 100 yield zero earnings on this shard.",
+      "For Miner, reject any want forecasting above 30 gold per minute; actual earnings rarely exceed half of that forecast."
     ],
     "Emeric": [
-      "On this shard, reject Woodsman work with positive forecast; they overstate value and hide material costs.",
-      "On this shard, reject Woodsman work with zero forecast regardless of Want status; Wants do not guarantee value when forecast is zero.",
-      "On this shard, reject all Smith work regardless of forecast.",
-      "On this shard, reject Feuder work with zero forecast.",
-      "On this shard, reject any Smith trade with zero forecast; they drop below zero within four minutes.",
-      "Reject Miner work with any positive forecast; on this shard, these forecasts are traps that hide material costs and result in zero profit.",
-      "On this shard, reject Feuder work with zero forecast immediately; Want status does not cover material loss on this trade.",
-      "On this shard, reject Miner work with any positive forecast regardless of Want status; they hide material costs and result in loss."
+      "On this shard, reject any trade with zero gold-per-minute forecast immediately; Hunter specifically drops below expected duration within two and a half minutes regardless of Want status or band needs.",
+      "On this shard, ignore duration variance for zero-forecast trades; reject all zero-forecast work immediately.",
+      "On this shard, reject all zero-forecast trades immediately; finishing early does not generate profit.",
+      "On this shard, reject any trade with zero gold-per-minute forecast immediately; they always hide material costs and yield no profit regardless of Want status.",
+      "On this shard, zero-forecast work finishes early but yields no profit; reject immediately regardless of duration variance or Want status.",
+      "On this shard, reject all Tailor work; positive forecasts hide material costs and yield zero profit.",
+      "On this shard, reject any trade with positive gold-per-minute forecast; they hide material costs and yield loss.",
+      "On this shard, reject all Miner work immediately regardless of forecast value."
     ],
     "Ulric": [
-      "Shopper work does not follow the shard's 20 gold underestimate trend; expect actual earnings to match forecast.",
-      "Reject any Smith work with a forecast of zero or less, regardless of active shortage status.",
-      "Reject Miner work with a forecast above 100 gold per minute unless it is on the active shortage list, as these forecasts often drop to zero.",
-      "Reject all Miner work regardless of forecast value unless it is on the active shortage list.",
-      "Reject staker work with zero or negative forecast; actual earnings are negative.",
-      "Staker work at zero forecast guarantees -400+ loss per minute; reject regardless of shortage status.",
-      "Reject all Tailor work; actual earnings are negative even at zero forecast on this shard.",
-      "Reject all Tailor work regardless of forecast value or shortage status; forecasts are false on this shard."
+      "Reject all Tailor work; zero forecast predicts guaranteed loss on this shard.",
+      "Reject Smith work with 0 forecast immediately; actual earnings match forecast exactly on this shard.",
+      "Cook forecasts are false; reject all Cook work.",
+      "Reject all Hunter work unless it is on the active shortage list.",
+      "Never take Hunter work with zero forecast unless it appears on the Want List.",
+      "Reject all Smith work with forecasts above 15 gold/min.",
+      "Take Miner with zero forecast if it fills an active Want List shortage; 0 forecast yields profit on this shard.",
+      "Reject all Miner work with a positive forecast; only take if it fills an active Want List shortage."
     ],
     "Wulfric": [
-      "If Smith forecast is zero, switch crafts immediately without waiting for a cycle check.",
-      "If Smith forecast is zero, switch crafts immediately.",
-      "On this shard, if Tailor forecast exceeds 200 gold and stall wants are fewer than three, do not take it.",
       "On this shard, if Tailor forecast exceeds 200 gold, reject immediately regardless of stall wants or material stock.",
       "On this shard, if Miner forecast exceeds 150 gold and first minute yield is zero, switch immediately regardless of stall stock or cycle check.",
       "On this shard, if Woodsman forecast exceeds 100 gold and first minute yield is zero, switch immediately.",
       "On this shard, if Woodsman forecast exceeds 150 gold, reject immediately.",
-      "On this shard, if Shopper forecast is zero, reject immediately."
+      "On this shard, if Shopper forecast is zero, reject immediately.",
+      "On this shard, if Tailor forecast is below 150 gold, switch crafts immediately.",
+      "On this shard, if Hunter forecast is zero and stall wants exist, take the work instead of switching crafts.",
+      "On this shard, if Hunter forecast is zero, reject immediately regardless of stall wants."
     ],
     "Alaric": [
-      "Reject 'staker' tasks if forecast exceeds 100g/min; actual yield on this shard is consistently less than 10% of prediction.",
-      "Reject 'staker' tasks regardless of forecast; actual yield is negative on this shard.",
-      "Reject all Woodsman tasks immediately; assume actual yield is zero regardless of forecast or Want status.",
-      "Reject Miner tasks even if an active Want exists for the ore; raw material yield is zero on this shard.",
-      "Reject 'Tailor' tasks if the forecast exceeds 100g/min; assume all craft forecasts are inflated by at least 150g/min.",
-      "Woodsman tasks yield positive value even if forecast is zero; accept them if a Want exists.",
-      "Reject Surgeon tasks immediately unless an active Want exists; actual yield is zero on this shard without one.",
-      "Reject all Tailor tasks regardless of forecast value."
+      "Skip any task with a zero or negative forecast; Wants do not save lost time on this shard.",
+      "Ignore all skill forecasts; only accept Wants where gold is already lodged.",
+      "Zero forecast yield tasks always waste minutes; reject them regardless of Want status or gold lodged.",
+      "Trust Wants on the board over my skill forecasts; only take work where gold is already lodged.",
+      "Never take Tailoring wants where my skill forecast exceeds 1000 gold/min; actual payouts on this shard are often negative.",
+      "Reject Miner tasks forecasted above 500 gold/min unless they have an active Want with lodged gold.",
+      "Verify material costs before taking Tailoring wants; recent loss proves high forecasts can still yield negative returns on this shard.",
+      "Reject Miner tasks forecasted above 300 gold/min; on this shard, mining forecasts inflate value until they collapse to zero return regardless of Want status."
     ]
   }
 }

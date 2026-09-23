@@ -34,10 +34,14 @@ public static class BotPurse
 
     public static int Float { get; set; } = 100;
 
+    public static int KeepBack { get; set; } = 100;
+
     public static int Keeps(Mobile bot) =>
-        bot is BotMobile rider && BotStable.Wants(rider)
-            ? Math.Max(Float, BotSteed.Price + BotStable.Reserve)
-            : Float;
+        BotFence.Is(bot)
+            ? Math.Max(Float, BotFence.Most)
+            : bot is BotMobile rider && BotStable.Wants(rider)
+                ? Math.Max(Float, BotSteed.Price + BotStable.Reserve)
+                : Float;
 
     public static int Reach { get; set; } = 3;
 
@@ -51,7 +55,7 @@ public static class BotPurse
         Deposits = 0;
     }
 
-    public static string Describe() => $"{Deposits} deposits worth {Banked}gp; {Wealthy()}";
+    public static string Describe() => $"{Deposits} deposits worth {Banked}gp; {Wealthy()}; {BotYield.DescribeAside()}";
 
     public static string Wealthy()
     {

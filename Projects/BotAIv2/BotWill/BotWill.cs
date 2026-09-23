@@ -59,6 +59,8 @@ public static class BotWill
 
     public static int LabourMs { get; set; } = 900000;
 
+    public static long OwnClock { get; private set; }
+
     public static double SwitchMargin { get; set; } = 1.25;
 
     public static double CommitStretch { get; set; } = 1.5;
@@ -84,6 +86,8 @@ public static class BotWill
     public static long Troubled { get; private set; }
 
     public static long Paused { get; private set; }
+
+    public static long PressPaused { get; private set; }
 
     public static long Resumed { get; private set; }
 
@@ -115,7 +119,11 @@ public static class BotWill
         public long Resumed;
 
         public long Returned;
+
+        public long Auctioned;
     }
+
+    public static bool Auctioned(string kind) => kind != null && _tallies.TryGetValue(kind, out var tally) && tally.Auctioned > 0;
 
     private static readonly Dictionary<string, Tally> _tallies = new(StringComparer.OrdinalIgnoreCase);
 
@@ -167,6 +175,126 @@ public static class BotWill
     public static long Dislodged { get; private set; }
 
     public static long Kept { get; private set; }
+
+    public static long Filed { get; private set; }
+
+    public static bool GuessHolds { get; set; } = true;
+
+    public static long SecondGuesses { get; private set; }
+
+    public static long MindOffers { get; private set; }
+
+    public static long MindRefused { get; private set; }
+
+    public static long MindOutscored { get; private set; }
+
+    public static long MindTopped { get; private set; }
+
+    private static readonly Dictionary<string, long> _mindBeatenBy = [];
+
+    private static readonly Dictionary<string, List<string>> _offeredAs = new(StringComparer.OrdinalIgnoreCase);
+
+    private static void Named(string kind, string name)
+    {
+        if (kind == null || name == null)
+        {
+            return;
+        }
+
+        if (!_offeredAs.TryGetValue(kind, out var names))
+        {
+            names = [];
+            _offeredAs[kind] = names;
+        }
+
+        for (var i = 0; i < names.Count; i++)
+        {
+            if (string.Equals(names[i], name, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+        }
+
+        names.Add(name);
+    }
+
+    public static bool OfferedAs(string kind, string name)
+    {
+        if (kind == null || name == null || !_offeredAs.TryGetValue(kind, out var names))
+        {
+            return false;
+        }
+
+        for (var i = 0; i < names.Count; i++)
+        {
+            if (string.Equals(names[i], name, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static int MindSampleEvery { get; set; } = 25;
+
+    private static string Factors(BotWeigh w) =>
+        $"estimate {w.Estimate:F0}, near {w.Nearness:F2}, new {w.Novelty:F2}, room {w.Room:F2}, safe {w.Caution:F2}, purse {w.Purse:F2}, standing {w.Stopped:F2}, revel {w.Revel:F2}, ground {w.Ground:F2}, charter {w.Charter:F2}, calling {w.Calling:F2}";
+
+    public static string MindsMet()
+    {
+        if (MindOffers == 0)
+        {
+            return "no mind's choice has been weighed";
+        }
+
+        List<(string Kind, long Times)> beaten = [];
+
+        foreach (var (kind, n) in _mindBeatenBy)
+        {
+            beaten.Add((kind, n));
+        }
+
+        beaten.Sort((a, b) => b.Times.CompareTo(a.Times));
+
+        var by = "";
+
+        for (var i = 0; i < beaten.Count && i < 3; i++)
+        {
+            by += (i == 0 ? " (by " : ", ") + $"{beaten[i].Kind} {beaten[i].Times}";
+        }
+
+        if (by.Length > 0)
+        {
+            by += ")";
+        }
+
+        return $"their choices weighed {MindOffers} times: {MindTopped} on top, {MindOutscored} outscored{by}, {MindRefused} refused outright";
+    }
+
+    public static bool MetCounts { get; set; } = true;
+
+    public static long Met { get; private set; }
+
+    public static long MetHome { get; private set; }
+
+    private static bool Meets(IBotWilful bot, BotDeed next)
+    {
+        if (next?.Kind is not { } kind)
+        {
+            return false;
+        }
+
+        if (kind.InsensitiveEquals(BotBand.Trade) || kind.InsensitiveEquals(BotEnlist.Trade) || kind.InsensitiveEquals(BotSlay.Trade))
+        {
+            return true;
+        }
+
+        return kind.InsensitiveEquals(BotRescue.Trade)
+               && next.Foe is { Deleted: false } foe
+               && bot?.Self is { } body
+               && body.InRange(foe.Location, BotMobile.NoticeRange);
+    }
 
     private static bool Sworn(IBotWilful bot, BotStanding rung, IBotProposer proposer)
     {
@@ -306,6 +434,10 @@ public static class BotWill
 
     public static long Unblamed { get; private set; }
 
+    public static long Rerouted { get; private set; }
+
+    public static long Foreign { get; private set; }
+
     public static Action<Mobile, string> Completed { get; set; }
 
     public static void Note(IBotWilful bot, BotWalkResult result)
@@ -325,6 +457,13 @@ public static class BotWill
 
         var refused = resolve.Sent;
 
+        if (refused.Follow == null && refused.Where == Point3D.Zero)
+        {
+            Foreign++;
+
+            return;
+        }
+
         resolve.Sent = default;
 
         var bent = false;
@@ -340,7 +479,17 @@ public static class BotWill
 
         if (bent)
         {
-            resolve.Bent = true;
+            if (deed.BendIsTrouble)
+            {
+                resolve.Bent = true;
+            }
+
+            if (result is BotWalkResult.Refused or BotWalkResult.GaveUp && refused.Follow == null && refused.Where != Point3D.Zero
+                && !BotOutlaw.KeptRound(bot.Self))
+            {
+                BotRefused.Refuse(deed.Map, refused.Where);
+                Rerouted++;
+            }
 
             if (Chatty)
             {
@@ -410,6 +559,9 @@ public static class BotWill
 
     public static void Forget(IBotWilful bot)
     {
+        BotBreaker.Forget(bot?.Self);
+        BotYield.Forget(bot?.Self);
+
         var resolve = bot?.Resolve;
         var deed = resolve?.Deed;
 
@@ -533,8 +685,21 @@ public static class BotWill
                     return;
                 }
 
-                if (!doing.Matches(resolve.Sent))
+                var carried = journey.Bottom;
+                var lost = carried == null
+                           || !carried.Interruption
+                           && !(carried.Map == doing.Map
+                                && ReferenceEquals(carried.Follow, doing.Follow)
+                                && (doing.Follow != null || carried.Where == doing.Where)
+                                && carried.Arrival.Tiles == doing.Arrival.Tiles);
+
+                if (!doing.Matches(resolve.Sent) || lost)
                 {
+                    if (doing.Matches(resolve.Sent))
+                    {
+                        Resent++;
+                    }
+
                     if (doing.Follow != null)
                     {
                         journey.Rebase(doing.Map, doing.Follow, doing.Arrival, doing.Note ?? deed.Kind);
@@ -575,6 +740,8 @@ public static class BotWill
                     {
                         Trudges++;
 
+                        BotAppraisal.Becalm(resolve, walker.Location, resolve.Started, resolve.Nearest);
+
                         Settle(
                             bot,
                             BotEnding.Failed,
@@ -588,6 +755,13 @@ public static class BotWill
             case BotDoingKind.Work:
                 if (Core.TickCount - resolve.StirredTick >= LabourMs)
                 {
+                    if (deed.Still)
+                    {
+                        OwnClock++;
+
+                        return;
+                    }
+
                     Settle(bot, BotEnding.Failed, $"nothing has come of this in {LabourMs / 60000} minutes");
 
                     return;
@@ -680,6 +854,8 @@ public static class BotWill
                 resolve.Offered.Add(proposer.Name);
             }
 
+            Named(offer.Kind, proposer.Name);
+
             _offers.Add(offer);
         }
 
@@ -709,10 +885,23 @@ public static class BotWill
         var viable = 0;
         string firstVeto = null;
 
+        BotDeed minded = null;
+        var mindedScore = 0.0;
+        var mindedWeigh = default(BotWeigh);
+        string mindedVeto = null;
+
         for (var i = 0; i < _offers.Count; i++)
         {
             var offer = _offers[i];
             var score = BotAppraisal.Weigh(bot, offer, Share(offer.Kind), out var weigh, out var veto);
+
+            if (offer.Kind.StartsWith("mind-", StringComparison.Ordinal))
+            {
+                minded = offer;
+                mindedScore = score;
+                mindedWeigh = weigh;
+                mindedVeto = veto;
+            }
 
             if (score <= 0.0)
             {
@@ -748,6 +937,50 @@ public static class BotWill
             Grounded++;
         }
 
+        if (minded != null)
+        {
+            MindOffers++;
+
+            if (mindedScore <= 0.0)
+            {
+                MindRefused++;
+
+                if (MindSampleEvery > 0 && MindRefused % MindSampleEvery == 1)
+                {
+                    logger.Information(
+                        "A mind's choice weighed: {Name}'s {Kind} was refused: {Veto}",
+                        bot.Self.Name,
+                        minded.Kind,
+                        mindedVeto ?? "no reason given"
+                    );
+                }
+            }
+            else if (minded == best)
+            {
+                MindTopped++;
+            }
+            else if (best != null)
+            {
+                MindOutscored++;
+                _mindBeatenBy.TryGetValue(best.Kind, out var beaten);
+                _mindBeatenBy[best.Kind] = beaten + 1;
+
+                if (MindSampleEvery > 0 && MindOutscored % MindSampleEvery == 1)
+                {
+                    logger.Information(
+                        "A mind's choice weighed: {Name}'s {Kind} at {Score:F0} ({Mind}) lost to {Best} at {BestScore:F0} ({Won})",
+                        bot.Self.Name,
+                        minded.Kind,
+                        mindedScore,
+                        Factors(mindedWeigh),
+                        best.Kind,
+                        bestScore,
+                        Factors(bestWeigh)
+                    );
+                }
+            }
+        }
+
         if (best == null)
         {
             if (held == null && rung == BotStanding.Free)
@@ -766,6 +999,7 @@ public static class BotWill
 
         string how = null;
         var heldNow = 0.0;
+        string heldVeto = null;
 
         if (held != null)
         {
@@ -781,7 +1015,7 @@ public static class BotWill
                 Dislodged++;
 
                 how = "dislodged";
-                heldNow = BotAppraisal.Weigh(bot, held, Share(held.Kind), out _);
+                heldNow = BotAppraisal.Weigh(bot, held, Share(held.Kind), out _, out heldVeto, inHand: true);
             }
             else
             {
@@ -794,17 +1028,31 @@ public static class BotWill
                     return false;
                 }
 
+                if (best.Paperwork && !jumps)
+                {
+                    Filed++;
+
+                    return false;
+                }
+
                 if (fresh && !jumps)
                 {
                     return false;
                 }
 
-                heldNow = BotAppraisal.Weigh(bot, held, Share(held.Kind), out _);
+                heldNow = BotAppraisal.Weigh(bot, held, Share(held.Kind), out _, out heldVeto, inHand: true);
 
                 var heldScore = heldNow * (jumps ? 1.0 : BotAppraisal.Inertia);
 
                 if (bestScore <= heldScore * (jumps ? 1.0 : SwitchMargin))
                 {
+                    return false;
+                }
+
+                if (GuessHolds && held.Guess && best.Guess && held.Kind.InsensitiveEquals(best.Kind))
+                {
+                    SecondGuesses++;
+
                     return false;
                 }
 
@@ -828,7 +1076,7 @@ public static class BotWill
             }
         }
 
-        Commit(bot, resolve, rung, best, bestWeigh, second, secondScore, now, _offers.Count, viable, firstVeto, how, heldNow);
+        Commit(bot, resolve, rung, best, bestWeigh, second, secondScore, now, _offers.Count, viable, firstVeto, how, heldNow, heldVeto);
 
         return true;
     }
@@ -846,7 +1094,8 @@ public static class BotWill
         int viable,
         string refused,
         string how = null,
-        double heldNow = 0.0
+        double heldNow = 0.0,
+        string heldVeto = null
     )
     {
         var dropped = resolve.Deed;
@@ -884,15 +1133,40 @@ public static class BotWill
                     break;
             }
 
+            var vetoed = heldVeto == null ? "" : "; vetoed: " + heldVeto;
             var account =
-                $"{how ?? "replaced"} by {deed.Kind} at {weigh.Score:F0}/min after {heldFor:F1} of {resolve.Expected:F1} minutes reckoned, taken at {resolve.TakenAt:F0}/min and worth {heldNow:F0}/min by then";
+                $"{how ?? "replaced"} by {deed.Kind} at {weigh.Score:F0}/min after {heldFor:F1} of {resolve.Expected:F1} minutes reckoned, taken at {resolve.TakenAt:F0}/min and worth {heldNow:F0}/min by then{vetoed}";
 
-            var pause = Resume
+            var metHome = MetCounts && dropped is BotHomeward && how is "outbid" or "summoned";
+            var met = metHome || MetCounts && dropped is BotProwl && Meets(bot, deed);
+
+            var pause = !met
+                        && Resume
                         && dropped.Steadfast
                         && resolve.Paused == null
                         && how is "jumped" or "summoned" or "dislodged" or "interrupted";
 
-            if (pause)
+            if (met)
+            {
+                if (metHome)
+                {
+                    MetHome++;
+                }
+                else
+                {
+                    Met++;
+                }
+
+                if (how == "outbid" && resolve.Paused != null)
+                {
+                    DropPaused(bot, resolve, $"the bot changed its mind to {deed.Kind}");
+                }
+
+                Settle(bot, BotEnding.Done, $"met by {deed.Kind}: {account}", unpause: false, credit: false);
+
+                gone = $"; finished {dropped}, met by {deed.Kind}";
+            }
+            else if (pause)
             {
                 Pause(bot, resolve, deed.Kind, now);
 
@@ -927,6 +1201,15 @@ public static class BotWill
         resolve.Deed = deed;
         resolve.Took = rung;
         resolve.Stake = BotYield.Take(bot, deed);
+
+        try
+        {
+            deed.Taken(bot);
+        }
+        catch (Exception e)
+        {
+            logger.Error(e, "Undertaking {Kind} threw when it was taken on; carried on without it", deed.Kind);
+        }
         resolve.SinceTick = now;
         resolve.ReviewedTick = now;
         resolve.StirredTick = now;
@@ -948,7 +1231,11 @@ public static class BotWill
 
         Count(deed.Kind, 1);
         Taken++;
-        TallyOf(deed.Kind).Taken++;
+
+        var taken = TallyOf(deed.Kind);
+
+        taken.Taken++;
+        taken.Auctioned++;
 
         if (!Chatty)
         {
@@ -965,6 +1252,84 @@ public static class BotWill
         );
     }
 
+    public static long Pressed { get; private set; }
+
+    public static long Repressed { get; private set; }
+
+    public static bool Press(IBotWilful bot, BotDeed deed, string why)
+    {
+        var resolve = bot?.Resolve;
+        var body = bot?.Self;
+
+        if (resolve == null || body is not { Deleted: false, Alive: true } || deed == null)
+        {
+            return false;
+        }
+
+        var now = Core.TickCount;
+        var putDown = "";
+
+        if (resolve.Deed != null)
+        {
+            if (ReferenceEquals(resolve.Deed, deed) || resolve.Deed.Repeats(deed))
+            {
+                Repressed++;
+
+                return true;
+            }
+
+            var held = resolve.Deed;
+
+            if (Resume && held.Steadfast && resolve.Paused == null)
+            {
+                putDown = $"; put down {held} to take up again";
+                PressPaused++;
+
+                Pause(bot, resolve, deed.Kind, now);
+            }
+            else
+            {
+                Settle(bot, BotEnding.Dropped, $"pressed to {deed.Kind}: {why}", unpause: false);
+            }
+        }
+
+        resolve.Deed = deed;
+        resolve.Took = BotStanding.Busy;
+        resolve.Stake = BotYield.Take(bot, deed);
+
+        try
+        {
+            deed.Taken(bot);
+        }
+        catch (Exception e)
+        {
+            logger.Error(e, "Undertaking {Kind} threw when it was pressed; carried on without it", deed.Kind);
+        }
+
+        resolve.SinceTick = now;
+        resolve.ReviewedTick = now;
+        resolve.StirredTick = now;
+        resolve.Due = false;
+        resolve.Aside = false;
+        resolve.Sent = default;
+        resolve.TakenAt = deed.Expects;
+        resolve.Bent = false;
+        resolve.Expected = Math.Max(0.1, deed.Minutes)
+                           + (body.Map == deed.Map ? BotAppraisal.Travel(body.Location, deed.Where) : 0.0);
+        resolve.Because = $"pressed: {why}";
+        resolve.Empty = null;
+        resolve.Urges.Fruitful();
+
+        Count(deed.Kind, 1);
+        Taken++;
+        Pressed++;
+        TallyOf(deed.Kind).Taken++;
+
+        logger.Information("{Name} was pressed to {Deed}: {Why}{PutDown}", body.Name, deed, why, putDown);
+
+        return true;
+    }
+
     public static void Abandon(IBotWilful bot, string why, bool unreached = true)
     {
         if (bot?.Resolve?.Deed == null)
@@ -977,7 +1342,7 @@ public static class BotWill
 
     private static void Settle(
         IBotWilful bot, BotEnding ending, string why = null, bool unreached = false, bool ground = true,
-        bool unpause = true
+        bool unpause = true, bool credit = true
     )
     {
         var resolve = bot?.Resolve;
@@ -990,23 +1355,28 @@ public static class BotWill
 
         var takings = BotYield.Settle(bot, deed, resolve.Stake, ending);
 
+        if (credit && deed.Braves && takings.Coin > 0)
+        {
+            BotChest.Tithe(bot.Self, deed.Map, deed.Where, takings.Coin);
+        }
+
         if (unreached)
         {
             Unpriced++;
 
-            if (ground)
+            if (ground && !BotOutlaw.KeptRound(bot.Self))
             {
                 BotRefused.Refuse(deed.Map, deed.Where);
             }
         }
-        else
+        else if (credit)
         {
             resolve.Ledger.Note(deed.Kind, deed.Map, deed.Where, takings.PerMinute);
         }
 
         var told = bot.Self is BotMobile { Minded: true };
 
-        if (!unreached)
+        if (!unreached && credit)
         {
             BotCommons.Note(deed.Kind, deed.Map, deed.Where, takings.PerMinute, told);
 
@@ -1017,7 +1387,7 @@ public static class BotWill
         {
             resolve.Ledger.Beware(deed.Kind, deed.Map, deed.Where);
         }
-        else if (ending == BotEnding.Done)
+        else if (ending == BotEnding.Done && credit)
         {
             Completed?.Invoke(bot.Self, deed.Kind);
 
@@ -1046,12 +1416,22 @@ public static class BotWill
             case BotEnding.Done:
                 Finished++;
                 tallied.Finished++;
+                BotBreaker.Finished(bot.Self, deed.Kind);
 
                 break;
 
             case BotEnding.Failed:
                 Failed++;
                 tallied.Failed++;
+
+                if (takings.Made <= 0 && takings.Skill <= 0)
+                {
+                    BotBreaker.Failed(bot.Self, deed.Kind, why);
+                }
+                else
+                {
+                    BotBreaker.Excused++;
+                }
 
                 break;
 
@@ -1114,6 +1494,8 @@ public static class BotWill
 
     public static long Interrupted { get; private set; }
 
+    public static long Resent { get; private set; }
+
     private static bool Holding(BotResolve resolve, BotDeed held, BotStanding rung, long now)
     {
         if (CommitStretch <= 0.0 || rung != BotStanding.Free || resolve.Took != BotStanding.Free || !held.Steadfast)
@@ -1131,8 +1513,13 @@ public static class BotWill
         return now - resolve.SinceTick < HoldMs(resolve);
     }
 
-    private static long HoldMs(BotResolve resolve) =>
-        (long)Math.Clamp(resolve.Expected * CommitStretch * 60000.0, DwellMs, CommitCapMs);
+    private static long HoldMs(BotResolve resolve)
+    {
+        var held = (long)Math.Clamp(resolve.Expected * CommitStretch * 60000.0, DwellMs, CommitCapMs);
+        var own = resolve.Deed?.HoldsFor ?? 0.0;
+
+        return own > 0.0 ? Math.Max(held, (long)(own * 60000.0)) : held;
+    }
 
     private static void Pause(IBotWilful bot, BotResolve resolve, string forKind, long now)
     {
@@ -1150,6 +1537,7 @@ public static class BotWill
             TakenAt = resolve.TakenAt,
             Expected = resolve.Expected,
             Wealth = BotYield.Standing(body),
+            Aside = BotYield.AsideOf(body),
             Skill = BotYield.SkillOf(body, deed.Trains),
             For = forKind
         };
@@ -1157,6 +1545,15 @@ public static class BotWill
         Count(deed.Kind, -1);
         Paused++;
         TallyOf(deed.Kind).Paused++;
+
+        try
+        {
+            deed.Paused(bot);
+        }
+        catch (Exception e)
+        {
+            logger.Error(e, "Undertaking {Kind} threw when it was put down; put down anyway", deed.Kind);
+        }
 
         resolve.Deed = null;
         resolve.Sent = default;
@@ -1167,7 +1564,8 @@ public static class BotWill
             pause.Stake.Tick + away,
             pause.Stake.Skill + (BotYield.SkillOf(body, pause.Deed.Trains) - pause.Skill),
             pause.Stake.Wealth + (BotYield.Standing(body) - pause.Wealth),
-            pause.Stake.Made
+            pause.Stake.Made,
+            pause.Stake.Aside + (BotYield.AsideOf(body) - pause.Aside)
         );
 
     private static void Unpause(IBotWilful bot, BotResolve resolve, BotEnding ending, string after)
@@ -1326,7 +1724,7 @@ public static class BotWill
         else
         {
             var age = (now - resolve.SinceTick) / 60000.0;
-            var worth = BotAppraisal.Weigh(bot, deed, Share(deed.Kind), out _);
+            var worth = BotAppraisal.Weigh(bot, deed, Share(deed.Kind), out _, out _, inHand: true);
             var left = (HoldMs(resolve) - (now - resolve.SinceTick)) / 60000.0;
 
             string hold;
@@ -1388,7 +1786,7 @@ public static class BotWill
         var ended = Finished + Failed + Dropped + Deaths;
 
         line.Append(
-            $"{Finished} of {ended} endings finished ({Percent(Finished, ended)}%), {Failed} failed, {Dropped} dropped, {Deaths} died; of the drops {Jumped} for something that would not wait, {Summoned} for a call from outside, {Interrupted} for a rung above, {Dislodged} for a full pack and {Outbid} outbid; {Held} better offers refused inside a hold and {Troubled} holds lifted for trouble; {Paused} put down, {Resumed} taken up again and {Unresumed} not; {Returned} kinds of work taken back within {ReturnMs / 60000} minutes of being dropped; by trade, taken: finished/dropped %, held, put down/taken up:"
+            $"{Finished} of {ended} endings finished ({Percent(Finished, ended)}%), {Failed} failed, {Dropped} dropped, {Deaths} died; of the drops {Jumped} for something that would not wait, {Summoned} for a call from outside, {Interrupted} for a rung above, {Dislodged} for a full pack and {Outbid} outbid; {Held} better offers refused inside a hold and {Troubled} holds lifted for trouble; {Paused} put down ({PressPaused} of them for a press), {Resumed} taken up again and {Unresumed} not; {Returned} kinds of work taken back within {ReturnMs / 60000} minutes of being dropped; {Pressed} pieces pressed into hands, {Repressed} presses let alone as the work already in hand; by trade, taken: finished/dropped %, held, put down/taken up:"
         );
 
         var rows = new List<KeyValuePair<string, Tally>>(_tallies);
@@ -1523,7 +1921,7 @@ public static class BotWill
         using var line = ValueStringBuilder.Create(256);
 
         line.Append(
-            $"{Taken} taken on, {Finished} finished, {Failed} failed, {Dropped} dropped, {Deaths} died doing it; {Barren} times nothing was worth doing, {Unsworn} offers withheld from classes sworn elsewhere, {Trudges} given up for a walk that stopped closing; holding now:"
+            $"{Taken} taken on, {Finished} finished, {Failed} failed, {Dropped} dropped, {Deaths} died doing it; {Barren} times nothing was worth doing, {Unsworn} offers withheld from classes sworn elsewhere, {Trudges} given up for a walk that stopped closing, {OwnClock} beats of work that stands still on purpose left to its own clock past {LabourMs / 60000} minutes; holding now:"
         );
 
         var kinds = 0;
@@ -1551,7 +1949,12 @@ public static class BotWill
 
         if (Unpriced > 0)
         {
-            line.Append($"; {Unpriced} endings were not allowed to price the ground because the bot never got there, {Unblamed} of which blamed nothing because what they could not reach was somebody rather than somewhere");
+            line.Append($"; {Unpriced} endings were not allowed to price the ground because the bot never got there, {Unblamed} of which blamed nothing because what they could not reach was somebody rather than somewhere, and {Rerouted} places refused on the way were written down as the work went elsewhere");
+        }
+
+        if (Foreign > 0)
+        {
+            line.Append($"; {Foreign} refusals of a road the work in hand had not sent - a company's station, nearly always - were not charged to it");
         }
 
         if (BotAppraisal.Stopped > 0)
@@ -1568,6 +1971,40 @@ public static class BotWill
             );
         }
 
+        if (BotAppraisal.Restless > 0)
+        {
+            line.Append($"; {BotAppraisal.Restless} prowls let in at the unpaid floor for bots out of work past {BotAppraisal.RestlessAfter:F1} minutes");
+        }
+
+        if (BotAppraisal.Undergroundish > 0)
+        {
+            line.Append($"; {BotAppraisal.Undergroundish} offers refused for lying across a dungeon's edge from the bot");
+        }
+
+        if (BotAppraisal.Calms > 0)
+        {
+            line.Append(
+                $"; {BotAppraisal.Calms} walks gave up having closed nothing, and {BotAppraisal.Becalmed} offers of another long walk from the same footing were refused for it"
+            );
+        }
+
+        if (BotBreaker.Trips > 0)
+        {
+            line.Append($"; {BotBreaker.Describe()}");
+        }
+
+        if (Resent > 0)
+        {
+            line.Append($"; {Resent} walks sent again because the road no longer carried them");
+        }
+
+        if (BotPeril.KeptOut > 0 || BotPeril.Closed > 0)
+        {
+            line.Append(
+                $"; {BotPeril.KeptOut} offers refused because the work lay in or beside ground where bots had been dying lately, and {BotPeril.Closed} because so many had died there that it was closed to all work but running"
+            );
+        }
+
         if (Grounded > 0 || Dislodged > 0)
         {
             line.Append(
@@ -1578,6 +2015,26 @@ public static class BotWill
         if (Kept > 0)
         {
             line.Append($"; {Kept} better offers were turned down because the work in hand had already been paid for");
+        }
+
+        if (Filed > 0)
+        {
+            line.Append($"; {Filed} offers of paperwork left for the next choice rather than taking a bot off its work");
+        }
+
+        if (SecondGuesses > 0)
+        {
+            line.Append($"; {SecondGuesses} second guesses of the same kind turned down for the one in hand");
+        }
+
+        if (Met > 0)
+        {
+            line.Append($"; {Met} prowls finished by meeting the fighting they went for");
+        }
+
+        if (MetHome > 0)
+        {
+            line.Append($"; {MetHome} walks home finished by work found on the way");
         }
 
         if (BotAppraisal.Unpaid > 0)
@@ -1604,9 +2061,19 @@ public static class BotWill
         Barren = 0;
         Unsworn = 0;
         Trudges = 0;
+        OwnClock = 0;
         Grounded = 0;
         Dislodged = 0;
         Kept = 0;
+        Filed = 0;
+        SecondGuesses = 0;
+        MindOffers = 0;
+        MindRefused = 0;
+        MindOutscored = 0;
+        MindTopped = 0;
+        _mindBeatenBy.Clear();
+        Met = 0;
+        MetHome = 0;
         Jumped = 0;
         Summoned = 0;
         Interrupted = 0;
@@ -1614,11 +2081,14 @@ public static class BotWill
         Held = 0;
         Troubled = 0;
         Paused = 0;
+        PressPaused = 0;
+        Repressed = 0;
         Resumed = 0;
         Unresumed = 0;
         Returned = 0;
 
         _tallies.Clear();
         BotCalling.Forget();
+        BotYield.Reset();
     }
 }

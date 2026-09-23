@@ -50,6 +50,30 @@ public static class BotShops
 
     public static long Walled { get; private set; }
 
+    public static int RepickLimit { get; set; } = 2;
+
+    public static long Repicked { get; private set; }
+
+    public static BaseVendor Next(IBotWilful bot, BaseVendor emptied, Type wanted, ref int tries)
+    {
+        if (tries >= RepickLimit || emptied == null || wanted == null || Sells(emptied, wanted, out _))
+        {
+            return null;
+        }
+
+        var next = Nearest(bot, wanted);
+
+        if (next == null || next == emptied)
+        {
+            return null;
+        }
+
+        tries++;
+        Repicked++;
+
+        return next;
+    }
+
     public static bool Swept(Map map, Point3D around)
     {
         for (var i = 0; i < _swept.Count; i++)
@@ -663,5 +687,5 @@ public static class BotShops
     }
 
     public static string Describe() =>
-        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp, {Walled} counters passed over for having no way through to them, {Refills} shelves refilled on their own hour; the town is oftenest out of {Driest()}";
+        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp, {Walled} counters passed over for having no way through to them, {Refills} shelves refilled on their own hour, {Repicked} errands sent on to another shopkeeper when the shelf emptied before they arrived, {BotPeddle.SoldOnTheWay} loads bought off their stall while they were being carried to one and {BotPeddle.HandedBack} handed back into the pack on the way and sold from it, {BotRestock.FellThrough} errands that found their guild's shelf bought out and went on to one; the town is oftenest out of {Driest()}";
 }

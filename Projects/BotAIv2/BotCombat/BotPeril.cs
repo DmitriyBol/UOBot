@@ -41,7 +41,7 @@ public static class BotPeril
 
     public static int Side { get; set; } = 24;
 
-    public static int HalfLifeMs { get; set; } = 1200000;
+    public static int HalfLifeMs { get; set; } = 2400000;
 
     public static double PerBlow { get; set; } = 1.0;
 
@@ -72,6 +72,12 @@ public static class BotPeril
         public int Blows;
 
         public int Deaths;
+
+        public double Dying;
+
+        public long DyingTick;
+
+        public bool HasDied;
 
         public bool Baulked;
 
@@ -145,7 +151,23 @@ public static class BotPeril
         else
         {
             square.Deaths++;
+
+            square.Dying = DeadLately(square, now) + 1.0;
+            square.DyingTick = now;
+            square.HasDied = true;
         }
+    }
+
+    private static double DeadLately(Square square, long now)
+    {
+        if (!square.HasDied)
+        {
+            return 0.0;
+        }
+
+        var since = now - square.DyingTick;
+
+        return since <= 0 ? square.Dying : square.Dying * Math.Pow(0.5, since / (double)HalfLifeMs);
     }
 
     public static Point3D Worst(Map map, Point3D from, int within, out double reading) =>
@@ -470,6 +492,75 @@ public static class BotPeril
     public static double Reading(Map map, Point3D where) =>
         map != null && _squares.TryGetValue(Key(map, where), out var square) ? Faded(square, Core.TickCount) : 0.0;
 
+    public static bool KeepsOut { get; set; } = true;
+
+    public static double KeepOutDeaths { get; set; } = 2.0;
+
+    public static long KeptOut { get; private set; }
+
+    public static bool Lethal(Map map, Point3D where, Point3D from, out double dead)
+    {
+        dead = KeepsOut ? DeadAround(map, where, from) : 0.0;
+
+        if (dead < KeepOutDeaths)
+        {
+            return false;
+        }
+
+        KeptOut++;
+
+        return true;
+    }
+
+    public static double CloseDeaths { get; set; } = 3.0;
+
+    public static long Closed { get; private set; }
+
+    public static bool Closes(Map map, Point3D where, Point3D from, out double dead)
+    {
+        dead = KeepsOut ? DeadAround(map, where, from) : 0.0;
+
+        if (dead < CloseDeaths)
+        {
+            return false;
+        }
+
+        Closed++;
+
+        return true;
+    }
+
+    private static double DeadAround(Map map, Point3D where, Point3D from)
+    {
+        if (map == null || map == Map.Internal || _squares.Count == 0)
+        {
+            return 0.0;
+        }
+
+        var goal = Key(map, where);
+
+        if (goal == Key(map, from))
+        {
+            return 0.0;
+        }
+
+        var now = Core.TickCount;
+        var dead = 0.0;
+
+        for (var dx = -1; dx <= 1; dx++)
+        {
+            for (var dy = -1; dy <= 1; dy++)
+            {
+                if (_squares.TryGetValue((goal.Map, goal.X + dx, goal.Y + dy), out var square))
+                {
+                    dead += DeadLately(square, now);
+                }
+            }
+        }
+
+        return dead;
+    }
+
     private static bool Footing(Map map, Square square)
     {
         if (square.Sounded)
@@ -595,6 +686,56 @@ public static class BotPeril
         }
 
         return found;
+    }
+
+    public static string Tell(Map map, Point3D where)
+    {
+        if (map == null || map == Map.Internal)
+        {
+            return "no map to read";
+        }
+
+        var now = Core.TickCount;
+        var key = Key(map, where);
+        var dead = 0.0;
+        var heaviest = 0.0;
+        var heaviestAt = Point3D.Zero;
+
+        for (var dx = -1; dx <= 1; dx++)
+        {
+            for (var dy = -1; dy <= 1; dy++)
+            {
+                if (!_squares.TryGetValue((key.Map, key.X + dx, key.Y + dy), out var near))
+                {
+                    continue;
+                }
+
+                var lately = DeadLately(near, now);
+                dead += lately;
+
+                if (lately > heaviest)
+                {
+                    heaviest = lately;
+                    heaviestAt = Middle(near);
+                }
+            }
+        }
+
+        var own = _squares.TryGetValue(key, out var square)
+            ? $"its square of {Side} reads {Faded(square, now):F1} on {square.Blows} blows and {square.Deaths} dead, {DeadLately(square, now):F1} of them lately"
+            : $"its square of {Side} has no record since the shard came up";
+
+        var rule = (KeepsOut, dead) switch
+        {
+            (false, _) => "the rules that read it are off",
+            (_, var d) when d >= CloseDeaths => $"closed to every kind of work but running ({d:F1} dead lately in and round it, against {CloseDeaths:F1})",
+            (_, var d) when d >= KeepOutDeaths => $"kept from ordinary work ({d:F1} dead lately in and round it, against {KeepOutDeaths:F1}) and open to fighting work and calls",
+            (_, var d) => $"open to every kind of work ({d:F1} dead lately in and round it)"
+        };
+
+        var worst = heaviestAt == Point3D.Zero ? "" : $"; the most lately dead round it at {heaviestAt}, {heaviest:F1}";
+
+        return $"({where.X}, {where.Y}): {own}; {rule}{worst}; the dead fade by half every {HalfLifeMs / 60000} minutes, and none of this survives a restart";
     }
 
     public static string Describe()

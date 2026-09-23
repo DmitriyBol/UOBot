@@ -83,6 +83,15 @@ public sealed class BotDebugModule : BotModule
             BotRevel.MostPrize,
             BotRevel.Treasury
         );
+
+        if (BotMarshal.Standing != null)
+        {
+            logger.Information(
+                "{Marshal} is the marshal of events among them, asked every {Every}m for a revel, a camp, a tournament, an errand on the board, a standing order, a bounty, a price on a head or a fair; the revels are its business while it stands",
+                BotMarshal.Name,
+                BotMarshal.EveryMs / 60000
+            );
+        }
     }
 
     public static int SayEveryMs { get; set; } = 300000;

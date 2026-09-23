@@ -27,7 +27,7 @@ public sealed class BotEnlist : BotDeed
 
     public const string Trade = "enlist";
 
-    public static double Prior { get; set; } = 70.0;
+    public static double Prior { get; set; } = 24.0;
 
     public static double WorkMinutes { get; set; } = 3.0;
 
@@ -47,11 +47,16 @@ public sealed class BotEnlist : BotDeed
 
     public static void Foe() => Hostile++;
 
+    public static long Remote { get; private set; }
+
+    public static void Far() => Remote++;
+
     public static void Forget()
     {
         Ending = 0;
         Lonely = 0;
         Hostile = 0;
+        Remote = 0;
     }
 
     private readonly BotSquad _squad;
@@ -72,6 +77,8 @@ public sealed class BotEnlist : BotDeed
     public override string Kind => Trade;
 
     public override bool Summons => true;
+
+    public override bool Still => true;
 
     public override Map Map => _map;
 
@@ -210,6 +217,13 @@ public sealed class BotEnlister : IBotProposer
             return null;
         }
 
+        if (BotUnderworld.Member(body) && !BotFence.Is(body))
+        {
+            Unfit++;
+
+            return null;
+        }
+
         var squad = Nearest(body, map);
 
         if (squad == null)
@@ -247,6 +261,13 @@ public sealed class BotEnlister : IBotProposer
                 continue;
             }
 
+            var anchor = squad.Anchor;
+
+            if (anchor == Point3D.Zero || !Utility.InRange(body.Location, anchor, BotEnlist.Reach))
+            {
+                continue;
+            }
+
             if (squad.Leader?.Self is Mobile lead && BotRegard.AtWar(body, lead))
             {
                 BotEnlist.Foe();
@@ -254,10 +275,10 @@ public sealed class BotEnlister : IBotProposer
                 continue;
             }
 
-            var anchor = squad.Anchor;
-
-            if (anchor == Point3D.Zero || !Utility.InRange(body.Location, anchor, BotEnlist.Reach))
+            if (!BotSquads.Reaches(squad, body))
             {
+                BotEnlist.Far();
+
                 continue;
             }
 
@@ -291,7 +312,7 @@ public sealed class BotEnlister : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a place in a company"
-            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it, {BotEnlist.Ending} passed one over whose fight was nearly won, {BotEnlist.Lonely} passed over a company of one, {BotEnlist.Hostile} passed over the enemy's";
+            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it, {BotEnlist.Ending} passed one over whose fight was nearly won, {BotEnlist.Lonely} passed over a company of one, {BotEnlist.Hostile} passed over the enemy's, {BotEnlist.Remote} passed over one whose leader stood more than {BotSquads.JoinReach} tiles off";
 
     public static void Forget()
     {

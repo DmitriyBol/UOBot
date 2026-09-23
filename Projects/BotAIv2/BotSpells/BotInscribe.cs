@@ -53,7 +53,9 @@ public sealed class BotInscribe : BotDeed
         Market
     }
 
-    private readonly BaseVendor _shop;
+    private BaseVendor _shop;
+
+    private int _repicks;
 
     private readonly int _price;
 
@@ -182,6 +184,15 @@ public sealed class BotInscribe : BotDeed
 
         if (BotShops.Buy(bot, _shop, typeof(BlankScroll), Batch, out var refused) <= 0)
         {
+            var next = BotShops.Next(bot, _shop, typeof(BlankScroll), ref _repicks);
+
+            if (next != null)
+            {
+                _shop = next;
+
+                return BotDoing.Walk(next.Map, next, BotArrival.Within(BotShops.CounterReach), $"on to {next.Name} for blank scrolls");
+            }
+
             return BotDoing.Failed(refused ?? "no blank scrolls to be had");
         }
 
@@ -190,11 +201,13 @@ public sealed class BotInscribe : BotDeed
         return default;
     }
 
+    private bool _worn;
+
     private BotDoing Writing(Mobile body)
     {
         var pen = BotQuill.Pen(body);
 
-        if (pen == null)
+        if (pen == null && _swings == 0)
         {
             return BotDoing.Failed("nothing to write with");
         }
@@ -217,6 +230,19 @@ public sealed class BotInscribe : BotDeed
         {
             _scrolls += have - _had;
             _had = have;
+        }
+
+        if (pen == null)
+        {
+            if (_swung && Core.TickCount - _swungTick < SwingMs)
+            {
+                return BotDoing.Work("writing");
+            }
+
+            _worn = true;
+            _leg = Leg.Market;
+
+            return default;
         }
 
         if (BotQuill.Blanks(body) <= 0 || !BotQuill.Stocked(body, _recipe))
@@ -282,7 +308,7 @@ public sealed class BotInscribe : BotDeed
     {
         if (_scrolls <= 0)
         {
-            return BotDoing.Done($"{_swings} attempts, nothing came of it");
+            return BotDoing.Done($"{_swings} attempts, nothing came of it{(_worn ? ", the pen worn through" : "")}");
         }
 
         var written = BotQuill.Gather(body, _kind);
@@ -329,6 +355,6 @@ public sealed class BotInscribe : BotDeed
             }
         }
 
-        return BotDoing.Done($"{_scrolls} {_kind?.Name} in {_swings} attempts, {_kept} into its own book, {_sold} sold to order");
+        return BotDoing.Done($"{_scrolls} {_kind?.Name} in {_swings} attempts, {_kept} into its own book, {_sold} sold to order{(_worn ? ", the pen worn through" : "")}");
     }
 }

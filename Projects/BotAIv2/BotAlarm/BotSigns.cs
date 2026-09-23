@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -70,6 +71,10 @@ public static class BotSigns
 
     private static long _workDeaths;
 
+    private static long _workFailed;
+
+    private static long _workDropped;
+
     private static long _marketAt;
 
     private static long _marketSells;
@@ -98,6 +103,8 @@ public static class BotSigns
         _workTaken = BotWill.Taken;
         _workFinished = BotWill.Finished;
         _workDeaths = BotWill.Deaths;
+        _workFailed = BotWill.Failed;
+        _workDropped = BotWill.Dropped;
 
         _marketSells = BotAuction.Sells;
         _marketFills = BotAuction.Fills;
@@ -139,9 +146,68 @@ public static class BotSigns
             Market(now);
         }
 
+        Overstated();
+
         if (Due(now, _aliveAt, AliveMs))
         {
             Heartbeat(now);
+        }
+    }
+
+    public static double OverstatedBy { get; set; } = 1.5;
+
+    public static double OverstatedGap { get; set; } = 5.0;
+
+    private static string _overstated;
+
+    public static readonly HashSet<string> Ranked = new(StringComparer.OrdinalIgnoreCase) { "flee", "unload", "drill-in", "rescue", "harrow" };
+
+    private static void Overstated()
+    {
+        var gaps = BotCommons.Gaps(0);
+        string worst = null;
+        var worstClaimed = 0.0;
+        var worstMeasured = 0.0;
+        var worstSettled = 0;
+
+        for (var i = 0; i < gaps.Count; i++)
+        {
+            var (kind, claimed, measured, settled, _) = gaps[i];
+            var reads = BotAppraisal.Reads(kind, claimed);
+
+            if (settled < BotCommons.TradeConfidence || measured * OverstatedBy >= reads || reads - measured < OverstatedGap || BotAppraisal.IsUnpaid(kind) || Ranked.Contains(kind)
+                || !BotWill.Auctioned(kind))
+            {
+                continue;
+            }
+
+            worst = kind;
+            worstClaimed = reads;
+            worstMeasured = measured;
+            worstSettled = settled;
+
+            break;
+        }
+
+        if (worst != null)
+        {
+            _overstated = worst;
+
+            BotAlarm.Raise(
+                "overstated",
+                $"{worst} is read by the auction at {worstClaimed:F0}/min and pays {worstMeasured:F0}/min over {worstSettled} outcomes: a number in the source the correction cannot bring down",
+                (long)worstClaimed,
+                (long)worstMeasured,
+                "-"
+            );
+
+            return;
+        }
+
+        if (_overstated != null)
+        {
+            BotAlarm.Clear("overstated", $"{_overstated}'s claim is back within {OverstatedBy:F1}x of what it pays; no trade overstates now", 0, 0, "-");
+            _overstated = null;
         }
     }
 
@@ -213,8 +279,9 @@ public static class BotSigns
 
     private static void Work(long now)
     {
-        var taken = BotWill.Taken - _workTaken;
         var finished = BotWill.Finished - _workFinished;
+        var failed = BotWill.Failed - _workFailed;
+        var dropped = BotWill.Dropped - _workDropped;
         var deaths = BotWill.Deaths - _workDeaths;
         var alive = BotPopulation.Count;
         var window = Window(now, _workAt);
@@ -223,19 +290,28 @@ public static class BotSigns
         _workTaken = BotWill.Taken;
         _workFinished = BotWill.Finished;
         _workDeaths = BotWill.Deaths;
+        _workFailed = BotWill.Failed;
+        _workDropped = BotWill.Dropped;
 
-        if (taken >= WorkLeast)
+        var ended = finished + failed + dropped;
+
+        var loudest = BotBreaker.Loudest(out var who, out var kind, out var why, out var times, out var failures);
+
+        if (ended >= WorkLeast)
         {
-            var share = (double)finished / taken;
+            var share = (double)finished / ended;
+            var named = loudest
+                ? $" The loudest: {who} failed at {kind} {times} of the window's {failures} failures ({Percent((double)times / System.Math.Max(1, failures))}%): {why}"
+                : "";
 
             if (share < WorkFloor)
             {
                 BotAlarm.Raise(
                     "work-not-finishing",
-                    $"{finished} of {taken} pieces of work finished in the last {window}, which is"
-                    + $" {Percent(share)}%. Failed and dropped all told: {BotWill.Failed}, {BotWill.Dropped}",
+                    $"{finished} of {ended} pieces of work that ended in the last {window} finished, which is"
+                    + $" {Percent(share)}%; {failed} failed and {dropped} were dropped.{named}",
                     finished,
-                    taken,
+                    ended,
                     window
                 );
             }
@@ -243,9 +319,9 @@ public static class BotSigns
             {
                 BotAlarm.Clear(
                     "work-not-finishing",
-                    $"work is finishing again: {finished} of {taken} in the last {window}",
+                    $"work is finishing again: {finished} of {ended} in the last {window}",
                     finished,
-                    taken,
+                    ended,
                     window
                 );
             }

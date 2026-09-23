@@ -32,7 +32,13 @@ public sealed class BotUpkeep : IBotProposer
 
     public static double Worn { get; set; } = 0.34;
 
-    public static int Reserve { get; set; } = 200;
+    public static int Reserve
+    {
+        get => _reserve ?? BotPurse.KeepBack;
+        set => _reserve = value;
+    }
+
+    private static int? _reserve;
 
     public static double Prior { get; set; } = 30.0;
 

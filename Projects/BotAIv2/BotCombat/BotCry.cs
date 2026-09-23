@@ -134,7 +134,7 @@ public static class BotCry
     public static string Describe() =>
         Raised == 0
             ? "nobody has called for help"
-            : $"{Raised} cried for help, {Answered} were gone to, the first helper setting out {(Reactions > 0 ? ReactionMs / Reactions / 1000.0 : 0.0):F1}s after the cry on average over {Reactions}";
+            : $"{Raised} cried for help, {Answered} were gone to, the first helper setting out {(Reactions > 0 ? ReactionMs / Reactions / 1000.0 : 0.0):F1}s after the cry on average over {Reactions}; {BotDefender.Already} blows not answered with a second errand because the work in hand was already that fight, {BotDefender.Outnumbered} not answered with a fight the odds round the bot already called off, {BotDefender.Leading} on a company's leader left to the company";
 
     public static void Forget()
     {

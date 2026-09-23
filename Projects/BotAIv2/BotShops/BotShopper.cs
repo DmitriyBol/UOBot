@@ -35,7 +35,13 @@ public sealed class BotShopper : IBotProposer
 
     public static int Guess { get; set; } = 5;
 
-    public static int Reserve { get; set; } = 100;
+    public static int Reserve
+    {
+        get => _reserve ?? BotPurse.KeepBack;
+        set => _reserve = value;
+    }
+
+    private static int? _reserve;
 
     public static long Asked { get; private set; }
 
@@ -54,6 +60,8 @@ public sealed class BotShopper : IBotProposer
     public static long ToStall { get; private set; }
 
     public static long ToHall { get; private set; }
+
+    public static long HallWalled { get; private set; }
 
     public static long ToBoard { get; private set; }
 
@@ -133,7 +141,7 @@ public sealed class BotShopper : IBotProposer
 
         Looks++;
 
-        if (!Wanting(bot, klass, pack, out var wanted, out var amount))
+        if (!Wanting(bot, klass, pack, out var wanted, out var amount, out var band))
         {
             Stocked++;
 
@@ -153,10 +161,19 @@ public sealed class BotShopper : IBotProposer
         {
             ToStall++;
 
-            return new BotRestock(stall, wanted, Math.Min(amount, stall.Amount), map, body.Location);
+            return Ordered(new BotRestock(stall, wanted, Math.Min(amount, stall.Amount), map, body.Location), band);
         }
 
         var merchant = BotShelf.Of(body);
+
+        if (merchant != null
+            && (bot.Resolve?.Ledger?.Cautious(BotShops.ShopKind, merchant.Map, merchant.Location) == true
+                || BotReach.Ask(map, body.Location, merchant.Location, BotArrival.Within(BotShelf.Reach)) == BotReachVerdict.Sealed))
+        {
+            HallWalled++;
+            merchant = null;
+        }
+
         var lotPrice = 0;
         var ours = merchant == null ? null : BotShelf.Offer(merchant, wanted, out lotPrice);
 
@@ -168,7 +185,7 @@ public sealed class BotShopper : IBotProposer
             {
                 ToHall++;
 
-                return new BotRestock(merchant, wanted, Math.Max(1, ours.Amount), unit);
+                return Ordered(new BotRestock(merchant, wanted, Math.Max(1, ours.Amount), unit), band);
             }
         }
 
@@ -206,7 +223,20 @@ public sealed class BotShopper : IBotProposer
 
         ToCounter++;
 
-        return new BotRestock(shop, wanted, amount, counter);
+        return Ordered(new BotRestock(shop, wanted, amount, counter), band);
+    }
+
+    private static BotDeed Ordered(BotRestock errand, bool band)
+    {
+        if (errand == null || !band)
+        {
+            return errand;
+        }
+
+        errand.Claim = BotFence.Prior;
+        BotFence.Sending();
+
+        return errand;
     }
 
     public static List<(Type Kind, long Times)> Shortages()
@@ -246,7 +276,7 @@ public sealed class BotShopper : IBotProposer
         Looks == 0
             ? "nobody has been looked at for supplies"
             : $"{Looks} looks for supplies: {Stocked} were short of nothing, {ToCounter} sent to a shopkeeper, "
-              + $"{ToStall} to a cheaper stall, {ToHall} to their own guild's counter, {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
+              + $"{ToStall} to a cheaper stall, {ToHall} to their own guild's counter ({HallWalled} times it was passed over as out of reach), {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
               + $"{Broke} wanted something nobody sells and could not afford one made (the fattest purse among them held {Richest}gp); "
               + $"most often short of {Commonest()} lately";
 
@@ -265,8 +295,9 @@ public sealed class BotShopper : IBotProposer
         _everForgot = false;
     }
 
-    private static bool Wanting(IBotWilful bot, BotClass klass, Container pack, out Type wanted, out int amount)
+    private static bool Wanting(IBotWilful bot, BotClass klass, Container pack, out Type wanted, out int amount, out bool band)
     {
+        band = false;
         var kit = klass.Kit;
         var tools = BotOutfit.ToolsFor(klass);
         var body = bot.Self;
@@ -346,6 +377,15 @@ public sealed class BotShopper : IBotProposer
 
                 return true;
             }
+        }
+
+        if (BotFence.Is(body) && BotFence.Shortest(body, out var ordered, out var lot))
+        {
+            wanted = ordered;
+            amount = lot;
+            band = true;
+
+            return true;
         }
 
         if (BotFlask.Kit(body) == null)

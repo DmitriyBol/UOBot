@@ -52,6 +52,18 @@ public sealed class BotAttend : BotDeed
 
     private long _began;
 
+    private bool _stayPut;
+
+    private int _nearest = int.MaxValue;
+
+    private int _stalled;
+
+    public static int NearEnough { get; set; } = 3;
+
+    public static int StalledBeats { get; set; } = 40;
+
+    public static long Unstationed { get; private set; }
+
     public BotAttend(Map map, BotMobile student, int bill)
     {
         _map = map;
@@ -64,6 +76,8 @@ public sealed class BotAttend : BotDeed
 
     public override bool Summons => true;
 
+    public override void Taken(IBotWilful bot) => BotSchool.Promise(_student);
+
     public override Map Map => _map;
 
     public override Point3D Where => BotSchool.Ground;
@@ -72,7 +86,9 @@ public sealed class BotAttend : BotDeed
 
     public override double Minutes => BotSchool.LessonMs / 60000.0;
 
-    public override SkillName? Trains => BotSchool.Lacking(_student);
+    public override SkillName? Trains => _taught ?? BotSchool.Lacking(_student);
+
+    private SkillName? _taught;
 
     public override int Outlay => _bill;
 
@@ -81,6 +97,12 @@ public sealed class BotAttend : BotDeed
     public override bool Alongside => true;
 
     public override bool Still => _enrolled;
+
+    public override bool Steadfast => _enrolled;
+
+    public override bool BendIsTrouble => !_enrolled;
+
+    public override double HoldsFor => _enrolled ? Minutes + 1.0 : 0.0;
 
     public override string Stage =>
         !_enrolled
@@ -107,8 +129,12 @@ public sealed class BotAttend : BotDeed
         {
             if (_enrolled)
             {
-                return BotDoing.Walk(_map, BotSchool.Station(body), BotArrival.Within(0), "back to my place in the ranks");
+                return _stayPut
+                    ? BotDoing.Walk(_map, BotSchool.Ground, BotArrival.Within(BotSchool.Pace * BotSchool.Rank), "back into the ranks")
+                    : BotDoing.Walk(_map, BotSchool.Station(body), BotArrival.Within(0), "back to my place in the ranks");
             }
+
+            BotSchool.Promise(body);
 
             return BotDoing.Walk(_map, BotSchool.Ground, BotArrival.Within(BotSchool.Pace * BotSchool.Rank), "going to be taught");
         }
@@ -145,6 +171,7 @@ public sealed class BotAttend : BotDeed
 
             _enrolled = true;
             _began = Core.TickCount;
+            _taught = BotSchool.Lacking(body);
 
             logger.Information(
                 "{Name} paid {Bill}gp to be taught {Skill} by {Master}",
@@ -157,9 +184,24 @@ public sealed class BotAttend : BotDeed
 
         var station = BotSchool.Station(body);
 
-        if (!body.InRange(station, 0))
+        if (!_stayPut && !body.InRange(station, 1))
         {
-            return BotDoing.Walk(_map, station, BotArrival.Within(0), "taking my place in the ranks");
+            var gap = System.Math.Max(System.Math.Abs(body.X - station.X), System.Math.Abs(body.Y - station.Y));
+
+            if (gap < _nearest)
+            {
+                _nearest = gap;
+                _stalled = 0;
+            }
+            else if (++_stalled >= StalledBeats && gap <= NearEnough)
+            {
+                _stayPut = true;
+                Unstationed++;
+
+                return BotDoing.Work($"being drilled from {gap} tiles off my place, which has no footing");
+            }
+
+            return BotDoing.Walk(_map, station, BotArrival.Within(1), "taking my place in the ranks");
         }
 
         if (Core.TickCount - _began >= BotSchool.LessonMs)
@@ -207,6 +249,22 @@ public sealed class BotAttend : BotDeed
         _mark = now;
 
         return _learned;
+    }
+
+    public override bool Bend(IBotWilful bot)
+    {
+        if (!_enrolled)
+        {
+            return false;
+        }
+
+        if (!_stayPut)
+        {
+            _stayPut = true;
+            Unstationed++;
+        }
+
+        return true;
     }
 
     public override void Drop(IBotWilful bot)

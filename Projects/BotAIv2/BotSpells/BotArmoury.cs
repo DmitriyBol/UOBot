@@ -59,6 +59,20 @@ public sealed class BotArmoury : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    public static Type Kept(Mobile body, out int spell)
+    {
+        spell = -1;
+
+        if (body == null || BotGrimoire.Known == 0 || body.ManaMax < LeastPool)
+        {
+            return null;
+        }
+
+        spell = BotStrike.Stock(body);
+
+        return spell < 0 ? null : BotGrimoire.ScrollFor(spell);
+    }
+
     public BotDeed Propose(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -71,26 +85,15 @@ public sealed class BotArmoury : IBotProposer
 
         Asked++;
 
-        if (body.ManaMax < LeastPool)
-        {
-            NoPool++;
-
-            return null;
-        }
-
-        var spell = BotStrike.Stock(body);
-
-        if (spell < 0)
-        {
-            NoPool++;
-
-            return null;
-        }
-
-        var kind = BotGrimoire.ScrollFor(spell);
+        var kind = Kept(body, out var spell);
 
         if (kind == null)
         {
+            if (spell < 0)
+            {
+                NoPool++;
+            }
+
             return null;
         }
 

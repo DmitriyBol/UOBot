@@ -47,11 +47,23 @@ public static class BotCore
 
         BotQuadStore.Configure();
 
+        BotCommonsStore.Configure();
+
+        BotOutlawStore.Configure();
+
+        BotCityStore.Configure();
+
+        BotChestStore.Configure();
+
+        BotQuestStore.Configure();
+
         BotClaimStore.Configure();
 
         BotSeatStore.Configure();
 
         BotWarStore.Configure();
+
+        BotUnderworldStore.Configure();
 
         BotMeal.Configure();
 
@@ -71,6 +83,8 @@ public static class BotCore
         BotModules.Register(new BotDrillModule());
 
         BotModules.Register(new BotEstateModule());
+
+        BotModules.Register(new BotQuestModule());
 
         BotModules.Register(new BotBaronModule());
 

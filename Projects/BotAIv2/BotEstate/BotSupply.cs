@@ -276,13 +276,14 @@ public sealed class BotSupply : BotDeed
 
     private static Item Lift(Mobile body, Container pack, Type kind, int many)
     {
+        var bond = (body as BotMobile)?.Bond;
         List<Item> carried = [.. pack.Items];
 
         for (var i = 0; i < carried.Count; i++)
         {
             var item = carried[i];
 
-            if (item.Deleted || !item.Movable || !kind.IsInstanceOfType(item))
+            if (item.Deleted || !item.Movable || !kind.IsInstanceOfType(item) || BotBinding.IsBound(item, bond))
             {
                 continue;
             }
@@ -306,7 +307,7 @@ public sealed class BotSupply : BotDeed
         {
             var item = carried[i];
 
-            if (!item.Deleted && item.Movable && kind.IsInstanceOfType(item))
+            if (!item.Deleted && item.Movable && kind.IsInstanceOfType(item) && !BotBinding.IsBound(item, bond))
             {
                 return item;
             }

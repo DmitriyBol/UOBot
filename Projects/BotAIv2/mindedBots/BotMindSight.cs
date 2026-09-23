@@ -85,6 +85,19 @@ public static class BotMindSight
         members cannot raise a hall, because a hall is paid for by a levy on the members; a band carrying
         somebody who is learning nothing is carrying it. Say 'none' for either when you are content. Using
         the power rests it for half an hour, so spend it on the clearest case rather than the first one.
+
+        The crafters share one market and one board, and you talk to each other through 'say' and read what
+        the others said. Use 'say' for the market: what you will make, what you are short of, what you will
+        leave to somebody else. When 'take' appears in your answer you may name one row of the board that you
+        will fill; the others are told it is yours for a quarter of an hour, and a row somebody else has taken
+        is theirs — leave it, unless they have gone quiet. Say 'none' when you are taking nothing.
+
+        Your guild has a board of its own. With 'want' and 'wantamount' you may ask your band for a material —
+        ore, logs, herbs, hides, feathers, meat or wool — and how much; the request stands for half an hour.
+        Gatherers of your band will be worth half again for bringing it in, and where it comes off a creature
+        the hunters of your band will go for the creatures that carry it. Ask for what the orders on the board
+        actually eat, in the amount they eat; a board full of requests is a board nobody reads. Say 'none' and
+        nought when the band should carry on.
         """;
 
     private static int Others() => Math.Max(0, BotPopulation.Bots.Count - 1);
@@ -218,7 +231,38 @@ public static class BotMindSight
         sb.Append(BotClaim.Price);
         sb.Append("gp each). Standing orders: ");
         sb.Append(BotCharter.Says(guild));
+        sb.Append(". The guild's board asks for: ");
+        sb.Append(BotCharter.BoardSays(guild));
         sb.Append('.');
+
+        var best = BotCommons.Best(5);
+
+        if (best.Count > 0)
+        {
+            sb.Append(" What pays on this island lately, by everybody's record: ");
+
+            for (var i = 0; i < best.Count; i++)
+            {
+                var (kind, _, where, perMinute, settled, _) = best[i];
+
+                if (i > 0)
+                {
+                    sb.Append("; ");
+                }
+
+                sb.Append(kind);
+                sb.Append(' ');
+                sb.Append((int)perMinute);
+                sb.Append("/min at ");
+                sb.Append(where.X);
+                sb.Append(',');
+                sb.Append(where.Y);
+                sb.Append(" on ");
+                sb.Append(settled);
+            }
+
+            sb.Append('.');
+        }
 
         var worst = 0.0;
         string sourest = null;
@@ -317,7 +361,7 @@ public static class BotMindSight
 
     public static bool Dump { get; set; }
 
-    public static string State(BotMind mind, BotMobile body, IReadOnlyList<string> trades)
+    public static string State(BotMind mind, BotMobile body, IReadOnlyList<string> trades, IReadOnlyList<string> band = null)
     {
         var sb = ValueStringBuilder.Create(2048);
 
@@ -336,7 +380,7 @@ public static class BotMindSight
             Heard(ref sb, mind);
             Lessons(ref sb, mind);
             Band(ref sb, body);
-            Offers(ref sb, trades);
+            Offers(ref sb, trades, band);
 
             sb.Append("\nChoose one trade from the list, say what you expect it to be worth per minute, how many minutes you expect to spend on it, and why in one sentence.");
             sb.Append(" You may also put one short line in `say` for the other thinking bots to read — something you have found, somewhere worth coming to, something you have given up on. Leave it empty unless it is worth their attention.");
@@ -831,6 +875,8 @@ public static class BotMindSight
         var shown = 0;
         var unmakeable = 0;
 
+        mind.Orders.Clear();
+
         var seen = new Dictionary<(string Label, int Offer), (int Wanted, int Orders, int Escrow, int Filled, int Raises, Type Kind)>();
 
         for (var i = 0; i < wants.Count; i++)
@@ -870,10 +916,25 @@ public static class BotMindSight
 
             shown++;
 
+            if (!mind.Orders.Contains(label))
+            {
+                mind.Orders.Add(label);
+            }
+
             sb.Append("- ");
             sb.Append(row.Wanted);
             sb.Append(" x ");
             sb.Append(label);
+
+            var (holder, ago) = BotMindClaims.Holder(label);
+
+            if (holder != null)
+            {
+                sb.Append(string.Equals(holder, mind.Name, global::System.StringComparison.OrdinalIgnoreCase)
+                    ? $" [yours, taken {ago / 60} min ago]"
+                    : $" [taken by {holder} {ago / 60} min ago — theirs]");
+            }
+
             sb.Append(" at ");
             sb.Append(offer);
             sb.Append("gp each, ");
@@ -937,6 +998,10 @@ public static class BotMindSight
         {
             sb.AppendLine("Nothing. Nobody has paid for anything you could make - so make what sells, or go and get material.");
         }
+        else
+        {
+            sb.AppendLine("Name one row in 'take' to tell the other crafters it is yours; a row marked theirs is spoken for.");
+        }
 
         if (unmakeable > 0)
         {
@@ -979,7 +1044,20 @@ public static class BotMindSight
             sb.Append("- ");
             sb.Append(other.Name);
             sb.Append(": ");
-            sb.AppendLine(fellow.Resolve?.Deed?.Kind ?? "nothing yet");
+            sb.Append(fellow.Resolve?.Deed?.Kind ?? "nothing yet");
+
+            var (row, ago) = BotMindClaims.Of(other.Name);
+
+            if (row != null)
+            {
+                sb.Append(", and has taken the order for ");
+                sb.Append(row);
+                sb.Append(" (");
+                sb.Append(ago / 60);
+                sb.Append(" min ago)");
+            }
+
+            sb.AppendLine("");
         }
 
         if (said == 0)
@@ -1321,7 +1399,7 @@ public static class BotMindSight
         }
     }
 
-    private static void Offers(ref ValueStringBuilder sb, IReadOnlyList<string> trades)
+    private static void Offers(ref ValueStringBuilder sb, IReadOnlyList<string> trades, IReadOnlyList<string> band)
     {
         sb.AppendLine("\nTRADES WITH WORK IN THEM RIGHT NOW");
 
@@ -1329,6 +1407,37 @@ public static class BotMindSight
         {
             sb.Append("- ");
             sb.AppendLine(Explain(trades[i]));
+        }
+
+        if (band == null)
+        {
+            return;
+        }
+
+        var first = true;
+
+        for (var i = 0; i < band.Count; i++)
+        {
+            var listed = false;
+
+            for (var j = 0; j < trades.Count && !listed; j++)
+            {
+                listed = string.Equals(trades[j], band[i], StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (listed)
+            {
+                continue;
+            }
+
+            sb.Append(first ? "Your band's gather and make may also name: " : ", ");
+            sb.Append(band[i]);
+            first = false;
+        }
+
+        if (!first)
+        {
+            sb.AppendLine(".");
         }
     }
 

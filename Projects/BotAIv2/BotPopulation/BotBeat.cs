@@ -111,7 +111,13 @@ public static class BotBeat
 
         logger.Information("Money: {What}", BotPurse.Describe());
 
-        logger.Information("The island: {What}; {Hunting}", BotQuad.Describe(), BotHunter.Describe());
+        logger.Information("City: {What}", BotCity.Describe());
+
+        logger.Information("Quests: {What}", BotQuests.Describe());
+
+        logger.Information("Kit: {What}", BotTidy.Describe());
+
+        logger.Information("The island: {What}; {Hunting}; {Kept}", BotQuad.Describe(), BotHunter.Describe(), BotKept.Describe());
 
         logger.Information("At death's door: {What}; {Supplies}", BotMobile.DescribeGasps(), BotShopper.Describe());
 
@@ -189,6 +195,7 @@ public static class BotBeat
 
     private static void Look(long began)
     {
+
         var bots = BotPopulation.Bots;
         var now = Core.TickCount;
 
@@ -226,6 +233,8 @@ public static class BotBeat
         Segment("the wars");
 
         BotGuilds.Review();
+
+        BotGuilds.Gather();
         Segment("the guild reviews");
 
         BotShops.Keep();

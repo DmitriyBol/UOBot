@@ -46,16 +46,27 @@ public sealed class BotPopulationModule : BotModule
 
         BotWill.Offer(new BotHomer());
 
-        var purged = BotPopulation.PurgeSaved();
+        var deleted = BotPopulation.Reclaim(BotPopulationConfig.Mix, out var kept);
+        var back = 0;
 
-        if (purged > 0)
+        foreach (var (_, many) in kept)
         {
-            logger.Information("Deleted {Count} bots that came back from the world save", purged);
+            back += many;
         }
 
-        var born = BotPopulation.Raise(BotPopulationConfig.Mix);
+        if (back > 0 || deleted > 0)
+        {
+            logger.Information(
+                "{Back} bots came back from the world save with their place, their pack, their bank and what they had learned, {Ghosts} of them dead at the save and left for the reviver; {Deleted} were deleted for not being asked for any more",
+                back,
+                BotMobile.BackAsGhost,
+                deleted
+            );
+        }
 
-        if (born == 0)
+        var born = BotPopulation.Raise(BotPopulationConfig.Mix, kept);
+
+        if (born == 0 && back == 0)
         {
             logger.Error(
                 "No bots were raised, so nothing else in this assembly will do anything. Check the class names and the home point in Configuration/bot-population.json"
@@ -75,6 +86,8 @@ public sealed class BotPopulationModule : BotModule
         );
 
         BotGuilds.Muster();
+
+        BotUnderworld.Reform();
 
         logger.Information(
             "Learning carried over: {Restored} of {Remembered} remembered bots picked up where they left off, with {Returned}gp of earlier earnings handed back (savings carry over: {Savings})",

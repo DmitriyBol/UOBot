@@ -49,7 +49,13 @@ public static class BotStable
 
     public static int Reach { get; set; } = 8;
 
-    public static int Reserve { get; set; } = 200;
+    public static int Reserve
+    {
+        get => _reserve ?? BotPurse.KeepBack;
+        set => _reserve = value;
+    }
+
+    private static int? _reserve;
 
     public static int EveryMs { get; set; } = 2000;
 
@@ -123,6 +129,8 @@ public static class BotStable
         Bought++;
         Paid += BotSteed.Price;
 
+        BotYield.Aside(bot, BotSteed.Price);
+
         logger.Information(
             "{Name} bought a horse from {Keeper} for {Price}gp, {Pack} of it out of its pocket and {Bank} out of its account",
             bot.Name,
@@ -190,6 +198,33 @@ public static class BotStable
 
     public static long Fetched { get; private set; }
 
+    public static long Unfetched { get; private set; }
+
+    private static void Unfetch(BotMobile bot)
+    {
+        var journey = bot?.Journey;
+
+        if (journey?.Current is not { Interruption: true, Reason: "a horse" } errand)
+        {
+            return;
+        }
+
+        var keeper = errand.Follow;
+
+        if (Wants(bot) && keeper is { Deleted: false } && !bot.InRange(keeper.Location, Reach))
+        {
+            return;
+        }
+
+        if (Wants(bot) && keeper is { Deleted: false } && BotYield.Wealth(bot) - BotSteed.Price >= Reserve)
+        {
+            return;
+        }
+
+        journey.Complete();
+        Unfetched++;
+    }
+
     public static int Nearest { get; private set; } = int.MaxValue;
 
     public static long Ready { get; private set; }
@@ -244,6 +279,8 @@ public static class BotStable
 
     public static void Keep(BotMobile bot)
     {
+        Unfetch(bot);
+
         if (bot?.Class is not { Rides: true } || bot.Deleted || !bot.Alive || !Wants(bot))
         {
             return;
@@ -337,6 +374,13 @@ public static class BotStable
             return;
         }
 
+        if (bot.Resolve?.Deed is { Afoot: true })
+        {
+            HeldBack++;
+
+            return;
+        }
+
         if (BotLadder.Standing(bot) < BotStanding.Busy)
         {
             return;
@@ -358,11 +402,26 @@ public static class BotStable
         Thrown++;
     }
 
+    public static void Alight(Mobile bot)
+    {
+        if (bot?.Mount == null)
+        {
+            return;
+        }
+
+        EtherealMount.Dismount(bot);
+        Alighted++;
+    }
+
+    public static long Alighted { get; private set; }
+
+    public static long HeldBack { get; private set; }
+
     public static string Describe() =>
         Asked == 0
             ? "no class that rides has been looked at"
             : $"{Asked} looks at a rider with no horse: {Ready} had the price and a stablemaster in reach, {Away} had the price and were too far from one (the closest of them stood {(Nearest == int.MaxValue ? 0 : Nearest)} tiles off, against a reach of {Reach}), {Nowhere} had no stablemaster surveyed at all, {Poor} could not afford {BotSteed.Price}gp and keep {Reserve} (the fattest purse among them held {Richest}gp); "
-              + $"{Fetched} sent the last streets to one; {Bought} horses bought for {Paid}gp out of {Drawn}gp drawn, {Fenced} stablemasters found behind a fence; {Summons} called up, {Thrown} riders put on the ground by a blow";
+              + $"{Fetched} sent the last streets to one and {Unfetched} of those walks taken off the road once done; {Bought} horses bought for {Paid}gp out of {Drawn}gp drawn, {Fenced} stablemasters found behind a fence; {Summons} called up, {Thrown} riders put on the ground by a blow, {Alighted} put on foot to mine and {HeldBack} calls held back while they worked";
 
     public static void Forget()
     {
@@ -370,6 +429,8 @@ public static class BotStable
         Paid = 0;
         Summons = 0;
         Thrown = 0;
+        Alighted = 0;
+        HeldBack = 0;
         Drawn = 0;
         Fenced = 0;
         Asked = 0;

@@ -128,7 +128,7 @@ public static class BotRoster
 
         for (var i = 0; i < guild.Members.Count; i++)
         {
-            if (guild.Members[i] is BotMobile { Deleted: false } member && !BotGuilds.IsMaker(member))
+            if (guild.Members[i] is BotMobile { Deleted: false } member && !BotGuilds.IsHead(member))
             {
                 found.Add(member);
             }

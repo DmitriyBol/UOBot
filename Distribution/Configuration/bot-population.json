@@ -16,10 +16,10 @@
     "Sage": 1,
     "Brawler": 1,
     "Gatherer": 12,
-    "Warrior": 11,
-    "Archer": 10,
+    "Warrior": 15,
+    "Archer": 13,
     "Mage": 10,
-    "Healer": 11,
+    "Healer": 4,
     "WarriorMage": 8,
     "WarriorArcher": 8
   }

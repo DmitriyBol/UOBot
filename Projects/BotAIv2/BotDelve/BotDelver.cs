@@ -88,7 +88,7 @@ public sealed class BotDelver : IBotProposer
             return null;
         }
 
-        if (body is not BotMobile who || who.Guild is not Guild guild || !ReferenceEquals(BotGuilds.Maker(guild), who))
+        if (body is not BotMobile who || who.Guild is not Guild guild || !ReferenceEquals(BotGuilds.Head(guild), who))
         {
             NotALeader++;
 

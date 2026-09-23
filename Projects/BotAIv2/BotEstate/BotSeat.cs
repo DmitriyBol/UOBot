@@ -75,8 +75,88 @@ public static class BotSeat
                 continue;
             }
 
-            _configured[name] = new Point3D(at[0], at[1], at.Length > 2 ? at[2] : 0);
+            var seat = new Point3D(at[0], at[1], at.Length > 2 ? at[2] : 0);
+
+            if (TooNear(name, seat, out var other, out var gap))
+            {
+                Crowded++;
+
+                logger.Warning(
+                    "The file seats {Guild} at {X},{Y}, {Gap} tiles from the seat of {Other}, nearer than the {Neighbouring} at which guilds sour on each other; that seat is ignored",
+                    name,
+                    seat.X,
+                    seat.Y,
+                    gap,
+                    other,
+                    BotRegard.Neighbouring
+                );
+
+                continue;
+            }
+
+            _configured[name] = seat;
         }
+    }
+
+    public static long Crowded { get; private set; }
+
+    public static bool TooNear(string guild, Point3D at, out string other, out int gap)
+    {
+        other = null;
+        gap = int.MaxValue;
+
+        foreach (var name in Named())
+        {
+            if (string.Equals(name, guild, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var seat = Of(name);
+
+            if (seat == Point3D.Zero)
+            {
+                continue;
+            }
+
+            var apart = Gap(at, seat);
+
+            if (apart < BotRegard.Neighbouring && apart < gap)
+            {
+                other = name;
+                gap = apart;
+            }
+        }
+
+        return other != null;
+    }
+
+    private static List<string> Named()
+    {
+        var names = new List<string>();
+
+        foreach (var name in _overrides.Keys)
+        {
+            names.Add(name);
+        }
+
+        foreach (var name in _configured.Keys)
+        {
+            if (!names.Contains(name))
+            {
+                names.Add(name);
+            }
+        }
+
+        foreach (var name in BotEstate.Held.Keys)
+        {
+            if (!names.Contains(name))
+            {
+                names.Add(name);
+            }
+        }
+
+        return names;
     }
 
     public static Point3D Of(string guild)
@@ -110,6 +190,11 @@ public static class BotSeat
         if (!Running || bot?.Guild is not Guild guild)
         {
             return where;
+        }
+
+        if (BotUnderworld.Member(bot) && BotUnderworld.Hideout != Point3D.Zero)
+        {
+            return BotUnderworld.Hideout;
         }
 
         if (BotEstate.Hall(guild) is { Deleted: false } hall && hall.Map == BotPopulation.Home)
@@ -250,10 +335,58 @@ public static class BotSeat
         return say.Length == 0 ? "no guilds stand" : say.ToString();
     }
 
+    public static int RoadlessSeats { get; private set; }
+
+    public static bool Roadless(Point3D seat, out string why)
+    {
+        why = null;
+
+        var map = BotPopulation.Home;
+
+        if (map == null || seat == Point3D.Zero || !BotRoads.Ready || !BotRoads.Covers(map, seat.X, seat.Y))
+        {
+            return false;
+        }
+
+        if (BotRoads.FromHome(map, seat.X, seat.Y) >= 0)
+        {
+            return false;
+        }
+
+        why = $"no road reaches ({seat.X}, {seat.Y}) from home at ({BotRoads.Home.X}, {BotRoads.Home.Y})";
+
+        return true;
+    }
+
+    public static void Audit()
+    {
+        RoadlessSeats = 0;
+
+        foreach (var guild in BotGuilds.Standing)
+        {
+            var seat = Of(guild.Name);
+
+            if (!Roadless(seat, out var why))
+            {
+                continue;
+            }
+
+            RoadlessSeats++;
+
+            logger.Warning(
+                "The seat of {Guild} at {X},{Y} is off the roads: {Why}; bots put down there are carried home from it. Move it with \"seat <guild> <x> <y>\" at the door",
+                guild.Name,
+                seat.X,
+                seat.Y,
+                why
+            );
+        }
+    }
+
     public static string Describe() =>
         !Running
             ? "guilds have no seats"
-            : $"seats: {Tell()}; a hall is at home within {Settled} tiles of its seat; {Homed} bots put down at their guild's hall or seat, {Carried} halls carried to a seat, {Spoken} seats set by hand";
+            : $"seats: {Tell()}; a hall is at home within {Settled} tiles of its seat; {Homed} bots put down at their guild's hall or seat, {Carried} halls carried to a seat, {Spoken} seats set by hand, {RoadlessSeats} seats off the roads at the last audit";
 
     public static void Forget()
     {
@@ -261,6 +394,16 @@ public static class BotSeat
         Carried = 0;
         Spoken = 0;
         _moved.Clear();
+    }
+
+    public static int Wipe()
+    {
+        var gone = _overrides.Count;
+
+        _overrides.Clear();
+        Forget();
+
+        return gone;
     }
 }
 

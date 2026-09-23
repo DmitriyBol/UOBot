@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Logging;
+using Server.Mobiles;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -51,6 +53,287 @@ public static class BotCharter
     public static long Marching { get; private set; }
 
     public static long Followed { get; private set; }
+
+    public static long Named { get; private set; }
+
+    public static readonly string[] Materials = ["ore", "logs", "herbs", "hides", "feathers", "meat", "wool"];
+
+    private static readonly Dictionary<string, string[]> _brings = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["ore"] = ["mine", "prospect"],
+        ["logs"] = ["chop"],
+        ["herbs"] = ["herbs", "forage"],
+        ["hides"] = ["hunt", "band"],
+        ["feathers"] = ["hunt", "band"],
+        ["meat"] = ["hunt", "band"],
+        ["wool"] = ["hunt", "band"]
+    };
+
+    public static int WantHoldsMs { get; set; } = 1800000;
+
+    public static long Requested { get; private set; }
+
+    public static long Fetched { get; private set; }
+
+    /// <summary>One request on a guild's board.</summary>
+    private sealed class Request
+    {
+        public string Material;
+
+        public int Amount;
+
+        public string By;
+
+        public long Set;
+
+        public string Why;
+    }
+
+    private static readonly Dictionary<string, List<Request>> _boards = [];
+
+    public static readonly string[] Carvings = ["hides", "feathers", "meat", "wool"];
+
+    public static int Bit(string material)
+    {
+        if (material == null)
+        {
+            return 0;
+        }
+
+        for (var i = 0; i < Materials.Length; i++)
+        {
+            if (Materials[i].InsensitiveEquals(material))
+            {
+                return 1 << i;
+            }
+        }
+
+        return 0;
+    }
+
+    public static int Carved(BaseCreature creature)
+    {
+        var mask = 0;
+
+        for (var i = 0; i < Carvings.Length; i++)
+        {
+            if (Yields(creature, Carvings[i]))
+            {
+                mask |= Bit(Carvings[i]);
+            }
+        }
+
+        return mask;
+    }
+
+    public static string Names(int mask)
+    {
+        if (mask == 0)
+        {
+            return "nothing";
+        }
+
+        var say = ValueStringBuilder.Create(64);
+
+        try
+        {
+            var shown = 0;
+
+            for (var i = 0; i < Materials.Length; i++)
+            {
+                if ((mask & (1 << i)) == 0)
+                {
+                    continue;
+                }
+
+                if (shown++ > 0)
+                {
+                    say.Append(", ");
+                }
+
+                say.Append(Materials[i]);
+            }
+
+            return say.ToString();
+        }
+        finally
+        {
+            say.Dispose();
+        }
+    }
+
+    public static string Carved(Mobile body)
+    {
+        for (var i = 0; i < Carvings.Length; i++)
+        {
+            if (Wants(body, Carvings[i]))
+            {
+                return Carvings[i];
+            }
+        }
+
+        return null;
+    }
+
+    public static bool Yields(BaseCreature creature, string material)
+    {
+        if (creature == null || material == null)
+        {
+            return false;
+        }
+
+        return material.ToLowerInvariant() switch
+        {
+            "hides"    => creature.Hides > 0,
+            "feathers" => creature.Feathers > 0,
+            "meat"     => creature.Meat > 0,
+            "wool"     => creature.Wool > 0,
+            _          => false
+        };
+    }
+
+    private static bool Carved(string material) =>
+        material is not null && (material.Equals("hides", StringComparison.OrdinalIgnoreCase)
+            || material.Equals("feathers", StringComparison.OrdinalIgnoreCase)
+            || material.Equals("meat", StringComparison.OrdinalIgnoreCase)
+            || material.Equals("wool", StringComparison.OrdinalIgnoreCase));
+
+    private static List<Request> BoardOf(string guild)
+    {
+        if (!Running || guild == null || !_boards.TryGetValue(guild, out var board))
+        {
+            return null;
+        }
+
+        for (var i = board.Count - 1; i >= 0; i--)
+        {
+            if (Core.TickCount - (board[i].Set + WantHoldsMs) >= 0)
+            {
+                board.RemoveAt(i);
+            }
+        }
+
+        if (board.Count == 0)
+        {
+            _boards.Remove(guild);
+
+            return null;
+        }
+
+        return board;
+    }
+
+    public static void Want(Guild guild, string material, int amount, string by, string why)
+    {
+        if (!Running || guild == null || string.IsNullOrWhiteSpace(material) || amount <= 0
+            || Array.FindIndex(Materials, m => m.Equals(material, StringComparison.OrdinalIgnoreCase)) < 0)
+        {
+            return;
+        }
+
+        if (!_boards.TryGetValue(guild.Name, out var board))
+        {
+            _boards[guild.Name] = board = [];
+        }
+
+        var kept = material.ToLowerInvariant();
+
+        for (var i = board.Count - 1; i >= 0; i--)
+        {
+            if (board[i].Material == kept)
+            {
+                board.RemoveAt(i);
+            }
+        }
+
+        board.Add(new Request { Material = kept, Amount = amount, By = by, Set = Core.TickCount, Why = why });
+        Requested++;
+
+        logger.Information(
+            "{By} puts a request on {Guild}'s board: {Amount} {Material} — {Why}",
+            by ?? "the maker",
+            guild.Name,
+            amount,
+            kept,
+            why ?? "no reason given"
+        );
+    }
+
+    public static bool Wants(Mobile body, string material)
+    {
+        if (body?.Guild is not Guild guild || material == null)
+        {
+            return false;
+        }
+
+        var board = BoardOf(guild.Name);
+
+        if (board == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < board.Count; i++)
+        {
+            if (board[i].Material.Equals(material, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool Fetches(Guild guild, BotDeed deed)
+    {
+        var board = BoardOf(guild.Name);
+
+        if (board == null || deed?.Kind == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < board.Count; i++)
+        {
+            var material = board[i].Material;
+
+            if (!_brings.TryGetValue(material, out var trades) || Array.IndexOf(trades, deed.Kind.ToLowerInvariant()) < 0)
+            {
+                continue;
+            }
+
+            if (Carved(material) && !(deed.Foe is BaseCreature creature && Yields(creature, material)))
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public static string BoardSays(Guild guild)
+    {
+        var board = guild == null ? null : BoardOf(guild.Name);
+
+        if (board == null)
+        {
+            return "nothing";
+        }
+
+        List<string> said = [];
+
+        for (var i = 0; i < board.Count; i++)
+        {
+            var r = board[i];
+            var ago = (int)((Core.TickCount - r.Set) / 60000);
+
+            said.Add($"{r.Amount} {r.Material} ({r.By ?? "the maker"}, {ago} min ago)");
+        }
+
+        return string.Join("; ", said);
+    }
 
     /// <summary>What one guild has standing.</summary>
     private sealed class Charter
@@ -147,11 +430,22 @@ public static class BotCharter
 
         if (charter == null)
         {
+            if (Fetches(guild, deed))
+            {
+                Fetched++;
+
+                return Boost;
+            }
+
             return 1.0;
         }
 
-        var wanted = string.Equals(deed.Kind, charter.Gather, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(deed.Kind, charter.Make, StringComparison.OrdinalIgnoreCase);
+        var wanted = Names(deed.Kind, charter.Gather) || Names(deed.Kind, charter.Make);
+
+        if (wanted)
+        {
+            Named++;
+        }
 
         if (!wanted && charter.March != Point3D.Zero && deed.Map == charter.Map)
         {
@@ -163,6 +457,13 @@ public static class BotCharter
             wanted = deed.Where != Point3D.Zero && gap <= Reach;
         }
 
+        if (!wanted && Fetches(guild, deed))
+        {
+            Fetched++;
+
+            return Boost;
+        }
+
         if (!wanted)
         {
             return 1.0;
@@ -172,6 +473,11 @@ public static class BotCharter
 
         return Boost;
     }
+
+    public static bool ByProposer { get; set; } = true;
+
+    private static bool Names(string kind, string word) =>
+        word != null && (string.Equals(kind, word, StringComparison.OrdinalIgnoreCase) || ByProposer && BotWill.OfferedAs(kind, word));
 
     public static string Says(Guild guild)
     {
@@ -209,14 +515,19 @@ public static class BotCharter
             ? "no guild charges its band with anything"
             : $"{_charters.Count} guilds have standing orders ({Gathering} to gather, {Making} to make, "
             + $"{Marching} to muster somewhere), worth ×{Boost:F2} for {HoldsMs / 60000} minutes; "
-            + $"{Followed} pieces of work were weighed under one";
+            + $"{Followed} pieces of work were weighed under one ({Named} for the trade it named, the rest for its muster); {_boards.Count} guild boards carry requests "
+            + $"({Requested} put up, for {WantHoldsMs / 60000} minutes each) and {Fetched} pieces of work were weighed up for bringing one in";
 
     public static void Forget()
     {
         _charters.Clear();
+        _boards.Clear();
         Gathering = 0;
         Making = 0;
         Marching = 0;
         Followed = 0;
+        Named = 0;
+        Requested = 0;
+        Fetched = 0;
     }
 }

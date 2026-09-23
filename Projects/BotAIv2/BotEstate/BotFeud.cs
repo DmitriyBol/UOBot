@@ -239,6 +239,10 @@ public static class BotFeud
 
     public static long Rallied { get; private set; }
 
+    public static long Beyond { get; private set; }
+
+    public static long Pocketed { get; private set; }
+
     private static readonly Dictionary<string, BotSquad> _companies = [];
 
     public static int SortieMs { get; set; } = 180000;
@@ -366,6 +370,21 @@ public static class BotFeud
 
         if (company != null && company.Count >= company.Ceiling && !ReferenceEquals(member.Squad, company))
         {
+            return null;
+        }
+
+        if (company != null && !ReferenceEquals(member.Squad, company) && !BotSquads.Reaches(company, body))
+        {
+            Beyond++;
+
+            return null;
+        }
+
+        if (company != null && !ReferenceEquals(member.Squad, company) && body.Map is { } map
+            && BotReach.Ask(map, body.Location, company.Anchor, BotArrival.Within(BotSquad.PressReach - 1)) == BotReachVerdict.Sealed)
+        {
+            Pocketed++;
+
             return null;
         }
 
@@ -511,7 +530,7 @@ public static class BotFeud
             ? "no guild has called anybody onto anybody"
             : $"{Called} calls raised against an enemy at war, {Answered} members came to one somebody else had raised, "
             + $"{Threatened} times an enemy was seen on a guild's own ground and {Defended} members went to it from up to {Defend} tiles, the first setting out {(Reactions > 0 ? ReactionMs / Reactions / 1000.0 : 0.0):F1}s after the sighting on average over {Reactions}; "
-            + $"{Companies} war companies formed and {Rallied} members rallied to one, {Sorties} times one was sent out after an enemy nobody had seen; {BotRally.Describe()}";
+            + $"{Companies} war companies formed and {Rallied} members rallied to one, {Beyond} not called to one whose leader stood more than {BotSquads.JoinReach} tiles off, {Pocketed} not called to one fighting in a pocket proved closed from where they stood, {Sorties} times one was sent out after an enemy nobody had seen; {BotRally.Describe()}";
 
     public static void Forget()
     {
@@ -527,6 +546,8 @@ public static class BotFeud
         _unanswered = 0;
         Companies = 0;
         Rallied = 0;
+        Beyond = 0;
+        Pocketed = 0;
         _companies.Clear();
         Sorties = 0;
         BotRally.Forget();

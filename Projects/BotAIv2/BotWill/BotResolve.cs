@@ -38,6 +38,14 @@ public sealed class BotResolve
 
     public int Started { get; internal set; } = -1;
 
+    public Point3D BecalmedAt { get; internal set; }
+
+    public int BecalmedOff { get; internal set; }
+
+    public long BecalmedTick { get; internal set; }
+
+    public bool Becalmed { get; internal set; }
+
     public long SinceTick { get; internal set; }
 
     public long ReviewedTick { get; internal set; }
@@ -163,6 +171,8 @@ public sealed class BotPause
     public double Expected { get; init; }
 
     public int Wealth { get; init; }
+
+    public long Aside { get; init; }
 
     public double Skill { get; init; }
 

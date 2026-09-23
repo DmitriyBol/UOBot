@@ -94,7 +94,41 @@ public static class BotQuarry
 
     private static readonly Dictionary<Serial, long> _shunned = [];
 
-    public static void Shun(Mobile quarry) => Shun(quarry, ShunMs);
+    public static void Shun(Mobile quarry) => Shun(quarry, Sentence(quarry));
+
+    public static int StillWithin { get; set; } = 2;
+
+    public static long Reshunned { get; private set; }
+
+    private static readonly Dictionary<Serial, (int Times, Point3D At)> _unreached = [];
+
+    private static int Sentence(Mobile quarry)
+    {
+        if (quarry == null)
+        {
+            return ShunMs;
+        }
+
+        var times = _unreached.TryGetValue(quarry.Serial, out var last) && quarry.InRange(last.At, StillWithin)
+            ? last.Times + 1
+            : 1;
+
+        if (_unreached.Count >= 4096)
+        {
+            _unreached.Clear();
+        }
+
+        _unreached[quarry.Serial] = (times, quarry.Location);
+
+        if (times == 1)
+        {
+            return ShunMs;
+        }
+
+        Reshunned++;
+
+        return (int)System.Math.Min((long)ShunMs << System.Math.Min(times - 1, 8), HopelessMs);
+    }
 
     public static void Shun(Mobile quarry, int ms)
     {
@@ -212,31 +246,36 @@ public static class BotQuarry
             _                => typeof(RawRibs)
         };
 
-    public static double Sought(BaseCreature creature)
+    public static double Sought(BaseCreature creature, Mobile hunter = null)
     {
-        if (creature == null || BotAuction.Wants.Count == 0)
+        if (creature == null)
         {
             return 0.0;
         }
 
         var worth = 0.0;
 
-        if (creature.Feathers > 0 && (Demanded(typeof(Feather)) || Demanded(typeof(Arrow))))
+        var hides = Demanded(typeof(Hides)) || BotCharter.Wants(hunter, "hides");
+        var feathers = Demanded(typeof(Feather)) || Demanded(typeof(Arrow)) || BotCharter.Wants(hunter, "feathers");
+        var wool = Demanded(typeof(Wool)) || BotCharter.Wants(hunter, "wool");
+        var meat = BotCharter.Wants(hunter, "meat");
+
+        if (creature.Feathers > 0 && feathers)
         {
             worth += Bounty;
         }
 
-        if (creature.Hides > 0 && Demanded(typeof(Hides)))
+        if (creature.Hides > 0 && hides)
         {
             worth += Bounty;
         }
 
-        if (creature.Wool > 0 && Demanded(typeof(Wool)))
+        if (creature.Wool > 0 && wool)
         {
             worth += Bounty;
         }
 
-        if (creature.Meat > 0 && Demanded(Butchered(creature.MeatType)))
+        if (creature.Meat > 0 && (meat || Demanded(Butchered(creature.MeatType))))
         {
             worth += Bounty;
         }
@@ -273,6 +312,7 @@ public static class BotQuarry
     {
         _claims.Clear();
         _shunned.Clear();
+        _unreached.Clear();
         _crowded.Clear();
         _paid.Clear();
         Sent = 0;
@@ -293,7 +333,7 @@ public static class BotQuarry
             }
         }
 
-        return $"{kinds} kinds of creature killed and priced, {paying} of them worth the trouble; {Walled} passed over by a company as shut off from where it stood";
+        return $"{kinds} kinds of creature killed and priced, {paying} of them worth the trouble; {Walled} passed over by a company as shut off from where it stood and {Afloat} as swimming where nobody can stand; {Penned} passed over by a lone hunter as standing in a pocket shut off from it, {Unwelcome} as standing on refused ground and {Daunted} as standing on ground asking more strength than it brought ({(ReadsGround ? "passed over" : "only counted")}); {Reshunned} left alone for longer for being found unreachable again where they stood before";
     }
 
     public static BaseCreature Best(Mobile bot, int range)
@@ -311,6 +351,8 @@ public static class BotQuarry
         {
             return null;
         }
+
+        var strength = BotQuad.Strength(bot);
 
         BaseCreature best = null;
         var bestPower = 0.0;
@@ -335,11 +377,35 @@ public static class BotQuarry
                 continue;
             }
 
-            var pays = Pays(creature.GetType()) + Sought(creature);
+            var pays = Pays(creature.GetType()) + Sought(creature, bot);
 
             if (best != null && (pays < bestPays || pays == bestPays && power <= bestPower))
             {
                 continue;
+            }
+
+            if (HunterReadsRefusals && BotRefused.Refusing(map, creature.Location))
+            {
+                Unwelcome++;
+
+                continue;
+            }
+
+            if (ShutOff(map, bot.Location, creature.Location))
+            {
+                Penned++;
+
+                continue;
+            }
+
+            if (BotQuad.MuscleNear(map, creature.Location, GroundWithin) > strength)
+            {
+                Daunted++;
+
+                if (ReadsGround)
+                {
+                    continue;
+                }
             }
 
             best = creature;
@@ -356,6 +422,23 @@ public static class BotQuarry
         && Best(bot, Reach) != null;
 
     public static long Walled { get; private set; }
+
+    public static long Penned { get; private set; }
+
+    public static long Unwelcome { get; private set; }
+
+    public static bool HunterReadsRefusals { get; set; } = true;
+
+    public static bool ReadsGround { get; set; } = true;
+
+    public static int GroundWithin { get; set; } = 12;
+
+    public static long Daunted { get; private set; }
+
+    private static bool ShutOff(Map map, Point3D from, Point3D at) =>
+        BotReach.Ask(map, from, at, BotArrival.Exactly) == BotReachVerdict.Sealed;
+
+    public static long Afloat { get; private set; }
 
     public static BaseCreature Company(Mobile bot, int range) => Company(bot, range, out _);
 
@@ -417,7 +500,14 @@ public static class BotQuarry
                 continue;
             }
 
-            if (BotReach.Ask(map, bot.Location, creature.Location, BotArrival.Within(Reach)) == BotReachVerdict.Sealed)
+            if (creature.CanSwim && !BotStep.Settle(map, creature.X, creature.Y, out _))
+            {
+                Afloat++;
+
+                continue;
+            }
+
+            if (ShutOff(map, bot.Location, creature.Location))
             {
                 Walled++;
 

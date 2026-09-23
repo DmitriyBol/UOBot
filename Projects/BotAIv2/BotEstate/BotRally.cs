@@ -45,6 +45,8 @@ public sealed class BotRally : BotDeed
 
     public static long Marched { get; private set; }
 
+    public static long Kept { get; private set; }
+
     public static int Drift { get; set; } = 8;
 
     private readonly Guild _guild;
@@ -138,7 +140,14 @@ public sealed class BotRally : BotDeed
                 }
             }
 
-            _company.Engage(_enemy, ReferenceEquals(member.Squad, _company) ? member : null);
+            if (_company.Focus is { Deleted: false, Alive: true } held && !ReferenceEquals(held, _enemy))
+            {
+                Kept++;
+            }
+            else
+            {
+                _company.Engage(_enemy, ReferenceEquals(member.Squad, _company) ? member : null);
+            }
         }
 
         if (!BotFeud.Standing(_company))
@@ -207,14 +216,15 @@ public sealed class BotRally : BotDeed
     }
 
     public static string Describe() =>
-        Stood + Late == 0
+        Stood + Late + Marched + Kept == 0
             ? "nobody has rallied to a war company"
-            : $"{Stood} rallies stood through to the company's end, {Late} arrived to find no company, {Marched} marches led at an enemy out of reach";
+            : $"{Stood} rallies stood through to the company's end, {Late} arrived to find no company, {Marched} marches led at an enemy out of reach, {Kept} rallies left their company on the enemy it already had";
 
     public static void Forget()
     {
         Stood = 0;
         Late = 0;
         Marched = 0;
+        Kept = 0;
     }
 }

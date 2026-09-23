@@ -30,7 +30,35 @@ if (Get-Process ModernUO -ErrorAction SilentlyContinue) {
 $log = Join-Path $logs ('session-{0:yyyy-MM-dd_HH-mm}.log' -f (Get-Date))
 $exe = Join-Path $root 'Distribution\ModernUO.exe'
 $dir = Join-Path $root 'Distribution'
-$name = 'ModernUO-shard'
+$name = 'ModernUO-shard-once'
+$keeper = 'ModernUO-shard'
+
+# This script used to register itself under the keeper's name, and the `/Delete` below then removed the
+# autostart every time the shard was started by hand. On 22.09.2026 the machine restarted at 01:07 and the
+# shard stayed down: the task install-shard-autostart.ps1 had registered on 11.09 was gone, replaced by a ONCE
+# trigger from the evening before. If the keeper is there, starting the shard means running it — it names its
+# own log and the scheduler goes on watching it — and this script only waits for the port.
+if (Get-ScheduledTask -TaskName $keeper -ErrorAction SilentlyContinue) {
+    $since = Get-Date
+    schtasks /Run /TN $keeper | Out-Null
+    Write-Host ("shard starting through '{0}'; newest file in logs\ is its log" -f $keeper)
+
+    for ($i = 0; $i -lt 60; $i++) {
+        Start-Sleep -Milliseconds 500
+
+        $newest = Get-ChildItem $logs -Filter 'session-*.log' |
+            Where-Object { $_.LastWriteTime -ge $since.AddSeconds(-5) } |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+        if ($newest -and (Select-String -Path $newest.FullName -Pattern 'Listening: 127.0.0.1:2593' -Quiet)) {
+            Write-Host ('shard up on 127.0.0.1:2593; log: ' + $newest.FullName)
+            exit 0
+        }
+    }
+
+    Write-Host 'shard did not report listening within 30s — check the newest log'
+    exit 1
+}
 
 # /c rather than /k, and the whole command quoted the way cmd wants it: the redirection has to happen inside
 # cmd, because handing the task scheduler a redirection does nothing.

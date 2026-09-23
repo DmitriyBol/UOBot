@@ -61,6 +61,8 @@ public sealed class BotOrder : BotDeed
 
     public override double Minutes => 0.5;
 
+    public override bool Paperwork => true;
+
     public override int Outlay => _offer * System.Math.Max(1, _units);
 
     public override int Made => _paid;

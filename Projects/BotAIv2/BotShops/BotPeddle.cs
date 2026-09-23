@@ -56,6 +56,16 @@ public sealed class BotPeddle : BotDeed
 
     private int _sold;
 
+    private BotListing _listing;
+
+    private int _soldBefore;
+
+    private bool _begun;
+
+    public static long SoldOnTheWay { get; private set; }
+
+    public static long HandedBack { get; private set; }
+
     public BotPeddle(BaseVendor shop, Type kind, string label, int units, int price)
     {
         _shop = shop;
@@ -116,6 +126,13 @@ public sealed class BotPeddle : BotDeed
             return BotDoing.Failed("the shopkeeper is gone");
         }
 
+        if (!_begun)
+        {
+            _begun = true;
+            _listing = BotAuction.Find(bot, _kind);
+            _soldBefore = _listing?.Sold ?? 0;
+        }
+
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} with {_label}");
@@ -123,7 +140,17 @@ public sealed class BotPeddle : BotDeed
 
         var taken = BotAuction.Reclaim(bot, _kind);
 
-        if (taken <= 0)
+        if (taken <= 0 && Gather(body, _kind).Count > 0)
+        {
+            HandedBack++;
+        }
+        else if (taken <= 0 && _listing != null && _listing.Sold > _soldBefore)
+        {
+            SoldOnTheWay++;
+
+            return BotDoing.Done($"the stall sold {_listing.Sold - _soldBefore} of them while it walked");
+        }
+        else if (taken <= 0)
         {
             return BotDoing.Failed(
                 BotYield.Pocket(body) ? "the stall was empty by the time it got here" : "the pack had no room to take the goods back off the stall"
@@ -160,13 +187,14 @@ public sealed class BotPeddle : BotDeed
             return found;
         }
 
+        var bond = (body as BotMobile)?.Bond;
         List<Item> carried = [.. pack.Items];
 
         for (var i = 0; i < carried.Count; i++)
         {
             var item = carried[i];
 
-            if (!item.Deleted && item.Movable && kind.IsInstanceOfType(item))
+            if (!item.Deleted && item.Movable && kind.IsInstanceOfType(item) && !BotBinding.IsBound(item, bond))
             {
                 found.Add(item);
             }

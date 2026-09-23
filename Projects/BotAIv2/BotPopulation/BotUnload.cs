@@ -36,7 +36,9 @@ public sealed class BotUnload : BotDeed
 
     public static int Risk { get; set; } = 8;
 
-    public static double Prior { get; set; } = 120.0;
+    public static double Prior { get; set; } = 30.0;
+
+    public static double Stuck { get; set; } = 120.0;
 
     public static double WorkMinutes { get; set; } = 2.0;
 
@@ -77,7 +79,7 @@ public sealed class BotUnload : BotDeed
 
     public override Point3D Where => _counter;
 
-    public override double Expects => Prior;
+    public override double Expects => _immobile || _jammed ? Stuck : Prior;
 
     public override double Minutes => WorkMinutes;
 
@@ -796,6 +798,13 @@ public sealed class BotUnload : BotDeed
             var (kind, count) = bottles[i];
 
             keep[kind] = Math.Max(1, count);
+        }
+
+        var thrown = BotArmoury.Kept(body, out _);
+
+        if (thrown != null)
+        {
+            keep[thrown] = Math.Max(keep.TryGetValue(thrown, out var already) ? already : 0, BotArmoury.Stock);
         }
 
         var ammunition = bot.Bond?.Weapon?.Ammunition;

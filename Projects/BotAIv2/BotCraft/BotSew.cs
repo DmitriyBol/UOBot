@@ -52,6 +52,8 @@ public sealed class BotSew : BotDeed
 
     private BaseVendor _shop;
 
+    private int _repicks;
+
     private BotListing _stall;
 
     private readonly Type _stuff;
@@ -251,6 +253,17 @@ public sealed class BotSew : BotDeed
 
         if (BotShops.Buy(bot, _shop, _stuff, _take, out var refused) <= 0)
         {
+            var next = BotShops.Next(bot, _shop, _stuff, ref _repicks);
+
+            if (next != null)
+            {
+                _shop = next;
+                _map = next.Map;
+                _where = next.Location;
+
+                return BotDoing.Walk(next.Map, next, BotArrival.Within(BotShops.CounterReach), $"on to {next.Name} for {_stuff.Name}");
+            }
+
             return BotDoing.Failed(refused ?? $"no {_stuff.Name} to be had");
         }
 
@@ -263,7 +276,7 @@ public sealed class BotSew : BotDeed
     {
         var kit = BotThread.Kit(body);
 
-        if (kit == null)
+        if (kit == null && _swings == 0)
         {
             return BotDoing.Failed("nothing to sew with");
         }
@@ -297,6 +310,23 @@ public sealed class BotSew : BotDeed
             _pieces += have - _had;
             _had = have;
             _made = _pieces * _worth;
+        }
+
+        if (kit == null)
+        {
+            if (_swung && Core.TickCount - _swungTick < SwingMs)
+            {
+                return BotDoing.Work("sewing");
+            }
+
+            if (_pieces <= 0)
+            {
+                return BotDoing.Failed("nothing to sew with");
+            }
+
+            _leg = Leg.Counter;
+
+            return default;
         }
 
         var left = BotThread.Amount(body, _stuff);

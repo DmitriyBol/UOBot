@@ -229,6 +229,24 @@ public static class BotCommons
         return Math.Max(claim * LeastShare, corrected);
     }
 
+    public static double Realised(string kind, double claim)
+    {
+        if (claim <= 0.0 || kind == null || !_trades.TryGetValue(kind, out var trade) || trade.Settled == 0 || trade.Claimed <= 0.0)
+        {
+            return claim;
+        }
+
+        Realisations++;
+
+        var settled = Math.Min(trade.Settled, TradeConfidence);
+        var share = Math.Clamp(trade.Measured / trade.Claimed, 0.0, 2.0);
+        var corrected = claim * (PriorWeight + share * settled) / (PriorWeight + settled);
+
+        return Math.Max(claim * LeastShare, corrected);
+    }
+
+    public static long Realisations { get; private set; }
+
     public static List<(string Kind, double Claimed, double Measured, int Settled, int Minded)> Gaps(int most)
     {
         List<(string Kind, double Claimed, double Measured, int Settled, int Minded)> found = [];
@@ -391,10 +409,167 @@ public static class BotCommons
 
     private static Point3D Middle(Patch patch) => new(patch.X * Band + Band / 2, patch.Y * Band + Band / 2, 0);
 
+    internal static void Save(IGenericWriter writer)
+    {
+        var now = Core.TickCount;
+
+        writer.WriteEncodedInt(_patches.Count);
+
+        foreach (var (key, patch) in _patches)
+        {
+            writer.Write(key.Kind);
+            writer.WriteEncodedInt(key.Map);
+            writer.WriteEncodedInt(key.X);
+            writer.WriteEncodedInt(key.Y);
+            writer.Write(patch.Measured);
+            writer.WriteEncodedInt(patch.Settled);
+            writer.WriteEncodedInt(patch.Minded);
+            writer.Write(Math.Max(0L, now - patch.TouchedTick));
+        }
+
+        writer.WriteEncodedInt(_trades.Count);
+
+        foreach (var (kind, trade) in _trades)
+        {
+            writer.Write(kind);
+            writer.Write(trade.Claimed);
+            writer.Write(trade.Measured);
+            writer.WriteEncodedInt(trade.Settled);
+            writer.WriteEncodedInt(trade.Minded);
+            writer.Write(Math.Max(0L, now - trade.TouchedTick));
+        }
+
+        writer.WriteEncodedInt(_seams.Count);
+
+        foreach (var (key, seam) in _seams)
+        {
+            writer.WriteEncodedInt(key.Map);
+            writer.WriteEncodedInt(key.X);
+            writer.WriteEncodedInt(key.Y);
+            writer.WriteEncodedInt(seam.Rank);
+            writer.WriteEncodedInt(seam.Loads);
+        }
+    }
+
+    internal static (int Patches, int Trades, int Seams) Load(IGenericReader reader)
+    {
+        var now = Core.TickCount;
+        var maps = Map.Maps;
+
+        var patches = reader.ReadEncodedInt();
+
+        for (var i = 0; i < patches; i++)
+        {
+            var kind = reader.ReadString();
+            var facet = reader.ReadEncodedInt();
+            var x = reader.ReadEncodedInt();
+            var y = reader.ReadEncodedInt();
+            var measured = reader.ReadDouble();
+            var settled = reader.ReadEncodedInt();
+            var minded = reader.ReadEncodedInt();
+            var age = reader.ReadLong();
+            var map = maps is { Length: > 0 } && facet >= 0 && facet < maps.Length ? maps[facet] : null;
+
+            if (kind == null || map == null || map == Map.Internal || _patches.Count >= MostPatches)
+            {
+                continue;
+            }
+
+            _patches[(kind, facet, x, y)] = new Patch
+            {
+                Kind = kind,
+                Map = map,
+                X = x,
+                Y = y,
+                Measured = measured,
+                Settled = settled,
+                Minded = minded,
+                TouchedTick = now - Math.Max(0L, age)
+            };
+        }
+
+        var trades = reader.ReadEncodedInt();
+
+        for (var i = 0; i < trades; i++)
+        {
+            var kind = reader.ReadString();
+            var claimed = reader.ReadDouble();
+            var measured = reader.ReadDouble();
+            var settled = reader.ReadEncodedInt();
+            var minded = reader.ReadEncodedInt();
+            var age = reader.ReadLong();
+
+            if (kind == null)
+            {
+                continue;
+            }
+
+            _trades[kind] = new Trade
+            {
+                Claimed = claimed,
+                Measured = measured,
+                Settled = settled,
+                Minded = minded,
+                TouchedTick = now - Math.Max(0L, age)
+            };
+        }
+
+        var seams = reader.ReadEncodedInt();
+
+        for (var i = 0; i < seams; i++)
+        {
+            var facet = reader.ReadEncodedInt();
+            var x = reader.ReadEncodedInt();
+            var y = reader.ReadEncodedInt();
+            var rank = reader.ReadEncodedInt();
+            var loads = reader.ReadEncodedInt();
+
+            _seams[(facet, x, y)] = (rank, loads);
+        }
+
+        return (patches, trades, seams);
+    }
+
     public static string Describe() =>
         _patches.Count == 0
             ? "the population has not learned anything about anywhere yet"
             : $"{_patches.Count} patches and {_trades.Count} trades known from {Noted} outcomes, {Taught} of them from a bot with a mind; asked {Asked} times by somebody who had never been there and {Corrections} claims corrected by what the work really paid; {_seams.Count} patches dug over";
+
+    private static readonly List<(string Kind, int Map, int X, int Y)> _forgiving = [];
+
+    public static int Forgive(string kind)
+    {
+        if (string.IsNullOrEmpty(kind))
+        {
+            return 0;
+        }
+
+        _forgiving.Clear();
+
+        foreach (var key in _patches.Keys)
+        {
+            if (string.Equals(key.Kind, kind, StringComparison.OrdinalIgnoreCase))
+            {
+                _forgiving.Add(key);
+            }
+        }
+
+        for (var i = 0; i < _forgiving.Count; i++)
+        {
+            _patches.Remove(_forgiving[i]);
+        }
+
+        var patches = _forgiving.Count;
+
+        _forgiving.Clear();
+
+        if (_trades.Remove(kind))
+        {
+            patches++;
+        }
+
+        return patches;
+    }
 
     public static void Forget()
     {
@@ -403,6 +578,7 @@ public static class BotCommons
         _seams.Clear();
         Loads = 0;
         Corrections = 0;
+        Realisations = 0;
         Noted = 0;
         Taught = 0;
         Asked = 0;

@@ -80,6 +80,8 @@ public sealed class BotWatcher
 
     public string Charge { get; }
 
+    public bool Organiser { get; init; }
+
     public bool Watches(string typeName) => Owner(typeName) == Rank % Charges.Length;
 
     public BotDebugger Body { get; set; }
@@ -89,6 +91,10 @@ public sealed class BotWatcher
     public long Asked { get; set; }
 
     public long Findings { get; set; }
+
+    public long Labels { get; set; }
+
+    public long Echoes { get; set; }
 
     public long Quiet { get; set; }
 
@@ -105,5 +111,5 @@ public sealed class BotWatcher
     public string Describe() =>
         Body is not { Deleted: false }
             ? $"{Name} has no body"
-            : $"{Name} at {Body.Location.X},{Body.Location.Y} after {Body.Hops} hops, {Asked} asked, {Findings} findings, {Quiet} quiet looks, {Reflections} reflections";
+            : $"{Name} at {Body.Location.X},{Body.Location.Y} after {Body.Hops} hops, {Asked} asked, {Findings} findings, {Labels} labels and {Echoes} echoes turned away, {Quiet} quiet looks, {Reflections} reflections";
 }

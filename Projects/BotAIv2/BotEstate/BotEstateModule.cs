@@ -32,6 +32,8 @@ public sealed class BotEstateModule : BotModule
 
         BotWill.Offer(new BotSteward());
 
+        BotWill.Offer(new BotReeve());
+
         BotWill.Offer(new BotFitter());
 
         BotWill.Offer(new BotHirer());
@@ -114,6 +116,8 @@ public sealed class BotEstateModule : BotModule
         BotSeat.Forget();
         BotClaim.Forget();
         BotHolder.Forget();
+        BotReeve.Forget();
+        BotChest.Forget();
         BotHold.Forget();
         BotRemover.Forget();
         BotRemove.Forget();

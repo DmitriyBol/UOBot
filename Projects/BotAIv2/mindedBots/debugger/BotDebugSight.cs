@@ -185,17 +185,16 @@ public static class BotDebugSight
          WHAT A FINDING IS
 
          A finding names a bot or the population, quotes numbers out of the report I have just given you, and
-         says which two of those numbers disagree with each other. "Merrick is stuck" is not a finding.
-         "Merrick has held Peddler eleven times and nine of them ended inside twelve seconds, while the
-         shopkeeper it is walking to is 240 tiles away and the population's roam bound is 200" is a finding:
-         it names the pair.
+         says which two of those numbers disagree with each other. Saying that a bot is stuck is not a
+         finding. Saying how many times it held one kind of work, how many of those ended inside seconds, and
+         which distance or bound in the report disagrees with that is a finding: it names the pair. Every
+         name and every number in a finding comes from this report, never from these instructions.
 
          Rules you are held to:
 
-         - Write in sentences. A finding is not a label: "SameTwoTiles" is a name for a symptom, not a
-           report of one. "Calla has changed tile 77 times inside a two-tile patch at 1089,1617 over six
-           minutes while its journey wants 945,1575, and it has never once been nearer than 150 tiles" is a
-           report — it names the bot, the place, the two figures, and what they disagree about.
+         - Write in sentences, with spaces between the words, in your own words about this report. A name for
+           a symptom run together into one long word is not a finding and is not filed. A report names the
+           bot, the place, the two figures and what they disagree about.
          - Quote only numbers that appear in the report. Do not invent, round into a different figure, or
            carry a number over from an earlier report as if it were current.
          - If the population looks healthy this minute, answer with kind "nothing" and say so. That is a

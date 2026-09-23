@@ -192,6 +192,68 @@ public static class BotFittings
         return spare[0];
     }
 
+    public static long Unblocked { get; private set; }
+
+    public static long Cornered { get; private set; }
+
+    public static int Unblock(BaseHouse hall)
+    {
+        if (hall is not { Deleted: false } || hall.Map == null || hall.Map == Map.Internal
+            || hall.PlayerVendors == null || hall.Doors == null)
+        {
+            return 0;
+        }
+
+        var moved = 0;
+
+        for (var i = 0; i < hall.PlayerVendors.Count; i++)
+        {
+            if (hall.PlayerVendors[i] is not { Deleted: false } merchant)
+            {
+                continue;
+            }
+
+            var nearest = int.MaxValue;
+            Item way = null;
+
+            for (var d = 0; d < hall.Doors.Count; d++)
+            {
+                if (hall.Doors[d] is Item { Deleted: false } door)
+                {
+                    var gap = Math.Max(Math.Abs(door.X - merchant.X), Math.Abs(door.Y - merchant.Y));
+
+                    if (gap < nearest)
+                    {
+                        nearest = gap;
+                        way = door;
+                    }
+                }
+            }
+
+            if (way == null || nearest > Doorway + 1)
+            {
+                continue;
+            }
+
+            var spot = Spot(hall);
+
+            if (spot == Point3D.Zero
+                || Math.Max(Math.Abs(way.X - spot.X), Math.Abs(way.Y - spot.Y)) <= nearest)
+            {
+                Cornered++;
+
+                continue;
+            }
+
+            merchant.MoveToWorld(spot, hall.Map);
+            moved++;
+        }
+
+        Unblocked += moved;
+
+        return moved;
+    }
+
     public static bool InRoom(BaseHouse hall, Point3D at)
     {
         if (hall is not { Deleted: false })
@@ -525,9 +587,10 @@ public static class BotFittings
     }
 
     public static string Fittings() =>
-        Bought == 0
+        (Bought == 0
             ? "no benches have been bought"
-            : $"{Bought} benches bought for {Spent}gp";
+            : $"{Bought} benches bought for {Spent}gp")
+        + $"; {Unblocked} merchants moved out of a doorway and {Cornered} left in one for want of anywhere further in";
 
     public static void Forget()
     {

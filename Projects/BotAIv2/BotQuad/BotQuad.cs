@@ -75,7 +75,7 @@ public static class BotQuad
 
     public static double Fearless { get; set; } = Neutral;
 
-    public static double DeathWorth { get; set; } = -0.05;
+    public static double DeathWorth { get; set; } = -0.25;
 
     public static double BaronWorth { get; set; } = -0.5;
 
@@ -244,7 +244,13 @@ public static class BotQuad
 
         public long Sighted;
 
+        public int Yields;
+
+        public long YieldedTick;
+
         public bool Townbound;
+
+        public bool Deep;
 
         public int RangerBruising;
 
@@ -253,6 +259,8 @@ public static class BotQuad
         public bool Swept;
 
         public int Deaths;
+
+        public long DiedTick;
 
         public bool Trodden;
 
@@ -412,6 +420,8 @@ public static class BotQuad
 
         var middle = new Point3D(x, y, map.GetAverageZ(x, y));
 
+        quad.Deep = Underground(x, y);
+
         if (Region.Find(middle, map)?.IsPartOf<GuardedRegion>() != true)
         {
             return;
@@ -422,6 +432,22 @@ public static class BotQuad
         quad.Townbound = true;
 
         Walled++;
+    }
+
+    private static bool Underground(int x, int y)
+    {
+        var at = new Point3D(x, y, 0);
+        var deeps = BotDungeon.All;
+
+        for (var i = 0; i < deeps.Count; i++)
+        {
+            if (deeps[i].Holds(at))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static Quad Known(Map map, Point3D where) =>
@@ -449,7 +475,7 @@ public static class BotQuad
 
     public static double Earned(Map map, Point3D where) => Known(map, where)?.Safety ?? Fresh;
 
-    public static void Sighted(Map map, Point3D where, int mobs)
+    public static void Sighted(Map map, Point3D where, int mobs, int yields = 0)
     {
         var quad = At(map, where);
 
@@ -461,7 +487,124 @@ public static class BotQuad
         quad.Mobs = Math.Max(0, mobs);
         quad.Sighted = Core.TickCount;
 
+        if (yields != 0)
+        {
+            quad.Yields = yields;
+            quad.YieldedTick = Core.TickCount;
+        }
+
         Counted++;
+    }
+
+    public static int YieldMs { get; set; } = 3600000;
+
+    public static int StaleMs { get; set; } = 21600000;
+
+    public static long Resurveys { get; private set; }
+
+    public static Point3D Stalest(Map map, Point3D from, int within, Func<Point3D, bool> fit)
+    {
+        if (map == null || map == Map.Internal)
+        {
+            return Point3D.Zero;
+        }
+
+        var now = Core.TickCount;
+        Quad best = null;
+        var closest = int.MaxValue;
+
+        foreach (var quad in _quads.Values)
+        {
+            if (quad.Map != map || !quad.Trodden || quad.Deep || quad.Townbound)
+            {
+                continue;
+            }
+
+            if (quad.Sighted != 0 && now - quad.Sighted < StaleMs)
+            {
+                continue;
+            }
+
+            var middle = quad.Middle;
+            var away = Math.Max(Math.Abs(middle.X - from.X), Math.Abs(middle.Y - from.Y));
+
+            if (away > within || away >= closest)
+            {
+                continue;
+            }
+
+            var at = Stand(quad);
+
+            if (at == Point3D.Zero || (fit != null && !fit(at)))
+            {
+                continue;
+            }
+
+            closest = away;
+            best = quad;
+        }
+
+        if (best == null)
+        {
+            return Point3D.Zero;
+        }
+
+        Resurveys++;
+
+        return Stand(best);
+    }
+
+    public static long Yielded { get; private set; }
+
+    private static bool Yielding(Quad quad, int bit) =>
+        quad != null && bit != 0 && (quad.Yields & bit) != 0 && Core.TickCount - quad.YieldedTick < YieldMs;
+
+    public static bool YieldsAt(Map map, Point3D where, string material) => Yielding(Known(map, where), BotCharter.Bit(material));
+
+    public static Point3D Yielding(Map map, Point3D from, int within, string material)
+    {
+        var bit = BotCharter.Bit(material);
+
+        if (map == null || map == Map.Internal || bit == 0)
+        {
+            return Point3D.Zero;
+        }
+
+        Quad best = null;
+        var closest = int.MaxValue;
+
+        foreach (var quad in _quads.Values)
+        {
+            if (quad.Map != map || quad.Deep || !quad.Trodden || !Yielding(quad, bit))
+            {
+                continue;
+            }
+
+            var middle = quad.Middle;
+            var away = Math.Max(Math.Abs(middle.X - from.X), Math.Abs(middle.Y - from.Y));
+
+            if (away > within || away >= closest)
+            {
+                continue;
+            }
+
+            closest = away;
+            best = quad;
+        }
+
+        if (best == null)
+        {
+            return Point3D.Zero;
+        }
+
+        var at = Stand(best);
+
+        if (at != Point3D.Zero)
+        {
+            Yielded++;
+        }
+
+        return at;
     }
 
     public static long Counted { get; private set; }
@@ -485,10 +628,21 @@ public static class BotQuad
         }
 
         var mobs = 0;
+        var yields = 0;
 
         foreach (var creature in body.Map.GetMobilesInRange<BaseCreature>(body.Location, Side / 2))
         {
-            if (creature is { Deleted: false, Alive: true } && BotThreat.Hostile(body, creature))
+            if (creature is not { Deleted: false, Alive: true })
+            {
+                continue;
+            }
+
+            if (creature is { Controlled: false, Summoned: false })
+            {
+                yields |= BotCharter.Carved(creature);
+            }
+
+            if (BotThreat.Hostile(body, creature))
             {
                 mobs++;
             }
@@ -496,7 +650,7 @@ public static class BotQuad
 
         Looks++;
 
-        Sighted(body.Map, body.Location, mobs);
+        Sighted(body.Map, body.Location, mobs, yields);
     }
 
     public static double Muscle(double safety)
@@ -528,6 +682,26 @@ public static class BotQuad
 
     public static double Muscle(Map map, Point3D where) => Muscle(Safety(map, where));
 
+    public static double MuscleNear(Map map, Point3D where, int within)
+    {
+        if (within <= 0)
+        {
+            return Muscle(map, where);
+        }
+
+        var most = 0.0;
+
+        for (var qx = Floor(where.X - within); qx <= Floor(where.X + within); qx++)
+        {
+            for (var qy = Floor(where.Y - within); qy <= Floor(where.Y + within); qy++)
+            {
+                most = Math.Max(most, Muscle(map, new Point3D(qx * Side + Side / 2, qy * Side + Side / 2, where.Z)));
+            }
+        }
+
+        return most;
+    }
+
     public static double Strength(Mobile body)
     {
         if (body is not { Deleted: false, Alive: true })
@@ -556,7 +730,7 @@ public static class BotQuad
 
     public static long Feared { get; private set; }
 
-    public static bool Together(Mobile body, Map map, Point3D where, int within)
+    public static bool Together(Mobile body, Map map, Point3D where, int within, Point3D from = default)
     {
         var asked = Muscle(map, where);
 
@@ -573,7 +747,9 @@ public static class BotQuad
             return false;
         }
 
-        foreach (var mobile in facet.GetMobilesInRange<Mobile>(body.Location, within))
+        _powers.Clear();
+
+        foreach (var mobile in facet.GetMobilesInRange<Mobile>(from == Point3D.Zero ? body.Location : from, within))
         {
             if (mobile == body || mobile is not IBotSquadMember { Squad: null })
             {
@@ -582,12 +758,21 @@ public static class BotQuad
 
             if (mobile is IBotAlly { AbleToFight: true } && mobile is { Deleted: false, Alive: true })
             {
-                strength += BotThreat.Power(mobile);
+                _powers.Add(BotThreat.Power(mobile));
             }
+        }
+
+        _powers.Sort();
+
+        for (int i = _powers.Count - 1, taken = 0; i >= 0 && taken < BotSquad.MaxSize - 1; i--, taken++)
+        {
+            strength += _powers[i];
         }
 
         return strength >= asked;
     }
+
+    private static readonly List<double> _powers = [];
 
     public static bool Dares(Mobile body, Map map, Point3D where)
     {
@@ -630,8 +815,16 @@ public static class BotQuad
         }
 
         quad.Passes++;
-        quad.Towards++;
         quad.Tick = Core.TickCount;
+
+        if (Dreading(quad))
+        {
+            Dreaded++;
+
+            return;
+        }
+
+        quad.Towards++;
 
         if (quad.Towards < PerPass)
         {
@@ -654,8 +847,16 @@ public static class BotQuad
         }
 
         quad.Harvests++;
-        quad.Reaping++;
         quad.Tick = Core.TickCount;
+
+        if (Dreading(quad))
+        {
+            Dreaded++;
+
+            return;
+        }
+
+        quad.Reaping++;
 
         if (quad.Reaping < PerHarvest)
         {
@@ -669,6 +870,12 @@ public static class BotQuad
     }
 
     public static long Reaped { get; private set; }
+
+    public static int DreadMs { get; set; } = 10800000;
+
+    public static long Dreaded { get; private set; }
+
+    private static bool Dreading(Quad quad) => quad.DiedTick != 0 && Core.TickCount - quad.DiedTick < DreadMs;
 
     public static void Seen(Map map, Point3D where)
     {
@@ -801,6 +1008,10 @@ public static class BotQuad
 
         quad.Deaths++;
         quad.Tick = Core.TickCount;
+        quad.DiedTick = Core.TickCount;
+
+        quad.Towards = 0;
+        quad.Reaping = 0;
 
         Raise(quad, worth);
         Mourned++;
@@ -868,7 +1079,7 @@ public static class BotQuad
 
         foreach (var quad in _quads.Values)
         {
-            if (map != null && quad.Map != map)
+            if (map != null && quad.Map != map || quad.Deep)
             {
                 continue;
             }
@@ -944,7 +1155,7 @@ public static class BotQuad
 
         foreach (var quad in _quads.Values)
         {
-            if (quad.Map != map || !quad.Trodden)
+            if (quad.Map != map || !quad.Trodden || quad.Deep)
             {
                 continue;
             }
@@ -1005,7 +1216,7 @@ public static class BotQuad
 
         foreach (var quad in _quads.Values)
         {
-            if (quad.Map != map || quad.Safety > lowest)
+            if (quad.Map != map || quad.Deep || quad.Safety > lowest)
             {
                 continue;
             }
@@ -1048,6 +1259,26 @@ public static class BotQuad
             : Point3D.Zero;
     }
 
+    public static string Tell(Map map, Point3D where)
+    {
+        var quad = Known(map, where);
+
+        if (quad == null)
+        {
+            return $"no quadrant of {Side} is written down there";
+        }
+
+        var safety = Safety(map, where);
+
+        return $"its quadrant of {Side} at ({quad.X}, {quad.Y}) is {Band(safety)} at {safety:F2} ({quad.Safety:F2} before what lives there), "
+            + $"on {quad.Blows} blows, {quad.Deaths} dead, {quad.Wipes} companies lost whole, {quad.Mobs} hostile at the last look and {quad.Baulks} times nobody could get near; "
+            + $"a bot going alone needs {Muscle(map, where):F0} of strength and a company is weighed as the company; this record is kept across restarts"
+            + (quad.Deep ? "; it is down a dungeon and kept off the island's lists" : "")
+            + (quad.Yields != 0 && Core.TickCount - quad.YieldedTick < YieldMs
+                ? $"; the creatures seen here {(Core.TickCount - quad.YieldedTick) / 60000} min ago would yield {BotCharter.Names(quad.Yields)}"
+                : "; nothing seen here lately that could be carved");
+    }
+
     public static string Describe()
     {
         if (_quads.Count == 0)
@@ -1056,6 +1287,7 @@ public static class BotQuad
         }
 
         var trodden = 0;
+        var deep = 0;
         var quiet = 0;
         var wanted = 0;
         var dire = 0;
@@ -1064,6 +1296,13 @@ public static class BotQuad
 
         foreach (var quad in _quads.Values)
         {
+            if (quad.Deep)
+            {
+                deep++;
+
+                continue;
+            }
+
             if (quad.Trodden)
             {
                 trodden++;
@@ -1095,11 +1334,11 @@ public static class BotQuad
             }
         }
 
-        return $"{_quads.Count} quadrants of {Side} tiles, {trodden} of them stood in: {quiet} too quiet to hunt "
+        return $"{_quads.Count} quadrants of {Side} tiles, {trodden} of them stood in and {deep} down the dungeons and kept off the island's lists: {quiet} too quiet to hunt "
             + $"({Hushed} shut and {Roused} reopened since the shard came up, which is the direction rather than the level) "
                + $"(above {TooQuiet:F2}), {wanted} worth going to (at or below {Wanted:F2}), {dire} dire (at or below {Dire:F2}) of which {damned} damned by a company being lost in them; "
                + $"worst is {worst}; {Discovered} first set foot in, {Credited} raised for crossings, "
-               + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough, {Walled} born safe inside the walls";
+               + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough, {Walled} born safe inside the walls, {Yielded} times a hunter was pointed at a square for what walks there, {Resurveys} scouts sent back to ground uncounted for {StaleMs / 3600000} hours, {Dreaded} crossings and harvests that earned nothing within {DreadMs / 3600000} hours of a death";
     }
 
     public static void Restore(
@@ -1125,7 +1364,7 @@ public static class BotQuad
             return;
         }
 
-        _quads[(facet, x, y)] = new Quad
+        var quad = new Quad
         {
             Map = map,
             X = x,
@@ -1143,6 +1382,10 @@ public static class BotQuad
             Tick = Core.TickCount,
             HarrowedTick = harrowed ? Core.TickCount : 0
         };
+
+        quad.Deep = Underground(quad.Middle.X, quad.Middle.Y);
+
+        _quads[(facet, x, y)] = quad;
     }
 
     public static void Forget()
@@ -1159,6 +1402,9 @@ public static class BotQuad
         Looks = 0;
         Feared = 0;
         Walled = 0;
+        Yielded = 0;
+        Resurveys = 0;
+        Dreaded = 0;
         Baulked = 0;
         Sweeps = 0;
         Wiped = 0;

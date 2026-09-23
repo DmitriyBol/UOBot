@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -30,6 +31,20 @@ public sealed class BotFugitive : IBotProposer
 
     public static long Cornered { get; private set; }
 
+    public static int CalmMs { get; set; } = 8000;
+
+    public static long Calmed { get; private set; }
+
+    private static readonly Dictionary<Serial, long> _cleared = [];
+
+    public static void Cleared(Mobile body)
+    {
+        if (body != null)
+        {
+            _cleared[body.Serial] = Core.TickCount;
+        }
+    }
+
     private static bool _saidRunning;
 
     private static bool _saidCornered;
@@ -61,6 +76,14 @@ public sealed class BotFugitive : IBotProposer
 
         if (threat <= left * Bearable)
         {
+            return null;
+        }
+
+        if (_cleared.TryGetValue(body.Serial, out var clearedTick) && Core.TickCount - clearedTick < CalmMs
+            && (bot.Resolve == null || bot.Resolve.HurtTick - clearedTick <= 0))
+        {
+            Calmed++;
+
             return null;
         }
 
@@ -121,5 +144,10 @@ public sealed class BotFugitive : IBotProposer
         _saidRunning = false;
         _saidCornered = false;
         Cornered = 0;
+        Calmed = 0;
+        _cleared.Clear();
     }
+
+    public static string Describe() =>
+        $"{Cornered} bots losing with nowhere to run, {Calmed} flights not offered to a bot that had just got clear and had not been hit since";
 }

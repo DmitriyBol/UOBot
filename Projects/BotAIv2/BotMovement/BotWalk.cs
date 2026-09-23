@@ -311,7 +311,7 @@ public static class BotWalk
             journey.Target,
             journey.Arrival,
             _path,
-            journey.Avoid(bot.Location),
+            BotOutlaw.Road(bot, map, journey.Target, journey.Avoid(bot.Location)),
             ceiling
         );
 

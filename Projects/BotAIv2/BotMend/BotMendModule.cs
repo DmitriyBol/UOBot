@@ -39,6 +39,8 @@ public sealed class BotMendModule : BotModule
 
         BotWill.Offer(new BotAttendant());
 
+        BotWill.Offer(new BotHouseCalls());
+
         BotWill.Offer(new BotFugitive());
 
         logger.Information(
@@ -59,8 +61,12 @@ public sealed class BotMendModule : BotModule
     public override void Reset()
     {
         BotMedic.Forget();
+        BotMend.Forget();
         BotSurgeon.Forget();
         BotAttendant.Forget();
+        BotHouseCalls.Forget();
+        BotSalve.Forget();
+        BotRetainer.Forget();
         BotFugitive.Forget();
     }
 }
