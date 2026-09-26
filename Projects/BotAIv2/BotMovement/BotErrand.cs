@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Server.BotAI.V2;
 
 /// <summary>
@@ -24,6 +26,26 @@ public sealed class BotErrand
     public bool Interruption { get; init; }
 
     public Point3D Target => Follow != null ? Follow.Location : Where;
+
+    internal List<Point3D> Route { get; } = [];
+
+    internal int Leg;
+
+    internal Point3D RouteGoal;
+
+    internal int Reroutes;
+
+    internal bool RouteSpent;
+
+    internal bool Redraw;
+
+    internal Point3D Aim;
+
+    internal bool Unreachable;
+
+    internal bool FromChart;
+
+    internal bool NoWaySaid;
 
     public bool Lapsed => Follow != null && (Follow.Deleted || !Follow.Alive || Follow.Map != Map);
 

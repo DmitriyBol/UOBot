@@ -147,6 +147,8 @@ public sealed class BotJourney
 
     public static int DirectTiles { get; set; } = 24;
 
+    public static int RoundTiles { get; set; } = 40;
+
     public static int LegTiles { get; set; } = 24;
 
     public static int LegReached { get; set; } = 3;
@@ -155,91 +157,90 @@ public sealed class BotJourney
 
     public static int MostReroutes { get; set; } = 4;
 
-    private readonly List<Point3D> _route = [];
+    public static long Routed { get; private set; }
 
-    private int _leg;
+    public static long Charted { get; private set; }
 
-    private BotErrand _routeErrand;
+    public static long NoWay { get; private set; }
 
-    private Point3D _routeGoal;
+    private BotErrand _legErrand;
 
-    private int _reroutes;
+    public int RouteStamp { get; private set; }
 
-    private bool _routeSpent;
-
-    private Point3D _aim;
+    private int _awayStamp = -1;
 
     public bool Legging { get; private set; }
 
-    public Point3D Aim => Legging ? _aim : Target;
+    public Point3D Aim => Legging && _legErrand != null ? _legErrand.Aim : Target;
 
-    public int RouteLeft => _route.Count - _leg;
+    public int RouteLeft => Current is { } errand ? System.Math.Max(0, errand.Route.Count - errand.Leg) : 0;
+
+    public bool NoWayThere => Current?.Unreachable == true;
 
     public bool Leg(Map map, Point3D at, out Point3D leg)
     {
         leg = Point3D.Zero;
         Legging = false;
+        _legErrand = null;
 
         var errand = Current;
 
-        if (errand == null || map == null || !BotChart.Ready)
+        if (errand == null || map == null || errand.RouteSpent || errand.Reason is "station" or "sweep")
         {
             return false;
         }
 
-        var target = Target;
+        var target = errand.Target;
+        var live = errand.RouteGoal != Point3D.Zero && errand.Leg < errand.Route.Count;
+        var round = _plansSinceCloser > 0 && BotRoads.Farther(map, at, target) >= RoundTiles;
 
-        if (!ReferenceEquals(_routeErrand, errand))
-        {
-            _routeErrand = errand;
-            _routeGoal = Point3D.Zero;
-            _route.Clear();
-            _leg = 0;
-            _reroutes = 0;
-            _routeSpent = false;
-        }
-
-        if (_routeSpent || Away(at, target) <= DirectTiles)
+        if (Away(at, target) <= DirectTiles && !live && !round && errand.RouteGoal == Point3D.Zero)
         {
             return false;
         }
 
-        var redraw = _routeGoal == Point3D.Zero || Away(target, _routeGoal) > LegTiles / 2
-            || _leg < _route.Count && Away(at, _route[_leg]) > StrayTiles;
+        var strayed = live && Away(at, errand.Route[errand.Leg]) > StrayTiles;
+        var drifted = errand.RouteGoal != Point3D.Zero && Away(target, errand.RouteGoal) > LegTiles / 2;
 
-        if (redraw)
+        if (errand.RouteGoal == Point3D.Zero || errand.Redraw || strayed || drifted)
         {
-            if (_routeGoal != Point3D.Zero && ++_reroutes > MostReroutes)
+            if ((errand.Redraw || strayed) && ++errand.Reroutes > MostReroutes)
             {
-                _routeSpent = true;
-                _route.Clear();
+                errand.RouteSpent = true;
+                errand.Route.Clear();
 
                 return false;
             }
 
-            _routeGoal = target;
-            _leg = 0;
-            BotChart.Route(map, at, target, _route);
+            errand.Redraw = false;
+            errand.RouteGoal = target;
+            errand.Leg = 0;
+            Draw(map, at, target, errand);
         }
 
-        while (_leg < _route.Count && Away(at, _route[_leg]) <= LegReached)
-        {
-            _leg++;
-        }
-
-        if (_leg >= _route.Count)
+        if (errand.Unreachable)
         {
             return false;
         }
 
-        var pick = _leg;
-        var along = Away(at, _route[_leg]);
-
-        for (var j = _leg + 1; j < _route.Count && j <= _leg + 3; j++)
+        while (errand.Leg < errand.Route.Count && Away(at, errand.Route[errand.Leg]) <= LegReached)
         {
-            along += Away(_route[j - 1], _route[j]);
+            errand.Leg++;
+        }
 
-            if (along > LegTiles || Away(at, _route[j]) > LegTiles)
+        if (errand.Leg >= errand.Route.Count)
+        {
+            return false;
+        }
+
+        var pick = errand.Leg;
+        var along = Away(at, errand.Route[errand.Leg]);
+
+        for (var j = errand.Leg + 1; j < errand.Route.Count && j <= errand.Leg + 3; j++)
+        {
+            along += Away(errand.Route[j - 1], errand.Route[j]);
+
+            if (along > LegTiles || Away(at, errand.Route[j]) > LegTiles)
             {
                 break;
             }
@@ -247,52 +248,106 @@ public sealed class BotJourney
             pick = j;
         }
 
-        _leg = pick;
-        _aim = _route[pick];
-        leg = _aim;
+        errand.Leg = pick;
+        errand.Aim = errand.Route[pick];
+        leg = errand.Aim;
         Legging = true;
+        _legErrand = errand;
 
         return true;
     }
 
-    public void LegFailed(Map map)
+    private void Draw(Map map, Point3D at, Point3D target, BotErrand errand)
     {
-        if (!Legging)
+        errand.Unreachable = false;
+        errand.FromChart = false;
+        RouteStamp++;
+
+        switch (Server.Engines.Pathing.Tiered.NavigationService.Route(map, at, target, errand.Route, errand.Arrival.Tiles))
+        {
+            case Server.Engines.Pathing.Tiered.NavStatus.Ok:
+                {
+                    Routed++;
+
+                    return;
+                }
+            case Server.Engines.Pathing.Tiered.NavStatus.Direct:
+                {
+                    errand.Route.Clear();
+
+                    return;
+                }
+            case Server.Engines.Pathing.Tiered.NavStatus.Unreachable:
+                {
+                    NoWay++;
+                    errand.Unreachable = true;
+                    errand.Route.Clear();
+
+                    return;
+                }
+            default:
+                {
+                    if (BotChart.Route(map, at, target, errand.Route))
+                    {
+                        Charted++;
+                        errand.FromChart = true;
+                    }
+
+                    return;
+                }
+        }
+    }
+
+    public void LegFailed(Map map, bool shun)
+    {
+        var errand = _legErrand;
+
+        if (!Legging || errand == null)
         {
             return;
         }
 
-        BotChart.Shun(map, _aim);
-
-        _routeGoal = Point3D.Zero;
-        _reroutes++;
-        Legging = false;
-
-        if (_reroutes > MostReroutes)
+        if (shun)
         {
-            _routeSpent = true;
-            _route.Clear();
+            if (errand.FromChart)
+            {
+                BotChart.Shun(map, errand.Aim);
+            }
+            else
+            {
+                Server.Engines.Pathing.Tiered.NavigationService.Shun(map, errand.Aim);
+            }
         }
+
+        errand.Redraw = true;
+        Legging = false;
     }
 
-    private int Distance(Point3D at) => Legging ? RoadLeft(at, Target) : Away(at, Target);
+    private int Distance(Point3D at) => RoadLeft(at, Target);
 
     public int RoadLeft(Point3D at, Point3D where)
     {
-        if (_routeSpent || _route.Count == 0 || _leg >= _route.Count || _routeErrand == null
-            || Away(_routeGoal, where) > LegTiles / 2)
+        for (var i = _errands.Count - 1; i >= 0; i--)
         {
-            return Away(at, where);
+            var errand = _errands[i];
+
+            if (errand.RouteSpent || errand.Route.Count == 0 || errand.Leg >= errand.Route.Count
+                || Away(errand.RouteGoal, where) > LegTiles / 2)
+            {
+                continue;
+            }
+
+            var left = Away(at, errand.Route[errand.Leg]);
+
+            for (var k = errand.Leg + 1; k < errand.Route.Count; k++)
+            {
+                left += Away(errand.Route[k - 1], errand.Route[k]);
+            }
+
+            return left + Away(errand.Route[^1], where);
         }
 
-        var left = Away(at, _route[_leg]);
-
-        for (var i = _leg + 1; i < _route.Count; i++)
-        {
-            left += Away(_route[i - 1], _route[i]);
-        }
-
-        return left + Away(_route[^1], where);
+        return Away(at, where);
     }
 
     public int Remaining => _plan.Count - _step;
@@ -493,6 +548,12 @@ public sealed class BotJourney
         }
 
         var away = Distance(at);
+
+        if (_awayStamp != RouteStamp)
+        {
+            _awayStamp = RouteStamp;
+            _bestAway = int.MaxValue;
+        }
 
         if (!ReferenceEquals(_awayErrand, Current))
         {

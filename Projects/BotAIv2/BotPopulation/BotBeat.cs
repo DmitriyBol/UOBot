@@ -104,6 +104,7 @@ public static class BotBeat
         _summaryTick = now;
 
         logger.Information("Getting about: {Paths}; {Walk}; {Reach}; {Refused}; {Footing}", BotPath.Describe(), BotWalk.Describe(), BotReach.Describe(), BotRefused.Describe(), BotFooting.Describe());
+        logger.Information("Navigation: {Tiers}; {Chart}", Server.Engines.Pathing.Tiered.NavigationService.Describe(), BotChart.Describe());
 
         logger.Information("The market: {What}", BotAuction.Describe());
 

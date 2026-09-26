@@ -11,8 +11,8 @@ optional:
 `BotMindAI` references `BotAIv2` and never the other way round. You can ship the first without the second; you
 cannot ship the second alone.
 
-> **Four engine patches are required**, all in `engine-patches/`. From the root of the ModernUO checkout, before
-> building:
+> **Seven engine patches are required**, all in `engine-patches/`, and one folder of new engine code. From the root
+> of the ModernUO checkout, before building:
 >
 > ```bash
 > git apply Projects/BotAIv2/engine-patches/*.patch
@@ -23,14 +23,28 @@ cannot ship the second alone.
 >   one.
 > - `CraftItem-said.patch` adds one event to the same file, raised wherever the craft system tells the crafter
 >   something, so a bot can hear why an attempt produced nothing.
+> - `DefInscription-knows.patch` adds a hook to `Projects/UOContent/Engines/Craft/DefInscription.cs` that a caller may
+>   set to let a mobile write a spell it does not hold in a book. Left null, as the engine leaves it, the spell must
+>   be in the scribe's own book, as before.
 > - `HarvestDefinition-said.patch` adds one event to `Projects/UOContent/Engines/Harvest/Core/HarvestDefinition.cs`,
 >   raised where the harvest system sends a player its message, so a bot can hear why a swing produced nothing.
 > - `Titles-skill-title.patch` adds an overload to `Projects/UOContent/Misc/Titles.cs` that titles a mobile by a skill
 >   the caller chooses, so a bot is ranked by what it earned rather than by what every bot is handed.
+> - `StepProbe-standable-with-multis.patch` adds a method to `Projects/UOContent/Engines/Pathing/Cache/StepProbe.cs`
+>   that finds the surfaces a walker can stand on with house and boat floors counted, beside the old one, which sees
+>   only the map's own tiles.
+> - `BaseHouse-navigation.patch` tells the tiered navigation, from `Projects/UOContent/Multis/Houses/BaseHouse.cs`,
+>   when a house is raised, moved or taken down, so the ground under it is drawn again.
+>
+> The new code is the tiered navigation, `Projects/UOContent/Engines/Pathing/Tiered/`, with its tests in
+> `Projects/UOContent.Tests/Tests/Engines/Pathing/Tiered/`: a graph of the whole map that answers a route of any
+> length in a few milliseconds. It draws the graph in slices of the game loop at boot (Felucca takes about 100 s, 18 s
+> of it on the loop), keeps it in `Distribution/Data/Pathfinding/` between boots, and is switched in
+> `modernuo.json` by `pathfinding.tiered.enable` and `pathfinding.tiered.persist`.
 >
 > Without them `BotAIv2` does not compile. Nothing in the engine subscribes to the two events, every message is
-> still sent exactly as before, and the old `GetSkillTitle` answers exactly as it did. Each file explains itself
-> above its diff; `git apply` skips that text. The diffs need LF line endings, which this repository's
+> still sent exactly as before, and the old `GetSkillTitle` and the old surface probe answer exactly as they did.
+> Each file explains itself above its diff; `git apply` skips that text. The diffs need LF line endings, which this repository's
 > `.gitattributes` keeps on every checkout.
 
 ---
@@ -55,7 +69,9 @@ what they say.
 **Copy the projects**
 
 ```
-Projects/BotAIv2/                 → your ModernUO checkout, same place
+Projects/BotAIv2/                                        → your ModernUO checkout, same place
+Projects/UOContent/Engines/Pathing/Tiered/               → same place
+Projects/UOContent.Tests/Tests/Engines/Pathing/Tiered/   → same place (the tests; optional)
 ```
 
 **Add them to the solution** (`ModernUO.slnx`):

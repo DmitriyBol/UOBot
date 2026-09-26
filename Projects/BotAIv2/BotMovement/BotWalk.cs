@@ -112,6 +112,10 @@ public static class BotWalk
 
     public static long LegsFailed { get; private set; }
 
+    public static long NoWay { get; private set; }
+
+    public static bool TrustNoWay { get; set; }
+
     private static readonly Dictionary<string, long> _burned = [];
 
     private static readonly Dictionary<string, long> _lost = [];
@@ -165,12 +169,13 @@ public static class BotWalk
         EscalationFailed = 0;
         Legs = 0;
         LegsFailed = 0;
+        NoWay = 0;
         _burned.Clear();
         _lost.Clear();
     }
 
     public static string Describe() =>
-        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions, {Knots} stepped aside from somebody who would not; the whole ceiling was burned by: {Top(_burned)} ({Stationed} station searches held to {StationCeilingMs:F0}ms instead); {Escalated} searches at the stranded ceiling for a way round, {EscalationFound} found one and {EscalationFailed} ended the errand instead of nine more searches; {Legs} plans drawn to a leg of the chart's route and {LegsFailed} legs that could not be walked; errands lost as hopeless or without a way round, by kind: {Top(_lost)}";
+        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions, {Knots} stepped aside from somebody who would not; the whole ceiling was burned by: {Top(_burned)} ({Stationed} station searches held to {StationCeilingMs:F0}ms instead); {Escalated} searches at the stranded ceiling for a way round, {EscalationFound} found one and {EscalationFailed} ended the errand instead of nine more searches; {Legs} plans drawn to a leg of a route and {LegsFailed} legs that could not be walked; routes drawn: {BotJourney.Routed} over the navigation graph, {BotJourney.Charted} over the old chart where the graph was not drawn yet, {BotJourney.NoWay} with no way on the ground ({NoWay} plans the graph said had none{(TrustNoWay ? ", dropped" : ", planned straight instead")}); errands lost as hopeless or without a way round, by kind: {Top(_lost)}";
 
     public static int StepDelayMs(bool run) => run ? RunStepMs : WalkStepMs;
 
@@ -297,9 +302,34 @@ public static class BotWalk
 
     private static bool Plan(Mobile bot, BotJourney journey, Map map)
     {
-        if (journey.Leg(map, bot.Location, out var leg))
+        if (journey.Leg(map, bot.Location, out var leg) && PlanLeg(bot, journey, map, leg))
         {
-            return PlanLeg(bot, journey, map, leg);
+            return true;
+        }
+
+        if (journey.NoWayThere && Math.Max(Math.Abs(bot.X - journey.Target.X), Math.Abs(bot.Y - journey.Target.Y)) > BotJourney.DirectTiles)
+        {
+            NoWay++;
+
+            if (TrustNoWay)
+            {
+                Count(_lost, journey.Reason);
+
+                return Drop(bot, journey, "the ground has no way there");
+            }
+
+            if (journey.Current is { NoWaySaid: false } errand)
+            {
+                errand.NoWaySaid = true;
+
+                logger.Information(
+                    "{Name}: the navigation graph says there is no way from {From} to {Where} ({Reason}); planned straight instead",
+                    bot.Name,
+                    bot.Location,
+                    journey.Target,
+                    journey.Reason
+                );
+            }
         }
 
         var escalate = journey.Probed && !journey.Escalated && journey.PlansSinceCloser >= PlansBeforeAskingTheFarSide;
@@ -385,23 +415,25 @@ public static class BotWalk
     {
         Legs++;
 
+        var avoid = BotOutlaw.Road(bot, map, journey.Target, journey.Avoid(bot.Location));
         var outcome = BotPath.Find(
             map,
             bot.Location,
             leg,
             BotArrival.Within(BotJourney.LegReached),
             _path,
-            BotOutlaw.Road(bot, map, journey.Target, journey.Avoid(bot.Location)),
+            avoid,
             journey.PlansSinceCloser > 0 ? BotPath.CeilingMs : 0.0
         );
+
+        var fair = !BotPath.LastStarved && avoid.Empty;
 
         if (outcome == BotPathOutcome.Sealed)
         {
             LegsFailed++;
-            journey.LegFailed(map);
-            journey.Planned(outcome, null, bot.Location);
+            journey.LegFailed(map, fair);
 
-            return true;
+            return false;
         }
 
         journey.Planned(outcome, _path, bot.Location);
@@ -409,7 +441,7 @@ public static class BotWalk
         if (outcome == BotPathOutcome.Partial && journey.PlansSinceCloser >= PlansBeforeAskingTheFarSide)
         {
             LegsFailed++;
-            journey.LegFailed(map);
+            journey.LegFailed(map, fair);
         }
 
         return true;

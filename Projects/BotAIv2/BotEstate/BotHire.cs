@@ -89,9 +89,23 @@ public sealed class BotHire : BotDeed
 
     private int _stalled;
 
+    private int _routeStamp = -1;
+
     private bool Closing(Mobile body, Point3D at)
     {
         var gap = System.Math.Max(System.Math.Abs(body.X - at.X), System.Math.Abs(body.Y - at.Y));
+
+        if (body is BotMobile { Journey: { } journey })
+        {
+            gap = journey.RoadLeft(body.Location, at);
+
+            if (_routeStamp != journey.RouteStamp)
+            {
+                _routeStamp = journey.RouteStamp;
+                _nearest = int.MaxValue;
+                _stalled = 0;
+            }
+        }
 
         if (gap < _nearest)
         {

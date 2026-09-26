@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 using Server.BotAI.V2;
@@ -112,7 +113,7 @@ public static class BotHand
         + "counts near the place named or anywhere, goods are brought to the place or to home. unpost <id> — the errand "
         + "withdrawn and its reward back. quests — the board and what came of it.";
 
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart"];
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench"];
 
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
@@ -376,6 +377,15 @@ public static class BotHand
 
             case "chart":
                 return Chart(tail);
+
+            case "nav":
+                return Nav(tail);
+
+            case "navcells":
+                return NavCells(tail);
+
+            case "navbench":
+                return NavBench(tail);
 
             case "peril":
                 return Peril(tail);
@@ -1818,6 +1828,315 @@ public static class BotHand
         return $"from {from} to {goal}: {points.Count} points, about {length} steps over the chart for "
             + $"{Math.Max(Math.Abs(goal.X - from.X), Math.Abs(goal.Y - from.Y))} straight, {BotChart.Expanded - expanded} nodes "
             + $"expanded in {took:F2}ms; first points {string.Join(" ", shown)}{(points.Count > 12 ? " …" : "")}; legs: {string.Join("; ", legs)}.";
+    }
+
+    private static string Nav(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length == 0)
+        {
+            return Server.Engines.Pathing.Tiered.NavigationService.Describe() + ".";
+        }
+
+        Map map;
+        Point3D from;
+        int gx;
+        int gy;
+
+        if (words.Length >= 3 && !int.TryParse(words[0], out _) && int.TryParse(words[^2], out gx) && int.TryParse(words[^1], out gy))
+        {
+            var who = Find(string.Join(' ', words[..^2]));
+
+            if (who?.Map == null || who.Map == Map.Internal)
+            {
+                Refused++;
+
+                return $"there is no bot called \"{string.Join(' ', words[..^2])}\" standing anywhere.";
+            }
+
+            map = who.Map;
+            from = who.Location;
+        }
+        else if (words.Length >= 4 && int.TryParse(words[0], out var x1) && int.TryParse(words[1], out var y1)
+            && int.TryParse(words[2], out gx) && int.TryParse(words[3], out gy))
+        {
+            map = BotPopulation.Home;
+
+            if (map == null || map == Map.Internal)
+            {
+                return "the population has no home map yet.";
+            }
+
+            from = BotStep.Settle(map, x1, y1, out var fz) ? new Point3D(x1, y1, fz) : new Point3D(x1, y1, map.GetAverageZ(x1, y1));
+        }
+        else
+        {
+            Refused++;
+
+            return "nav wants nothing, a bot and two numbers, or four numbers: nav | nav <bot> <x> <y> | nav <x1> <y1> <x2> <y2>.";
+        }
+
+        var goal = BotStep.Settle(map, gx, gy, out var gz) ? new Point3D(gx, gy, gz) : new Point3D(gx, gy, map.GetAverageZ(gx, gy));
+        var points = new List<Point3D>();
+        var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+        var status = Server.Engines.Pathing.Tiered.NavigationService.Route(map, from, goal, points);
+        var took = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        var planner = Server.Engines.Pathing.Tiered.NavigationService.Medium;
+
+        if (status != Server.Engines.Pathing.Tiered.NavStatus.Ok)
+        {
+            return $"from {from} to {goal}: {status}, cost {planner.LastCost}, {planner.LastExpanded} nodes expanded in {took:F2}ms"
+                + (status == Server.Engines.Pathing.Tiered.NavStatus.Unreachable
+                    ? $"; {Server.Engines.Pathing.Tiered.NavigationService.Explain(map, from, goal)}"
+                    : "")
+                + ".";
+        }
+
+        var legs = new List<string>();
+        var leg = from;
+        var plan = new List<Point3D>();
+
+        for (var i = 0; i < points.Count && i < 5; i++)
+        {
+            var l0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            var walked = BotPath.Find(map, leg, points[i], BotArrival.Within(1), plan);
+            var lms = (System.Diagnostics.Stopwatch.GetTimestamp() - l0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+            legs.Add($"to ({points[i].X},{points[i].Y},{points[i].Z}) {walked} in {lms:F1}ms");
+            leg = points[i];
+        }
+
+        var shown = new List<string>();
+
+        for (var i = 0; i < points.Count && i < 12; i++)
+        {
+            shown.Add($"({points[i].X},{points[i].Y},{points[i].Z})");
+        }
+
+        return $"from {from} to {goal}: {points.Count} points, cost {planner.LastCost} ({planner.LastCost / 100} steps) for "
+            + $"{Math.Max(Math.Abs(goal.X - from.X), Math.Abs(goal.Y - from.Y))} straight, {planner.LastExpanded} nodes expanded "
+            + $"in {took:F2}ms; first points {string.Join(" ", shown)}{(points.Count > 12 ? " \u2026" : "")}; legs: {string.Join("; ", legs)}.";
+    }
+
+    private static string NavCells(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var map = BotPopulation.Home;
+
+        if (map == null || words.Length < 2 || !int.TryParse(words[0], out var cx) || !int.TryParse(words[1], out var cy))
+        {
+            return "navcells wants x y and a radius.";
+        }
+
+        var r = words.Length > 2 && int.TryParse(words[2], out var rr) ? Math.Clamp(rr, 0, 30) : 8;
+        Span<sbyte> zs = stackalloc sbyte[16];
+        Span<sbyte> nz = stackalloc sbyte[16];
+        var steps = 0;
+        var dropped = 0;
+        var gaps = new Dictionary<int, int>();
+        var shown = new List<string>();
+        int[] dx = [0, 1, 1, 1, 0, -1, -1, -1];
+        int[] dy = [-1, -1, 0, 1, 1, 1, 0, -1];
+
+        for (var y = cy - r; y <= cy + r; y++)
+        {
+            for (var x = cx - r; x <= cx + r; x++)
+            {
+                var n = Server.Engines.Pathing.Cache.StepProbe.ComputeStandableSurfaceZs(map, x, y, zs);
+
+                for (var s = 0; s < n; s++)
+                {
+                    var mask = Server.Engines.Pathing.Cache.StepProbe.ComputeMaskAt(map, x, y, zs[s]);
+
+                    for (var d = 0; d < 8; d++)
+                    {
+                        if ((mask.WalkMask & (1 << d)) == 0)
+                        {
+                            continue;
+                        }
+
+                        steps++;
+
+                        var land = mask.GetWalkZ((Direction)d);
+                        var m = Server.Engines.Pathing.Cache.StepProbe.ComputeStandableSurfaceZs(map, x + dx[d], y + dy[d], nz);
+                        var best = int.MaxValue;
+
+                        for (var t = 0; t < m; t++)
+                        {
+                            best = Math.Min(best, Math.Abs(nz[t] - land));
+                        }
+
+                        if (best <= Server.Engines.Pathing.Tiered.NavWindow.MatchTolerance)
+                        {
+                            continue;
+                        }
+
+                        dropped++;
+
+                        var key = best == int.MaxValue ? -1 : best;
+
+                        gaps[key] = gaps.GetValueOrDefault(key) + 1;
+
+                        if (shown.Count < 8)
+                        {
+                            var list = new List<string>();
+
+                            for (var t = 0; t < m; t++)
+                            {
+                                list.Add(nz[t].ToString());
+                            }
+
+                            shown.Add($"({x},{y},{zs[s]}) {(Direction)d} lands at {land}, next cell stands at [{string.Join(",", list)}]");
+                        }
+                    }
+                }
+            }
+        }
+
+        var byGap = new List<string>();
+
+        foreach (var (gap, count) in gaps)
+        {
+            byGap.Add($"{(gap < 0 ? "no surface" : gap.ToString())}: {count}");
+        }
+
+        return $"within {r} of ({cx}, {cy}): {steps} steps the engine allows, {dropped} of them matching no surface of the next cell "
+            + $"within {Server.Engines.Pathing.Tiered.NavWindow.MatchTolerance} (by the gap: {string.Join(", ", byGap)}); "
+            + $"for example {string.Join("; ", shown)}.";
+    }
+
+    private static string NavBench(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var map = BotPopulation.Home;
+        var home = BotPopulation.Where;
+
+        if (map == null || map == Map.Internal)
+        {
+            return "the population has no home map yet.";
+        }
+
+        var n = words.Length > 0 && int.TryParse(words[0], out var nn) ? Math.Clamp(nn, 1, 2000) : 200;
+        var radius = words.Length > 1 && int.TryParse(words[1], out var rr) ? Math.Clamp(rr, 16, 2000) : 500;
+        var check = words.Length > 2 && int.TryParse(words[2], out var cc) ? Math.Clamp(cc, 0, 50) : 10;
+        var random = new System.Random(26092026);
+        var points = new List<Point3D>();
+        var plan = new List<Point3D>();
+        var times = new List<double>();
+        var counts = new Dictionary<Server.Engines.Pathing.Tiered.NavStatus, int>();
+        var longBefore = Server.Engines.Pathing.Tiered.NavigationService.LongRoutes;
+        var expandedBefore = Server.Engines.Pathing.Tiered.NavigationService.Medium.Expanded;
+        var checkedRoutes = 0;
+        var legsWalked = 0;
+        var legsFailed = 0;
+        var over = new List<double>();
+        var planned = 0;
+
+        for (var i = 0; i < n; i++)
+        {
+            Point3D a;
+            Point3D b;
+
+            if (!RandomStand(map, home, radius, random, out a) || !RandomStand(map, home, radius, random, out b))
+            {
+                continue;
+            }
+
+            var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            var status = Server.Engines.Pathing.Tiered.NavigationService.Route(map, a, b, points, 1);
+            var ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+            times.Add(ms);
+            counts[status] = counts.GetValueOrDefault(status) + 1;
+
+            if (status != Server.Engines.Pathing.Tiered.NavStatus.Ok || checkedRoutes >= check)
+            {
+                continue;
+            }
+
+            checkedRoutes++;
+
+            var cost = Server.Engines.Pathing.Tiered.NavigationService.Medium.LastCost / 100;
+            var leg = a;
+            var ok = true;
+
+            foreach (var point in points)
+            {
+                legsWalked++;
+
+                if (BotPath.Find(map, leg, point, BotArrival.Within(3), plan) != BotPathOutcome.Reached)
+                {
+                    legsFailed++;
+                    ok = false;
+                }
+
+                leg = point;
+            }
+
+            if (!ok)
+            {
+                continue;
+            }
+
+            if (BotPath.Find(map, a, b, BotArrival.Within(1), plan, default, BotPath.CeilingMs * 3) == BotPathOutcome.Reached && plan.Count > 0)
+            {
+                planned++;
+                over.Add((cost - plan.Count) / (double)plan.Count);
+            }
+        }
+
+        times.Sort();
+
+        var mean = times.Count > 0 ? times.Average() : 0.0;
+        var p95 = times.Count > 0 ? times[Math.Min(times.Count - 1, (int)(times.Count * 0.95))] : 0.0;
+        var worst = times.Count > 0 ? times[^1] : 0.0;
+        var statuses = new List<string>();
+
+        foreach (var (status, count) in counts)
+        {
+            statuses.Add($"{status} {count}");
+        }
+
+        over.Sort();
+
+        var overMean = over.Count > 0 ? over.Average() * 100 : 0.0;
+        var overP95 = over.Count > 0 ? over[Math.Min(over.Count - 1, (int)(over.Count * 0.95))] * 100 : 0.0;
+
+        return $"{times.Count} random routes within {radius} of home: {string.Join(", ", statuses)}; "
+            + $"{Server.Engines.Pathing.Tiered.NavigationService.LongRoutes - longBefore} handed to the long tier; "
+            + $"{mean:F2}ms a route on average, {p95:F2}ms at the 95th percentile, {worst:F2}ms at worst; "
+            + $"{Server.Engines.Pathing.Tiered.NavigationService.Medium.Expanded - expandedBefore} medium nodes expanded in all; "
+            + $"of {checkedRoutes} routes walked leg by leg, {legsWalked} legs and {legsFailed} the precise search could not walk; "
+            + $"{planned} also planned end to end by the precise search, the route {overMean:F1}% longer on average and "
+            + $"{overP95:F1}% at the 95th percentile.";
+    }
+
+    private static bool RandomStand(Map map, Point3D home, int radius, System.Random random, out Point3D at)
+    {
+        Span<sbyte> zs = stackalloc sbyte[16];
+
+        for (var tries = 0; tries < 50; tries++)
+        {
+            var x = home.X + random.Next(-radius, radius + 1);
+            var y = home.Y + random.Next(-radius, radius + 1);
+
+            if (x < 0 || y < 0 || x >= map.Width || y >= map.Height)
+            {
+                continue;
+            }
+
+            if (Server.Engines.Pathing.Cache.StepProbe.ComputeStandableSurfaceZs(map, x, y, zs) > 0)
+            {
+                at = new Point3D(x, y, zs[0]);
+
+                return true;
+            }
+        }
+
+        at = Point3D.Zero;
+
+        return false;
     }
 
     private static string Road(string tail)

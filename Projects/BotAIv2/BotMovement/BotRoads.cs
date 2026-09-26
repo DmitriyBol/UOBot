@@ -325,6 +325,8 @@ public static class BotRoads
         _map = map;
         _home = BotPopulation.Where;
 
+        Server.Engines.Pathing.Tiered.NavigationService.Prepare(map, _home);
+
         var reach = Math.Clamp(Reach, 16, 2000);
 
         _side = 2 * reach + 1;
