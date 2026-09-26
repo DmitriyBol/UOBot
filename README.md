@@ -2,47 +2,48 @@
 
 ## Work, and how much of it gets finished
 
-Every piece of work the bots took on, on the live shard on 26 September 2026 between 13:16 and 14:49 (builds 259–263:
-the world awake round the bots as round a player, and from 14:32 the two-level pathfinding chart). "Finished" is
-finished ÷ (finished + failed + dropped); dropped work is mostly work put down to run from a fight. Deaths are
-counted apart. The shard's target is 95 % finished.
-
-| Work | What it is | Taken on | Finished | Finished share | Died doing it |
-|---|---|---:|---:|---:|---:|
-| restock | buying what its class must carry — bandages, bottles, arrows, reagents, tools | 758 | 639 | 87 % | 9 |
-| flee | running from a fight it is losing | 443 | 223 | 62 % | 80 |
-| prowl | walking out to ground where there is something to fight | 424 | 355 | 86 % | 0 |
-| rescue | going to the help of a bot under attack | 310 | 194 | 64 % | 3 |
-| hunt | killing a creature for its loot and hide | 306 | 192 | 67 % | 6 |
-| mine | digging ore | 299 | 239 | 90 % | 8 |
-| ward | telling a stranger hunting the guild's land about the toll | 279 | 278 | 100 % | 0 |
-| rally | joining its guild's war company | 230 | 72 | 73 % | 52 |
-| peddle | selling goods to an NPC shopkeeper | 157 | 128 | 86 % | 1 |
-| mend | healing itself or another bot | 129 | 40 | 34 % | 8 |
-| unload | taking a full pack to a stall or a counter | 123 | 104 | 89 % | 0 |
-| cook | cooking meat at a fire | 109 | 87 | 88 % | 1 |
-| stake | standing on a square its guild is claiming | 99 | 32 | 67 % | 33 |
-| order | putting money down on the market for what it cannot make | 97 | 97 | 100 % | 0 |
-| herbs | picking reagents | 93 | 61 | 69 % | 3 |
-| acquire | buying off the market | 92 | 82 | 89 % | 0 |
-| reclaim | going back to its own corpse for its things | 85 | 56 | 68 % | 1 |
-| forage | picking up reagents lying about | 74 | 64 | 86 % | 0 |
-| glean | picking up its spent arrows | 72 | 62 | 89 % | 1 |
-| supply | stocking its guild's counter from the shops | 70 | 36 | 56 % | 2 |
-| forge | smithing weapons and armour | 56 | 53 | 95 % | 0 |
-| pickings | going through a corpse | 44 | 44 | 100 % | 0 |
-| chop | felling trees | 37 | 34 | 100 % | 1 |
-| harrow | a guild's or the Baron's company clearing a deadly square | 32 | 6 | 26 % | 0 |
-| brew | brewing potions | 29 | 20 | 83 % | 3 |
-| homeward | walking home | 29 | 22 | 79 % | 0 |
-| escort | seeing another bot safely somewhere | 23 | 15 | 94 % | 1 |
-| quarrel | fighting a member of a guild it is at war with | 16 | 1 | 7 % | 2 |
-| enlist | joining a Captain's company | 15 | 2 | 18 % | 0 |
-| sew | tailoring leather and cloth | 15 | 15 | 100 % | 0 |
-| fletch | making arrows and bows | 12 | 11 | 100 % | 1 |
-| evict | moving a stranger out of its guild's hall | 10 | 9 | 100 % | 0 |
-| other | ten rarer kinds: sweeps, house calls, bands, errands, scrolls, rescues from a cell, delves, scouting, plunder, skulking | 30 | 23 | 70 % | 3 |
-| **all work** | | **4,597** | **3,296** | **79 %** | **219** |
+| Work | What it is | Taken on | Finished | Finished share |
+|---|---|---:|---:|---:|
+| order | putting money down on the market for what it cannot make | 1,000 | 997 | 100 % |
+| restock | buying what its class must carry — bandages, bottles, arrows, reagents, tools | 1,000 | 882 | 88 % |
+| prowl | walking out to ground where there is something to fight | 1,000 | 878 | 88 % |
+| unload | taking a full pack to a stall or a counter | 1,000 | 893 | 89 % |
+| hunt | killing a creature for its loot and hide | 1,000 | 749 | 75 % |
+| mine | digging ore | 1,000 | 922 | 92 % |
+| flee | running from a fight it is losing | 1,000 | 602 | 60 % |
+| chop | felling trees | 1,000 | 980 | 98 % |
+| peddle | selling goods to an NPC shopkeeper | 1,000 | 927 | 93 % |
+| acquire | buying off the market | 845 | 813 | 96 % |
+| rescue | going to the help of a bot under attack | 821 | 594 | 72 % |
+| mend | healing itself or another bot | 746 | 338 | 45 % |
+| rally | joining its guild's war company | 639 | 194 | 30 % |
+| ward | telling a stranger hunting the guild's land about the toll | 609 | 609 | 100 % |
+| cook | cooking meat at a fire | 606 | 535 | 88 % |
+| forge | smithing weapons and armour | 584 | 566 | 97 % |
+| supply | stocking its guild's counter from the shops | 532 | 378 | 71 % |
+| herbs | picking reagents | 458 | 351 | 77 % |
+| pickings | going through a corpse | 429 | 410 | 96 % |
+| glean | picking up its spent arrows | 393 | 353 | 90 % |
+| sew | tailoring leather and cloth | 389 | 375 | 96 % |
+| brew | brewing potions | 325 | 269 | 83 % |
+| stake | standing on a square its guild is claiming | 307 | 126 | 41 % |
+| forage | picking up reagents lying about | 227 | 201 | 89 % |
+| delve | going down into a dungeon as a party | 144 | 54 | 38 % |
+| reclaim | going back to its own corpse for its things | 117 | 83 | 71 % |
+| homeward | walking home | 115 | 96 | 83 % |
+| inscribe | writing spell scrolls | 100 | 94 | 94 % |
+| quarrel | fighting a member of a guild it is at war with | 93 | 43 | 46 % |
+| evict | moving a stranger out of its guild's hall | 83 | 77 | 93 % |
+| fletch | making arrows and bows | 77 | 76 | 99 % |
+| band | calling a company together for something one bot cannot take | 64 | 62 | 97 % |
+| enlist | joining a Captain's company | 64 | 14 | 22 % |
+| escort | seeing another bot safely somewhere | 63 | 52 | 83 % |
+| tutor | teaching a class for a fee | 54 | 47 | 87 % |
+| harrow | a guild's or the Baron's company clearing a deadly square | 48 | 15 | 31 % |
+| scout | walking ground nobody has looked at | 24 | 24 | 100 % |
+| housecall | a healer going to a bot that sent for it | 23 | 21 | 91 % |
+| other | 11 rarer kinds: drill, remove, plunder, stroll, errand, liberate, drill-in, sweep, hall, hire, fit | 96 | 70 | 73 % |
+| **all work** | | **18,075** | **14,770** | **82 %** |
 
 ## Working on now — 26 September 2026
 
