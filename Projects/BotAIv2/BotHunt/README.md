@@ -37,6 +37,7 @@ The first work in the project that **brings new gold into the world**. Everythin
 | `BotSilence.cs` | the fence's chase after a witness it could not buy: cut it down inside thirty seconds or it tells (build 119) |
 | `BotHoleUp.cs` | the keeper with a price on its head going to the hideout and sitting it out, because nothing it could be doing instead survives a catch (build 139) |
 | `BotFetch.cs` | the fence's run out to the chest for the goods, after which the island's ordinary peddling turns them into coin (build 120) |
+| `BotBurgle.cs` | a bandit breaks into a guild's hall — hidden, the lock picked by skill — and carries off a share of the treasury (26.09.2026) |
 
 ---
 

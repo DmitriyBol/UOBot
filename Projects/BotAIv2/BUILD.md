@@ -115,10 +115,10 @@ ModernUO-fork\Projects\BotAIv2\BotModules\ ...
 The paths in the `.csproj` are relative and assume exactly that depth — the folder must sit **beside**
 `UOContent`, `Server` and `Logger`. One level deeper and every path needs another `..\`.
 
-**2. Apply the two engine patches** from the fork root, before building:
-`git apply Projects/BotAIv2/engine-patches/CraftItem-heat-source.patch` and
-`git apply Projects/BotAIv2/engine-patches/HarvestDefinition-said.patch`. The first is required to compile; the
-second lets a bot hear what the harvest system says about a swing. `INSTALL.md` describes both.
+**2. Apply the engine patches** from the fork root, before building: every file in
+`Projects/BotAIv2/engine-patches/` with `git apply` — `CraftItem-heat-source.patch`, `CraftItem-said.patch`,
+`HarvestDefinition-said.patch`, `Titles-skill-title.patch` and `DefInscription-knows.patch` (25.09.2026). Each file
+begins with what it changes and why; BotAIv2 uses every one of them, so none may be left out.
 
 **3. Add both projects to the solution** (needed if you run `dotnet build` from the root). In `ModernUO.slnx`,
 alphabetically among the others:

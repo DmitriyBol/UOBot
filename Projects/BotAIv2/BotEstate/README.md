@@ -80,6 +80,14 @@ design silently if it had gone the other way.
 | `BotClaimStore.cs` | keeps who owns which square across restarts — the one board on this shard that survives, because it was paid for |
 | `BotEstateConfig.cs` | what `Configuration/bot-estate.json` is allowed to say |
 | `BotEstateModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Population` |
+| `BotToll.cs` | the toll on hunting a guild's land: posted (10% of a stranger's hunting coin) or patrolled (20%, once told), who pays, and the price it puts on hunting there (26.09.2026) |
+| `BotTollman.cs` | sends a fighter of a patrolling guild to a stranger hunting its land |
+| `BotWard.cs` | the tollman's walk and the sentence that makes the toll owed |
+| `BotHallKind.cs` | the four sizes of hall (small, sandstone patio, large patio, large marble), the members each holds and what each costs (26.09.2026) |
+| `BotEnlarge.cs` | a guild that has nearly filled its hall moves into the next size up, benches and counter carried across |
+| `BotOutpost.cs` | a guild's second house on its far land: a place to rise nearer the hunting, and a yard for the toll (26.09.2026) |
+| `BotAbode.cs` | houses of the population's own, bought by a bot that has done well, found again by the sign at every boot (26.09.2026) |
+| `BotRepose.cs` | a bored bot with a house goes home for a while: boredom falls, spare armour goes in the chest |
 
 ## Where a hall may not go, and what "inside" means
 

@@ -169,6 +169,9 @@ Holds the subsystems, works out what order to start them in, starts them, and sa
 |---|---|
 | `BotBeat.cs` | The population's clock. |
 | `BotCharter.cs` | What a guild's maker has told the guild to be doing: a trade to gather at, a trade to make at, and somewhere to be. |
+| `BotGrowth.cs` | Newcomers: a couple of novices raised every two hours, so the island has old hands and beginners at once. |
+| `BotGrowthStore.cs` | Keeps the newcomers across restarts. |
+| `BotGuildWidenStore.cs` | Keeps the guilds' widenings across restarts. |
 | `BotGuilds.cs` | Who each bot belongs to, and what that belonging is worth. |
 | `BotHomeward.cs` | Walking back to where the population lives, when there is nothing else to do and the bot is a long way from it. |
 | `BotMobile.cs` | An autonomous inhabitant of the shard. |
@@ -178,6 +181,8 @@ Holds the subsystems, works out what order to start them in, starts them, and sa
 | `BotProgress.cs` | What a bot has become, kept across restarts: its skills, its fame, its karma and its savings. |
 | `BotPurse.cs` | What a bot keeps in its pocket, and what it puts away the moment it is standing somewhere it can. |
 | `BotReclaim.cs` | Going back for what death took. |
+| `BotRest.cs` | How long a bot plays before it is tired, and the rest it takes before it plays again. |
+| `BotRestStore.cs` | Keeps every bot's play and rest across restarts. |
 | `BotRoster.cs` | Who a guild's leader may put out and who it may take in, and how often. |
 | `BotStall.cs` | Notices a bot that has stopped getting anywhere, and says so as an error. |
 | `BotTidy.cs` | What a bot carries and wears, kept in order: an unidentified thing is identified — off a corpse, in the pack or worn — and the robe the engine dresses a risen body in is taken off. |
@@ -228,6 +233,7 @@ Getting a bot from where it is to where the work is. The most expensive part of 
 | `BotAvoid.cs` | Ground a single plan is to keep out of. |
 | `BotBarred.cs` | Ground the population is never to want, however attractive whatever is standing on it. |
 | `BotErrand.cs` | One thing a bot is trying to get to. |
+| `BotFooting.cs` | Tiles a walk has proved nobody can stand at, kept for everybody for half an hour. |
 | `BotJourney.cs` | What a bot is trying to get to, what it has put aside to do first, and the plan it is walking now. |
 | `BotMovementConfig.cs` | What Configuration/bot-movement.json is allowed to say. |
 | `BotMovementModule.cs` | Movement as a module: reads its numbers, lets the population walk, and puts its counters back on a world reload. |
@@ -286,6 +292,7 @@ Turns a class's kit into items actually in a pack, decides what death has no rig
 | `BotBond.cs` | What one bot was given, and therefore what death may not take from it. |
 | `BotBrawlerGloves.cs` | The gloves a brawler fights in. |
 | `BotCasterStaff.cs` | The staff a caster leans on. |
+| `BotChampionSteed.cs` | A champion's steed: a mount of a kind no stable sells, won in the championship. |
 | `BotHarness.cs` | What a bot ought to be wearing, worked out from what this shard can actually make and what it costs. |
 | `BotOutfit.cs` | Turns a class's kit into things a bot is actually holding. |
 | `BotStable.cs` | Buying a horse, and calling it up. |
@@ -334,6 +341,7 @@ Five trades that make things: the smith at a forge, the tailor out of leather or
 | `BotFletcher` | Fletcher | Free | `BotFletch` |
 | `BotSmith` | Smith | Free | `BotForge` |
 | `BotTailor` | Tailor | Free | `BotSew` |
+| `BotTutor` | Tutor | Free | — |
 
 - **Trap.** Crafting is asynchronous: `CraftItem.Craft` starts a timer. Count what the *last* swing produced at the top of the next tick, never after the swing you just made.
 - **Trap.** The engine refuses in silence, because it answers a refusal by sending a message to a screen the bot does not have. Requirements live on the *recipe* (`SetNeedHeat`, `SetNeedOven`, `SetNeedMill`), not on the system's `CanCraft`.
@@ -361,6 +369,7 @@ Five trades that make things: the smith at a forge, the tailor out of leather or
 | `BotSmith.cs` | Offers a bot with a hammer and some metal a turn at an anvil, and offers it the board's orders first. |
 | `BotTailor.cs` | Offers the needle to anybody carrying a sewing kit. |
 | `BotThread.cs` | Sewing: what can be made out of cloth, and the swing that makes it. |
+| `BotTutor.cs` | The first steps of a trade, bought from a shopkeeper who knows it — the engine's own teaching, paid for in gold. |
 
 ### `BotHunt/` — the only new gold in the world
 
@@ -380,6 +389,7 @@ Everything else on this shard moves money about; this brings it in. Choosing wha
 | `BotAmbush.cs` | The blow struck out of hiding: three swings' worth in one, and the victim stunned where it stands. |
 | `BotBand.cs` | Calling a company together for something one bot cannot take, and seeing it through. |
 | `BotBarrier.cs` | Where walks have stopped getting any nearer, and which way they were heading, so the hunt stops throwing darts past those places. |
+| `BotBurgle.cs` | A bandit breaks into a guild's hall: creeps up hidden, picks the lock of the guild's chest, and carries off a share of what the guild has put by. |
 | `BotFence.cs` | The band's fence: the one member of The Shadow who commits no crime, and keeps its goods and its errands. |
 | `BotFetch.cs` | The fence's run out to the chest for the band's goods. |
 | `BotFreedom.cs` | Getting a prisoner out of a camp and home again. |
@@ -626,6 +636,26 @@ Five bots taken underground by the maker of their guild, for twenty minutes or t
 | `BotDungeon.cs` | The dungeons of this era: where each one is, what rooms it has, and how hard it is. |
 | `BotHalls.cs` | Which rooms of a dungeon can actually be walked between, found by walking between them. |
 
+### `BotProving/` — Argus's proving ground
+
+A bot's double against a creature in Green Acres, and a guild's company of doubles against a dungeon's worst room: the engine fights, the doubles answer with the bots' own hands, and what comes of it is the strength the delve judges a band by instead of health times weapon damage. Patrick's order of 26.09.2026.
+
+**Module** `BotProvingModule` · **Config** `bot-proving.json` · **Writes** `Proving:`
+
+- **Trap.** A walkover is a lower bound, not a measurement: R is capped at 5 and nothing measured on a lower rung is carried up the ladder at more than the creature it beat, times 0.75. The first boot extrapolated an orcish mage beaten at R 20 into a Balron beaten at R 1.4.
+- **Trap.** A band is as far as its weakest member goes, and a room is not its worst creature one at a time: the delve counts the leader, wants every member at a fifth of the worst, and past the easiest dungeon wants the guild's company to have cleared the worst room lately.
+
+| file | decides |
+|---|---|
+| `BotDriver.cs` | One double's hands in a fight: the bot's own reflexes, beat by beat, against whatever it is set on. |
+| `BotProving.cs` | Argus's proving ground in Green Acres: who is fought against what, what each fight measured, and the strength a bot is judged by once it has been measured. |
+| `BotProvingModule.cs` | What Configuration/bot-proving.json may say. |
+| `BotProvingStore.cs` | Keeps what the proving ground has measured across restarts. |
+| `BotRoomTrial.cs` | A guild's company of doubles against a dungeon's worst room, on the proving ground: whether the band clears it, what it cost, and who fell. |
+| `BotStandIn.cs` | A bot's double for one fight on the proving ground: the same body, build, skills and kit, and nothing that makes it one of the population. |
+| `BotTrial.cs` | What a bot is built of, as far as a fight is concerned: enough to say whether a measurement made last hour still describes it. |
+| `BotWake.cs` | Wakes the ground round the bots the way the engine wakes it round a player. |
+
 ### `BotEstate/` — the guilds' halls
 
 The one thing this population builds that outlives it. A guild levies its members, finds ground the engine will take a house on, raises a hall, and fits it out with the tools of its own trade. Next start the halls are read back out of the world by the name on their signs and handed to whoever leads that guild now.
@@ -641,18 +671,21 @@ The one thing this population builds that outlives it. A guild levies its member
 | `BotReeve` | Reeve | Free | `BotHarrow` |
 | `BotSteward` | steward | Free | `BotHall` |
 | `BotSupplier` | supplier | Free | `BotSupply` |
+| `BotTollman` | tollman | Free | `BotWard` |
 
 - **Trap.** A house is permanent and a population is not, so an unowned hall decays: `BotEstate.Adopt` is the only thing standing between an evening's building and an empty ruin.
 - **Trap.** The price is a dial rather than the engine's 35,250gp, which no bot on this shard could ever reach. Watch the `short` clause in the summary before moving it.
 
 | file | decides |
 |---|---|
+| `BotAbode.cs` | Houses of the population's own: a bot that has done well buys one, spends its leisure there, and keeps its belongings in a chest by the wall. |
 | `BotBailiff.cs` | Whether anybody is standing on this guild's land who should not be, and who is going to say so. |
 | `BotBench.cs` | Buying one workbench for the guild's hall and setting it up. |
 | `BotChest.cs` | The guild's chest: what the guild's ground earns, and what it pays for before any member's pack is asked. |
 | `BotChestStore.cs` | Keeps the guilds' chests across restarts. |
 | `BotClaim.cs` | What a guild has claimed of the island itself, square by square, and how a claim is won. |
 | `BotClaimStore.cs` | Keeps who owns which square of the island across restarts. |
+| `BotEnlarge.cs` | Moves a guild out of the hall it has filled and into the next size up: new ground proved, the price levied, the old hall taken down with its counter and benches carried across, the bigger one raised. |
 | `BotEstate.cs` | The halls the guilds own: where they stand, who paid for them, and what they hold. |
 | `BotEstateConfig.cs` | What Configuration/bot-estate.json is allowed to say. |
 | `BotEstateModule.cs` | The guilds' halls, as a module. |
@@ -663,24 +696,30 @@ The one thing this population builds that outlives it. A guild levies its member
 | `BotFitter.cs` | Who decides the guild can afford its next workbench, and sends somebody to fetch it. |
 | `BotFittings.cs` | What goes inside a hall: a chest, and the guild's own tools of the trade. |
 | `BotHall.cs` | Raising the guild's hall: walk to the plot, call the levy, put the house up. |
+| `BotHallKind.cs` | The sizes a guild's hall comes in, smallest first: what each is, how many members it holds, and what it costs. |
 | `BotHire.cs` | Hiring a merchant for the guild's hall: buy the contract in town, walk it home, and set the shopkeeper up. |
 | `BotHirer.cs` | Whether the guild wants a merchant in its hall, can pay for one, and who is going to fetch it. |
 | `BotHold.cs` | Standing in a square your guild has laid claim to, for as long as the claim takes. |
 | `BotLand.cs` | The ground round a guild's hall, and what belonging to a guild does to work done on it. |
 | `BotOffice.cs` | One guild, one officer, one errand at a time — and the difference between having been offered an errand and actually being on one. |
+| `BotOutpost.cs` | A guild's second house, out on the far edge of its land: where its members rise when they fall nearer to it than to the hall, and a yard of the guild's own out there — land the toll can be charged on. |
 | `BotPlot.cs` | Finding ground a house will actually stand on. |
 | `BotQuarrel.cs` | Closing with a member of a guild yours is at war with, and fighting them. |
 | `BotRally.cs` | Falling in with the guild's war company and fighting with it, as a company, until the company is done. |
 | `BotReeve.cs` | The guild's own company for the guild's own ground. |
 | `BotRegard.cs` | What one guild thinks of another, and the two thresholds that turn an opinion into a war. |
 | `BotRemove.cs` | Carrying a beaten guild's hall out of the winner's yard and putting it down again. |
+| `BotRepose.cs` | Offers a bored bot with a house of its own the walk home, to pass some time there. |
 | `BotSeat.cs` | Where each guild lives: the point its hall is raised near, its members are born at and rise again at, and the place "home" means to them. |
 | `BotShelf.cs` | The guild's own counter: finding the merchant in the hall, putting goods on it, buying off it, and carrying its takings back to the guild. |
 | `BotSteward.cs` | Who decides the guild can afford a hall, and offers to go and raise one. |
 | `BotSupplier.cs` | Whether the guild's counter is short of something its members keep running out of, and who is going to fetch it. |
 | `BotSupply.cs` | Fetching a batch of something the population keeps running out of and leaving it on the guild's own counter, so that the other nine members do not each walk to Britain for it. |
+| `BotToll.cs` | How a guild charges strangers for hunting its land. |
+| `BotTollman.cs` | Sends a fighter of a patrolling guild to a stranger hunting the guild's land, to tell it the hunting there is tolled. |
 | `BotWar.cs` | The wars themselves: which pairs are fighting, what each side has taken off the other, and the rules that begin, end and forbid one. |
 | `BotWarStore.cs` | Keeps the war ledger across restarts: the wars standing, with their clocks, kills and plunder; the truces and the once-a-day declaration clocks; and the halls a lost war still owes a move. |
+| `BotWard.cs` | A warden's walk to a stranger hunting the guild's land, and the sentence that makes the toll owed. |
 
 ### `BotQuest/` — the board of errands
 

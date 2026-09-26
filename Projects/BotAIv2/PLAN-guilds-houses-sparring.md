@@ -1,126 +1,126 @@
-# Гильдии, дома и спарринг — проект
+# Guilds, houses and sparring — a plan
 
-Заказ Патрика от 08.09.2026: гильдии для сплочения; покупка домов с сундуками и станками; спарринг ради
-Anatomy и Healing — **и боты не должны становиться серыми**, потому что серый бот это лёгкая добыча и
-цель для городской стражи.
+Patrick's order of 08.09.2026: guilds to bind the bots together; houses bought with chests and workbenches in them;
+sparring for Anatomy and Healing — **and no bot may turn grey**, because a grey bot is easy prey and a target for the
+town guards.
 
-Три заказа связаны одним узлом движка, и его надо назвать первым.
+The three orders are tied by one knot in the engine, and it has to be named first.
 
 ---
 
-## Узел: серым делает удар по невиновному, и обойти это можно только войной гильдий
+## The knot: a blow against an innocent is what turns a bot grey, and only a guild war gets round it
 
-`Projects/UOContent/Misc/Notoriety.cs` решает, кого можно бить безнаказанно. Проверены три пути:
+`Projects/UOContent/Misc/Notoriety.cs` decides who may be struck with impunity. Three roads were checked:
 
-| путь | вердикт |
+| road | verdict |
 |---|---|
-| `CheckHouseFlag` — «драка в своём доме» | **не подходит.** Разрешает бить только того, кто **не** друг дома (строка 534: если `m` друг дома — false). Двое наших в общем доме остаются защищены друг от друга. |
-| одна гильдия | **не подходит.** `sourceGuild == targetGuild` → `Notoriety.Ally`, удар делает криминальным. |
-| **война гильдий** | **работает.** `sourceGuild.IsEnemy(targetGuild)` → `Notoriety.Enemy`, законная цель, флага нет, стража не вмешивается. |
+| `CheckHouseFlag` — "a fight in one's own house" | **does not fit.** It allows striking only somebody who is **not** a friend of the house (line 534: if `m` is a friend of the house — false). Two of ours sharing a house stay protected from each other. |
+| one guild | **does not fit.** `sourceGuild == targetGuild` → `Notoriety.Ally`, and the blow is criminal. |
+| **a guild war** | **works.** `sourceGuild.IsEnemy(targetGuild)` → `Notoriety.Enemy`, a lawful target, no flag, the guards stay out. |
 
-**Но война гильдий действует по всему острову, а не в доме.** Объявить войну между двумя большими
-гильдиями — значит получить резню в поле и на рынке.
+**But a guild war holds across the whole island, not in a house.** Declaring war between two large guilds means a
+massacre in the fields and in the market.
 
-**Решение: спарринг-пары.** На время тренировки два бота выходят из своих гильдий в две крошечные
-гильдии-однодневки, между которыми объявлена война. Дерутся только они двое; для всех остальных ничего не
-меняется. По окончании — распустить обе, вернуть бойцов домой.
+**The answer: sparring pairs.** For a training bout two bots leave their guilds for two tiny one-day guilds at war with
+each other. Only the two of them fight; nothing changes for anybody else. When it ends, both guilds are disbanded and
+the fighters go home.
 
 ---
 
-## Этап 1. Гильдии
+## Stage 1. Guilds
 
-**Что даёт.** Тег над головой (видно глазами), `Notoriety.Ally` между своими, основа для этапа 3.
+**What it gives.** A tag over the head (visible to the eye), `Notoriety.Ally` between members, the ground for stage 3.
 
-**Устройство.** `new Guild(leader, name, abbreviation)` из `Projects/UOContent/Misc/Guild.cs`;
-`AddMember`, `Members`, `Enemies`, `IsEnemy`.
+**How.** `new Guild(leader, name, abbreviation)` from `Projects/UOContent/Misc/Guild.cs`; `AddMember`, `Members`,
+`Enemies`, `IsEnemy`.
 
-**Сколько и по какому признаку.** По ремеслу, а не случайно — гильдия должна что-то значить:
+**How many, and by what.** By trade, not at random — a guild has to mean something:
 
-- **Молот** (`HAM`) — кузнец, шахтёр, архитектор
-- **Игла** (`NDL`) — портной, повар, алхимик, писец
-- **Клинок** (`BLD`) — воин, лучник, маг, лекарь, брави
-- **Корона** (`CRN`) — капитан, барон, наблюдатель
+- **The Hammer** (`HAM`) — smith, miner, architect
+- **The Needle** (`NDL`) — tailor, cook, alchemist, scribe
+- **The Blade** (`BLD`) — warrior, archer, mage, healer, bravo
+- **The Crown** (`CRN`) — captain, baron, watcher
 
-**Что меняется в поведении** (по одному шву каждое, все с бирками):
+**What changes in behaviour** (one seam each, every one counted):
 
-1. `BotRescuer` — на крик своего по гильдии цена выше: помощь внутри гильдии приоритетнее.
-2. `BotMuster` — рота собирается из своих, если хватает; чужие добираются, когда не хватает.
-3. `BotSpoils` — добыча делится внутри гильдии щедрее.
+1. `BotRescuer` — a guildmate's cry is worth more: help inside the guild comes first.
+2. `BotMuster` — a company is raised from guildmates when there are enough; others are taken on when there are not.
+3. `BotSpoils` — the spoils are shared more generously inside the guild.
 
-**Риск.** Гильдия не должна дробить популяцию: если рота может собираться только из своих, вернётся
-дефект «рядом нет наших». Поэтому гильдия — **предпочтение, а не условие** (множитель, не вето; см.
+**The risk.** A guild must not split the population: if a company could be raised only from guildmates, the defect
+"none of ours nearby" would come back. So the guild is **a preference, not a condition** (a factor, not a veto; see
 `factor-without-a-floor-is-a-veto`).
 
 ---
 
-## Этап 2. Дома
+## Stage 2. Houses
 
-**Что даёт.** Своё хранилище вместо банка, место для станков, площадка для спарринга.
+**What it gives.** Storage of its own instead of the bank, room for workbenches, a floor for sparring.
 
-**Устройство.** `Projects/UOContent/Multis/HouseDeed.cs` → `BaseHouse`. Бот покупает деед у зодчего
-(`Architect` NPC торгует ими), ставит дом на свободной земле, кладёт внутрь сундук.
+**How.** `Projects/UOContent/Multis/HouseDeed.cs` → `BaseHouse`. A bot buys a deed from an architect (the `Architect`
+NPC sells them), places the house on free ground and puts a chest inside.
 
-**Порядок работ:**
+**The order of work:**
 
-1. `BotEstate` — реестр домов популяции: кто владелец, где стоит, что внутри.
-2. `BotSteward` (проповедник) — предлагает «купить дом», когда у бота хватает денег и дома нет.
-3. `BotHomestead` (дело) — купить деед, дойти до места, поставить, внести сундук.
-4. Хранение: `BotUnload` предпочитает свой сундук банку, когда дом есть и он ближе.
+1. `BotEstate` — the population's register of houses: who owns it, where it stands, what is inside.
+2. `BotSteward` (a proposer) — offers "buy a house" when a bot has the money and no house.
+3. `BotHomestead` (a deed) — buy the deed, walk to the place, place the house, bring in the chest.
+4. Storage: `BotUnload` prefers its own chest to the bank when there is a house and it is nearer.
 
-**Где ставить.** Не наугад: `BaseHouse.FindHouseAt` и правила размещения движка откажут в занятом месте.
-Нужен поиск свободного пятна рядом с домом популяции — задача того же рода, что `BotStep.Settle`, и её
-надо решать через уже существующий `BotQuad.Trodden`, иначе дом встанет там, куда никто не ходит.
+**Where to place it.** Not at random: `BaseHouse.FindHouseAt` and the engine's placement rules refuse occupied ground.
+A search for a free patch near the population's home is needed — the same kind of problem as `BotStep.Settle` — and it
+has to go through the existing `BotQuad.Trodden`, or the house will stand where nobody walks.
 
-**Риск.** Дом — вечный объект в мире, который переживёт эксперименты. Ставить только с явной пометкой
-владельца и уметь снести все дома популяции одной командой Аргуса (`do raze`), иначе остров зарастёт.
-
----
-
-## Этап 3. Станки в доме
-
-`ForgeAddon`, `AnvilAddon`, `Loom`, `SpinningWheel`, `Oven` — обычные аддоны, продаются деедами.
-Поставленный в доме станок делает дом мастерской: `BotGround` уже ищет огни и наковальни
-пространственным запросом, поэтому **никакого нового кода для «дом стал кузницей» не нужно** — свип
-найдёт их сам. Это самая дешёвая часть заказа и самая приятная: экономика подхватит её без правок.
-
-Единственное, что нужно: свип должен добраться до дома. Дом рядом с популяцией — добирается.
+**The risk.** A house is a permanent object in the world and will outlive the experiments. Place one only with an
+explicit owner's mark, and be able to raze every house of the population with one word to Argus (`do raze`), or the
+island will be overgrown.
 
 ---
 
-## Этап 4. Спарринг
+## Stage 3. Workbenches in the house
 
-**Условия входа:** оба бота здоровы, свободны, стоят в доме одного из них, оба ниже цели по Anatomy или
-Healing, и никто из них не в роте.
+`ForgeAddon`, `AnvilAddon`, `Loom`, `SpinningWheel`, `Oven` are ordinary addons, sold as deeds. A workbench placed in a
+house makes the house a workshop: `BotGround` already finds fires and anvils with a spatial query, so **no new code is
+needed for "the house became a smithy"** — the sweep will find them by itself. This is the cheapest part of the order
+and the most pleasing one: the economy will take it up without a change.
 
-**Ход:**
+The one thing needed: the sweep has to reach the house. A house near the population is reached.
 
-1. Обоих вывести в парные гильдии-однодневки, объявить войну (см. узел выше).
-2. Драться до `SparSpare` (например, 40 % здоровья) — не до смерти.
-3. Разойтись, объявить мир, распустить гильдии, вернуть в родные.
-4. **Лечить друг друга бинтами** — вот где растут Anatomy и Healing, а не в самих ударах.
+---
 
-**Почему лечение и есть цель.** Anatomy растёт от применения, Healing — от бинтования раненого. Драка
-здесь только способ получить рану, которую можно вылечить. Значит успех спарринга измеряется **не** числом
-ударов, а приростом навыка — и это то, что должно попасть в счётчики.
+## Stage 4. Sparring
 
-**Риски, каждый со своим предохранителем:**
+**Conditions to begin:** both bots healthy and free, standing in the house of one of them, both below their aim in
+Anatomy or Healing, and neither of them in a company.
 
-| риск | предохранитель |
+**The bout:**
+
+1. Move both into paired one-day guilds and declare war (see the knot above).
+2. Fight down to `SparSpare` (say, 40% health) — not to the death.
+3. Part, declare peace, disband the guilds, send both back to their own.
+4. **Heal each other with bandages** — this is where Anatomy and Healing grow, not in the blows themselves.
+
+**Why the healing is the point.** Anatomy grows with use, Healing with bandaging somebody wounded. The fight here is
+only a way to get a wound that can be healed. So the success of a bout is measured **not** by the number of blows but
+by the skill gained — and that is what has to go into the counters.
+
+**The risks, each with its own safeguard:**
+
+| risk | safeguard |
 |---|---|
-| убили друг друга | порог выхода по здоровью + `BotSlay.FleeAt` уже существует |
-| война не распустилась, резня по острову | распускать по таймеру, а не по событию; при перезагрузке мира — чистить все спарринг-гильдии |
-| спарринг вместо работы | цена спарринга низкая, как у `stroll`; он выигрывает только когда делать нечего |
-| стража | дом приватный, стражи внутри нет; но проверить, что дом **не** в городской зоне |
+| they kill each other | a health threshold to stop at + `BotSlay.FleeAt`, which already exists |
+| the war is not disbanded, a massacre across the island | disband on a timer, not on an event; on a world restart, clear every sparring guild |
+| sparring instead of work | sparring is priced low, like `stroll`; it wins only when there is nothing to do |
+| the guards | a private house has no guards inside; but check that the house is **not** inside a town's zone |
 
 ---
 
-## Порядок и цена
+## Order and cost
 
-1. **Гильдии** — небольшой объём, немедленный эффект, нужны для этапа 4.
-2. **Дома** — самый большой кусок, но он же даёт хранилище и мастерские.
-3. **Станки** — почти бесплатно, экономика подхватит сама.
-4. **Спарринг** — требует 1 и 2, и его стоит делать последним, потому что он единственный, кто трогает
-   войну гильдий.
+1. **Guilds** — small, with an immediate effect, needed for stage 4.
+2. **Houses** — the largest piece, but it is also what gives storage and workshops.
+3. **Workbenches** — nearly free; the economy will take them up by itself.
+4. **Sparring** — needs 1 and 2, and is best done last, because it is the only one that touches guild wars.
 
-**Что проверять после каждого этапа:** доля серых (`Criminal`) и убийств между своими — обе должны
-остаться нулём. Это главный признак того, что узел решён правильно.
+**What to check after every stage:** the share of grey bots (`Criminal`) and of kills between our own — both must stay
+at nought. That is the main sign the knot was solved correctly.
