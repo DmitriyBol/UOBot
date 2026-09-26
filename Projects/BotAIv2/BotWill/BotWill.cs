@@ -739,6 +739,13 @@ public static class BotWill
                 {
                     var away = journey.RoadLeft(walker.Location, doing.Where);
 
+                    if (resolve.RouteStamp != journey.RouteStamp)
+                    {
+                        resolve.RouteStamp = journey.RouteStamp;
+                        resolve.Nearest = int.MaxValue;
+                        resolve.Trudged = 0;
+                    }
+
                     if (resolve.Started < 0)
                     {
                         resolve.Started = away;

@@ -34,6 +34,8 @@ public sealed class BotResolve
 
     public int Nearest { get; internal set; } = int.MaxValue;
 
+    public int RouteStamp { get; internal set; } = -1;
+
     public int Trudged { get; internal set; }
 
     public int Started { get; internal set; } = -1;

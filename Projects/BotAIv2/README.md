@@ -49,14 +49,16 @@
 
 - **Pathfinding in tiers.** A bot's walk was one search from where it stood, cut off after 60 to 150 ms. It could not
   see a way round longer than that, such as a river whose bridge is a thousand steps off, and 38 % of searches ended
-  short. Since build 263 a coarse chart does the far part. The chart is a grid of 16-tile squares with the gates
-  between them, drawn in 0.3 s of the game loop at boot. It routes every walk longer than 24 tiles, and the search
-  only walks the next short leg. In the first ten minutes path search cost nine times less (1.35 s a minute against
-  12.5), and 7 % of searches ended short. Now being built into the engine: the full three-tier navigation, so that
-  creatures can use it too.
-  - **Short:** the precise tile search.
-  - **Medium:** hierarchical A* over the chart, with floors and bridges kept apart.
-  - **Long:** 128-tile regions, dungeon teleporters and a route cache.
+  short. The engine now has three tiers of navigation, and the bots walk by them:
+  - **Short:** the precise tile search. It now walks only the next leg of a route, about 24 tiles.
+  - **Medium:** hierarchical A* over a graph of 16-tile clusters and the gates between them, with floors and bridges
+    kept apart. The graph of the whole map is drawn in slices of the game loop at boot and kept on disk between boots.
+  - **Long:** 128-tile regions. When a route is too long for the medium tier, a search over the regions gives it a
+    corridor to work in.
+
+  Now 1.3 % of searches end short. A route over the graph takes 2 ms on average and 7 ms for one route in twenty, and
+  it is 9 % longer than the route the precise search would walk. Still to come: dungeon teleporters and moongates in
+  the long tier, and creatures walking by it too.
 - **The world awake.** Creatures act only near a player's client. Bots have none, so the island slept round them, and
   the shard's balance had been tuned against sleeping creatures. Each bot now wakes the ground round it as a client
   would.
@@ -83,8 +85,9 @@ On every turn each bot prices every piece of work the shard can offer it, takes 
 done or something actually happens. The prices are learned from what the work really paid, so a trade that stops
 paying stops being chosen without anybody editing a number.
 
-The bots are a separate assembly that ModernUO loads beside its own content. The engine itself changes in four
-files, through the small patches in `Projects/BotAIv2/engine-patches/`.
+The bots are a separate assembly that ModernUO loads beside its own content. The engine itself changes in six files,
+through the small patches in `Projects/BotAIv2/engine-patches/`, and gains the tiered navigation the bots walk by, in
+`Projects/UOContent/Engines/Pathing/Tiered/`.
 
 ### What the bots do
 
@@ -178,6 +181,10 @@ The documents live in `Projects/BotAIv2/`:
 | `MAP.md` | where anything is, file by file |
 | `DIALS.md` | every tunable number and the config key that reaches it |
 | `DECISIONS.md` | what was decided and tried, and the defects that keep coming back |
+
+The research behind the design is in [`docs/investigation/`](docs/investigation/): how strong a bot really is, how
+it finds its way, how its money moves, and how it weighs one piece of work against another. Each study has its data,
+the script that reproduces its numbers and a page that draws them.
 
 New work is written in the fork, [DmitriyBol/ModernUO-fork](https://github.com/DmitriyBol/ModernUO-fork), and comes
 here after it has run on a live shard. The paths here match the paths there. The code in this repository keeps only

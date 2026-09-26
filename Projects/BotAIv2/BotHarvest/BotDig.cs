@@ -92,6 +92,8 @@ public sealed class BotDig : BotDeed
 
     private int _nearest = int.MaxValue;
 
+    private int _routeStamp = -1;
+
     private int _setOut;
 
     private int _stalled;
@@ -297,6 +299,18 @@ public sealed class BotDig : BotDeed
             BotGround.Working(body, _seam.Where);
 
             var gap = System.Math.Max(System.Math.Abs(body.X - _seam.Where.X), System.Math.Abs(body.Y - _seam.Where.Y));
+
+            if (body is BotMobile { Journey: { } journey })
+            {
+                gap = journey.RoadLeft(body.Location, _seam.Where);
+
+                if (_routeStamp != journey.RouteStamp)
+                {
+                    _routeStamp = journey.RouteStamp;
+                    _nearest = int.MaxValue;
+                    _stalled = 0;
+                }
+            }
 
             if (_nearest == int.MaxValue)
             {
