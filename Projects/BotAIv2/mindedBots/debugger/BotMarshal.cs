@@ -306,7 +306,7 @@ public static class BotMarshal
             var can = what switch
             {
                 "revel" or "camp" => !BotRevel.Running,
-                "tourney" => BotTourney.Running && !BotTourney.InProgress,
+                "tourney" => BotTourney.Ready,
                 "errand" => paid && BotQuests.Running,
                 "order" => BotCity.Running && Stalls(1).Count > 0,
                 "bounty" => paid,

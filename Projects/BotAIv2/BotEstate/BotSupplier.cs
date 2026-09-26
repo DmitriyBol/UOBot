@@ -101,6 +101,8 @@ public sealed class BotSupplier : IBotProposer
 
     public static long Laden { get; private set; }
 
+    public static long Below { get; private set; }
+
     public static long Trimmed { get; private set; }
 
     public static long Spared { get; private set; }
@@ -137,6 +139,13 @@ public sealed class BotSupplier : IBotProposer
         }
 
         Asked++;
+
+        if (BotDungeon.Under(body.Location))
+        {
+            Below++;
+
+            return null;
+        }
 
         if (BotLadder.Load(body) >= BotLadder.Ceiling(body))
         {
@@ -288,7 +297,7 @@ public sealed class BotSupplier : IBotProposer
             : $"the supplier looked {Asked} times and sent {Offered}: {Shopless} guilds had no counter, {Claimed} already had somebody on it, "
               + $"{Stocked} shelves held enough, {Unsold} wanted what nobody within reach sells, {Wanting} could not raise a batch"
               + (Wanting > 0 ? $" (the best-off had {Nearest}gp free and was {Short} short)" : "")
-              + $", {Unmeasured} asked before the population had run short of anything, {Laden} could not have carried it, "
+              + $", {Unmeasured} asked before the population had run short of anything, {Laden} could not have carried it, {Below} were underground, "
               + $"{Cramped} found the shelf with no room left for it ({Closed} more found it full on arrival at the shop)"
               + $"; {Trimmed} lots came back smaller than a packet, {Spared} units the shelf or the courier had no room for";
 
@@ -309,5 +318,6 @@ public sealed class BotSupplier : IBotProposer
         Nearest = 0;
         Short = 0;
         Laden = 0;
+        Below = 0;
     }
 }

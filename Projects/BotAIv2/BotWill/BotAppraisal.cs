@@ -18,7 +18,8 @@ public readonly struct BotWeigh
         double revel = 1.0,
         double charter = 1.0,
         double ground = 1.0,
-        double calling = 1.0
+        double calling = 1.0,
+        double toll = 1.0
     )
     {
         Estimate = estimate;
@@ -33,6 +34,7 @@ public readonly struct BotWeigh
         Charter = charter;
         Ground = ground;
         Calling = calling;
+        Toll = toll;
     }
 
     public double Estimate { get; }
@@ -57,11 +59,13 @@ public readonly struct BotWeigh
 
     public double Calling { get; }
 
+    public double Toll { get; }
+
     public double Score { get; }
 
     public string Describe()
     {
-        var bend = Estimate > 0.0 && Calling > 0.0 ? Score / (Estimate * Calling) : 0.0;
+        var bend = Estimate > 0.0 && Calling > 0.0 && Toll > 0.0 ? Score / (Estimate * Calling * Toll) : 0.0;
 
         var extra = "";
 
@@ -71,6 +75,11 @@ public readonly struct BotWeigh
         }
 
         var called = Calling == 1.0 ? "" : $"; × {Calling:F2} for {BotCalling.Word(Calling)}";
+
+        if (Toll != 1.0)
+        {
+            called += $"; × {Toll:F2} after the toll on this land";
+        }
 
         return $"{Score:F0}/min = {Estimate:F0} × {bend:F2}, that being the {Nth(BotAppraisal.Root)} root of "
                + $"near {Nearness:F2} × new {Novelty:F2} × room {Room:F2} × safe {Caution:F2} × purse {Purse:F2}{extra}{called}";
@@ -152,7 +161,7 @@ public static class BotAppraisal
 
     internal static void Becalm(BotResolve resolve, Point3D at, int setOut, int nearest)
     {
-        if (resolve == null || setOut < BecalmedFar || setOut - nearest >= BecalmedGain)
+        if (resolve == null || setOut < BecalmedFar || setOut - nearest >= BecalmedGain && nearest < BecalmedFar)
         {
             return;
         }
@@ -246,7 +255,10 @@ public static class BotAppraisal
             return 0.0;
         }
 
-        if (!inHand && !deed.Standing && resolve.Becalmed)
+        if (!inHand && resolve.Becalmed
+            && (!deed.Standing
+                || deed.Where != Point3D.Zero && Tiles(body.Location, deed.Where) > BecalmedStay
+                && BotLadder.Load(body) <= BotLadder.Ceiling(body)))
         {
             if (Core.TickCount - resolve.BecalmedTick >= BecalmedMs || !Utility.InRange(body.Location, resolve.BecalmedAt, BecalmedStay))
             {
@@ -267,16 +279,11 @@ public static class BotAppraisal
             }
         }
 
-        if (deed is not BotBolt && BotPeril.Closes(map, deed.Where, body.Location, out var deadThere))
+        if (deed is not BotBolt && BotPeril.Overwhelms(map, deed.Where, body.Location, deed.Brings(body), out var hostile))
         {
-            veto = $"{deed.Kind} lies in or beside ground where {deadThere:F1} bots have died lately, against {BotPeril.CloseDeaths:F1} that close it to everything but running";
+            var brought = Math.Max(1.0, deed.Brings(body));
 
-            return 0.0;
-        }
-
-        if (!deed.Braves && !deed.Summons && BotPeril.Lethal(map, deed.Where, body.Location, out var deadLately))
-        {
-            veto = $"{deed.Kind} lies in or beside ground where {deadLately:F1} bots have died lately, against {BotPeril.KeepOutDeaths:F1} that keep ordinary work out";
+            veto = $"{deed.Kind} lies where the hostile strength is {hostile:F0}, {hostile / brought:F1} times the {brought:F0} going there, against {BotPeril.Overwhelm:F1} that close it to everything but running";
 
             return 0.0;
         }
@@ -326,7 +333,10 @@ public static class BotAppraisal
         }
 
         var work = Math.Max(0.1, deed.Minutes);
-        var travel = Tiles(body.Location, deed.Where) * (double)BotWalk.StepDelayMs(false) / 60000.0;
+
+        var road = Tiles(body.Location, deed.Where)
+            + (deed.Where == Point3D.Zero ? 0 : BotRoads.Farther(map, body.Location, deed.Where));
+        var travel = road * (double)BotWalk.StepDelayMs(false) / 60000.0;
         var nearness = work / (work + travel);
 
         var spins = resolve.Ledger.Spins(deed.Kind, map, deed.Where);
@@ -368,9 +378,11 @@ public static class BotAppraisal
 
         var calling = BotCalling.Worth(body, deed);
 
-        var score = estimate * Math.Pow(product, 1.0 / Math.Max(1, Root)) * calling;
+        var toll = BotToll.Factor(body, map, deed);
 
-        weigh = new BotWeigh(estimate, nearness, novelty, room, caution, purse, score, stopped, revel, charter, ground, calling);
+        var score = estimate * Math.Pow(product, 1.0 / Math.Max(1, Root)) * calling * toll;
+
+        weigh = new BotWeigh(estimate, nearness, novelty, room, caution, purse, score, stopped, revel, charter, ground, calling, toll);
 
         return score;
     }

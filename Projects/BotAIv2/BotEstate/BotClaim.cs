@@ -137,6 +137,106 @@ public static class BotClaim
 
     private static readonly Dictionary<(int Map, int X, int Y), Holding> _held = [];
 
+    public static long CutOff { get; private set; }
+
+    public static long HallsLost { get; private set; }
+
+    private static readonly HashSet<(int Map, int X, int Y)> _reached = [];
+
+    private static readonly Queue<(int Map, int X, int Y)> _frontier = new();
+
+    private static readonly List<((int Map, int X, int Y) Key, string Guild)> _cut = [];
+
+    public static void Seat(string guild, Map map, Point3D hall)
+    {
+        if (!Running || guild == null || map == null || map == Map.Internal)
+        {
+            return;
+        }
+
+        _held[BotQuad.Key(map, hall)] = new Holding { Guild = guild, Bought = true };
+    }
+
+    public static int Connect()
+    {
+        if (!Running || _held.Count == 0 || !BotEstate.HallsAdopted)
+        {
+            return 0;
+        }
+
+        _reached.Clear();
+
+        foreach (var (name, hall) in BotEstate.Held)
+        {
+            if (hall is not { Deleted: false } || hall.Map == null || hall.Map == Map.Internal)
+            {
+                continue;
+            }
+
+            var root = BotQuad.Key(hall.Map, hall.Location);
+
+            if (!_held.TryGetValue(root, out var seat) || seat.Guild != name)
+            {
+                continue;
+            }
+
+            _frontier.Clear();
+            _frontier.Enqueue(root);
+            _reached.Add(root);
+
+            while (_frontier.Count > 0)
+            {
+                var at = _frontier.Dequeue();
+
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    for (var dy = -1; dy <= 1; dy++)
+                    {
+                        if (dx == 0 && dy == 0)
+                        {
+                            continue;
+                        }
+
+                        var next = (at.Map, at.X + dx, at.Y + dy);
+
+                        if (!_reached.Contains(next) && _held.TryGetValue(next, out var held) && held.Guild == name)
+                        {
+                            _reached.Add(next);
+                            _frontier.Enqueue(next);
+                        }
+                    }
+                }
+            }
+        }
+
+        _cut.Clear();
+
+        foreach (var (key, held) in _held)
+        {
+            if (!_reached.Contains(key))
+            {
+                _cut.Add((key, held.Guild));
+            }
+        }
+
+        for (var i = 0; i < _cut.Count; i++)
+        {
+            var (key, guild) = _cut[i];
+
+            _held.Remove(key);
+            CutOff++;
+
+            logger.Warning(
+                "{Guild}'s square at {X},{Y} no longer reaches its hall through its own ground and belongs to nobody now",
+                guild,
+                key.X * BotQuad.Side + BotQuad.Side / 2,
+                key.Y * BotQuad.Side + BotQuad.Side / 2
+            );
+        }
+
+        return _cut.Count;
+    }
+
     private static readonly Dictionary<(int Map, int X, int Y), Bid> _bids = [];
 
     private static readonly Dictionary<string, Bid> _byGuild = [];
@@ -255,7 +355,16 @@ public static class BotClaim
 
         if (held != null)
         {
-            BotRegard.Claimed(guild.Name, held.Guild);
+            BotRegard.Claimed(guild.Name, held.Guild, Important(held.Guild, map, middle));
+
+            if (Important(held.Guild, map, middle))
+            {
+                BotRest.Call(BotGuilds.Named(held.Guild), $"{guild.Name} laying claim to its square at {middle.X},{middle.Y}");
+            }
+            else
+            {
+                Unwoken++;
+            }
         }
 
         logger.Warning(
@@ -308,6 +417,7 @@ public static class BotClaim
         _looked = now;
 
         Sweep();
+        Connect();
 
         var bots = BotPopulation.Bots;
         List<Bid> over = [];
@@ -352,6 +462,8 @@ public static class BotClaim
     {
         _bids.Remove(bid.Key);
         _byGuild.Remove(bid.Guild);
+
+        var before = _held.TryGetValue(bid.Key, out var was0) ? was0.Guild : null;
 
         if (bid.Fallen > bid.Felled)
         {
@@ -402,6 +514,8 @@ public static class BotClaim
                 bid.Middle.Y
             );
 
+            Lost(before, bid);
+
             return;
         }
 
@@ -421,6 +535,25 @@ public static class BotClaim
             bid.Guild,
             bid.From == null ? "" : $", taken from {bid.From}"
         );
+
+        Lost(before, bid);
+    }
+
+    private static void Lost(string before, Bid bid)
+    {
+        if (before == null || before == bid.Guild)
+        {
+            return;
+        }
+
+        if (BotEstate.Held.TryGetValue(before, out var hall) && hall is { Deleted: false } && hall.Map == bid.Map
+            && BotQuad.Key(hall.Map, hall.Location) == bid.Key)
+        {
+            HallsLost++;
+            BotEstate.RazeHall(before, $"the square it stood in was taken by {bid.Guild}");
+        }
+
+        Connect();
     }
 
     public static Point3D Middle(Map map, Point3D where)
@@ -477,7 +610,7 @@ public static class BotClaim
             Middle = middle,
             Key = (facet, x, y),
             Began = Core.TickCount,
-            From = from
+            From = string.IsNullOrEmpty(from) ? null : from
         };
 
         _bids[bid.Key] = bid;
@@ -512,6 +645,43 @@ public static class BotClaim
 
     public static IEnumerable<Bid> Bids => _bids.Values;
 
+    public static bool Contested(string guild)
+    {
+        if (guild == null)
+        {
+            return false;
+        }
+
+        foreach (var bid in _bids.Values)
+        {
+            if (string.Equals(bid.From, guild, StringComparison.OrdinalIgnoreCase) && Important(guild, bid.Map, bid.Middle))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static int HallRing { get; set; } = 1;
+
+    public static long Unwoken { get; private set; }
+
+    public static bool Important(string guild, Map map, Point3D middle)
+    {
+        var hall = BotEstate.Hall(BotGuilds.Named(guild));
+
+        if (hall is not { Deleted: false } || map == null || hall.Map != map)
+        {
+            return false;
+        }
+
+        var at = BotQuad.Key(map, hall.Location);
+        var square = BotQuad.Key(map, middle);
+
+        return at.Map == square.Map && Math.Abs(at.X - square.X) <= HallRing && Math.Abs(at.Y - square.Y) <= HallRing;
+    }
+
     public static int Left(Bid bid) =>
         bid == null ? 0 : Math.Max(0, MusterMs - (int)(Core.TickCount - bid.Began));
 
@@ -541,7 +711,8 @@ public static class BotClaim
             : $"{_held.Count} squares are spoken for and {_bids.Count} being claimed now ({Free} free to a guild, "
             + $"then {Price}gp up to {Cheap}, then {Step}gp more each; {Ousting}gp to take one, {Stripping}gp to strike a name off it); {Declared} claims made, "
             + $"{Won} won, {Stripped} that only struck a name off, {Unmustered} where the guild never gathered "
-            + $"{Gather} of itself, {Beaten} driven off by somebody who came; {Paid}gp paid for ground";
+            + $"{Gather} of itself, {Beaten} driven off by somebody who came; {Paid}gp paid for ground; {Unwoken} claims on a held square too far from its hall (more than {HallRing} quadrant) to call anybody back from rest; "
+            + $"{CutOff} squares fell for no longer reaching their hall, {HallsLost} halls razed with the square they stood in";
 
     public static int Wipe()
     {
@@ -561,6 +732,7 @@ public static class BotClaim
         Declared = 0;
         Won = 0;
         Unmustered = 0;
+        Unwoken = 0;
         Beaten = 0;
         Stripped = 0;
         Paid = 0;

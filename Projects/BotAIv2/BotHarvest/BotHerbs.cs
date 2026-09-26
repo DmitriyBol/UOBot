@@ -420,6 +420,9 @@ public sealed class BotHerbalist : IBotProposer
         var home = BotPopulation.Where;
         var roam = Math.Min(Range, BotPopulation.Roam);
 
+        var best = Point3D.Zero;
+        var bestAway = double.MaxValue;
+
         for (var tries = 0; tries < Samples; tries++)
         {
             var x = home.X + Utility.RandomMinMax(-roam, roam);
@@ -457,10 +460,16 @@ public sealed class BotHerbalist : IBotProposer
                 continue;
             }
 
-            return where;
+            var away = body.GetDistanceToSqrt(where) + Math.Max(0, BotRoads.Behind(map, body.Location, where));
+
+            if (away < bestAway)
+            {
+                best = where;
+                bestAway = away;
+            }
         }
 
-        return Point3D.Zero;
+        return best;
     }
 
     public static string Describe() =>

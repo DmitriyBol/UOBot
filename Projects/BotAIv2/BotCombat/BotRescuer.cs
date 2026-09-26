@@ -56,6 +56,13 @@ public sealed class BotRescuer : IBotProposer
             return null;
         }
 
+        if (BotDungeon.Under(foe.Location))
+        {
+            BotDefender.Below++;
+
+            return null;
+        }
+
         if (BotThreat.Decide(body, BotMobile.NoticeRange) == BotStand.Outmatched)
         {
             return null;
@@ -132,12 +139,15 @@ public sealed class BotDefender : IBotProposer
 
     public static long Assailed { get; private set; }
 
+    public static long Below { get; set; }
+
     public static void Forget()
     {
         Already = 0;
         Outnumbered = 0;
         Leading = 0;
         Assailed = 0;
+        Below = 0;
     }
 
     public BotDeed Propose(IBotWilful bot)
@@ -185,6 +195,13 @@ public sealed class BotDefender : IBotProposer
         if (bot is IBotSquadMember { Squad: { } company } member && ReferenceEquals(company.Leader, member))
         {
             Leading++;
+
+            return null;
+        }
+
+        if (bot is IBotSquadMember { Squad: not null } && BotDungeon.Under(body.Location))
+        {
+            Below++;
 
             return null;
         }

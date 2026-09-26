@@ -422,7 +422,13 @@ public static class BotWill
             resolve.Urges.Idle(minutes);
         }
 
-        if (resolve.Due || now - resolve.ReviewedTick >= (resolve.Deed == null ? IdleMs : ReviewMs))
+        if (resolve.Deed == null && bot is BotMobile { Tired: false } free)
+        {
+            BotSkulk.Urge(free, now);
+        }
+
+        if ((resolve.Due || now - resolve.ReviewedTick >= (resolve.Deed == null ? IdleMs : ReviewMs))
+            && bot is not BotMobile { Tired: true })
         {
             Auction(bot, resolve, BotStanding.Free, now);
         }
@@ -539,6 +545,16 @@ public static class BotWill
         if (!ground)
         {
             Unblamed++;
+        }
+
+        var toward = refused.Follow?.Location ?? refused.Where;
+
+        if ((result == BotWalkResult.Refused || result == BotWalkResult.GaveUp && refused.Follow == null)
+            && toward != Point3D.Zero && bot.Self is { } walker && !BotDungeon.Under(walker.Location))
+        {
+            var off = Math.Max(Math.Abs(walker.X - toward.X), Math.Abs(walker.Y - toward.Y));
+
+            BotAppraisal.Becalm(resolve, walker.Location, off, off);
         }
 
         Settle(bot, BotEnding.Failed, where, unreached: true, ground);
@@ -721,10 +737,7 @@ public static class BotWill
 
                 if (doing.Follow == null && bot.Self is { Deleted: false } walker && walker.Map == doing.Map)
                 {
-                    var away = Math.Max(
-                        Math.Abs(walker.Location.X - doing.Where.X),
-                        Math.Abs(walker.Location.Y - doing.Where.Y)
-                    );
+                    var away = journey.RoadLeft(walker.Location, doing.Where);
 
                     if (resolve.Started < 0)
                     {
@@ -753,6 +766,11 @@ public static class BotWill
                 return;
 
             case BotDoingKind.Work:
+                if (deed.Alongside && resolve.Sent.Kind == BotDoingKind.Walk)
+                {
+                    resolve.Sent = default;
+                }
+
                 if (Core.TickCount - resolve.StirredTick >= LabourMs)
                 {
                     if (deed.Still)
@@ -1338,6 +1356,16 @@ public static class BotWill
         }
 
         Settle(bot, BotEnding.Failed, why, unreached);
+    }
+
+    public static void PutDown(IBotWilful bot, string why)
+    {
+        if (bot?.Resolve?.Deed == null)
+        {
+            return;
+        }
+
+        Settle(bot, BotEnding.Dropped, why, unpause: false);
     }
 
     private static void Settle(
@@ -1998,10 +2026,10 @@ public static class BotWill
             line.Append($"; {Resent} walks sent again because the road no longer carried them");
         }
 
-        if (BotPeril.KeptOut > 0 || BotPeril.Closed > 0)
+        if (BotPeril.Overwhelmed > 0)
         {
             line.Append(
-                $"; {BotPeril.KeptOut} offers refused because the work lay in or beside ground where bots had been dying lately, and {BotPeril.Closed} because so many had died there that it was closed to all work but running"
+                $"; {BotPeril.Overwhelmed} offers refused because the hostile strength where the work lay was {BotPeril.Overwhelm:F1} times what was going there or more ({BotPeril.Reckoned} places reckoned)"
             );
         }
 

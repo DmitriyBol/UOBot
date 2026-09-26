@@ -418,7 +418,12 @@ public static class BotHarness
                 continue;
             }
 
-            var able = bot.Skills[craft].Base;
+            if (craft == SkillName.Tailoring && BotThread.Kit(bot) == null)
+            {
+                continue;
+            }
+
+            var able = bot.Skills[craft].Base - BotCraftwork.Margin;
 
             if (able > best)
             {

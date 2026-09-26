@@ -795,7 +795,7 @@ public static class BotAuction
 
         if (bid > 0)
         {
-            return bid;
+            return fallback > 0 ? Math.Min(bid, (int)Math.Min(int.MaxValue, fallback * (long)Math.Max(1.0, MostMultiple))) : bid;
         }
 
         for (var i = 0; i < _listings.Count; i++)

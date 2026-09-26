@@ -80,6 +80,8 @@ public abstract class BotDeed
 
     public virtual bool Braves => false;
 
+    public virtual double Brings(Mobile body) => BotQuad.Strength(body);
+
     public virtual Mobile Foe => null;
 
     public virtual bool Afoot => false;

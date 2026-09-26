@@ -26,6 +26,8 @@ public sealed class BotSmith : IBotProposer
 
     public static int LeastMetal { get; set; } = 6;
 
+    public static int OrderPieces { get; set; } = 2;
+
     private static bool _saidNoSystem;
 
     private static bool _saidNoForge;
@@ -160,7 +162,7 @@ public sealed class BotSmith : IBotProposer
                 continue;
             }
 
-            var cost = BotCraftwork.Cost(recipe);
+            var cost = BotCraftwork.Cost(recipe) * System.Math.Max(1, OrderPieces);
 
             if (BotAnvil.Ingots(body, BotAnvil.Best(body, cost)) < cost)
             {

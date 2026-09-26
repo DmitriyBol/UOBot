@@ -72,6 +72,13 @@ public static class BotExile
             return;
         }
 
+        if (!AfterWar)
+        {
+            Superseded++;
+
+            return;
+        }
+
         Judged++;
 
         if (BaseGuild.FindByName(winner) is not Guild won || BaseGuild.FindByName(loser) is not Guild lost ||
@@ -103,7 +110,7 @@ public static class BotExile
 
     public static BaseHouse Owed(Guild guild)
     {
-        if (!Running || guild == null || !_owed.TryGetValue(guild.Name, out var winner))
+        if (!Running || !AfterWar || guild == null || !_owed.TryGetValue(guild.Name, out var winner))
         {
             return null;
         }
@@ -117,6 +124,10 @@ public static class BotExile
 
         return hall;
     }
+
+    public static bool AfterWar { get; set; }
+
+    public static long Superseded { get; private set; }
 
     public static void Paid(Guild guild)
     {

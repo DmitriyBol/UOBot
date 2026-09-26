@@ -103,7 +103,7 @@ public static class BotBeat
 
         _summaryTick = now;
 
-        logger.Information("Getting about: {Paths}; {Walk}; {Reach}; {Refused}", BotPath.Describe(), BotWalk.Describe(), BotReach.Describe(), BotRefused.Describe());
+        logger.Information("Getting about: {Paths}; {Walk}; {Reach}; {Refused}; {Footing}", BotPath.Describe(), BotWalk.Describe(), BotReach.Describe(), BotRefused.Describe(), BotFooting.Describe());
 
         logger.Information("The market: {What}", BotAuction.Describe());
 
@@ -148,6 +148,10 @@ public static class BotBeat
             BotQuarry.Describe(),
             BotPopulation.Describe()
         );
+
+        logger.Information("Rest: {Rest}; {Growth}", BotRest.Describe(), BotGrowth.Describe());
+
+        logger.Information("Lessons: {Lessons}", BotTutor.Describe());
 
         logger.Information("Guilds: {What}", BotGuilds.Describe());
 
@@ -227,6 +231,9 @@ public static class BotBeat
 
         BotClaim.Look();
         Segment("the claims");
+
+        BotToll.Look();
+        Segment("the tolls");
 
         BotWar.Beat();
         BotFeud.Watch();

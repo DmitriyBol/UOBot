@@ -20,9 +20,9 @@
   "WarLoot": 5000,
   "WarLeastMinutes": 15,
   "WarLongestMinutes": 180,
-  "TruceMinutes": 1440,
-  "DeclareEveryMinutes": 1440,
-  "MostWars": 1,
+  "TruceMinutes": 0,
+  "DeclareEveryMinutes": 0,
+  "MostWars": 3,
   "Defend": 250,
   "Seats": {
     "The Crown": [

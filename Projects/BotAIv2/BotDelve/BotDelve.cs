@@ -123,7 +123,7 @@ public sealed class BotDelve : BotDeed
         }
     }
 
-    private readonly BotDungeon.Deep _deep;
+    private BotDungeon.Deep _deep;
 
     private readonly Map _map;
 
@@ -181,6 +181,8 @@ public sealed class BotDelve : BotDeed
     }
 
     public override string Kind => Trade;
+
+    public override void Taken(IBotWilful bot) => BotDelver.Stamp(bot?.Self, _deep);
 
     public override bool Braves => true;
 
@@ -336,6 +338,22 @@ public sealed class BotDelve : BotDeed
 
     private BotDoing Descend(BotSquad squad, Mobile body)
     {
+        var planned = _deep;
+
+        _deep = BotDelver.Recheck(squad, body, _deep, out var strength) ?? planned;
+
+        if (_deep != planned)
+        {
+            logger.Information(
+                "{Name}'s party for {Planned} is {Strength} of proven strength against its worst ({Wanted} wanted), so it goes down {Deep} instead",
+                body.Name,
+                planned.Name,
+                strength.ToString("F0"),
+                (planned.Worst * BotDelver.Odds).ToString("F0"),
+                _deep.Name
+            );
+        }
+
         _hall = BotHalls.Largest(_deep);
         _which = Utility.Random(Math.Max(1, _hall?.Rooms.Count ?? _deep.Rooms.Count));
 
@@ -610,6 +628,16 @@ public sealed class BotDelve : BotDeed
                 continue;
             }
 
+            if (other.Resolve?.Deed is { Alongside: true })
+            {
+                continue;
+            }
+
+            if (!BotProvision.Fit(other, out _))
+            {
+                continue;
+            }
+
             _called0.Add(other);
         }
 
@@ -727,7 +755,12 @@ public sealed class BotDelve : BotDeed
                 continue;
             }
 
-            if (!leader.CanBeHarmful(creature, false))
+            if (!BotThreat.Hostile(leader, creature))
+            {
+                continue;
+            }
+
+            if (BotQuarry.Shunned(creature))
             {
                 continue;
             }

@@ -9,18 +9,18 @@
   "Run": true,
   "Roam": 1000,
   "Classes": {
-    "Crafter": 5,
+    "Crafter": 3,
     "Captain": 1,
     "Baron": 1,
     "Architect": 1,
     "Sage": 1,
     "Brawler": 1,
-    "Gatherer": 12,
-    "Warrior": 15,
-    "Archer": 13,
-    "Mage": 10,
-    "Healer": 4,
-    "WarriorMage": 8,
-    "WarriorArcher": 8
+    "Gatherer": 7,
+    "Warrior": 9,
+    "Archer": 8,
+    "Mage": 6,
+    "Healer": 3,
+    "WarriorMage": 5,
+    "WarriorArcher": 4
   }
 }

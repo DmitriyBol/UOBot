@@ -353,7 +353,7 @@ public sealed class BotSquad
             return BotBlow.Blind;
         }
 
-        if (!body.CanBeHarmful(focus, false))
+        if (!body.CanBeHarmful(focus, false) || body.IsHarmfulCriminal(focus))
         {
             return BotBlow.Refused;
         }
@@ -621,6 +621,11 @@ public sealed class BotSquad
             var share = body.Hits / (double)body.HitsMax;
 
             if (share >= lowest)
+            {
+                continue;
+            }
+
+            if (BotMend.Abetting(medic, body) != null)
             {
                 continue;
             }

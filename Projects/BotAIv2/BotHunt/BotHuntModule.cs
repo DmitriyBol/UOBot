@@ -92,11 +92,14 @@ public sealed class BotHuntModule : BotModule
         );
 
         logger.Information(
-            "Prisoners are worth freeing: heard {Reach} tiles out once a minute, accepted from {Touch} tiles, and walked to {Town} whatever town the engine picked for them — passed over only when the cage is further than {Roam} tiles from it; the engine pays around {Reward}gp, and refuses anybody who escorted somebody else inside five minutes",
+            "Prisoners are worth freeing: heard {Reach} tiles out once a minute, accepted from {Touch} tiles, and walked to {Town} whatever town the engine picked for them — passed over only when the cage is further than {Roam} tiles from it; the escort turns back for a prisoner more than {Lag} tiles behind until it is within {Rejoin}, and gives up on one that gets no nearer home in {Stuck}ms; the engine pays around {Reward}gp, and refuses anybody who escorted somebody else inside five minutes",
             BotFreedom.Reach,
             BotFreedom.Touch,
             BotFreedom.Town,
             BotFreedom.Roam,
+            BotFreedom.Lag,
+            BotFreedom.Rejoin,
+            BotFreedom.StuckMs,
             BotFreedom.Reward
         );
     }

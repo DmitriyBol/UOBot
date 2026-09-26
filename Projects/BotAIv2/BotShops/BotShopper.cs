@@ -57,6 +57,8 @@ public sealed class BotShopper : IBotProposer
 
     public static long ToCounter { get; private set; }
 
+    public static long Spares { get; private set; }
+
     public static long ToStall { get; private set; }
 
     public static long ToHall { get; private set; }
@@ -125,6 +127,23 @@ public sealed class BotShopper : IBotProposer
         }
     }
 
+    private static bool Trade(BotClass klass, Type tool)
+    {
+        var own = klass.Kit.Tools;
+
+        for (var i = 0; i < own.Count; i++)
+        {
+            if (own[i] == tool)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static long Provisioned { get; private set; }
+
     public BotDeed Propose(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -141,11 +160,19 @@ public sealed class BotShopper : IBotProposer
 
         Looks++;
 
-        if (!Wanting(bot, klass, pack, out var wanted, out var amount, out var band))
+        if (!Wanting(bot, klass, pack, out var wanted, out var amount, out var band, out var spare))
         {
             Stocked++;
 
             return null;
+        }
+
+        var needy = BotProvision.Consumable(wanted) && BotProvision.Short(body);
+
+        if (needy)
+        {
+            spare = true;
+            Provisioned++;
         }
 
         Fade();
@@ -161,7 +188,12 @@ public sealed class BotShopper : IBotProposer
         {
             ToStall++;
 
-            return Ordered(new BotRestock(stall, wanted, Math.Min(amount, stall.Amount), map, body.Location), band);
+            if (needy)
+            {
+                BotProvision.Fund(body, stall.Price * Math.Min(amount, stall.Amount));
+            }
+
+            return Ordered(new BotRestock(stall, wanted, Math.Min(amount, stall.Amount), map, body.Location), band, spare);
         }
 
         var merchant = BotShelf.Of(body);
@@ -185,7 +217,7 @@ public sealed class BotShopper : IBotProposer
             {
                 ToHall++;
 
-                return Ordered(new BotRestock(merchant, wanted, Math.Max(1, ours.Amount), unit), band);
+                return Ordered(new BotRestock(merchant, wanted, Math.Max(1, ours.Amount), unit), band, spare);
             }
         }
 
@@ -223,18 +255,34 @@ public sealed class BotShopper : IBotProposer
 
         ToCounter++;
 
-        return Ordered(new BotRestock(shop, wanted, amount, counter), band);
+        if (needy)
+        {
+            BotProvision.Fund(body, counter * amount);
+        }
+
+        return Ordered(new BotRestock(shop, wanted, amount, counter), band, spare);
     }
 
-    private static BotDeed Ordered(BotRestock errand, bool band)
+    private static BotDeed Ordered(BotRestock errand, bool band, bool spare)
     {
-        if (errand == null || !band)
+        if (errand == null)
         {
+            return null;
+        }
+
+        if (band)
+        {
+            errand.Claim = BotFence.Prior;
+            BotFence.Sending();
+
             return errand;
         }
 
-        errand.Claim = BotFence.Prior;
-        BotFence.Sending();
+        if (spare)
+        {
+            errand.Claim = BotRestock.Spare;
+            Spares++;
+        }
 
         return errand;
     }
@@ -277,6 +325,7 @@ public sealed class BotShopper : IBotProposer
             ? "nobody has been looked at for supplies"
             : $"{Looks} looks for supplies: {Stocked} were short of nothing, {ToCounter} sent to a shopkeeper, "
               + $"{ToStall} to a cheaper stall, {ToHall} to their own guild's counter ({HallWalled} times it was passed over as out of reach), {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
+              + $"{Spares} trips were for a tool bought again before the last gave out, "
               + $"{Broke} wanted something nobody sells and could not afford one made (the fattest purse among them held {Richest}gp); "
               + $"most often short of {Commonest()} lately";
 
@@ -285,6 +334,7 @@ public sealed class BotShopper : IBotProposer
         Looks = 0;
         Stocked = 0;
         ToCounter = 0;
+        Spares = 0;
         ToStall = 0;
         ToHall = 0;
         ToBoard = 0;
@@ -295,9 +345,12 @@ public sealed class BotShopper : IBotProposer
         _everForgot = false;
     }
 
-    private static bool Wanting(IBotWilful bot, BotClass klass, Container pack, out Type wanted, out int amount, out bool band)
+    private static bool Wanting(
+        IBotWilful bot, BotClass klass, Container pack, out Type wanted, out int amount, out bool band, out bool spare
+    )
     {
         band = false;
+        spare = false;
         var kit = klass.Kit;
         var tools = BotOutfit.ToolsFor(klass);
         var body = bot.Self;
@@ -328,13 +381,15 @@ public sealed class BotShopper : IBotProposer
 
         for (var i = 0; i < tools.Count; i++)
         {
-            if (pack.GetAmount(tools[i]) > 0 || Held(pack.Parent as Mobile, tools[i]))
+            if (Kept(body, pack, tools[i], out var spent))
             {
                 continue;
             }
 
             wanted = tools[i];
             amount = 1;
+
+            spare = spent || Trade(klass, tools[i]);
 
             return true;
         }
@@ -411,6 +466,45 @@ public sealed class BotShopper : IBotProposer
 
         wanted = null;
         amount = 0;
+
+        return false;
+    }
+
+    private static bool Kept(Mobile body, Container pack, Type kind, out bool spent)
+    {
+        spent = false;
+
+        foreach (var item in pack.FindItemsByType(kind))
+        {
+            if (!BotOutfit.Spent(item))
+            {
+                return true;
+            }
+
+            spent = true;
+        }
+
+        var worn = body?.Items;
+
+        if (worn == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < worn.Count; i++)
+        {
+            if (!kind.IsInstanceOfType(worn[i]))
+            {
+                continue;
+            }
+
+            if (!BotOutfit.Spent(worn[i]))
+            {
+                return true;
+            }
+
+            spent = true;
+        }
 
         return false;
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Server.Logging;
+using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
@@ -494,6 +495,93 @@ public static class BotPeril
 
     public static bool KeepsOut { get; set; } = true;
 
+    public static double Overwhelm { get; set; } = 3.0;
+
+    public static int HostileReach { get; set; } = 14;
+
+    public static int HostileGrain { get; set; } = 8;
+
+    public static int HostileMs { get; set; } = 10000;
+
+    public static long Overwhelmed { get; private set; }
+
+    public static long Reckoned { get; private set; }
+
+    private static readonly Dictionary<(int Map, int X, int Y), (double Fight, long Tick)> _hostility = [];
+
+    public static bool Overwhelms(Map map, Point3D where, Point3D from, double brought, out double hostile, bool count = true)
+    {
+        hostile = 0.0;
+
+        if (!KeepsOut || map == null || map == Map.Internal || where == Point3D.Zero || Utility.InRange(from, where, HostileReach))
+        {
+            return false;
+        }
+
+        hostile = Hostility(map, where);
+
+        if (hostile <= 0.0 || hostile < Overwhelm * Math.Max(1.0, brought))
+        {
+            return false;
+        }
+
+        if (count)
+        {
+            Overwhelmed++;
+        }
+
+        return true;
+    }
+
+    public static double Hostility(Map map, Point3D where)
+    {
+        if (map == null || map == Map.Internal)
+        {
+            return 0.0;
+        }
+
+        var grain = Math.Max(1, HostileGrain);
+        var key = (map.MapID, where.X / grain, where.Y / grain);
+        var now = Core.TickCount;
+
+        if (_hostility.TryGetValue(key, out var held) && now - held.Tick < HostileMs)
+        {
+            return held.Fight;
+        }
+
+        var middle = new Point3D(key.Item2 * grain + grain / 2, key.Item3 * grain + grain / 2, where.Z);
+        var worst = 0.0;
+        var sum = 0.0;
+
+        foreach (var creature in map.GetMobilesInRange<BaseCreature>(middle, HostileReach))
+        {
+            if (creature is not { Deleted: false, Alive: true, Controlled: false, Summoned: false } || creature is BaseVendor
+                || creature.FightMode is FightMode.None or FightMode.Aggressor or FightMode.Evil)
+            {
+                continue;
+            }
+
+            var power = BotThreat.Power(creature);
+
+            sum += power;
+            worst = Math.Max(worst, power);
+        }
+
+        var seen = worst + BotThreat.Secondary * (sum - worst);
+        var kept = BotLairs.MetFight(map, middle, BotKept.Sight, out _, out _);
+        var fight = Math.Max(seen, kept);
+
+        if (_hostility.Count >= 8192)
+        {
+            _hostility.Clear();
+        }
+
+        _hostility[key] = (fight, now);
+        Reckoned++;
+
+        return fight;
+    }
+
     public static double KeepOutDeaths { get; set; } = 2.0;
 
     public static long KeptOut { get; private set; }
@@ -780,6 +868,9 @@ public static class BotPeril
     {
         _squares.Clear();
         _passed.Clear();
+        _hostility.Clear();
+        Overwhelmed = 0;
+        Reckoned = 0;
         Blows = 0;
         Deaths = 0;
         Sweeps = 0;

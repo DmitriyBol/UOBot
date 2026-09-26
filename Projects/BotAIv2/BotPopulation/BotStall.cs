@@ -304,7 +304,7 @@ public static class BotStall
         );
     }
 
-    private static string Road(BotMobile bot)
+    internal static string Road(BotMobile bot)
     {
         var journey = bot.Journey;
         var errand = journey?.Current;

@@ -52,14 +52,27 @@ public static class BotChest
             return;
         }
 
-        var owner = BotClaim.Owner(map, where);
+        var owner = BotLand.Holder(map, where);
 
         if (owner == null)
         {
             return;
         }
 
-        var share = (int)(coin * Rate);
+        var own = body.Guild?.Name == owner;
+        var rate = own ? Rate : BotToll.Rate(owner, body);
+
+        if (rate <= 0.0)
+        {
+            if (!own)
+            {
+                BotToll.Owed(owner, body);
+            }
+
+            return;
+        }
+
+        var share = (int)(coin * rate);
 
         if (share <= 0 || !pack.ConsumeTotal(typeof(Gold), share))
         {
@@ -67,8 +80,16 @@ public static class BotChest
         }
 
         _chests[owner] = Holds(owner) + share;
-        Tithes++;
-        TitheGold += share;
+
+        if (own)
+        {
+            Tithes++;
+            TitheGold += share;
+        }
+        else
+        {
+            BotToll.Paid(owner, body, share);
+        }
     }
 
     public static int Draw(string guild, int want)
@@ -94,6 +115,28 @@ public static class BotChest
         logger.Information("{Guild}'s chest paid {Gold}gp of the {Want}gp asked of the guild; {Left}gp left in it", guild, drawn, want, held - drawn);
 
         return drawn;
+    }
+
+    public static long Thefts { get; private set; }
+
+    public static long StolenGold { get; private set; }
+
+    public static int Steal(string guild, int want)
+    {
+        var held = Holds(guild);
+
+        if (!Running || want <= 0 || held <= 0)
+        {
+            return 0;
+        }
+
+        var taken = Math.Min(held, want);
+
+        _chests[guild] = held - taken;
+        Thefts++;
+        StolenGold += taken;
+
+        return taken;
     }
 
     internal static void Save(IGenericWriter writer)

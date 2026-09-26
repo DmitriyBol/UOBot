@@ -102,7 +102,7 @@ public sealed class BotDelveModule : BotModule
         }
 
         logger.Information(
-            "Delving is {State}: the maker of a guild may take {Company} down a dungeon — {Fighters} of them able to hold a line, its own band called first — for {Quota} corpses or {Minutes} minutes, after {Muster} minutes of calling at the home ground. It goes to the richest dungeon whose worst inhabitant the band is ×{Odds} the strength of, is carried down and carried back up because no road runs there, and has {Raisings} raisings between them; what it takes is swept into one pot and divided at the end, {Share} to the leader and the rest evenly. A band waits {Between} minutes between delves",
+            "Delving is {State}: any member of a guild may take {Company} down a dungeon — {Fighters} of them able to hold a line, its own band called first — for {Quota} corpses or {Minutes} minutes, after {Muster} minutes of calling at the home ground. It goes to the richest dungeon whose worst inhabitant the band is ×{Odds} the strength of, is carried down and carried back up because no road runs there, and has {Raisings} raisings between them; what it takes is swept into one pot and divided at the end, {Share} to the leader and the rest evenly. A band waits {Between} minutes between delves",
             Enabled ? "on" : "off",
             BotDelve.Company,
             BotDelve.Fighters,
@@ -175,7 +175,12 @@ public sealed class BotDelveModule : BotModule
         {
         }
 
-        protected override void OnTick() => BotDelveParty.Watch();
+        protected override void OnTick()
+        {
+            BotDelveParty.Watch();
+
+            BotDungeon.Restock();
+        }
     }
 
     public override void Reset()

@@ -229,7 +229,7 @@ public sealed class BotBake : BotDeed
     private void Refuse(IBotWilful bot)
     {
         bot?.Resolve?.Ledger?.Beware(BotGround.HearthKind, _map, _where);
-        BotGround.Cold(_where);
+        BotGround.Cold(_map, _where);
     }
 
     public override bool Bend(IBotWilful bot)

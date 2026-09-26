@@ -145,6 +145,156 @@ public sealed class BotJourney
 
     public IReadOnlyList<Point3D> Plan => _plan;
 
+    public static int DirectTiles { get; set; } = 24;
+
+    public static int LegTiles { get; set; } = 24;
+
+    public static int LegReached { get; set; } = 3;
+
+    public static int StrayTiles { get; set; } = 24;
+
+    public static int MostReroutes { get; set; } = 4;
+
+    private readonly List<Point3D> _route = [];
+
+    private int _leg;
+
+    private BotErrand _routeErrand;
+
+    private Point3D _routeGoal;
+
+    private int _reroutes;
+
+    private bool _routeSpent;
+
+    private Point3D _aim;
+
+    public bool Legging { get; private set; }
+
+    public Point3D Aim => Legging ? _aim : Target;
+
+    public int RouteLeft => _route.Count - _leg;
+
+    public bool Leg(Map map, Point3D at, out Point3D leg)
+    {
+        leg = Point3D.Zero;
+        Legging = false;
+
+        var errand = Current;
+
+        if (errand == null || map == null || !BotChart.Ready)
+        {
+            return false;
+        }
+
+        var target = Target;
+
+        if (!ReferenceEquals(_routeErrand, errand))
+        {
+            _routeErrand = errand;
+            _routeGoal = Point3D.Zero;
+            _route.Clear();
+            _leg = 0;
+            _reroutes = 0;
+            _routeSpent = false;
+        }
+
+        if (_routeSpent || Away(at, target) <= DirectTiles)
+        {
+            return false;
+        }
+
+        var redraw = _routeGoal == Point3D.Zero || Away(target, _routeGoal) > LegTiles / 2
+            || _leg < _route.Count && Away(at, _route[_leg]) > StrayTiles;
+
+        if (redraw)
+        {
+            if (_routeGoal != Point3D.Zero && ++_reroutes > MostReroutes)
+            {
+                _routeSpent = true;
+                _route.Clear();
+
+                return false;
+            }
+
+            _routeGoal = target;
+            _leg = 0;
+            BotChart.Route(map, at, target, _route);
+        }
+
+        while (_leg < _route.Count && Away(at, _route[_leg]) <= LegReached)
+        {
+            _leg++;
+        }
+
+        if (_leg >= _route.Count)
+        {
+            return false;
+        }
+
+        var pick = _leg;
+        var along = Away(at, _route[_leg]);
+
+        for (var j = _leg + 1; j < _route.Count && j <= _leg + 3; j++)
+        {
+            along += Away(_route[j - 1], _route[j]);
+
+            if (along > LegTiles || Away(at, _route[j]) > LegTiles)
+            {
+                break;
+            }
+
+            pick = j;
+        }
+
+        _leg = pick;
+        _aim = _route[pick];
+        leg = _aim;
+        Legging = true;
+
+        return true;
+    }
+
+    public void LegFailed(Map map)
+    {
+        if (!Legging)
+        {
+            return;
+        }
+
+        BotChart.Shun(map, _aim);
+
+        _routeGoal = Point3D.Zero;
+        _reroutes++;
+        Legging = false;
+
+        if (_reroutes > MostReroutes)
+        {
+            _routeSpent = true;
+            _route.Clear();
+        }
+    }
+
+    private int Distance(Point3D at) => Legging ? RoadLeft(at, Target) : Away(at, Target);
+
+    public int RoadLeft(Point3D at, Point3D where)
+    {
+        if (_routeSpent || _route.Count == 0 || _leg >= _route.Count || _routeErrand == null
+            || Away(_routeGoal, where) > LegTiles / 2)
+        {
+            return Away(at, where);
+        }
+
+        var left = Away(at, _route[_leg]);
+
+        for (var i = _leg + 1; i < _route.Count; i++)
+        {
+            left += Away(_route[i - 1], _route[i]);
+        }
+
+        return left + Away(_route[^1], where);
+    }
+
     public int Remaining => _plan.Count - _step;
 
     public void Begin(Map map, Point3D where, BotArrival arrival, string reason)
@@ -342,7 +492,7 @@ public sealed class BotJourney
             _emptyPlans = 0;
         }
 
-        var away = Away(at, Target);
+        var away = Distance(at);
 
         if (!ReferenceEquals(_awayErrand, Current))
         {

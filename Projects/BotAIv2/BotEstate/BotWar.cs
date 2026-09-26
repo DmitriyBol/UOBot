@@ -61,6 +61,20 @@ public static class BotWar
 
     public static int LookMs { get; set; } = 10000;
 
+    public static int Engage { get; set; } = 5;
+
+    public static double PerKillBehind { get; set; } = 0.5;
+
+    public static int BigAt { get; set; } = 10;
+
+    public static long Bigs { get; private set; }
+
+    private static readonly Dictionary<string, (int Involved, int Free)> _strength = [];
+
+    private static readonly Dictionary<string, List<BotMobile>> _free = [];
+
+    private static readonly HashSet<Serial> _mustered = [];
+
     public static long Declared { get; private set; }
 
     public static long Truced { get; private set; }
@@ -68,6 +82,46 @@ public static class BotWar
     public static long Cooling { get; private set; }
 
     public static long Busy { get; private set; }
+
+    public static double DauntedAt { get; set; } = 2.0;
+
+    public static long Daunted { get; private set; }
+
+    public static int YieldBehind { get; set; } = 8;
+
+    public static double YieldRatio { get; set; } = 3.0;
+
+    public static double YieldMight { get; set; } = 1.5;
+
+    public static long Capitulated { get; private set; }
+
+    public static double Might(string guild)
+    {
+        if (guild == null || BaseGuild.FindByName(guild) is not Guild g || g.Members == null)
+        {
+            return 0.0;
+        }
+
+        var total = 0.0;
+
+        for (var i = 0; i < g.Members.Count; i++)
+        {
+            if (g.Members[i] is not BotMobile { Deleted: false } member)
+            {
+                continue;
+            }
+
+            var skills = member.Skills;
+            var best = Math.Max(
+                Math.Max(Math.Max(skills.Swords.Value, skills.Macing.Value), Math.Max(skills.Fencing.Value, skills.Archery.Value)),
+                Math.Max(skills.Wrestling.Value, skills.Magery.Value)
+            );
+
+            total += BotThreat.Power(member) * (0.5 + best / 100.0 + skills.Tactics.Value / 200.0);
+        }
+
+        return total;
+    }
 
     public static long WonByBlood { get; private set; }
 
@@ -105,6 +159,8 @@ public static class BotWar
         public string Why;
 
         public (string A, string B)? Joined;
+
+        public bool Big;
 
         public string Against(string guild) => guild == A ? B : guild == B ? A : null;
 
@@ -177,9 +233,205 @@ public static class BotWar
         return many;
     }
 
+    public static int Behind(string guild)
+    {
+        var worst = 0;
+
+        foreach (var war in _wars.Values)
+        {
+            var enemy = war.Against(guild);
+
+            if (enemy == null)
+            {
+                continue;
+            }
+
+            worst = Math.Max(worst, war.Score(enemy).Kills - war.Score(guild).Kills);
+        }
+
+        return worst;
+    }
+
+    public static int Wanted(string guild)
+    {
+        if (guild == null || Fighting(guild) == 0)
+        {
+            return 0;
+        }
+
+        var members = BotGuilds.Named(guild)?.Members?.Count ?? 0;
+
+        return Math.Min(members, Engage + (int)Math.Ceiling(PerKillBehind * Behind(guild)));
+    }
+
+    public static int Involved(string guild) => guild != null && _strength.TryGetValue(guild, out var s) ? s.Involved : 0;
+
+    public static bool Short(string guild) => guild != null && Fighting(guild) > 0 && Involved(guild) < Wanted(guild);
+
+    public static int FromRest(string guild)
+    {
+        if (guild == null || !_strength.TryGetValue(guild, out var s))
+        {
+            return 0;
+        }
+
+        return Math.Max(0, Wanted(guild) - s.Involved - s.Free);
+    }
+
+    public static bool Mustered(Mobile bot) => bot != null && _mustered.Contains(bot.Serial);
+
+    public static bool InBig(string guild)
+    {
+        foreach (var war in _wars.Values)
+        {
+            if (war.Big && war.Against(guild) != null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void Count()
+    {
+        _strength.Clear();
+        _mustered.Clear();
+
+        foreach (var list in _free.Values)
+        {
+            list.Clear();
+        }
+
+        var bots = BotPopulation.Bots;
+
+        for (var i = 0; i < bots.Count; i++)
+        {
+            if (bots[i] is not { Deleted: false, Alive: true } bot || bot.Guild is not Guild guild || Fighting(guild.Name) == 0)
+            {
+                continue;
+            }
+
+            var (involved, free) = _strength.GetValueOrDefault(guild.Name);
+
+            if (InTheWar(bot, guild))
+            {
+                involved++;
+            }
+            else if (Able(bot))
+            {
+                free++;
+
+                if (!_free.TryGetValue(guild.Name, out var list))
+                {
+                    _free[guild.Name] = list = [];
+                }
+
+                list.Add(bot);
+            }
+
+            _strength[guild.Name] = (involved, free);
+        }
+
+        foreach (var (name, list) in _free)
+        {
+            var need = Wanted(name) - Involved(name);
+
+            if (need <= 0 || list.Count == 0)
+            {
+                continue;
+            }
+
+            var guild = BotGuilds.Named(name);
+            var target = BotFeud.Threat(guild) ?? BotFeud.On(guild);
+
+            if (target is not { Deleted: false } || target.Map == null)
+            {
+                continue;
+            }
+
+            list.Sort((a, b) => Apart(a, target).CompareTo(Apart(b, target)));
+
+            for (var i = 0; i < list.Count && i < need; i++)
+            {
+                _mustered.Add(list[i].Serial);
+            }
+        }
+
+        foreach (var war in _wars.Values)
+        {
+            if (war.Big)
+            {
+                continue;
+            }
+
+            var a = Involved(war.A);
+            var b = Involved(war.B);
+
+            if (a <= BigAt || b <= BigAt)
+            {
+                continue;
+            }
+
+            war.Big = true;
+            Bigs++;
+
+            logger.Warning(
+                "The war of {Declarer} on {Other} has become a big war: {A} of {GuildA} and {B} of {GuildB} in it, the score {KillsA} to {KillsB}",
+                war.Declarer,
+                war.Against(war.Declarer),
+                a,
+                war.A,
+                b,
+                war.B,
+                war.KillsA,
+                war.KillsB
+            );
+        }
+    }
+
+    private static bool InTheWar(BotMobile bot, Guild guild)
+    {
+        var deed = bot.Resolve?.Deed;
+
+        if (deed is BotRally rally && ReferenceEquals(rally.Guild, guild) || deed is BotQuarrel quarrel && quarrel.Ours == guild.Name)
+        {
+            return true;
+        }
+
+        if (bot.Squad != null && ReferenceEquals(bot.Squad, BotFeud.Company(guild)))
+        {
+            return true;
+        }
+
+        return string.Equals(BotRest.CalledBy(bot), guild.Name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int Apart(Mobile a, Mobile b) =>
+        a.Map != b.Map ? int.MaxValue : Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
+
+    private static bool Able(BotMobile bot)
+    {
+        var kit = bot.Class?.Kit;
+
+        if (kit == null || kit.Melee.Count == 0 && kit.Ranged.Count == 0)
+        {
+            return false;
+        }
+
+        return bot.Hits >= bot.HitsMax * BotFeuder.Fit && !BotDungeon.Under(bot.Location);
+    }
+
     public static bool MayDeclare(string mine, string theirs, out string why)
     {
         why = null;
+
+        if (mine == BotUnderworld.GuildName || theirs == BotUnderworld.GuildName)
+        {
+            why = "The Shadow is everybody's enemy already";
+
+            return false;
+        }
 
         if (!Running)
         {
@@ -218,6 +470,20 @@ public static class BotWar
             return false;
         }
 
+        if (DauntedAt > 0)
+        {
+            var ours = Might(mine);
+            var others = Might(theirs);
+
+            if (ours > 0 && others >= ours * DauntedAt)
+            {
+                Daunted++;
+                why = $"{theirs} is {others / ours:F1} times its might ({others:F0} against {ours:F0})";
+
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -253,11 +519,16 @@ public static class BotWar
         Enlist(mine, theirs, pair);
         Enlist(theirs, mine, pair);
 
+        BotRest.Call(mine, $"its war on {theirs.Name}");
+        BotRest.Call(theirs, $"{mine.Name}'s war on it");
+
         logger.Warning(
-            "{Mine} has declared war on {Theirs} over {Why}; it is won at {Kills} dead or {Loot}gp of plunder, judged after {Longest} minutes, and cannot be ended for {Least}",
+            "{Mine} has declared war on {Theirs} over {Why}, might {MineMight:F0} against {TheirsMight:F0}; it is won at {Kills} dead or {Loot}gp of plunder, judged after {Longest} minutes, and cannot be ended for {Least}",
             mine.Name,
             theirs.Name,
             why,
+            Might(mine.Name),
+            Might(theirs.Name),
             Kills,
             Loot,
             LongestMs / 60000,
@@ -276,6 +547,13 @@ public static class BotWar
 
         foreach (var (pair, _) in _wars)
         {
+            if (pair.A == BotUnderworld.GuildName || pair.B == BotUnderworld.GuildName)
+            {
+                (stale ??= []).Add(pair);
+
+                continue;
+            }
+
             var ga = BotGuilds.Named(pair.A) ?? BaseGuild.FindByName(pair.A) as Guild;
             var gb = BotGuilds.Named(pair.B) ?? BaseGuild.FindByName(pair.B) as Guild;
 
@@ -324,7 +602,7 @@ public static class BotWar
 
             for (var i = 0; i < enemies.Count; i++)
             {
-                if (enemies[i] is Guild theirs && Of(mine.Name, theirs.Name) == null)
+                if (enemies[i] is Guild theirs && theirs.Name != BotUnderworld.GuildName && Of(mine.Name, theirs.Name) == null)
                 {
                     standing.Add((mine, theirs));
                 }
@@ -384,6 +662,8 @@ public static class BotWar
             };
 
             logger.Warning("{Ally} joins the war on {Theirs} beside its ally {Ours}", ally.Name, theirs.Name, ours.Name);
+
+            BotRest.Call(ally, $"its ally {ours.Name}'s war on {theirs.Name}");
         }
     }
 
@@ -486,6 +766,8 @@ public static class BotWar
         _looked = now;
         _over.Clear();
 
+        Count();
+
         foreach (var war in _wars.Values)
         {
             if (war.Joined == null && now - (war.Began + LongestMs) >= 0)
@@ -520,8 +802,28 @@ public static class BotWar
         {
             WonByPlunder++;
             End(war, war.LootA >= Loot ? war.A : war.B, "plunder");
+
+            return;
+        }
+
+        var aYields = Beaten(war.KillsA, war.KillsB) && Outmatched(war.A, war.B);
+
+        if (aYields || Beaten(war.KillsB, war.KillsA) && Outmatched(war.B, war.A))
+        {
+            Capitulated++;
+            End(war, aYields ? war.B : war.A, "the other side's capitulation");
         }
     }
+
+    private static bool Outmatched(string side, string enemy)
+    {
+        var ours = Might(side);
+
+        return ours <= 0 || Might(enemy) >= ours * YieldMight;
+    }
+
+    private static bool Beaten(int ours, int theirs) =>
+        YieldBehind > 0 && theirs >= YieldBehind && theirs >= YieldRatio * (ours + 1);
 
     private static string Ahead(War war) =>
         war.KillsA > war.KillsB ? war.A : war.KillsB > war.KillsA ? war.B : null;
@@ -645,6 +947,9 @@ public static class BotWar
             say.Append(
                 $"{war.Declarer} on {war.Against(war.Declarer)} for {war.Minutes} min over {war.Why}{(war.Joined == null ? "" : " (joined)")}: {war.A} {war.KillsA} dead {war.LootA}gp, {war.B} {war.KillsB} dead {war.LootB}gp"
             );
+            say.Append(
+                $"; in it {Involved(war.A)} of {war.A} (wanted {Wanted(war.A)}) and {Involved(war.B)} of {war.B} (wanted {Wanted(war.B)}){(war.Big ? ", a big war" : "")}"
+            );
         }
 
         return say.ToString();
@@ -654,9 +959,10 @@ public static class BotWar
         !Running
             ? "wars are not ruled"
             : $"{_wars.Count} wars standing ({Tell()}); won at {Kills} dead or {Loot}gp of plunder, no peace before {LeastMs / 60000} minutes, "
+            + $"each side fought with {Engage} and one more for every {1.0 / Math.Max(0.01, PerKillBehind):0.#} kills it is behind, a big war past {BigAt} on each side ({Bigs} so far), "
             + $"judged at {LongestMs / 60000}, a truce of {TruceMs / 60000} after, one declaration a guild per {DeclareEveryMs / 60000} minutes and {MostWars} at a time; "
-            + $"{Declared} declared, {Truced} refused for a truce, {Cooling} for declaring too soon ({LosersCooled} clocks started by a defeat), {Busy} for a guild already at war; "
-            + $"{WonByBlood} won by blood, {WonByPlunder} by plunder, {TimedOut} judged by the clock, {Peaced} ended in peace, {Drawn} of those drawn; "
+            + $"{Declared} declared, {Truced} refused for a truce, {Cooling} for declaring too soon ({LosersCooled} clocks started by a defeat), {Busy} for a guild already at war, {Daunted} against a guild {DauntedAt:0.#} times the declarer's might or more; "
+            + $"{WonByBlood} won by blood, {WonByPlunder} by plunder, {Capitulated} by the other side's capitulation (at {YieldBehind} kills and {YieldRatio:0.#} times its own, against {YieldMight:0.#} times its might), {TimedOut} judged by the clock, {Peaced} ended in peace, {Drawn} of those drawn; "
             + $"{Counted} kills and {Plundered}gp of plunder counted";
 
     public static void Forget()
@@ -677,5 +983,9 @@ public static class BotWar
         Drawn = 0;
         Counted = 0;
         Plundered = 0;
+        Bigs = 0;
+        _strength.Clear();
+        _free.Clear();
+        _mustered.Clear();
     }
 }

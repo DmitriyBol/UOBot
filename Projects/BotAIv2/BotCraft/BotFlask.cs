@@ -39,7 +39,7 @@ public static class BotFlask
 {
     public static CraftSystem System => DefAlchemy.CraftSystem;
 
-    public static BaseTool Kit(Mobile bot) => bot?.Backpack?.FindItemByType<MortarPestle>();
+    public static BaseTool Kit(Mobile bot) => BotOutfit.Oldest<MortarPestle>(bot?.Backpack);
 
     public static int Herbs { get; set; } = 5;
 

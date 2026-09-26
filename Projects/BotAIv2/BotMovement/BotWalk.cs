@@ -108,6 +108,10 @@ public static class BotWalk
 
     public static long EscalationFailed { get; private set; }
 
+    public static long Legs { get; private set; }
+
+    public static long LegsFailed { get; private set; }
+
     private static readonly Dictionary<string, long> _burned = [];
 
     private static readonly Dictionary<string, long> _lost = [];
@@ -159,12 +163,14 @@ public static class BotWalk
         Stationed = 0;
         EscalationFound = 0;
         EscalationFailed = 0;
+        Legs = 0;
+        LegsFailed = 0;
         _burned.Clear();
         _lost.Clear();
     }
 
     public static string Describe() =>
-        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions, {Knots} stepped aside from somebody who would not; the whole ceiling was burned by: {Top(_burned)} ({Stationed} station searches held to {StationCeilingMs:F0}ms instead); {Escalated} searches at the stranded ceiling for a way round, {EscalationFound} found one and {EscalationFailed} ended the errand instead of nine more searches; errands lost as hopeless or without a way round, by kind: {Top(_lost)}";
+        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions, {Knots} stepped aside from somebody who would not; the whole ceiling was burned by: {Top(_burned)} ({Stationed} station searches held to {StationCeilingMs:F0}ms instead); {Escalated} searches at the stranded ceiling for a way round, {EscalationFound} found one and {EscalationFailed} ended the errand instead of nine more searches; {Legs} plans drawn to a leg of the chart's route and {LegsFailed} legs that could not be walked; errands lost as hopeless or without a way round, by kind: {Top(_lost)}";
 
     public static int StepDelayMs(bool run) => run ? RunStepMs : WalkStepMs;
 
@@ -291,6 +297,11 @@ public static class BotWalk
 
     private static bool Plan(Mobile bot, BotJourney journey, Map map)
     {
+        if (journey.Leg(map, bot.Location, out var leg))
+        {
+            return PlanLeg(bot, journey, map, leg);
+        }
+
         var escalate = journey.Probed && !journey.Escalated && journey.PlansSinceCloser >= PlansBeforeAskingTheFarSide;
 
         var ceiling = escalate ? BotPath.StrandedCeilingMs : journey.PlansSinceCloser > 0 ? BotPath.CeilingMs : 0.0;
@@ -356,6 +367,8 @@ public static class BotWalk
 
         if (far == BotEnclosure.NoFooting)
         {
+            BotFooting.Note(map, journey.Target);
+
             return Drop(bot, journey, "there is nowhere there to stand");
         }
 
@@ -363,6 +376,40 @@ public static class BotWalk
             && BotReach.Ask(map, bot.Location, journey.Target, journey.Arrival, tally: false) == BotReachVerdict.Sealed)
         {
             return Drop(bot, journey, "it is shut in and this bot is outside it");
+        }
+
+        return true;
+    }
+
+    private static bool PlanLeg(Mobile bot, BotJourney journey, Map map, Point3D leg)
+    {
+        Legs++;
+
+        var outcome = BotPath.Find(
+            map,
+            bot.Location,
+            leg,
+            BotArrival.Within(BotJourney.LegReached),
+            _path,
+            BotOutlaw.Road(bot, map, journey.Target, journey.Avoid(bot.Location)),
+            journey.PlansSinceCloser > 0 ? BotPath.CeilingMs : 0.0
+        );
+
+        if (outcome == BotPathOutcome.Sealed)
+        {
+            LegsFailed++;
+            journey.LegFailed(map);
+            journey.Planned(outcome, null, bot.Location);
+
+            return true;
+        }
+
+        journey.Planned(outcome, _path, bot.Location);
+
+        if (outcome == BotPathOutcome.Partial && journey.PlansSinceCloser >= PlansBeforeAskingTheFarSide)
+        {
+            LegsFailed++;
+            journey.LegFailed(map);
         }
 
         return true;
@@ -425,7 +472,7 @@ public static class BotWalk
         var nothingTried = next == bot.Location;
 
         var heading = nothingTried
-            ? (int)(bot.GetDirectionTo(journey.Target) & Direction.Mask)
+            ? (int)(bot.GetDirectionTo(journey.Aim) & Direction.Mask)
             : (int)(bot.GetDirectionTo(next) & Direction.Mask);
 
         ReadOnlySpan<int> offsets = [0, 1, -1, 2, -2, 3, -3, 4];

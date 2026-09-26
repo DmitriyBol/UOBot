@@ -138,7 +138,7 @@ public sealed class BotMuster : IBotProposer
 
         Once(body, quarry);
 
-        return new BotBand(quarry);
+        return new BotBand(quarry, BotThreat.OurPower(body, Reach));
     }
 
     private static int Free(Mobile body, int range)

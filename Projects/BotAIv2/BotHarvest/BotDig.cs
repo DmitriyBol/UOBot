@@ -2,6 +2,7 @@
 using Server.Engines.Harvest;
 using Server.Items;
 using Server.Mobiles;
+using Server.Multis;
 
 namespace Server.BotAI.V2;
 
@@ -126,6 +127,24 @@ public sealed class BotDig : BotDeed
     public static long Adrift { get; private set; }
 
     public static long Laden { get; private set; }
+
+    public static long NextPickaxe { get; private set; }
+
+    public static long Spurned { get; private set; }
+
+    public static long Nearer { get; private set; }
+
+    public static long Forsaken { get; private set; }
+
+    public static int MostRefusals { get; set; } = 2;
+
+    public static int NearingMs { get; set; } = 1800000;
+
+    private static readonly Dictionary<Point3D, long> _nearing = [];
+
+    private bool _closer;
+
+    private int _refusals;
 
     private Point3D _swungFrom;
 
@@ -304,8 +323,8 @@ public sealed class BotDig : BotDeed
 
                     return BotDoing.Failed(
                         third
-                            ? $"the walk to the {_seam.Ore} stopped closing {gap} tiles short, the {BotGround.ShiedLimit}rd to do so, and the seam is struck off"
-                            : $"the walk to the {_seam.Ore} stopped closing {gap} tiles short, which says nothing of the seam; it rests and stays on the board"
+                            ? $"the walk to the {_seam.Ore} at ({_seam.Where.X}, {_seam.Where.Y}) stopped closing {gap} tiles short, the {BotGround.ShiedLimit}rd to do so, and the seam is struck off"
+                            : $"the walk to the {_seam.Ore} at ({_seam.Where.X}, {_seam.Where.Y}) stopped closing {gap} tiles short, which says nothing of the seam; it rests and stays on the board"
                     );
                 }
 
@@ -361,9 +380,9 @@ public sealed class BotDig : BotDeed
                 {
                     BotGround.Drained(_seam.Where);
 
-                    return BotDoing.Failed(
-                        $"emptied {_ranDry} of {_spent.Count} rocks and found no more, and the seam rests"
-                    );
+                    return Made > 0
+                        ? BotDoing.Done($"worked the seam out: emptied {_ranDry} of {_spent.Count} rocks, and it rests")
+                        : BotDoing.Failed($"emptied {_ranDry} of {_spent.Count} rocks and found no more, and the seam rests");
                 }
 
                 bot?.Resolve?.Ledger?.Beware(Trade, _map, _seam.Where);
@@ -468,7 +487,16 @@ public sealed class BotDig : BotDeed
                 {
                     BotHeard.Clear(body);
 
-                    return BotDoing.Failed("the pickaxe wore out");
+                    if (BotOre.Tool(body) != null)
+                    {
+                        NextPickaxe++;
+
+                        break;
+                    }
+
+                    return Made > 0
+                        ? BotDoing.Done($"the pickaxe wore out, {_raw} ore still to smelt")
+                        : BotDoing.Failed("the pickaxe wore out");
                 }
         }
 
@@ -591,12 +619,50 @@ public sealed class BotDig : BotDeed
             }
         }
 
-        if (!body.InRange(_fire, BotOre.FireReach))
+        if (_closer ? !body.InRange(_fire, 1) : !body.InRange(_fire, BotOre.FireReach))
         {
-            return BotDoing.Walk(_map, _fire, BotArrival.Within(BotOre.FireReach), "to a fire");
+            return _closer
+                ? BotDoing.Walk(_map, _fire, BotArrival.Beside, "closer to the fire")
+                : BotDoing.Walk(_map, _fire, BotArrival.Within(BotOre.FireReach), "to a fire");
         }
 
+        var before = BotOre.Carried(body);
         var made = BotOre.Melt(body);
+
+        if (made <= 0 && BotOre.Carried(body) >= before)
+        {
+            Spurned++;
+
+            var house = BaseHouse.FindHouseAt(_fire, _map, 16);
+            var lately = _nearing.TryGetValue(_fire, out var when) && Core.TickCount - when < NearingMs;
+
+            if (!_closer && !lately && (house == null || BaseHouse.FindHouseAt(body) == house))
+            {
+                _closer = true;
+                _nearing[_fire] = Core.TickCount;
+                Nearer++;
+
+                return BotDoing.Walk(_map, _fire, BotArrival.Beside, "closer to the fire");
+            }
+
+            BotGround.Unfit(_fire);
+            Forsaken++;
+
+            _fire = Point3D.Zero;
+            _closer = false;
+
+            if (++_refusals >= MostRefusals)
+            {
+                _leg = Leg.Counter;
+            }
+
+            return default;
+        }
+
+        if (made > 0 && _closer)
+        {
+            _nearing.Remove(_fire);
+        }
 
         if (made <= 0)
         {

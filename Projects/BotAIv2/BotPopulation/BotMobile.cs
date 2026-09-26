@@ -109,6 +109,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
     public int Refusals { get; set; }
 
+    public bool Tired { get; set; }
+
     public long FellTick { get; private set; }
 
     public double Progress
@@ -628,9 +630,16 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
             );
         }
 
-        BotPeril.Fell(Map, Location);
+        if ((c as Corpse)?.Killer is BotMobile { Deleted: false } killer && killer != this)
+        {
+            BotQuad.FellToBot();
+        }
+        else
+        {
+            BotPeril.Fell(Map, Location);
 
-        BotQuad.Fell(Map, Location, Class is BotBaron ? BotQuad.BaronWorth : BotQuad.DeathWorth);
+            BotQuad.Fell(Map, Location, Class is BotBaron ? BotQuad.BaronWorth : BotQuad.DeathWorth);
+        }
 
         Journey.Finish();
 
@@ -1073,7 +1082,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
                     continue;
                 }
 
-                if (item.Layer == Layer.OneHanded && taken.Contains(Layer.TwoHanded))
+                if (item.Layer == Layer.OneHanded && FindItemOnLayer(Layer.TwoHanded) is BaseWeapon)
                 {
                     continue;
                 }
@@ -1543,9 +1552,26 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
             return false;
         }
 
+        var shield = wanted.Layer == Layer.TwoHanded ? FindItemOnLayer(Layer.TwoHanded) : null;
+
+        if (shield != null && !pack.TryDropItem(this, shield, false))
+        {
+            if (held != null)
+            {
+                EquipItem(held);
+            }
+
+            return false;
+        }
+
         if (EquipItem(wanted))
         {
             return true;
+        }
+
+        if (shield != null)
+        {
+            EquipItem(shield);
         }
 
         if (held != null)
@@ -1640,7 +1666,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         WasDoingAt = reader.ReadPoint3D();
     }
 
-    public bool Revive(BotClass klass)
+    public bool Revive(BotClass klass, bool away = false)
     {
         if (klass == null || Deleted || Backpack == null)
         {
@@ -1657,12 +1683,12 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         Player = true;
 
-        if ((Map == null || Map == Map.Internal) && LogoutMap != null && LogoutMap != Map.Internal)
+        if (!away && (Map == null || Map == Map.Internal) && LogoutMap != null && LogoutMap != Map.Internal)
         {
             MoveToWorld(LogoutLocation, LogoutMap);
         }
 
-        if (Map == null || Map == Map.Internal)
+        if (away ? LogoutMap == null || LogoutMap == Map.Internal : Map == null || Map == Map.Internal)
         {
             return false;
         }

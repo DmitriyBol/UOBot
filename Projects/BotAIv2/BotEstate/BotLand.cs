@@ -54,24 +54,30 @@ public static class BotLand
         }
 
         string held = null;
-        var closest = int.MaxValue;
+
+        var here = BotQuad.Key(map, where);
 
         foreach (var (name, hall) in BotEstate.Held)
         {
-            if (hall is not { Deleted: false } || hall.Map != map)
+            if (hall is { Deleted: false } && hall.Map == map && BotQuad.Key(map, hall.Location) == here)
             {
-                continue;
+                held = name;
+
+                break;
             }
+        }
 
-            var gap = Math.Max(Math.Abs(hall.X - where.X), Math.Abs(hall.Y - where.Y));
-
-            if (gap > Reach || gap >= closest)
+        if (held == null)
+        {
+            foreach (var (name, post) in BotOutpost.Held)
             {
-                continue;
-            }
+                if (post is { Deleted: false } && post.Map == map && BotQuad.Key(map, post.Location) == here)
+                {
+                    held = name;
 
-            held = name;
-            closest = gap;
+                    break;
+                }
+            }
         }
 
         return held ?? BotClaim.Owner(map, where);

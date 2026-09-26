@@ -63,6 +63,8 @@ public sealed class BotDashboardGump : DynamicGump
 
     private const int Red = 0x26;
 
+    private const int Offline = 0x3B2;
+
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDashboardGump));
 
     private const int BotsTab = 0;
@@ -298,8 +300,15 @@ public sealed class BotDashboardGump : DynamicGump
             named += " — RED";
         }
 
+        if (!Away(bot) && BotRest.CalledBy(bot) is { } calledBy)
+        {
+            named += $" — called by {calledBy}";
+        }
+
         return named;
     }
+
+    private static bool Away(BotMobile bot) => bot.Map == null || bot.Map == Map.Internal;
 
     private static int NameHue(BotMobile bot) =>
         !bot.Alive ? Bad
@@ -314,7 +323,7 @@ public sealed class BotDashboardGump : DynamicGump
         builder.AddLabelCropped(310, 44, 70, 20, Head, "class");
         builder.AddLabelCropped(386, 44, 60, 20, Head, "rung");
         builder.AddLabelCropped(452, 44, 214, 20, Head, "doing");
-        builder.AddLabelCropped(672, 44, 56, 20, Head, "power");
+        builder.AddLabelCropped(672, 44, 56, 20, Head, "beats");
         builder.AddLabelCropped(734, 44, 46, 20, Head, "mood");
         builder.AddLabelCropped(786, 44, 56, 20, Head, "vector");
         builder.AddLabelCropped(848, 44, 60, 20, Head, "purse");
@@ -329,12 +338,31 @@ public sealed class BotDashboardGump : DynamicGump
             var y = 68 + i * RowHeight;
             var resolve = bot.Resolve;
 
+            if (Away(bot))
+            {
+                builder.AddLabelCropped(14, y, 250, 20, Offline, $"{Named(bot)} — offline");
+                builder.AddLabelCropped(270, y, 34, 20, Offline, bot.Minded ? "(AI)" : "");
+                builder.AddLabelCropped(310, y, 70, 20, Offline, bot.Class?.Name ?? "?");
+                builder.AddLabelCropped(386, y, 60, 20, Offline, "offline");
+                builder.AddLabelCropped(452, y, 214, 20, Offline, BotRest.Offline(bot) ?? "resting");
+                builder.AddLabelCropped(672, y, 56, 20, Offline, BotProving.Beats(bot));
+                builder.AddLabelCropped(734, y, 46, 20, Offline, $"{bot.Mood:P0}");
+                builder.AddLabelCropped(786, y, 56, 20, Offline, $"{bot.Progress:P0}");
+                builder.AddLabelCropped(848, y, 60, 20, Offline, $"{Purse(bot)}");
+                builder.AddLabelCropped(914, y, 68, 20, Offline, $"{Banker.GetBalance(bot)}");
+                builder.AddLabelCropped(988, y, 40, 20, Offline, $"{bot.BankBox?.TotalItems ?? 0}");
+                builder.AddLabelCropped(1034, y, 50, 20, Offline, $"{BotAuction.StallsOf(bot)}");
+                builder.AddLabelCropped(1090, y, 50, 20, Offline, $"{BotAuction.WorthOf(bot)}");
+
+                continue;
+            }
+
             builder.AddLabelCropped(14, y, 250, 20, NameHue(bot), Named(bot));
             builder.AddLabelCropped(270, y, 34, 20, Ink, bot.Minded ? "(AI)" : "");
             builder.AddLabelCropped(310, y, 70, 20, Ink, bot.Class?.Name ?? "?");
             builder.AddLabelCropped(386, y, 60, 20, Rung(resolve), $"{resolve.Standing}");
             builder.AddLabelCropped(452, y, 214, 20, Ink, Doing(bot));
-            builder.AddLabelCropped(672, y, 56, 20, Ink, $"{BotThreat.Power(bot):N0}");
+            builder.AddLabelCropped(672, y, 56, 20, Ink, BotProving.Beats(bot));
             builder.AddLabelCropped(734, y, 46, 20, Shade(bot.Mood, 0.5), $"{bot.Mood:P0}");
             builder.AddLabelCropped(786, y, 56, 20, Shade(bot.Progress, 0.35), $"{bot.Progress:P0}");
             builder.AddLabelCropped(848, y, 60, 20, Ink, $"{Purse(bot)}");
@@ -361,7 +389,8 @@ public sealed class BotDashboardGump : DynamicGump
         var (units, worth) = BotAuction.Offered();
 
         builder.AddLabelCropped(14, Height - 52, 130, 20, Ink, $"{BotPopulation.Count} bots, {BotPopulation.Living} alive");
-        builder.AddLabelCropped(150, Height - 52, 1016, 20, Ink, BotWill.Describe());
+        builder.AddLabelCropped(150, Height - 52, 150, 20, Offline, $"{BotPopulation.Away.Count} offline, resting");
+        builder.AddLabelCropped(306, Height - 52, 860, 20, Ink, BotWill.Describe());
 
         builder.AddLabelCropped(
             14,
@@ -1576,9 +1605,18 @@ public sealed class BotDashboardGump : DynamicGump
 
         var bot = _bots[row];
 
-        if (bot.Deleted || bot.Map == null || bot.Map == Map.Internal)
+        if (bot.Deleted)
         {
             from.SendMessage("That bot is not in the world any more.");
+
+            return;
+        }
+
+        if (Away(bot))
+        {
+            from.SendMessage($"{bot.Name} the {bot.Class?.Name} is offline, {BotRest.Offline(bot) ?? "resting"}.");
+
+            DisplayTo(from, _tab, _page);
 
             return;
         }
@@ -1649,6 +1687,16 @@ public sealed class BotDashboardGump : DynamicGump
             if (all[i] is { Deleted: false })
             {
                 alive.Add(all[i]);
+            }
+        }
+
+        var away = BotPopulation.Away;
+
+        for (var i = 0; i < away.Count; i++)
+        {
+            if (away[i] is { Deleted: false })
+            {
+                alive.Add(away[i]);
             }
         }
 

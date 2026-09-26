@@ -109,6 +109,10 @@ public static class BotPopulation
 
     public static IReadOnlyList<BotMobile> Bots => _bots;
 
+    private static readonly List<BotMobile> _away = [];
+
+    public static IReadOnlyList<BotMobile> Away => _away;
+
     public static int Count => _bots.Count - _holes;
 
     public static int Living
@@ -150,8 +154,10 @@ public static class BotPopulation
             var name = bot.Was;
             var klass = name == null ? null : BotClasses.Find(name);
 
+            var resting = BotRest.Resting(bot.Name);
+
             if (klass == null || mix == null || !mix.TryGetValue(klass.Name, out var want)
-                || kept.GetValueOrDefault(klass.Name) >= want || !bot.Revive(klass))
+                || kept.GetValueOrDefault(klass.Name) >= want || !bot.Revive(klass, resting))
             {
                 bot.Delete();
                 deleted++;
@@ -161,8 +167,16 @@ public static class BotPopulation
 
             kept[klass.Name] = kept.GetValueOrDefault(klass.Name) + 1;
 
+            if (resting)
+            {
+                _away.Add(bot);
+                continue;
+            }
+
             Enlist(bot);
         }
+
+        Unduplicate();
 
         return deleted;
     }
@@ -228,6 +242,135 @@ public static class BotPopulation
     }
 
     public static BotMobile Raise(BotClass klass) => Raise(klass, null);
+
+    public static BotMobile RaiseNewcomer(BotClass klass)
+    {
+        for (var index = 0; index < Names.Length * (Houses.Length + 1); index++)
+        {
+            var name = NameAt(index);
+
+            if (!InUse(name) && !BotProgress.Remembers(name))
+            {
+                return Raise(klass, name);
+            }
+        }
+
+        return null;
+    }
+
+    public static long Renamed { get; private set; }
+
+    private static void Unduplicate()
+    {
+        List<BotMobile> everybody = [];
+
+        for (var i = 0; i < _bots.Count; i++)
+        {
+            if (_bots[i] is { Deleted: false } bot)
+            {
+                everybody.Add(bot);
+            }
+        }
+
+        everybody.AddRange(_away);
+        everybody.Sort((a, b) => a.Serial.CompareTo(b.Serial));
+
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < everybody.Count; i++)
+        {
+            var bot = everybody[i];
+
+            if (string.IsNullOrEmpty(bot.Name) || seen.Add(bot.Name))
+            {
+                continue;
+            }
+
+            string fresh = null;
+
+            for (var index = 0; index < Names.Length * (Houses.Length + 1); index++)
+            {
+                var name = NameAt(index);
+
+                if (!seen.Contains(name) && !InUse(name) && !BotProgress.Remembers(name))
+                {
+                    fresh = name;
+                    break;
+                }
+            }
+
+            if (fresh == null)
+            {
+                continue;
+            }
+
+            logger.Warning(
+                "{Old} the {Class} answered to the same name as an older bot; it is {New} from now on",
+                bot.Name,
+                bot.Class?.Name,
+                fresh
+            );
+
+            bot.Name = fresh;
+            seen.Add(fresh);
+            Renamed++;
+        }
+    }
+
+    public static void Park(BotMobile bot)
+    {
+        if (bot == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < _bots.Count; i++)
+        {
+            if (!ReferenceEquals(_bots[i], bot))
+            {
+                continue;
+            }
+
+            _bots[i] = null;
+            _holes++;
+
+            break;
+        }
+
+        bot.Scheduled = false;
+
+        if (!_away.Contains(bot))
+        {
+            _away.Add(bot);
+        }
+    }
+
+    public static bool Unpark(BotMobile bot)
+    {
+        if (bot == null)
+        {
+            return false;
+        }
+
+        _away.Remove(bot);
+
+        var map = bot.LogoutMap;
+        var at = bot.LogoutLocation;
+        var own = map != null && map != Map.Internal && map.CanSpawnMobile(at);
+
+        if (own)
+        {
+            bot.MoveToWorld(at, map);
+        }
+        else if (!TryPlace(bot) && Home != null)
+        {
+            bot.MoveToWorld(Where, Home);
+        }
+
+        Enlist(bot);
+
+        return own;
+    }
 
     public static BotMobile Raise(BotClass klass, string called)
     {
@@ -407,6 +550,8 @@ public static class BotPopulation
             return;
         }
 
+        _away.Remove(bot);
+
         for (var i = 0; i < _bots.Count; i++)
         {
             if (!ReferenceEquals(_bots[i], bot))
@@ -428,7 +573,13 @@ public static class BotPopulation
             _bots[i]?.Delete();
         }
 
+        for (var i = _away.Count - 1; i >= 0; i--)
+        {
+            _away[i]?.Delete();
+        }
+
         _bots.Clear();
+        _away.Clear();
 
         _holes = 0;
         _named = 0;
@@ -446,7 +597,7 @@ public static class BotPopulation
             }
         }
 
-        return $"{Count} bots, {Living} on their feet, {fallen} waiting to be revived";
+        return $"{Count} bots, {Living} on their feet, {fallen} waiting to be revived, {_away.Count} resting";
     }
 
     private static void Enlist(BotMobile bot)
@@ -615,8 +766,41 @@ public static class BotPopulation
 
     private static string Christen()
     {
+        string name;
+
+        do
+        {
+            name = NameAt(_named++);
+        }
+        while (InUse(name) && _named < Names.Length * (Houses.Length + 1));
+
+        return name;
+    }
+
+    private static bool InUse(string name)
+    {
+        for (var i = 0; i < _bots.Count; i++)
+        {
+            if (_bots[i] is { Deleted: false } bot && bot.Name.InsensitiveEquals(name))
+            {
+                return true;
+            }
+        }
+
+        for (var i = 0; i < _away.Count; i++)
+        {
+            if (_away[i] is { Deleted: false } bot && bot.Name.InsensitiveEquals(name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string NameAt(int index)
+    {
         var pool = Names;
-        var index = _named++;
 
         if (index < pool.Length)
         {

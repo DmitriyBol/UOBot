@@ -27,7 +27,7 @@ public static class BotThread
 
     public static CraftSystem System => DefTailoring.CraftSystem;
 
-    public static SewingKit Kit(Mobile bot) => bot?.Backpack?.FindItemByType<SewingKit>();
+    public static SewingKit Kit(Mobile bot) => BotOutfit.Oldest<SewingKit>(bot?.Backpack);
 
     public static int Amount(Mobile bot, Type stuff) =>
         stuff == null ? 0 : bot?.Backpack?.GetAmount(stuff) ?? 0;

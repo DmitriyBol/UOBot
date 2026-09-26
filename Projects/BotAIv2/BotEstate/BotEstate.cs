@@ -315,6 +315,8 @@ public static class BotEstate
 
         _halls[guild.Name] = house;
 
+        BotClaim.Seat(guild.Name, house.Map, house.Location);
+
         if (bought)
         {
             Raised++;
@@ -410,6 +412,43 @@ public static class BotEstate
 
             Register(guild, house, false);
         }
+
+        HallsAdopted = true;
+    }
+
+    public static bool HallsAdopted { get; private set; }
+
+    public static long RazedByLoss { get; private set; }
+
+    public static bool RazeHall(string guild, string why)
+    {
+        if (guild == null || !_halls.TryGetValue(guild, out var house) || house is not { Deleted: false })
+        {
+            return false;
+        }
+
+        var where = house.Location;
+        var merchant = BotShelf.Of(house);
+
+        if (merchant is { Deleted: false })
+        {
+            merchant.House = null;
+            merchant.Delete();
+        }
+
+        house.Delete();
+        _halls.Remove(guild);
+        BotPlot.Spend();
+        RazedByLoss++;
+
+        if (BaseGuild.FindByName(guild) is Guild lost)
+        {
+            BotExile.Paid(lost);
+        }
+
+        logger.Warning("The hall of {Guild} at {X},{Y} is razed: {Why}", guild, where.X, where.Y, why);
+
+        return true;
     }
 
     public static void Take(Guild guild, BaseHouse house)
@@ -577,7 +616,7 @@ public static class BotEstate
             var owed = wanting.Length == 0 ? "every guild has one" : wanting.ToString();
 
             return
-                $"{halls}; {ledger}; {owed}; {BotSteward.Describe()}; {BotFitter.Describe()}; {BotHirer.Describe()}; {Merchanted} merchants hired for {Contracts}gp; {BotSupplier.Describe()}; {BotOffice.Describe()}; {BotShelf.Describe()}; {BotLand.Describe()}; {BotRegard.Describe()}; {BotBailiff.Describe()}; {BotFeuder.Describe()}; {BotExile.Describe()}; {BotRemover.Describe()}; {BotHolder.Describe()}; {BotReeve.Describe()}; {BotChest.Describe()}; {Barred} times a workshop was passed over as somebody else's; {BotPlot.Describe()}";
+                $"{halls}; {ledger}; {owed}; {BotSteward.Describe()}; {BotFitter.Describe()}; {BotHirer.Describe()}; {Merchanted} merchants hired for {Contracts}gp; {BotSupplier.Describe()}; {BotOffice.Describe()}; {BotShelf.Describe()}; {BotLand.Describe()}; {BotRegard.Describe()}; {BotBailiff.Describe()}; {BotFeuder.Describe()}; {BotExile.Describe()}; {BotRemover.Describe()}; {BotHolder.Describe()}; {BotReeve.Describe()}; {BotChest.Describe()}; {BotToll.Describe()}; {BotTollman.Describe()}; {BotEnlarger.Describe()}; {BotAbode.Describe()}; {BotAbodeBuyer.Describe()}; {BotReposer.Describe()}; {BotOutposter.Describe()}; {Barred} times a workshop was passed over as somebody else's; {BotPlot.Describe()}";
         }
         finally
         {

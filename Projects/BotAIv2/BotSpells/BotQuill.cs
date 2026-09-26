@@ -96,7 +96,7 @@ public static class BotQuill
 
     public static int Asking(int cost) => cost <= 0 ? 0 : (int)Math.Ceiling(cost * (1.0 + Markup));
 
-    public static ScribesPen Pen(Mobile bot) => bot?.Backpack?.FindItemByType<ScribesPen>();
+    public static ScribesPen Pen(Mobile bot) => BotOutfit.Oldest<ScribesPen>(bot?.Backpack);
 
     public static int Blanks(Mobile bot) => bot?.Backpack?.GetAmount(typeof(BlankScroll)) ?? 0;
 
@@ -214,7 +214,7 @@ public static class BotQuill
                 continue;
             }
 
-            if (book?.HasSpell(spell) != true)
+            if (DefInscription.Knows?.Invoke(bot, spell) != true && book?.HasSpell(spell) != true)
             {
                 continue;
             }

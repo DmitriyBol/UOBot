@@ -199,6 +199,11 @@ public static class BotSeat
 
         if (BotEstate.Hall(guild) is { Deleted: false } hall && hall.Map == BotPopulation.Home)
         {
+            if (!bot.Alive && BotOutpost.Nearer(guild, hall, bot) is var post && post != Point3D.Zero)
+            {
+                return post;
+            }
+
             return hall.BanLocation;
         }
 

@@ -67,7 +67,8 @@ public static class BotStable
 
     public static long Thrown { get; private set; }
 
-    public static BotSteed Of(Mobile bot) => bot?.Backpack?.FindItemByType<BotSteed>();
+    public static BotSteed Of(Mobile bot) =>
+        bot?.Backpack?.FindItemByType<BotChampionSteed>() ?? bot?.Backpack?.FindItemByType<BotSteed>();
 
     public static bool Wants(BotMobile bot) =>
         bot?.Class is { Rides: true } && Of(bot) == null && !bot.Mounted;

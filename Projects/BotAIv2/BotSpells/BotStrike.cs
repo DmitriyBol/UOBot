@@ -38,6 +38,19 @@ public static class BotStrike
         SpellEnergyBolt
     ];
 
+    public static int Strongest(Mobile bot)
+    {
+        for (var i = Ladder.Length - 1; i >= 0; i--)
+        {
+            if (BotGrimoire.Holds(bot, Ladder[i]))
+            {
+                return Ladder[i];
+            }
+        }
+
+        return -1;
+    }
+
     public const int SpellHarm = 11;
 
     public const int SpellFireball = 17;

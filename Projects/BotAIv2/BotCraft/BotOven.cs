@@ -48,7 +48,7 @@ public static class BotOven
 
     public static SkillName Skill => SkillName.Cooking;
 
-    public static BaseTool Kit(Mobile bot) => bot?.Backpack?.FindItemByType<Skillet>();
+    public static BaseTool Kit(Mobile bot) => BotOutfit.Oldest<Skillet>(bot?.Backpack);
 
     public static IReadOnlyList<Type> Raw { get; } =
     [

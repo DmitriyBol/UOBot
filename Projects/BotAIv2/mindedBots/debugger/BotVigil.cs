@@ -479,16 +479,11 @@ public static class BotVigil
             watch.Sample(now, since);
         }
 
-        if (_watch.Count <= bots.Count)
-        {
-            return;
-        }
-
         List<Serial> gone = [];
 
         foreach (var (serial, watch) in _watch)
         {
-            if (watch.Bot is not { Deleted: false })
+            if (watch.Bot is not { Deleted: false } || watch.Bot.Map == null || watch.Bot.Map == Map.Internal)
             {
                 gone.Add(serial);
             }

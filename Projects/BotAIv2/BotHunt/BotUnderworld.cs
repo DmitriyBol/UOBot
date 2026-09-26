@@ -49,7 +49,7 @@ public static class BotUnderworld
 
     public static int MostMembers { get; set; } = 5;
 
-    public static int LeastUnseen { get; set; } = 1;
+    public static int LeastUnseen { get; set; } = 0;
 
     public static int SweepMs { get; set; } = 60000;
 
@@ -59,7 +59,13 @@ public static class BotUnderworld
 
     public static int HideoutMostRoad { get; set; } = 520;
 
-    public static double MemberRobChance { get; set; } = 0.25;
+    public static double MemberRobChance { get; set; } = 0.5;
+
+    public static int BanditEveryMs { get; set; } = 300000;
+
+    public static long Outcasts { get; private set; }
+
+    public static long Enmities { get; private set; }
 
     public static double ExtortShare { get; set; } = 0.5;
 
@@ -140,6 +146,69 @@ public static class BotUnderworld
     public static bool Band(Guild guild) => _founded && _guild is { Disbanded: false } && ReferenceEquals(guild, _guild);
 
     public static bool Member(Mobile m) => _founded && _guild is { Disbanded: false } && m?.Guild != null && ReferenceEquals(m.Guild, _guild);
+
+    public static bool Outlawed(Mobile m) => m != null && Of(m.Name) is { } sheet && sheet.Murders + sheet.Robberies > 0;
+
+    public static BotMobile Near(Mobile from, int range)
+    {
+        if (!_founded || _guild is not { Disbanded: false } || from?.Map == null || _members.Count == 0 || Member(from))
+        {
+            return null;
+        }
+
+        for (var i = 0; i < _members.Count; i++)
+        {
+            if (Named(_members[i]) is not { Deleted: false, Alive: true, Hidden: false } one || one.Map != from.Map
+                || !from.InRange(one.Location, range) || !from.CanSee(one) || BotOutlaw.Jailed(one))
+            {
+                continue;
+            }
+
+            return one;
+        }
+
+        return null;
+    }
+
+    public static long Dissolved { get; private set; }
+
+    private static bool Anybody()
+    {
+        for (var i = 0; i < _members.Count; i++)
+        {
+            if (Named(_members[i]) != null)
+            {
+                return true;
+            }
+
+            var away = BotPopulation.Away;
+
+            for (var k = 0; k < away.Count; k++)
+            {
+                if (away[k] is { Deleted: false } resting && resting.Name == _members[i])
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static int Bandits()
+    {
+        var count = 0;
+
+        foreach (var (_, sheet) in _sheets)
+        {
+            if (sheet.Murders + sheet.Robberies > 0)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
 
     public static Sheet Of(string name) => name != null && _sheets.TryGetValue(name, out var sheet) ? sheet : null;
 
@@ -257,6 +326,8 @@ public static class BotUnderworld
         {
             sheet.Unseen++;
         }
+
+        Outcast(killer);
     }
 
     public static void Robbed(Mobile robber)
@@ -264,6 +335,77 @@ public static class BotUnderworld
         if (Sheeted(robber) is { } sheet)
         {
             sheet.Robberies++;
+
+            Outcast(robber);
+        }
+    }
+
+    private static void Outcast(Mobile m)
+    {
+        if (!Running || m is not BotMobile { Deleted: false } bot || Member(bot))
+        {
+            return;
+        }
+
+        if (bot.Guild is Guild old && !ReferenceEquals(old, _guild))
+        {
+            Leave(bot);
+            Outcasts++;
+
+            logger.Information("{Bot} walks out of {Guild}: a bandit keeps no honest company", bot.Name, old.Name);
+        }
+
+        if (!_founded || !Anybody())
+        {
+            TryFound();
+
+            return;
+        }
+
+        if (_guild is { Disbanded: false } && Thieves < MostMembers && Fit(bot))
+        {
+            Join(bot);
+            Recruited++;
+
+            logger.Information("{Bot} is taken into The Shadow at once, {Count} thieves of {Most}", bot.Name, Thieves, MostMembers);
+        }
+    }
+
+    public static void EnemyOfAll()
+    {
+        if (!Running || !_founded || _guild is not { Disbanded: false } band)
+        {
+            return;
+        }
+
+        var made = 0;
+
+        foreach (var guild in BotGuilds.Standing)
+        {
+            if (guild == null || guild.Disbanded || ReferenceEquals(guild, band) || band.IsWar(guild))
+            {
+                continue;
+            }
+
+            band.AddEnemy(guild);
+            made++;
+        }
+
+        if (made > 0)
+        {
+            Enmities += made;
+
+            logger.Information("The Shadow is set against {Count} guilds as their enemy; every guild on the island now counts it one", made);
+        }
+    }
+
+    public static void Burgled(Mobile burglar)
+    {
+        if (Sheeted(burglar) is { } sheet)
+        {
+            sheet.Robberies++;
+
+            Outcast(burglar);
         }
     }
 
@@ -335,6 +477,11 @@ public static class BotUnderworld
         _sheets.Clear();
         _members.Clear();
         _paid.Clear();
+
+        _founded = false;
+        _guild = null;
+
+        BotBurgle.Forget();
     }
 
     public static void Reform()
@@ -388,6 +535,22 @@ public static class BotUnderworld
 
             return;
         }
+
+        if (!Anybody())
+        {
+            _founded = false;
+            _guild = null;
+            _members.Clear();
+            Dissolved++;
+
+            logger.Information("The Shadow has nobody left on its roll and is dissolved; the next {Founders} bandits found it again", Math.Max(1, Founders));
+
+            TryFound();
+
+            return;
+        }
+
+        EnemyOfAll();
 
         if (_hideout == Point3D.Zero)
         {
@@ -594,7 +757,8 @@ public static class BotUnderworld
 
     private static bool Fit(BotMobile bot)
     {
-        if (bot is not { Deleted: false } || bot.Class is not { } klass || Of(bot.Name) is not { } sheet || sheet.Unseen < LeastUnseen)
+        if (bot is not { Deleted: false } || bot.Class is not { } klass || Of(bot.Name) is not { } sheet
+            || sheet.Murders + sheet.Robberies < 1 || sheet.Unseen < LeastUnseen)
         {
             return false;
         }
@@ -747,6 +911,8 @@ public static class BotUnderworld
             band[i].DisplayGuildTitle = true;
             _members.Add(band[i].Name);
         }
+
+        EnemyOfAll();
     }
 
     public static bool Take(BotMobile bot)
@@ -887,10 +1053,10 @@ public static class BotUnderworld
         }
 
         var guild = !_founded
-            ? $"The Shadow is not founded ({unseen} of the {Math.Max(1, Founders)} killers from hiding it wants)"
-            : $"The Shadow: {string.Join(", ", _members)}, hideout at ({_hideout.X}, {_hideout.Y}){(_hideoutKnown ? $", given away by {_givenAwayBy}" : "")}; founded {Founded} times, {Recruited} taken in, {Reformed} put back at a boot, {GivenAway} hideouts given away and {Burned} burned";
+            ? $"The Shadow is not founded ({Bandits()} of the {Math.Max(1, Founders)} bandits it wants)"
+            : $"The Shadow, the enemy of every guild ({Enmities} set against it): {string.Join(", ", _members)}, hideout at ({_hideout.X}, {_hideout.Y}){(_hideoutKnown ? $", given away by {_givenAwayBy}" : "")}; founded {Founded} times, {Recruited} taken in, {Reformed} put back at a boot, {GivenAway} hideouts given away and {Burned} burned";
 
-        return $"{_sheets.Count} bots on record, {murderers} of them murderers and {unseen} killers from hiding, {extortions} demands paid on record; {guild}; {BotFence.Describe()}; {BotSilence.Describe()}; {BotLair.Describe()}; {BotStash.Describe()}; {Sweeps} sweeps for a walk out ({NoChest} found no chest, {Busy} members at the band's own business, {Light} carrying nothing worth the walk, {Unready} not free to go, {Sent} sent); {BotFetch.Describe()}; {BotRaid.Describe()}";
+        return $"{_sheets.Count} bots on record, {murderers} of them murderers and {unseen} killers from hiding, {extortions} demands paid on record, {Outcasts} walked out of their guilds for it; {guild}; {BotFence.Describe()}; {BotSilence.Describe()}; {BotLair.Describe()}; {BotStash.Describe()}; {Sweeps} sweeps for a walk out ({NoChest} found no chest, {Busy} members at the band's own business, {Light} carrying nothing worth the walk, {Unready} not free to go, {Sent} sent); {BotFetch.Describe()}; {BotRaid.Describe()}; {BotBurgle.Describe()}";
     }
 
     internal static void Save(IGenericWriter writer)

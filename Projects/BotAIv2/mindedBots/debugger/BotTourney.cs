@@ -39,11 +39,17 @@ public static class BotTourney
 
     public static bool Running { get; set; } = true;
 
-    public static long EveryMs { get; set; } = 604800000L;
+    public static long EveryMs { get; set; } = 3600000L;
+
+    public static long LeastGapMs { get; set; } = 3600000L;
+
+    public static bool Ready => Running && _stage == Stage.Idle && (DateTime.Now - _held).TotalMilliseconds >= LeastGapMs;
+
+    public static long TooSoon { get; private set; }
 
     public static int Entrants { get; set; } = 30;
 
-    public static Point3D Ring { get; set; } = new(1460, 1500, 0);
+    public static Point3D Ring { get; set; } = new(1458, 1500, 0);
 
     public static int Apart { get; set; } = 3;
 
@@ -52,6 +58,14 @@ public static class BotTourney
     public static int SlackMs { get; set; } = 30000;
 
     public static long Held { get; private set; }
+
+    public static int RepeatPurse { get; set; } = 1000;
+
+    public static long Repeats { get; private set; }
+
+    public static long Duplicates { get; private set; }
+
+    private static bool _swept;
 
     public static long Called { get; private set; }
 
@@ -168,6 +182,13 @@ public static class BotTourney
             return $"a championship is already running: round {_roundNo}, {_round.Count + _next.Count} still in it.";
         }
 
+        if (by != "the keyboard" && (DateTime.Now - _held).TotalMilliseconds < LeastGapMs)
+        {
+            TooSoon++;
+
+            return $"too soon: the last championship ended {(DateTime.Now - _held).TotalMinutes:F0} minutes ago, and they are held once an hour.";
+        }
+
         var fighters = Fighters();
 
         if (fighters.Count < 2)
@@ -260,6 +281,7 @@ public static class BotTourney
         {
             _hueTick = now;
             Crowned(Find(Champion));
+            Regalia();
         }
 
         switch (_stage)
@@ -420,6 +442,8 @@ public static class BotTourney
 
     private static void Crown(BotMobile winner)
     {
+        Sweep();
+
         Held++;
         _held = DateTime.Now;
         Champion = winner?.Name;
@@ -443,6 +467,15 @@ public static class BotTourney
         );
 
         winner?.Say($"I am the champion of this island, and my name is {winner.Name}!");
+    }
+
+    public static void Forget()
+    {
+        Champion = null;
+        _held = DateTime.Now;
+        _swept = false;
+        Uncrown(null);
+        Save();
     }
 
     private static void Uncrown(string except)
@@ -479,40 +512,500 @@ public static class BotTourney
             return "nothing, there was no pack to put it in";
         }
 
-        Item prize = null;
-        var role = bot.Class?.Role ?? BotRole.Melee;
+        var total = 0;
 
-        if (role is BotRole.Melee or BotRole.Ranged && bot.Bond?.Weapon is { Weapon: { } kind }
-            && kind.CreateInstance<Item>() is BaseWeapon copy)
+        for (var i = 0; i < Draws.Length; i++)
         {
-            copy.DamageLevel = WeaponDamageLevel.Vanq;
-            copy.DurabilityLevel = WeaponDurabilityLevel.Indestructible;
-            prize = copy;
+            total += Draws[i].Weight;
+        }
+
+        var roll = Utility.Random(total);
+        var drawn = Draws.Length - 1;
+
+        for (var i = 0; i < Draws.Length; i++)
+        {
+            if (roll < Draws[i].Weight)
+            {
+                drawn = i;
+
+                break;
+            }
+
+            roll -= Draws[i].Weight;
+        }
+
+        var draw = Draws[drawn];
+
+        Drawn[drawn]++;
+
+        string won;
+
+        if (draw.Level > 0)
+        {
+            var top = draw.Level == TopLevel;
+            var role = bot.Class?.Role ?? BotRole.Melee;
+
+            won = role is BotRole.Caster or BotRole.Medic
+                ? (top ? Robe(bot, pack) : null) ?? Leather(bot, pack, draw.Level) ?? (top ? Steed(bot, pack) : null)
+                : Weapon(bot, pack, draw.Level) ?? Armour(bot, pack, draw.Level) ?? (top ? Steed(bot, pack) : null);
+
+            if (won == null)
+            {
+                Repeats++;
+                Pay(bot, pack, RepeatPurse);
+
+                won = $"{RepeatPurse}gp, holding every prize of that rung its kind may choose";
+            }
+        }
+        else if (draw.Gold > 0)
+        {
+            Pay(bot, pack, draw.Gold);
+
+            won = $"{draw.Gold}gp";
         }
         else
         {
-            prize = new LeatherChest
-            {
-                ProtectionLevel = ArmorProtectionLevel.Invulnerability,
-                Durability = ArmorDurabilityLevel.Indestructible
-            };
+            won = Supplies(bot, pack);
         }
 
-        if (prize == null)
+        return $"{won} (the draw fell on {draw.Name}, {draw.Weight} in {total})";
+    }
+
+    private const int TopLevel = 5;
+
+    private static readonly (int Weight, int Level, int Gold, string Name)[] Draws =
+    [
+        (1, 5, 0, "the top: vanquishing or invulnerability"),
+        (2, 4, 0, "power or fortification"),
+        (3, 3, 0, "force or hardening"),
+        (5, 2, 0, "might or guarding"),
+        (8, 1, 0, "ruin or defense"),
+        (13, 0, 0, "a pack of supplies"),
+        (21, 0, 1000, "a purse of 1000"),
+        (34, 0, 500, "a purse of 500"),
+        (55, 0, 250, "a purse of 250")
+    ];
+
+    private static readonly long[] Drawn = new long[9];
+
+    private static readonly string[] WeaponWords = ["", "ruin", "might", "force", "power", "vanquishing"];
+
+    private static readonly string[] ArmourWords = ["", "defense", "guarding", "hardening", "fortification", "invulnerability"];
+
+    public static int SupplyBandages { get; set; } = 40;
+
+    public static int SupplyHeals { get; set; } = 3;
+
+    public static int SupplyCures { get; set; } = 2;
+
+    public static int SupplyReagents { get; set; } = 20;
+
+    public static int SupplyAmmo { get; set; } = 150;
+
+    private static string Supplies(BotMobile bot, Container pack)
+    {
+        var said = $"a pack of supplies: {SupplyBandages} bandages, {SupplyHeals} heal and {SupplyCures} cure potions";
+
+        pack.TryDropItem(bot, new Bandage(SupplyBandages), false);
+        pack.TryDropItem(bot, new HealPotion { Amount = SupplyHeals }, false);
+        pack.TryDropItem(bot, new CurePotion { Amount = SupplyCures }, false);
+
+        if (bot.Class?.Role is BotRole.Caster or BotRole.Medic || bot.Skills.Magery.Base >= 30.0)
         {
-            return "nothing could be made";
+            Item[] herbs =
+            [
+                new BlackPearl(SupplyReagents), new Bloodmoss(SupplyReagents), new Garlic(SupplyReagents), new Ginseng(SupplyReagents),
+                new MandrakeRoot(SupplyReagents), new Nightshade(SupplyReagents), new SpidersSilk(SupplyReagents), new SulfurousAsh(SupplyReagents)
+            ];
+
+            for (var i = 0; i < herbs.Length; i++)
+            {
+                pack.TryDropItem(bot, herbs[i], false);
+            }
+
+            said += $", {SupplyReagents} of each reagent";
         }
 
+        if (bot.Bond?.Weapon is { Weapon: { } kind } && typeof(BaseRanged).IsAssignableFrom(kind)
+            && kind.CreateInstance<Item>() is BaseRanged bow)
+        {
+            var ammo = bow.AmmoType;
+
+            bow.Delete();
+
+            if (ammo != null && ammo.CreateInstance<Item>() is { } shot)
+            {
+                shot.Amount = SupplyAmmo;
+                pack.TryDropItem(bot, shot, false);
+
+                said += $", {SupplyAmmo} {ammo.Name.ToLowerInvariant()}s";
+            }
+        }
+
+        return said;
+    }
+
+    public static int RobeInt { get; set; } = 15;
+
+    public const int RobeHue = 0x0555;
+
+    public const int SteedHue = 0x0501;
+
+    private const string RobeMod = "champion's robe";
+
+    private static string Weapon(BotMobile bot, Container pack, int level)
+    {
+        if (bot.Class?.Role is not (BotRole.Melee or BotRole.Ranged) || bot.Bond?.Weapon is not { Weapon: { } kind })
+        {
+            return null;
+        }
+
+        var owned = Owned(bot, kind);
+
+        for (var i = 0; i < owned.Count; i++)
+        {
+            if (owned[i] is BaseWeapon held && (int)held.DamageLevel >= level)
+            {
+                return null;
+            }
+        }
+
+        if (kind.CreateInstance<Item>() is not BaseWeapon copy)
+        {
+            return null;
+        }
+
+        copy.DamageLevel = (WeaponDamageLevel)level;
+        copy.DurabilityLevel = (WeaponDurabilityLevel)level;
+
+        var said = Give(bot, pack, copy, $"{kind.Name} of {WeaponWords[level]}, bound");
+
+        if (said != null)
+        {
+            Replace(bot, owned);
+        }
+
+        return said;
+    }
+
+    private static void Replace(BotMobile bot, List<Item> lesser)
+    {
+        for (var i = 0; i < lesser.Count; i++)
+        {
+            if (lesser[i] is { Deleted: false } old)
+            {
+                bot.Bond?.Items.Remove(old.Serial);
+                old.Delete();
+            }
+        }
+    }
+
+    private static string Armour(BotMobile bot, Container pack, int level)
+    {
+        Layer[] order = [Layer.InnerTorso, Layer.Pants, Layer.Arms, Layer.Gloves, Layer.Neck, Layer.Helm];
+
+        for (var i = 0; i < order.Length; i++)
+        {
+            if (bot.FindItemOnLayer(order[i]) is not BaseArmor worn || (int)worn.ProtectionLevel >= level)
+            {
+                continue;
+            }
+
+            var given = Piece(bot, pack, worn.GetType(), level);
+
+            if (given != null)
+            {
+                return given;
+            }
+        }
+
+        return null;
+    }
+
+    private static string Piece(BotMobile bot, Container pack, Type type, int level)
+    {
+        var owned = Owned(bot, type);
+
+        for (var i = 0; i < owned.Count; i++)
+        {
+            if (owned[i] is BaseArmor held && (int)held.ProtectionLevel >= level)
+            {
+                return null;
+            }
+        }
+
+        if (type.CreateInstance<Item>() is not BaseArmor copy)
+        {
+            return null;
+        }
+
+        copy.ProtectionLevel = (ArmorProtectionLevel)level;
+        copy.Durability = (ArmorDurabilityLevel)level;
+
+        var said = Give(bot, pack, copy, $"{type.Name} of {ArmourWords[level]}, bound");
+
+        if (said != null)
+        {
+            Replace(bot, owned);
+        }
+
+        return said;
+    }
+
+    private static string Leather(BotMobile bot, Container pack, int level)
+    {
+        Type[] set = [typeof(LeatherChest), typeof(LeatherLegs), typeof(LeatherArms), typeof(LeatherGloves), typeof(LeatherGorget), typeof(LeatherCap)];
+
+        for (var i = 0; i < set.Length; i++)
+        {
+            var given = Piece(bot, pack, set[i], level);
+
+            if (given != null)
+            {
+                return given;
+            }
+        }
+
+        return null;
+    }
+
+    private static string Robe(BotMobile bot, Container pack)
+    {
+        if (RobeOf(bot) != null)
+        {
+            return null;
+        }
+
+        var robe = new Robe(RobeHue) { Name = "a robe of the arcane mind" };
+        var said = Give(bot, pack, robe, $"a robe of the arcane mind (+{RobeInt} Intelligence while worn), bound");
+
+        if (said != null && !robe.Deleted)
+        {
+            if (bot.FindItemOnLayer(Layer.OuterTorso) is { } over)
+            {
+                pack.DropItem(over);
+            }
+
+            bot.EquipItem(robe);
+            Regalia(bot);
+        }
+
+        return said;
+    }
+
+    private static Robe RobeOf(BotMobile bot)
+    {
+        if (bot?.Bond == null)
+        {
+            return null;
+        }
+
+        if (bot.FindItemOnLayer(Layer.OuterTorso) is Robe { Hue: RobeHue } worn && BotBinding.IsBound(worn, bot.Bond))
+        {
+            return worn;
+        }
+
+        if (bot.Backpack is not { } pack)
+        {
+            return null;
+        }
+
+        foreach (var item in pack.FindItemsByType(typeof(Robe), true))
+        {
+            if (item is Robe { Hue: RobeHue } robe && BotBinding.IsBound(robe, bot.Bond))
+            {
+                return robe;
+            }
+        }
+
+        return null;
+    }
+
+    private static string Steed(BotMobile bot, Container pack)
+    {
+        if (bot.Mount is BotChampionSteed || pack.FindItemByType<BotChampionSteed>() != null)
+        {
+            return null;
+        }
+
+        var (regular, mounted, kind) = bot.Class?.Role switch
+        {
+            BotRole.Caster => (0x25A0, 0x3E9C, "kirin"),
+            BotRole.Medic  => (0x25CE, 0x3E9B, "unicorn"),
+            BotRole.Melee  => (0x2619, 0x3E98, "swamp dragon"),
+            BotRole.Ranged => (0x2135, 0x3EAC, "ostard"),
+            _              => (0x2615, 0x3E9A, "ridgeback")
+        };
+
+        var steed = new BotChampionSteed
+        {
+            RegularID = regular,
+            MountedID = mounted,
+            Hue = SteedHue,
+            Name = $"{bot.Name}'s {kind}"
+        };
+
+        if (!pack.TryDropItem(bot, steed, false))
+        {
+            steed.Delete();
+
+            return null;
+        }
+
+        if (pack.FindItemByType<BotSteed>() is { } bought && bought is not BotChampionSteed)
+        {
+            bought.Delete();
+            Banker.Deposit(bot, BotSteed.Price);
+        }
+
+        return $"a golden {kind} of its own";
+    }
+
+    private static string Give(BotMobile bot, Container pack, Item prize, string said)
+    {
         if (!pack.TryDropItem(bot, prize, false))
         {
             prize.Delete();
 
-            return "nothing, the pack would not take it";
+            return null;
         }
 
         BotBinding.Bind(prize, bot.Bond);
 
-        return prize.GetType().Name + (prize is BaseWeapon ? " of vanquishing" : " of invulnerability") + ", bound";
+        return said;
+    }
+
+    private static void Regalia(BotMobile bot)
+    {
+        if (bot is not { Deleted: false })
+        {
+            return;
+        }
+
+        var wearing = bot.FindItemOnLayer(Layer.OuterTorso) is Robe { Hue: RobeHue } robe && BotBinding.IsBound(robe, bot.Bond);
+        var lent = bot.GetStatMod(RobeMod);
+
+        if (wearing && lent == null)
+        {
+            bot.AddStatMod(new StatMod(StatType.Int, RobeMod, RobeInt, TimeSpan.Zero));
+        }
+        else if (!wearing && lent != null)
+        {
+            bot.RemoveStatMod(RobeMod);
+        }
+    }
+
+    private static void Regalia()
+    {
+        var bots = BotPopulation.Bots;
+
+        for (var i = 0; i < bots.Count; i++)
+        {
+            if (bots[i] is { Deleted: false } bot && (bot.GetStatMod(RobeMod) != null || RobeOf(bot) != null))
+            {
+                Regalia(bot);
+            }
+        }
+    }
+
+    private static bool IsPrize(Item item) =>
+        item is BaseWeapon { DamageLevel: not WeaponDamageLevel.Regular } or BaseArmor { ProtectionLevel: not ArmorProtectionLevel.Regular };
+
+    private static List<Item> Owned(BotMobile bot, Type type)
+    {
+        List<Item> owned = [];
+
+        if (bot?.Bond == null || type == null)
+        {
+            return owned;
+        }
+
+        for (var i = 0; i < bot.Items.Count; i++)
+        {
+            var item = bot.Items[i];
+
+            if (item.GetType() == type && IsPrize(item) && BotBinding.IsBound(item, bot.Bond))
+            {
+                owned.Add(item);
+            }
+        }
+
+        if (bot.Backpack is { } pack)
+        {
+            foreach (var item in pack.FindItemsByType(type, true))
+            {
+                if (IsPrize(item) && BotBinding.IsBound(item, bot.Bond) && !owned.Contains(item))
+                {
+                    owned.Add(item);
+                }
+            }
+        }
+
+        return owned;
+    }
+
+    private static void Pay(BotMobile bot, Container pack, int amount)
+    {
+        if (!Banker.Deposit(bot, amount))
+        {
+            pack?.TryDropItem(bot, new Gold(amount), false);
+        }
+    }
+
+    private static void Sweep()
+    {
+        if (_swept)
+        {
+            return;
+        }
+
+        _swept = true;
+
+        var exchanged = Sweep(BotPopulation.Bots) + Sweep(BotPopulation.Away);
+
+        if (exchanged > 0)
+        {
+            logger.Information("Tourney: {Count} duplicate prizes the population held were exchanged for prizes of their owners' choosing", exchanged);
+        }
+    }
+
+    private static int Sweep(IReadOnlyList<BotMobile> bots)
+    {
+        var exchanged = 0;
+
+        for (var i = 0; i < bots.Count; i++)
+        {
+            if (bots[i] is not { Deleted: false, Bond: { } bond } bot)
+            {
+                continue;
+            }
+
+            List<Type> seen = [];
+
+            foreach (var serial in new List<Serial>(bond.Items))
+            {
+                if (World.FindItem(serial) is not { Deleted: false } item || !IsPrize(item) || seen.Contains(item.GetType()))
+                {
+                    continue;
+                }
+
+                seen.Add(item.GetType());
+
+                var owned = Owned(bot, item.GetType());
+
+                for (var k = 1; k < owned.Count; k++)
+                {
+                    bond.Items.Remove(owned[k].Serial);
+                    owned[k].Delete();
+                    Duplicates++;
+                    exchanged++;
+
+                    logger.Information("Tourney: {Name} exchanged a duplicate {Kind} for {Prize}", bot.Name, item.GetType().Name, Prize(bot));
+                }
+            }
+        }
+
+        return exchanged;
     }
 
     private static bool Summon(BotMobile bot, Map map, int x, int y)
@@ -529,6 +1022,11 @@ public static class BotTourney
             var sy = y + Utility.RandomMinMax(-spread, spread);
 
             if (!map.CanSpawnMobile(sx, sy, Ring.Z - 12, Ring.Z + 12, false, false, out var z))
+            {
+                continue;
+            }
+
+            if (!map.LineOfSight(new Point3D(sx, sy, z + 10), new Point3D(Ring.X, Ring.Y, Ring.Z + 10)))
             {
                 continue;
             }
@@ -607,6 +1105,6 @@ public static class BotTourney
             _              => "between fights"
         };
 
-        return $"the championship: {stage}; champion {Champion ?? "nobody"}; {Held} held, {Fights} fights, {Byes} byes, {Unset} pairs passed over, {CalledOff} called by the referee; {BotDuel.Describe()}; next by the calendar {(_held + TimeSpan.FromMilliseconds(EveryMs)):yyyy-MM-dd HH:mm}";
+        return $"the championship: {stage}; champion {Champion ?? "nobody"}; {Held} held, {Fights} fights, {Byes} byes, {Unset} pairs passed over, {CalledOff} called by the referee, {Repeats} champions paid in gold for holding every prize and {Duplicates} duplicate prizes exchanged; draws since the boot {string.Join("/", Drawn)} (top first), {TooSoon} calls refused inside the hour; {BotDuel.Describe()}; next by the calendar {(_held + TimeSpan.FromMilliseconds(EveryMs)):yyyy-MM-dd HH:mm}";
     }
 }

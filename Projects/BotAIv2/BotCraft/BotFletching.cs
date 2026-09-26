@@ -38,7 +38,7 @@ public static class BotFletching
 {
     public static CraftSystem System => DefBowFletching.CraftSystem;
 
-    public static BaseTool Kit(Mobile bot) => bot?.Backpack?.FindItemByType<FletcherTools>();
+    public static BaseTool Kit(Mobile bot) => BotOutfit.Oldest<FletcherTools>(bot?.Backpack);
 
     public const int PerArrow = 1;
 

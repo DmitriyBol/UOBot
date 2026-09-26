@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Server.Mobiles;
 
@@ -71,6 +72,16 @@ public sealed class BotFreedom : BotDeed
 
     public static long TooFar { get; private set; }
 
+    public static int Lag { get; set; } = 10;
+
+    public static int Rejoin { get; set; } = 3;
+
+    public static int StuckMs { get; set; } = 120000;
+
+    public static long TurnedBack { get; private set; }
+
+    public static long Stuck { get; private set; }
+
     private readonly Map _map;
 
     private readonly BaseEscortable _prisoner;
@@ -80,6 +91,12 @@ public sealed class BotFreedom : BotDeed
     private bool _taken;
 
     private bool _delivered;
+
+    private bool _behind;
+
+    private int _nearestHome = int.MaxValue;
+
+    private long _nearestHomeTick;
 
     public static int ClaimMs { get; set; } = 90000;
 
@@ -207,6 +224,7 @@ public sealed class BotFreedom : BotDeed
             }
 
             _taken = true;
+            _nearestHomeTick = Core.TickCount;
             Uncaged++;
 
             return BotDoing.Work("freeing it");
@@ -236,6 +254,36 @@ public sealed class BotFreedom : BotDeed
 
             return BotDoing.Failed("it no longer knows where it is going");
         }
+
+        var left = Math.Max(Math.Abs(_prisoner.X - home.X), Math.Abs(_prisoner.Y - home.Y));
+
+        if (left < _nearestHome)
+        {
+            _nearestHome = left;
+            _nearestHomeTick = Core.TickCount;
+        }
+        else if (Core.TickCount - _nearestHomeTick >= StuckMs)
+        {
+            Stuck++;
+            Lost++;
+
+            return BotDoing.Failed($"{_prisoner.Name} got no nearer home in {StuckMs / 1000}s, {left} tiles off it");
+        }
+
+        var gap = Math.Max(Math.Abs(_prisoner.X - body.X), Math.Abs(_prisoner.Y - body.Y));
+
+        if (_behind ? gap > Rejoin : gap > Lag)
+        {
+            if (!_behind)
+            {
+                _behind = true;
+                TurnedBack++;
+            }
+
+            return BotDoing.Walk(_map, _prisoner, BotArrival.Within(Rejoin), $"going back for {_prisoner.Name}");
+        }
+
+        _behind = false;
 
         return BotDoing.Walk(_map, home, BotArrival.Within(2), $"walking {_prisoner.Name} home");
     }
@@ -311,10 +359,13 @@ public sealed class BotFreedom : BotDeed
         Refused = 0;
         Lost = 0;
         TooFar = 0;
+        TurnedBack = 0;
+        Stuck = 0;
     }
 
     public static string Describe() =>
-        $"{Uncaged} prisoners taken out of cages and {Freed} walked home, {Lost} lost on the way, "
+        $"{Uncaged} prisoners taken out of cages and {Freed} walked home, {Lost} lost on the way ({Stuck} of them got no nearer home "
+        + $"in {StuckMs / 1000}s), {TurnedBack} times an escort turned back for one more than {Lag} tiles behind, "
         + $"{Refused} refused by the engine, {TooFar} passed over for living further than {Roam} tiles from {Town}";
 }
 

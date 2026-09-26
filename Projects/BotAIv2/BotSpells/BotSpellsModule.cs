@@ -33,6 +33,8 @@ public sealed class BotSpellsModule : BotModule
     {
         BotSpellsConfig.Load();
 
+        Server.Engines.Craft.DefInscription.Knows = static (mobile, _) => mobile is BotMobile;
+
         BotGrimoire.Read();
 
         BotWill.Offer(new BotScribe());
@@ -51,6 +53,7 @@ public sealed class BotSpellsModule : BotModule
 
     public override void Reset()
     {
+        Server.Engines.Craft.DefInscription.Knows = null;
         BotScribe.Forget();
         BotSeeker.Forget();
         BotArmoury.Forget();

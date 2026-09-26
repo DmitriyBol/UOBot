@@ -230,6 +230,8 @@ public static class BotSpoils
             }
 
             _claimants[i].Self.Backpack?.DropItem(new Gold(amount));
+
+            BotChest.Tithe(_claimants[i].Self, corpse.Map, corpse.GetWorldLocation(), amount);
         }
 
         GoldSplit += total;

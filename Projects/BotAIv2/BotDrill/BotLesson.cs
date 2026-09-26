@@ -221,7 +221,7 @@ public sealed class BotLesson : BotDeed
 
         _turn++;
 
-        var post = BotSchool.Post(_turn, students.Count);
+        var post = BotSchool.Post(_map, _turn, students.Count);
 
         if (_turn % 2 == 0)
         {

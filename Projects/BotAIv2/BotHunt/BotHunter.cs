@@ -196,7 +196,7 @@ public sealed class BotHunter : IBotProposer
                 continue;
             }
 
-            if (BotRoads.Detour(map, body.Location, where) > Detour)
+            if (BotRoads.Detour(map, body.Location, where) > Detour || BotRoads.Behind(map, body.Location, where) > Detour)
             {
                 Roundabout++;
 
@@ -218,7 +218,7 @@ public sealed class BotHunter : IBotProposer
                 continue;
             }
 
-            if (BotRefused.Refusing(map, where))
+            if (BotRefused.Refusing(map, where) || BotQuad.Baulking(map, where))
             {
                 Darted++;
 
@@ -243,7 +243,7 @@ public sealed class BotHunter : IBotProposer
             }
 
             var dares = BotQuad.Dares(body, map, where);
-            var lethal = BotPeril.Lethal(map, where, body.Location, out _);
+            var lethal = BotPeril.Overwhelms(map, where, body.Location, BotQuad.Strength(body), out _, count: false);
 
             if (lethal && dares)
             {

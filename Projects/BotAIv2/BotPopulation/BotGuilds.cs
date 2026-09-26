@@ -65,6 +65,102 @@ public static class BotGuilds
 
     public static int Most { get; set; } = 15;
 
+    public static int WidenBy { get; set; } = 10;
+
+    public static int WidenPrice { get; set; } = 10000;
+
+    public static int MostWidenings { get; set; } = 3;
+
+    public static long Widenings { get; private set; }
+
+    public static long Unwidened { get; private set; }
+
+    private static readonly Dictionary<string, int> _widened = new(StringComparer.OrdinalIgnoreCase);
+
+    public static int Widened(Guild guild) =>
+        guild?.Name != null && _widened.TryGetValue(guild.Name, out var times) ? times : 0;
+
+    public static int Ceiling(Guild guild) => Math.Min(Most + Math.Max(0, WidenBy) * Widened(guild), Math.Max(Most, BotHallKind.Holds(guild)));
+
+    public static long Cramped { get; private set; }
+
+    private static bool Widen(Guild guild, string why)
+    {
+        if (guild?.Name == null || guild.Disbanded || WidenBy <= 0 || WidenPrice < 0 || Widened(guild) >= MostWidenings)
+        {
+            return false;
+        }
+
+        if (Most + WidenBy * (Widened(guild) + 1) > BotHallKind.Holds(guild))
+        {
+            Cramped++;
+
+            return false;
+        }
+
+        if (BotChest.Holds(guild.Name) + BotEstate.Fund(guild) < WidenPrice)
+        {
+            Unwidened++;
+
+            return false;
+        }
+
+        var paid = new List<BotEstate.Contribution>();
+        var got = BotEstate.Levy(guild, WidenPrice, paid);
+
+        if (got < WidenPrice)
+        {
+            BotEstate.Refund(paid);
+            Unwidened++;
+
+            return false;
+        }
+
+        _widened[guild.Name] = Widened(guild) + 1;
+        Widenings++;
+
+        logger.Information(
+            "{Guild} has widened to {Ceiling} places for {Price}gp raised off its chest and members — {Why}",
+            guild.Name,
+            Ceiling(guild),
+            WidenPrice,
+            why ?? "no reason given"
+        );
+
+        return true;
+    }
+
+    internal static void SaveWidenings(IGenericWriter writer)
+    {
+        writer.WriteEncodedInt(_widened.Count);
+
+        foreach (var (name, times) in _widened)
+        {
+            writer.Write(name);
+            writer.WriteEncodedInt(times);
+        }
+    }
+
+    internal static int LoadWidenings(IGenericReader reader)
+    {
+        _widened.Clear();
+
+        var count = reader.ReadEncodedInt();
+
+        for (var i = 0; i < count; i++)
+        {
+            var name = reader.ReadString();
+            var times = reader.ReadEncodedInt();
+
+            if (!string.IsNullOrEmpty(name) && times > 0)
+            {
+                _widened[name] = times;
+            }
+        }
+
+        return _widened.Count;
+    }
+
     public static int Band { get; set; } = 10;
 
     public static readonly string[] Makers = ["Crafter"];
@@ -75,6 +171,11 @@ public static class BotGuilds
 
     public static bool Outside(BotMobile bot)
     {
+        if (BotUnderworld.Outlawed(bot))
+        {
+            return true;
+        }
+
         var klass = bot?.Class?.Name;
 
         if (klass == null)
@@ -185,6 +286,22 @@ public static class BotGuilds
             kept++;
         }
 
+        var resting = 0;
+        var away = BotPopulation.Away;
+
+        for (var i = 0; i < away.Count; i++)
+        {
+            if (away[i] is not { Deleted: false } bot || bot.Class == null || Outside(bot)
+                || bot.Guild is not Guild { Disbanded: false } guild || !Ours(guild.Name))
+            {
+                continue;
+            }
+
+            _guilds[guild.Name] = guild;
+            Joined(bot);
+            resting++;
+        }
+
         foreach (var guild in _guilds.Values)
         {
             Stone(guild);
@@ -203,9 +320,10 @@ public static class BotGuilds
         _cursor = roster.Count == 0 ? 0 : Utility.Random(roster.Count);
 
         logger.Information(
-            "Guilds mustered: {Guilds} came back from the world save holding {Kept} bots, {Free} bots belong to none and {Excused} stand outside the bands by class — {What}",
+            "Guilds mustered: {Guilds} came back from the world save holding {Kept} bots and {Resting} resting members, {Free} bots belong to none and {Excused} stand outside the bands by class — {What}",
             _guilds.Count,
             kept,
+            resting,
             free,
             Excused,
             Describe()
@@ -394,9 +512,16 @@ public static class BotGuilds
             return;
         }
 
-        if (Roomiest(Most) is { } any)
+        if (Roomiest(0) is { } any)
         {
             Admit(any, bot);
+
+            return;
+        }
+
+        if (Widest() is { } widened && Widen(widened, $"{bot.Name} the {bot.Class?.Name} had nowhere else to go"))
+        {
+            Admit(widened, bot);
 
             return;
         }
@@ -410,7 +535,7 @@ public static class BotGuilds
 
         foreach (var guild in _guilds.Values)
         {
-            if (guild.Disbanded || guild.Members.Count >= under)
+            if (guild.Disbanded || guild.Members.Count >= (under > 0 ? under : Ceiling(guild)))
             {
                 continue;
             }
@@ -422,6 +547,30 @@ public static class BotGuilds
         }
 
         return smallest;
+    }
+
+    private static Guild Widest()
+    {
+        Guild best = null;
+        var bestFund = -1;
+
+        foreach (var guild in _guilds.Values)
+        {
+            if (guild.Disbanded || Widened(guild) >= MostWidenings || guild.Members.Count < Ceiling(guild))
+            {
+                continue;
+            }
+
+            var fund = BotChest.Holds(guild.Name) + BotEstate.Fund(guild);
+
+            if (fund > bestFund)
+            {
+                bestFund = fund;
+                best = guild;
+            }
+        }
+
+        return best;
     }
 
     private static bool FreeName(out (string Name, string Abbrev) named)
@@ -479,7 +628,7 @@ public static class BotGuilds
             bot.Class?.Name,
             guild.Name,
             guild.Members.Count,
-            Most,
+            Ceiling(guild),
             Head(guild)?.Name ?? "nobody"
         );
     }
@@ -526,6 +675,8 @@ public static class BotGuilds
             Joined(band[i]);
             Enrolled++;
         }
+
+        BotUnderworld.EnemyOfAll();
     }
 
     private static void Show(Mobile bot)
@@ -561,7 +712,7 @@ public static class BotGuilds
 
         foreach (var guild in _guilds.Values)
         {
-            if (guild.Disbanded || guild.Members.Count >= Most)
+            if (guild.Disbanded || guild.Members.Count >= Ceiling(guild))
             {
                 continue;
             }
@@ -647,7 +798,7 @@ public static class BotGuilds
 
         foreach (var other in _guilds.Values)
         {
-            if (other == null || ReferenceEquals(other, than) || other.Disbanded || other.Members.Count >= Most)
+            if (other == null || ReferenceEquals(other, than) || other.Disbanded || other.Members.Count >= Ceiling(other))
             {
                 continue;
             }
@@ -757,7 +908,7 @@ public static class BotGuilds
                     better.Name,
                     Worth(better) >= 2 ? "holding a hall" : "holding ground or a purse",
                     better.Members.Count,
-                    Most
+                    Ceiling(better)
                 );
 
                 return;
@@ -869,7 +1020,7 @@ public static class BotGuilds
             return false;
         }
 
-        if (guild.Members.Count >= Most)
+        if (guild.Members.Count >= Ceiling(guild) && !Widen(guild, $"to take {bot.Name} the {bot.Class?.Name} on: {why ?? "no reason given"}"))
         {
             Crowded++;
 
@@ -894,7 +1045,7 @@ public static class BotGuilds
             bot.Name,
             bot.Class?.Name,
             guild.Members.Count,
-            Most,
+            Ceiling(guild),
             why ?? "no reason given"
         );
 
@@ -1159,7 +1310,7 @@ public static class BotGuilds
                   + $"looks that placed nobody: {TooFew} found fewer than {Least - 1} others without a guild to found with, "
                   + $"{Nameless} found every name taken, {Barred48} were inside the bar for walking out, {Unplaced} found every guild full";
 
-            var rule = $"{Least} to found and {Most} at most, anybody may found";
+            var rule = $"{Least} to found and {Most} at most, anybody may found, a full guild widening by {WidenBy} for {WidenPrice}gp up to {MostWidenings} times ({Widenings} bought, {Unwidened} wanted and not raised)";
             var short_ = makerless == 0 ? "" : $", {makerless} of them with nobody to make anything";
 
             return $"{_guilds.Count} guilds holding {held} bots with {loose} outside them ({rule}{short_}), a guildmate worth ×{Kinship:F2}: {say.ToString()}; {founding}{stood}";
@@ -1200,6 +1351,9 @@ public static class BotGuilds
         Stones = 0;
         _cursor = 0;
         _dealt = false;
+        _widened.Clear();
+        Widenings = 0;
+        Unwidened = 0;
 
         BotRoster.Forget();
     }

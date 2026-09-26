@@ -210,6 +210,34 @@ public static class BotOutfit
         return tools;
     }
 
+    public static int SpareAt { get; set; } = 5;
+
+    public static bool Spent(Item tool) => tool is IUsesRemaining { UsesRemaining: var left } && left <= SpareAt;
+
+    public static T Oldest<T>(Container pack, Predicate<T> can = null) where T : Item
+    {
+        if (pack == null)
+        {
+            return null;
+        }
+
+        T oldest = null;
+        var least = int.MaxValue;
+
+        foreach (var item in pack.FindItemsByType<T>(true, can))
+        {
+            var left = item is IUsesRemaining worn ? worn.UsesRemaining : int.MaxValue;
+
+            if (oldest == null || left < least)
+            {
+                oldest = item;
+                least = left;
+            }
+        }
+
+        return oldest;
+    }
+
     private static void GiveTools(Mobile bot, BotClass klass)
     {
         var pack = bot.Backpack;

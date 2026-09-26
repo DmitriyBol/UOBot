@@ -44,9 +44,15 @@ public sealed class BotFeuder : IBotProposer
 
     public static long Unarmed { get; private set; }
 
+    public static long Unsupplied { get; private set; }
+
     public static long Sheltered { get; private set; }
 
     public static long Sallied { get; private set; }
+
+    public static long Summoned { get; private set; }
+
+    public static long Mustered { get; private set; }
 
     public string Name => "feuder";
 
@@ -77,6 +83,18 @@ public sealed class BotFeuder : IBotProposer
 
         Asked++;
 
+        if (BotUnderworld.Near(body, Watch) is { } bandit)
+        {
+            if (body.Hits >= body.HitsMax * Fit && BotThreat.Now(body) >= BotThreat.Power(bandit) * BanditOdds
+                && BotFeud.Quarrel(body, bandit))
+            {
+                Bandits++;
+                Offered++;
+
+                return Alone(bot, new BotQuarrel(bandit, ours.Name));
+            }
+        }
+
         if (!AnyWar(ours))
         {
             Peaceful++;
@@ -102,7 +120,23 @@ public sealed class BotFeuder : IBotProposer
 
         var threat = BotFeud.Threat(ours);
 
-        if (threat != null && threat != body && body.InRange(threat.Location, BotFeud.Defend))
+        var summoned = string.Equals(BotRest.CalledBy(body), ours.Name, System.StringComparison.OrdinalIgnoreCase);
+
+        if (summoned)
+        {
+            Summoned++;
+        }
+
+        var mustered = !summoned && BotWar.Mustered(body);
+
+        if (mustered)
+        {
+            Mustered++;
+        }
+
+        var anywhere = summoned || mustered;
+
+        if (threat != null && threat != body && (anywhere || body.InRange(threat.Location, BotFeud.Defend)))
         {
             if (BotFeud.Quarrel(body, threat))
             {
@@ -116,9 +150,16 @@ public sealed class BotFeuder : IBotProposer
             Sheltered++;
         }
 
+        if (!BotProvision.Fit(body, out _))
+        {
+            Unsupplied++;
+
+            return null;
+        }
+
         var called = BotFeud.On(ours);
 
-        if (called != null && called != body && body.InRange(called.Location, BotFeud.Answer))
+        if (called != null && called != body && (anywhere || body.InRange(called.Location, BotFeud.Answer)))
         {
             if (!BotFeud.Quarrel(body, called))
             {
@@ -139,6 +180,11 @@ public sealed class BotFeuder : IBotProposer
         foreach (var near in body.GetMobilesInRange<BotMobile>(Watch))
         {
             if (near == body || near.Deleted || !near.Alive || near.Guild is not Guild theirs || theirs == ours)
+            {
+                continue;
+            }
+
+            if (theirs.Name == BotUnderworld.GuildName)
             {
                 continue;
             }
@@ -205,7 +251,7 @@ public sealed class BotFeuder : IBotProposer
             return false;
         }
 
-        var engine = ours.Enemies is { Count: > 0 };
+        var engine = Warring(ours);
         var ledger = BotWar.Fighting(ours.Name) > 0;
 
         if (engine != ledger)
@@ -231,6 +277,30 @@ public sealed class BotFeuder : IBotProposer
         return engine || ledger;
     }
 
+    private static bool Warring(Guild ours)
+    {
+        var enemies = ours.Enemies;
+
+        if (enemies == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < enemies.Count; i++)
+        {
+            if (enemies[i] is { } enemy && enemy.Name != BotUnderworld.GuildName)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static double BanditOdds { get; set; } = 0.8;
+
+    public static long Bandits { get; private set; }
+
     public static long Disagreeing { get; private set; }
 
     private static long _disagreedTick;
@@ -241,8 +311,8 @@ public sealed class BotFeuder : IBotProposer
         Asked == 0
             ? "nobody has been looked at for a quarrel"
             : $"the feuder looked {Asked} times and sent {Offered} ({Defended} of them to defend their own ground): {Peaceful} guilds were at war with nobody, "
-            + $"{Unseen} saw no enemy within {Watch} tiles or the call, {Sallied} went out after one nobody had seen, {Sheltered} were kept apart by a town, "
-            + $"{Unfit} were too hurt to start one, {Unarmed} carry no weapon, {Disagreeing} found the ledger and the engine disagreeing about the war; {BotQuarrel.Describe()}; {BotFeud.Describe()}";
+            + $"{Unseen} saw no enemy within {Watch} tiles or the call, {Sallied} went out after one nobody had seen, {Summoned} looks at members called back from rest, {Mustered} at members drawn in from beyond their reach because their guild was behind in its war, {Sheltered} were kept apart by a town, "
+            + $"{Unfit} were too hurt to start one, {Unarmed} carry no weapon, {Unsupplied} kept off somebody else's ground for want of supplies, {Disagreeing} found the ledger and the engine disagreeing about the war; {BotQuarrel.Describe()}; {BotFeud.Describe()}";
 
     public static void Forget()
     {
@@ -250,10 +320,13 @@ public sealed class BotFeuder : IBotProposer
         Offered = 0;
         Defended = 0;
         Sallied = 0;
+        Summoned = 0;
+        Mustered = 0;
         Disagreeing = 0;
         Peaceful = 0;
         Unseen = 0;
         Unfit = 0;
+        Unsupplied = 0;
         Sheltered = 0;
         Unarmed = 0;
     }

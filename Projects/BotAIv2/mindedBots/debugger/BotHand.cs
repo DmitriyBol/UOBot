@@ -112,20 +112,26 @@ public static class BotHand
         + "counts near the place named or anywhere, goods are brought to the place or to home. unpost <id> — the errand "
         + "withdrawn and its reward back. quests — the board and what came of it.";
 
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "band", "reset", "forgive"];
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart"];
 
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
         + "which is how an evening's building is undone. revel <trade> [<prize>] [<x> <y>] — declare one "
         + "this second instead of waiting a quarter of an hour for the watcher to think of it; naming a spot "
         + "raises a camp there, pulled into the ring around the population if it is too near or too far. "
-        + "wars — every war standing, with its score and its clock. seats — where each guild lives and how far "
+        + "wars — every war standing, with its score and its clock. "
+        + "guilds — every guild in a paragraph: who leads it, how many it has in the world, at rest and dead, what they fight "
+        + "with (strength, armour, the skills a fight turns on, bandages and potions), what it owns, and the war it stands in "
+        + "with how many of it are in the fight against how many the score asks for. seats — where each guild lives and how far "
         + "its hall is from it. seat <guild> <x> <y> — move a guild's seat; its hall is carried there and its "
         + "members are born and rise there from then on. save — write the world to disk now, before the shard is "
         + "stopped: a kill without one rolls the island back to the last autosave, five minutes of halls and moves. "
         + "census — one line per bot into logs/bot-census.log: class, band, work in hand, health, purse, place, company. "
         + "tourney [stop|state] — hold the championship now instead of waiting for the week: the strongest thirty, one against "
         + "one in the ring, the winner's name yellow and a prize in its pack; stop calls it off, state says where it stands. "
+        + "prove <bot> [<Creature>] — put the bot's double on the proving ground in Green Acres next, against the creature named "
+        + "or the rung of the dungeons' ladder it is due; proof <bot> — every fight its doubles have had, what each proved, and "
+        + "its strength against each dungeon's worst; proofs — every bot measured, strongest first, and the ladder. "
         + "reset — the population back to novices: halls razed, claims and hand-set seats let go, wars and opinions forgotten, "
         + "everybody's learning wiped, the world saved; restart after it. "
         + "forgive <kind> — strike out what the population has learned about one kind of work (its patches and its "
@@ -309,6 +315,9 @@ public static class BotHand
             case "census":
                 return Census();
 
+            case "guilds":
+                return Guilds();
+
             case "arms" when string.IsNullOrWhiteSpace(tail):
                 return Quivers();
 
@@ -335,6 +344,24 @@ public static class BotHand
             case "band":
                 return Band();
 
+            case "proofs":
+                return BotProving.Board();
+
+            case "awake":
+                return BotWake.Census();
+
+            case "proof":
+                return string.IsNullOrWhiteSpace(tail) ? BotProving.Board() : BotProving.Tell(tail.Trim());
+
+            case "prove":
+                {
+                    var (who, what) = First(tail);
+
+                    return string.IsNullOrWhiteSpace(who)
+                        ? "prove wants a bot, and may name a creature: prove Nessa OrcishLord."
+                        : BotProving.Prove(who, what?.Trim(), "the keyboard");
+                }
+
             case "seats":
                 return BotSeat.Tell();
 
@@ -346,6 +373,9 @@ public static class BotHand
 
             case "roads":
                 return Roads(tail);
+
+            case "chart":
+                return Chart(tail);
 
             case "peril":
                 return Peril(tail);
@@ -372,7 +402,7 @@ public static class BotHand
 
             case "raze":
                 {
-                    var gone = BotEstate.Raze();
+                    var gone = BotEstate.Raze() + BotOutpost.Raze();
 
                     return gone == 0
                         ? "there are no guild halls standing to take down."
@@ -471,17 +501,179 @@ public static class BotHand
         return $"{bot.Name}: {banked}gp banked, {added} oil cloths added, {pack.TotalItems} of {most} things in the pack, room for a coin: {BotYield.Pocket(bot)}.";
     }
 
+    private static string Guilds()
+    {
+        List<Server.Guilds.Guild> guilds = [.. BotGuilds.Standing];
+
+        if (guilds.Count == 0)
+        {
+            return "there are no guilds.";
+        }
+
+        guilds.Sort((a, b) => (b.Members?.Count ?? 0).CompareTo(a.Members?.Count ?? 0));
+
+        using var say = ValueStringBuilder.Create(8192);
+        List<(string Name, double Power)> ranking = [];
+        List<double> powers = [];
+        Dictionary<string, int> classes = [];
+
+        foreach (var guild in guilds)
+        {
+            var members = guild.Members;
+            var count = members?.Count ?? 0;
+            int inWorld = 0, resting = 0, dead = 0, fight = 0;
+            double power = 0, armour = 0, weapon = 0, tactics = 0, anatomy = 0, healing = 0, magery = 0;
+            int bandages = 0, potions = 0, bots = 0;
+            long purses = 0;
+
+            powers.Clear();
+            classes.Clear();
+
+            for (var i = 0; i < count; i++)
+            {
+                if (members[i] is not BotMobile { Deleted: false } bot)
+                {
+                    continue;
+                }
+
+                bots++;
+
+                if (bot.Map == null || bot.Map == Map.Internal)
+                {
+                    resting++;
+                }
+                else if (!bot.Alive)
+                {
+                    dead++;
+                }
+                else
+                {
+                    inWorld++;
+                }
+
+                var name = bot.Class?.Name ?? "?";
+                classes[name] = classes.GetValueOrDefault(name) + 1;
+
+                if (bot.Class?.Kit is { } kit && (kit.Melee.Count > 0 || kit.Ranged.Count > 0))
+                {
+                    fight++;
+                }
+
+                var strength = BotThreat.Power(bot);
+                power += strength;
+                powers.Add(strength);
+                armour += bot.ArmorRating;
+
+                var arm = (bot.Weapon as BaseWeapon)?.Skill ?? SkillName.Wrestling;
+                weapon += bot.Skills[arm].Base;
+                tactics += bot.Skills.Tactics.Base;
+                anatomy += bot.Skills.Anatomy.Base;
+                healing += bot.Skills.Healing.Base;
+                magery += bot.Skills.Magery.Base;
+
+                var pack = bot.Backpack;
+                bandages += pack?.GetAmount(typeof(Bandage)) ?? 0;
+                potions += pack?.GetAmount(typeof(BasePotion)) ?? 0;
+                purses += (pack?.GetAmount(typeof(Gold)) ?? 0) + Banker.GetBalance(bot);
+            }
+
+            powers.Sort((a, b) => b.CompareTo(a));
+
+            var best = 0.0;
+
+            for (var i = 0; i < powers.Count && i < 5; i++)
+            {
+                best += powers[i];
+            }
+
+            var per = Math.Max(1, bots);
+            ranking.Add((guild.Name, power));
+
+            if (say.Length > 0)
+            {
+                say.Append(Environment.NewLine);
+            }
+
+            say.Append(
+                $"{guild.Name} [{guild.Abbreviation}] under {guild.Leader?.Name ?? "nobody"}: {count} of {BotGuilds.Ceiling(guild)} places, {inWorld} in the world, {resting} at rest, {dead} dead; "
+            );
+
+            say.Append($"{fight} who fight (");
+
+            var first = true;
+
+            foreach (var (name, many) in classes)
+            {
+                say.Append(first ? "" : ", ");
+                say.Append($"{name} {many}");
+                first = false;
+            }
+
+            say.Append(
+                $"); strength {power:F0}, {power / per:F0} a head, the best five {best:F0}; armour {armour / per:F0}, weapon {weapon / per:F0}, tactics {tactics / per:F0}, anatomy {anatomy / per:F0}, healing {healing / per:F0}, magery {magery / per:F0}; {bandages / per} bandages and {potions / per} potions a head; "
+            );
+
+            var hall = BotEstate.Hall(guild);
+
+            say.Append(
+                $"{(hall is { Deleted: false } ? $"hall at {hall.X},{hall.Y}" : "no hall")}, {BotChest.Holds(guild.Name)}gp in the chest and {purses}gp in its members' purses and accounts, {BotClaim.Holds(guild.Name)} squares held"
+            );
+
+            foreach (var war in BotWar.Standing)
+            {
+                var enemy = war.Against(guild.Name);
+
+                if (enemy == null)
+                {
+                    continue;
+                }
+
+                say.Append(
+                    $"; at war with {enemy} for {war.Minutes} min, {war.Score(guild.Name).Kills} to {war.Score(enemy).Kills}, {BotWar.Involved(guild.Name)} of ours in it against {BotWar.Wanted(guild.Name)} the score asks for{(war.Big ? ", a big war" : "")}"
+                );
+            }
+
+            foreach (var (pair, ends) in BotWar.Truces)
+            {
+                var other = pair.A == guild.Name ? pair.B : pair.B == guild.Name ? pair.A : null;
+
+                if (other != null && ends - Core.TickCount > 0)
+                {
+                    say.Append($"; a truce with {other} for {(ends - Core.TickCount) / 60000} more minutes");
+                }
+            }
+
+            say.Append('.');
+        }
+
+        ranking.Sort((a, b) => b.Power.CompareTo(a.Power));
+        say.Append(Environment.NewLine);
+        say.Append("By strength: ");
+
+        for (var i = 0; i < ranking.Count; i++)
+        {
+            say.Append(i == 0 ? "" : ", ");
+            say.Append($"{ranking[i].Name} {ranking[i].Power:F0}");
+        }
+
+        say.Append('.');
+
+        return say.ToString();
+    }
+
     private static string Census()
     {
         var bots = BotPopulation.Bots;
+        var away = BotPopulation.Away;
         var stamp = DateTime.Now.ToString("HH:mm:ss");
-        using var sb = ValueStringBuilder.Create(8192);
+        using var sb = ValueStringBuilder.Create(16384);
         var alive = 0;
         var idle = 0;
 
-        for (var i = 0; i < bots.Count; i++)
+        for (var i = 0; i < bots.Count + away.Count; i++)
         {
-            var bot = bots[i];
+            var resting = i >= bots.Count;
+            var bot = resting ? away[i - bots.Count] : bots[i];
 
             if (bot is not { Deleted: false })
             {
@@ -506,7 +698,8 @@ public static class BotHand
             var company = bot.Squad == null ? "no company" : $"company {bot.Squad.Id} {bot.Squad.Stance}";
             var flags = (bot.Murderer ? " | RED" : "") + (bot.NameHue >= 0 ? $" | name hue {bot.NameHue}" : "");
 
-            sb.Append($"[{stamp}] {bot.Name} | {bot.Class?.Name ?? "?"} | {guild} | {(bot.Alive ? "alive" : "dead")} | {deed?.Kind ?? "nothing"}: {deed?.Stage ?? "-"} | hits {bot.Hits}/{bot.HitsMax} mana {bot.Mana}/{bot.ManaMax} | pack {bot.Backpack?.GetAmount(typeof(Gold)) ?? 0}gp bank {Banker.GetBalance(bot)}gp | at ({bot.X}, {bot.Y}, {bot.Z}) {region?.Name ?? "open ground"} | {company}{flags}");
+            sb.Append($"[{stamp}] {bot.Name} | {bot.Class?.Name ?? "?"} | {guild} | {(resting ? "resting" : bot.Alive ? "alive" : "dead")} | {deed?.Kind ?? "nothing"}: {deed?.Stage ?? "-"} | hits {bot.Hits}/{bot.HitsMax} mana {bot.Mana}/{bot.ManaMax} | pack {bot.Backpack?.GetAmount(typeof(Gold)) ?? 0}gp bank {Banker.GetBalance(bot)}gp | at ({bot.X}, {bot.Y}, {bot.Z}) {region?.Name ?? "open ground"} | {company}{flags}");
+            sb.Append($" | {Fighting(bot)}");
             sb.Append(Environment.NewLine);
         }
 
@@ -521,7 +714,18 @@ public static class BotHand
             return $"the census could not be written: {e.Message}";
         }
 
-        return $"{bots.Count} bots written to logs/bot-census.log at {stamp}: {alive} alive, {idle} holding nothing.";
+        return $"{bots.Count + away.Count} bots written to logs/bot-census.log at {stamp}: {alive} alive, {away.Count} of them at rest, {idle} holding nothing.";
+    }
+
+    private static string Fighting(BotMobile bot)
+    {
+        var weapon = bot.Weapon as BaseWeapon;
+        var skills = bot.Skills;
+        var held = weapon is null or Fists ? "fists" : $"{weapon.GetType().Name} {weapon.MinDamage}-{weapon.MaxDamage}";
+        var arm = weapon?.Skill ?? SkillName.Wrestling;
+        var pack = bot.Backpack;
+
+        return $"power {BotThreat.Power(bot):F0} AR {bot.ArmorRating:F0} {held} ({arm} {skills[arm].Base:F0}) tactics {skills.Tactics.Base:F0} anatomy {skills.Anatomy.Base:F0} healing {skills.Healing.Base:F0} parry {skills.Parry.Base:F0} magery {skills.Magery.Base:F0} resist {skills.MagicResist.Base:F0} inscribe {skills.Inscribe.Base:F0} | str {bot.RawStr} dex {bot.RawDex} | bandages {pack?.GetAmount(typeof(Bandage)) ?? 0} potions {pack?.GetAmount(typeof(BasePotion)) ?? 0}";
     }
 
     private static string ResetPopulation()
@@ -549,6 +753,20 @@ public static class BotHand
         BotQuad.Forget();
         BotCommons.Forget();
 
+        BotRest.Forget();
+        BotGrowth.Forget();
+
+        BotCity.Forget();
+        BotTourney.Forget();
+
+        BotProving.Forget();
+
+        BotAbode.Raze();
+        BotOutpost.Raze();
+
+        BotToll.Forget();
+        BotTollman.Forget();
+
         if (!World.Saving)
         {
             World.Save();
@@ -557,7 +775,7 @@ public static class BotHand
 
         return $"reset: {halls} halls razed, {claims} claims let go, {seats} hand-set seats forgotten, wars, truces and opinions forgotten, "
                + $"{learned} bots' learning wiped and {bodies} bodies deleted with everything they were carrying, "
-               + $"the market, the wants and the board of errands emptied, every crime and the band forgotten, the guilds disbanded, "
+               + $"the market, the wants and the board of errands emptied, the city's wants and bounties and the championship's record forgotten, every crime and the band forgotten, the guilds disbanded, "
                + $"the island's danger map and everything known about what pays where wiped; the world is being saved — wait for \"the snapshot is on disk\", then restart the shard and the population rises as novices.";
     }
 
@@ -1504,6 +1722,102 @@ public static class BotHand
         var where = new Point3D(x, y, 0);
 
         return $"{BotPeril.Tell(map, where)}; {BotQuad.Tell(map, where)}.";
+    }
+
+    private static string Chart(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length == 0)
+        {
+            return BotChart.Describe() + ".";
+        }
+
+        Map map;
+        Point3D from;
+        int gx;
+        int gy;
+
+        if (words.Length >= 3 && !int.TryParse(words[0], out _) && int.TryParse(words[^2], out gx) && int.TryParse(words[^1], out gy))
+        {
+            var who = Find(string.Join(' ', words[..^2]));
+
+            if (who?.Map == null || who.Map == Map.Internal)
+            {
+                Refused++;
+
+                return $"there is no bot called \"{string.Join(' ', words[..^2])}\" standing anywhere.";
+            }
+
+            map = who.Map;
+            from = who.Location;
+        }
+        else if (words.Length >= 4 && int.TryParse(words[0], out var x1) && int.TryParse(words[1], out var y1)
+            && int.TryParse(words[2], out gx) && int.TryParse(words[3], out gy))
+        {
+            map = BotPopulation.Home;
+
+            if (map == null || map == Map.Internal)
+            {
+                return "the population has no home map yet.";
+            }
+
+            from = BotStep.Settle(map, x1, y1, out var fz) ? new Point3D(x1, y1, fz) : new Point3D(x1, y1, map.GetAverageZ(x1, y1));
+        }
+        else
+        {
+            Refused++;
+
+            return "chart wants nothing, a bot and two numbers, or four numbers: chart | chart <bot> <x> <y> | chart <x1> <y1> <x2> <y2>.";
+        }
+
+        var goal = BotStep.Settle(map, gx, gy, out var gz) ? new Point3D(gx, gy, gz) : new Point3D(gx, gy, map.GetAverageZ(gx, gy));
+        var points = new List<Point3D>();
+        var expanded = BotChart.Expanded;
+        var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+        var found = BotChart.Route(map, from, goal, points);
+        var took = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+        if (!found)
+        {
+            return $"from {from} to {goal}: no route ({BotChart.Describe()}), in {took:F2}ms.";
+        }
+
+        var length = 0;
+        var last = from;
+
+        for (var i = 0; i < points.Count; i++)
+        {
+            length += Math.Max(Math.Abs(points[i].X - last.X), Math.Abs(points[i].Y - last.Y));
+            last = points[i];
+        }
+
+        length += Math.Max(Math.Abs(goal.X - last.X), Math.Abs(goal.Y - last.Y));
+
+        var legs = new List<string>();
+        var leg = from;
+        var plan = new List<Point3D>();
+
+        for (var i = 0; i < points.Count && i < 5; i++)
+        {
+            var l0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            var walked = BotPath.Find(map, leg, points[i], BotArrival.Within(1), plan);
+            var lms = (System.Diagnostics.Stopwatch.GetTimestamp() - l0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+            legs.Add($"to ({points[i].X},{points[i].Y},{points[i].Z}) {walked} in {lms:F1}ms");
+            leg = points[i];
+        }
+
+        var shown = new List<string>();
+
+        for (var i = 0; i < points.Count && i < 12; i++)
+        {
+            shown.Add($"({points[i].X},{points[i].Y})");
+        }
+
+        return $"from {from} to {goal}: {points.Count} points, about {length} steps over the chart for "
+            + $"{Math.Max(Math.Abs(goal.X - from.X), Math.Abs(goal.Y - from.Y))} straight, {BotChart.Expanded - expanded} nodes "
+            + $"expanded in {took:F2}ms; first points {string.Join(" ", shown)}{(points.Count > 12 ? " …" : "")}; legs: {string.Join("; ", legs)}.";
     }
 
     private static string Road(string tail)

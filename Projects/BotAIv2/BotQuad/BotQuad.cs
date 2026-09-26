@@ -93,6 +93,10 @@ public static class BotQuad
 
     public static long Wiped { get; private set; }
 
+    public static int Rebuffed { get; set; } = 3;
+
+    public static long Rebuffs { get; private set; }
+
     public static double TooQuiet { get; set; } = 0.5;
 
     public static double Wanted { get; set; } = -0.1;
@@ -162,6 +166,34 @@ public static class BotQuad
             quad.Middle.X,
             quad.Middle.Y,
             quad.Safety,
+            quad.Levied
+        );
+    }
+
+    public static void DrivenOff(Map map, Point3D where, int marched)
+    {
+        if (map == null || map == Map.Internal || marched <= 0)
+        {
+            return;
+        }
+
+        var quad = At(map, where);
+
+        if (quad == null)
+        {
+            return;
+        }
+
+        quad.Levied = Math.Max(quad.Levied, marched) + Rebuffed;
+        quad.Tick = Core.TickCount;
+
+        Rebuffs++;
+
+        logger.Information(
+            "A company of {Marched} was driven off around ({X}, {Y}) with its leader; the next levy is {Levy}",
+            marched,
+            quad.Middle.X,
+            quad.Middle.Y,
             quad.Levied
         );
     }
@@ -351,6 +383,10 @@ public static class BotQuad
     public static long Marked { get; private set; }
 
     public static long Mourned { get; private set; }
+
+    public static long ToBots { get; private set; }
+
+    public static void FellToBot() => ToBots++;
 
     public static long Discovered { get; private set; }
 
@@ -1338,7 +1374,7 @@ public static class BotQuad
             + $"({Hushed} shut and {Roused} reopened since the shard came up, which is the direction rather than the level) "
                + $"(above {TooQuiet:F2}), {wanted} worth going to (at or below {Wanted:F2}), {dire} dire (at or below {Dire:F2}) of which {damned} damned by a company being lost in them; "
                + $"worst is {worst}; {Discovered} first set foot in, {Credited} raised for crossings, "
-               + $"{Marked} marked for blows, {Mourned} for a death, {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough, {Walled} born safe inside the walls, {Yielded} times a hunter was pointed at a square for what walks there, {Resurveys} scouts sent back to ground uncounted for {StaleMs / 3600000} hours, {Dreaded} crossings and harvests that earned nothing within {DreadMs / 3600000} hours of a death";
+               + $"{Marked} marked for blows, {Mourned} for a death ({ToBots} deaths at the hand of a bot left off the ground), {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Rebuffs} drove one off with its leader, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough, {Walled} born safe inside the walls, {Yielded} times a hunter was pointed at a square for what walks there, {Resurveys} scouts sent back to ground uncounted for {StaleMs / 3600000} hours, {Dreaded} crossings and harvests that earned nothing within {DreadMs / 3600000} hours of a death";
     }
 
     public static void Restore(
@@ -1408,6 +1444,8 @@ public static class BotQuad
         Baulked = 0;
         Sweeps = 0;
         Wiped = 0;
+        ToBots = 0;
+        Rebuffs = 0;
         Hushed = 0;
         Roused = 0;
     }

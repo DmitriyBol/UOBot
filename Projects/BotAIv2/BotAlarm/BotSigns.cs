@@ -160,7 +160,7 @@ public static class BotSigns
 
     private static string _overstated;
 
-    public static readonly HashSet<string> Ranked = new(StringComparer.OrdinalIgnoreCase) { "flee", "unload", "drill-in", "rescue", "harrow" };
+    public static readonly HashSet<string> Ranked = new(StringComparer.OrdinalIgnoreCase) { "flee", "unload", "drill-in", "rescue", "harrow", "band" };
 
     private static void Overstated()
     {

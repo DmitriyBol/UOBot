@@ -171,6 +171,7 @@ public static class BotDungeon
                 continue;
             }
 
+            _spawners.Add(spawner);
             deep.Rooms.Add(spawner.Location);
             Rooms++;
 
@@ -285,6 +286,50 @@ public static class BotDungeon
             : room;
     }
 
+    public static int RestockMs { get; set; } = 60000;
+
+    public static long Restocked { get; private set; }
+
+    private static readonly List<BaseSpawner> _spawners = [];
+
+    private static long _restockedTick;
+
+    public static void Restock()
+    {
+        if (RestockMs <= 0 || !Surveyed || Core.TickCount - _restockedTick < RestockMs)
+        {
+            return;
+        }
+
+        _restockedTick = Core.TickCount;
+
+        for (var i = _spawners.Count - 1; i >= 0; i--)
+        {
+            var spawner = _spawners[i];
+
+            if (spawner is not { Deleted: false })
+            {
+                _spawners.RemoveAt(i);
+
+                continue;
+            }
+
+            if (!spawner.Running || spawner.Group || spawner.IsFull)
+            {
+                continue;
+            }
+
+            var before = spawner.Spawned?.Count ?? 0;
+
+            spawner.Spawn();
+
+            if ((spawner.Spawned?.Count ?? 0) > before)
+            {
+                Restocked++;
+            }
+        }
+    }
+
     public static string Describe()
     {
         if (!Surveyed)
@@ -303,7 +348,8 @@ public static class BotDungeon
         }
 
         return $"{ready} of {_deeps.Length} dungeons surveyed, {Rooms} rooms between them, "
-            + $"{Measured} kinds of creature measured and {Unknown} the engine would not build";
+            + $"{Measured} kinds of creature measured and {Unknown} the engine would not build; "
+            + $"{Restocked} creatures put back by the restock, one a spawner every {RestockMs / 1000}s";
     }
 
     public static void Forget()
@@ -319,6 +365,7 @@ public static class BotDungeon
         }
 
         _might.Clear();
+        _spawners.Clear();
         Surveyed = false;
         Rooms = 0;
         Measured = 0;

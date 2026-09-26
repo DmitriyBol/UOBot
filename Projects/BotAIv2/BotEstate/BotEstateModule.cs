@@ -42,9 +42,20 @@ public sealed class BotEstateModule : BotModule
 
         BotWill.Offer(new BotBailiff());
 
+        BotWill.Offer(new BotTollman());
+
         BotWill.Offer(new BotFeuder());
 
         BotWill.Offer(new BotRemover());
+
+        BotWill.Offer(new BotEnlarger());
+
+        BotAbode.Adopt();
+        BotWill.Offer(new BotAbodeBuyer());
+        BotWill.Offer(new BotReposer());
+
+        BotOutpost.Adopt();
+        BotWill.Offer(new BotOutposter());
 
         BotWill.Offer(new BotHolder());
 
@@ -118,9 +129,17 @@ public sealed class BotEstateModule : BotModule
         BotHolder.Forget();
         BotReeve.Forget();
         BotChest.Forget();
+        BotToll.Forget();
+        BotTollman.Forget();
         BotHold.Forget();
         BotRemover.Forget();
         BotRemove.Forget();
+        BotEnlarger.Forget();
+        BotAbode.Forget();
+        BotAbodeBuyer.Forget();
+        BotReposer.Forget();
+        BotOutpost.Forget();
+        BotOutposter.Forget();
         BotShelf.Forget();
         BotFittings.Forget();
     }

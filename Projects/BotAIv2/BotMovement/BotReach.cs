@@ -109,6 +109,7 @@ public static class BotReach
 
         var reach = Math.Min(arrival.Tiles, MaxSweep);
         var goalZ = (sbyte)Math.Clamp(goal.Z, sbyte.MinValue, sbyte.MaxValue);
+        var sealedSeen = false;
 
         for (var dx = -reach; dx <= reach; dx++)
         {
@@ -116,35 +117,52 @@ public static class BotReach
             {
                 var x = goal.X + dx;
                 var y = goal.Y + dy;
+                var goalCell = BotStep.Cell(x, y, goalZ);
 
                 Probes++;
 
-                var settled = BotStep.Settle(map, x, y, out var z);
-                var verdict = Look(map, BotStep.Cell(x, y, goalZ), hasHere, here, tally);
+                var verdict = Look(map, goalCell, hasHere, here);
 
-                if (verdict != BotReachVerdict.Unknown)
+                if (verdict == BotReachVerdict.Connected)
                 {
                     return verdict;
                 }
 
-                if (settled && z != goalZ)
+                if (verdict == BotReachVerdict.Sealed)
                 {
-                    verdict = Look(map, BotStep.Cell(x, y, z), hasHere, here, tally);
+                    sealedSeen = true;
 
-                    if (verdict != BotReachVerdict.Unknown)
+                    continue;
+                }
+
+                var open = BotStep.Ground(map, x, y, goalZ, BotArrival.PersonHeight - 1, out var z)
+                    || BotStep.Settle(map, x, y, out z);
+
+                if (open && BotStep.Cell(x, y, z) != goalCell)
+                {
+                    verdict = Look(map, BotStep.Cell(x, y, z), hasHere, here);
+
+                    if (verdict == BotReachVerdict.Connected)
                     {
                         return verdict;
                     }
+
+                    if (verdict == BotReachVerdict.Sealed)
+                    {
+                        sealedSeen = true;
+
+                        continue;
+                    }
                 }
 
-                if (!hasHere && settled)
+                if (!hasHere && open)
                 {
                     return BotReachVerdict.Unknown;
                 }
             }
         }
 
-        if (!hasHere)
+        if (!hasHere && !sealedSeen)
         {
             return BotReachVerdict.Unknown;
         }
@@ -157,7 +175,7 @@ public static class BotReach
         return BotReachVerdict.Sealed;
     }
 
-    private static BotReachVerdict Look(Map map, int cell, bool hasHere, int here, bool tally)
+    private static BotReachVerdict Look(Map map, int cell, bool hasHere, int here)
     {
         if (!_pocketOf.TryGetValue(Fold(map, cell), out var there))
         {
@@ -169,11 +187,6 @@ public static class BotReach
         if (hasHere)
         {
             return there == here ? BotReachVerdict.Connected : BotReachVerdict.Unknown;
-        }
-
-        if (tally)
-        {
-            Refused++;
         }
 
         return BotReachVerdict.Sealed;

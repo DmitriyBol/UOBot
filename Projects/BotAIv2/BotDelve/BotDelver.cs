@@ -44,9 +44,9 @@ public sealed class BotDelver : IBotProposer
 
     public static int Reach { get; set; } = 200;
 
-    public static int HeadsPerParty { get; set; } = 20;
+    public static int HeadsPerParty { get; set; } = 12;
 
-    public static int BetweenMs { get; set; } = 1800000;
+    public static int BetweenMs { get; set; } = 600000;
 
     public string Name => "Delver";
 
@@ -59,6 +59,8 @@ public sealed class BotDelver : IBotProposer
     public static long Held { get; private set; }
 
     public static long Unfit { get; private set; }
+
+    public static long Unsupplied { get; private set; }
 
     public static long Resting { get; private set; }
 
@@ -88,7 +90,7 @@ public sealed class BotDelver : IBotProposer
             return null;
         }
 
-        if (body is not BotMobile who || who.Guild is not Guild guild || !ReferenceEquals(BotGuilds.Head(guild), who))
+        if (body is not BotMobile who || who.Guild is not Guild guild)
         {
             NotALeader++;
 
@@ -130,10 +132,18 @@ public sealed class BotDelver : IBotProposer
             return null;
         }
 
+        if (!BotProvision.Fit(body, out _))
+        {
+            Unsupplied++;
+
+            return null;
+        }
+
         BotDungeon.Survey(map);
 
-        var strength = Band(map, body);
-        var deep = Deepest(strength);
+        Gather(map, body);
+
+        var deep = Deepest();
 
         if (deep == null)
         {
@@ -141,30 +151,37 @@ public sealed class BotDelver : IBotProposer
             {
                 Unsurveyed++;
             }
-            else if (Deepest(strength, alone: false, full: true) != null)
+            else if (Deepest(alone: false, full: true) != null)
             {
                 Crowded++;
             }
             else
             {
                 Outmatched++;
+
+                if (BotProving.Judges && Deepest(alone: false, full: true, formula: true) != null)
+                {
+                    HeldBack++;
+                }
             }
 
             return null;
         }
 
-        _last[guild.Name] = Core.TickCount;
-        _claims[deep.Name] = Core.TickCount;
         Offered++;
 
+        var strength = Strength(deep);
+
+        Compare(body, deep, strength);
         Once(body, deep, strength);
 
         return new BotDelve(map, deep);
     }
 
-    private static double Band(Map map, Mobile leader)
+    private static void Gather(Map map, Mobile leader)
     {
-        _might.Clear();
+        _band.Clear();
+        _leader = leader as BotMobile;
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(leader.Location, Reach))
         {
@@ -183,17 +200,159 @@ public sealed class BotDelver : IBotProposer
                 continue;
             }
 
-            _might.Add(BotThreat.Power(other));
+            if (other.Resolve?.Deed is { Alongside: true })
+            {
+                continue;
+            }
+
+            if (BotProvision.Short(other))
+            {
+                continue;
+            }
+
+            _band.Add(other);
         }
 
-        _might.Sort(static (a, b) => b.CompareTo(a));
+        _band.Sort(
+            (a, b) =>
+            {
+                var mine = (BotGuilds.Same(leader, b) ? 1 : 0).CompareTo(BotGuilds.Same(leader, a) ? 1 : 0);
 
-        var total = 0.0;
-        var counted = Math.Min(_might.Count, Math.Max(1, BotDelve.Company - 1));
+                return mine != 0 ? mine : leader.GetDistanceToSqrt(a).CompareTo(leader.GetDistanceToSqrt(b));
+            }
+        );
+    }
 
-        for (var i = 0; i < counted; i++)
+    private static readonly List<BotMobile> _band = [];
+
+    private static BotMobile _leader;
+
+    private static string _partyGuild;
+
+    public static double WeakestShare { get; set; } = 0.2;
+
+    public static long Weakest { get; private set; }
+
+    private static bool Holds(BotMobile member, BotDungeon.Deep deep) =>
+        member == null || deep == Easiest() || BotProving.Against(member, deep) >= deep.Worst * WeakestShare;
+
+    public static long Unproven { get; private set; }
+
+    private static bool Proven(string guild, BotDungeon.Deep deep)
+    {
+        if (!BotProving.Judges || !BotProving.RoomGate || deep == Easiest() || BotProving.RoomCleared(guild, deep))
         {
-            total += _might[i];
+            return true;
+        }
+
+        Unproven++;
+
+        return false;
+    }
+
+    private static BotDungeon.Deep Easiest()
+    {
+        BotDungeon.Deep easiest = null;
+        var all = BotDungeon.All;
+
+        for (var i = 0; i < all.Count; i++)
+        {
+            if (all[i].Ready && (easiest == null || all[i].Worst < easiest.Worst))
+            {
+                easiest = all[i];
+            }
+        }
+
+        return easiest;
+    }
+
+    private static readonly HashSet<int> _picked = [];
+
+    private static double Strength(BotDungeon.Deep deep, bool formula = false)
+    {
+        if (deep == Easiest())
+        {
+            formula = true;
+        }
+
+        if (formula)
+        {
+            _might.Clear();
+
+            for (var i = 0; i < _band.Count; i++)
+            {
+                _might.Add(BotThreat.Power(_band[i]));
+            }
+
+            _might.Sort(static (a, b) => b.CompareTo(a));
+
+            var sum = 0.0;
+            var top = Math.Min(_might.Count, Math.Max(1, BotDelve.Company - 1));
+
+            for (var i = 0; i < top; i++)
+            {
+                sum += _might[i];
+            }
+
+            return sum;
+        }
+
+        var want = Math.Max(1, BotDelve.Company - 1);
+        var total = 0.0;
+        var taken = 0;
+
+        if (!Proven((_leader?.Guild as Guild)?.Name, deep))
+        {
+            return 0.0;
+        }
+
+        if (_leader != null)
+        {
+            if (!Holds(_leader, deep))
+            {
+                Weakest++;
+
+                return 0.0;
+            }
+
+            total += BotProving.Against(_leader, deep);
+        }
+
+        _picked.Clear();
+
+        for (var i = 0; i < _band.Count && taken < Math.Min(BotDelve.Fighters, want); i++)
+        {
+            if (_band[i].Class?.Role == BotRole.Melee)
+            {
+                if (!Holds(_band[i], deep))
+                {
+                    Weakest++;
+
+                    return 0.0;
+                }
+
+                total += BotProving.Against(_band[i], deep);
+                taken++;
+                _picked.Add(i);
+            }
+        }
+
+        for (var i = 0; i < _band.Count && taken < want; i++)
+        {
+            if (_picked.Contains(i))
+            {
+                continue;
+            }
+
+            if (!Holds(_band[i], deep))
+            {
+                Weakest++;
+
+                return 0.0;
+            }
+
+            total += BotProving.Against(_band[i], deep);
+            taken++;
         }
 
         return total;
@@ -201,14 +360,14 @@ public sealed class BotDelver : IBotProposer
 
     private static readonly List<double> _might = [];
 
-    private static BotDungeon.Deep Deepest(double strength)
+    private static BotDungeon.Deep Deepest()
     {
-        var empty = Deepest(strength, alone: true);
+        var empty = Deepest(alone: true);
 
-        return empty ?? Deepest(strength, alone: false);
+        return empty ?? Deepest(alone: false);
     }
 
-    private static BotDungeon.Deep Deepest(double strength, bool alone, bool full = false)
+    private static BotDungeon.Deep Deepest(bool alone, bool full = false, bool formula = false)
     {
         BotDungeon.Deep best = null;
 
@@ -218,7 +377,7 @@ public sealed class BotDelver : IBotProposer
         {
             var deep = all[i];
 
-            if (!deep.Ready || strength < deep.Worst * Odds)
+            if (!deep.Ready || Strength(deep, formula) < deep.Worst * Odds)
             {
                 continue;
             }
@@ -242,11 +401,184 @@ public sealed class BotDelver : IBotProposer
         return best;
     }
 
+    public static long Taken { get; private set; }
+
+    public static void Stamp(Mobile body, BotDungeon.Deep deep)
+    {
+        if (body is BotMobile { Guild: Guild guild })
+        {
+            _last[guild.Name] = Core.TickCount;
+        }
+
+        if (deep != null)
+        {
+            _claims[deep.Name] = Core.TickCount;
+        }
+
+        Taken++;
+    }
+
     private static int Holds(BotDungeon.Deep deep) =>
         Math.Max(1, deep.Heads / Math.Max(1, HeadsPerParty));
 
     private static bool Spoken(BotDungeon.Deep deep) =>
         _claims.TryGetValue(deep.Name, out var when) && Core.TickCount - (when + BotDelve.MusterMs) < 0;
+
+    public static long Rechosen { get; private set; }
+
+    public static BotDungeon.Deep Recheck(BotSquad squad, Mobile leader, BotDungeon.Deep planned, out double strength)
+    {
+        strength = 0.0;
+
+        if (squad == null || planned == null || !BotProving.Judges)
+        {
+            return planned;
+        }
+
+        _band.Clear();
+        _leader = null;
+
+        var members = squad.Members;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            if (members[i]?.Self is BotMobile { Deleted: false, Alive: true } member)
+            {
+                _band.Add(member);
+            }
+        }
+
+        if (leader is BotMobile head && !_band.Contains(head))
+        {
+            _band.Add(head);
+        }
+
+        _partyGuild = (leader?.Guild as Guild)?.Name;
+
+        strength = Party(planned);
+
+        if (strength >= planned.Worst * Odds)
+        {
+            return planned;
+        }
+
+        BotDungeon.Deep best = null;
+        BotDungeon.Deep weakest = null;
+        var all = BotDungeon.All;
+
+        for (var i = 0; i < all.Count; i++)
+        {
+            var deep = all[i];
+
+            if (!deep.Ready)
+            {
+                continue;
+            }
+
+            if (weakest == null || deep.Worst < weakest.Worst)
+            {
+                weakest = deep;
+            }
+
+            if (Party(deep) >= deep.Worst * Odds && (best == null || deep.Power > best.Power))
+            {
+                best = deep;
+            }
+        }
+
+        var chosen = best ?? weakest ?? planned;
+
+        if (chosen != planned)
+        {
+            Rechosen++;
+        }
+
+        return chosen;
+    }
+
+    private static double Party(BotDungeon.Deep deep)
+    {
+        var total = 0.0;
+
+        if (deep == Easiest())
+        {
+            for (var i = 0; i < _band.Count; i++)
+            {
+                total += BotThreat.Power(_band[i]);
+            }
+
+            return total;
+        }
+
+        if (!Proven(_partyGuild, deep))
+        {
+            return 0.0;
+        }
+
+        for (var i = 0; i < _band.Count; i++)
+        {
+            if (!Holds(_band[i], deep))
+            {
+                return 0.0;
+            }
+
+            total += BotProving.Against(_band[i], deep);
+        }
+
+        return total;
+    }
+
+    public static long Lifted { get; private set; }
+
+    public static long Lowered { get; private set; }
+
+    public static long HeldBack { get; private set; }
+
+    private static int _compared;
+
+    public static int SayDifferences { get; set; } = 8;
+
+    private static void Compare(Mobile body, BotDungeon.Deep deep, double strength)
+    {
+        if (!BotProving.Judges)
+        {
+            return;
+        }
+
+        var proven = Deepest(alone: false, full: true);
+        var formula = Deepest(alone: false, full: true, formula: true);
+        var provenWorst = proven?.Worst ?? 0.0;
+        var formulaWorst = formula?.Worst ?? 0.0;
+
+        if (provenWorst > formulaWorst)
+        {
+            Lifted++;
+        }
+        else if (provenWorst < formulaWorst)
+        {
+            Lowered++;
+        }
+        else
+        {
+            return;
+        }
+
+        if (_compared++ >= SayDifferences)
+        {
+            return;
+        }
+
+        logger.Information(
+            "Proving moved a delve offer: {Name}'s band of {Band} is {Proven} of strength against {Deep}'s worst by the proving ground and {Formula} by the old formula, so it can reach {Reach} where the formula said {Said}",
+            body.Name,
+            _band.Count,
+            strength.ToString("F0"),
+            deep.Name,
+            Strength(deep, formula: true).ToString("F0"),
+            proven?.Name ?? "nowhere",
+            formula?.Name ?? "nowhere"
+        );
+    }
 
     private static void Once(Mobile body, BotDungeon.Deep deep, double strength)
     {
@@ -269,12 +601,15 @@ public sealed class BotDelver : IBotProposer
 
     public static string Describe() =>
         Asked == 0
-            ? $"no guild's maker has ever been offered a delve ({NotALeader} answers went to bots that lead no band)"
-            : $"{Asked} times a maker was asked: {Offered} were offered a dungeon, {Held} were already leading a company, "
-            + $"{Unfit} were too hurt, {Resting} came too soon after a call that failed, {TooSoon} too soon after their band's last delve, "
+            ? $"no guild member has ever been offered a delve ({NotALeader} answers went to bots in no guild)"
+            : $"{Asked} times a guild member was asked: {Offered} were offered a dungeon and {Taken} took one, {Held} were already leading a company, "
+            + $"{Unfit} were too hurt, {Unsupplied} lacked their supplies, {Resting} came too soon after a call that failed, {TooSoon} too soon after their band's last delve, "
             + $"{Unsurveyed} found nothing surveyed, {Crowded} found every dungeon they could survive already full, "
             + $"{Outmatched} found nothing their band could come back out of at ×{Odds:F2} the worst of it; "
-            + $"{BotDungeon.Describe()}; {BotDelve.Describe()}";
+            + $"judged by the proving ground: {Lifted} offers went deeper than the old formula would have sent them, {Lowered} less deep, "
+            + $"{HeldBack} bands kept on the island that the formula would have sent down, {Rechosen} parties sent elsewhere once raised, "
+            + $"{Weakest} dungeons closed to a band by its weakest member (under {WeakestShare:P0} of the worst), {Unproven} by its guild's company not having cleared the worst room lately; "
+            + $"{BotDungeon.Describe()}; {BotDelve.Describe()}; {BotProvision.Describe()}";
 
     public static void Forget()
     {
@@ -283,12 +618,22 @@ public sealed class BotDelver : IBotProposer
         NotALeader = 0;
         Held = 0;
         Unfit = 0;
+        Unsupplied = 0;
         Resting = 0;
         TooSoon = 0;
         Unsurveyed = 0;
         Outmatched = 0;
         Crowded = 0;
         Offered = 0;
+        Taken = 0;
+        Lifted = 0;
+        Lowered = 0;
+        HeldBack = 0;
+        Rechosen = 0;
+        Weakest = 0;
+        Unproven = 0;
+        _compared = 0;
+        _band.Clear();
         _last.Clear();
         _claims.Clear();
         _might.Clear();

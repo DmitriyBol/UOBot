@@ -134,9 +134,11 @@ public static class BotAnvil
         }
     }
 
-    public static SmithHammer Kit(Mobile bot) => bot?.Backpack?.FindItemByType<SmithHammer>();
+    public static SmithHammer Kit(Mobile bot) => BotOutfit.Oldest<SmithHammer>(bot?.Backpack);
 
     public static int Ingots(Mobile bot, Type metal = null) => bot?.Backpack?.GetAmount(metal ?? Metal) ?? 0;
+
+    public static double Able(Mobile bot) => bot?.Skills[Skill].Base ?? 0.0;
 
     public static Type Best(Mobile bot, int need)
     {
@@ -148,7 +150,7 @@ public static class BotAnvil
             return Metal;
         }
 
-        var able = bot.Skills[Skill].Value;
+        var able = Able(bot);
         var metals = system.CraftSubRes;
 
         Type best = null;
@@ -193,7 +195,7 @@ public static class BotAnvil
             return;
         }
 
-        var able = body.Skills[Skill].Value;
+        var able = Able(body);
         var metals = system.CraftSubRes;
 
         for (var i = 0; i < metals.Count; i++)
@@ -217,7 +219,7 @@ public static class BotAnvil
             return 0;
         }
 
-        var able = body.Skills[Skill].Value;
+        var able = Able(body);
         var metals = system.CraftSubRes;
         var back = 0;
 
@@ -255,6 +257,71 @@ public static class BotAnvil
         return anvil && forge;
     }
 
+    public static Point3D Between(Map map, Point3D forge, Point3D from)
+    {
+        var best = Point3D.Zero;
+
+        if (map == null || map == Map.Internal)
+        {
+            return best;
+        }
+
+        var bestOff = int.MaxValue;
+        var span = Reach * 2;
+
+        foreach (var item in map.GetItemsInRange(forge, span))
+        {
+            if (BotGround.IsAnvilId(item.ItemID) && Math.Abs(item.Z - forge.Z) <= BotArrival.PersonHeight)
+            {
+                Stand(map, forge, item.Location, from, ref best, ref bestOff);
+            }
+        }
+
+        for (var dx = -span; dx <= span; dx++)
+        {
+            for (var dy = -span; dy <= span; dy++)
+            {
+                foreach (var tile in map.Tiles.GetStaticAndMultiTiles(forge.X + dx, forge.Y + dy))
+                {
+                    if (BotGround.IsAnvilId(tile.ID) && Math.Abs(tile.Z - forge.Z) <= BotArrival.PersonHeight)
+                    {
+                        Stand(map, forge, new Point3D(forge.X + dx, forge.Y + dy, tile.Z), from, ref best, ref bestOff);
+                    }
+                }
+            }
+        }
+
+        return best;
+    }
+
+    private static void Stand(Map map, Point3D forge, Point3D anvil, Point3D from, ref Point3D best, ref int bestOff)
+    {
+        for (var x = forge.X - Reach; x <= forge.X + Reach; x++)
+        {
+            for (var y = forge.Y - Reach; y <= forge.Y + Reach; y++)
+            {
+                if (Math.Abs(x - anvil.X) > Reach || Math.Abs(y - anvil.Y) > Reach)
+                {
+                    continue;
+                }
+
+                if (!BotStep.Ground(map, x, y, forge.Z, BotArrival.PersonHeight / 2, out var z)
+                    || !map.CanFit(x, y, z, BotArrival.PersonHeight, false, true))
+                {
+                    continue;
+                }
+
+                var off = Math.Max(Math.Abs(x - from.X), Math.Abs(y - from.Y));
+
+                if (off < bestOff)
+                {
+                    best = new Point3D(x, y, z);
+                    bestOff = off;
+                }
+            }
+        }
+    }
+
     public static int Stock(Mobile bot)
     {
         var system = System;
@@ -265,7 +332,7 @@ public static class BotAnvil
             return 0;
         }
 
-        var able = bot.Skills[Skill].Value;
+        var able = Able(bot);
         var metals = system.CraftSubRes;
         var most = pack.GetAmount(Base);
 

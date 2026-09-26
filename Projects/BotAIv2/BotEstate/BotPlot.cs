@@ -113,13 +113,16 @@ public static class BotPlot
         public bool HasKept;
     }
 
-    private static readonly Dictionary<(int X, int Y), Search> _searches = [];
+    private static readonly Dictionary<(int X, int Y, int Multi), Search> _searches = [];
 
     public static bool Find(Mobile by, out Point3D centre) => Find(by, Point3D.Zero, Point3D.Zero, 0, out centre);
 
     public static bool Find(Mobile by, Point3D from, out Point3D centre) => Find(by, from, Point3D.Zero, 0, out centre);
 
-    public static bool Find(Mobile by, Point3D from, Point3D shun, int clear, out Point3D centre)
+    public static bool Find(Mobile by, Point3D from, Point3D shun, int clear, out Point3D centre) =>
+        Find(by, from, shun, clear, MultiID, null, out centre);
+
+    public static bool Find(Mobile by, Point3D from, Point3D shun, int clear, int multi, BaseHouse replacing, out Point3D centre)
     {
         centre = Point3D.Zero;
 
@@ -135,13 +138,15 @@ public static class BotPlot
             from = BotPopulation.Where;
         }
 
-        if (!_searches.TryGetValue((from.X, from.Y), out var search))
+        if (!_searches.TryGetValue((from.X, from.Y, multi), out var search))
         {
             search = new Search();
-            _searches[(from.X, from.Y)] = search;
+            _searches[(from.X, from.Y, multi)] = search;
         }
 
-        if (search.HasKept && Sound(map, search.Kept) && Away(search.Kept, shun, clear))
+        if (search.HasKept && Sound(map, search.Kept, multi, replacing) && Away(search.Kept, shun, clear)
+            && !BotRefused.Refusing(map, search.Kept) && !Foreign(by, map, search.Kept.X, search.Kept.Y)
+            && !Round(map, from, search.Kept.X, search.Kept.Y))
         {
             centre = search.Kept;
 
@@ -173,6 +178,27 @@ public static class BotPlot
                 continue;
             }
 
+            if (BotRefused.Refusing(map, new Point3D(x, y, 0)))
+            {
+                Unreached++;
+
+                continue;
+            }
+
+            if (Foreign(by, map, x, y))
+            {
+                Foreigners++;
+
+                continue;
+            }
+
+            if (Round(map, from, x, y))
+            {
+                Roundabout++;
+
+                continue;
+            }
+
             map.GetAverageZ(x, y, out _, out var avg, out _);
 
             var at = new Point3D(x, y, avg);
@@ -184,7 +210,7 @@ public static class BotPlot
                 continue;
             }
 
-            if (Crowded(map, at))
+            if (Crowded(map, at, replacing))
             {
                 Occupied++;
 
@@ -205,7 +231,7 @@ public static class BotPlot
                 continue;
             }
 
-            if (!Level(map, at))
+            if (!Level(map, at, multi))
             {
                 Uneven++;
 
@@ -214,7 +240,7 @@ public static class BotPlot
 
             Tested++;
 
-            var result = HousePlacement.Check(by, MultiID, at, out var toMove, Direction.South);
+            var result = HousePlacement.Check(by, multi, at, out var toMove, Direction.South);
 
             if (result != HousePlacementResult.Valid)
             {
@@ -309,6 +335,36 @@ public static class BotPlot
 
     public static long Overshadowed { get; private set; }
 
+    public static long Unreached { get; private set; }
+
+    public static long Foreigners { get; private set; }
+
+    public static long Roundabout { get; private set; }
+
+    public static int MostBehind { get; set; } = 60;
+
+    private static bool Foreign(Mobile by, Map map, int x, int y)
+    {
+        var owner = BotClaim.Owner(map, new Point3D(x, y, 0));
+
+        return owner != null && owner != (by?.Guild as Server.Guilds.Guild)?.Name;
+    }
+
+    private static bool Round(Map map, Point3D from, int x, int y)
+    {
+        if (!BotRoads.Covers(map, x, y))
+        {
+            return false;
+        }
+
+        if (BotRoads.FromHome(map, x, y) < 0)
+        {
+            return true;
+        }
+
+        return BotRoads.Behind(map, from, new Point3D(x, y, 0)) > MostBehind;
+    }
+
     public static void Spend()
     {
         foreach (var search in _searches.Values)
@@ -317,7 +373,8 @@ public static class BotPlot
         }
     }
 
-    private static bool Sound(Map map, Point3D at) => !Crowded(map, at) && Level(map, at);
+    private static bool Sound(Map map, Point3D at, int multi, BaseHouse replacing) =>
+        !Crowded(map, at, replacing) && Level(map, at, multi);
 
     private static void Say(Point3D at, Point3D from, bool trodden) =>
         logger.Information(
@@ -333,9 +390,9 @@ public static class BotPlot
             Fit
         );
 
-    private static bool Level(Map map, Point3D at)
+    private static bool Level(Map map, Point3D at, int multi)
     {
-        var mcl = MultiData.GetComponents(MultiID);
+        var mcl = MultiData.GetComponents(multi);
 
         for (var ix = 0; ix < mcl.Width; ix++)
         {
@@ -454,11 +511,27 @@ public static class BotPlot
         return nearest;
     }
 
-    private static bool Crowded(Map map, Point3D at)
+    private static bool Crowded(Map map, Point3D at, BaseHouse replacing)
     {
         foreach (var house in BotEstate.Halls)
         {
-            if (house is { Deleted: false } && house.Map == map && house.Location.GetDistanceToSqrt(at) < Apart)
+            if (house is { Deleted: false } && house != replacing && house.Map == map && house.Location.GetDistanceToSqrt(at) < Apart)
+            {
+                return true;
+            }
+        }
+
+        foreach (var house in BotOutpost.Houses)
+        {
+            if (house is { Deleted: false } && house != replacing && house.Map == map && house.Location.GetDistanceToSqrt(at) < Apart)
+            {
+                return true;
+            }
+        }
+
+        foreach (var house in BotAbode.Houses)
+        {
+            if (house is { Deleted: false } && house != replacing && house.Map == map && house.Location.GetDistanceToSqrt(at) < BotAbode.Apart)
             {
                 return true;
             }
@@ -504,7 +577,7 @@ public static class BotPlot
     }
 
     public static string Describe() =>
-        $"plots: {Tested} put to the engine and {Fit} would take a hall; {Uneven} passed over as not level, {Floorless} with no floor at all, {InTown} for standing in a town, {Shunned} for pressing against a graveyard, {Occupied} with something standing on them, {Neighboured} taken within {Shy} tiles of another clan for want of anything further off; the engine refused {Forbidden} on its own regions, {Surfaceless} for resting on nothing, {BadLand} for the land, {BadStatic} for a static or an unclear yard, {BadItem} for something lying there; the spiral has been walked out {Exhausted} times";
+        $"plots: {Tested} put to the engine and {Fit} would take a hall; {Uneven} passed over as not level, {Floorless} with no floor at all, {Unreached} for ground somebody lately failed to reach, {Foreigners} for standing on another guild's square, {Roundabout} for lying round the far side of something by road, {InTown} for standing in a town, {Shunned} for pressing against a graveyard, {Occupied} with something standing on them, {Neighboured} taken within {Shy} tiles of another clan for want of anything further off; the engine refused {Forbidden} on its own regions, {Surfaceless} for resting on nothing, {BadLand} for the land, {BadStatic} for a static or an unclear yard, {BadItem} for something lying there; the spiral has been walked out {Exhausted} times";
 
     public static void Forget()
     {
@@ -513,6 +586,9 @@ public static class BotPlot
         Tested = 0;
         Fit = 0;
         Floorless = 0;
+        Unreached = 0;
+        Foreigners = 0;
+        Roundabout = 0;
         Occupied = 0;
         InTown = 0;
         Shunned = 0;

@@ -326,12 +326,19 @@ public static class BotLairs
             var lair = lairs[i];
             var away = Math.Max(Math.Abs(lair.At.X - from.X), Math.Abs(lair.At.Y - from.Y));
 
-            if (away >= closest || Passed(passed, lair.At) || Unreached(map, lair) || !Holds(lair, quarry))
+            if (away >= closest || Passed(passed, lair.At))
             {
                 continue;
             }
 
-            closest = away;
+            var cost = away + Math.Max(0, BotRoads.Behind(map, from, lair.At));
+
+            if (cost >= closest || Unreached(map, lair) || !Holds(lair, quarry))
+            {
+                continue;
+            }
+
+            closest = cost;
             best = lair;
         }
 

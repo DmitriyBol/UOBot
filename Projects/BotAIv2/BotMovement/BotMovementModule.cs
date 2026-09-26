@@ -89,10 +89,11 @@ public sealed class BotMovementModule : BotModule
         BotReach.Reset();
         BotRefused.Forget();
         BotRoads.Forget();
+        BotChart.Forget();
     }
 
     public static string Summarise() =>
-        $"{BotPath.Describe()}; {BotWalk.Describe()}; {BotReach.Describe()}; {BotRefused.Describe()}";
+        $"{BotPath.Describe()}; {BotWalk.Describe()}; {BotReach.Describe()}; {BotRefused.Describe()}; {BotChart.Describe()}";
 
     private sealed class RoadsTimer : Timer
     {
@@ -102,9 +103,14 @@ public sealed class BotMovementModule : BotModule
 
         protected override void OnTick()
         {
-            BotRoads.Slice();
+            if (!BotRoads.Ready && !BotRoads.Failed)
+            {
+                BotRoads.Slice();
 
-            if (BotRoads.Ready || BotRoads.Failed)
+                return;
+            }
+
+            if (BotRoads.Failed || !BotChart.Running || BotChart.Slice())
             {
                 Stop();
             }

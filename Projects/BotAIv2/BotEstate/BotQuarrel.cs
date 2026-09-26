@@ -54,6 +54,8 @@ public sealed class BotQuarrel : BotDeed
 
     private readonly string _ours;
 
+    public string Ours => _ours;
+
     private readonly bool _defending;
 
     private long _began;

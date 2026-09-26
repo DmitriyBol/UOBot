@@ -124,6 +124,40 @@ public static class BotFeud
                 continue;
             }
 
+            if (_musters.TryGetValue(company, out var muster))
+            {
+                if (!muster.Out)
+                {
+                    if (Threat(ours) != null)
+                    {
+                        muster.Out = true;
+                        SetOut++;
+                    }
+                    else if (!Ready(ours, company, muster, now))
+                    {
+                        continue;
+                    }
+                }
+                else if (company.Count < LeastToAttack && Threat(ours) == null
+                         && company.Leader?.Self is { Deleted: false } head0 && !head0.InRange(muster.Where, Assembly))
+                {
+                    company.Disengage("too few left in the field; back to the muster");
+                    muster.Out = false;
+                    muster.Since = now;
+                    FellBack++;
+
+                    logger.Information(
+                        "The war company of {Guild} falls back to muster again at ({X}, {Y}) with {Count} left",
+                        name,
+                        muster.Where.X,
+                        muster.Where.Y,
+                        company.Count
+                    );
+
+                    continue;
+                }
+            }
+
             if (company.Stance == BotSquadStance.Fighting && company.Focus is { Deleted: false, Alive: true })
             {
                 continue;
@@ -245,6 +279,206 @@ public static class BotFeud
 
     private static readonly Dictionary<string, BotSquad> _companies = [];
 
+    public static int MusterMs { get; set; } = 90000;
+
+    public static int Assembly { get; set; } = 12;
+
+    public static int LeastToAttack { get; set; } = 3;
+
+    public static int Straggle { get; set; } = 40;
+
+    public static int Wave { get; set; } = 3;
+
+    public static int WaveMs { get; set; } = 60000;
+
+    public static long Mustered { get; private set; }
+
+    public static long SetOut { get; private set; }
+
+    public static long SetOutWhole { get; private set; }
+
+    public static long FellBack { get; private set; }
+
+    public static long Waves { get; private set; }
+
+    /// <summary>Where a war company forms up, since when, whether it has set out, and who is waiting there for the next wave.</summary>
+    private sealed class Muster
+    {
+        private Point3D _where;
+
+        public Point3D Where
+        {
+            get => Guild != null && BotEstate.Held.TryGetValue(Guild, out var hall) && hall is { Deleted: false } ? hall.BanLocation : _where;
+            set => _where = value;
+        }
+
+        public long Since;
+
+        public bool Out;
+
+        public string Guild;
+
+        public readonly Dictionary<Serial, (long Arrived, long Seen)> Waiting = [];
+
+        public long Released;
+
+        public bool EverReleased;
+    }
+
+    private static readonly Dictionary<BotSquad, Muster> _musters = [];
+
+    public static bool Mustering(BotSquad company) => company != null && _musters.TryGetValue(company, out var muster) && !muster.Out;
+
+    public static bool Out(BotSquad company) => company == null || !_musters.TryGetValue(company, out var muster) || muster.Out;
+
+    public static Point3D MusterAt(BotSquad company) =>
+        company != null && _musters.TryGetValue(company, out var muster) ? muster.Where : Point3D.Zero;
+
+    public static int Gathered(BotSquad company)
+    {
+        if (company == null || !_musters.TryGetValue(company, out var muster))
+        {
+            return 0;
+        }
+
+        var here = 0;
+        var members = company.Members;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            if (members[i]?.Self is { Deleted: false, Alive: true } body && body.Map == company.Map && body.InRange(muster.Where, Assembly))
+            {
+                here++;
+            }
+        }
+
+        return here;
+    }
+
+    public static int Needed(Guild ours, BotSquad company) =>
+        Math.Clamp(BotWar.Wanted(ours?.Name), LeastToAttack, Math.Max(LeastToAttack, company?.Ceiling ?? CompanySize));
+
+    public static int Waiting(BotSquad company) =>
+        company != null && _musters.TryGetValue(company, out var muster) ? muster.Waiting.Count : 0;
+
+    public static bool WaveGoes(BotSquad company, Mobile body)
+    {
+        if (company == null || body == null || !_musters.TryGetValue(company, out var muster))
+        {
+            return true;
+        }
+
+        var now = Core.TickCount;
+        var waiting = muster.Waiting;
+
+        if (waiting.TryGetValue(body.Serial, out var mine))
+        {
+            mine = (mine.Arrived, now);
+        }
+        else
+        {
+            mine = (now, now);
+        }
+
+        waiting[body.Serial] = mine;
+
+        if (muster.EverReleased && muster.Released - mine.Arrived >= 0)
+        {
+            waiting.Remove(body.Serial);
+
+            return true;
+        }
+
+        List<Serial> stale = null;
+        var oldest = now;
+
+        foreach (var (serial, seen) in waiting)
+        {
+            if (now - seen.Seen > 5000)
+            {
+                (stale ??= []).Add(serial);
+
+                continue;
+            }
+
+            if (seen.Arrived - oldest < 0)
+            {
+                oldest = seen.Arrived;
+            }
+        }
+
+        for (var i = 0; stale != null && i < stale.Count; i++)
+        {
+            waiting.Remove(stale[i]);
+        }
+
+        if (waiting.Count < Wave && now - oldest < WaveMs)
+        {
+            return false;
+        }
+
+        muster.Released = now;
+        muster.EverReleased = true;
+        Waves++;
+
+        logger.Information(
+            "A wave of {Count} of {Guild}'s war company leaves the muster at ({X}, {Y}) for the company",
+            waiting.Count,
+            muster.Guild,
+            muster.Where.X,
+            muster.Where.Y
+        );
+
+        waiting.Remove(body.Serial);
+
+        return true;
+    }
+
+    public static Point3D MusterPoint(Guild ours, Mobile founder)
+    {
+        if (BotEstate.Hall(ours) is { Deleted: false } hall)
+        {
+            return hall.BanLocation;
+        }
+
+        var seat = BotSeat.Of(ours);
+
+        return seat != Point3D.Zero ? seat : founder.Location;
+    }
+
+    private static bool Ready(Guild ours, BotSquad company, Muster muster, long now)
+    {
+        var here = Gathered(company);
+        var needed = Needed(ours, company);
+        var waited = now - muster.Since;
+
+        if (here < needed && (waited < MusterMs || here < LeastToAttack))
+        {
+            return false;
+        }
+
+        muster.Out = true;
+        SetOut++;
+
+        if (here >= needed)
+        {
+            SetOutWhole++;
+        }
+
+        logger.Information(
+            "The war company of {Guild} sets out from ({X}, {Y}) with {Here} gathered of {Count} in it ({Needed} wanted) after {Waited:F0}s of mustering",
+            ours.Name,
+            muster.Where.X,
+            muster.Where.Y,
+            here,
+            company.Count,
+            needed,
+            waited / 1000.0
+        );
+
+        return true;
+    }
+
     public static int SortieMs { get; set; } = 180000;
 
     public static long Sorties { get; private set; }
@@ -347,6 +581,7 @@ public static class BotFeud
         if (!Standing(company))
         {
             _companies.Remove(ours.Name);
+            _musters.Remove(company);
 
             return null;
         }
@@ -373,7 +608,7 @@ public static class BotFeud
             return null;
         }
 
-        if (company != null && !ReferenceEquals(member.Squad, company) && !BotSquads.Reaches(company, body))
+        if (company != null && !ReferenceEquals(member.Squad, company) && !BotSquads.Reaches(company, body) && !_musters.ContainsKey(company))
         {
             Beyond++;
 
@@ -425,13 +660,21 @@ public static class BotFeud
         _companies[ours.Name] = company;
         Companies++;
 
+        var muster = new Muster { Where = MusterPoint(ours, body), Since = Core.TickCount, Out = defending, Guild = ours.Name };
+        _musters[company] = muster;
+
+        if (!defending)
+        {
+            Mustered++;
+        }
+
         logger.Information(
             "{Name} has formed the war company of {Guild} against {Enemy} of {Theirs}{Why}",
             body.Name,
             ours.Name,
             enemy?.Name ?? "nobody",
             (enemy?.Guild as Guild)?.Name ?? "nobody",
-            defending ? ", on our own ground" : ""
+            defending ? ", on our own ground" : $", mustering it at ({muster.Where.X}, {muster.Where.Y})"
         );
 
         return company;
@@ -445,6 +688,7 @@ public static class BotFeud
         }
 
         _companies.Remove(guild);
+        _musters.Remove(company);
 
         if (Standing(company))
         {
@@ -530,7 +774,8 @@ public static class BotFeud
             ? "no guild has called anybody onto anybody"
             : $"{Called} calls raised against an enemy at war, {Answered} members came to one somebody else had raised, "
             + $"{Threatened} times an enemy was seen on a guild's own ground and {Defended} members went to it from up to {Defend} tiles, the first setting out {(Reactions > 0 ? ReactionMs / Reactions / 1000.0 : 0.0):F1}s after the sighting on average over {Reactions}; "
-            + $"{Companies} war companies formed and {Rallied} members rallied to one, {Beyond} not called to one whose leader stood more than {BotSquads.JoinReach} tiles off, {Pocketed} not called to one fighting in a pocket proved closed from where they stood, {Sorties} times one was sent out after an enemy nobody had seen; {BotRally.Describe()}";
+            + $"{Companies} war companies formed and {Rallied} members rallied to one, {Beyond} not called to one whose leader stood more than {BotSquads.JoinReach} tiles off, {Pocketed} not called to one fighting in a pocket proved closed from where they stood, {Sorties} times one was sent out after an enemy nobody had seen; "
+            + $"{Mustered} attacking companies mustered before the fight (up to {MusterMs / 1000}s, setting out with what the score asks or at least {LeastToAttack}), {SetOut} set out ({SetOutWhole} whole), {FellBack} fell back to muster again with fewer than {LeastToAttack} in the field, {Waves} waves of stragglers sent from the muster ({Wave} or {WaveMs / 1000}s); {BotRally.Describe()}";
 
     public static void Forget()
     {
@@ -549,6 +794,12 @@ public static class BotFeud
         Beyond = 0;
         Pocketed = 0;
         _companies.Clear();
+        _musters.Clear();
+        Mustered = 0;
+        SetOut = 0;
+        SetOutWhole = 0;
+        FellBack = 0;
+        Waves = 0;
         Sorties = 0;
         BotRally.Forget();
     }

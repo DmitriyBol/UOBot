@@ -127,6 +127,9 @@ public sealed class BotProwl : BotDeed
 
     private bool _raised;
 
+    public override double Brings(Mobile body) =>
+        _company && !_raised ? System.Math.Max(BotQuad.Strength(body), BotThreat.Power(body) * BotSquad.MaxSize) : BotQuad.Strength(body);
+
     private bool _gated;
 
     private Point3D _gate;

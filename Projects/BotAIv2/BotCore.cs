@@ -89,6 +89,8 @@ public static class BotCore
         BotModules.Register(new BotBaronModule());
 
         BotModules.Register(new BotDelveModule());
+
+        BotModules.Register(new BotProvingModule());
         BotModules.Register(new BotDashboardModule());
 
         BotModules.Register(new BotAlarmModule());

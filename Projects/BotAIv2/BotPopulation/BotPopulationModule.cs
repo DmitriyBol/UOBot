@@ -46,7 +46,8 @@ public sealed class BotPopulationModule : BotModule
 
         BotWill.Offer(new BotHomer());
 
-        var deleted = BotPopulation.Reclaim(BotPopulationConfig.Mix, out var kept);
+        var mix = BotGrowth.Mix(BotPopulationConfig.Mix);
+        var deleted = BotPopulation.Reclaim(mix, out var kept);
         var back = 0;
 
         foreach (var (_, many) in kept)
@@ -64,7 +65,7 @@ public sealed class BotPopulationModule : BotModule
             );
         }
 
-        var born = BotPopulation.Raise(BotPopulationConfig.Mix, kept);
+        var born = BotPopulation.Raise(mix, kept);
 
         if (born == 0 && back == 0)
         {
@@ -84,6 +85,8 @@ public sealed class BotPopulationModule : BotModule
             BotPopulation.Home,
             BotBeat.Describe()
         );
+
+        BotRest.Start();
 
         BotGuilds.Muster();
 
@@ -107,6 +110,7 @@ public sealed class BotPopulationModule : BotModule
 
         logger.Information("Population, before the reload: {State}", BotPopulation.Describe());
 
+        BotRest.Stop();
         BotBeat.Reset();
         BotPopulation.Reset();
     }

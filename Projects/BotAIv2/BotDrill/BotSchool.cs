@@ -413,6 +413,28 @@ public static class BotSchool
         return new Point3D(Ground.X + dx, Ground.Y + dy, Ground.Z);
     }
 
+    public static Point3D Post(Map map, int turn, int count)
+    {
+        for (var i = 0; i < 8; i++)
+        {
+            var post = Post(turn + i, count);
+
+            if (map == null || map == Map.Internal)
+            {
+                return post;
+            }
+
+            if (BotFooting.Footless(map, post.X, post.Y) || !BotStep.Settle(map, post.X, post.Y, out var z))
+            {
+                continue;
+            }
+
+            return new Point3D(post.X, post.Y, z);
+        }
+
+        return Post(turn, count);
+    }
+
     public static double Teach(BotMobile student)
     {
         var master = Master;

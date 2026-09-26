@@ -135,7 +135,7 @@ public sealed class BotHall : BotDeed
 
         BotPlot.Spend();
 
-        var house = new SmallOldHouse(body, BotPlot.MultiID);
+        var house = BotHallKind.First.Make(body);
 
         if (house.Deleted)
         {
@@ -161,6 +161,8 @@ public sealed class BotHall : BotDeed
         _fitted = BotFittings.Furnish(house, _guild);
         BotEstate.Fit(_fitted);
         BotEstate.Register(_guild, house, true);
+
+        BotSeat.Set(_guild.Name, house.Location, false);
 
         _paid = got;
 

@@ -43,12 +43,17 @@ public sealed class BotBand : BotDeed
 
     private bool _engaged;
 
-    public BotBand(BaseCreature quarry)
+    private readonly double _together;
+
+    public BotBand(BaseCreature quarry, double together = 0.0)
     {
         _quarry = quarry;
         _map = quarry.Map;
         _found = quarry.Location;
+        _together = together;
     }
+
+    public override double Brings(Mobile body) => System.Math.Max(BotQuad.Strength(body), _together);
 
     public override string Kind => Trade;
 

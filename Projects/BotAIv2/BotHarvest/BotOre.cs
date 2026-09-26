@@ -58,6 +58,8 @@ public static class BotOre
         return Mining.System?.OreAndStone?.GetBank(map, x, y)?.Current ?? 0;
     }
 
+    public static int StockedLeast { get; set; } = 4;
+
     public static bool Stocked(Map map, Point3D seam)
     {
         var system = Mining.System;
@@ -88,7 +90,7 @@ public static class BotOre
                         continue;
                     }
 
-                    if (Left(map, x, y) > 0)
+                    if (Left(map, x, y) >= StockedLeast)
                     {
                         return true;
                     }
@@ -160,9 +162,9 @@ public static class BotOre
             return null;
         }
 
-        Item tool = pack.FindItemByType<Pickaxe>();
+        Item tool = BotOutfit.Oldest<Pickaxe>(pack);
 
-        return tool ?? pack.FindItemByType<Shovel>();
+        return tool ?? BotOutfit.Oldest<Shovel>(pack);
     }
 
     private const int SmallPile = 0x19B7;
@@ -242,7 +244,7 @@ public static class BotOre
                         continue;
                     }
 
-                    if (Skipped(skip, x, y))
+                    if (Skipped(skip, x, y) || BotFooting.Footless(map, x, y))
                     {
                         continue;
                     }

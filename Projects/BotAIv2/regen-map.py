@@ -40,7 +40,7 @@ ROOT = "(root)"
 ORDER = [
     ROOT, "BotModules", "BotPopulation", "BotWill", "BotMovement", "BotClasses", "BotOutfit",
     "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotAuction", "BotSpells",
-    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotEstate", "BotQuest", "BotQuad", "BotRanger",
+    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotProving", "BotEstate", "BotQuest", "BotQuad", "BotRanger",
     "BotDashboard", "BotAlarm", "mindedBots", "mindedBots/debugger",
 ]
 
@@ -246,6 +246,18 @@ BLOCKS = {
          "the count of what it lifts out is printed: a backstop doing the ordinary work has become the "
          "design."],
     ),
+    "BotProving": (
+        "Argus's proving ground",
+        "A bot's double against a creature in Green Acres, and a guild's company of doubles against a dungeon's "
+        "worst room: the engine fights, the doubles answer with the bots' own hands, and what comes of it is the "
+        "strength the delve judges a band by instead of health times weapon damage. Patrick's order of 26.09.2026.",
+        ["A walkover is a lower bound, not a measurement: R is capped at 5 and nothing measured on a lower rung is "
+         "carried up the ladder at more than the creature it beat, times 0.75. The first boot extrapolated an orcish "
+         "mage beaten at R 20 into a Balron beaten at R 1.4.",
+         "A band is as far as its weakest member goes, and a room is not its worst creature one at a time: the "
+         "delve counts the leader, wants every member at a fifth of the worst, and past the easiest dungeon wants "
+         "the guild's company to have cleared the worst room lately."],
+    ),
     "BotEstate": (
         "the guilds' halls",
         "The one thing this population builds that outlives it. A guild levies its members, finds ground the "
@@ -333,6 +345,7 @@ LINES = {
     "BotDrill": ["The captain:"],
     "BotBaron": ["The Baron:"],
     "BotDelve": ["Delving:"],
+    "BotProving": ["Proving:"],
     "BotEstate": ["Estate:"],
     "BotQuest": ["Quests:"],
     "BotQuad": ["The captain:"],

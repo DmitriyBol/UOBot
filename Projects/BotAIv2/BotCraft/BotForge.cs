@@ -58,6 +58,8 @@ public sealed class BotForge : BotDeed
 
     public static long NoPlace { get; private set; }
 
+    public static long Rounded { get; private set; }
+
     private enum Leg
     {
         Walk,
@@ -73,6 +75,10 @@ public sealed class BotForge : BotDeed
 
     private Leg _leg;
 
+    private bool _rounded;
+
+    private Point3D _stand;
+
     private CraftItem _recipe;
 
     private Type _kind;
@@ -82,6 +88,10 @@ public sealed class BotForge : BotDeed
     private Type _metal;
 
     private int _made;
+
+    private int _had = -1;
+
+    public static long Preowned { get; private set; }
 
     private int _handed;
 
@@ -147,7 +157,27 @@ public sealed class BotForge : BotDeed
             return BotDoing.Work("at the anvil");
         }
 
-        if (body.InRange(_smithy, 1))
+        if (!_rounded && body.InRange(_smithy, 1))
+        {
+            _rounded = true;
+            _stand = BotAnvil.Between(_map, _smithy, body.Location);
+
+            if (_stand != Point3D.Zero && (_stand.X != body.X || _stand.Y != body.Y))
+            {
+                Rounded++;
+            }
+            else
+            {
+                _stand = Point3D.Zero;
+            }
+        }
+
+        if (_stand != Point3D.Zero && (_stand.X != body.X || _stand.Y != body.Y))
+        {
+            return BotDoing.Walk(_map, _stand, BotArrival.Exactly, "round to the anvil side of the forge");
+        }
+
+        if (_stand != Point3D.Zero || body.InRange(_smithy, 1))
         {
             Refuse(bot);
 
@@ -179,7 +209,9 @@ public sealed class BotForge : BotDeed
 
         if (tool == null)
         {
-            return BotDoing.Failed("no hammer");
+            return _made > 0
+                ? BotDoing.Done($"the hammer wore out after {_made} made")
+                : BotDoing.Failed("no hammer");
         }
 
         if (!BotAnvil.AtASmithy(body))
@@ -200,7 +232,17 @@ public sealed class BotForge : BotDeed
 
         var had = _made;
 
-        _made = BotAnvil.Made(body, _kind);
+        if (_had < 0)
+        {
+            _had = BotAnvil.Made(body, _kind);
+
+            if (_had > 0)
+            {
+                Preowned++;
+            }
+        }
+
+        _made = Math.Max(0, BotAnvil.Made(body, _kind) - _had);
 
         if (_made > had)
         {
@@ -274,6 +316,8 @@ public sealed class BotForge : BotDeed
     {
         var goods = BotAnvil.Gather(body, _kind);
 
+        goods.RemoveAll(item => BotBinding.IsBound(item, bot?.Bond));
+
         if (goods.Count == 0)
         {
             Stints++;
@@ -296,6 +340,8 @@ public sealed class BotForge : BotDeed
         if (BotDig.ListGoods)
         {
             var left = BotAnvil.Gather(body, _kind);
+
+            left.RemoveAll(item => BotBinding.IsBound(item, bot?.Bond));
 
             for (var i = 0; i < left.Count; i++)
             {
@@ -329,7 +375,8 @@ public sealed class BotForge : BotDeed
         Stints == 0
             ? "no stint at an anvil has ended yet"
             : $"{Stints} stints at an anvil ended: {Wrought} with {Pieces} pieces beaten out, {RanOut} out of metal, "
-              + $"{Fruitless} that used every swing and made nothing, {NoPlace} that found no anvil the engine would take; {BotCraftEar.Describe()}";
+              + $"{Fruitless} that used every swing and made nothing, {NoPlace} that found no anvil the engine would take, "
+              + $"{Rounded} that walked round the forge to its anvil's side, {Preowned} that began with pieces of the kind already in the pack and left them out of what they made; {BotCraftEar.Describe()}";
 
     public static void Forget()
     {
@@ -339,5 +386,6 @@ public sealed class BotForge : BotDeed
         RanOut = 0;
         Fruitless = 0;
         NoPlace = 0;
+        Rounded = 0;
     }
 }

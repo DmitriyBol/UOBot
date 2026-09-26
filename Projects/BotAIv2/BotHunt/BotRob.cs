@@ -809,6 +809,8 @@ public static class BotRobber
 
     public static long Rolled { get; private set; }
 
+    public static long Burgling { get; private set; }
+
     public static long Tempted { get; private set; }
 
     public static long NoVictim { get; private set; }
@@ -890,7 +892,9 @@ public static class BotRobber
 
         var sprung = _sprung.Remove(body.Serial, out var seen);
 
-        if (!sprung && _rolledTick.TryGetValue(body.Serial, out var last) && now - last < EveryMs)
+        var bandit = BotUnderworld.Member(body) || BotUnderworld.Outlawed(body);
+
+        if (!sprung && _rolledTick.TryGetValue(body.Serial, out var last) && now - last < (bandit ? BotUnderworld.BanditEveryMs : EveryMs))
         {
             return;
         }
@@ -898,7 +902,7 @@ public static class BotRobber
         _rolledTick[body.Serial] = now;
         Rolled++;
 
-        if (!sprung && Utility.RandomDouble() >= (BotUnderworld.Member(body) ? BotUnderworld.MemberRobChance : Chance))
+        if (!sprung && Utility.RandomDouble() >= (bandit ? BotUnderworld.MemberRobChance : Chance))
         {
             return;
         }
@@ -912,7 +916,7 @@ public static class BotRobber
             return;
         }
 
-        if (bot.Resolve?.Deed is { Steadfast: true })
+        if (!sprung && bot.Resolve?.Deed is { Steadfast: true })
         {
             Holding++;
 
@@ -939,6 +943,26 @@ public static class BotRobber
             );
 
             return;
+        }
+
+        if (bandit && !sprung && Utility.RandomDouble() < BotBurgle.Share && BotBurgle.Target(body, map, out var whose) is { } hall)
+        {
+            if (BotWill.Press(bot, new BotBurgle(hall, whose), $"tempted by what {whose} has put by"))
+            {
+                Burgling++;
+
+                logger.Information(
+                    "{Name} the {Class} is tempted by the chest of {Guild} ({Gold}gp put by) and creeps off to break into its hall at {X},{Y}",
+                    body.Name,
+                    klass.Name,
+                    whose,
+                    BotChest.Holds(whose),
+                    hall.X,
+                    hall.Y
+                );
+
+                return;
+            }
         }
 
         if (body.Region?.GetRegion<GuardedRegion>() is { } guarded && !guarded.IsDisabled())

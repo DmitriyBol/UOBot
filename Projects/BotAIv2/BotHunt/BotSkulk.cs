@@ -45,6 +45,12 @@ public sealed class BotSkulk : BotDeed
 
     public static long Eager { get; private set; }
 
+    public static int WaitMs { get; set; } = 600000;
+
+    public static long Waited { get; private set; }
+
+    private static readonly HashSet<Serial> _waiting = [];
+
     public static double HidingGained { get; private set; }
 
     public static double StealthGained { get; private set; }
@@ -275,6 +281,13 @@ public sealed class BotSkulk : BotDeed
             return;
         }
 
+        if (body.Resolve?.Deed != null && now - last < every + WaitMs)
+        {
+            _waiting.Add(body.Serial);
+
+            return;
+        }
+
         _urgedTick[body.Serial] = now;
 
         if (body.Map is not { } map || map == Map.Internal || body.Squad != null || BotDuel.Duelling(body) || BotOutlaw.Jailed(body)
@@ -290,9 +303,16 @@ public sealed class BotSkulk : BotDeed
 
         var where = BotUnderworld.Member(body) && BotUnderworld.Hideout != Point3D.Zero ? BotUnderworld.Hideout : body.Location;
 
+        var waited = _waiting.Remove(body.Serial) && body.Resolve?.Deed == null;
+
         if (BotWill.Press(body, new BotSkulk(map, where), apprentice ? "practising in earnest" : "the itch to practise hiding"))
         {
             Urged++;
+
+            if (waited)
+            {
+                Waited++;
+            }
 
             if (apprentice)
             {
@@ -383,13 +403,15 @@ public sealed class BotSkulk : BotDeed
     }
 
     public static string Describe() =>
-        $"{Stints} stints of practising hiding ({Urged} of them from the itch, {Eager} of those an apprentice's, {_apprentices.Count} apprentices named), {Ended} run to the end, gaining {HidingGained:F1} Hiding and {StealthGained:F1} Stealth between them";
+        $"{Stints} stints of practising hiding ({Urged} of them from the itch: {Waited} of those begun between two pieces of work after waiting for the one in hand, {Eager} an apprentice's; {_waiting.Count} itches waiting now, {_apprentices.Count} apprentices named), {Ended} run to the end, gaining {HidingGained:F1} Hiding and {StealthGained:F1} Stealth between them";
 
     public static void Forget()
     {
         Stints = 0;
         Ended = 0;
         Urged = 0;
+        Waited = 0;
+        _waiting.Clear();
         Eager = 0;
         HidingGained = 0;
         StealthGained = 0;

@@ -86,6 +86,11 @@ public sealed class BotEvict : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+        if (_said || _them is not { Deleted: false } || !BotLand.Trespassing(_them, out var whose) || whose != _ours)
+        {
+            return true;
+        }
+
         BotBailiff.Unreached(bot?.Self, _them);
 
         return false;
@@ -118,7 +123,7 @@ public sealed class BotEvict : BotDeed
             {
                 Missed++;
 
-                return BotDoing.Failed($"{_them.Name} had already left our land");
+                return BotDoing.Done($"{_them.Name} had already left our land");
             }
 
             Moved++;

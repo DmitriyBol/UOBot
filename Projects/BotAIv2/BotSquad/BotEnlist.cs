@@ -47,6 +47,10 @@ public sealed class BotEnlist : BotDeed
 
     public static void Foe() => Hostile++;
 
+    public static long Unlawful { get; private set; }
+
+    public static void Crime() => Unlawful++;
+
     public static long Remote { get; private set; }
 
     public static void Far() => Remote++;
@@ -56,6 +60,7 @@ public sealed class BotEnlist : BotDeed
         Ending = 0;
         Lonely = 0;
         Hostile = 0;
+        Unlawful = 0;
         Remote = 0;
     }
 
@@ -275,6 +280,13 @@ public sealed class BotEnlister : IBotProposer
                 continue;
             }
 
+            if (squad.Focus is { Deleted: false } fighting && body.IsHarmfulCriminal(fighting))
+            {
+                BotEnlist.Crime();
+
+                continue;
+            }
+
             if (!BotSquads.Reaches(squad, body))
             {
                 BotEnlist.Far();
@@ -312,7 +324,7 @@ public sealed class BotEnlister : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a place in a company"
-            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it, {BotEnlist.Ending} passed one over whose fight was nearly won, {BotEnlist.Lonely} passed over a company of one, {BotEnlist.Hostile} passed over the enemy's, {BotEnlist.Remote} passed over one whose leader stood more than {BotSquads.JoinReach} tiles off";
+            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it, {BotEnlist.Ending} passed one over whose fight was nearly won, {BotEnlist.Lonely} passed over a company of one, {BotEnlist.Hostile} passed over the enemy's, {BotEnlist.Unlawful} passed over one whose fight would have made it a criminal, {BotEnlist.Remote} passed over one whose leader stood more than {BotSquads.JoinReach} tiles off";
 
     public static void Forget()
     {

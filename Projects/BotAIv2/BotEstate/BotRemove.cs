@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Server.Guilds;
 using Server.Items;
 using Server.Mobiles;
@@ -124,7 +125,8 @@ public sealed class BotRemove : BotDeed
             return BotDoing.Walk(_map, _plot, BotArrival.Within(Reach), $"to the new ground at {_plot.X},{_plot.Y}");
         }
 
-        var result = HousePlacement.Check(body, BotPlot.MultiID, _plot, out var toMove, Direction.South);
+        var kind = BotHallKind.Of(old);
+        var result = HousePlacement.Check(body, kind.Multi, _plot, out var toMove, Direction.South);
 
         if (result != HousePlacementResult.Valid)
         {
@@ -158,7 +160,7 @@ public sealed class BotRemove : BotDeed
 
         BotPlot.Spend();
 
-        var house = new SmallOldHouse(body, BotPlot.MultiID);
+        var house = kind.Make(body);
 
         if (house.Deleted)
         {
@@ -272,6 +274,8 @@ public sealed class BotRemover : IBotProposer
 
     public static long NoNearer { get; private set; }
 
+    public static int FartherBy { get; set; } = 30;
+
     public string Name => "remover";
 
     public BotStanding Rung => BotStanding.Free;
@@ -314,7 +318,7 @@ public sealed class BotRemover : IBotProposer
                 return null;
             }
 
-            if (!BotPlot.Find(body, seat, out var ground))
+            if (!BotPlot.Find(body, seat, Point3D.Zero, 0, BotHallKind.Of(hall).Multi, hall, out var ground))
             {
                 Groundless++;
 
@@ -343,7 +347,17 @@ public sealed class BotRemover : IBotProposer
             return null;
         }
 
-        if (!BotPlot.Find(body, BotSeat.Of(ours), winner.Location, BotExile.Clear, out var plot))
+        var losing = BotEstate.Hall(ours);
+        var clear = BotExile.Clear;
+
+        if (losing != null)
+        {
+            var stood = Math.Max(Math.Abs(losing.X - winner.X), Math.Abs(losing.Y - winner.Y));
+
+            clear = Math.Max(clear, stood + FartherBy);
+        }
+
+        if (!BotPlot.Find(body, BotSeat.Of(ours), winner.Location, clear, BotHallKind.Of(losing).Multi, losing, out var plot))
         {
             Groundless++;
 

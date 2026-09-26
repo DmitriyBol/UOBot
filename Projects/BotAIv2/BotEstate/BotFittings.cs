@@ -79,6 +79,53 @@ public static class BotFittings
 
     public static long Spent { get; private set; }
 
+    public static int GroundHigh { get; set; } = 16;
+
+    public static List<Bench> Installed(BaseHouse hall, Guild guild)
+    {
+        List<Bench> had = [];
+
+        if (hall is not { Deleted: false } || !_wanted.TryGetValue(guild?.Name ?? string.Empty, out var list))
+        {
+            return had;
+        }
+
+        for (var i = 0; i < list.Length; i++)
+        {
+            if (Has(hall, list[i].Kind))
+            {
+                had.Add(list[i]);
+            }
+        }
+
+        return had;
+    }
+
+    public static int Strip(BaseHouse hall)
+    {
+        if (hall?.Addons == null)
+        {
+            return 0;
+        }
+
+        var taken = 0;
+
+        for (var i = hall.Addons.Count - 1; i >= 0; i--)
+        {
+            var addon = hall.Addons[i];
+
+            hall.Addons.RemoveAt(i);
+
+            if (addon is { Deleted: false })
+            {
+                addon.Delete();
+                taken++;
+            }
+        }
+
+        return taken;
+    }
+
     public static bool Wanting(BaseHouse hall, Guild guild, out Bench bench)
     {
         bench = default;
@@ -434,6 +481,12 @@ public static class BotFittings
                 for (var t = 0; t < tiles.Length; t++)
                 {
                     var tile = tiles[t];
+
+                    if (tile.Z > GroundHigh)
+                    {
+                        continue;
+                    }
+
                     var data = TileData.ItemTable[tile.ID & TileData.MaxItemValue];
 
                     if ((data.Flags & TileFlag.Impassable) != 0)

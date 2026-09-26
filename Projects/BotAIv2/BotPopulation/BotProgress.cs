@@ -67,6 +67,19 @@ public sealed class BotProgress : GenericPersistence
 
     public static int Remembered => _saved.Count;
 
+    public static bool Remembers(string name)
+    {
+        foreach (var (key, _) in _saved)
+        {
+            if (key.Name.InsensitiveEquals(name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static int Restored { get; private set; }
 
     public static long Returned { get; private set; }

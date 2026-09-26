@@ -48,13 +48,15 @@ public sealed class BotSupply : BotDeed
 
     private readonly BaseHouse _hall;
 
-    private readonly BaseVendor _shop;
+    private BaseVendor _shop;
+
+    private int _repicks;
 
     private readonly Type _kind;
 
     private readonly int _batch;
 
-    private readonly int _price;
+    private int _price;
 
     private int _before = -1;
 
@@ -217,6 +219,17 @@ public sealed class BotSupply : BotDeed
 
             if (got <= 0)
             {
+                var next = BotShops.Next(bot, _shop, _kind, ref _repicks);
+
+                if (next != null)
+                {
+                    _shop = next;
+                    _price = Math.Max(1, BotShops.Price(next, _kind));
+                    Fresh();
+
+                    return BotDoing.Walk(next.Map, next, BotArrival.Within(Reach), $"on to {next.Name} for {_kind.Name}");
+                }
+
                 return BotDoing.Failed(refused ?? "the shopkeeper would not sell it");
             }
 

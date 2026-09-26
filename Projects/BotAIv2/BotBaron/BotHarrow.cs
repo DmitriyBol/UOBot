@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using Server.Guilds;
 using Server.Items;
 using Server.Logging;
 using Server.Mobiles;
 using Server.Regions;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -59,6 +61,26 @@ public sealed class BotHarrow : BotDeed
     public static int MusterMs { get; set; } = 300000;
 
     public static int RestMs { get; set; } = 600000;
+
+    public static int HoldMs { get; set; } = 120000;
+
+    public static int RegroupMs { get; set; } = 30000;
+
+    public static long Held { get; private set; }
+
+    public static long Engaged { get; private set; }
+
+    private static readonly Dictionary<(int Map, int X, int Y), (BotHarrow Deed, long Beat)> _taken = [];
+
+    public static int TakenMs { get; set; } = 60000;
+
+    public static long Doubled { get; private set; }
+
+    public static bool Taken(Map map, Point3D square, BotHarrow except = null) =>
+        map != null && _taken.TryGetValue(BotQuad.Key(map, square), out var held) && !ReferenceEquals(held.Deed, except)
+        && Core.TickCount - held.Beat < TakenMs;
+
+    public static void Declined() => Doubled++;
 
     public static long Rested { get; private set; }
 
@@ -122,6 +144,10 @@ public sealed class BotHarrow : BotDeed
 
     public static double WorkMinutes { get; set; } = 25.0;
 
+    public static double DutyPrior { get; set; } = 300.0;
+
+    public static long Unsupplied { get; private set; }
+
     public static long Marches { get; private set; }
 
     public static long Undermanned { get; private set; }
@@ -180,6 +206,14 @@ public sealed class BotHarrow : BotDeed
 
     private bool _atMuster;
 
+    private long _foughtTick;
+
+    private bool _fought;
+
+    private bool _held;
+
+    private bool _ended;
+
     private int _said0 = -1;
 
     private int _said1 = -1;
@@ -188,16 +222,21 @@ public sealed class BotHarrow : BotDeed
 
     private long _sweptTick;
 
-    public BotHarrow(Map map, Point3D square, int dead)
+    private readonly Guild _guild;
+
+    public Guild Guild => _guild;
+
+    public BotHarrow(Map map, Point3D square, int dead, Guild guild = null)
     {
         _map = map;
         _square = square;
         _dead = dead;
+        _guild = guild;
         _began = Core.TickCount;
     }
 
     public static string Describe() =>
-        $"{Musters} musters called and {Called} bots called up, {Marches} of them marched, {Undermanned} could not raise the company asked for in {MusterMs / 60000} minutes of calling ({Rested} times the idea was then left alone for {RestMs / 60000} minutes), {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them, {FellBack} times the leader put the harrow down and the company fell back with him, {TookUp} of them taken up again";
+        $"{Musters} musters called and {Called} bots called up, {Marches} of them marched, {Undermanned} could not raise the company asked for in {MusterMs / 60000} minutes of calling ({Rested} times the idea was then left alone for {RestMs / 60000} minutes), {Held} bells held while the company fought, {Engaged} looks at a bot already answering to a company or a class passed over, {Unsupplied} without their supplies, {Across} round the far side of something by road from the muster, {Doubled} harrows let go or not offered for a square another already stood on, {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them, {FellBack} times the leader put the harrow down and the company fell back with him, {TookUp} of them taken up again";
 
     public override string Kind => Trade;
 
@@ -211,7 +250,24 @@ public sealed class BotHarrow : BotDeed
 
     public override Point3D Where => _square;
 
-    public override double Expects => Prior;
+    public override double Expects => _guild != null ? DutyPrior : Prior;
+
+    public override double Brings(Mobile body) =>
+        Math.Max(BotQuad.Strength(body), Expected(_map, _square, BotThreat.Power(body), _guild));
+
+    public static double Expected(Map map, Point3D square, double head, Guild guild = null)
+    {
+        var bodies = map == null ? Company : BotQuad.Levy(map, square, Company);
+
+        if (guild != null)
+        {
+            bodies = Math.Max(Least, Math.Min(bodies, BotReeve.Fighters(guild)));
+        }
+
+        return head * bodies;
+    }
+
+    public override bool Unpaid => _guild != null;
 
     public override double Minutes => WorkMinutes;
 
@@ -244,6 +300,15 @@ public sealed class BotHarrow : BotDeed
             return BotDoing.Failed("not the sort of thing that leads companies");
         }
 
+        if (Taken(_map, _square, this))
+        {
+            Doubled++;
+
+            return BotDoing.Done($"another harrow already stands on ({_square.X}, {_square.Y})");
+        }
+
+        _taken[BotQuad.Key(_map, _square)] = (this, Core.TickCount);
+
         return _marching ? Harrowing(member, body) : Calling(member, body);
     }
 
@@ -265,6 +330,11 @@ public sealed class BotHarrow : BotDeed
         }
 
         _wanted = BotQuad.Levy(_map, _square, Company);
+
+        if (_guild != null)
+        {
+            _wanted = Math.Max(Least, Math.Min(_wanted, BotReeve.Fighters(_guild)));
+        }
 
         squad.Ceiling = _wanted;
         squad.Charged = true;
@@ -338,14 +408,38 @@ public sealed class BotHarrow : BotDeed
             );
         }
 
-        if (_here < _wanted && now - _musteredTick < MusterMs)
+        if (squad.Focus is { Deleted: false, Alive: true })
         {
+            _fought = true;
+            _foughtTick = now;
+        }
+
+        var fighting = _fought && now - _foughtTick < RegroupMs && now - _musteredTick < MusterMs + HoldMs;
+
+        if (_here < _wanted && (now - _musteredTick < MusterMs || fighting))
+        {
+            if (!_held && now - _musteredTick >= MusterMs)
+            {
+                _held = true;
+                Held++;
+            }
+
             return BotDoing.Work($"calling at ({_muster.X}, {_muster.Y}): {_here} of {_wanted} gathered");
         }
 
         if (_here < _wanted)
         {
             Undermanned++;
+
+            logger.Information(
+                "{Name}'s muster at ({MX}, {MY}) came up {Here} of {Wanted}; not in the square: {Absent}",
+                body.Name,
+                _muster.X,
+                _muster.Y,
+                _here,
+                _wanted,
+                Absent(squad)
+            );
 
             Rest(body);
 
@@ -518,6 +612,16 @@ public sealed class BotHarrow : BotDeed
 
     private Point3D Rally(Mobile body)
     {
+        if (_guild != null)
+        {
+            var door = BotFeud.MusterPoint(_guild, body);
+
+            if (door != Point3D.Zero)
+            {
+                return BotStep.Settle(_map, door.X, door.Y, out var dz) ? new Point3D(door.X, door.Y, dz) : door;
+            }
+        }
+
         var gate = BotPopulation.Gate(_map, body.Location, _square);
 
         if (gate != Point3D.Zero)
@@ -546,24 +650,28 @@ public sealed class BotHarrow : BotDeed
 
         _called0.Clear();
 
-        foreach (var mobile in _map.GetMobilesInRange<Mobile>(_muster, Reach))
+        if (_guild != null)
         {
-            if (mobile == body || mobile is not BotMobile other)
-            {
-                continue;
-            }
+            var members = _guild.Members;
 
-            if (other.Squad != null || other is not IBotAlly { AbleToFight: true })
+            for (var i = 0; i < members?.Count; i++)
             {
-                continue;
+                if (members[i] is BotMobile other && other != body && other.Map == _map && Callable(other)
+                    && Reaches(_map, other.Location, _muster))
+                {
+                    _called0.Add(other);
+                }
             }
-
-            if (other.Class is not { } klass || klass.Role == BotRole.Producer)
+        }
+        else
+        {
+            foreach (var mobile in _map.GetMobilesInRange<Mobile>(_muster, Reach))
             {
-                continue;
+                if (mobile != body && mobile is BotMobile other && Callable(other) && Reaches(_map, other.Location, _muster))
+                {
+                    _called0.Add(other);
+                }
             }
-
-            _called0.Add(other);
         }
 
         _called0.Sort((a, b) => Apart(a, body).CompareTo(Apart(b, body)));
@@ -572,6 +680,60 @@ public sealed class BotHarrow : BotDeed
         Take(squad, BotRole.Ranged, Ranged);
         Take(squad, BotRole.Medic, Medics);
         Take(squad, null, Wanted);
+    }
+
+    public static long Across { get; private set; }
+
+    public static bool Reaches(Map map, Point3D from, Point3D to, bool count = true)
+    {
+        if (map == null || to == Point3D.Zero)
+        {
+            return true;
+        }
+
+        var there = BotRoads.Behind(map, from, to);
+        var back = BotRoads.Behind(map, to, from);
+
+        if (there < 0 || Math.Max(there, back) <= BotPlot.MostBehind)
+        {
+            return true;
+        }
+
+        if (count)
+        {
+            Across++;
+        }
+
+        return false;
+    }
+
+    private static bool Callable(BotMobile other)
+    {
+        if (other.Squad != null || other is not IBotAlly { AbleToFight: true })
+        {
+            return false;
+        }
+
+        if (other.Class is not { } klass || klass.Role == BotRole.Producer)
+        {
+            return false;
+        }
+
+        if (other.Resolve?.Deed is { Alongside: true })
+        {
+            Engaged++;
+
+            return false;
+        }
+
+        if (!BotProvision.Fit(other, out _))
+        {
+            Unsupplied++;
+
+            return false;
+        }
+
+        return true;
     }
 
     public static int Musterable()
@@ -664,6 +826,79 @@ public sealed class BotHarrow : BotDeed
         }
 
         return here;
+    }
+
+    private string Absent(BotSquad squad)
+    {
+        var members = squad.Members;
+        var say = ValueStringBuilder.Create(256);
+
+        try
+        {
+            for (var i = 0; i < members.Count; i++)
+            {
+                var body = members[i]?.Self;
+
+                if (body is { Deleted: false, Alive: true } && body.Map == _map && body.InRange(_muster, Assembly))
+                {
+                    continue;
+                }
+
+                if (say.Length > 0)
+                {
+                    say.Append("; ");
+                }
+
+                if (body is not { Deleted: false })
+                {
+                    say.Append("a member with no body");
+
+                    continue;
+                }
+
+                var apart = Math.Max(Math.Abs(body.X - _muster.X), Math.Abs(body.Y - _muster.Y));
+
+                say.Append($"{body.Name} {apart} tiles off at ({body.X}, {body.Y}, {body.Z})");
+
+                if (!body.Alive)
+                {
+                    say.Append(", dead");
+                }
+
+                if (body.Map != _map)
+                {
+                    say.Append($", on {body.Map}");
+                }
+
+                if (BotDungeon.Under(body.Location))
+                {
+                    say.Append(", underground");
+                }
+
+                var round = BotRoads.Behind(_map, _muster, body.Location);
+
+                if (round > 0)
+                {
+                    say.Append($", {round} further round by road than the muster");
+                }
+
+                if (body.Combatant is { Deleted: false } foe)
+                {
+                    say.Append($", fighting {foe.Name}");
+                }
+
+                if (body is BotMobile bot)
+                {
+                    say.Append($", {BotStall.Road(bot)}");
+                }
+            }
+
+            return say.Length > 0 ? say.ToString() : "nobody, every member is in the square";
+        }
+        finally
+        {
+            say.Dispose();
+        }
     }
 
     private static bool Master(Mobile body)
@@ -778,6 +1013,11 @@ public sealed class BotHarrow : BotDeed
                 continue;
             }
 
+            if (BotQuarry.Shunned(creature))
+            {
+                continue;
+            }
+
             var apart = Math.Max(Math.Abs(creature.X - leader.X), Math.Abs(creature.Y - leader.Y));
 
             if (apart >= closest)
@@ -813,6 +1053,8 @@ public sealed class BotHarrow : BotDeed
 
     private BotDoing Finish(BotSquad squad, string why, bool cleared)
     {
+        _ended = true;
+
         if (cleared)
         {
             BotPeril.Cleared(_map, _square, Side / 2);
@@ -901,6 +1143,18 @@ public sealed class BotHarrow : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
+        var key = BotQuad.Key(_map, _square);
+
+        if (_taken.TryGetValue(key, out var held) && ReferenceEquals(held.Deed, this))
+        {
+            _taken.Remove(key);
+        }
+
+        if (_marching && !_ended && _marched > 0)
+        {
+            BotQuad.DrivenOff(_map, _square, _marched);
+        }
+
         Release(_squad);
 
         if (bot is IBotSquadMember member && member.Squad != null && ReferenceEquals(member.Squad, _squad))
@@ -933,6 +1187,12 @@ public sealed class BotHarrow : BotDeed
         _resting.Clear();
         Called = 0;
         Undermanned = 0;
+        Held = 0;
+        Engaged = 0;
+        Unsupplied = 0;
+        Across = 0;
+        Doubled = 0;
+        _taken.Clear();
         Emptied = 0;
         Timedout = 0;
         Killed = 0;

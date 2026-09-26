@@ -107,6 +107,19 @@ public sealed class BotBolt : BotDeed
         body.Combatant = null;
         body.Warmode = false;
 
+        if (BotMend.Share(body) < BotMend.Hurt || body.Poisoned)
+        {
+            if (!BotMend.Winding(body) && BotMend.Wind(body, body))
+            {
+                Tended++;
+            }
+
+            if (BotMend.Draught(body) is { } bottle && BotMend.Swallow(body, bottle))
+            {
+                Tended++;
+            }
+        }
+
         var worst = BotThreat.Strongest(body, Watch);
 
         if (worst == null && now - _begun >= _least)
@@ -171,6 +184,8 @@ public sealed class BotBolt : BotDeed
     }
 
     public static long Bent { get; private set; }
+
+    public static long Tended { get; private set; }
 
     public static Point3D Retreat(Map map, Mobile body, Mobile from) => Retreat(map, body, from, null);
 

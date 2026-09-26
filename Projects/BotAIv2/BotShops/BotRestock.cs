@@ -32,7 +32,7 @@ public sealed class BotRestock : BotDeed
 
     private int _repicks;
 
-    private readonly BotListing _stall;
+    private BotListing _stall;
 
     private readonly Type _wanted;
 
@@ -41,6 +41,8 @@ public sealed class BotRestock : BotDeed
     private int _price;
 
     public static long FellThrough { get; private set; }
+
+    public static long Restalled { get; private set; }
 
     private int _bought;
 
@@ -85,6 +87,8 @@ public sealed class BotRestock : BotDeed
     public override Point3D Where => _shop?.Location ?? _merchant?.Location ?? _where;
 
     public double? Claim { get; set; }
+
+    public static double Spare { get; set; } = 180.0;
 
     public override double Expects => Claim ?? Prior;
 
@@ -136,7 +140,15 @@ public sealed class BotRestock : BotDeed
         {
             if (_stall.IsEmpty)
             {
-                return BotDoing.Failed("that stall is empty now");
+                var next = BotAuction.Cheapest(_wanted, bot);
+
+                if (next == null || next.IsEmpty || ReferenceEquals(next, _stall))
+                {
+                    return BotDoing.Failed("that stall is empty now");
+                }
+
+                _stall = next;
+                Restalled++;
             }
 
             var price = _stall.Price;

@@ -77,6 +77,8 @@ public static class BotRoads
 
     private static sbyte[] _heights;
 
+    private static byte[] _exits;
+
     private static readonly Dictionary<int, ushort> _stacked = [];
 
     private static List<int> _ring = [];
@@ -236,6 +238,38 @@ public static class BotRoads
         return Math.Max(0, road - own - straight);
     }
 
+    public static int Behind(Map map, Point3D from, Point3D to)
+    {
+        var road = FromHome(map, to.X, to.Y);
+        var own = FromHome(map, from.X, from.Y);
+
+        if (road < 0 || own < 0)
+        {
+            return -1;
+        }
+
+        var toRound = road - Math.Max(Math.Abs(to.X - _home.X), Math.Abs(to.Y - _home.Y));
+        var fromRound = own - Math.Max(Math.Abs(from.X - _home.X), Math.Abs(from.Y - _home.Y));
+
+        return Math.Max(0, toRound - fromRound);
+    }
+
+    public static int Farther(Map map, Point3D a, Point3D b)
+    {
+        var ra = FromHome(map, a.X, a.Y);
+        var rb = FromHome(map, b.X, b.Y);
+
+        if (ra < 0 || rb < 0)
+        {
+            return 0;
+        }
+
+        var roundA = ra - Math.Max(Math.Abs(a.X - _home.X), Math.Abs(a.Y - _home.Y));
+        var roundB = rb - Math.Max(Math.Abs(b.X - _home.X), Math.Abs(b.Y - _home.Y));
+
+        return Math.Abs(roundA - roundB);
+    }
+
     public static string Describe()
     {
         if (!Running)
@@ -303,10 +337,12 @@ public static class BotRoads
         {
             _steps = new ushort[cells];
             _heights = new sbyte[cells];
+            _exits = new byte[cells];
         }
         else
         {
             Array.Clear(_steps);
+            Array.Clear(_exits);
         }
 
         _stacked.Clear();
@@ -427,6 +463,21 @@ public static class BotRoads
             return;
         }
 
+        if (z == _heights[index])
+        {
+            var exits = (int)walk;
+
+            for (var d = 1; d < 8; d += 2)
+            {
+                if ((walk & (1 << ((d + 7) & 7))) == 0 || (walk & (1 << ((d + 1) & 7))) == 0)
+                {
+                    exits &= ~(1 << d);
+                }
+            }
+
+            _exits[index] = (byte)exits;
+        }
+
         for (var d = 0; d < 8; d++)
         {
             if ((walk & (1 << d)) == 0)
@@ -497,5 +548,19 @@ public static class BotRoads
         );
 
         BotSeat.Audit();
+
+        BotChart.Begin();
+    }
+
+    public static bool Lend(out Map map, out int x0, out int y0, out int side, out byte[] exits, out sbyte[] heights)
+    {
+        map = _map;
+        x0 = _x0;
+        y0 = _y0;
+        side = _side;
+        exits = _exits;
+        heights = _heights;
+
+        return Ready && _exits != null;
     }
 }

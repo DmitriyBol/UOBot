@@ -31,18 +31,22 @@ public static class BotCraftwork
 
     public static double LeastChance { get; set; } = 0.35;
 
+    public static double CookingLeastChance { get; set; } = 0.15;
+
     public static long Unlikely { get; private set; }
 
     private static bool Likely(Mobile bot, CraftSystem system, CraftItem recipe, Type material)
     {
-        if (LeastChance <= 0.0)
+        var least = system?.MainSkill == SkillName.Cooking ? CookingLeastChance : LeastChance;
+
+        if (least <= 0.0)
         {
             return true;
         }
 
         var chance = recipe.GetSuccessChance(bot, material, system, false, out var all);
 
-        if (all && chance >= LeastChance)
+        if (all && chance >= least)
         {
             return true;
         }

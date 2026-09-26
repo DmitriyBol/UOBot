@@ -43,6 +43,8 @@ public sealed class BotCraftModule : BotModule
 
         BotWill.Offer(new BotCook());
 
+        BotWill.Offer(new BotTutor());
+
         logger.Information(
             "Craft ready: a tailor buys {Bolt} cloth at a time, works {Margin} points below its own skill, attempts every {Swing}ms, and asks {Price}gp a piece; a fletcher makes at least {Least} arrows at a time and opens them at {Arrow}gp, buying wood to match the feathers it holds because nobody anywhere sells a feather",
             BotSew.Bolt,

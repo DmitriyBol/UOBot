@@ -139,7 +139,10 @@ public sealed class BotHomer : IBotProposer
             return null;
         }
 
-        if (bot.Resolve?.Urges?.BarrenMinutes(Core.TickCount) < BotHomeward.BarrenFor)
+        var barren = bot.Resolve?.Urges?.BarrenMinutes(Core.TickCount) >= BotHomeward.BarrenFor;
+
+        if (!barren && !(body is BotMobile loose && BotDungeon.Under(body.Location) && !BotDelveParty.Delving(body)
+                         && BotThreat.Decide(loose, BotMobile.NoticeRange) == BotStand.Nothing))
         {
             Busy++;
 

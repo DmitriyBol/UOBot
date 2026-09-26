@@ -86,6 +86,50 @@ public sealed class BotHold : BotDeed
 
     public override bool Bend(IBotWilful bot) => false;
 
+    private Point3D Footing()
+    {
+        if (_footing != Point3D.Zero || _map == null)
+        {
+            return _footing == Point3D.Zero ? _middle : _footing;
+        }
+
+        for (var ring = 0; ring <= FootingRings; ring++)
+        {
+            for (var dx = -ring; dx <= ring; dx++)
+            {
+                for (var dy = -ring; dy <= ring; dy++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring)
+                    {
+                        continue;
+                    }
+
+                    if (BotStep.Settle(_map, _middle.X + dx, _middle.Y + dy, out var z))
+                    {
+                        _footing = new Point3D(_middle.X + dx, _middle.Y + dy, z);
+
+                        if (ring > 0)
+                        {
+                            Footed++;
+                        }
+
+                        return _footing;
+                    }
+                }
+            }
+        }
+
+        _footing = _middle;
+
+        return _footing;
+    }
+
+    private Point3D _footing;
+
+    public static int FootingRings { get; set; } = 12;
+
+    public static long Footed { get; private set; }
+
     public override BotDoing Advance(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -108,7 +152,7 @@ public sealed class BotHold : BotDeed
         {
             _standing = false;
 
-            return BotDoing.Walk(_map, _middle, BotArrival.Within(Reach), $"to the square at {_middle.X},{_middle.Y}");
+            return BotDoing.Walk(_map, Footing(), BotArrival.Within(Reach), $"to the square at {_middle.X},{_middle.Y}");
         }
 
         _standing = true;
@@ -131,12 +175,13 @@ public sealed class BotHold : BotDeed
     }
 
     public static string Describe() =>
-        Stood + Ended == 0 ? "nobody has stood for a claim" : $"{Stood} beats stood on claimed ground, {Ended} musters that outlived their claim";
+        Stood + Ended == 0 ? "nobody has stood for a claim" : $"{Stood} beats stood on claimed ground, {Ended} musters that outlived their claim, {Footed} walks to ground beside a middle nothing could stand on";
 
     public static void Forget()
     {
         Stood = 0;
         Ended = 0;
+        Footed = 0;
     }
 }
 
@@ -326,76 +371,60 @@ public sealed class BotHolder : IBotProposer
         want = BotClaim.Kind.Settle;
 
         var map = hall.Map;
-        var best = int.MaxValue;
+        var home = BotQuad.Key(map, hall.Location);
+        var rings = Math.Max(1, Look / BotQuad.Side);
         var poor = false;
+        var found = -1;
 
-        foreach (var quad in BotQuad.All)
+        for (var ring = 0; ring <= rings && found < 0; ring++)
         {
-            if (quad == null || quad.Map != map || quad.Safety < Worst)
+            var bestTouch = -1;
+            var bestGap = int.MaxValue;
+
+            for (var dx = -ring; dx <= ring; dx++)
             {
-                continue;
+                for (var dy = -ring; dy <= ring; dy++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring)
+                    {
+                        continue;
+                    }
+
+                    var at = new Point3D(
+                        (home.X + dx) * BotQuad.Side + BotQuad.Side / 2,
+                        (home.Y + dy) * BotQuad.Side + BotQuad.Side / 2,
+                        0
+                    );
+
+                    if (!Worth(ours, hall, map, fund, at, ref poor, out var settled, out var kind))
+                    {
+                        continue;
+                    }
+
+                    var touch = Touching(ours.Name, map, home.X + dx, home.Y + dy);
+
+                    if (ring > 0 && touch == 0)
+                    {
+                        continue;
+                    }
+
+                    var gap = Math.Max(Math.Abs(at.X - hall.X), Math.Abs(at.Y - hall.Y));
+
+                    if (touch < bestTouch || touch == bestTouch && gap >= bestGap)
+                    {
+                        continue;
+                    }
+
+                    bestTouch = touch;
+                    bestGap = gap;
+                    middle = settled;
+                    want = kind;
+                    found = ring;
+                }
             }
-
-            var at = new Point3D(
-                quad.X * BotQuad.Side + BotQuad.Side / 2,
-                quad.Y * BotQuad.Side + BotQuad.Side / 2,
-                0
-            );
-
-            var gap = Math.Max(Math.Abs(at.X - hall.X), Math.Abs(at.Y - hall.Y));
-
-            if (gap > Look || gap >= best)
-            {
-                continue;
-            }
-
-            var owner = BotClaim.Owner(map, at);
-
-            if (owner == ours.Name)
-            {
-                continue;
-            }
-
-            if (BotClaim.Resting(ours.Name, BotQuad.Key(map, at)))
-            {
-                Rested++;
-
-                continue;
-            }
-
-            var kind = owner == null
-                ? BotClaim.Kind.Settle
-                : fund >= BotClaim.Ousting || !BotClaim.Bought(map, at)
-                    ? BotClaim.Kind.Oust
-                    : BotClaim.Kind.Strip;
-
-            if (fund < BotClaim.Cost(ours.Name, BotQuad.Key(map, at), kind))
-            {
-                poor = true;
-
-                continue;
-            }
-
-            var settled = BotClaim.Middle(map, at);
-
-            if (settled == Point3D.Zero)
-            {
-                continue;
-            }
-
-            if (BotReach.Ask(map, hall.Location, settled, BotArrival.Within(BotHold.Reach), tally: false) == BotReachVerdict.Sealed)
-            {
-                Unreachable++;
-
-                continue;
-            }
-
-            best = gap;
-            middle = settled;
-            want = kind;
         }
 
-        if (middle == Point3D.Zero)
+        if (found < 0)
         {
             if (poor)
             {
@@ -409,6 +438,92 @@ public sealed class BotHolder : IBotProposer
             return false;
         }
 
+        if (found > 1)
+        {
+            Outward++;
+        }
+
+        return true;
+    }
+
+    public static long Outward { get; private set; }
+
+    private static int Touching(string guild, Map map, int qx, int qy)
+    {
+        var touch = 0;
+
+        for (var dx = -1; dx <= 1; dx++)
+        {
+            for (var dy = -1; dy <= 1; dy++)
+            {
+                if ((dx != 0 || dy != 0)
+                    && BotClaim.Owner(
+                        map,
+                        new Point3D((qx + dx) * BotQuad.Side + BotQuad.Side / 2, (qy + dy) * BotQuad.Side + BotQuad.Side / 2, 0)
+                    ) == guild)
+                {
+                    touch++;
+                }
+            }
+        }
+
+        return touch;
+    }
+
+    private static bool Worth(Guild ours, BaseHouse hall, Map map, int fund, Point3D at, ref bool poor, out Point3D settled, out BotClaim.Kind want)
+    {
+        settled = Point3D.Zero;
+        want = BotClaim.Kind.Settle;
+
+        if (BotQuad.Known(map, at) is { } quad && quad.Safety < Worst)
+        {
+            return false;
+        }
+
+        var owner = BotClaim.Owner(map, at);
+
+        if (owner == ours.Name)
+        {
+            return false;
+        }
+
+        if (BotClaim.Resting(ours.Name, BotQuad.Key(map, at)))
+        {
+            Rested++;
+
+            return false;
+        }
+
+        var kind = owner == null
+            ? BotClaim.Kind.Settle
+            : fund >= BotClaim.Ousting || !BotClaim.Bought(map, at)
+                ? BotClaim.Kind.Oust
+                : BotClaim.Kind.Strip;
+
+        if (fund < BotClaim.Cost(ours.Name, BotQuad.Key(map, at), kind))
+        {
+            poor = true;
+
+            return false;
+        }
+
+        settled = BotClaim.Middle(map, at);
+
+        if (settled == Point3D.Zero)
+        {
+            return false;
+        }
+
+        if (BotReach.Ask(map, hall.Location, settled, BotArrival.Within(BotHold.Reach), tally: false) == BotReachVerdict.Sealed)
+        {
+            Unreachable++;
+            settled = Point3D.Zero;
+
+            return false;
+        }
+
+        want = kind;
+
         return true;
     }
 
@@ -417,7 +532,7 @@ public sealed class BotHolder : IBotProposer
             ? "nobody has been looked at for a claim"
             : $"the staker looked {Asked} times: {Opened} claims opened, {Sent} sent to stand on one, "
             + $"{Enough} not sent because the square already had its muster of {BotClaim.Gather} and {Spare} to spare, {Landless} guilds had no hall to want ground near, {Nothing} found no square worth claiming within "
-            + $"{Look} tiles, {Poor} could not pay for the one they wanted, {Unreachable} passed over a square the hall cannot reach; {Walled} members were not sent because they cannot reach it from where they stand, {Refused} because a walk to it lately gave up and {Shy} because their own walk to it lately ended somewhere else; {Rested} squares passed over where the guild lately failed to muster; {BotHold.Describe()}";
+            + $"{Look} tiles, {Poor} could not pay for the one they wanted, {Unreachable} passed over a square the hall cannot reach; {Walled} members were not sent because they cannot reach it from where they stand, {Refused} because a walk to it lately gave up and {Shy} because their own walk to it lately ended somewhere else; {Rested} squares passed over where the guild lately failed to muster, {Outward} claims opened beyond the first ring round the hall; {BotHold.Describe()}";
 
     public static void Forget()
     {
@@ -430,6 +545,7 @@ public sealed class BotHolder : IBotProposer
         Walled = 0;
         Unreachable = 0;
         Rested = 0;
+        Outward = 0;
         Refused = 0;
         Shy = 0;
         _missed.Clear();

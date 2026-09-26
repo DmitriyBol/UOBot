@@ -51,6 +51,8 @@ public sealed class BotRally : BotDeed
 
     private readonly Guild _guild;
 
+    public Guild Guild => _guild;
+
     private readonly BotMobile _enemy;
 
     private readonly Map _map;
@@ -62,6 +64,8 @@ public sealed class BotRally : BotDeed
     private bool _joined;
 
     private Point3D _march;
+
+    private bool _waved;
 
     public BotRally(Guild guild, BotMobile enemy, Map map, bool defending)
     {
@@ -92,6 +96,8 @@ public sealed class BotRally : BotDeed
     public override bool Unpaid => true;
 
     public override bool Alongside => true;
+
+    public override bool Still => _joined;
 
     public override bool Pressing(IBotWilful bot) => _defending;
 
@@ -140,7 +146,10 @@ public sealed class BotRally : BotDeed
                 }
             }
 
-            if (_company.Focus is { Deleted: false, Alive: true } held && !ReferenceEquals(held, _enemy))
+            if (BotFeud.Mustering(_company))
+            {
+            }
+            else if (_company.Focus is { Deleted: false, Alive: true } held && !ReferenceEquals(held, _enemy))
             {
                 Kept++;
             }
@@ -173,6 +182,18 @@ public sealed class BotRally : BotDeed
 
             _joined = true;
 
+            if (ReferenceEquals(_company.Leader, member) && BotFeud.Mustering(_company) && _company.Stance != BotSquadStance.Fighting)
+            {
+                var at = BotFeud.MusterAt(_company);
+
+                if (at != Point3D.Zero && !body.InRange(at, 2))
+                {
+                    return BotDoing.Walk(_map, at, BotArrival.Within(2), $"to the muster at ({at.X}, {at.Y})");
+                }
+
+                return BotDoing.Work($"mustering the war company at ({at.X}, {at.Y}): {BotFeud.Gathered(_company)} of {BotFeud.Needed(_guild, _company)}");
+            }
+
             if (ReferenceEquals(_company.Leader, member)
                 && _company.Focus is { Deleted: false, Alive: true } focus
                 && focus.Map == _map
@@ -200,6 +221,26 @@ public sealed class BotRally : BotDeed
 
         if (!body.InRange(anchor, BotSquad.PressReach))
         {
+            if (!_waved && BotFeud.Out(_company) && !body.InRange(anchor, BotFeud.Straggle))
+            {
+                var at = BotFeud.MusterAt(_company);
+
+                if (at != Point3D.Zero)
+                {
+                    if (!body.InRange(at, BotFeud.Assembly))
+                    {
+                        return BotDoing.Walk(_map, at, BotArrival.Within(BotFeud.Assembly - 2), $"to the muster at ({at.X}, {at.Y}) for the next wave");
+                    }
+
+                    if (!BotFeud.WaveGoes(_company, body))
+                    {
+                        return BotDoing.Work($"waiting at the muster for the next wave: {BotFeud.Waiting(_company)} of {BotFeud.Wave}");
+                    }
+
+                    _waved = true;
+                }
+            }
+
             return BotDoing.Walk(_map, anchor, BotArrival.Within(BotSquad.PressReach - 1), "to the war company");
         }
 

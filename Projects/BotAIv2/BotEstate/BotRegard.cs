@@ -58,7 +58,9 @@ public static class BotRegard
 
     public static double Defiance { get; set; } = -12.0;
 
-    public static double Claim { get; set; } = -20.0;
+    public static double Claim { get; set; } = -50.0;
+
+    public static double HallClaim { get; set; } = -100.0;
 
     public static long Claims { get; private set; }
 
@@ -214,7 +216,7 @@ public static class BotRegard
         Move(whose, who, Defiance, "refusing to move along");
     }
 
-    public static void Claimed(string who, string whose)
+    public static void Claimed(string who, string whose, bool byTheHall = false)
     {
         if (who == null || whose == null || who == whose)
         {
@@ -222,6 +224,14 @@ public static class BotRegard
         }
 
         Claims++;
+
+        if (byTheHall)
+        {
+            Move(whose, who, Math.Min(HallClaim, Enmity - Of(whose, who) - 1.0), "claiming the ground by our hall");
+
+            return;
+        }
+
         Move(whose, who, Claim, "claiming our ground");
     }
 

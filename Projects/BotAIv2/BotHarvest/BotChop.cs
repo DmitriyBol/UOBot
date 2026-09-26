@@ -118,11 +118,18 @@ public sealed class BotChop : BotDeed
             return true;
         }
 
-        var held = body.FindItemOnLayer(Layer.TwoHanded) ?? body.FindItemOnLayer(Layer.OneHanded);
+        var twoHanded = body.FindItemOnLayer(Layer.TwoHanded);
 
-        if (held != null && held != tool)
+        if (twoHanded != null && twoHanded != tool)
         {
-            body.AddToBackpack(held);
+            body.AddToBackpack(twoHanded);
+        }
+
+        var oneHanded = body.FindItemOnLayer(Layer.OneHanded);
+
+        if (oneHanded != null && oneHanded != tool)
+        {
+            body.AddToBackpack(oneHanded);
         }
 
         return body.EquipItem(tool);
@@ -326,7 +333,9 @@ public sealed class BotChop : BotDeed
                 {
                     BotHeard.Clear(body);
 
-                    return BotDoing.Failed("the axe wore out");
+                    return _cut > 0
+                        ? BotDoing.Done($"the axe wore out after {_cut} logs")
+                        : BotDoing.Failed("the axe wore out");
                 }
 
             case BotHeard.Word.Full:

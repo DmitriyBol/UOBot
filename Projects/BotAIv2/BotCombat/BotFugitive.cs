@@ -149,5 +149,6 @@ public sealed class BotFugitive : IBotProposer
     }
 
     public static string Describe() =>
-        $"{Cornered} bots losing with nowhere to run, {Calmed} flights not offered to a bot that had just got clear and had not been hit since";
+        $"{Cornered} bots losing with nowhere to run, {Calmed} flights not offered to a bot that had just got clear and had not been hit since, "
+        + $"{BotBolt.Tended} bandages and bottles taken on the run, {BotBolt.Bent} flights turned another way for a refused road";
 }
