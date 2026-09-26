@@ -73,11 +73,15 @@
 
 ## What it is
 
-Bots living on a Renaissance-era [ModernUO](https://github.com/modernuo/ModernUO) shard with nobody driving them:
-fifty at first, and two newcomers every two hours up to 120. On every turn each bot prices every piece of work the
-shard can offer it, takes the best and keeps at it until it is done or something actually happens. The prices are
-learned from what the work really paid, so a trade that stops paying stops being chosen without anybody editing a
-number.
+An ecosystem of bots on a Renaissance-era [ModernUO](https://github.com/modernuo/ModernUO) shard, with nobody driving
+them. A bot is born a novice and develops on its own as it goes. It dresses itself, and puts in its own orders for the
+resources, goods and services it needs. It gathers its own resources and explores the world. It writes down what it
+learns about the world: what things are worth, and where the danger is. There are fifty bots at first, and two
+newcomers join every two hours, up to 120.
+
+On every turn each bot prices every piece of work the shard can offer it, takes the best and keeps at it until it is
+done or something actually happens. The prices are learned from what the work really paid, so a trade that stops
+paying stops being chosen without anybody editing a number.
 
 The bots are a separate assembly that ModernUO loads beside its own content. The engine itself changes in four
 files, through the small patches in `Projects/BotAIv2/engine-patches/`.
