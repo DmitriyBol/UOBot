@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Server.Mobiles;
 
 namespace Server.BotAI.V2;
@@ -34,68 +36,22 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotFreedom : BotDeed
 {
-    /// <summary>
-    /// The ledger key.
-    ///
-    /// Not "free": the debugger's hand already has a verb by that name — <c>free &lt;bot&gt;</c>, which makes a
-    /// bot forget its plan — and a summary in which the same word means both a rescue and a shake-loose is a
-    /// summary somebody reads wrong at two in the morning.
-    /// </summary>
     public const string Trade = "liberate";
 
-    /// <summary>
-    /// What freeing somebody is reckoned at per minute before experience corrects it.
-    ///
-    /// <para>
-    /// The engine pays 500 to 1000 gold for a walk that takes a few minutes, which is several times what
-    /// any trade on this island earns in the same time — so this is priced high on purpose and still
-    /// honestly: it is one of the few things on the shard that brings coin in from outside the population's
-    /// own pockets, which is the only kind of earning that grows the economy rather than moving it about.
-    /// </para>
-    /// </summary>
     public static double Prior { get; set; } = 220.0;
 
-    /// <summary>How long the walk home is reckoned to take. Long, because it is a walk across a map.</summary>
     public static double WorkMinutes { get; set; } = 6.0;
 
-    /// <summary>How far around itself a bot hears somebody yelling from a cage.</summary>
     public static int Reach { get; set; } = 48;
 
-    /// <summary>
-    /// How far a prisoner may be from Britain and still be worth freeing.
-    ///
-    /// The population's own roam rather than the dart limit: this is one bot walking one prisoner home a few
-    /// times an hour, not forty-seven bots throwing darts every beat, so the price rule that keeps the hunt
-    /// cheap does not belong here. The same distinction BotScout.Range makes, and for the same reason.
-    /// </summary>
     public static int Roam { get; set; } = 1000;
 
-    /// <summary>How near a prisoner a bot has to be for the engine to accept it as an escort.</summary>
     public static int Touch { get; set; } = 3;
 
-    /// <summary>The middle of what the engine pays, for the errand's own account of itself.</summary>
     public static int Reward { get; set; } = 750;
 
-    /// <summary>
-    /// Where every prisoner is taken, whatever town the engine picked for it.
-    ///
-    /// <para>
-    /// <b>Patrick's order of 08.09.2026, and the measurement behind it.</b> The engine gives a prisoner a
-    /// random town or dungeon region on Felucca, which on this map can be most of a continent away — and an
-    /// escort that cannot be finished takes somebody out of a cage to die of neglect in a field. The first
-    /// version refused those escorts instead, and the shard duly reported "5 passed over for living further
-    /// from their own town than 500 tiles" with an orc camp standing 129 tiles from home and nobody freed.
-    /// </para>
-    ///
-    /// <para>
-    /// Refusing was the wrong half to fix. The population lives beside Britain, walks it daily and banks in
-    /// it; a rescued prisoner delivered there is delivered somewhere real. So the destination is set rather
-    /// than inspected, and the distance test below measures the walk that will actually happen.
-    /// </para>
-    /// </summary>
     public static string Town { get; set; } = "Britain";
 
-    /// <summary>Where that town is, or nowhere if the map has no region by that name.</summary>
     private static Point3D Where_Town
     {
         get
@@ -106,20 +62,25 @@ public sealed class BotFreedom : BotDeed
         }
     }
 
-    /// <summary>Prisoners taken on.</summary>
-    public static long Taken { get; private set; }
+    public static long Uncaged { get; private set; }
 
-    /// <summary>Prisoners delivered.</summary>
     public static long Freed { get; private set; }
 
-    /// <summary>Times the engine refused the escort — usually the five-minute rest between two of them.</summary>
     public static long Refused { get; private set; }
 
-    /// <summary>Escorts that ended without a delivery: the prisoner died, wandered off, or gave up on the bot.</summary>
     public static long Lost { get; private set; }
 
-    /// <summary>Prisoners passed over for living further from their own destination than a road is searched for.</summary>
     public static long TooFar { get; private set; }
+
+    public static int Lag { get; set; } = 10;
+
+    public static int Rejoin { get; set; } = 3;
+
+    public static int StuckMs { get; set; } = 120000;
+
+    public static long TurnedBack { get; private set; }
+
+    public static long Stuck { get; private set; }
 
     private readonly Map _map;
 
@@ -131,6 +92,16 @@ public sealed class BotFreedom : BotDeed
 
     private bool _delivered;
 
+    private bool _behind;
+
+    private int _nearestHome = int.MaxValue;
+
+    private long _nearestHomeTick;
+
+    public static int ClaimMs { get; set; } = 90000;
+
+    private static readonly Dictionary<Serial, (Serial By, long Tick)> _claims = [];
+
     public BotFreedom(Map map, BaseEscortable prisoner)
     {
         _map = map;
@@ -140,17 +111,50 @@ public sealed class BotFreedom : BotDeed
 
     public override string Kind => Trade;
 
+    public override void Taken(IBotWilful bot)
+    {
+        if (bot?.Self is { } body && _prisoner != null)
+        {
+            _claims[_prisoner.Serial] = (body.Serial, Core.TickCount);
+        }
+    }
+
+    public override void Drop(IBotWilful bot)
+    {
+        base.Drop(bot);
+
+        Release(bot?.Self, _prisoner);
+    }
+
+    public static bool Claimed(Mobile body, BaseEscortable prisoner)
+    {
+        if (body == null || prisoner == null || !_claims.TryGetValue(prisoner.Serial, out var claim))
+        {
+            return false;
+        }
+
+        if (Core.TickCount - claim.Tick >= ClaimMs)
+        {
+            _claims.Remove(prisoner.Serial);
+
+            return false;
+        }
+
+        return claim.By != body.Serial;
+    }
+
+    private static void Release(Mobile body, BaseEscortable prisoner)
+    {
+        if (body != null && prisoner != null && _claims.TryGetValue(prisoner.Serial, out var claim) && claim.By == body.Serial)
+        {
+            _claims.Remove(prisoner.Serial);
+        }
+    }
+
+    public override bool Summons => true;
+
     public override Map Map => _map;
 
-    /// <summary>
-    /// Where the errand is headed, which changes exactly once.
-    ///
-    /// <para>
-    /// <b>And it must change only once.</b> A destination recomputed every beat resets the walk — see the
-    /// rule about a walking order having to be stable — so this reads the cage until the prisoner is in
-    /// hand and the town from then on, and never anything else.
-    /// </para>
-    /// </summary>
     public override Point3D Where => _taken ? Home() : _cage;
 
     public override double Expects => Prior;
@@ -163,11 +167,6 @@ public sealed class BotFreedom : BotDeed
 
     public override double Coin => 0.0;
 
-    /// <summary>
-    /// What the engine paid, near enough. The exact figure is 500 to 1000 and it lands in the pack without
-    /// telling anybody, so this reports the middle of the range; the true movement of the purse is in the
-    /// GOLD column, which is measured rather than declared.
-    /// </summary>
     public override int Made => _delivered ? Reward : 0;
 
     public override string Stage =>
@@ -182,10 +181,10 @@ public sealed class BotFreedom : BotDeed
             return BotDoing.Failed("no body");
         }
 
-        // Delivered: the engine pays, then deletes. So a prisoner that has gone while this bot was still its
-        // escorter is the success case, and there is no other signal for it.
         if (_prisoner == null || _prisoner.Deleted)
         {
+            Release(body, _prisoner);
+
             if (_taken)
             {
                 _delivered = true;
@@ -211,34 +210,37 @@ public sealed class BotFreedom : BotDeed
                 return BotDoing.Walk(_map, _cage, BotArrival.Within(Touch), $"after {_prisoner.Name}");
             }
 
-            // Britain, whatever the engine picked. Set before the escort is accepted, because AcceptEscorter
-            // refuses outright when there is no destination and announces the one it has when there is. See
-            // Town.
             if (_prisoner.Destination != Town)
             {
                 _prisoner.Destination = Town;
             }
 
-            // The engine's own answer, asked once. It refuses for reasons this file should not second-guess:
-            // somebody already has this one, the bot escorted somebody else inside five minutes, the prisoner
-            // has nowhere to go.
             if (!_prisoner.AcceptEscorter(body))
             {
                 Refused++;
+                Release(body, _prisoner);
 
                 return BotDoing.Failed("it would not come");
             }
 
             _taken = true;
-            Taken++;
+            _nearestHomeTick = Core.TickCount;
+            Uncaged++;
 
             return BotDoing.Work("freeing it");
         }
 
-        // Somebody else's now, or nobody's. Either way this errand is over and the bot should not go on
-        // walking to a town for a prisoner that is not behind it.
         if (_prisoner.GetEscorter() != body)
         {
+            if (_prisoner.GetDestination() == null)
+            {
+                Release(body, _prisoner);
+                _delivered = true;
+                Freed++;
+
+                return BotDoing.Done("delivered, and paid for it");
+            }
+
             Lost++;
 
             return BotDoing.Failed("it is no longer following");
@@ -253,13 +255,39 @@ public sealed class BotFreedom : BotDeed
             return BotDoing.Failed("it no longer knows where it is going");
         }
 
-        // The prisoner follows by itself — the engine set it to Follow at twice a bot's pace — so the whole
-        // of the walking is this bot's own. Arrival is the engine's to declare: it checks the region on the
-        // prisoner's own think, pays, and deletes, which is caught at the top of this method.
+        var left = Math.Max(Math.Abs(_prisoner.X - home.X), Math.Abs(_prisoner.Y - home.Y));
+
+        if (left < _nearestHome)
+        {
+            _nearestHome = left;
+            _nearestHomeTick = Core.TickCount;
+        }
+        else if (Core.TickCount - _nearestHomeTick >= StuckMs)
+        {
+            Stuck++;
+            Lost++;
+
+            return BotDoing.Failed($"{_prisoner.Name} got no nearer home in {StuckMs / 1000}s, {left} tiles off it");
+        }
+
+        var gap = Math.Max(Math.Abs(_prisoner.X - body.X), Math.Abs(_prisoner.Y - body.Y));
+
+        if (_behind ? gap > Rejoin : gap > Lag)
+        {
+            if (!_behind)
+            {
+                _behind = true;
+                TurnedBack++;
+            }
+
+            return BotDoing.Walk(_map, _prisoner, BotArrival.Within(Rejoin), $"going back for {_prisoner.Name}");
+        }
+
+        _behind = false;
+
         return BotDoing.Walk(_map, home, BotArrival.Within(2), $"walking {_prisoner.Name} home");
     }
 
-    /// <summary>Where this prisoner is trying to get to, or nowhere.</summary>
     private Point3D Home()
     {
         var region = _prisoner?.GetDestination()?.Region;
@@ -267,17 +295,10 @@ public sealed class BotFreedom : BotDeed
         return region == null ? Point3D.Zero : region.GoLocation;
     }
 
-    /// <summary>
-    /// The nearest prisoner nobody is walking home yet, or null.
-    ///
-    /// <para>
-    /// <c>CantWalk</c> is the test rather than <c>IsPrisoner</c> alone: the flag stays set for the whole of
-    /// the escort, and the engine clears the cage the moment somebody accepts. So this asks "still in the
-    /// cage", which is the question, rather than "was once in one".
-    /// </para>
-    /// </summary>
-    public static BaseEscortable Nearest(Mobile body, int range)
+    public static BaseEscortable Nearest(Mobile body, int range, out bool spoken)
     {
+        spoken = false;
+
         var map = body?.Map;
 
         if (map == null || map == Map.Internal)
@@ -295,6 +316,13 @@ public sealed class BotFreedom : BotDeed
                 continue;
             }
 
+            if (Claimed(body, near))
+            {
+                spoken = true;
+
+                continue;
+            }
+
             var town = Where_Town;
 
             if (town == Point3D.Zero)
@@ -302,10 +330,6 @@ public sealed class BotFreedom : BotDeed
                 continue;
             }
 
-            // <b>Refused before it is offered, never after.</b> An escort that cannot be finished leaves
-            // somebody standing in a field who was at least safe in the cage. Measured from the prisoner,
-            // because that is where the walk starts, and against Britain, because that is where it ends —
-            // see Town. The engine's own random destination is not consulted: it is overwritten.
             if (!Utility.InRange(near.Location, town, Roam))
             {
                 TooFar++;
@@ -329,15 +353,19 @@ public sealed class BotFreedom : BotDeed
 
     public static void Forget()
     {
-        Taken = 0;
+        _claims.Clear();
+        Uncaged = 0;
         Freed = 0;
         Refused = 0;
         Lost = 0;
         TooFar = 0;
+        TurnedBack = 0;
+        Stuck = 0;
     }
 
     public static string Describe() =>
-        $"{Taken} prisoners taken out of cages and {Freed} walked home, {Lost} lost on the way, "
+        $"{Uncaged} prisoners taken out of cages and {Freed} walked home, {Lost} lost on the way ({Stuck} of them got no nearer home "
+        + $"in {StuckMs / 1000}s), {TurnedBack} times an escort turned back for one more than {Lag} tiles behind, "
         + $"{Refused} refused by the engine, {TooFar} passed over for living further than {Roam} tiles from {Town}";
 }
 
@@ -363,6 +391,8 @@ public sealed class BotLiberator : IBotProposer
 
     public static long Offered { get; private set; }
 
+    public static long Spoken { get; private set; }
+
     public BotDeed Propose(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -382,11 +412,18 @@ public sealed class BotLiberator : IBotProposer
             return null;
         }
 
-        var prisoner = BotFreedom.Nearest(body, BotFreedom.Reach);
+        var prisoner = BotFreedom.Nearest(body, BotFreedom.Reach, out var spoken);
 
         if (prisoner == null)
         {
-            None++;
+            if (spoken)
+            {
+                Spoken++;
+            }
+            else
+            {
+                None++;
+            }
 
             return null;
         }
@@ -397,7 +434,7 @@ public sealed class BotLiberator : IBotProposer
     }
 
     public static string Describe() =>
-        $"{Asked} asked to walk somebody home: {Offered} sent to a cage, {None} heard nobody, {Soon} had listened too recently";
+        $"{Asked} asked to walk somebody home: {Offered} sent to a cage, {None} heard nobody, {Spoken} heard only prisoners another bot had set out for, {Soon} had listened too recently";
 
     public static void Reset()
     {
@@ -405,5 +442,6 @@ public sealed class BotLiberator : IBotProposer
         Soon = 0;
         None = 0;
         Offered = 0;
+        Spoken = 0;
     }
 }

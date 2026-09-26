@@ -14,24 +14,16 @@ namespace Server.BotAI.V2;
 /// </summary>
 public interface IBotAlly
 {
-    /// <summary>Whether this one could actually take part. A corpse and a bot at two hit points are not help.</summary>
     bool AbleToFight { get; }
 }
 
 /// <summary>What to do about being attacked on the way somewhere.</summary>
 public enum BotStand
 {
-    /// <summary>Nothing hostile worth the name. Carry on.</summary>
     Nothing,
 
-    /// <summary>
-    /// Winnable, alone or with the company standing here. Put the road aside, deal with this, then carry on.
-    /// </summary>
     Fight,
 
-    /// <summary>
-    /// Several times over. Keep walking the road and hit back on the move — the errand never changed.
-    /// </summary>
     Outmatched
 }
 
@@ -55,28 +47,12 @@ public enum BotStand
 /// </summary>
 public static class BotThreat
 {
-    /// <summary>
-    /// How much stronger than us the opposition may be before walking on beats standing and fighting.
-    ///
-    /// One and a half, which is the first version's measured figure and not a guess. It is the meaning of
-    /// "several times over": at or under it a bot commits, above it the road wins. Note what falls either
-    /// side — a lone bot against a graveyard spectre is 2120 against 1116, so it walks on unless it has
-    /// company; six bots against a lich is 6696 against 6937, ratio 1.04, so they commit.
-    /// </summary>
     public static double Tolerance { get; set; } = 1.5;
 
-    /// <summary>
-    /// Weight given to hostiles other than the worst one.
-    ///
-    /// Adding every creature in sight at full strength badly overstates a fight: blows are traded with one
-    /// thing at a time, and the rest arrive piecemeal, get held off, or never engage at all. Counting them
-    /// fully meant a graveyard's ordinary residents — the skeletons and zombies that live there anyway —
-    /// stacked on top of whatever had wandered in, and a band that could comfortably have taken the newcomer
-    /// refused because it was also adding up the scenery.
-    /// </summary>
     private const double SecondaryWeight = 0.4;
 
-    /// <summary>Rough fighting power: how long something lasts multiplied by how hard it hits.</summary>
+    public static double Secondary => SecondaryWeight;
+
     public static double Power(Mobile m)
     {
         if (m == null || m.Deleted)
@@ -85,6 +61,16 @@ public static class BotThreat
         }
 
         return Math.Max(1, m.HitsMax) * AverageDamage(m);
+    }
+
+    public static double Now(Mobile m)
+    {
+        if (m == null || m.Deleted || m.HitsMax <= 0)
+        {
+            return Power(m);
+        }
+
+        return Power(m) * Math.Clamp(m.Hits / (double)m.HitsMax, 0.1, 1.0);
     }
 
     private static double AverageDamage(Mobile m)
@@ -100,22 +86,11 @@ public static class BotThreat
             melee = (weapon.MinDamage + weapon.MaxDamage) / 2.0;
         }
 
-        // A caster's real output is in its spells, and spells appear nowhere in the melee figures. Half its
-        // magery is a crude stand-in, and it is the difference between correctly refusing a lich and walking
-        // into one because its health bar looked ordinary.
         var magery = m.Skills[SkillName.Magery].Base;
 
         return Math.Max(1.0, melee + magery / 2.0);
     }
 
-    /// <summary>
-    /// Whether this creature is something a bot standing here would fight.
-    ///
-    /// The town test is on the <b>hunter</b>, not the quarry, because what matters is where the swing would
-    /// happen — and it is a town rather than merely guarded ground. The wider test caught the graveyard too,
-    /// which sits inside Britain's guarded region, and the population stopped fighting anywhere at all: a far
-    /// worse fault than the one it was fixing.
-    /// </summary>
     public static bool Hostile(Mobile bot, BaseCreature creature)
     {
         if (bot?.Region?.IsPartOf<TownRegion>() == true)
@@ -146,14 +121,6 @@ public static class BotThreat
         return bot.CanBeHarmful(creature, false);
     }
 
-    /// <summary>
-    /// Combined power of everything hostile within range: the worst of it in full, the rest discounted.
-    ///
-    /// This counts creatures a bot cannot reach, unlike choosing a target. "I cannot land a blow on it" and
-    /// "it cannot hurt me" are different statements — the wraith on the crypt roof that prompted the whole
-    /// distinction casts down perfectly well — and a bot that judged the place safe on those grounds would
-    /// stand in it and die.
-    /// </summary>
     public static double ThreatPower(Mobile bot, int range)
     {
         var map = bot?.Map;
@@ -188,19 +155,9 @@ public static class BotThreat
             return 0.0;
         }
 
-        // The worst at full weight, everything else discounted.
         return worst + (total - worst) * SecondaryWeight;
     }
 
-    /// <summary>
-    /// The strongest hostile within range, which is <b>not</b> the nearest.
-    ///
-    /// The distinction cost the first version an evening. Its party formed against whatever was closest, and
-    /// on a graveyard the closest thing is a skeleton — so six bots would declare a band against a skeleton,
-    /// commit instantly because a skeleton is trivial, all go and kill it, while the lich that was actually
-    /// killing them carried on casting. If a bot is going to put its road aside for a fight, it has to be the
-    /// fight that matters.
-    /// </summary>
     public static BaseCreature Strongest(Mobile bot, int range)
     {
         var map = bot?.Map;
@@ -234,17 +191,6 @@ public static class BotThreat
         return worst;
     }
 
-    /// <summary>
-    /// Whatever hostile creature is presently set on this bot, or null.
-    ///
-    /// <para>
-    /// <b>Asked of the creature rather than of the bot, and the direction is the whole point.</b>
-    /// <c>bot.Combatant</c> says who the bot has decided to fight; this says who has decided to fight the
-    /// bot, and those are different facts about different moments. A healer standing over a patient has no
-    /// combatant of its own while a zombie eats it, and every rule about what a hurt bot may do — bandage,
-    /// cast, stand still at all — turns on the second question, not the first.
-    /// </para>
-    /// </summary>
     public static BaseCreature Hunter(Mobile bot, int range)
     {
         var map = bot?.Map;
@@ -278,7 +224,6 @@ public static class BotThreat
         return worst;
     }
 
-    /// <summary>Whether anything hostile is standing near enough to interfere with standing still.</summary>
     public static bool Anything(Mobile bot, int range)
     {
         var map = bot?.Map;
@@ -299,13 +244,6 @@ public static class BotThreat
         return false;
     }
 
-    /// <summary>
-    /// Our side: this bot plus every able one of its own standing near enough to join in.
-    ///
-    /// Counted from what is nearby rather than from a roster, and only those that could actually swing. A bot
-    /// on its last two hit points is not reinforcement — the first version formed bands whose founder could
-    /// not fight, found nobody able, and disbanded in the same tick, over and over.
-    /// </summary>
     public static double OurPower(Mobile bot, int range)
     {
         var map = bot?.Map;
@@ -330,26 +268,6 @@ public static class BotThreat
         return total;
     }
 
-    /// <summary>
-    /// The same reckoning of the opposition, taken where the fight would be rather than where the bot is.
-    ///
-    /// <para>
-    /// <b>Because the odds were being learnt by walking into them.</b> A quarry is weighed alone — its own
-    /// power against ours — and the crowd standing round it was found only on arrival, by
-    /// <see cref="Decide"/>, which then called the fight off. Over the night of 02-03.09.2026 that came to
-    /// 202 endings on "too many of them around", and 184 of them fired inside the shortest span the ledger
-    /// can record: the crowd was not gathering while the bot walked, it was standing there when the bot
-    /// chose. What is paid for that is a whole walk, every time, by every bot in turn.
-    /// </para>
-    ///
-    /// <para>
-    /// Ours is still counted around the bot, and that is a forecast rather than a promise: the allies near it
-    /// now are the ones likely to be near it there. The yardstick is deliberately the same <see cref="Tolerance"/>
-    /// the arrival test uses — a pre-check that disagreed with the test it is meant to spare would refuse
-    /// fights the bot would have won, or send it to ones it would drop on arrival, which is the loop again
-    /// with an extra step.
-    /// </para>
-    /// </summary>
     public static bool Overrun(Mobile bot, IPoint3D where, int range)
     {
         var map = bot?.Map;
@@ -390,9 +308,6 @@ public static class BotThreat
         return ours > 0.0 && threat / ours > Tolerance;
     }
 
-    /// <summary>
-    /// How much stronger the opposition is than us. Above <see cref="Tolerance"/> the road wins.
-    /// </summary>
     public static double Danger(Mobile bot, int range)
     {
         var ours = OurPower(bot, range);
@@ -400,17 +315,6 @@ public static class BotThreat
         return ours <= 0.0 ? 0.0 : ThreatPower(bot, range) / ours;
     }
 
-    /// <summary>
-    /// The whole decision, in one call: stand and deal with it, or walk on and hit back on the move.
-    ///
-    /// <para>
-    /// <b>Binary and immediate, with no assembling and no hesitating.</b> The first version had a soft
-    /// utility here and it produced the worst behaviour on the shard: six bots stood politely in a circle
-    /// waiting for a rally that was already complete while a lich killed them one at a time. A caster strikes
-    /// from eight tiles and never closes, so not one rung of the survival ladder ever fired. Standing still is
-    /// not an option at any number.
-    /// </para>
-    /// </summary>
     public static BotStand Decide(Mobile bot, int range)
     {
         if (bot == null || !bot.Alive)

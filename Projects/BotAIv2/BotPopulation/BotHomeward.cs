@@ -1,4 +1,5 @@
 using System;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -34,46 +35,12 @@ public sealed class BotHomeward : BotDeed
 {
     public const string Trade = "homeward";
 
-    /// <summary>
-    /// How far from the camp a bot has to be before going back is worth offering at all.
-    ///
-    /// Inside this it is already among the shops, the seams and the counters, and walking to the middle of
-    /// them would be an errand that changes nothing.
-    /// </summary>
     public static int Away { get; set; } = 120;
 
-    /// <summary>Near enough to be home. The camp is a place, not a tile — see BotArrival.Within.</summary>
     public static int Arrived { get; set; } = 20;
 
-    /// <summary>
-    /// How long a bot must have had nothing worth doing before the walk home is offered at all.
-    ///
-    /// <para>
-    /// <b>Half a minute, and it was nought for the first hour — which made this an errand that mostly
-    /// interrupted itself.</b> Offered on the very first barren review, the walk was taken the instant a bot
-    /// ran out of work, and real work turned up a few seconds later and took the bot straight back off it.
-    /// Measured 02.09.2026 over five minutes: 43 walks home begun, 28 of them dropped and 15 finished. Two
-    /// thirds were bots that had not actually run out of anything; they had simply not been offered it yet.
-    /// </para>
-    ///
-    /// <para>
-    /// The cure is not to make the walk worth more — it must go on losing to everything — but to ask it
-    /// later. A bot that has had nothing for thirty seconds has been offered every trade on the shard
-    /// twice over and been refused by all of them, and that is a bot with nothing to do rather than a bot
-    /// between jobs. The shard already keeps that clock: see BotUrges.BarrenMinutes.
-    /// </para>
-    /// </summary>
     public static double BarrenFor { get; set; } = 0.5;
 
-    /// <summary>
-    /// What this is worth a minute. Deliberately tiny.
-    ///
-    /// <para>
-    /// It is not nought, and that distinction is the whole of the design. At nought the auction would score
-    /// it at nought and a bot with nothing to do would go on having nothing to do, which is the state this
-    /// exists to end. At a few coins it loses to every real offer on the shard and beats only silence.
-    /// </para>
-    /// </summary>
     public static double Worth { get; set; } = 5.0;
 
     private readonly Map _map;
@@ -94,42 +61,8 @@ public sealed class BotHomeward : BotDeed
 
     public override double Expects => Worth;
 
-    /// <summary>
-    /// Not about money, and it must not be refused for failing to earn any.
-    ///
-    /// <para>
-    /// <b>The second deed on this shard to need this flag, and it was found the same way as the first.</b>
-    /// The Baron's rounds pay nothing by design, the ledger measured that honestly, and the arithmetic threw
-    /// them away — twelve minutes standing in Britain with 600gp in his pack. This is the same thing at
-    /// population scale: at 03:20 on 09.09.2026 Argus was asked who was idle and every one of them gave the
-    /// same answer — <i>"39 proposers asked, 2 offered work, and it was refused: homeward is expected to pay
-    /// -25.7/min here, against a claim of 1.2"</i> — while standing in Britain, where
-    /// <c>BotThreat.Hostile</c> answers false for anybody inside a town region and so there is genuinely
-    /// nothing to fight, nothing to hunt, and almost nothing to do.
-    /// </para>
-    ///
-    /// <para>
-    /// So the one errand whose whole purpose is to cure "there is nothing to do here" was refused for being
-    /// unprofitable, by a shard that had learned — correctly — that walking home earns nothing and costs
-    /// upkeep on the way. It is measured right and priced wrong, which is precisely what this flag is for.
-    /// The shard's own count of it: 416 times nothing was worth doing, in eighty minutes.
-    /// </para>
-    /// </summary>
     public override bool Unpaid => true;
 
-    /// <summary>
-    /// How long the walk will take, honestly.
-    ///
-    /// <para>
-    /// <b>This number is what keeps the appraisal from vetoing the one errand written for distant bots.</b>
-    /// The auction weighs an offer by <c>work / (work + travel)</c> — the share of the time that is spent
-    /// working rather than walking — so a deed that claims to take a moment and is four hundred tiles away
-    /// scores near nought, every time, by construction. That is correct for a dig and it would be fatal
-    /// here: the further a bot has strayed the more it needs this and the less it would be offered it.
-    /// Declaring the walk as the work is not a way round the rule, it is the truth: the walk IS the errand,
-    /// and told that, the arithmetic gives it a fair hearing without a single exception being carved.
-    /// </para>
-    /// </summary>
     public override double Minutes =>
         Math.Max(0.2, Tiles() * BotWalk.StepDelayMs(BotMobile.Runs) / 60000.0);
 
@@ -171,12 +104,12 @@ public sealed class BotHomeward : BotDeed
 /// </summary>
 public sealed class BotHomer : IBotProposer
 {
-    /// <summary>Bots asked, and what became of the question. Each case counted apart.</summary>
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHomer));
+
     public static long Asked { get; private set; }
 
     public static long Near { get; private set; }
 
-    /// <summary>Far from home, but not yet out of work for long enough to be worth fetching.</summary>
     public static long Busy { get; private set; }
 
     public static long Sent { get; private set; }
@@ -197,26 +130,49 @@ public sealed class BotHomer : IBotProposer
 
         Asked++;
 
-        if (Utility.InRange(body.Location, BotPopulation.Where, BotHomeward.Away))
+        var hearth = body is BotMobile own ? BotSeat.Home(own) : BotPopulation.Where;
+
+        if (Utility.InRange(body.Location, hearth, BotHomeward.Away))
         {
             Near++;
 
             return null;
         }
 
-        // Not on the first empty review. See BotHomeward.BarrenFor: offered at once, this errand spent two
-        // thirds of its life being dropped for work that was about to be offered anyway.
-        if (bot.Resolve?.Urges?.BarrenMinutes(Core.TickCount) < BotHomeward.BarrenFor)
+        var barren = bot.Resolve?.Urges?.BarrenMinutes(Core.TickCount) >= BotHomeward.BarrenFor;
+
+        if (!barren && !(body is BotMobile loose && BotDungeon.Under(body.Location) && !BotDelveParty.Delving(body)
+                         && BotThreat.Decide(loose, BotMobile.NoticeRange) == BotStand.Nothing))
         {
             Busy++;
 
             return null;
         }
 
+        if (body is BotMobile below && BotDungeon.Under(body.Location) && !BotDelveParty.Delving(body))
+        {
+            if (BotPopulation.Carry(below))
+            {
+                below.Journey?.Finish();
+                Surfaced++;
+
+                logger.Information(
+                    "{Name} was underground with no party to bring it up and no work for {Minutes:F1} minutes, and has been put back on the island at {Where}",
+                    body.Name,
+                    BotHomeward.BarrenFor,
+                    body.Location
+                );
+            }
+
+            return null;
+        }
+
         Sent++;
 
-        return new BotHomeward(home, BotPopulation.Where);
+        return new BotHomeward(home, hearth);
     }
+
+    public static long Surfaced { get; private set; }
 
     public static void Forget()
     {
@@ -224,10 +180,11 @@ public sealed class BotHomer : IBotProposer
         Near = 0;
         Busy = 0;
         Sent = 0;
+        Surfaced = 0;
     }
 
-    /// <summary>One line, every case named, no branch called other.</summary>
     public static string Describe() =>
         $"{Asked} asked whether to go home: {Near} were already within {BotHomeward.Away} tiles of it, "
-        + $"{Busy} were far but had not been out of work for {BotHomeward.BarrenFor:F1} minutes yet, {Sent} were sent back";
+        + $"{Busy} were far but had not been out of work for {BotHomeward.BarrenFor:F1} minutes yet, {Sent} were sent back"
+        + $" and {Surfaced} were underground with no party and were brought up instead";
 }

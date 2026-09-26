@@ -17,37 +17,26 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotSpellsSettings
 {
-    /// <summary>How far below its own Inscribe a scribe keeps its work.</summary>
     public double? Margin { get; set; }
 
-    /// <summary>What a scribe adds to what its materials cost when it prices what it wrote. A fifth by default.</summary>
     public double? Markup { get; set; }
 
-    /// <summary>How many of each herb a caster keeps back from the pen, to cast with.</summary>
     public int? Reserve { get; set; }
 
-    /// <summary>What a herb is reckoned at where no shopkeeper within reach sells one.</summary>
     public int? HerbGuess { get; set; }
 
-    /// <summary>How many blank scrolls are bought in one go.</summary>
     public int? Batch { get; set; }
 
-    /// <summary>How often an attempt is made, in milliseconds.</summary>
     public int? SwingMs { get; set; }
 
-    /// <summary>How long a scribe waits for mana before taking what it has written and going.</summary>
     public int? PatienceMs { get; set; }
 
-    /// <summary>What a session at the pen is reckoned at per minute before experience corrects it.</summary>
     public double? Expects { get; set; }
 
-    /// <summary>How long a session is expected to take.</summary>
     public double? WorkMinutes { get; set; }
 
-    /// <summary>What getting hold of one spell is reckoned at per minute.</summary>
     public double? SeekExpects { get; set; }
 
-    /// <summary>How long that is expected to take.</summary>
     public double? SeekMinutes { get; set; }
 }
 

@@ -55,30 +55,20 @@ public static class BotDials
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDials));
 
-    /// <summary>Name to property, built once by reflection. Key is <c>class.dial</c>, lower-cased.</summary>
     private static Dictionary<string, PropertyInfo> _dials;
 
-    /// <summary>What a dial held before this session's first change of it, and who moved it when.</summary>
     private static readonly Dictionary<string, (string Was, string Now, DateTime When, string Who)> _moved = new();
 
     private static string _journal;
 
     private static bool _broken;
 
-    /// <summary>Changes made through the door this session.</summary>
     public static long Changes { get; private set; }
 
-    /// <summary>How many dials the assemblies turned out to have.</summary>
     public static int Count => Map().Count;
 
-    /// <summary>Dials standing at something other than what they booted with.</summary>
     public static int Moved => _moved.Count;
 
-    /// <summary>
-    /// Opens the journal. Ordered as the hand's is: a change is refused outright if it cannot be written
-    /// down first, because a lever whose record can fail quietly is a lever whose effects cannot be read
-    /// back out of the log afterwards.
-    /// </summary>
     public static void Open()
     {
         _broken = false;
@@ -112,11 +102,6 @@ public static class BotDials
         }
     }
 
-    /// <summary>
-    /// The dials, found once. Both assemblies: the population's own and the debugger's, because the
-    /// observer's sampling rate and its frozen-after thresholds are as worth trying against a live shard as
-    /// the smith's number of attempts, and they are the ones a restart makes hardest to compare.
-    /// </summary>
     private static Dictionary<string, PropertyInfo> Map()
     {
         if (_dials != null)
@@ -168,22 +153,12 @@ public static class BotDials
         return _dials;
     }
 
-    /// <summary>
-    /// The types a line of text can be turned into without guessing. Everything else a dial might be — a
-    /// point, an access level, a list — is left alone rather than half-supported: a door that accepts
-    /// <c>1592,1680,10</c> for one dial and refuses it for the next is a door that has to be remembered.
-    /// </summary>
     private static bool Settable(Type type) =>
         type == typeof(int) || type == typeof(long) || type == typeof(double) || type == typeof(float)
         || type == typeof(bool) || type == typeof(string);
 
-    /// <summary>Full name as it is printed.</summary>
     private static string Pretty(PropertyInfo property) => $"{property.DeclaringType?.Name}.{property.Name}";
 
-    /// <summary>
-    /// Finds one dial by name. Exact <c>Class.Name</c> first, then a bare dial name if exactly one class has
-    /// it — <c>Tries</c> is unambiguous, <c>Reach</c> is held by several subsystems and must be said in full.
-    /// </summary>
     private static PropertyInfo Find(string name, out string trouble)
     {
         trouble = null;
@@ -211,7 +186,6 @@ public static class BotDials
         return null;
     }
 
-    /// <summary>Reads one, printed the way it is written in source.</summary>
     private static string Read(PropertyInfo property)
     {
         try
@@ -233,11 +207,6 @@ public static class BotDials
         }
     }
 
-    /// <summary>
-    /// One dial, or a table of every dial whose name contains the word. The word is the whole of the search:
-    /// <c>dials ms</c> is every clock in the shard side by side, which is the comparison that says whether a
-    /// guard is faster than the work it is judging — the shape of defect this shard produces most often.
-    /// </summary>
     public static string Show(string filter)
     {
         var map = Map();
@@ -287,11 +256,6 @@ public static class BotDials
         return text.ToString();
     }
 
-    /// <summary>
-    /// What has been moved, with the words to write into the configuration file. Printed on demand and also
-    /// carried into the debugger's own state line, because a shard running with hand-moved thresholds and no
-    /// visible sign of it is a shard whose next measurement is quietly about a different world.
-    /// </summary>
     public static string Changed()
     {
         if (_moved.Count == 0)
@@ -320,7 +284,6 @@ public static class BotDials
         return text.ToString();
     }
 
-    /// <summary>One line for a summary elsewhere, or null when nothing has been touched.</summary>
     public static string Note()
     {
         if (_moved.Count == 0)
@@ -337,10 +300,6 @@ public static class BotDials
             );
     }
 
-    /// <summary>
-    /// Moves one dial, or puts it back with <c>reset</c>. Written down before it happens, and refused
-    /// outright if the writing fails.
-    /// </summary>
     public static string Set(string name, string value, string who)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -421,8 +380,6 @@ public static class BotDials
             }
             catch
             {
-                // The refusal is already going back through the door; a journal that cannot record it is
-                // reported by the next set, which checks the same flag.
                 _broken = true;
             }
 
@@ -459,11 +416,6 @@ public static class BotDials
             + " lists everything moved so far.";
     }
 
-    /// <summary>
-    /// Text to value. The decimal separator is accepted either way round: this keyboard is a Russian one and
-    /// types <c>0,5</c>, while the shard's own numbers are all invariant — a door that answered "not a
-    /// number" to that would be answering about the locale rather than about the dial.
-    /// </summary>
     private static bool Parse(Type type, string text, out object value, out string why)
     {
         value = null;

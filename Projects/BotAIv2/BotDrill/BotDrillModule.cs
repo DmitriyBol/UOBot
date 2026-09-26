@@ -16,50 +16,30 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotDrillSettings
 {
-    /// <summary>
-    /// Where the training field is, as X, Y, Z on the population's own facet.
-    ///
-    /// <para>
-    /// Ordered as (1479, 1629, 20). If the ground turns out to be somewhere else, this is the one key that
-    /// moves it — no rebuild, and nothing else in the subsystem holds a coordinate.
-    /// </para>
-    /// </summary>
     public int[] Ground { get; set; }
 
-    /// <summary>Tiles between one student and the next. Two makes the block a chessboard.</summary>
     public int? Pace { get; set; }
 
-    /// <summary>How many stand in one rank.</summary>
     public int? Rank { get; set; }
 
-    /// <summary>Most students one captain takes at once.</summary>
     public int? Most { get; set; }
 
-    /// <summary>How long the captain waits on the field for people to arrive.</summary>
     public int? GatherMs { get; set; }
 
-    /// <summary>How long one class runs.</summary>
     public int? LessonMs { get; set; }
 
-    /// <summary>How often points are handed out and the captain moves round the ring.</summary>
     public int? BeatMs { get; set; }
 
-    /// <summary>How near the captain has to be for a student to get the whole of a beat.</summary>
     public int? Voice { get; set; }
 
-    /// <summary>Points a beat at the bottom of a skill with the captain standing over you.</summary>
     public double? Rate { get; set; }
 
-    /// <summary>What a beat is worth to a student the captain is nowhere near.</summary>
     public double? Distant { get; set; }
 
-    /// <summary>What a lesson costs before the student's own standing is added.</summary>
     public int? Fee { get; set; }
 
-    /// <summary>What each point the student already holds adds to the bill.</summary>
     public int? FeePerPoint { get; set; }
 
-    /// <summary>How far a captain will be from the field and still call a class.</summary>
     public int? Range { get; set; }
 }
 
@@ -90,26 +70,15 @@ public sealed class BotDrillModule : BotModule
     {
         Load();
 
-        // Tried here and re-tried on first use: the craft systems this reads are built by the engine's own
-        // content initialisation, and whether that has happened by the time a bot module starts is not ours
-        // to decide. See BotHarness.Survey.
         BotHarness.Survey();
 
         BotWill.Offer(new BotDrill());
         BotWill.Offer(new BotStudent());
 
-        // The first demand for armour this shard has ever had, offered to every bot. See BotArmourer:
-        // nobody here wore any, because nothing ever asked for it.
         BotWill.Offer(new BotArmourer());
 
-        // The captain's fourth office, and the only errand on this shard whose product is knowledge. See
-        // BotScout: it belongs to the captain because it is the same thing a patrol is — a company raised on
-        // the spot and walked somewhere — with the destination chosen by what nobody knows rather than by
-        // what has gone wrong.
         BotWill.Offer(new BotScoutmaster());
 
-        // The numbers it is actually running with. A belief about behaviour built on the defaults in the
-        // source can be wrong by a factor of two without anything looking odd.
         logger.Information(
             "The drill field is at ({X}, {Y}, {Z}): up to {Most} in ranks of {Rank} at {Pace} tiles, the roll open {Gather}ms and the class {Lesson}ms, a beat every {Beat}ms worth {Rate:F2} points within {Voice} tiles and {Distant:P0} of that beyond; a lesson costs {Fee} + {Per} a point and a master teaches only as far as it has got itself; one field and one master at a time, a captain for those who swing and shoot and a sage for those who cast, whose lessons cost {Magic:F2} times as much",
             BotSchool.Ground.X,
@@ -167,18 +136,6 @@ public sealed class BotDrillModule : BotModule
         BotDrill.Range = settings.Range ?? BotDrill.Range;
     }
 
-    /// <summary>
-    /// How often the captain's three offices are summed up in the shard's own log.
-    ///
-    /// <para>
-    /// <b>Printed on a clock rather than only on a reload, and this project has the note about why.</b>
-    /// <c>BotBeat.Summarise</c> carries it: numbers that exist and are only printed when the world is
-    /// reloaded are numbers that are never printed, and the one budget everybody shares was invisible while
-    /// it was being spent. A captain is one bot in twenty doing three things nobody else does; if its
-    /// counters are silent, "the captain is not patrolling" and "the captain patrols and you have not been
-    /// watching" are the same log.
-    /// </para>
-    /// </summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _timer;
@@ -207,13 +164,6 @@ public sealed class BotDrillModule : BotModule
         BotScoutmaster.Forget();
     }
 
-    /// <summary>
-    /// Everything the captain is and does, in one line, every case counted separately.
-    ///
-    /// The patrol belongs to the squad module by file and to the captain by office, and it is read here
-    /// because a person asking "what is the captain doing" should not have to read two lines in two places
-    /// and join them up.
-    /// </summary>
     public static string Summarise() =>
         $"{BotPatrol.Describe()}; {BotScoutmaster.Describe()}; {BotDrill.Describe()}; {BotStudent.Describe()}; {BotArmourer.Describe()}";
 }

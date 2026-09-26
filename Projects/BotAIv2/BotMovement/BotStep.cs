@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Server.Engines.Pathing.Cache;
 using Server.Items;
 using CalcMoves = Server.Movement.Movement;
@@ -34,65 +34,24 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotStep
 {
-    /// <summary>How far up one step may take a bot, as the engine's movement code has it.</summary>
     public const int StepUp = 2;
 
-    /// <summary>
-    /// How far a floor may be from the bot's own height and still be somewhere it could plausibly walk
-    /// to. Two storeys: enough for stairs, a cellar or a hillside, not enough for a roof.
-    /// </summary>
     public const int StandingReach = 24;
 
-    /// <summary>
-    /// How high above or below a point to look for the floor that belongs to it.
-    ///
-    /// Narrow on purpose, and this narrowness is the whole of the roof fix. The first version asked
-    /// <c>map.CanSpawnMobile(x, y, -128, 127, ...)</c> — the entire world vertically — and
-    /// <c>CanSpawnMobile</c> answers with <em>any</em> standable surface it finds. In a built-up world
-    /// that regularly means a roof. The point looked legal, the search planned through it, the engine
-    /// refused, and the bill was twenty-five seconds and one abandoned errand <b>per approach
-    /// direction</b>.
-    /// </summary>
     public const int GroundReach = 8;
 
-    /// <summary>
-    /// Height bands the search folds Z into, exactly as the engine's own search does. Two floors of a
-    /// building get separate cells; the ordinary jitter of walking over uneven ground does not multiply
-    /// the search.
-    /// </summary>
     private const int ZPlaneHeight = 20;
 
-    /// <summary>The vertical space a standing person occupies.</summary>
     private const int PersonHeight = BotArrival.PersonHeight;
 
-    /// <summary>
-    /// One integer naming a standing cell. Used as the key by the search, by the reach ledger and by the
-    /// item memo, so all three agree on what "the same place" means.
-    /// </summary>
     public static int Cell(int x, int y, sbyte z) => ((z + 128) / ZPlaneHeight << 26) | (x << 13) | y;
 
-    /// <summary>
-    /// The eight-direction step mask for one tile: from the cache where it can answer, and from the same
-    /// rules it was baked with where it cannot.
-    ///
-    /// Correctness never depends on the cache being warm — a cold shard is only slower. That property is
-    /// worth stating because it is what makes this trustworthy at boot, when nothing is baked yet and the
-    /// first bots are already walking.
-    /// </summary>
     public static StepMask Mask(Map map, int x, int y, sbyte z)
     {
         var lookup = StepCache.Instance.TryGetMask(map, x, y, z);
 
         if (lookup.IsHit)
         {
-            // Inside the cache's own tolerance, and still wrong.
-            //
-            // A tile is baked at one standing height and served to any query within a step of it. Sound
-            // for the engine, whose search tracks the height it baked; not sound here, because
-            // reachability flips exactly at a step — climbing four units is legal from Z=2 and illegal
-            // from Z=0, and both queries are inside the tolerance. Bots at the graveyard gate were handed
-            // a diagonal onto a Z=3 kerb, believed it, and failed that step for ever. The plan was right,
-            // about a bot standing two units higher than this one.
             if (!ClimbsTooHigh(lookup, z))
             {
                 return lookup;
@@ -109,25 +68,15 @@ public static class BotStep
                 }
             case CacheHitKind.Fallthrough_Multi:
                 {
-                    // A house or a boat covers this tile. Its own cache always has an answer, and that is
-                    // what lets bots walk indoors at all.
                     return MultiMaskCache.Instance.GetMask(map, x, y, z);
                 }
             default:
                 {
-                    // Chunk not built yet, stacked floors, or a query height the bake does not cover. The
-                    // prober built the cache in the first place, so this is the same answer, computed
-                    // rather than remembered.
                     return StepProbe.ComputeMaskAt(map, x, y, z);
                 }
         }
     }
 
-    /// <summary>
-    /// Whether a cached answer offers a climb no bot standing at <paramref name="z"/> could make — the
-    /// symptom of a tile baked from a different height than the one being asked about. Falling any
-    /// distance is legal, so only upward steps are suspect.
-    /// </summary>
     private static bool ClimbsTooHigh(in StepMask mask, sbyte z)
     {
         var walk = mask.WalkMask;
@@ -143,31 +92,6 @@ public static class BotStep
         return false;
     }
 
-    /// <summary>
-    /// Whether an item standing on a tile keeps a bot off it. Mirrors the item half of the engine's own
-    /// obstacle test, with one deliberate exception for doors.
-    ///
-    /// <para>
-    /// <b>Items are not optional, and leaving them out was the single most expensive omission in the
-    /// first version.</b> <see cref="StepCache"/> bakes land and statics. This shard's world is built
-    /// with <c>[Decorate</c> — that is, out of <em>items</em>: the graveyard railing, the headstones, the
-    /// crates. The planner confidently drew straight lines through precisely the fences the whole
-    /// exercise existed for, and the bot then failed the step and abandoned the errand, insisting the
-    /// route was sound.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>A shut door is not a wall</b>, because a bot opens it. Counting one would declare the inside of
-    /// every building in the world unreachable and no bot would enter a bank again. A locked one is a
-    /// wall, because it cannot — and pretending otherwise routes the whole population through the back
-    /// of a shop it has no key to, over and over.
-    /// </para>
-    /// </summary>
-    /// <param name="doorsShut">
-    /// When true, even an unlocked shut door counts as a wall. This is how "is this spot out on the
-    /// street" gets answered — without it, a bot asked for somewhere outdoors is handed a point in
-    /// somebody's pantry.
-    /// </param>
     public static bool BlockedByItems(Map map, int x, int y, sbyte z, bool doorsShut = false)
     {
         var ourTop = z + PersonHeight;
@@ -209,15 +133,6 @@ public static class BotStep
         return false;
     }
 
-    /// <summary>
-    /// Whether one of the two tiles flanking a diagonal is blocked, at the height a bot would land on it.
-    ///
-    /// <para>
-    /// The engine refuses a player a diagonal unless <b>both</b> flanking tiles pass the full test — and
-    /// full includes items. A half version of this rule, checking statics only, meant that every diagonal
-    /// past a headstone failed. In a graveyard made of decorations that is a diagonal every few tiles.
-    /// </para>
-    /// </summary>
     public static bool FlankBlocked(Map map, int x, int y, int dir, in StepMask mask, bool doorsShut = false)
     {
         var fx = x;
@@ -228,14 +143,6 @@ public static class BotStep
         return BlockedByItems(map, fx, fy, mask.GetWalkZ((Direction)dir), doorsShut);
     }
 
-    /// <summary>
-    /// The floor at a point nearest to a height already known to be sensible — the bot's own feet, or the
-    /// terrain.
-    ///
-    /// This and <see cref="LowestGround"/> are the only two ways anything in v2 turns an (x, y) into a
-    /// place a bot can stand, and both are narrow by construction. See <see cref="GroundReach"/> for what
-    /// the wide version cost.
-    /// </summary>
     public static bool Ground(Map map, int x, int y, int nearZ, int tolerance, out sbyte z)
     {
         z = 0;
@@ -274,13 +181,6 @@ public static class BotStep
         return found;
     }
 
-    /// <summary>
-    /// The lowest floor at a point — a building's ground storey, the path under a bridge, the bottom of a
-    /// stairwell.
-    ///
-    /// The fallback for anywhere the terrain height is no guide, and safe in the way a wide search is not:
-    /// <b>a roof is never the lowest thing at a point.</b>
-    /// </summary>
     public static bool LowestGround(Map map, int x, int y, out sbyte z)
     {
         z = 0;
@@ -302,13 +202,6 @@ public static class BotStep
         return true;
     }
 
-    /// <summary>
-    /// The floor a point ought to mean: near the terrain first, and the lowest storey only if that fails.
-    ///
-    /// The one call anything outside this folder should need. Wrapping the order up here is the point —
-    /// the first version's roof bugs were all somebody reaching for the wide search directly because it
-    /// was the one that always answered.
-    /// </summary>
     public static bool Settle(Map map, int x, int y, out sbyte z)
     {
         z = 0;
@@ -319,6 +212,47 @@ public static class BotStep
         }
 
         return Ground(map, x, y, map.GetAverageZ(x, y), GroundReach, out z) || LowestGround(map, x, y, out z);
+    }
+
+    public static bool Wet(Map map, int x, int y)
+    {
+        if (!OnMap(map, x, y))
+        {
+            return false;
+        }
+
+        var land = map.Tiles.GetLandTile(x, y);
+
+        if (!land.Ignored && (TileData.LandTable[land.ID & TileData.MaxLandValue].Flags & TileFlag.Wet) != 0)
+        {
+            return true;
+        }
+
+        foreach (var tile in map.Tiles.GetStaticTiles(x, y))
+        {
+            if ((TileData.ItemTable[tile.ID & TileData.MaxItemValue].Flags & TileFlag.Wet) != 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool Dry(Map map, int x, int y, int reach)
+    {
+        for (var dy = -reach; dy <= reach; dy++)
+        {
+            for (var dx = -reach; dx <= reach; dx++)
+            {
+                if (!OnMap(map, x + dx, y + dy) || Wet(map, x + dx, y + dy))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     public static bool OnMap(Map map, int x, int y) =>

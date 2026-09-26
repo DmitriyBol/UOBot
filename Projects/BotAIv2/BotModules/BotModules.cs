@@ -30,16 +30,8 @@ public static class BotModules
     private static readonly Dictionary<string, BotModule> _byName =
         new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Modules registered, whether or not they are switched on.</summary>
     public static IReadOnlyList<BotModule> All => _all;
 
-    /// <summary>
-    /// Takes a module and reads its switch. Called from the entry point, in any order.
-    ///
-    /// The switch is read here rather than by the module itself for the reason given on
-    /// <see cref="BotModule.Enabled"/>: a module cannot read its own configuration before it has
-    /// started, and asking it to would put the answer behind the question.
-    /// </summary>
     public static void Register(BotModule module)
     {
         if (module == null)
@@ -68,9 +60,6 @@ public static class BotModules
         _byName[module.Name] = module;
     }
 
-    /// <summary>
-    /// Starts everything due in this phase, in dependency order. Returns how many actually started.
-    /// </summary>
     public static int Start(BotPhase phase)
     {
         var due = Ordered(phase);
@@ -95,8 +84,6 @@ public static class BotModules
 
             if (missing != null)
             {
-                // Named on both sides on purpose. "Trade did not start" is a mystery; "Trade needs
-                // Classes, which is not ready" is a sentence somebody can act on.
                 logger.Error(
                     "Module {Name} needs {Missing}, which is not ready; {Name} did not start",
                     module.Name,
@@ -128,23 +115,6 @@ public static class BotModules
         return started;
     }
 
-    /// <summary>
-    /// Puts this phase back to before it ran: every running module in it is reset and marked as needing
-    /// to start again.
-    ///
-    /// <para>
-    /// Both halves are needed and the second is the one that is easy to miss. Resetting alone leaves the
-    /// modules marked ready, and <see cref="Start"/> skips anything already ready — so a world reload
-    /// would have wiped every counter and then started nothing at all, leaving a shard with no
-    /// population and no error to explain it. Clearing readiness is what makes a phase re-runnable.
-    /// </para>
-    ///
-    /// <para>
-    /// Phase-by-phase rather than everything at once, because the phases mean different things. A world
-    /// reload is a second world, not a second process: what was read from a settings file is still true,
-    /// and re-reading it would be work at best and a second set of overrides at worst.
-    /// </para>
-    /// </summary>
     public static void Rewind(BotPhase phase)
     {
         var rewound = 0;
@@ -177,7 +147,6 @@ public static class BotModules
         }
     }
 
-    /// <summary>The first requirement of this module that is not ready, or null if all of them are.</summary>
     private static string Unmet(BotModule module)
     {
         var requires = module.Requires;
@@ -186,8 +155,6 @@ public static class BotModules
         {
             var name = requires[i];
 
-            // An unknown name is unmet as well, and says something different: not "it failed" but "you
-            // are depending on something that does not exist", which is a typo rather than a fault.
             if (!_byName.TryGetValue(name, out var needed) || !needed.Ready)
             {
                 return name;
@@ -197,13 +164,6 @@ public static class BotModules
         return null;
     }
 
-    /// <summary>
-    /// The modules of this phase, each after everything it requires from the same phase.
-    ///
-    /// Only within the phase: a requirement that lives in an earlier phase is already satisfied by the
-    /// phases themselves, and one that lives in a later phase cannot be satisfied at all — which is
-    /// caught by the readiness check rather than by the sort, and reported as what it is.
-    /// </summary>
     private static List<BotModule> Ordered(BotPhase phase)
     {
         List<BotModule> ordered = new(_all.Count);
@@ -235,10 +195,6 @@ public static class BotModules
         {
             if (seen == Visiting)
             {
-                // A ring. Reported and then broken rather than followed, and the consequence is
-                // deliberately mild: the modules in the ring will fail their readiness check in turn and
-                // be refused by name. A cycle is a design mistake, and the useful response to one is a
-                // sentence, not a stack overflow.
                 logger.Error(
                     "Module {Name} is part of a circular dependency; the ring is broken here and the modules in it will not start",
                     module.Name
@@ -264,7 +220,6 @@ public static class BotModules
         ordered.Add(module);
     }
 
-    /// <summary>One line about what is running, for the boot log and for the summary.</summary>
     public static string Describe()
     {
         var running = 0;

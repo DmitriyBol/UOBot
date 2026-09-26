@@ -6,17 +6,17 @@ buys cloth to work with — and whatever the population refused goes back over t
 | File | What is in it |
 |---|---|
 | `BotShops.cs` | where the shopkeepers are, what they sell, what they buy, and both transactions |
-| `BotRestock.cs` | an obligation: go and buy what has run out — off a shelf or off another bot's stall |
-| `BotShopper.cs` | the proposer: who is short of what |
-| `BotPeddle.cs` | an obligation: take what nobody wanted to somebody who will buy it |
+| `BotRestock.cs` | an obligation: go and buy what has run out — off a shelf or off another bot's stall; a guild shelf bought out on arrival sends it on to a shopkeeper |
+| `BotShopper.cs` | the proposer: who is short of what; keeps back `BotPurse.KeepBack` (build 64) |
+| `BotPeddle.cs` | an obligation: take what nobody wanted to somebody who will buy it; a load bought off its stall on the way ends finished, and one the market handed back into the pack on the way is sold from the pack |
 | `BotPeddler.cs` | the proposer: whose stall the population has ignored |
 | `BotShopsConfig.cs` | `Configuration/bot-shops.json` |
 | `BotShopsModule.cs` | module, phase `World`, requires `Classes` and `Will` |
-| `BotBullion.cs` | a crafter with money buys its metal instead of going and digging it |
+| `BotBullion.cs` | a crafter with money buys its metal instead of going and digging it; keeps back `BotPurse.KeepBack` (build 64) |
 | `BotNeeds.cs` | how often a bot reconsiders what it is short of |
-| `BotOrder.cs` | putting an order on the board, and going back for it when somebody has filled it |
-| `BotStores.cs` | a crafter short of the raw material of its trade, putting the order to the population |
-| `BotUpkeep.cs` | asking the population, by name, for a replacement for something that is wearing out |
+| `BotOrder.cs` | putting an order on the board, and going back for it when somebody has filled it; paperwork, taken at the next choice rather than over work in hand (build 50) |
+| `BotStores.cs` | a crafter short of the raw material of its trade, putting the order to the population; keeps back `BotPurse.KeepBack` (build 64) |
+| `BotUpkeep.cs` | asking the population, by name, for a replacement for something that is wearing out; keeps back `BotPurse.KeepBack` (build 64) |
 
 ---
 
@@ -100,6 +100,14 @@ something is hitting it, and the last makes it useful.
 charge and never the preference. That ordering is where a crafter's living comes from: a fighter's gold came off
 a monster, and it goes to a smith rather than out of the world whenever the smith asks less than the shelf.
 
+**Then the guild's own counter, asked the same two questions as a shopkeeper.** A shopkeeper this bot lately failed to
+reach is skipped (its caution is filed under `BotShops.ShopKind` at the counter's place, which is the word
+`BotShops.Nearest` asks in), and so is one the shard's reach ledger has proved there is no way to. The hall's merchant
+came later and was offered on price alone, and `BotRestock.Bend` wrote nothing for it: on 14.09.2026 Edda Ashdown was
+sent to The Needle's counter six times in two seconds, "no way from here", until `BotBreaker` rested the work. The
+merchant route now files the same caution, the hall is passed over on either answer (`BotShopper.HallWalled`), and the
+supply is sought at a shopkeeper instead.
+
 **Who sells what** (read out of `SBInfo`): pickaxe 22 at the blacksmith, miner, tinker and weaponsmith;
 **hatchet 25 at the weaponsmith only** — the narrowest supply on the shard; sewing kit 3 at the tailor and
 tinker; smith hammer 21; scissors 11; mortar 8 at the alchemist and herbalist; pen 8 at the mage and scribe;
@@ -120,6 +128,15 @@ where an errand to the shops belongs.
 
 The one number that does real work there is `Outlay`: the brain measures need against it. A bot that cannot
 afford its own bandages feels short of money, and stops the moment it can.
+
+**Both directions go through the pack, and a pack has a cap on things as well as on weight.** The engine takes a
+bill under two thousand gold out of the backpack and puts a shopkeeper's payment into it, so a pack at
+`Container.GlobalMaxItems` (125 things) with no pile of gold on top can neither pay nor be paid: the coin bounces at
+the counter. Every errand that changes money over a counter says so (`BotDeed.AtCounter`: restocking at a shop,
+sewing, brewing, fletching, inscribing, a scroll bought at a counter, a contract, a guild's batch, peddling), and the
+appraisal refuses it to such a pack before it is weighed (`BotYield.Pocket`); the porter offers that bot the trip that
+makes room instead. Found on 14.09.2026, when one bot jammed that way failed a trip to the shops 8,719 times in half
+an hour.
 
 **Selling: at what the load is actually worth, per minute.** The proposer knows both numbers exactly — how many
 there are and what this shopkeeper pays for one — so a guess would be strictly worse than the truth, and twenty

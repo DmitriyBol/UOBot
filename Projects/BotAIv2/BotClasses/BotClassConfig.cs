@@ -15,7 +15,6 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotClassSettings
 {
-    /// <summary>Overrides by class name. Anything absent keeps the number the code chose.</summary>
     public Dictionary<string, BotClassOverride> Classes { get; set; } = [];
 }
 
@@ -47,14 +46,6 @@ public static class BotClassConfig
         BotClasses.Override(settings.Classes);
     }
 
-    /// <summary>
-    /// Writes a file listing the nine class names with nothing set under any of them.
-    ///
-    /// Discoverable without being a second source of truth, and the distinction matters. A starter file
-    /// restating every default would look authoritative, drift from the code the first time somebody
-    /// edited a class, and then silently win — so the file that ships states only which names exist and
-    /// leaves every number where the code put it.
-    /// </summary>
     private static void WriteStarter(string path)
     {
         var settings = new BotClassSettings();

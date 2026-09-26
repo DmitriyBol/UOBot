@@ -1,19 +1,22 @@
-# Population: the bot, and the beat
+﻿# Population: the bot, and the beat
 
 The object six subsystems were waiting for, and the clock that drives them. **This is the folder from which the
 project first does anything at all.**
 
 | File | What is in it |
 |---|---|
-| `BotMobile.cs` | the bot itself: a `PlayerMobile` that holds the bond, the journey and the resolve, and can take one turn |
+| `BotMobile.cs` | the bot itself: a `PlayerMobile` that holds the bond, the journey and the resolve, and can take one turn; its re-arm wears the best of each place and wields the better weapon of its own kind, keeping the bound one in the pack (build 55), never the same weapon twice within five minutes (build 59) |
 | `BotBeat.cs` | the population's clock: one timer, each bot with its own due time |
 | `BotPopulation.cs` | who exists: purging saved bots, birth, placement, raising the fallen |
 | `BotPopulationConfig.cs` | `Configuration/bot-population.json` — the only configuration file with working values in it |
 | `BotPopulationModule.cs` | module, phase `World`, requires `Classes`, `Movement`, `Will` |
 | `BotHomeward.cs` | walking back to where the population lives, when there is nothing else to do and the bot is a long way from it |
 | `BotGuilds.cs` | which of the four guilds a bot belongs to, by its trade, and what a guildmate is worth |
-| `BotProgress.cs` | what a bot has become, kept across restarts: its skills, its fame, its karma and its savings |
-| `BotPurse.cs` | what a bot keeps in its pocket, and what it puts away the moment it is standing somewhere it can |
+| `BotCharter.cs` | what a guild's maker has charged its band with: a trade to gather at, one to make at, and somewhere to be |
+| `BotRoster.cs` | who a guild's leader may put out and who it may take in, and how often |
+| `BotProgress.cs` | what a bot has become, kept across restarts: its skills, its fame, its karma and its savings; kept by name and class since build 65, so a class-mix edit no longer wipes a bot's levelling |
+| `BotPurse.cs` | what a bot keeps in its pocket, and what it puts away the moment it is standing somewhere it can; `KeepBack`, the one reserve the buying proposers keep (build 64) |
+| `BotTidy.cs` | what a bot carries and wears kept in order on its beat: an unidentified magic weapon or armour identified with Item Identification's check (every bot has it at 100) — off a corpse before it is listed, and in the pack or worn, and the death robe the engine dresses a risen body in cut into bandages with scissors or thrown away (build 98) |
 | `BotReclaim.cs` | going back for what death took |
 | `BotStall.cs` | notices a bot that has stopped getting anywhere, and says so as an error |
 | `BotUnload.cs` | going to the counter when the pack is getting heavy: coin into the account, everything spare onto the market |
@@ -148,6 +151,14 @@ decision layer counts the same price in its own units (`BotYield.DeathMinutes`);
 ---
 
 ## Known rough edges
+
+**A pack is full by count as well as by weight.** The porter sends a bot to the counter when its pack is heavy, rich,
+wanted, worth losing or hoarding — and, since 14.09.2026, when it has no room for a coin (`BotYield.Pocket`). A pack at
+the engine's cap of 125 things cannot pay or be paid at a counter, so every trade that does either is refused to it,
+and the trip is offered unpaid, as it is to a bot too heavy to walk. Loot, spoils and deliveries off the board still
+go into a pack without asking it, which is how a pack gets there. The `Will:` line counts the refusals and the offers
+of the trip; both are counted once a review while the state lasts, so they measure how long it lasted, not how many
+bots were in it.
 
 **Nobody musters a squad.** `BotSquads.Form` is still called by nothing, so formation, scouting and sharing are
 written and do not run. That is the next proposer, not a defect.

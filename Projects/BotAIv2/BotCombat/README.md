@@ -11,10 +11,12 @@ needed reworking.
 | `BotArms.cs` | whether a bot has anything in its hands, asked at the moment it matters |
 | `BotBolt.cs` | getting away from whatever is killing it |
 | `BotCry.cs` | somebody of ours is being killed and has said so out loud |
-| `BotFugitive.cs` | offers a bot whose health is going the one thing that was missing from that rung: leaving |
-| `BotPeril.cs` | where the shard is dangerous, learned from the only two facts that actually say so: where bots are being hit, and where they are dying |
+| `BotFugitive.cs` | offers a bot whose health is going the one thing that was missing from that rung: leaving; not again for a few seconds after getting clear unless something hits it (`CalmMs`) |
+| `BotPeril.cs` | where the shard is dangerous, learned from the only two facts that actually say so: where bots are being hit, and where they are dying; two deaths lately keep ordinary work out (`Lethal`), three close the ground to everything but flight (`Closes`; four until build 65), each fading by half in forty minutes (twenty until build 65); `Tell` answers Argus's `peril` (build 50) |
 | `BotRescue.cs` | going to somebody's aid, or hitting back at whatever is hitting you |
-| `BotRescuer.cs` | offers a free bot the chance to go to somebody's aid |
+| `BotRescuer.cs` | offers a free bot the chance to go to somebody's aid; and `BotDefender`, hitting back at whatever is hitting a bot — never offered when the work in hand is already fighting that creature (`BotDeed.Foe`), nor when the odds round the bot already call the fight off (`Outnumbered`, build 51) |
+| `BotBrawl.cs` | one bot fighting another as a piece of work — a duel, a robbery, a manhunt, a defence — pressed on the bot rather than won at auction; the caller's rule says when it is over; counted on the first beat, not in the constructor (build 69, 72) |
+| `BotDuel.cs` | a pair of brawls with one rule between them: over when one is down, yields at a share of health or the clock runs out; both are disarmed when it is decided; `Between` makes a duel no crime (build 69) |
 
 No configuration file: the only dial is `Tolerance`, and it lives in code for now. When there is a second one
 there will be a file.
@@ -93,6 +95,21 @@ them one at a time. A caster strikes from eight tiles and **never enters contact
 survival ladder ever fired — every one of them tested for contact.
 
 **Standing still is not allowed at any numbers.** Either fight or walk.
+
+## Who reads the danger map
+
+`BotPeril` is written from `OnDamage` and `OnDeath` and decays on a twenty-minute half-life. Until 14.09.2026 it was
+read by captains choosing where to sweep, by the Baron choosing ground to harrow, and by the hunters' tie-break — and
+not by the auction, whose only caution was each bot's own ledger, keyed by trade and remembering disappointment rather
+than harm. That evening a field north-east of Britain filled with plague beasts and their spawn after a revel sent
+companies into it, and twenty-eight bots died there in twenty minutes on offers to unload, sell, cook, mine and fetch
+their own corpses that all read "safe 1.00".
+
+So the dead are now kept apart from the blows, faded on the same half-life, and `BotPeril.Lethal` sums them over a
+destination's square and the eight around it. `BotAppraisal` refuses work there at `KeepOutDeaths` (two), unless the
+work goes where the fighting is on purpose or is a call from outside. Blows alone do not count: a hunting ground reads
+high on them without anybody dying. Work in the square the bot already stands in is left alone, and running away is
+never refused. The table is not saved, so a restart forgets the field until two more bots die in it.
 
 ## What is not here yet
 

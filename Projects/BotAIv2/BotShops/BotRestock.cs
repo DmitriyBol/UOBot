@@ -22,27 +22,27 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotRestock : BotDeed
 {
-    /// <summary>The ledger's key. A kind of work, not one shop or one thing.</summary>
     public const string Trade = "restock";
 
-    /// <summary>
-    /// What an errand to the shops is reckoned at before experience corrects it. Low on purpose: it produces
-    /// nothing, and the only reason to do it is that something has run out.
-    /// </summary>
     public static double Prior { get; set; } = 12.0;
 
-    /// <summary>How long the errand itself is expected to take once the bot is there.</summary>
     public static double WorkMinutes { get; set; } = 2.0;
 
-    private readonly BaseVendor _shop;
+    private BaseVendor _shop;
 
-    private readonly BotListing _stall;
+    private int _repicks;
+
+    private BotListing _stall;
 
     private readonly Type _wanted;
 
     private readonly int _amount;
 
-    private readonly int _price;
+    private int _price;
+
+    public static long FellThrough { get; private set; }
+
+    public static long Restalled { get; private set; }
 
     private int _bought;
 
@@ -56,21 +56,6 @@ public sealed class BotRestock : BotDeed
         _price = Math.Max(1, price);
     }
 
-    /// <summary>
-    /// The same errand, off another bot's stall instead of a shelf.
-    ///
-    /// <para>
-    /// <b>This is where a crafter's living comes from.</b> A blade breaks in somebody's ribs and the bot needs
-    /// another; if a smith has one out cheaper than the shopkeeper, the fighter's gold — which came off a
-    /// monster — goes to the smith instead of out of the world. Same undertaking, because it is the same
-    /// errand: the only difference is whose counter it is, and a bot has no reason to care.
-    /// </para>
-    ///
-    /// <para>
-    /// And it needs no walk. The market holds its goods out of the world, so buying from a stall happens from
-    /// wherever the bot is standing.
-    /// </para>
-    /// </summary>
     public BotRestock(BotListing stall, Type wanted, int amount, Map map, Point3D where)
     {
         _stall = stall;
@@ -81,24 +66,6 @@ public sealed class BotRestock : BotDeed
         _where = where;
     }
 
-    /// <summary>
-    /// The same errand again, at the bot's own guild's counter.
-    ///
-    /// <para>
-    /// <b>The third place a bandage can come from, and the reason the hall was worth building.</b> A stall
-    /// needs no walk, a shopkeeper needs a walk to Britain, and this needs a walk across the guild's own
-    /// yard — so it sits between them and it is where the errand lands whenever the guild has thought to
-    /// stock the thing. The gold has already left the world, at the town counter, when the guild bought it;
-    /// what changes hands here is one member paying its own guild, which is coin staying in the population.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>What is bought is the lot, not the count, and the lot is looked up on arrival rather than held.</b>
-    /// A shelf sells packets — twenty bandages tied together — and somebody else may have taken the packet
-    /// while this bot was walking. Carrying the merchant and the kind instead of the item means the errand
-    /// takes whatever the shelf has when it gets there, and only fails when the shelf is bare.
-    /// </para>
-    /// </summary>
     public BotRestock(PlayerVendor merchant, Type wanted, int amount, int price)
     {
         _merchant = merchant;
@@ -107,7 +74,7 @@ public sealed class BotRestock : BotDeed
         _price = Math.Max(1, price);
     }
 
-    private readonly PlayerVendor _merchant;
+    private PlayerVendor _merchant;
 
     private readonly Map _map;
 
@@ -119,39 +86,37 @@ public sealed class BotRestock : BotDeed
 
     public override Point3D Where => _shop?.Location ?? _merchant?.Location ?? _where;
 
-    public override double Expects => Prior;
+    public double? Claim { get; set; }
+
+    public static double Spare { get; set; } = 180.0;
+
+    public override double Expects => Claim ?? Prior;
 
     public override double Minutes => WorkMinutes;
 
-    /// <summary>Nothing. Handing coin over a counter teaches a bot nothing at all.</summary>
     public override SkillName? Trains => null;
 
-    /// <summary>What it will cost. The one number the decision layer measures need against.</summary>
     public override int Outlay => _amount * _price;
 
-    /// <summary>Not a penny comes back. This is the spending half of a living.</summary>
+    public override bool AtCounter => _shop != null;
+
     public override double Coin => 0.0;
 
-    /// <summary>Goods are worth what they cost, so the errand comes out at about nothing rather than a loss.</summary>
+    public override bool Unpaid => true;
+
     public override int Made => _paid;
 
     public override string Stage => _bought > 0 ? $"bought {_bought} {_wanted?.Name}" : $"after {_amount} {_wanted?.Name}";
 
-    /// <summary>
-    /// The way to the shopkeeper turned out not to exist.
-    ///
-    /// <para>
-    /// <b>Nothing to bend to here, and something to write down — and it was the writing down that was
-    /// missing.</b> What this undertaking carries was priced against <em>this</em> shopkeeper, so swapping in
-    /// another one mid-errand would carry a stale price; failing is the honest answer. But the failure has to
-    /// be filed under the <em>place's</em> name, because that is the word the shop lookup asks in. Filed under
-    /// the undertaking's name — which is all <c>BotWill.Settle</c> can do — it is written and never read, and
-    /// the next beat picks the same unreachable shopkeeper on distance alone. Calla walked at Gus thirty-one
-    /// times in an hour on 26.08.2026 that way.
-    /// </para>
-    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
+        if (_merchant != null)
+        {
+            bot?.Resolve?.Ledger?.Beware(BotShops.ShopKind, _merchant.Map, _merchant.Location);
+
+            return false;
+        }
+
         if (_shop == null)
         {
             return false;
@@ -175,7 +140,15 @@ public sealed class BotRestock : BotDeed
         {
             if (_stall.IsEmpty)
             {
-                return BotDoing.Failed("that stall is empty now");
+                var next = BotAuction.Cheapest(_wanted, bot);
+
+                if (next == null || next.IsEmpty || ReferenceEquals(next, _stall))
+                {
+                    return BotDoing.Failed("that stall is empty now");
+                }
+
+                _stall = next;
+                Restalled++;
             }
 
             var price = _stall.Price;
@@ -213,6 +186,24 @@ public sealed class BotRestock : BotDeed
 
             if (lot == null)
             {
+                var next = BotShops.Nearest(bot, _wanted);
+
+                if (next != null)
+                {
+                    FellThrough++;
+
+                    _merchant = null;
+                    _shop = next;
+                    _price = Math.Max(1, BotShops.Price(next, _wanted));
+
+                    return BotDoing.Walk(
+                        _shop.Map,
+                        _shop,
+                        BotArrival.Within(BotShops.CounterReach),
+                        $"on to {_shop.Name} for {_wanted?.Name}"
+                    );
+                }
+
                 return BotDoing.Failed($"the guild's shelf has no {_wanted?.Name} left on it");
             }
 
@@ -237,8 +228,6 @@ public sealed class BotRestock : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
-            // The distance the work itself asks for, on the line above. See BotArrival.Beside.
-            // Followed rather than aimed at: a shopkeeper wanders. See BotPeddle for the whole reason.
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name}");
         }
 
@@ -246,19 +235,21 @@ public sealed class BotRestock : BotDeed
 
         if (_bought <= 0)
         {
-            // Standing at the counter with nothing to show for it: sold out, priced out, or refused. All
-            // three are the shop's business rather than the bot's — but which of the three it was is this
-            // log's business, and lumping them cost a night. See the note on the overload above.
+            var next = BotShops.Next(bot, _shop, _wanted, ref _repicks);
+
+            if (next != null)
+            {
+                _shop = next;
+                _price = Math.Max(1, BotShops.Price(next, _wanted));
+
+                return BotDoing.Walk(next.Map, next, BotArrival.Within(BotShops.CounterReach), $"on to {next.Name} for {_wanted?.Name}");
+            }
+
             return BotDoing.Failed(refused ?? "the shop would not sell it");
         }
 
         _paid = _bought * _price;
 
-        // Straight on, if it is something to wear or wield.
-        //
-        // <b>The same hole death opened, dug by shopping.</b> A blade wears through and is bought again — and
-        // the new one lands in the pack, where the old one never was. Without this a bot walks out of the shop
-        // it just spent its takings in and goes back to fighting with its fists, carrying the sword.
         (bot as BotMobile)?.Rearm();
 
         return BotDoing.Done($"{_bought} {_wanted?.Name} for {_paid}gp");

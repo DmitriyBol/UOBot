@@ -8,10 +8,10 @@ One bot on this shard exists for the others rather than for itself.
 | `../BotCombat/BotPeril.cs` | where the island is dangerous, learned from blows and deaths |
 | `../BotSquad/BotPatrol.cs` | the offer only a captain ever gets: a company and the worst square on the map |
 | `../BotSquad/BotSweep.cs` | the patrol itself — march, hold, clear, come home |
-| `BotSchool.cs` | the training field: the block, the roster, the fee and the formula |
+| `BotSchool.cs` | the training field: the block, the roster, the fee and the formula; places spoken for by students on their way (`Promise`); ten students a class and twelve minutes' rest between lessons since build 64 |
 | `BotDrill.cs` | two proposers — the captain offering a class, and a student offering itself a place |
-| `BotLesson.cs` | the captain's half: open the field, close the roll, pace the ranks |
-| `BotAttend.cs` | the student's half: pay, take your place, keep it |
+| `BotLesson.cs` | the captain's half: open the field, close the roll, pace the ranks; a post of the ring with no road is walked past, not the end of the class |
+| `BotAttend.cs` | the student's half: speak for a place when chosen, pay, take your place, keep it; a station with no road is given up for where it stands |
 | `BotArmourer.cs` | the first demand for armour this shard has ever had |
 | `BotDrillModule.cs` | module and `Configuration/bot-drill.json` |
 

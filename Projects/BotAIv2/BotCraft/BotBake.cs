@@ -30,42 +30,18 @@ public sealed class BotBake : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBake));
 
-    /// <summary>How many suppers a cook keeps on itself rather than selling. One, and one is enough: the
-    /// eater's rule is one meal per ten minutes, so a second is a stall's worth of stock in a pocket.</summary>
     public static int Keeps { get; set; } = 1;
 
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "cook";
 
-    /// <summary>What a turn at the skillet is reckoned at before the ledger knows better.</summary>
     public static double Prior { get; set; } = 70.0;
 
-    /// <summary>How long one is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 2.0;
 
-    /// <summary>How often the skillet comes round.</summary>
     public static int SwingMs { get; set; } = 3000;
 
-    /// <summary>How long the meat may sit unchanged before the round is given up. Eight swings' worth.</summary>
     public static int StallMs { get; set; } = SwingMs * 8;
 
-    /// <summary>
-    /// How long to wait for the pan after the last of the meat goes in.
-    ///
-    /// <para>
-    /// <b>The last swing takes the meat before it gives back the meal.</b> <c>CraftItem.Craft</c> ends by
-    /// starting a timer, so there is a second in which the pack holds neither — and a round that finishes the
-    /// moment the meat runs out finishes inside exactly that second. It then reports, truthfully as far as it
-    /// can see, that nothing came of it. On 05.09.2026 that was 37 rounds ending "the meat is gone" against
-    /// 26 that cooked something, and the 26 were only the ones where an earlier swing had already landed.
-    /// </para>
-    ///
-    /// <para>
-    /// The same fault the alchemist had, one step along: there it was the count taken after the swing instead
-    /// of before the next one, here it is the <em>exit</em> taken between the two. One swing's worth of
-    /// patience is enough, because that is what the engine's own timer is measured against.
-    /// </para>
-    /// </summary>
     public static int SettleMs { get; set; } = SwingMs;
 
     private enum Leg
@@ -98,7 +74,6 @@ public sealed class BotBake : BotDeed
 
     private long _swungTick;
 
-    /// <summary>Meat left at the last look. Minus one, which no amount can equal — see BotSew.</summary>
     private int _lastLeft = -1;
 
     private long _stirTick;
@@ -116,6 +91,16 @@ public sealed class BotBake : BotDeed
 
     public override string Kind => Trade;
 
+    public override bool Steadfast => true;
+
+    public override void Resumed(IBotWilful bot)
+    {
+        _swung = false;
+        _stirTick = Core.TickCount;
+        _lastLeft = -1;
+        _counting = false;
+    }
+
     public override Map Map => _map;
 
     public override Point3D Where => _where;
@@ -126,10 +111,8 @@ public sealed class BotBake : BotDeed
 
     public override SkillName? Trains => BotOven.Skill;
 
-    /// <summary>The meat was already in the pack. Nothing is bought to do this.</summary>
     public override int Outlay => 0;
 
-    /// <summary>Nothing here is coin. Suppers are goods, and what one is worth is what the market pays.</summary>
     public override double Coin => 0.0;
 
     public override int Made => _cooked * BotOven.Worth;
@@ -164,13 +147,10 @@ public sealed class BotBake : BotDeed
 
         if (!_counting)
         {
-            // Seeded rather than started from nought: a cook may already be carrying supper, and counting
-            // that as made would price the round at what it did not do.
             _counting = true;
             _had = BotCraftwork.Made(body, _meal);
         }
 
-        // What the last swing produced, counted before the next one is made. See the note at the top.
         var have = BotCraftwork.Made(body, _meal);
 
         if (have > _had)
@@ -183,7 +163,6 @@ public sealed class BotBake : BotDeed
 
         if (left <= 0)
         {
-            // Not yet: the meal from the last swing may still be in the engine's timer. See SettleMs.
             if (_swung && Core.TickCount - _swungTick < SettleMs)
             {
                 return BotDoing.Work("waiting for the pan");
@@ -198,10 +177,6 @@ public sealed class BotBake : BotDeed
             _stirTick = Core.TickCount;
         }
 
-        // <b>The skillet stopped moving and the engine will not say why.</b> A craft refused by an action
-        // lock, a tool worn through mid-round, a stack the engine declines to consume — all three look
-        // identical from here, which is silence with meat still in the pack. The named give-up is the only
-        // thing standing between that and a bot swinging at nothing until the shard restarts.
         if (Core.TickCount - _stirTick >= StallMs)
         {
             logger.Information(
@@ -230,16 +205,6 @@ public sealed class BotBake : BotDeed
         return BotDoing.Work("cooking");
     }
 
-    /// <summary>
-    /// To the fire, and the arrival is judged by the engine and not by the distance.
-    ///
-    /// <para>
-    /// Standing on the remembered hearth with the engine still refusing is the end of the road for that
-    /// hearth, and it is written down under the place's name so the next choice is a different fire rather
-    /// than this one again — the ruling <c>BotForge.Walking</c> arrived at after a smith answered the same
-    /// unusable walk order for ever. See <c>BotGround.HearthKind</c>.
-    /// </para>
-    /// </summary>
     private BotDoing Walking(IBotWilful bot, Mobile body)
     {
         if (BotOven.AtAHearth(body))
@@ -261,13 +226,12 @@ public sealed class BotBake : BotDeed
         return BotDoing.Walk(_map, _where, BotArrival.Beside, "to a fire");
     }
 
-    /// <summary>This fire is no use to this bot. Kept off its list for a while — see BotLedger.Beware.</summary>
-    private void Refuse(IBotWilful bot) => bot?.Resolve?.Ledger?.Beware(BotGround.HearthKind, _map, _where);
+    private void Refuse(IBotWilful bot)
+    {
+        bot?.Resolve?.Ledger?.Beware(BotGround.HearthKind, _map, _where);
+        BotGround.Cold(_map, _where);
+    }
 
-    /// <summary>
-    /// The way to the fire turned out not to exist. Nothing to bend to — the nearest is the nearest — but
-    /// the refusal is filed under the place so the next choice is a different fire.
-    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
         Refuse(bot);
@@ -275,23 +239,12 @@ public sealed class BotBake : BotDeed
         return false;
     }
 
-    /// <summary>
-    /// Puts the suppers where they belong: whatever the bot keeps for itself stays, the rest goes out.
-    ///
-    /// <para>
-    /// Listing needs no counter — a stall holds its goods out of the world — so a cook that has finished in a
-    /// field has finished, rather than owing a walk. The eater's side is a condition on the bot's own beat;
-    /// see <c>BotMeal</c>.
-    /// </para>
-    /// </summary>
     private BotDoing Finish(IBotWilful bot, Mobile body, string why)
     {
         _served = true;
 
         if (_cooked <= 0)
         {
-            // The attempts were real and the skill checks happened. Finished rather than failed: what it
-            // cost is what learning a trade costs.
             return BotDoing.Done($"{_swings} swings, nothing came of it — {why}");
         }
 
@@ -301,13 +254,8 @@ public sealed class BotBake : BotDeed
 
         if (pack != null)
         {
-            // The same gatherer every craft here sells through, so a partial stack and a full one are
-            // handled the one way.
             List<Item> made = BotCraftwork.Gather(body, _meal);
 
-            // One supper kept back, because the whole point of the trade is that somebody eats. Split off
-            // the same way the brewer keeps its own draughts — LiftItemDupe or nothing, never a sale of the
-            // bot's own supplies through a failed split.
             var keep = Keeps;
 
             for (var i = 0; i < made.Count; i++)
@@ -362,7 +310,6 @@ public sealed class BotBake : BotDeed
 
     private static bool _said;
 
-    /// <summary>Said once. The first supper cooked on this shard is worth a line and the thousandth is not.</summary>
     private static void Once(Mobile body, Type meal)
     {
         if (_said)

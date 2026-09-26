@@ -15,27 +15,19 @@ namespace Server.BotAI.V2;
 /// </summary>
 public enum BotPotionKind
 {
-    /// <summary>Closes wounds. The only healing available to a bot in contact with something.</summary>
     Heal,
 
-    /// <summary>Ends a poison, which otherwise outlasts several rounds of bandaging.</summary>
     Cure,
 
-    /// <summary>Stamina back, which is what a bot that cannot take another step is short of.</summary>
     Refresh,
 
-    /// <summary>Mana back. This project's own item — see the remarks on the type.</summary>
     Mana,
 
-    /// <summary>Strength for a while.</summary>
     Strength,
 
-    /// <summary>Dexterity for a while.</summary>
     Agility,
 
-    /// <summary>A weapon, not a supply: poison goes on a blade or down somebody else's throat.</summary>
     Poison,
 
-    /// <summary>The other weapon. Thrown, and the only ranged option a non-caster can brew.</summary>
     Explosion
 }

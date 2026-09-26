@@ -22,44 +22,24 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotHirer : IBotProposer
 {
-    /// <summary>How long a claim lasts after the bot holding it was last heard from.</summary>
     public static int ClaimMs { get; set; } = 240000;
 
-    /// <summary>Merchants offered.</summary>
     public static long Offered { get; private set; }
 
-    /// <summary>Times a guild wanted one and could not pay.</summary>
     public static long Wanting { get; private set; }
 
-    /// <summary>
-    /// And how short the last such guild was.
-    ///
-    /// <para>
-    /// <b>A refusal for want of money that does not say how much money is half an instrument.</b> The
-    /// steward's line has always said "The Hammer has 443 of 5000 and is 4557 short", and reading it takes a
-    /// second; this one said "held off 349 times for want of the money" and left the reader to guess whether
-    /// the guild was fifty gold short or a thousand — the difference between a dial to move and an hour to
-    /// wait. That is this project's most-repeated defect in its mildest form, and it is one line.
-    /// </para>
-    /// </summary>
     public static int Short { get; private set; }
 
-    /// <summary>What the guild nearest to affording one actually had, so the pair can be read together.</summary>
     public static int Nearest { get; private set; }
 
-    /// <summary>Times nobody within reach sells a contract of employment.</summary>
     public static long Unsold { get; private set; }
 
-    /// <summary>Times the hall already had all the merchants it is allowed. The good answer.</summary>
     public static long Staffed { get; private set; }
 
-    /// <summary>Times the guild was still fitting out its workshop, which comes first.</summary>
     public static long Fitting { get; private set; }
 
-    /// <summary>Times another member was already away fetching one.</summary>
     public static long Claimed { get; private set; }
 
-    /// <summary>This officer's name in the shared register of who is on what. See <see cref="BotOffice"/>.</summary>
     public const string Office = "hirer";
 
     public string Name => "hirer";
@@ -78,6 +58,11 @@ public sealed class BotHirer : IBotProposer
             return null;
         }
 
+        if (BotUnderworld.Band(guild))
+        {
+            return null;
+        }
+
         var hall = BotEstate.Hall(guild);
 
         if (hall is not { Deleted: false } || hall.Map != body.Map)
@@ -92,8 +77,6 @@ public sealed class BotHirer : IBotProposer
             return null;
         }
 
-        // The tools first. A guild that has not finished fitting out its workshop has better uses for the
-        // money than a shopkeeper to sell what it cannot yet make.
         if (BotFittings.Wanting(hall, guild, out _))
         {
             Fitting++;
@@ -149,13 +132,10 @@ public sealed class BotHirer : IBotProposer
         return new BotHire(guild, hall, shop, price);
     }
 
-    /// <summary>The errand is alive and still on it. Called every beat by <c>BotHire.Advance</c>.</summary>
     public static void Hold(Guild guild) => BotOffice.Hold(Office, guild, ClaimMs);
 
-    /// <summary>The errand is over, however it went.</summary>
     public static void Release(Guild guild) => BotOffice.Release(Office, guild);
 
-    /// <summary>Part of the estate's line.</summary>
     public static string Describe() =>
         $"the hirer offered a merchant {Offered} times, held off {Wanting} times for want of the money"
         + (Wanting > 0 ? $" (the best-off guild that wanted one had {Nearest}gp free and was {Short} short)" : "")

@@ -11,14 +11,14 @@ A standing company: a leader, a few followers, a formation, scouting, and dividi
 | File | What is in it |
 |---|---|
 | `BotSquad.cs` | the squad itself: members, leader, focus, three states, anchor and axis |
-| `BotSquads.cs` | the registry: forming, joining, leaving, disbanding, its own beat once a second |
+| `BotSquads.cs` | the registry: forming, joining, leaving, disbanding, its own beat once a second; `Join` refuses a bot more than `JoinReach` from the leader, because the dungeons share the island's facet, and `Reaches` is that question for anything that sends a bot to a company (build 49) |
 | `BotFormation.cs` | where each one stands — derived, not assigned |
 | `BotScatter.cs` | scouting: knots of 2–3 ten tiles apart |
 | `BotSpoils.cs` | dividing by worth, gold by sum |
 | `BotSquadMember.cs` | what a squad needs from a bot. Four things |
 | `BotSquadConfig.cs` | `Configuration/bot-squad.json` — numbers only |
 | `BotSquadModule.cs` | module, phase `World`, requires `Classes` |
-| `BotEnlist.cs` | falling in with a company that is already fighting, rather than starting a fight of your own beside it |
+| `BotEnlist.cs` | falling in with a company that is already fighting, rather than starting a fight of your own beside it; not offered a company whose leader stands too far off for the door (build 49) |
 | `BotPatrol.cs` | offers a captain the worst square on the island and a company to take there |
 | `BotSweep.cs` | a company called together for a place rather than for a creature, and kept together until the place stops killing people |
 
@@ -50,6 +50,13 @@ desynchronisation, no orphaned assignments, no message queue.
 
 The only things that remain messages are the things that are **events**: "I am being hit" (`BotSquads.Note`) and
 "get off this tile" (`IBotAside`).
+
+**A station is written where the bot's own walk is kept, and leaving gives nothing back.** Stationing rebases the
+bottom of the member's road (`BotJourney.Rebase`) — the same slot `BotWill` keeps the bot's own work in — so there is no
+errand underneath to fall back to when the company lets the bot go. Its last station stays there: a "sweep" one tile
+away reads as arrived on every beat, and on 14.09.2026 Kestrel, Lorcan and Cassia each stood four minutes on one after
+their companies were done with them. `BotWill` now sends a bot's own walk again whenever the bottom of the road is no
+longer that walk (`BotWill.Resent`).
 
 ## No state is "stand and wait"
 

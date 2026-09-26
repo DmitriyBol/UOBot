@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using Server.Guilds;
 using Server.Gumps;
 using Server.Items;
 using Server.Logging;
@@ -46,7 +47,6 @@ public sealed class BotDashboardGump : DynamicGump
 
     private const int Height = 560;
 
-    /// <summary>How many rows a page holds. Twelve fits the height without a scrollbar.</summary>
     private const int Rows = 12;
 
     private const int RowHeight = 26;
@@ -59,6 +59,12 @@ public sealed class BotDashboardGump : DynamicGump
 
     private const int Bad = 0x21;
 
+    private const int Gold = 0x35;
+
+    private const int Red = 0x26;
+
+    private const int Offline = 0x3B2;
+
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDashboardGump));
 
     private const int BotsTab = 0;
@@ -67,79 +73,21 @@ public sealed class BotDashboardGump : DynamicGump
 
     private const int NeedsTab = 2;
 
-    /// <summary>
-    /// The city: the one tab that does something to the world rather than reporting on it.
-    ///
-    /// <para>
-    /// Everything else here is a window. This is a lever, and it is on a dashboard whose command is
-    /// registered at <c>AccessLevel.Administrator</c> and whose responses check the same again — because a
-    /// gump reply is a packet and a packet can be sent by anybody who has ever seen the window.
-    /// </para>
-    /// </summary>
     private const int CrownTab = 3;
 
-    /// <summary>
-    /// What the population knows, as opposed to what any one bot knows.
-    ///
-    /// <para>
-    /// <b>The one tab that is about the shard's memory rather than its state.</b> Everything on the other
-    /// four is a photograph — who is alive, what is on a stall, what somebody is short of, what the city
-    /// wants — and all of it is true only for the second it was drawn. This is the opposite: what the island
-    /// has taught thirty-three bots between them, decaying on its own clock, and it is the page to read when
-    /// the question is "why is everybody suddenly doing that".
-    /// </para>
-    /// </summary>
     private const int KnownTab = 4;
 
-    /// <summary>
-    /// The island itself: every quadrant the population has an opinion about, worst ground first.
-    ///
-    /// <para>
-    /// <b>The one tab that is about the world rather than about the bots.</b> Everything else here reports on
-    /// what the population is doing; this reports on what it has found out about where it lives, which is the
-    /// page to read when deciding where anybody should be sent. Sorted worst first because a list of safe
-    /// ground is a list nobody acts on, and beside each dire square is whether the Baron has actually gone
-    /// there — the one column that says whether the map is being used or merely kept.
-    /// </para>
-    /// </summary>
     private const int QuadTab = 5;
 
-    /// <summary>
-    /// What the watcher has declared, and where it is.
-    ///
-    /// <para>
-    /// <b>The one tab about something that was nobody's plan.</b> Argus reads the shard, forms an opinion
-    /// and turns it into a revel — a trade made worth three times as much for twelve minutes, sometimes with
-    /// an orc camp raised to go with it. None of that is visible from the other five tabs: the population
-    /// simply starts mining, and the reason is a sentence in a log file. This is that sentence, with the
-    /// clock beside it and a button that puts whoever is reading it on the spot.
-    /// </para>
-    ///
-    /// <para>
-    /// Read through <see cref="BotCrier"/> rather than from the watcher itself, because the watcher lives in
-    /// an assembly that references this one and must never be referenced back.
-    /// </para>
-    /// </summary>
     private const int RevelTab = 6;
 
-    /// <summary>
-    /// What the population owns: the guild halls, where they stand and what is in them.
-    ///
-    /// <para>
-    /// <b>The only tab about something permanent.</b> Everything else here is gone by the next restart — the
-    /// bots, their purses, their errands, the market. A hall is a world object: it outlives the population
-    /// that levied for it, is found again at the next start by the name on its sign, and stays on the island
-    /// until somebody takes it down. That is worth a page which says where each one is and puts whoever is
-    /// reading it on the doorstep.
-    /// </para>
-    ///
-    /// <para>
-    /// The half of the page that is easy to miss is the lower half: the guilds that have <em>no</em> hall,
-    /// with what they have raised against what one costs. A shard where nothing is ever built looks the same
-    /// from every other tab, and the answer is always one of two numbers — the money, or the ground.
-    /// </para>
-    /// </summary>
     private const int HallTab = 7;
+
+    private const int ClaimTab = 8;
+
+    private const int GuildTab = 9;
+
+    private const int BandTab = 10;
 
     private readonly int _tab;
 
@@ -147,28 +95,22 @@ public sealed class BotDashboardGump : DynamicGump
 
     private readonly int _pages;
 
-    /// <summary>
-    /// The exact rows this window is showing.
-    ///
-    /// Snapshotted in the constructor rather than read again while drawing or answering, and that is not
-    /// tidiness: bots take turns and the market moves between the moment a window is sent and the moment a
-    /// button on it comes back. A row that means one thing on screen and another in the response handler is
-    /// how an admin tool teleports somebody to the wrong bot.
-    /// </summary>
     private readonly List<BotMobile> _bots = [];
 
     private readonly List<BotListing> _stalls = [];
 
     private readonly List<BotWant> _wants = [];
 
-    /// <summary>The halls this window is showing, snapshotted like every other row on it.</summary>
     private readonly List<BaseHouse> _estate = [];
+
+    private readonly List<(Map Map, Point3D Where, string What)> _spots = [];
 
     public override bool Singleton => true;
 
     private BotDashboardGump(int tab, int page) : base(30, 30)
     {
         _tab = tab is MarketTab or NeedsTab or CrownTab or KnownTab or QuadTab or RevelTab or HallTab
+            or ClaimTab or GuildTab or BandTab
             ? tab
             : BotsTab;
 
@@ -196,14 +138,47 @@ public sealed class BotDashboardGump : DynamicGump
             return;
         }
 
-        // <b>The quadrant tab's visit list is the rangers, not the population, and that is not a shortcut.</b>
-        // Visit reads _bots by row, and Fill only ever puts the *current page* into it — so a button numbered
-        // from the whole population would point at whoever happens to be twelfth on this page, or at nothing
-        // at all. One list, filled with exactly the bots this page offers to walk to.
-        if (_tab is QuadTab or RevelTab)
+        if (_tab is QuadTab or RevelTab or ClaimTab or GuildTab)
         {
             _pages = 1;
             _page = 0;
+
+            if (_tab == ClaimTab)
+            {
+                foreach (var bid in BotClaim.Bids)
+                {
+                    if (_spots.Count >= 5)
+                    {
+                        break;
+                    }
+
+                    _spots.Add((bid.Map, bid.Middle, $"{BotClaim.Short(bid.Guild)} is claiming this square"));
+                }
+
+                while (_spots.Count < 5)
+                {
+                    _spots.Add((null, Point3D.Zero, null));
+                }
+
+                foreach (var (key, guild, _) in BotClaim.Owned())
+                {
+                    if (_spots.Count >= 5 + Rows - 2)
+                    {
+                        break;
+                    }
+
+                    var middle = BotClaim.Middle(
+                        BotPopulation.Home,
+                        new Point3D(
+                            key.X * BotQuad.Side + BotQuad.Side / 2,
+                            key.Y * BotQuad.Side + BotQuad.Side / 2,
+                            0
+                        )
+                    );
+
+                    _spots.Add((BotPopulation.Home, middle, $"{BotClaim.Short(guild)} holds this square"));
+                }
+            }
 
             return;
         }
@@ -238,21 +213,22 @@ public sealed class BotDashboardGump : DynamicGump
         builder.AddBackground(0, 0, Width, Height, 5054);
         builder.AddAlphaRegion(8, 8, Width - 16, Height - 16);
 
-        builder.AddLabel(14, 12, Head, "BotAI v2 — dashboard");
+        builder.AddLabelCropped(14, 12, 1070, 20, Head, "BotAI v2 — dashboard");
 
-        // Tabs. The one being shown is drawn as a label rather than a button, so the window always says which
-        // of the two it is.
-        Tab(ref builder, 300, "Bots", BotsTab);
-        Tab(ref builder, 390, "Market", MarketTab);
-        Tab(ref builder, 490, "Needs", NeedsTab);
-        Tab(ref builder, 580, "City", CrownTab);
-        Tab(ref builder, 660, "Known", KnownTab);
-        Tab(ref builder, 750, "Quad", QuadTab);
-        Tab(ref builder, 830, "Revel", RevelTab);
-        Tab(ref builder, 910, "Halls", HallTab);
+        Tab(ref builder, 250, "Bots", BotsTab);
+        Tab(ref builder, 335, "Market", MarketTab);
+        Tab(ref builder, 430, "Needs", NeedsTab);
+        Tab(ref builder, 515, "City", CrownTab);
+        Tab(ref builder, 590, "Known", KnownTab);
+        Tab(ref builder, 675, "Quad", QuadTab);
+        Tab(ref builder, 750, "Revel", RevelTab);
+        Tab(ref builder, 830, "Halls", HallTab);
+        Tab(ref builder, 905, "Claims", ClaimTab);
+        Tab(ref builder, 995, "Guilds", GuildTab);
+        Tab(ref builder, 1075, "Band", BandTab);
 
         builder.AddButton(Width - 90, 12, 4014, 4016, 5);
-        builder.AddLabel(Width - 60, 12, Ink, "refresh");
+        builder.AddLabelCropped(Width - 60, 12, 46, 20, Ink, "refresh");
 
         builder.AddImageTiled(14, 36, Width - 28, 1, 9274);
 
@@ -284,6 +260,18 @@ public sealed class BotDashboardGump : DynamicGump
         {
             HallsPage(ref builder);
         }
+        else if (_tab == ClaimTab)
+        {
+            ClaimsPage(ref builder);
+        }
+        else if (_tab == GuildTab)
+        {
+            GuildsPage(ref builder);
+        }
+        else if (_tab == BandTab)
+        {
+            BandPage(ref builder);
+        }
         else
         {
             BotsPage(ref builder);
@@ -292,47 +280,57 @@ public sealed class BotDashboardGump : DynamicGump
         Footer(ref builder);
     }
 
-    /// <summary>
-    /// The bot's name with its rank behind a comma — "Perri, Apprentice Swordsman" — spelled the way the
-    /// engine spells a player's.
-    ///
-    /// <para>
-    /// <b>Here rather than in <c>Mobile.Title</c>, which is where it used to be and where it did harm.</b>
-    /// Title means <em>custom</em> title to this engine: <c>AddNameProperties</c> joins it to the name with a
-    /// bare space, so a bot in the world read "Perri Apprentice Swordsman" while a player reads "Arold,
-    /// Grandmaster Alchemist" — and a non-empty Title makes <c>Titles.ComputeTitle</c> skip the skill-title
-    /// branch, which is the only branch that writes the comma. Storing it there both mangled the punctuation
-    /// and disabled the code that would have got it right.
-    /// </para>
-    ///
-    /// <para>
-    /// So the rank lives on the bot and is spelled out here, in the one frame that wants it, and the world
-    /// label is left to the engine.
-    /// </para>
-    /// </summary>
     private static string Named(BotMobile bot)
     {
         var name = bot.Name ?? "?";
         var rank = bot.BotRank;
+        var named = string.IsNullOrEmpty(rank) ? name : $"{name}, {rank}";
 
-        return string.IsNullOrEmpty(rank) ? name : $"{name}, {rank}";
+        if (bot.NameHue == BotMobile.ChampionHue)
+        {
+            named += " — champion";
+        }
+
+        if (BotOutlaw.Jailed(bot))
+        {
+            named += $" — in a cell, {BotOutlaw.LeftInCell(bot)} min";
+        }
+        else if (BotOutlaw.IsRed(bot))
+        {
+            named += " — RED";
+        }
+
+        if (!Away(bot) && BotRest.CalledBy(bot) is { } calledBy)
+        {
+            named += $" — called by {calledBy}";
+        }
+
+        return named;
     }
+
+    private static bool Away(BotMobile bot) => bot.Map == null || bot.Map == Map.Internal;
+
+    private static int NameHue(BotMobile bot) =>
+        !bot.Alive ? Bad
+        : BotOutlaw.IsRed(bot) || BotOutlaw.Jailed(bot) ? Red
+        : bot.NameHue == BotMobile.ChampionHue ? Gold
+        : Ink;
 
     private void BotsPage(ref DynamicGumpBuilder builder)
     {
-        builder.AddLabel(14, 44, Head, "name");
-        builder.AddLabel(270, 44, Head, "ai");
-        builder.AddLabel(310, 44, Head, "class");
-        builder.AddLabel(386, 44, Head, "rung");
-        builder.AddLabel(452, 44, Head, "doing");
-        builder.AddLabel(672, 44, Head, "power");
-        builder.AddLabel(734, 44, Head, "mood");
-        builder.AddLabel(786, 44, Head, "vector");
-        builder.AddLabel(848, 44, Head, "purse");
-        builder.AddLabel(914, 44, Head, "bank");
-        builder.AddLabel(988, 44, Head, "box");
-        builder.AddLabel(1034, 44, Head, "stalls");
-        builder.AddLabel(1090, 44, Head, "onsale");
+        builder.AddLabelCropped(14, 44, 250, 20, Head, "name");
+        builder.AddLabelCropped(270, 44, 34, 20, Head, "ai");
+        builder.AddLabelCropped(310, 44, 70, 20, Head, "class");
+        builder.AddLabelCropped(386, 44, 60, 20, Head, "rung");
+        builder.AddLabelCropped(452, 44, 214, 20, Head, "doing");
+        builder.AddLabelCropped(672, 44, 56, 20, Head, "beats");
+        builder.AddLabelCropped(734, 44, 46, 20, Head, "mood");
+        builder.AddLabelCropped(786, 44, 56, 20, Head, "vector");
+        builder.AddLabelCropped(848, 44, 60, 20, Head, "purse");
+        builder.AddLabelCropped(914, 44, 68, 20, Head, "bank");
+        builder.AddLabelCropped(988, 44, 40, 20, Head, "box");
+        builder.AddLabelCropped(1034, 44, 50, 20, Head, "stalls");
+        builder.AddLabelCropped(1090, 44, 76, 20, Head, "onsale");
 
         for (var i = 0; i < _bots.Count; i++)
         {
@@ -340,104 +338,134 @@ public sealed class BotDashboardGump : DynamicGump
             var y = 68 + i * RowHeight;
             var resolve = bot.Resolve;
 
-            builder.AddLabelCropped(14, y, 250, 20, bot.Alive ? Ink : Bad, Named(bot));
-            builder.AddLabel(270, y, Ink, bot.Minded ? "(AI)" : "");
+            if (Away(bot))
+            {
+                builder.AddLabelCropped(14, y, 250, 20, Offline, $"{Named(bot)} — offline");
+                builder.AddLabelCropped(270, y, 34, 20, Offline, bot.Minded ? "(AI)" : "");
+                builder.AddLabelCropped(310, y, 70, 20, Offline, bot.Class?.Name ?? "?");
+                builder.AddLabelCropped(386, y, 60, 20, Offline, "offline");
+                builder.AddLabelCropped(452, y, 214, 20, Offline, BotRest.Offline(bot) ?? "resting");
+                builder.AddLabelCropped(672, y, 56, 20, Offline, BotProving.Beats(bot));
+                builder.AddLabelCropped(734, y, 46, 20, Offline, $"{bot.Mood:P0}");
+                builder.AddLabelCropped(786, y, 56, 20, Offline, $"{bot.Progress:P0}");
+                builder.AddLabelCropped(848, y, 60, 20, Offline, $"{Purse(bot)}");
+                builder.AddLabelCropped(914, y, 68, 20, Offline, $"{Banker.GetBalance(bot)}");
+                builder.AddLabelCropped(988, y, 40, 20, Offline, $"{bot.BankBox?.TotalItems ?? 0}");
+                builder.AddLabelCropped(1034, y, 50, 20, Offline, $"{BotAuction.StallsOf(bot)}");
+                builder.AddLabelCropped(1090, y, 50, 20, Offline, $"{BotAuction.WorthOf(bot)}");
+
+                continue;
+            }
+
+            builder.AddLabelCropped(14, y, 250, 20, NameHue(bot), Named(bot));
+            builder.AddLabelCropped(270, y, 34, 20, Ink, bot.Minded ? "(AI)" : "");
             builder.AddLabelCropped(310, y, 70, 20, Ink, bot.Class?.Name ?? "?");
             builder.AddLabelCropped(386, y, 60, 20, Rung(resolve), $"{resolve.Standing}");
             builder.AddLabelCropped(452, y, 214, 20, Ink, Doing(bot));
-            builder.AddLabel(672, y, Ink, $"{BotThreat.Power(bot):N0}");
-            builder.AddLabel(734, y, Shade(bot.Mood, 0.5), $"{bot.Mood:P0}");
-            builder.AddLabel(786, y, Shade(bot.Progress, 0.35), $"{bot.Progress:P0}");
-            builder.AddLabel(848, y, Ink, $"{Purse(bot)}");
-            builder.AddLabel(914, y, Ink, $"{Banker.GetBalance(bot)}");
-            builder.AddLabel(988, y, Ink, $"{bot.BankBox?.TotalItems ?? 0}");
-            builder.AddLabel(1034, y, Ink, $"{BotAuction.StallsOf(bot)}");
-            builder.AddLabel(1090, y, Ink, $"{BotAuction.WorthOf(bot)}");
+            builder.AddLabelCropped(672, y, 56, 20, Ink, BotProving.Beats(bot));
+            builder.AddLabelCropped(734, y, 46, 20, Shade(bot.Mood, 0.5), $"{bot.Mood:P0}");
+            builder.AddLabelCropped(786, y, 56, 20, Shade(bot.Progress, 0.35), $"{bot.Progress:P0}");
+            builder.AddLabelCropped(848, y, 60, 20, Ink, $"{Purse(bot)}");
+            builder.AddLabelCropped(914, y, 68, 20, Ink, $"{Banker.GetBalance(bot)}");
+            builder.AddLabelCropped(988, y, 40, 20, Ink, $"{bot.BankBox?.TotalItems ?? 0}");
+            builder.AddLabelCropped(1034, y, 50, 20, Ink, $"{BotAuction.StallsOf(bot)}");
+            builder.AddLabelCropped(1090, y, 50, 20, Ink, $"{BotAuction.WorthOf(bot)}");
 
-            // Straight to whoever is on this row. The one thing an admin always wants next after reading a
-            // line like this is to look at the bot it describes.
             builder.AddButton(1146, y, 4005, 4007, 100 + i);
         }
 
         if (_bots.Count == 0)
         {
-            builder.AddLabel(14, 68, Bad, "No bots. Check bots.population.enabled and bot-population.json");
+            builder.AddLabelCropped(
+                14,
+                68,
+                1152,
+                20,
+                Bad,
+                "No bots. Check bots.population.enabled and bot-population.json"
+            );
         }
 
         var (units, worth) = BotAuction.Offered();
 
-        // Two labels rather than one interpolated line: a string-returning call inside a hole is the one
-        // shape that defeats the zero-allocation handler, and the census line is long.
-        builder.AddLabel(14, Height - 52, Ink, $"{BotPopulation.Count} bots, {BotPopulation.Living} alive");
-        builder.AddLabelCropped(150, Height - 52, Width - 170, 20, Ink, BotWill.Describe());
+        builder.AddLabelCropped(14, Height - 52, 130, 20, Ink, $"{BotPopulation.Count} bots, {BotPopulation.Living} alive");
+        builder.AddLabelCropped(150, Height - 52, 150, 20, Offline, $"{BotPopulation.Away.Count} offline, resting");
+        builder.AddLabelCropped(306, Height - 52, 860, 20, Ink, BotWill.Describe());
 
-        builder.AddLabel(14, Height - 34, Ink, $"market: {BotAuction.Stalls} stalls, {units} things worth {worth}gp, {BotAuction.Asks} wants");
+        builder.AddLabelCropped(
+            14,
+            Height - 34,
+            1010,
+            20,
+            Ink,
+            $"market: {BotAuction.Stalls} stalls, {units} things worth {worth}gp, {BotAuction.Asks} wants"
+        );
     }
 
     private void MarketPage(ref DynamicGumpBuilder builder)
     {
-        builder.AddLabel(14, 44, Head, "item");
-        builder.AddLabel(250, 44, Head, "amount");
-        builder.AddLabel(320, 44, Head, "price");
-        builder.AddLabel(390, 44, Head, "worth");
-        builder.AddLabel(460, 44, Head, "sold");
-        builder.AddLabel(520, 44, Head, "earned");
-        builder.AddLabel(596, 44, Head, "moves");
-        builder.AddLabel(670, 44, Head, "seller");
+        builder.AddLabelCropped(14, 44, 230, 20, Head, "item");
+        builder.AddLabelCropped(250, 44, 64, 20, Head, "amount");
+        builder.AddLabelCropped(320, 44, 64, 20, Head, "price");
+        builder.AddLabelCropped(390, 44, 64, 20, Head, "worth");
+        builder.AddLabelCropped(460, 44, 54, 20, Head, "sold");
+        builder.AddLabelCropped(520, 44, 70, 20, Head, "earned");
+        builder.AddLabelCropped(596, 44, 68, 20, Head, "moves");
+        builder.AddLabelCropped(670, 44, 496, 20, Head, "seller");
 
         for (var i = 0; i < _stalls.Count; i++)
         {
             var stall = _stalls[i];
             var y = 66 + i * (RowHeight + 8);
 
-            // The thing itself, not its name. A market you can only read is a spreadsheet.
             builder.AddItem(20, y - 4, stall.ItemId, stall.Hue);
 
             builder.AddLabelCropped(64, y, 180, 20, Ink, stall.Label);
-            builder.AddLabel(250, y, Ink, $"{stall.Amount}");
-            builder.AddLabel(320, y, Ink, $"{stall.Price}");
-            builder.AddLabel(390, y, Ink, $"{stall.Worth}");
-            builder.AddLabel(460, y, Ink, $"{stall.Sold}");
-            builder.AddLabel(520, y, Ink, $"{stall.Earned}");
-            builder.AddLabel(596, y, stall.Raises >= stall.Cuts ? Good : Bad, $"+{stall.Raises}/-{stall.Cuts}");
+            builder.AddLabelCropped(250, y, 64, 20, Ink, $"{stall.Amount}");
+            builder.AddLabelCropped(320, y, 64, 20, Ink, $"{stall.Price}");
+            builder.AddLabelCropped(390, y, 64, 20, Ink, $"{stall.Worth}");
+            builder.AddLabelCropped(460, y, 54, 20, Ink, $"{stall.Sold}");
+            builder.AddLabelCropped(520, y, 70, 20, Ink, $"{stall.Earned}");
+            builder.AddLabelCropped(
+                596,
+                y,
+                68,
+                20,
+                stall.Raises >= stall.Cuts ? Good : Bad,
+                $"+{stall.Raises}/-{stall.Cuts}"
+            );
             builder.AddLabelCropped(670, y, 150, 20, Ink, stall.Seller?.Self?.Name ?? "gone");
 
-            // Buys one, at the asking price, out of your own purse. The only way to see a bot move its own
-            // price before a trade exists that buys from another. Unguarded now: nothing empty reaches this
-            // list at all — see Market.
             builder.AddButton(838, y, 4005, 4007, 200 + i);
-            builder.AddLabel(858, y, Ink, "buy");
+            builder.AddLabelCropped(858, y, 308, 20, Ink, "buy");
         }
 
         if (_stalls.Count == 0)
         {
-            builder.AddLabel(14, 68, Bad, "Nothing on offer yet. Bots list what they produce when they bank it");
+            builder.AddLabelCropped(
+                14,
+                68,
+                1152,
+                20,
+                Bad,
+                "Nothing on offer yet. Bots list what they produce when they bank it"
+            );
         }
 
-        builder.AddLabel(14, Height - 34, Ink, BotAuction.Describe());
+        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotAuction.Describe());
     }
 
-    /// <summary>
-    /// What the population is short of, at what price, with whose money behind it.
-    ///
-    /// <para>
-    /// <b>This is the tab that answers "why is nobody mining".</b> The other two say what bots are doing and
-    /// what they have made; neither can say what the shard has been unable to get hold of. A want with its
-    /// offer four times what it opened at and nothing filled is the clearest sentence this population can
-    /// speak: somebody has been trying to buy that for half an hour and nobody here can make it.
-    /// </para>
-    /// </summary>
     private void NeedsPage(ref DynamicGumpBuilder builder)
     {
-        builder.AddLabel(14, 44, Head, "wanted");
-        builder.AddLabel(250, 44, Head, "count");
-        builder.AddLabel(310, 44, Head, "offer");
-        builder.AddLabel(370, 44, Head, "down");
-        builder.AddLabel(436, 44, Head, "filled");
-        builder.AddLabel(496, 44, Head, "paid");
-        builder.AddLabel(560, 44, Head, "moves");
-        builder.AddLabel(632, 44, Head, "held");
-        builder.AddLabel(686, 44, Head, "buyer");
+        builder.AddLabelCropped(14, 44, 230, 20, Head, "wanted");
+        builder.AddLabelCropped(250, 44, 54, 20, Head, "count");
+        builder.AddLabelCropped(310, 44, 54, 20, Head, "offer");
+        builder.AddLabelCropped(370, 44, 60, 20, Head, "down");
+        builder.AddLabelCropped(436, 44, 54, 20, Head, "filled");
+        builder.AddLabelCropped(496, 44, 58, 20, Head, "paid");
+        builder.AddLabelCropped(560, 44, 66, 20, Head, "moves");
+        builder.AddLabelCropped(632, 44, 48, 20, Head, "held");
+        builder.AddLabelCropped(686, 44, 480, 20, Head, "buyer");
 
         for (var i = 0; i < _wants.Count; i++)
         {
@@ -447,65 +475,34 @@ public sealed class BotDashboardGump : DynamicGump
             builder.AddItem(20, y - 4, want.ItemId, want.Hue);
 
             builder.AddLabelCropped(64, y, 180, 20, Ink, want.Label);
-            builder.AddLabel(250, y, want.IsOpen ? Ink : Bad, $"{want.Amount}");
-            builder.AddLabel(310, y, Ink, $"{want.Offer}");
-            builder.AddLabel(370, y, want.Escrow >= want.Offer ? Ink : Bad, $"{want.Escrow}");
-            builder.AddLabel(436, y, Ink, $"{want.Filled}");
-            builder.AddLabel(496, y, Ink, $"{want.Paid}");
+            builder.AddLabelCropped(250, y, 54, 20, want.IsOpen ? Ink : Bad, $"{want.Amount}");
+            builder.AddLabelCropped(310, y, 54, 20, Ink, $"{want.Offer}");
+            builder.AddLabelCropped(370, y, 60, 20, want.Escrow >= want.Offer ? Ink : Bad, $"{want.Escrow}");
+            builder.AddLabelCropped(436, y, 54, 20, Ink, $"{want.Filled}");
+            builder.AddLabelCropped(496, y, 58, 20, Ink, $"{want.Paid}");
 
-            // Raises mean the opposite of what they mean on a stall: a want that keeps going up is one the
-            // shard cannot supply, so the colours are the other way round on purpose.
-            builder.AddLabel(560, y, want.Raises > want.Cuts ? Bad : Good, $"+{want.Raises}/-{want.Cuts}");
-            builder.AddLabel(632, y, want.Waiting > 0 ? Good : Ink, $"{want.Waiting}");
+            builder.AddLabelCropped(560, y, 66, 20, want.Raises > want.Cuts ? Bad : Good, $"+{want.Raises}/-{want.Cuts}");
+            builder.AddLabelCropped(632, y, 48, 20, want.Waiting > 0 ? Good : Ink, $"{want.Waiting}");
             builder.AddLabelCropped(686, y, 150, 20, Ink, want.Buyer?.Self?.Name ?? "gone");
         }
 
         if (_wants.Count == 0)
         {
-            builder.AddLabel(14, 68, Bad, "Nobody is short of anything they cannot buy off a shelf");
+            builder.AddLabelCropped(14, 68, 1152, 20, Bad, "Nobody is short of anything they cannot buy off a shelf");
         }
 
-        builder.AddLabel(14, Height - 34, Ink, BotAuction.Describe());
+        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotAuction.Describe());
     }
 
-    /// <summary>
-    /// What the population has found out: where work pays, where blood is spilt, and how much of it was
-    /// learned by the three bots that think.
-    ///
-    /// <para>
-    /// <b>Both maps on one page, because they are read together or not at all.</b> "This patch pays forty a
-    /// minute" and "this square has killed two people" are the two halves of every decision a bot makes about
-    /// where to go, and they were previously visible only as one sentence each at the bottom of two other
-    /// tabs. Side by side they answer the question an admin actually has, which is whether the population is
-    /// avoiding somewhere for a good reason.
-    /// </para>
-    ///
-    /// <para>
-    /// The <c>mind</c> column is the point of the whole page. Three bots on this shard think with a model and
-    /// thirty do not, and the design has always been that the three <em>supplement</em> the rest rather than
-    /// replace them — so the useful question is how much of what everybody now knows came from them. A column
-    /// of noughts would mean three expensive bots are learning only for themselves.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// The island, worst ground first, with what the Baron is doing about it.
-    ///
-    /// <para>
-    /// Sorted by safety ascending and never by anything else: a list of safe ground is a list nobody acts on.
-    /// The rightmost column is the one that matters — whether a square bad enough to want a great hunt has
-    /// actually had one sent to it. "Dire and nobody going" is the single reading on this page that means
-    /// something is wrong, and it is the reason the column exists rather than being inferred from two others.
-    /// </para>
-    /// </summary>
     private void QuadPage(ref DynamicGumpBuilder builder)
     {
-        builder.AddLabel(14, 100, Head, "quadrant");
-        builder.AddLabel(160, 100, Head, "safety");
-        builder.AddLabel(240, 100, Head, "standing");
-        builder.AddLabel(390, 100, Head, "crossings");
-        builder.AddLabel(480, 100, Head, "blows");
-        builder.AddLabel(550, 100, Head, "dead");
-        builder.AddLabel(620, 100, Head, "the Baron");
+        builder.AddLabelCropped(14, 100, 140, 20, Head, "quadrant");
+        builder.AddLabelCropped(160, 100, 74, 20, Head, "safety");
+        builder.AddLabelCropped(240, 100, 144, 20, Head, "standing");
+        builder.AddLabelCropped(390, 100, 84, 20, Head, "crossings");
+        builder.AddLabelCropped(480, 100, 64, 20, Head, "blows");
+        builder.AddLabelCropped(550, 100, 64, 20, Head, "dead");
+        builder.AddLabelCropped(620, 100, 546, 20, Head, "the Baron");
 
         var quads = BotQuad.Worst(Rows - 2);
 
@@ -515,16 +512,15 @@ public sealed class BotDashboardGump : DynamicGump
             var y = 122 + i * (RowHeight + 8);
             var middle = quad.Middle;
 
-            builder.AddLabel(14, y, quad.Trodden ? Ink : Bad, $"({middle.X}, {middle.Y})");
+            builder.AddLabelCropped(14, y, 140, 20, quad.Trodden ? Ink : Bad, $"({middle.X}, {middle.Y})");
 
-            // Red once it is worth going to, green once it is too quiet to bother hunting in, plain between.
             var tint = quad.Safety <= BotQuad.Wanted ? Bad : quad.Safety > BotQuad.TooQuiet ? Good : Ink;
 
-            builder.AddLabel(160, y, tint, $"{quad.Safety:F2}");
+            builder.AddLabelCropped(160, y, 74, 20, tint, $"{quad.Safety:F2}");
             builder.AddLabelCropped(240, y, 140, 20, tint, Standing(quad));
-            builder.AddLabel(390, y, Ink, $"{quad.Passes}");
-            builder.AddLabel(480, y, quad.Blows > 0 ? Bad : Ink, $"{quad.Blows}");
-            builder.AddLabel(550, y, quad.Deaths > 0 ? Bad : Ink, $"{quad.Deaths}");
+            builder.AddLabelCropped(390, y, 84, 20, Ink, $"{quad.Passes}");
+            builder.AddLabelCropped(480, y, 64, 20, quad.Blows > 0 ? Bad : Ink, $"{quad.Blows}");
+            builder.AddLabelCropped(550, y, 64, 20, quad.Deaths > 0 ? Bad : Ink, $"{quad.Deaths}");
 
             var (word, colour) = Baron(quad);
 
@@ -533,13 +529,12 @@ public sealed class BotDashboardGump : DynamicGump
 
         if (quads.Count == 0)
         {
-            builder.AddLabel(14, 124, Bad, "The population has not walked anywhere yet");
+            builder.AddLabelCropped(14, 124, 1152, 20, Bad, "The population has not walked anywhere yet");
         }
 
-        builder.AddLabel(14, Height - 34, Ink, BotQuad.Describe());
+        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotQuad.Describe());
     }
 
-    /// <summary>What sort of ground this is, in the words the rules are written in.</summary>
     private static string Standing(BotQuad.Quad quad)
     {
         if (!quad.Trodden)
@@ -565,12 +560,6 @@ public sealed class BotDashboardGump : DynamicGump
         return quad.Swept ? "swept by rangers" : "ordinary";
     }
 
-    /// <summary>
-    /// Whether the Baron has gone to this square, is on his way, or has not been sent.
-    ///
-    /// The last of those is only worth saying about ground bad enough to deserve him: "nobody is going to
-    /// that meadow" is true of almost every square on the island and tells nobody anything.
-    /// </summary>
     private static (string Word, int Colour) Baron(BotQuad.Quad quad)
     {
         if (BotHarrow.Square != Point3D.Zero && BotQuad.Key(quad.Map, BotHarrow.Square) == (quad.Map?.MapID ?? -1, quad.X, quad.Y))
@@ -588,15 +577,15 @@ public sealed class BotDashboardGump : DynamicGump
 
     private void KnownPage(ref DynamicGumpBuilder builder)
     {
-        builder.AddLabel(14, 44, Head, "trade");
-        builder.AddLabel(280, 44, Head, "pays/min");
-        builder.AddLabel(370, 44, Head, "seen");
-        builder.AddLabel(430, 44, Head, "mind");
+        builder.AddLabelCropped(14, 44, 260, 20, Head, "trade");
+        builder.AddLabelCropped(280, 44, 84, 20, Head, "pays/min");
+        builder.AddLabelCropped(370, 44, 54, 20, Head, "seen");
+        builder.AddLabelCropped(430, 44, 84, 20, Head, "mind");
 
-        builder.AddLabel(520, 44, Head, "trade");
-        builder.AddLabel(620, 44, Head, "claims");
-        builder.AddLabel(690, 44, Head, "pays");
-        builder.AddLabel(760, 44, Head, "seen");
+        builder.AddLabelCropped(520, 44, 94, 20, Head, "trade");
+        builder.AddLabelCropped(620, 44, 64, 20, Head, "claims");
+        builder.AddLabelCropped(690, 44, 64, 20, Head, "pays");
+        builder.AddLabelCropped(760, 44, 406, 20, Head, "seen");
 
         var known = BotCommons.Best(Rows);
 
@@ -606,24 +595,17 @@ public sealed class BotDashboardGump : DynamicGump
             var y = 66 + i * (RowHeight + 8);
 
             builder.AddLabelCropped(14, y, 120, 20, Ink, kind);
-            builder.AddLabel(280, y, perMinute > 0 ? Good : Bad, $"{perMinute:F0}");
+            builder.AddLabelCropped(280, y, 84, 20, perMinute > 0 ? Good : Bad, $"{perMinute:F0}");
 
-            // Pale until the board has enough behind it to be believed — see BotCommons.Confidence, which is
-            // the same number the arithmetic uses to decide how much of the answer this patch is.
-            builder.AddLabel(370, y, settled >= 4 ? Ink : Bad, $"{settled}");
-            builder.AddLabel(430, y, minded > 0 ? Good : Ink, $"{minded}");
+            builder.AddLabelCropped(370, y, 54, 20, settled >= 4 ? Ink : Bad, $"{settled}");
+            builder.AddLabelCropped(430, y, 736, 20, minded > 0 ? Good : Ink, $"{minded}");
         }
 
         if (known.Count == 0)
         {
-            builder.AddLabel(14, 68, Bad, "The population has not found out anything about anywhere yet");
+            builder.AddLabelCropped(14, 68, 1152, 20, Bad, "The population has not found out anything about anywhere yet");
         }
 
-        // <b>What every trade says it is worth against what it turned out to be worth.</b> This is the column
-        // that changes what somebody does about the shard rather than what they think of it: a row where the
-        // claim is far above the payment is a constant in the source that stopped being true, and the whole
-        // population has been chasing it. Sorted by that gap, worst overstatement first, because an
-        // overstatement sends everybody at work that pays nothing and an understatement only surprises them.
         var gaps = BotCommons.Gaps(Rows);
 
         for (var i = 0; i < gaps.Count; i++)
@@ -632,20 +614,18 @@ public sealed class BotDashboardGump : DynamicGump
             var y = 66 + i * (RowHeight + 8);
 
             builder.AddLabelCropped(520, y, 90, 20, minded > 0 ? Good : Ink, kind);
-            builder.AddLabel(620, y, Ink, $"{claimed:F0}");
+            builder.AddLabelCropped(620, y, 64, 20, Ink, $"{claimed:F0}");
 
-            // Red when the claim is more than half again what the work pays: that is a number worth going and
-            // looking at, and anything less is the ordinary noise of a shard that changes.
-            builder.AddLabel(690, y, measured * 1.5 < claimed ? Bad : Good, $"{measured:F0}");
-            builder.AddLabel(760, y, settled >= 25 ? Ink : Bad, $"{settled}");
+            builder.AddLabelCropped(690, y, 64, 20, measured * 1.5 < claimed ? Bad : Good, $"{measured:F0}");
+            builder.AddLabelCropped(760, y, 406, 20, settled >= 25 ? Ink : Bad, $"{settled}");
         }
 
         if (gaps.Count == 0)
         {
-            builder.AddLabel(520, 68, Bad, "No trade has been measured against its own claim yet");
+            builder.AddLabelCropped(520, 68, 646, 20, Bad, "No trade has been measured against its own claim yet");
         }
 
-        builder.AddLabel(14, Height - 34, Ink, BotCommons.Describe());
+        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotCommons.Describe());
     }
 
     private void Footer(ref DynamicGumpBuilder builder)
@@ -657,7 +637,7 @@ public sealed class BotDashboardGump : DynamicGump
             builder.AddButton(Width - 150, Height - 34, 4014, 4016, 3);
         }
 
-        builder.AddLabel(Width - 120, Height - 34, Ink, $"page {_page + 1} of {_pages}");
+        builder.AddLabelCropped(Width - 120, Height - 34, 80, 20, Ink, $"page {_page + 1} of {_pages}");
 
         if (_page + 1 < _pages)
         {
@@ -665,61 +645,62 @@ public sealed class BotDashboardGump : DynamicGump
         }
     }
 
-    /// <summary>How many stalls one press of the city's button clears.</summary>
     private const int CrownLots = 10;
 
-    /// <summary>
-    /// The city, which is to say the only demand on this shard that does not come out of a monster's purse.
-    ///
-    /// <para>
-    /// One button, and it does exactly what the label says: buys ten stalls outright at whatever the sellers
-    /// are asking, and pays with money that did not exist a moment earlier. That is the point of it. Every
-    /// coin here otherwise enters through a corpse, so the population's market is sixteen bots passing the
-    /// same purse round while their stalls fill with goods none of them wants; an outside buyer is what turns
-    /// production into income. It also teaches prices, because the purchase is booked exactly as a bot's is.
-    /// </para>
-    ///
-    /// <para>
-    /// It stays a button rather than becoming a timer on purpose: printed money is a decision somebody should
-    /// have to make, and be able to stop making, one press at a time.
-    /// </para>
-    /// </summary>
     private void CrownPage(ref DynamicGumpBuilder builder)
     {
         var (units, worth) = BotAuction.Offered();
 
-        builder.AddLabel(14, 44, Head, "the city sends for goods");
+        builder.AddLabelCropped(14, 44, 1152, 20, Head, "the city sends for goods");
 
-        builder.AddLabel(
+        builder.AddLabelCropped(
             14,
             76,
+            1152,
+            20,
             Ink,
             $"The market holds {BotAuction.Stalls} stalls: {units} things the population is asking {worth}gp for."
         );
 
-        builder.AddLabel(
+        builder.AddLabelCropped(
             14,
             100,
+            1152,
+            20,
             Ink,
-            $"Buying takes {CrownLots} stalls at random and pays the sellers what they asked."
+            $"Buying takes {CrownLots} stalls, the longest-standing first, and pays the sellers what they asked."
         );
 
-        builder.AddLabel(14, 124, Bad, "This makes new gold. Nothing else on the shard does.");
+        builder.AddLabelCropped(
+            14,
+            124,
+            1152,
+            20,
+            Bad,
+            $"Paid from the treasury: {BotCity.Purse}gp of {BotCity.Cap}, minted at {BotCity.MintPerHour}gp an hour. Argus has the same lever."
+        );
 
         builder.AddButton(14, 160, 4005, 4007, 8);
-        builder.AddLabel(52, 160, Head, $"buy {CrownLots} lots from afar");
+        builder.AddLabelCropped(52, 160, 1114, 20, Head, $"buy {CrownLots} lots from afar");
 
-        builder.AddLabel(14, 200, Ink, $"so far: {BotAuction.Sales} sales on this market, {BotAuction.Turnover}gp turned over");
+        builder.AddLabelCropped(14, 200, Width - 28, 20, Ink, $"standing orders: {BotCity.Wants()}");
+        builder.AddLabelCropped(
+            14,
+            224,
+            1152,
+            20,
+            Ink,
+            $"so far: {BotAuction.Sales} sales on this market, {BotAuction.Turnover}gp turned over; the city spent {BotCity.Spent}gp"
+        );
     }
 
-    /// <summary>The button's work, said out loud to whoever pressed it and written down for everyone else.</summary>
     private static void Sent(Mobile from)
     {
-        var (lots, units, paid) = BotAuction.Crown(CrownLots);
+        var (lots, units, paid) = BotCity.Buy(CrownLots, from.Name);
 
         if (lots <= 0)
         {
-            from.SendMessage("The city sent for goods and found nothing on offer.");
+            from.SendMessage(BotCity.Purse <= 0 ? "The treasury is empty." : "The city sent for goods and found nothing on offer it could pay for.");
 
             return;
         }
@@ -735,6 +716,71 @@ public sealed class BotDashboardGump : DynamicGump
         );
     }
 
+    private void BandPage(ref DynamicGumpBuilder builder)
+    {
+        builder.AddLabelCropped(14, 100, 140, 20, Head, "bandit");
+        builder.AddLabelCropped(160, 100, 94, 20, Head, "trade");
+        builder.AddLabelCropped(260, 100, 154, 20, Head, "standing");
+        builder.AddLabelCropped(420, 100, 84, 20, Head, "murders");
+        builder.AddLabelCropped(510, 100, 74, 20, Head, "unseen");
+        builder.AddLabelCropped(590, 100, 94, 20, Head, "robberies");
+        builder.AddLabelCropped(690, 100, 94, 20, Head, "demands");
+        builder.AddLabelCropped(790, 100, 94, 20, Head, "price");
+        builder.AddLabelCropped(890, 100, 139, 20, Head, "where");
+        builder.AddLabelCropped(1035, 100, 131, 20, Head, "go");
+
+        var roll = BotUnderworld.AtLarge();
+
+        for (var i = 0; i < roll.Count && i < Rows - 2; i++)
+        {
+            var one = roll[i];
+            var y = 122 + i * (RowHeight + 8);
+
+            builder.AddLabelCropped(14, y, 140, 20, one.Red ? Red : one.Fence ? Gold : Ink, one.Name);
+            builder.AddLabelCropped(160, y, 95, 20, Ink, one.Trade);
+            builder.AddLabelCropped(260, y, 155, 20, one.Known ? Bad : Ink, Standing(one));
+            builder.AddLabelCropped(420, y, 84, 20, one.Murders > 0 ? Bad : Ink, $"{one.Murders}");
+            builder.AddLabelCropped(510, y, 74, 20, Ink, $"{one.Unseen}");
+            builder.AddLabelCropped(590, y, 94, 20, Ink, $"{one.Robberies}");
+            builder.AddLabelCropped(690, y, 94, 20, Ink, $"{one.Extortions}");
+            builder.AddLabelCropped(790, y, 94, 20, one.Price > 0 ? Gold : Ink, $"{one.Price}gp");
+            builder.AddLabelCropped(890, y, 139, 20, Ink, $"({one.Where.X}, {one.Where.Y})");
+            builder.AddButton(1035, y, 4005, 4007, 500 + i);
+        }
+
+        if (roll.Count == 0)
+        {
+            builder.AddLabelCropped(14, 124, 1152, 20, Good, "No bandit is at large on the island");
+        }
+
+        builder.AddButton(14, Height - 66, 4005, 4007, 18);
+        builder.AddLabelCropped(
+            46,
+            Height - 66,
+            1120,
+            20,
+            BotUnderworld.Exists && BotUnderworld.Hideout != Point3D.Zero ? Gold : Ink,
+            "stand in the band's hideout"
+        );
+
+        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotUnderworld.Describe());
+    }
+
+    private static string Standing(BotUnderworld.Wanted one)
+    {
+        if (one.Fence)
+        {
+            return one.Hunted ? "the band's fence, wanted" : "the band's fence";
+        }
+
+        if (one.Member)
+        {
+            return one.Red ? "of The Shadow, red" : one.Hunted ? "of The Shadow, wanted" : "of The Shadow";
+        }
+
+        return one.Red ? "red" : one.Hunted ? "wanted" : "at large";
+    }
+
     private void Tab(ref DynamicGumpBuilder builder, int x, string name, int tab)
     {
         if (_tab == tab)
@@ -744,10 +790,6 @@ public sealed class BotDashboardGump : DynamicGump
             return;
         }
 
-        // <b>Every tab needs a number here and a case below, and the fallback hides a missing one.</b> The
-        // arm reads "anything else is the Bots tab", so a tab added without its number does not fail — it
-        // quietly becomes a second button for Bots, which is exactly what happened to Known and is
-        // indistinguishable from a tab that will not open.
         builder.AddButton(
             x,
             12,
@@ -762,6 +804,9 @@ public sealed class BotDashboardGump : DynamicGump
                 QuadTab   => 10,
                 RevelTab  => 11,
                 HallTab   => 14,
+                ClaimTab  => 15,
+                GuildTab  => 16,
+                BandTab   => 17,
                 _         => 1
             }
         );
@@ -772,8 +817,6 @@ public sealed class BotDashboardGump : DynamicGump
     {
         var from = sender?.Mobile;
 
-        // Checked again here, and not only in the command: a gump response is a packet, and a packet can be
-        // sent by anybody who has ever seen this window.
         if (from == null || from.AccessLevel < AccessLevel.Administrator)
         {
             return;
@@ -853,14 +896,51 @@ public sealed class BotDashboardGump : DynamicGump
 
                 return;
 
+            case >= 60 and < 66:
+                Beside(from, button - 60);
+
+                return;
+
             case 14:
                 DisplayTo(from, HallTab);
 
                 return;
+
+            case 15:
+                DisplayTo(from, ClaimTab);
+
+                return;
+
+            case 16:
+                DisplayTo(from, GuildTab);
+
+                return;
+
+            case 17:
+                DisplayTo(from, BandTab);
+
+                return;
+
+            case 18:
+                Lair(from);
+
+                return;
         }
 
-        // Before the two below it, and the order is the whole of it being right: every one of these ranges
-        // is open-ended, so the highest has to be asked first or it is answered by the one underneath.
+        if (button >= 500)
+        {
+            Tail(from, button - 500);
+
+            return;
+        }
+
+        if (button >= 400)
+        {
+            Ground(from, button - 400);
+
+            return;
+        }
+
         if (button >= 300)
         {
             Doorstep(from, button - 300);
@@ -881,19 +961,217 @@ public sealed class BotDashboardGump : DynamicGump
         }
     }
 
-    /// <summary>
-    /// The halls: one row each, and under them the guilds that have not built yet and why.
-    /// </summary>
+    private void ClaimsPage(ref DynamicGumpBuilder builder)
+    {
+        builder.AddLabelCropped(14, 44, 1152, 20, Head, "being claimed now");
+        builder.AddLabelCropped(14, 68, 140, 20, Head, "square");
+        builder.AddLabelCropped(160, 68, 134, 20, Head, "by");
+        builder.AddLabelCropped(300, 68, 124, 20, Head, "for");
+        builder.AddLabelCropped(430, 68, 104, 20, Head, "gathered");
+        builder.AddLabelCropped(540, 68, 104, 20, Head, "blood");
+        builder.AddLabelCropped(650, 68, 104, 20, Head, "left");
+        builder.AddLabelCropped(760, 68, 406, 20, Head, "taken from");
+
+        var running = 0;
+
+        foreach (var bid in BotClaim.Bids)
+        {
+            if (running >= 5)
+            {
+                break;
+            }
+
+            var y = 92 + running++ * RowHeight;
+            var left = BotClaim.Left(bid) / 1000;
+
+            builder.AddLabelCropped(14, y, 140, 20, Ink, $"{bid.Middle.X}, {bid.Middle.Y}");
+            builder.AddLabelCropped(160, y, 130, 20, Head, BotClaim.Short(bid.Guild) ?? "nobody");
+            builder.AddLabelCropped(
+                300,
+                y,
+                124,
+                20,
+                Ink,
+                bid.Want switch
+                {
+                    BotClaim.Kind.Oust  => "to take it",
+                    BotClaim.Kind.Strip => "to strike a name off",
+                    _                   => "to settle it"
+                }
+            );
+
+            builder.AddLabelCropped(
+                430,
+                y,
+                104,
+                20,
+                bid.Peak >= BotClaim.Gather ? Good : Bad,
+                $"{bid.Peak} of {BotClaim.Gather}"
+            );
+
+            builder.AddLabelCropped(
+                540,
+                y,
+                104,
+                20,
+                bid.Fallen > bid.Felled ? Bad : Ink,
+                bid.Felled + bid.Fallen == 0 ? "none" : $"{bid.Felled} for, {bid.Fallen} against"
+            );
+
+            builder.AddLabelCropped(650, y, 104, 20, Ink, $"{left}s");
+            builder.AddLabelCropped(760, y, 140, 20, Ink, BotClaim.Short(bid.From) ?? "nobody");
+
+            if (running - 1 < _spots.Count)
+            {
+                builder.AddButton(940, y, 4005, 4007, 400 + running - 1);
+                builder.AddLabelCropped(970, y, 196, 20, Ink, "go");
+            }
+        }
+
+        if (running == 0)
+        {
+            builder.AddLabelCropped(14, 92, 1152, 20, Ink, "Nobody is claiming anything at the moment.");
+        }
+
+        var top = 92 + Math.Max(1, running) * RowHeight + 18;
+
+        builder.AddImageTiled(14, top - 10, Width - 28, 1, 9274);
+        builder.AddLabelCropped(14, top, 140, 20, Head, "held");
+        builder.AddLabelCropped(160, top, 134, 20, Head, "square");
+        builder.AddLabelCropped(300, top, 214, 20, Head, "how it was taken");
+        builder.AddLabelCropped(520, top, 646, 20, Head, "safety");
+
+        var held = 0;
+
+        foreach (var (key, guild, bought) in BotClaim.Owned())
+        {
+            if (held >= Rows - 2)
+            {
+                break;
+            }
+
+            var y = top + 26 + held++ * RowHeight;
+            var middle = new Point3D(
+                key.X * BotQuad.Side + BotQuad.Side / 2,
+                key.Y * BotQuad.Side + BotQuad.Side / 2,
+                0
+            );
+
+            builder.AddLabelCropped(14, y, 130, 20, Head, BotClaim.Short(guild) ?? "nobody");
+            builder.AddLabelCropped(160, y, 134, 20, Ink, $"{middle.X}, {middle.Y}");
+            builder.AddLabelCropped(
+                300,
+                y,
+                214,
+                20,
+                Ink,
+                bought ? $"bought for {BotClaim.Price}gp or taken" : "a free claim"
+            );
+
+            var quad = BotQuad.Known(BotPopulation.Home, middle);
+
+            builder.AddLabelCropped(520, y, 114, 20, Ink, quad == null ? "not walked" : $"{BotQuad.Reading(quad):F1}");
+
+            var spot = 5 + held - 1;
+
+            if (spot < _spots.Count)
+            {
+                builder.AddButton(640, y, 4005, 4007, 400 + spot);
+                builder.AddLabelCropped(670, y, 496, 20, Ink, "go");
+            }
+        }
+
+        if (held == 0)
+        {
+            builder.AddLabelCropped(14, top + 26, 1152, 20, Ink, "No square of the island belongs to anybody yet.");
+        }
+    }
+
+    private void GuildsPage(ref DynamicGumpBuilder builder)
+    {
+        builder.AddLabelCropped(14, 60, 130, 20, Head, "guild");
+        builder.AddLabelCropped(150, 60, 74, 20, Head, "of them");
+        builder.AddLabelCropped(230, 60, 84, 20, Head, "purse");
+        builder.AddLabelCropped(320, 60, 74, 20, Head, "ground");
+        builder.AddLabelCropped(400, 60, 234, 20, Head, "working towards");
+        builder.AddLabelCropped(640, 60, 254, 20, Head, "all doing now");
+        builder.AddLabelCropped(900, 60, 134, 20, Head, "at war with");
+        builder.AddLabelCropped(1040, 60, 126, 20, Head, "allied to");
+
+        var row = 0;
+
+        foreach (var guild in BotGuilds.Standing)
+        {
+            if (guild == null || row >= Rows)
+            {
+                continue;
+            }
+
+            var y = 86 + row++ * (RowHeight + 4);
+            var wars = Names(guild.Enemies);
+            var allies = Names(guild.Allies);
+
+            builder.AddLabelCropped(14, y, 130, 20, Head, BotClaim.Short(guild.Name) ?? guild.Name);
+            builder.AddLabelCropped(150, y, 74, 20, Ink, $"{guild.Members?.Count ?? 0}");
+            builder.AddLabelCropped(230, y, 84, 20, Ink, $"{BotEstate.Fund(guild)}gp");
+            builder.AddLabelCropped(320, y, 74, 20, Ink, $"{BotClaim.Holds(guild.Name)}");
+            builder.AddLabelCropped(400, y, 230, 20, Ink, BotGuilds.Aim(guild));
+            builder.AddLabelCropped(640, y, 250, 20, Ink, BotGuilds.Task(guild));
+            builder.AddLabelCropped(900, y, 130, 20, wars == null ? Ink : Bad, wars ?? "nobody");
+            builder.AddLabelCropped(1040, y, 126, 20, allies == null ? Ink : Good, allies ?? "nobody");
+        }
+
+        if (row == 0)
+        {
+            builder.AddLabelCropped(14, 86, 1152, 20, Bad, "No guild has been mustered.");
+        }
+
+        var foot = 86 + Math.Max(1, row) * (RowHeight + 4) + 18;
+
+        builder.AddImageTiled(14, foot - 10, Width - 28, 1, 9274);
+
+        builder.AddLabelCropped(
+            14,
+            foot,
+            1152,
+            20,
+            Ink,
+            "Alliances are the engine's own list; nothing on this shard yet asks a guild to make one."
+        );
+    }
+
+    private static string Names(List<Guild> guilds)
+    {
+        if (guilds == null || guilds.Count == 0)
+        {
+            return null;
+        }
+
+        var say = "";
+
+        for (var i = 0; i < guilds.Count; i++)
+        {
+            if (guilds[i] == null)
+            {
+                continue;
+            }
+
+            say += say.Length == 0 ? BotClaim.Short(guilds[i].Name) : ", " + BotClaim.Short(guilds[i].Name);
+        }
+
+        return say.Length == 0 ? null : say;
+    }
+
     private void HallsPage(ref DynamicGumpBuilder builder)
     {
-        builder.AddLabel(14, 60, Head, "guild");
-        builder.AddLabel(160, 60, Head, "where");
-        builder.AddLabel(280, 60, Head, "owner");
-        builder.AddLabel(440, 60, Head, "of the guild");
-        builder.AddLabel(560, 60, Head, "inside");
-        builder.AddLabel(700, 60, Head, "condition");
-        builder.AddLabel(860, 60, Head, "paid");
-        builder.AddLabel(960, 60, Head, "go");
+        builder.AddLabelCropped(14, 60, 140, 20, Head, "guild");
+        builder.AddLabelCropped(160, 60, 114, 20, Head, "where");
+        builder.AddLabelCropped(280, 60, 154, 20, Head, "owner");
+        builder.AddLabelCropped(440, 60, 114, 20, Head, "of the guild");
+        builder.AddLabelCropped(560, 60, 134, 20, Head, "inside");
+        builder.AddLabelCropped(700, 60, 154, 20, Head, "condition");
+        builder.AddLabelCropped(860, 60, 94, 20, Head, "paid");
+        builder.AddLabelCropped(960, 60, 206, 20, Head, "go");
 
         for (var i = 0; i < _estate.Count && i < Rows; i++)
         {
@@ -901,27 +1179,25 @@ public sealed class BotDashboardGump : DynamicGump
             var y = 86 + i * (RowHeight + 4);
 
             builder.AddLabelCropped(14, y, 140, 20, Head, hall.Sign?.Name ?? "unnamed");
-            builder.AddLabel(160, y, Ink, $"{hall.X}, {hall.Y}");
+            builder.AddLabelCropped(160, y, 114, 20, Ink, $"{hall.X}, {hall.Y}");
             builder.AddLabelCropped(280, y, 150, 20, Ink, hall.Owner?.Name ?? "nobody");
-            builder.AddLabel(440, y, Ink, $"{(hall.CoOwners?.Count ?? 0) + 1}");
-            builder.AddLabel(560, y, Ink, $"{Furnishings(hall)} things");
+            builder.AddLabelCropped(440, y, 114, 20, Ink, $"{(hall.CoOwners?.Count ?? 0) + 1}");
+            builder.AddLabelCropped(560, y, 134, 20, Ink, $"{Furnishings(hall)} things");
             builder.AddLabelCropped(700, y, 150, 20, Ink, Condition(hall));
-            builder.AddLabel(860, y, Ink, $"{hall.Price}gp");
+            builder.AddLabelCropped(860, y, 94, 20, Ink, $"{hall.Price}gp");
 
             builder.AddButton(960, y, 4005, 4007, 300 + i);
         }
 
         if (_estate.Count == 0)
         {
-            builder.AddLabel(14, 86, Bad, "Nothing has been built on this island yet.");
+            builder.AddLabelCropped(14, 86, 1152, 20, Bad, "Nothing has been built on this island yet.");
         }
 
-        // The other half of the answer, and the half worth reading when the first is empty: what each guild
-        // without a hall has raised, against what one costs.
         var y2 = 86 + Math.Max(1, _estate.Count) * (RowHeight + 4) + 20;
 
         builder.AddImageTiled(14, y2 - 12, Width - 28, 1, 9274);
-        builder.AddLabel(14, y2, Head, "still saving");
+        builder.AddLabelCropped(14, y2, 140, 20, Head, "still saving");
 
         var waiting = 0;
 
@@ -939,32 +1215,64 @@ public sealed class BotDashboardGump : DynamicGump
 
             if (fund >= BotEstate.Price)
             {
-                builder.AddLabel(160, row, Good, $"has {fund}gp of {BotEstate.Price} — it is the ground it is waiting for");
+                builder.AddLabelCropped(
+                    160,
+                    row,
+                    1006,
+                    20,
+                    Good,
+                    $"has {fund}gp of {BotEstate.Price} — it is the ground it is waiting for"
+                );
             }
             else
             {
-                builder.AddLabel(160, row, Ink, $"has {fund}gp of {BotEstate.Price}, {BotEstate.Price - fund}gp short");
+                builder.AddLabelCropped(
+                    160,
+                    row,
+                    1006,
+                    20,
+                    Ink,
+                    $"has {fund}gp of {BotEstate.Price}, {BotEstate.Price - fund}gp short"
+                );
             }
         }
 
         if (waiting == 0)
         {
-            builder.AddLabel(160, y2, Good, "every guild has one");
+            builder.AddLabelCropped(160, y2, 1006, 20, Good, "every guild has one");
         }
 
-        builder.AddLabelCropped(14, Height - 34, Width - 28, 20, Ink, BotPlot.Describe());
+        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotPlot.Describe());
     }
 
-    /// <summary>How many things stand in a hall: its fittings and whatever is locked down in it.</summary>
     private static int Furnishings(BaseHouse hall) => (hall.Addons?.Count ?? 0) + (hall.LockDowns?.Count ?? 0);
 
-    /// <summary>
-    /// The engine's own word for how a house is wearing, which is the one number about a hall that can go
-    /// wrong quietly: an unowned house in this era decays, and nothing else on this shard would say so.
-    /// </summary>
     private static string Condition(BaseHouse hall) => hall.DecayLevel.ToString();
 
-    /// <summary>Puts whoever pressed the button outside a hall's door.</summary>
+    private void Ground(Mobile from, int row)
+    {
+        if (row < 0 || row >= _spots.Count)
+        {
+            return;
+        }
+
+        var (map, where, what) = _spots[row];
+
+        if (map == null || map == Map.Internal || where == Point3D.Zero)
+        {
+            from.SendMessage("There is nothing on that row any more.");
+
+            DisplayTo(from, ClaimTab);
+
+            return;
+        }
+
+        from.MoveToWorld(where, map);
+        from.SendMessage(what ?? "The square.");
+
+        DisplayTo(from, ClaimTab);
+    }
+
     private void Doorstep(Mobile from, int row)
     {
         if (row < 0 || row >= _estate.Count)
@@ -983,57 +1291,68 @@ public sealed class BotDashboardGump : DynamicGump
             return;
         }
 
-        // The ban location rather than the middle of the house: it is the engine's own "outside the front
-        // door" for every multi it knows, and arriving inside somebody's wall is not an entrance.
         from.MoveToWorld(hall.BanLocation, hall.Map);
         from.SendMessage($"The hall of {hall.Sign?.Name ?? "somebody"}, {Furnishings(hall)} things inside it.");
 
         DisplayTo(from, HallTab);
     }
 
-    /// <summary>
-    /// The revel: what is on, what it is for, and where to stand to watch it.
-    /// </summary>
     private void RevelPage(ref DynamicGumpBuilder builder)
     {
         var notice = BotCrier.Read();
 
         if (notice == null)
         {
-            // Nothing is watching, which is a different thing from nothing being declared, and the tab says
-            // which of the two it is rather than showing an empty table that could mean either.
-            builder.AddLabel(14, 60, Bad, "No watcher is running on this shard, so nothing is being declared.");
-            builder.AddLabel(14, 84, Ink, "Revels come from the minds assembly. Without it this tab has nothing to show.");
+            builder.AddLabelCropped(
+                14,
+                60,
+                1152,
+                20,
+                Bad,
+                "No watcher is running on this shard, so nothing is being declared."
+            );
+            builder.AddLabelCropped(
+                14,
+                84,
+                1152,
+                20,
+                Ink,
+                "Revels come from the minds assembly. Without it this tab has nothing to show."
+            );
 
             return;
         }
 
-        builder.AddLabel(14, 60, Head, "what is on");
+        builder.AddLabelCropped(14, 60, 1152, 20, Head, "what is on");
 
         if (notice.Running)
         {
-            builder.AddLabel(
+            builder.AddLabelCropped(
                 14,
                 86,
+                1152,
+                20,
                 Good,
                 $"{notice.Kind} is worth x{notice.Bonus:F1} for another {Clock(notice.EndsIn)}, prize {notice.Prize}gp"
             );
 
-            builder.AddLabel(14, 112, Head, "it said");
+            builder.AddLabelCropped(14, 112, 100, 20, Head, "it said");
             builder.AddHtml(120, 112, Width - 150, 40, notice.Said ?? "nothing at all");
 
-            builder.AddLabel(14, 158, Head, "because");
+            builder.AddLabelCropped(14, 158, 100, 20, Head, "because");
             builder.AddHtml(120, 158, Width - 150, 60, notice.Why ?? "no reason was given");
 
             if (notice.Entered == 0)
             {
-                builder.AddLabel(14, 226, Bad, "nobody has taken it up yet");
+                builder.AddLabelCropped(14, 226, 1152, 20, Bad, "nobody has taken it up yet");
             }
             else
             {
-                builder.AddLabel(
+                builder.AddLabelCropped(
                     14,
                     226,
+                    1152,
+                    20,
                     Ink,
                     $"{notice.Entered} have taken it up; {notice.Leading} leads with {notice.LeadingDid}"
                 );
@@ -1041,26 +1360,37 @@ public sealed class BotDashboardGump : DynamicGump
 
             if (notice.Wave > 0)
             {
-                builder.AddLabel(14, 250, Good, $"wave {notice.Wave} is standing, {notice.Standing} of it alive");
+                builder.AddLabelCropped(
+                    14,
+                    250,
+                    1152,
+                    20,
+                    Good,
+                    $"wave {notice.Wave} is standing, {notice.Standing} of it alive"
+                );
             }
         }
         else
         {
-            builder.AddLabel(14, 86, Ink, $"Nothing is on. The watcher may declare again in {Clock(notice.NextIn)}.");
+            builder.AddLabelCropped(
+                14,
+                86,
+                1152,
+                20,
+                Ink,
+                $"Nothing is on. The watcher may declare again in {Clock(notice.NextIn)}."
+            );
 
             if (notice.Past is { Length: > 0 })
             {
-                builder.AddLabel(14, 112, Ink, $"the last one — {notice.Past[0]}");
+                builder.AddLabelCropped(14, 112, 1152, 20, Ink, $"the last one — {notice.Past[0]}");
             }
             else
             {
-                builder.AddLabel(14, 112, Ink, "nothing has been declared yet");
+                builder.AddLabelCropped(14, 112, 1152, 20, Ink, "nothing has been declared yet");
             }
         }
 
-        // Where to stand. Two buttons rather than one: the thing itself may be an hour's walk from the
-        // watcher who declared it, and on a quiet shard the more useful of the two is whichever is nearer
-        // to something happening.
         var where = notice.Map != null && notice.Where != Point3D.Zero;
 
         builder.AddImageTiled(14, 262, Width - 28, 1, 9274);
@@ -1071,24 +1401,33 @@ public sealed class BotDashboardGump : DynamicGump
 
             if (notice.Camp)
             {
-                builder.AddLabel(52, 276, Head, $"go to the camp at ({notice.Where.X}, {notice.Where.Y})");
+                builder.AddLabelCropped(52, 276, 1114, 20, Head, $"go to the camp at ({notice.Where.X}, {notice.Where.Y})");
             }
             else
             {
-                builder.AddLabel(52, 276, Head, $"go to where it was called, ({notice.Where.X}, {notice.Where.Y})");
+                builder.AddLabelCropped(
+                    52,
+                    276,
+                    1114,
+                    20,
+                    Head,
+                    $"go to where it was called, ({notice.Where.X}, {notice.Where.Y})"
+                );
             }
         }
         else
         {
-            builder.AddLabel(14, 276, Ink, "nowhere in particular: this one is a price, not a place");
+            builder.AddLabelCropped(14, 276, 1152, 20, Ink, "nowhere in particular: this one is a price, not a place");
         }
 
         if (notice.WatcherMap != null && notice.Watcher != Point3D.Zero)
         {
             builder.AddButton(14, 306, 4005, 4007, 13);
-            builder.AddLabel(
+            builder.AddLabelCropped(
                 52,
                 306,
+                1114,
+                20,
                 Head,
                 $"go to {notice.WatcherName ?? "the watcher"}, standing at ({notice.Watcher.X}, {notice.Watcher.Y})"
             );
@@ -1096,36 +1435,52 @@ public sealed class BotDashboardGump : DynamicGump
 
         builder.AddImageTiled(14, 340, Width - 28, 1, 9274);
 
-        builder.AddLabel(14, 354, Head, "the crown");
-        builder.AddLabel(
+        builder.AddLabelCropped(14, 354, 100, 20, Head, "the crown");
+        builder.AddLabelCropped(
             120,
             354,
+            1046,
+            20,
             Ink,
             $"{notice.Declared} declared, {notice.Won} won, {notice.Ignored} ignored, {notice.Bands} taken by a whole guild; {notice.Paid}gp paid out, {notice.Collected}gp taken in tax, {notice.Purse}gp in the purse"
         );
 
         builder.AddLabelCropped(14, 384, Width - 28, 20, Ink, notice.Waves ?? "no waves have been called");
 
-        // What the watcher's own events have actually come to, trade by trade. A kind held three times that
-        // drew nobody is the row worth seeing, and it is the row the watcher is now shown before it chooses.
         builder.AddLabelCropped(14, 404, Width - 28, 20, Ink, notice.Ledger ?? "none have been held yet");
 
-        builder.AddLabel(14, 434, Head, "before this");
+        builder.AddLabelCropped(14, 434, 100, 20, Head, "before this");
 
         var past = notice.Past ?? [];
 
         for (var i = 0; i < past.Length && i < 5; i++)
         {
-            builder.AddLabelCropped(120, 434 + i * 24, Width - 150, 20, Ink, past[i]);
+            builder.AddLabelCropped(120, 434 + i * 24, 540, 20, Ink, past[i]);
+        }
+
+        var squad = BotCrier.Squad();
+
+        builder.AddLabelCropped(680, 434, 486, 20, Head, "the watchers");
+
+        if (squad.Count == 0)
+        {
+            builder.AddLabelCropped(680, 458, 486, 20, Ink, "nobody is watching");
+        }
+
+        for (var i = 0; i < squad.Count && i < 4; i++)
+        {
+            var (name, _, at) = squad[i];
+
+            builder.AddButton(680, 458 + i * 24, 4005, 4007, 60 + i);
+            builder.AddLabelCropped(718, 458 + i * 24, Width - 740, 20, Ink, $"go to {name}, standing at ({at.X}, {at.Y})");
         }
 
         if (past.Length == 0)
         {
-            builder.AddLabel(120, 434, Ink, "nothing has ended yet");
+            builder.AddLabelCropped(120, 434, 554, 20, Ink, "nothing has ended yet");
         }
     }
 
-    /// <summary>Milliseconds as a clock a person reads, because 431000 is not a length of time to anybody.</summary>
     private static string Clock(long ms)
     {
         var seconds = Math.Max(0, ms / 1000);
@@ -1133,13 +1488,36 @@ public sealed class BotDashboardGump : DynamicGump
         return $"{seconds / 60}m {seconds % 60:D2}s";
     }
 
-    /// <summary>
-    /// Puts whoever pressed the button where the revel is, or beside the watcher who declared it.
-    ///
-    /// The notice is read again rather than remembered from when the window was drawn: a revel ends on its
-    /// own clock, and a button that teleports an administrator to where a camp used to be is worse than a
-    /// button that says the camp is gone.
-    /// </summary>
+    private void Beside(Mobile from, int which)
+    {
+        var squad = BotCrier.Squad();
+
+        if (which < 0 || which >= squad.Count)
+        {
+            from.SendMessage("That watcher is nowhere to be found.");
+
+            DisplayTo(from, RevelTab);
+
+            return;
+        }
+
+        var (name, map, at) = squad[which];
+
+        if (map == null || map == Map.Internal || at == Point3D.Zero)
+        {
+            from.SendMessage($"{name} has no body at the moment.");
+
+            DisplayTo(from, RevelTab);
+
+            return;
+        }
+
+        from.MoveToWorld(at, map);
+        from.SendMessage($"{name} is standing here.");
+
+        DisplayTo(from, RevelTab);
+    }
+
     private void Stand(Mobile from, bool watcher)
     {
         var notice = BotCrier.Read();
@@ -1170,6 +1548,54 @@ public sealed class BotDashboardGump : DynamicGump
         DisplayTo(from, RevelTab);
     }
 
+    private void Lair(Mobile from)
+    {
+        var at = BotUnderworld.Hideout;
+        var map = BotLair.Fire?.Map ?? BotLair.Chest?.Map ?? from.Map;
+
+        if (!BotUnderworld.Exists || at == Point3D.Zero || map == null || map == Map.Internal)
+        {
+            from.SendMessage("The Shadow has no hideout at the moment.");
+
+            DisplayTo(from, BandTab);
+
+            return;
+        }
+
+        from.MoveToWorld(at, map);
+        from.SendMessage($"The Shadow's hideout: {BotLair.Describe()}");
+
+        DisplayTo(from, BandTab);
+    }
+
+    private void Tail(Mobile from, int row)
+    {
+        var roll = BotUnderworld.AtLarge();
+
+        if (row < 0 || row >= roll.Count)
+        {
+            DisplayTo(from, BandTab);
+
+            return;
+        }
+
+        var one = roll[row];
+
+        if (one.Map == null || one.Map == Map.Internal || one.Where == Point3D.Zero)
+        {
+            from.SendMessage($"{one.Name} is nowhere to be found.");
+
+            DisplayTo(from, BandTab);
+
+            return;
+        }
+
+        from.MoveToWorld(one.Where, one.Map);
+        from.SendMessage($"{one.Name}: {Standing(one)}, {one.Murders} murders, {one.Price}gp on its head.");
+
+        DisplayTo(from, BandTab);
+    }
+
     private void Visit(Mobile from, int row)
     {
         if (row < 0 || row >= _bots.Count)
@@ -1179,9 +1605,18 @@ public sealed class BotDashboardGump : DynamicGump
 
         var bot = _bots[row];
 
-        if (bot.Deleted || bot.Map == null || bot.Map == Map.Internal)
+        if (bot.Deleted)
         {
             from.SendMessage("That bot is not in the world any more.");
+
+            return;
+        }
+
+        if (Away(bot))
+        {
+            from.SendMessage($"{bot.Name} the {bot.Class?.Name} is offline, {BotRest.Offline(bot) ?? "resting"}.");
+
+            DisplayTo(from, _tab, _page);
 
             return;
         }
@@ -1214,10 +1649,6 @@ public sealed class BotDashboardGump : DynamicGump
         DisplayTo(from, _tab, _page);
     }
 
-    /// <summary>
-    /// The only way in. Everything it checks is checked before the window exists, so the window is never
-    /// sent empty and never sent to somebody who cannot use it.
-    /// </summary>
     public static void DisplayTo(Mobile from, int tab = BotsTab, int page = 0)
     {
         if (from?.NetState == null || from.AccessLevel < AccessLevel.Administrator)
@@ -1246,7 +1677,6 @@ public sealed class BotDashboardGump : DynamicGump
         }
     }
 
-    /// <summary>The bots that exist, holes left by deleted ones removed.</summary>
     private static List<BotMobile> Population()
     {
         var all = BotPopulation.Bots;
@@ -1257,6 +1687,16 @@ public sealed class BotDashboardGump : DynamicGump
             if (all[i] is { Deleted: false })
             {
                 alive.Add(all[i]);
+            }
+        }
+
+        var away = BotPopulation.Away;
+
+        for (var i = 0; i < away.Count; i++)
+        {
+            if (away[i] is { Deleted: false })
+            {
+                alive.Add(away[i]);
             }
         }
 
@@ -1276,18 +1716,6 @@ public sealed class BotDashboardGump : DynamicGump
         return wants;
     }
 
-    /// <summary>
-    /// The stalls that actually have something on them.
-    ///
-    /// <para>
-    /// <b>A stall that has sold out is not a lot, and showing it as one made the market unreadable.</b> An
-    /// empty stall is deliberately kept for an hour — it is the seller's remembered price and its sales
-    /// history, and a miner coming back with a second load tops the same pitch up and inherits both, which
-    /// is real and is used. But that is a fact about the <em>seller</em>, not a thing anybody can buy: the
-    /// trade itself has always skipped them, so every red nought on this page was a row that could never be
-    /// clicked, crowding out the rows that could. Kept in the market and left off the board.
-    /// </para>
-    /// </summary>
     private static List<BotListing> Market()
     {
         var all = BotAuction.Listings;
@@ -1326,6 +1754,5 @@ public sealed class BotDashboardGump : DynamicGump
             _ => Bad
         };
 
-    /// <summary>Red below the mark, plain above it. Colour is the only thing a table of numbers cannot say.</summary>
     private static int Shade(double value, double mark) => value < mark ? Bad : Ink;
 }

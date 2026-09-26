@@ -42,11 +42,8 @@ public sealed class BotWillModule : BotModule
 
         BotWill.Deciding = true;
 
-        // Every number in this line is a claim about what the population will do all night. The exchange rate
-        // comes first because it decides whether this shard is full of miners or full of duellists, and it is
-        // the cheapest possible place to notice that it was set to something absurd.
         logger.Information(
-            "Will ready: a point of skill is worth {Gold} gold, dying costs {Death} minutes; work is reviewed every {Review}ms, held for what it reckons it needs between {Dwell}ms and {DwellCap}ms, and replaced only above ×{Margin} against ×{Inertia} for the work in hand; a crowd bites {Crowd}, repetition {Repeat}",
+            "Will ready: a point of skill is worth {Gold} gold, dying costs {Death} minutes; work is reviewed every {Review}ms, held for what it reckons it needs between {Dwell}ms and {DwellCap}ms, and replaced only above ×{Margin} against ×{Inertia} for the work in hand; steadfast work is held for ×{Stretch} its own reckoning up to {CommitCap}ms unless its walk stops closing for {Trouble} of the watchdog, and is taken up again after what would not wait: {Resume} (not below {ResumeHealth} health); a bot's own trade is worth ×{Own} and another class's ×{Other}; a crowd bites {Crowd}, repetition {Repeat}",
             BotYield.GoldPerSkillPoint,
             BotYield.DeathMinutes,
             BotWill.ReviewMs,
@@ -54,16 +51,18 @@ public sealed class BotWillModule : BotModule
             BotWill.DwellCapMs,
             BotWill.SwitchMargin,
             BotAppraisal.Inertia,
+            BotWill.CommitStretch,
+            BotWill.CommitCapMs,
+            BotWill.TroubleShare,
+            BotWill.Resume,
+            BotWill.ResumeHealth,
+            BotCalling.OwnTrade,
+            BotCalling.OtherTrade,
             BotAppraisal.CrowdBite,
             BotAppraisal.RepetitionBite
         );
     }
 
-    /// <summary>
-    /// A world reload is a different world. What the old population was doing is a count of undertakings held
-    /// by bots that no longer exist, and a count that is never released does not look wrong — it looks like a
-    /// busier shard.
-    /// </summary>
     public override void Reset()
     {
         logger.Information("Will, before the reload: {State}", BotWill.Describe());

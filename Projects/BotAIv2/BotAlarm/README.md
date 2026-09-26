@@ -6,8 +6,9 @@
 | File | What is in it |
 |---|---|
 | `BotAlarm.cs` | the channel: raise, still, clear, note, alive; the swallowing of repeats |
-| `BotSigns.cs` | the six rules and their thresholds, read once a minute |
+| `BotSigns.cs` | the six rules and their thresholds, read once a minute; the work alarm judges finished over the work that ended and names the loudest (bot, kind, reason) of its window (§5 S5, build 64) |
 | `BotTail.cs` | counts the errors the shard prints, by reading the tail of its own session log |
+| `BotBoot.cs` | the `world` alarm: a boot that loaded fewer than half the mobiles of the best boot on record (`logs/bot-boot.txt`) is a truncated save, said as an error and raised as an alert — the 16.09.2026 incident ran five hours with nothing saying so (build 70) |
 | `BotAlarmModule.cs` | the module, the clock, and `Configuration/bot-alarm.json` |
 
 ---

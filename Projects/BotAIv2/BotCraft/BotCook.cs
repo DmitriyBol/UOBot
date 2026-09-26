@@ -23,22 +23,16 @@ public sealed class BotCook : IBotProposer
 
     private static bool _saidNoSystem;
 
-    /// <summary>Bots asked who were carrying a skillet.</summary>
     public static long Asked { get; private set; }
 
-    /// <summary>Answers that went to somebody with no skillet at all. Most of them, and not a refusal.</summary>
     public static long NoKit { get; private set; }
 
-    /// <summary>Cooks with nothing raw in the pack worth putting on.</summary>
     public static long NoMeat { get; private set; }
 
-    /// <summary>Cooks holding meat their skill will not carry a recipe for.</summary>
     public static long Unskilled { get; private set; }
 
-    /// <summary>Cooks with meat and a recipe and no fire anywhere they could carry it to.</summary>
     public static long NoFire { get; private set; }
 
-    /// <summary>Turns at the skillet offered.</summary>
     public static long Offered { get; private set; }
 
     public string Name => "Cook";
@@ -89,17 +83,11 @@ public sealed class BotCook : IBotProposer
 
         if (recipe?.ItemType == null)
         {
-            // Held meat and could not make a meal of it. Counted apart from having no meat, because the two
-            // want opposite answers: one is a hunter's problem and the other is a lesson's.
             Unskilled++;
 
             return null;
         }
 
-        // <b>The fire is looked for last, after the meat and the recipe.</b> Order decides what the summary
-        // can say: asked first, it would answer "no fire" for the whole population including the twelve
-        // hundred carrying nothing to cook, and the one number that matters — cooks held up by having
-        // nowhere to cook — would be buried in it.
         var here = BotOven.AtAHearth(body);
         var hearth = here ? body.Location : BotGround.Hearth(bot, body.Location);
 

@@ -37,33 +37,17 @@ namespace Server.BotAI.Mind;
 /// </summary>
 public static class BotAudit
 {
-    /// <summary>How long a bot is given to get somewhere, finish something, or change in any way at all.</summary>
     public static int WindowMs { get; set; } = 120000;
 
-    /// <summary>
-    /// How many bots may be touched in one window.
-    ///
-    /// <para>
-    /// <b>A cap, because the failure mode of this file is a population being shaken every two minutes by the
-    /// thing that is supposed to be diagnosing it.</b> If more than a handful are stuck at once the fault is
-    /// not in those bots and no amount of shaking them will help; what that wants is the finding, not the
-    /// hand. So the worst few are touched, the rest are counted and named in the log, and the number that
-    /// went untouched is reported — a cap nobody is told about is a silent truncation.
-    /// </para>
-    /// </summary>
     public static int MostTouched { get; set; } = 4;
 
-    /// <summary>How long a bot is left alone after being touched, so a cure has time to work or not.</summary>
     public static int RestMs { get; set; } = 300000;
-
-
 
     /// <summary>What was true about one bot when the window opened.</summary>
     private sealed class Mark
     {
         public string Kind;
 
-        /// <summary>Which piece of work it was, not what it was called. See <see cref="BotWatch.Takes"/>.</summary>
         public long Takes;
 
         public Point3D Where;
@@ -95,7 +79,6 @@ public static class BotAudit
 
     private static bool _opened;
 
-    /// <summary>Windows run, bots found stuck, and what was done about it. Each counted apart.</summary>
     public static long Windows { get; private set; }
 
     public static long Stuck { get; private set; }
@@ -104,32 +87,18 @@ public static class BotAudit
 
     public static long Shaken { get; private set; }
 
-    /// <summary>
-    /// Why a stuck bot was left alone, counted apart rather than summed.
-    ///
-    /// Merged into one "untouched" figure these say opposite things: a population where everybody is in a
-    /// fight is healthy and one where the cap is being hit every window is not, and a single number cannot
-    /// tell the two apart. Same rule as every other tally on this shard.
-    /// </summary>
     public static long LeftFighting { get; private set; }
 
     public static long LeftResting { get; private set; }
 
     public static long LeftCapped { get; private set; }
 
-    /// <summary>
-    /// Bots that were stuck, were touched, and were not stuck when the next window closed.
-    ///
-    /// <para>
-    /// The only number here that says whether any of this is worth doing. Without it the log says "four bots
-    /// were shaken" for ever and nobody can tell a cure from a habit.
-    /// </para>
-    /// </summary>
     public static long Freed { get; private set; }
 
     public static long StillStuck { get; private set; }
 
-    /// <summary>What the last window found, in words, for the model and for the log.</summary>
+    public static long OnPurpose { get; private set; }
+
     public static string Last { get; private set; } = "No window has closed yet.";
 
     public static void Reset()
@@ -147,17 +116,14 @@ public static class BotAudit
         LeftCapped = 0;
         Freed = 0;
         StillStuck = 0;
+        OnPurpose = 0;
         Last = "No window has closed yet.";
     }
 
-    /// <summary>Whether the window has run out. Called every sample; true twice a minute at most.</summary>
     public static bool Due(long now)
     {
         if (!_opened)
         {
-            // Seeded from a real tick rather than left at zero. On a host whose counter starts enormous,
-            // zero is not "never", it is a moment eleven days in the past — and the first window would close
-            // instantly on a population nobody had watched yet.
             _opened = true;
             _sweptTick = now;
 
@@ -167,9 +133,6 @@ public static class BotAudit
         return now - _sweptTick >= WindowMs;
     }
 
-    /// <summary>
-    /// One window. Closes the last one, judges everybody, lays a hand on the worst, and opens the next.
-    /// </summary>
     public static void Sweep(long now, IReadOnlyList<BotWatch> roll)
     {
         _sweptTick = now;
@@ -208,11 +171,6 @@ public static class BotAudit
                     continue;
                 }
 
-                // <b>Enrolled is not judged, and saying otherwise was this file's first defect.</b> A bot
-                // seen for the first time has nothing to be compared against — there is no earlier mark, so
-                // no question can be answered about it. The first roll-call counted all thirty-eight as
-                // asked and then reported nought to every question, which is precisely the shape of summary
-                // this whole project exists to refuse: it named a denominator it had not measured.
                 if (!_marks.TryGetValue(bot.Serial, out var mark))
                 {
                     fresh++;
@@ -223,13 +181,6 @@ public static class BotAudit
 
                 seen++;
 
-                // 1. It took something on. Did it finish it? Asked first, because the answer decides
-                // whether the next question means anything at all.
-                // <b>The same piece of work, not the same name for one.</b> Comparing kinds says a bot that
-                // finished an unload and took another unload never finished anything — and this file acts on
-                // that answer: it throws routes away and ends work as failed. On 03.09.2026 at 05:56 it
-                // reminded Lysa the Warrior about a walk it had been on for 26 seconds, because the unload
-                // before it had the same name. Takes counts the pieces themselves.
                 var over = mark.Takes != watch.Takes;
 
                 if (mark.Kind == "-")
@@ -245,32 +196,10 @@ public static class BotAudit
                     holding++;
                 }
 
-                // 2. It was going somewhere. Did it get there?
-                //
-                // <b>Asked only of the bots still on the same piece of work, and the first version asked it
-                // of everybody.</b> A bot that finished its job two minutes ago and took another is walking
-                // somewhere else entirely; measuring it against the destination it has rightly abandoned
-                // counted seventeen bots that had just succeeded as "still short of it". The number was true
-                // — they are indeed not at that old place — and it answered a question nobody was asking.
-                // Where it went is now told by the work question, which is where it belongs.
                 var reached = false;
 
-                // <b>Not asked of a bot that had nothing two minutes ago, and asking it was an off-by-one in
-                // print.</b> Question one sorts every bot into idle, finished or holding; question two sorted
-                // the same bots into movedOn and four destination cases — but it used only the "did the work
-                // change" test, so a bot that held nothing then and holds nothing now answered "idle" above
-                // and "not going anywhere" below, and a bot that held nothing then and something now was
-                // counted as having ended a piece of work it never had. The two sentences then disagreed by
-                // exactly that many: on 03.09.2026 at 00:17 the roll-call read "Of the 7 still on the same
-                // piece of work ... 0 arrived, 5 short, 2 not going anywhere, 1 chasing", which is eight, and
-                // the same shape appeared at 22:03 the evening before with 24 against 25. A summary whose own
-                // two halves do not add up teaches whoever reads it to trust neither.
-                //
-                // With this, the halves are the same partition twice: finished equals movedOn, and holding
-                // equals the four cases below.
                 if (mark.Kind == "-")
                 {
-                    // It had no work to be going anywhere for. Counted as idle above and nowhere here.
                 }
                 else if (over)
                 {
@@ -278,8 +207,6 @@ public static class BotAudit
                 }
                 else if (watch.Following)
                 {
-                    // Chasing something that moves. There is no place it was going to: the destination is
-                    // wherever that creature now stands, and the mark holds where it stood two minutes ago.
                     chasing++;
                 }
                 else if (!mark.Going)
@@ -296,7 +223,6 @@ public static class BotAudit
                     short_++;
                 }
 
-                // 3. Did anything at all change?
                 var stirred = Math.Max(Math.Abs(bot.X - mark.Where.X), Math.Abs(bot.Y - mark.Where.Y)) > BotWatch.PacingSpan;
 
                 if (stirred)
@@ -324,18 +250,6 @@ public static class BotAudit
                     sadder++;
                 }
 
-                // <b>All of it, not any of it.</b> Standing still is ordinary, holding one job for two
-                // minutes is ordinary, and earning nothing for two minutes is ordinary — a smith at an anvil
-                // does all three and is working perfectly. What is not ordinary is a bot that did not
-                // arrive, did not finish, did not move off its patch and is no better off than it was: four
-                // ways of getting somewhere, and it took none of them.
-                // <b>And it is not a fight, which cost a whole night to learn.</b> A bot trading blows is
-                // standing next to something, so it has not "arrived" anywhere new, has not finished, does
-                // not leave a two-tile patch, and is no richer until the thing dies — all four tests, failed,
-                // by a bot doing exactly what it should. On the night of 01.09.2026 that produced 1010
-                // reminders and shakes and freed nobody at all, because nobody was stuck: the debugger spent
-                // the night interrupting fighters. Whether a fight is going anywhere is measured separately
-                // and reported separately — see BotWatch.SwingingMs — and it is not this question.
                 if (watch.Fighting)
                 {
                     fighting++;
@@ -344,21 +258,12 @@ public static class BotAudit
                 var wedged = !reached && !over && !stirred && !gained && !watch.Fighting && !watch.Following
                              && mark.Kind != "-";
 
-                // <b>The window's new mark is made and filed FIRST, and everything after this works on it.</b>
-                // It used to be the other way round: the old mark went into the stuck list, the dictionary was
-                // then given a fresh one built from it, and every note the hand made afterwards — that this
-                // bot had been touched, when, how often — was written into an object nobody would ever read
-                // again. So the five-minute rest between touches never applied, a remind never escalated to a
-                // shake, and the one number that says whether any of this works could not be counted at all.
-                //
-                // Measured, 02.09.2026: Doran the Crafter was reminded at 10:28, 10:30, 10:32, 10:34 and
-                // 10:36 — every window, two minutes apart, against a rest of five — while its mine went from
-                // 200s to 561s held and it never moved off 1360,1559. And across the night before: 1010
-                // reminders, 0 shakes, 0 freed. Neither figure was a fact about the population.
-                //
-                // The new mark carries Touched, Reminds, Shakes and Stuck over from the old one, so nothing
-                // is lost by filing it early — and `current.Touched` still means "was it touched before this
-                // window", which is the question the recovery test asks.
+                if (wedged && bot.Resolve?.Deed is { Still: true })
+                {
+                    OnPurpose++;
+                    wedged = false;
+                }
+
                 var current = Take(watch, now, mark);
 
                 _marks[bot.Serial] = current;
@@ -382,9 +287,6 @@ public static class BotAudit
         }
     }
 
-    /// <summary>
-    /// Books the verdict on one bot, and asks whether a hand laid on it last window did any good.
-    /// </summary>
     private static void Was(
         BotWatch watch,
         Mark mark,
@@ -394,9 +296,6 @@ public static class BotAudit
         bool touched
     )
     {
-        // Read before it is overwritten: the question "was it stuck last window" and the answer "is it stuck
-        // now" are the same field a moment apart, and taking them in the wrong order makes every recovery
-        // invisible.
         var was = mark.Stuck;
 
         mark.Stuck = wedged;
@@ -419,8 +318,6 @@ public static class BotAudit
             return;
         }
 
-        // It is not stuck now. If it was stuck and was touched, that is the only evidence this file produces
-        // that any of it works.
         if (touched && was)
         {
             Freed++;
@@ -431,16 +328,6 @@ public static class BotAudit
         }
     }
 
-    /// <summary>
-    /// Lays a hand on the worst of them, gently first.
-    ///
-    /// <para>
-    /// Only on the two rungs where a bot is choosing its own business. A bot that is bleeding, being hit or
-    /// marching with a company is not stuck — it is busy with something no opinion of this file's is wanted
-    /// in, and ending its work mid-fight would be the debugger causing exactly the kind of harm it exists to
-    /// find.
-    /// </para>
-    /// </summary>
     private static void Touch(long now, List<(BotWatch Watch, Mark Mark, string Why)> stuck, ref ValueStringBuilder sb)
     {
         if (stuck.Count == 0)
@@ -448,8 +335,6 @@ public static class BotAudit
             return;
         }
 
-        // Worst first, so a cap spends itself on the bots that have been stuck longest rather than on
-        // whoever happens to come first in the roll.
         stuck.Sort((a, b) => b.Watch.Suspicion.CompareTo(a.Watch.Suspicion));
 
         var touched = 0;
@@ -495,9 +380,6 @@ public static class BotAudit
             mark.Touched = true;
             mark.TouchedTick = now;
 
-            // Gently first. The route is thrown away and the destination kept, so the bot draws a fresh path
-            // to the same place — which is the whole cure when a plan has gone stale under it, and costs
-            // nothing when it is not.
             if (mark.Reminds == 0)
             {
                 mark.Reminds++;
@@ -510,30 +392,9 @@ public static class BotAudit
                 continue;
             }
 
-            // It was reminded last window and is still here. End the work as a failure, which is not merely
-            // dropping it: the ledger learns this place was no good, so the same errand to the same spot is
-            // worth less next time and the loop does not simply start again with a longer period.
             mark.Shakes++;
             Shaken++;
 
-            // <b>The work is given its own chance to learn before it is ended, and leaving this out made the
-            // debugger the cause of the loop it was reporting.</b>
-            //
-            // Every undertaking that walks somewhere has a Bend: the hook the walk layer calls when a road
-            // turns out not to exist, where the deed writes down that the place was no good. BotPeddle marks
-            // the shopkeeper, BotDig marks the seam, BotForge marks the smithy — and the shard's vendor
-            // choice then skips a shop the ledger is cautious about. That is how a bot learns to go somewhere
-            // else.
-            //
-            // Abandon ends the deed through BotWill, which never touches the walk layer, so Bend never fired
-            // and nothing was ever written down. Measured 02.09.2026: 40-odd attempts to carry three Fancy
-            // Shirts to Phyllis, every one ended by the line "the debugger found it stuck and ended it", every
-            // one re-offered within seconds at 72/min — while Melina buys the same shirts at 235/min and is
-            // reached without trouble. Phyllis is simply nearer, and nearer is what the choice weighs when
-            // nothing has marked her down.
-            //
-            // So Bend first. If it returns true the deed has found somewhere else to go and there is nothing
-            // to end — the shake becomes "try elsewhere", which is a better cure and a cheaper one.
             var work = bot.Resolve?.Deed;
 
             if (work != null && work.Bend(bot))
@@ -554,9 +415,6 @@ public static class BotAudit
         LeftResting += resting;
         LeftCapped += capped;
 
-        // Said even when it is nought, and said with the three reasons apart. A cap nobody is told about is
-        // a silent truncation, and "left alone because it is in a fight" and "left alone because I had
-        // already touched four" are opposite facts about the shard.
         if (fighting + resting + capped > 0)
         {
             sb.AppendLine(
@@ -663,11 +521,10 @@ public static class BotAudit
             Shakes = was?.Shakes ?? 0
         };
 
-    /// <summary>One line about what the roll-call has done, for the shard's own log.</summary>
     public static string Describe() =>
         Windows == 0
             ? "no roll-call has run yet"
             : $"{Windows} roll-calls, {Stuck} times a bot answered no to all three questions; "
               + $"{Reminded} reminded, {Shaken} shaken, {LeftFighting} left fighting, {LeftResting} resting, {LeftCapped} over the cap; "
-              + $"{Freed} were going again by the next window and {StillStuck} were not";
+              + $"{Freed} were going again by the next window and {StillStuck} were not; {OnPurpose} left to work that stands still on purpose";
 }

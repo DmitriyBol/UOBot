@@ -14,18 +14,13 @@ namespace Server.BotAI.V2;
 /// </summary>
 public enum BotRole
 {
-    /// <summary>Closes and holds. Warrior, warrior-mage, brawler.</summary>
     Melee,
 
-    /// <summary>Fights at distance and needs ammunition. Archer, warrior-archer.</summary>
     Ranged,
 
-    /// <summary>Damage and utility out of a spellbook. Mage.</summary>
     Caster,
 
-    /// <summary>Keeps everybody else standing. Healer.</summary>
     Medic,
 
-    /// <summary>Makes and gathers rather than fights. Crafter, gatherer.</summary>
     Producer
 }

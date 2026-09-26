@@ -8,12 +8,12 @@ right to take from it.
 | File | What is in it |
 |---|---|
 | `BotOutfit.cs` | the issuing step: the weapon roll, the order of equipping, tools, supplies, potions |
-| `BotBinding.cs` | what "bound" means: the flag, zero weight, the stack count, giving back what was lost |
+| `BotBinding.cs` | what "bound" means: the flag, zero weight, the stack count, giving back what was lost, and the market's two doors that turn it away |
 | `BotBond.cs` | the record of what a bot was issued. Lives **on the bot**, not in a table |
 | `BotCasterStaff.cs` | the casting staff, blue or green — the colour comes from the class |
 | `BotBrawlerGloves.cs` | the gloves a brawler fights in |
 | `BotHarness.cs` | what a bot ought to be wearing, worked out from what this shard can actually make and what it costs |
-| `BotStable.cs` | buying a horse, and calling it up |
+| `BotStable.cs` | buying a horse, and calling it up; keeps back `BotPurse.KeepBack` (build 64) |
 | `BotSteed.cs` | a horse a bot carries in its pack and calls up when it has somewhere to be |
 
 **Eight kinds of reagent are issued, not six.** Six were chosen to match exactly the three starting spells, and
@@ -110,6 +110,26 @@ deletes the corpse and its contents entirely — so the corpse exists and is ful
 | on resurrection | `BotBinding.Restore(this, Bond)` |
 
 Plus one check anywhere the economy might part a bot from something: `BotBinding.IsBound(item, bond)`.
+
+## The bound weapon rides in the pack once a better one is in the hand
+
+Patrick's order of 15.09.2026: a bot wields the better weapon even when it is already holding one, and the bound
+weapon stays in its pack, so that a bot stripped of the better one in a war still has something to fight with.
+`BotMobile.Rewield` does the first half — only within the bot's own kind (the birth weapon's skill, distance and
+ammunition), only for something that lands at least `WeaponMargin` times as much a second by the engine's own
+arithmetic, and never for a class whose staff gives back mana. The second half was already the bind: weightless,
+kept through death, never sold. After death the better weapon is on the corpse and the bound one in the pack, and
+the re-arm puts the bound one on.
+
+What changed is where the bound weapon lives. It used to be in the hand, and every scan of a pack missed it by
+construction; now it is in the pack, so the choosers that hand goods on pass it over (`BotPeddle.Gather`,
+`BotSupply.Lift`), and the market's two doors refuse it outright and count it:
+
+```
+N bound things turned away from a stall or a want
+```
+
+That number should stay at nought. Anything above it names a chooser that forgot to ask.
 
 `BotBond` deliberately **does not serialise**. The population is rebuilt from configuration on every world load —
 bots returning from a save are cleaned out, because the engine's entity serialiser has no per-entity refusal — so

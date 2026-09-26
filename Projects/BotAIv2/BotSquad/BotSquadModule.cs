@@ -31,13 +31,8 @@ public sealed class BotSquadModule : BotModule
         BotSquadConfig.Load();
         BotSquads.Start();
 
-        // The captain's offer. Registered here rather than with the hunt's proposers because a patrol is a
-        // company before it is a fight: without squads running it can never be taken up, and this is the
-        // module that knows whether they are.
         BotWill.Offer(new BotPatrol());
 
-        // And the way into a company that is already fighting. Until this, a squad could only be joined in
-        // the second it was formed — see BotEnlist.
         BotWill.Offer(new BotEnlister());
 
         logger.Information(
@@ -72,10 +67,6 @@ public sealed class BotSquadModule : BotModule
         );
     }
 
-    /// <summary>
-    /// A world reload is a different world, and every squad in the old one was made of bots that no longer
-    /// exist.
-    /// </summary>
     public override void Reset()
     {
         logger.Information("Squads, before the reload: {State}", BotSquads.Describe());

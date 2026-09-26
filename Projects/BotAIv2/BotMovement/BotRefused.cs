@@ -45,34 +45,20 @@ public static class BotRefused
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRefused));
 
-    /// <summary>
-    /// How wide a square one entry covers.
-    ///
-    /// Eight tiles: wide enough that a bot which failed to reach a doorway does not have to fail again two
-    /// tiles along, narrow enough that refusing one does not refuse a district. The ledger bands ground at
-    /// 64 and the quadrant map at 30; both proved too coarse to point at a place, which is what this is for.
-    /// </summary>
     public static int Grain { get; set; } = 8;
 
-    /// <summary>How long one refusal rests a square. Doubles per refusal, up to <see cref="MostRestMs"/>.</summary>
     public static int RestMs { get; set; } = 120000;
 
-    /// <summary>The ceiling on that doubling — two hours, which is longer than any errand's patience.</summary>
     public static int MostRestMs { get; set; } = 7200000;
 
-    /// <summary>Most squares remembered at once. Oldest untouched go first when it is full.</summary>
     public static int MostPlaces { get; set; } = 4096;
 
-    /// <summary>Refusals written.</summary>
     public static long Marked { get; private set; }
 
-    /// <summary>Times a chooser was told to leave a square alone.</summary>
     public static long Skipped { get; private set; }
 
-    /// <summary>Squares cleared because somebody arrived in them after all.</summary>
     public static long Disproved { get; private set; }
 
-    /// <summary>Squares dropped to keep the record inside <see cref="MostPlaces"/>.</summary>
     public static long Forgotten { get; private set; }
 
     private sealed class Row
@@ -89,10 +75,6 @@ public static class BotRefused
     private static (int Map, int X, int Y) Key(Map map, Point3D where) =>
         (map?.MapID ?? -1, where.X / Grain, where.Y / Grain);
 
-    /// <summary>
-    /// Somebody gave up trying to reach here. Written by whoever gives up — the walker when a road refuses,
-    /// the stall watch when it takes an errand away — and by nobody else.
-    /// </summary>
     public static void Refuse(Map map, Point3D where)
     {
         if (map == null || map == Map.Internal)
@@ -122,12 +104,13 @@ public static class BotRefused
         Marked++;
     }
 
-    /// <summary>
-    /// Whether this ground is resting after refusing somebody. Asked by every sampler that picks a place to
-    /// walk to, before it picks.
-    /// </summary>
     public static bool Refusing(Map map, Point3D where)
     {
+        if (BotBarred.Barred(map, where))
+        {
+            return true;
+        }
+
         if (map == null || _rows.Count == 0)
         {
             return false;
@@ -151,13 +134,6 @@ public static class BotRefused
         return true;
     }
 
-    /// <summary>
-    /// Somebody arrived here, so whatever this square refused before, it does not refuse now.
-    ///
-    /// <b>This is the half the quadrant baulks never had.</b> A record that only ever accumulates will, given
-    /// hours, refuse the whole map — the baulk map reached a quarter of the island in ninety minutes on the
-    /// night this was written, and nothing existed that could take one back.
-    /// </summary>
     public static void Arrived(Map map, Point3D where)
     {
         if (map == null || _rows.Count == 0)
@@ -171,7 +147,6 @@ public static class BotRefused
         }
     }
 
-    /// <summary>Drops the least recently touched squares when the record is full.</summary>
     private static void Sweep(long now)
     {
         if (_rows.Count < MostPlaces)
@@ -197,13 +172,11 @@ public static class BotRefused
         }
     }
 
-    /// <summary>One line for the shard's own summary.</summary>
     public static string Describe() =>
         Marked == 0
-            ? "nowhere has refused anybody yet"
-            : $"{_rows.Count} squares of {Grain} tiles are resting after refusing somebody: {Marked} refusals written, {Skipped} choices steered away from them, {Disproved} cleared by somebody arriving after all, {Forgotten} dropped to stay inside {MostPlaces}";
+            ? $"nowhere has refused anybody yet; {BotBarred.Describe()}"
+            : $"{_rows.Count} squares of {Grain} tiles are resting after refusing somebody: {Marked} refusals written, {Skipped} choices steered away from them, {Disproved} cleared by somebody arriving after all, {Forgotten} dropped to stay inside {MostPlaces}; {BotBarred.Describe()}";
 
-    /// <summary>A world reload is a different world.</summary>
     public static void Forget()
     {
         _rows.Clear();
@@ -211,5 +184,7 @@ public static class BotRefused
         Skipped = 0;
         Disproved = 0;
         Forgotten = 0;
+
+        BotBarred.Forget();
     }
 }

@@ -32,42 +32,18 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotInscribe : BotDeed
 {
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "inscribe";
 
-    /// <summary>
-    /// What a session at the pen is reckoned at per minute before experience corrects it.
-    ///
-    /// A little above the needle's fifty-five, and for a stated reason rather than a feeling: it is the same
-    /// on-vector skill at full rate, the materials cost more, and what comes off it asks more. It is also the
-    /// number most likely to be wrong, because the real pace is set by mana coming back — and that is exactly
-    /// what the ledger is for.
-    /// </summary>
     public static double Prior { get; set; } = 60.0;
 
-    /// <summary>How long a session is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 6.0;
 
-    /// <summary>How many blank scrolls to buy in one go.</summary>
     public static int Batch { get; set; } = 20;
 
-    /// <summary>How often an attempt is made. The engine's craft has its own timer besides this.</summary>
     public static int SwingMs { get; set; } = 3000;
 
-    /// <summary>
-    /// How many attempts may pass with nothing whatever changing before the session is given up.
-    ///
-    /// Generous, because a run of failed skill checks is ordinary and does consume blanks — what this catches
-    /// is the other thing entirely: attempts that are not happening at all.
-    /// </summary>
     public static int Patience { get; set; } = 10;
 
-    /// <summary>
-    /// How long a scribe will sit waiting for mana before it takes what it has written and goes.
-    ///
-    /// A session that stalls on an empty pool must end rather than wait for ever: the work is still finished
-    /// and still measured, and a bot that has run itself dry has learned something the ledger should see.
-    /// </summary>
     public static int PatienceMs { get; set; } = 60000;
 
     private enum Leg
@@ -77,7 +53,9 @@ public sealed class BotInscribe : BotDeed
         Market
     }
 
-    private readonly BaseVendor _shop;
+    private BaseVendor _shop;
+
+    private int _repicks;
 
     private readonly int _price;
 
@@ -95,14 +73,12 @@ public sealed class BotInscribe : BotDeed
 
     private int _swings;
 
-    /// <summary>Attempts since anything at all changed — a scroll appeared, or a blank was spent.</summary>
     private int _fruitless;
 
     private int _blanks = -1;
 
     private int _kept;
 
-    /// <summary>How many written scrolls have been dealt with — booked, sold or listed. See <see cref="Made"/>.</summary>
     private int _placed;
 
     private int _sold;
@@ -125,41 +101,20 @@ public sealed class BotInscribe : BotDeed
 
     public override Map Map => _shop?.Map;
 
-    /// <summary>The shop, for the whole life of the work: the one fixed place in the chain.</summary>
     public override Point3D Where => _shop?.Location ?? Point3D.Zero;
 
     public override double Expects => Prior;
 
     public override double Minutes => WorkMinutes;
 
-    /// <summary>Inscribe, and it is on the mage's own vector — which is what makes this worth its time.</summary>
     public override SkillName? Trains => SkillName.Inscribe;
 
     public override int Outlay => Batch * _price;
 
-    /// <summary>
-    /// Nothing is promised in coin. A scroll may end up filling somebody's want, which pays at once, but at
-    /// the moment the work is chosen that is a possibility rather than a plan.
-    /// </summary>
+    public override bool AtCounter => _shop != null;
+
     public override double Coin => 0.0;
 
-    /// <summary>
-    /// What was produced and <em>not</em> sold: scrolls kept for the book and scrolls left on a stall, and
-    /// the ones written but not yet placed.
-    ///
-    /// A scroll that filled a want is paid for in coin the moment it is handed over, and the coin is already
-    /// in the takings — counting it here as well would pay the scribe twice for one scroll.
-    ///
-    /// <para>
-    /// <b>The last clause is why a dropped session used to read as a catastrophe.</b> Everything was counted
-    /// in the placing leg, so a scribe whose work the auction chose against mid-page had bought paper, made
-    /// scrolls, and declared nothing for them: on 02.09.2026 Calla 2 settled a dropped inscribe at "-100 in
-    /// 1.3 min (-79/min): -100 coin, 0 made" with four scrolls in its pack, and Cedric at -198/min with
-    /// four more. The scrolls were real and still in hand; the ledger was taught that writing loses money.
-    /// Unplaced work is counted here at the price it will be asked for and taken back out as it is placed,
-    /// so nothing is counted twice.
-    /// </para>
-    /// </summary>
     public override int Made => _made + Math.Max(0, _scrolls - _placed) * _worth;
 
     public override string Stage => _leg switch
@@ -169,19 +124,6 @@ public sealed class BotInscribe : BotDeed
         _ => $"placing {_scrolls}"
     };
 
-    /// <summary>
-    /// The way to the shopkeeper turned out not to exist.
-    ///
-    /// <para>
-    /// <b>Nothing to bend to here, and something to write down — and it was the writing down that was
-    /// missing.</b> What this undertaking carries was priced against <em>this</em> shopkeeper, so swapping in
-    /// another one mid-errand would carry a stale price; failing is the honest answer. But the failure has to
-    /// be filed under the <em>place's</em> name, because that is the word the shop lookup asks in. Filed under
-    /// the undertaking's name — which is all <c>BotWill.Settle</c> can do — it is written and never read, and
-    /// the next beat picks the same unreachable shopkeeper on distance alone. Calla walked at Gus thirty-one
-    /// times in an hour on 26.08.2026 that way.
-    /// </para>
-    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
         if (_shop == null)
@@ -237,15 +179,20 @@ public sealed class BotInscribe : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
-            // The distance the work itself asks for, on the line above. See BotArrival.Beside.
-            // Followed rather than aimed at: a shopkeeper wanders. See BotPeddle for the whole reason.
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for blank scrolls");
         }
 
         if (BotShops.Buy(bot, _shop, typeof(BlankScroll), Batch, out var refused) <= 0)
         {
-            // The fourth and last counter in the project. All four said something different and none of them
-            // said which of the six ways a purchase can fail had happened.
+            var next = BotShops.Next(bot, _shop, typeof(BlankScroll), ref _repicks);
+
+            if (next != null)
+            {
+                _shop = next;
+
+                return BotDoing.Walk(next.Map, next, BotArrival.Within(BotShops.CounterReach), $"on to {next.Name} for blank scrolls");
+            }
+
             return BotDoing.Failed(refused ?? "no blank scrolls to be had");
         }
 
@@ -254,11 +201,13 @@ public sealed class BotInscribe : BotDeed
         return default;
     }
 
+    private bool _worn;
+
     private BotDoing Writing(Mobile body)
     {
         var pen = BotQuill.Pen(body);
 
-        if (pen == null)
+        if (pen == null && _swings == 0)
         {
             return BotDoing.Failed("nothing to write with");
         }
@@ -275,14 +224,25 @@ public sealed class BotInscribe : BotDeed
             _had = BotQuill.Held(body, _kind);
         }
 
-        // What the last attempt produced, counted before the next one is made. A failure produces nothing and
-        // is supposed to: that is what the blank and the herbs are paying for.
         var have = BotQuill.Held(body, _kind);
 
         if (have > _had)
         {
             _scrolls += have - _had;
             _had = have;
+        }
+
+        if (pen == null)
+        {
+            if (_swung && Core.TickCount - _swungTick < SwingMs)
+            {
+                return BotDoing.Work("writing");
+            }
+
+            _worn = true;
+            _leg = Leg.Market;
+
+            return default;
         }
 
         if (BotQuill.Blanks(body) <= 0 || !BotQuill.Stocked(body, _recipe))
@@ -292,8 +252,6 @@ public sealed class BotInscribe : BotDeed
             return default;
         }
 
-        // The engine refuses the attempt outright below the cost, so this is asked before swinging rather
-        // than discovered from a message nobody reads.
         if (body.Mana < _recipe.Mana)
         {
             if (_restingTick == 0)
@@ -317,14 +275,6 @@ public sealed class BotInscribe : BotDeed
             return BotDoing.Work("writing");
         }
 
-        // Nothing is changing hands.
-        //
-        // <b>An unbounded "still writing" is the one shape of state this project refuses to have, and it had
-        // one.</b> The engine's craft can decline silently — the action lock is held, the skill check comes
-        // out at nil, a resource is not where it expected — and it declines by returning, with a message to a
-        // client that a bot does not have. So a mage born with twenty blanks never walks to a shop, sits down
-        // to write, and stays there: no scroll is produced, no blank is spent, no mana is drawn, and there is
-        // nothing in the log at all. Two mages spent sixteen minutes doing that in plain sight.
         var blanks = BotQuill.Blanks(body);
 
         if (_blanks >= 0 && blanks == _blanks && have == _had)
@@ -354,23 +304,11 @@ public sealed class BotInscribe : BotDeed
         return BotDoing.Work("writing");
     }
 
-    /// <summary>
-    /// Where each scroll goes, in the order that makes the trade worth having.
-    ///
-    /// <para>
-    /// Its own book first, and only for the first one of a kind — after that the book already has the spell
-    /// and the question does not arise. Then somebody's standing want, because a funded want is a buyer who
-    /// has already put the money down and it pays at once. Then a stall, which is the market being told what
-    /// exists at what price even though nobody has asked for it yet.
-    /// </para>
-    /// </summary>
     private BotDoing Placing(IBotWilful bot, Mobile body)
     {
         if (_scrolls <= 0)
         {
-            // The paper is gone and nothing came of it. Finished rather than failed: the attempts were real,
-            // the skill checks happened, and what it cost is what learning a trade costs.
-            return BotDoing.Done($"{_swings} attempts, nothing came of it");
+            return BotDoing.Done($"{_swings} attempts, nothing came of it{(_worn ? ", the pen worn through" : "")}");
         }
 
         var written = BotQuill.Gather(body, _kind);
@@ -379,17 +317,12 @@ public sealed class BotInscribe : BotDeed
         {
             var scroll = written[i];
 
-            // Writing one into the book takes <em>one</em> off the stack. The rest of the stack is still a
-            // stack of scrolls and still has to be placed — falling through to the market here rather than
-            // going round the loop is the difference between selling two and quietly carrying them for ever.
             if (BotGrimoire.Write(body, scroll))
             {
                 _kept++;
                 _placed++;
                 _made += _worth;
 
-                // It wrote the thing it was queueing for. Whatever was standing on the market asking for it
-                // is asking for nothing, and the money behind it comes back.
                 BotAuction.Withdrawn(bot, _kind);
             }
 
@@ -422,6 +355,6 @@ public sealed class BotInscribe : BotDeed
             }
         }
 
-        return BotDoing.Done($"{_scrolls} {_kind?.Name} in {_swings} attempts, {_kept} into its own book, {_sold} sold to order");
+        return BotDoing.Done($"{_scrolls} {_kind?.Name} in {_swings} attempts, {_kept} into its own book, {_sold} sold to order{(_worn ? ", the pen worn through" : "")}");
     }
 }

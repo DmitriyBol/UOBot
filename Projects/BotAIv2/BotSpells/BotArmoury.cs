@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Server.Items;
 using Server.Logging;
 
@@ -33,58 +33,45 @@ public sealed class BotArmoury : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotArmoury));
 
-    /// <summary>
-    /// How many attack scrolls a bot keeps by it.
-    ///
-    /// Few. These are an opening, not a career: enough to soften something on the way in or to buy the
-    /// seconds it takes to get away, and not so many that a warrior spends its purse arming itself with
-    /// somebody else's trade.
-    /// </summary>
     public static int Stock { get; set; } = 3;
 
-    /// <summary>
-    /// Coin a bot will not spend on somebody else's trade.
-    ///
-    /// <para>
-    /// Scrolls are bought one at a time and each one is cheap, which is exactly how a purse disappears
-    /// without anybody noticing: a warrior that keeps topping up to its limit spends its whole takings a few
-    /// coins at a time and then cannot afford a weapon, a bandage or a resurrection. Below this line the
-    /// shopping stops, whatever the stock.
-    /// </para>
-    /// </summary>
     public static int Reserve { get; set; } = 150;
 
-    /// <summary>
-    /// The least mana that makes any of this worth buying.
-    ///
-    /// <para>
-    /// A pool, not a skill. Casting from a scroll asks nothing of Magery beyond the engine's own roll, but it
-    /// does spend mana out of whatever the bot has — so a bot with a pool of four can throw one arrow and
-    /// then nothing, and buying five scrolls for it is buying four ornaments.
-    /// </para>
-    /// </summary>
     public static int LeastPool { get; set; } = 12;
 
-    /// <summary>What one of these is reckoned to be worth per minute, before the ledger corrects it.</summary>
     public static double Prior { get; set; } = 14.0;
 
     private static bool _said;
 
-    /// <summary>Bots asked, and how each answer went. No bucket called "other".</summary>
     public static long Asked { get; private set; }
 
     public static long NoPool { get; private set; }
 
     public static long Stocked { get; private set; }
 
-    /// <summary>Wanted one and would not spend the last of its purse on it.</summary>
     public static long Broke { get; private set; }
+
+    public static long Vending { get; private set; }
 
     public static long Offered { get; private set; }
 
     public string Name => "Armoury";
 
     public BotStanding Rung => BotStanding.Free;
+
+    public static Type Kept(Mobile body, out int spell)
+    {
+        spell = -1;
+
+        if (body == null || BotGrimoire.Known == 0 || body.ManaMax < LeastPool)
+        {
+            return null;
+        }
+
+        spell = BotStrike.Stock(body);
+
+        return spell < 0 ? null : BotGrimoire.ScrollFor(spell);
+    }
 
     public BotDeed Propose(IBotWilful bot)
     {
@@ -98,33 +85,15 @@ public sealed class BotArmoury : IBotProposer
 
         Asked++;
 
-        if (body.ManaMax < LeastPool)
-        {
-            NoPool++;
-
-            return null;
-        }
-
-        // <b>The strongest attack this bot can actually use, not the cheapest one that exists.</b> This was a
-        // constant — the magic arrow, for everybody, for ever — and the reasoning beside it was sound as far
-        // as it went: a ladder that ignored what a bot can pay would have warriors shopping for energy bolts.
-        // But the answer to that is to ask about the bot, which BotStrike.Stock does, weighing the pool
-        // against the circle's mana and the bot's Magery against what the engine will roll when the scroll
-        // goes off. Frozen at the bottom rung, a mage that had spent all day getting better at magic bought
-        // exactly what it bought as a novice, and there was no rung above it to grow into.
-        var spell = BotStrike.Stock(body);
-
-        if (spell < 0)
-        {
-            NoPool++;
-
-            return null;
-        }
-
-        var kind = BotGrimoire.ScrollFor(spell);
+        var kind = Kept(body, out var spell);
 
         if (kind == null)
         {
+            if (spell < 0)
+            {
+                NoPool++;
+            }
+
             return null;
         }
 
@@ -137,7 +106,6 @@ public sealed class BotArmoury : IBotProposer
             return null;
         }
 
-        // Not with the last of the purse. See Reserve: one scroll is cheap and a habit of topping up is not.
         if ((body.Backpack?.TotalGold ?? 0) <= Reserve)
         {
             Broke++;
@@ -145,8 +113,13 @@ public sealed class BotArmoury : IBotProposer
             return null;
         }
 
-        // Somebody of ours may already be making these. Asking the market first is what turns a shopkeeper's
-        // price into a ceiling rather than the only option — see BotSeeker for the same order of preference.
+        if (BotAuction.Selling(bot, kind))
+        {
+            Vending++;
+
+            return null;
+        }
+
         var want = BotAuction.Wanted(bot, kind);
 
         if (want is { Waiting: > 0 })
@@ -163,11 +136,6 @@ public sealed class BotArmoury : IBotProposer
         Offered++;
         Once(body);
 
-        // <b>Whichever is cheaper, and one of ours wins a tie.</b> A shopkeeper's price stays the ceiling —
-        // no bot may charge more than the shelf for something the shelf has — but the two are not equivalent
-        // at the same number. Coin paid to a bot moves inside the population and comes round again; coin paid
-        // across a counter leaves the world for good, and a monster's purse is the only place new coin comes
-        // from. So an equal price is a reason to buy from the scribe who wrote it rather than from the shelf.
         if (stall != null && (counter <= 0 || stall.Price <= counter))
         {
             return BotAcquire.Stalled(kind, spell, stall, map, body.Location, toCast: true);
@@ -183,8 +151,6 @@ public sealed class BotArmoury : IBotProposer
             return null;
         }
 
-        // Nobody sells them and nobody has one on a stall. Say so on the board: that is what the board is
-        // for, and it is the signal a scribe reads to decide what to write next.
         var offer = BotAuction.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
 
         return BotAcquire.Board(kind, spell, map, body.Location, offer, toCast: true);
@@ -209,7 +175,7 @@ public sealed class BotArmoury : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered scrolls yet"
-            : $"{Asked} asked: {Offered} sent shopping, {Stocked} already carrying {Stock}, {Broke} too poor to spare it, {NoPool} with too small a pool";
+            : $"{Asked} asked: {Offered} sent shopping, {Stocked} already carrying {Stock}, {Broke} too poor to spare it, {Vending} selling the scroll themselves, {NoPool} with too small a pool";
 
     public static void Forget()
     {

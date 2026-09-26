@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
@@ -27,58 +28,16 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotBolt : BotDeed
 {
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "flee";
 
-    /// <summary>
-    /// What getting away is reckoned at per minute.
-    ///
-    /// <para>
-    /// <b>Enormous, and it is not a thumb on the scale.</b> Everything on this shard is priced in
-    /// gold-equivalent per minute so that wants can be compared, and what a death actually costs is the
-    /// unbound half of the kit, the purse, the resurrection walk and the three minutes the ledger charges
-    /// for a job that never finished. Against that, mending at thirty a minute is what it is worth and this
-    /// is what this is worth; a number small enough to lose to a bandage would be a number that says a bot
-    /// should stand and be killed tidily.
-    /// </para>
-    ///
-    /// <para>
-    /// It also has to survive its own measurement. The ledger blends this prior with what flight actually
-    /// pays — which is nothing, for ever — so a place fled from a dozen times settles at roughly a seventh
-    /// of what is written here. That floor is the number worth reading, not this one.
-    /// </para>
-    /// </summary>
     public static double Prior { get; set; } = 2000.0;
 
-    /// <summary>How long getting clear is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 0.5;
 
-    /// <summary>
-    /// How far a bot looks for what it is running from, and therefore how far counts as away.
-    ///
-    /// Fourteen tiles: outside a bow's ten and a caster's eight with enough margin that the thing has to
-    /// actually follow to get back into range. One number for both questions on purpose — "what is after me"
-    /// and "am I clear of it" are the same question asked twice, and answering them with two numbers is how
-    /// this project keeps producing a bot that is neither fleeing nor fighting.
-    /// </summary>
     public static int Watch { get; set; } = 14;
 
-    /// <summary>
-    /// How far to head in one go. Beyond the watch, so arriving means being clear rather than being asked
-    /// again; short enough that the ground is still ground the bot knows.
-    /// </summary>
     public static int Bound { get; set; } = 18;
 
-    /// <summary>
-    /// How long a flight may go on before it is given up as not working.
-    ///
-    /// <para>
-    /// Half a minute. Something that keeps pace with a bot for half a minute is not going to be outrun, and
-    /// a bot that runs for ever is a bot dragging a train of creatures across the whole population's ground.
-    /// Giving up hands it back to the rung, which will offer mending — a bandage under fire is a poor answer
-    /// and it is a better one than sprinting until dead.
-    /// </para>
-    /// </summary>
     public static int GiveUpMs { get; set; } = 30000;
 
     private readonly Map _map;
@@ -93,44 +52,35 @@ public sealed class BotBolt : BotDeed
 
     private int _legs;
 
+    private readonly int _least;
+
     public BotBolt(Map map, Point3D from)
     {
         _map = map;
         _from = from;
     }
 
+    public BotBolt(Map map, Point3D from, int leastMs) : this(map, from)
+    {
+        _least = Math.Max(0, leastMs);
+    }
+
     public override string Kind => Trade;
+
+    public override bool Braves => true;
 
     public override Map Map => _map;
 
-    /// <summary>
-    /// Where it was standing when it decided to run, never where it ends up.
-    ///
-    /// The ledger files outcomes by patch of ground and the fact worth filing is <em>this patch made me
-    /// run</em>. Filing it under the safe place the bot reached would teach it that safety is dangerous.
-    /// </summary>
     public override Point3D Where => _from;
 
     public override double Expects => Prior;
 
     public override double Minutes => WorkMinutes;
 
-    /// <summary>Nothing. Running teaches a bot nothing the engine will write on its sheet.</summary>
     public override SkillName? Trains => null;
 
     public override int Outlay => 0;
 
-    /// <summary>
-    /// Counted as coin, and it produces none.
-    ///
-    /// <para>
-    /// A deliberate lie, and the alternative is worse. Work that pays in anything but money is discounted by
-    /// how badly the bot needs money — and a bot that needs it badly enough discounts such work to nothing,
-    /// which is a veto rather than a discount. Written honestly as zero, this would read "a bot with an empty
-    /// purse may not run away", and the bots on this shard are born with an empty purse. What that factor is
-    /// for is choosing between ways of earning, and there is no earning on this rung to choose between.
-    /// </para>
-    /// </summary>
     public override double Coin => 1.0;
 
     public override int Made => 0;
@@ -154,29 +104,36 @@ public sealed class BotBolt : BotDeed
             _begun = now;
         }
 
-        // Said every beat, not once. Every blow that lands re-points the bot at whatever hit it — see
-        // BotMobile.OnDamage — so a flight that dropped its combatant once would be swinging again a
-        // fraction of a second later, and a bot that is swinging is a bot standing still.
         body.Combatant = null;
         body.Warmode = false;
 
+        if (BotMend.Share(body) < BotMend.Hurt || body.Poisoned)
+        {
+            if (!BotMend.Winding(body) && BotMend.Wind(body, body))
+            {
+                Tended++;
+            }
+
+            if (BotMend.Draught(body) is { } bottle && BotMend.Swallow(body, bottle))
+            {
+                Tended++;
+            }
+        }
+
         var worst = BotThreat.Strongest(body, Watch);
 
-        if (worst == null)
+        if (worst == null && now - _begun >= _least)
         {
+            BotFugitive.Cleared(body);
+
             return BotDoing.Done(_legs > 0 ? $"clear of it after {_legs} legs" : "nothing following");
         }
 
         if (now - _begun >= GiveUpMs)
         {
-            // Not a failure of the ground: the place did not do this, the thing that kept pace did. Finished
-            // rather than failed, so the patch is not marked with caution for it.
-            return BotDoing.Done($"could not shake {worst.Name}");
+            return BotDoing.Done(worst == null ? $"ran for {(now - _begun) / 1000}s" : $"could not shake {worst.Name}");
         }
 
-        // Recomputed on arrival rather than every beat, and that is the whole of the cost control here.
-        // Aiming at a point that moves with the creature would buy a fresh path search on every step, per
-        // fleeing bot, at exactly the moment the population has several of them.
         if (_to == Point3D.Zero || body.InRange(_to, 1))
         {
             _to = Retreat(_map, body, worst);
@@ -185,15 +142,14 @@ public sealed class BotBolt : BotDeed
 
         if (_to == Point3D.Zero)
         {
-            // Nowhere behind it holds a body. Standing and fighting is the honest fallback, and the rung will
-            // offer a bandage in the same breath.
             return BotDoing.Failed($"cornered by {worst.Name}");
         }
 
         return BotDoing.Walk(_map, _to, BotArrival.Within(1), $"away from {worst.Name}");
     }
 
-    /// <summary>The way out turned out not to exist. Try the other way — towards home — once, then give up.</summary>
+    private readonly List<Point3D> _refused = [];
+
     public override bool Bend(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -203,37 +159,42 @@ public sealed class BotBolt : BotDeed
             return false;
         }
 
-        var home = Homeward(_map, body);
-
-        if (home == Point3D.Zero || home == _to)
+        if (_to != Point3D.Zero)
         {
-            return false;
+            _refused.Add(_to);
         }
 
-        _to = home;
+        var worst = BotThreat.Strongest(body, Watch);
+        var next = worst == null ? Point3D.Zero : Retreat(_map, body, worst, _refused);
+
+        if (next == Point3D.Zero)
+        {
+            next = Homeward(_map, body);
+
+            if (next == Point3D.Zero || _refused.Contains(next))
+            {
+                return false;
+            }
+        }
+
+        _to = next;
+        Bent++;
 
         return true;
     }
 
-    /// <summary>
-    /// Somewhere roughly <see cref="Bound"/> tiles from the threat, on the far side of the bot from it, or
-    /// nothing at all when there is nowhere.
-    ///
-    /// <para>
-    /// <b>Public and static so that the proposer can ask it before offering flight, and that is the whole
-    /// point of it being here.</b> A bot with nowhere to run failed this undertaking the instant it took it
-    /// on, and was offered it again in the same beat — Cedric failed to flee a harpy eighty-one times in
-    /// thirty-six seconds on 26.08.2026, which is the shard's oldest defect shape: a piece of work that is
-    /// taken up and refused, over and over, because the refusal is invisible to whatever offers it. The
-    /// answer is not to price flight lower — being cornered is not a reason to run <em>less</em> keenly — it
-    /// is for nobody to offer running to somebody who cannot run.
-    /// </para>
-    ///
-    /// Falls back to heading home when straight back would put the bot off the ground the population lives
-    /// on — which is not a nicety. The far edge of the roam is where the terrain that strands bots is, and a
-    /// flight that ends in being carried back by the rescue has traded one emergency for another.
-    /// </summary>
-    public static Point3D Retreat(Map map, Mobile body, Mobile from)
+    public static long Bent { get; private set; }
+
+    public static long Tended { get; private set; }
+
+    public static Point3D Retreat(Map map, Mobile body, Mobile from) => Retreat(map, body, from, null);
+
+    private static readonly (int X, int Y)[] _ways =
+    [
+        (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)
+    ];
+
+    public static Point3D Retreat(Map map, Mobile body, Mobile from, List<Point3D> not)
     {
         if (map == null || map == Map.Internal || body == null || from == null)
         {
@@ -246,24 +207,61 @@ public sealed class BotBolt : BotDeed
 
         if (step > 0)
         {
-            var x = body.X + dx * Bound / step;
-            var y = body.Y + dy * Bound / step;
+            var under = BotDungeon.Under(body.Location);
 
-            if (BotStep.Settle(map, x, y, out var z))
+            var best = Point3D.Zero;
+            var bestScore = 0;
+
+            for (var i = 0; i < _ways.Length; i++)
             {
+                var (wx, wy) = _ways[i];
+                var score = wx * dx + wy * dy;
+
+                if (score <= 0 || score <= bestScore)
+                {
+                    continue;
+                }
+
+                var x = body.X + wx * Bound;
+                var y = body.Y + wy * Bound;
+
+                if (!BotStep.Settle(map, x, y, out var z))
+                {
+                    continue;
+                }
+
                 var back = new Point3D(x, y, z);
 
-                if (BotPopulation.Within(map, back))
+                if (not != null && not.Contains(back))
                 {
-                    return back;
+                    continue;
                 }
+
+                if (under ? !BotDungeon.Under(back) : !BotPopulation.Within(map, back) || BotBarred.Barred(map, back))
+                {
+                    continue;
+                }
+
+                best = back;
+                bestScore = score;
+            }
+
+            if (best != Point3D.Zero)
+            {
+                return best;
+            }
+
+            if (under)
+            {
+                return Point3D.Zero;
             }
         }
 
-        return Homeward(map, body);
+        var home = Homeward(map, body);
+
+        return not != null && not.Contains(home) ? Point3D.Zero : home;
     }
 
-    /// <summary>A leg of the way home, or home itself when it is nearer than a leg.</summary>
     private static Point3D Homeward(Map map, Mobile body)
     {
         var home = BotPopulation.Where;

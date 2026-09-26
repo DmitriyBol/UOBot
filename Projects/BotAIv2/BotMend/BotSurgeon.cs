@@ -39,8 +39,11 @@ public sealed class BotSurgeon : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSurgeon));
 
-    /// <summary>How far a caster looks for somebody worth healing.</summary>
     public static int Reach { get; set; } = 20;
+
+    public static int MovingMs { get; set; } = 1500;
+
+    public static long Moving { get; private set; }
 
     private static bool _said;
 
@@ -58,13 +61,6 @@ public sealed class BotSurgeon : IBotProposer
             return null;
         }
 
-        // <b>A healer may heal anybody, itself included, so long as nothing has picked the healer out.</b>
-        // Ordered on 24.08.2026, and it is the sharper half of the same rule that stops bandaging under fire.
-        // Mending is standing still: a cast is interrupted outright by a blow, and a bandage merely bleeds
-        // its worth away per hit — so a healer with a zombie on it is not slow at healing, it is doing
-        // nothing at all while being killed, and every beat spent trying is a beat not spent hitting back.
-        // What is asked here is who has chosen the healer, not what happens to be nearby: a fight going on
-        // ten tiles away is exactly when a healer is needed and is no reason to refuse.
         var onMe = BotThreat.Hunter(body, BotDefender.Reach);
 
         if (onMe != null)
@@ -81,8 +77,6 @@ public sealed class BotSurgeon : IBotProposer
             return null;
         }
 
-        // Something to mend with, or there is nothing to offer. Spell first, because that is what the
-        // undertaking will reach for first.
         var spell = BotMend.Spell(body, patient);
 
         if (spell < 0 && BotMend.Cloth(body) <= 0)
@@ -102,13 +96,6 @@ public sealed class BotSurgeon : IBotProposer
         return new BotSalve(patient, map, onSelf, spell >= 0 ? SkillName.Magery : SkillName.Healing);
     }
 
-    /// <summary>
-    /// The worst-hurt of this population within reach, counting the asker, or null.
-    ///
-    /// Asked of the map rather than of a roster, the same way our side of a fight is counted: a hundred and
-    /// fifty registry entries walked per bot per decision is what the first version did, and what is nearby
-    /// costs what is nearby.
-    /// </summary>
     private static Mobile Worst(Mobile bot, Map map)
     {
         Mobile worst = BotMend.Wants(bot) ? bot : null;
@@ -116,9 +103,6 @@ public sealed class BotSurgeon : IBotProposer
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(bot.Location, Reach))
         {
-            // Being unreachable does not make anybody less hurt, which is why the worst-hurt rule kept
-            // handing back the same patient after every refused road. See BotMend.Beyond — the note lapses in
-            // ten seconds, so this is a pause rather than an abandonment.
             if (mobile == bot || mobile is not IBotAlly || !BotMend.Wants(mobile) || BotMend.OutOfReach(mobile))
             {
                 continue;
@@ -131,6 +115,18 @@ public sealed class BotSurgeon : IBotProposer
                 continue;
             }
 
+            if (BotMend.Abetting(bot, mobile) != null)
+            {
+                continue;
+            }
+
+            if (OnTheMove(bot, mobile))
+            {
+                Moving++;
+
+                continue;
+            }
+
             worst = mobile;
             lowest = share;
         }
@@ -138,6 +134,17 @@ public sealed class BotSurgeon : IBotProposer
         return worst;
     }
 
-    /// <summary>Lets the note be made again after a world reload.</summary>
-    public static void Forget() => _said = false;
+    private static bool OnTheMove(Mobile healer, Mobile patient) =>
+        MovingMs > 0
+        && Core.TickCount - patient.LastMoveTime < MovingMs
+        && !healer.InRange(patient.Location, BotMend.Cast)
+        && !BotMend.Embattled(patient);
+
+    public static string Describe() => $"{Moving} times the worst-hurt was passed over for walking on out of a heal's reach";
+
+    public static void Forget()
+    {
+        _said = false;
+        Moving = 0;
+    }
 }

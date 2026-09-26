@@ -34,15 +34,10 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotFittings
 {
-    /// <summary>Whether halls are furnished at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>
-    /// How much clear floor is left around each door. One tile: enough to walk in and turn.
-    /// </summary>
     public static int Doorway { get; set; } = 1;
 
-    /// <summary>Fittings moved back indoors by <see cref="Tidy"/>.</summary>
     public static long Moved { get; private set; }
 
     /// <summary>One thing a guild wants in its hall, and what the guild will have to pay for it.</summary>
@@ -56,10 +51,8 @@ public static class BotFittings
             Price = price;
         }
 
-        /// <summary>What it is called out loud — "a forge", "a loom".</summary>
         public string Name { get; }
 
-        /// <summary>The addon type, which is how "has this hall got one" is answered.</summary>
         public Type Kind { get; }
 
         public Func<BaseAddon> Make { get; }
@@ -67,25 +60,6 @@ public static class BotFittings
         public int Price { get; }
     }
 
-    /// <summary>
-    /// What each guild wants in its hall, in the order it wants it, and what each costs.
-    ///
-    /// <para>
-    /// <b>Bought rather than given, by Patrick's order of 08.09.2026 — and the prices are ours, which is
-    /// worth saying plainly.</b> This engine has no shop price for a forge or a loom: they are carpentry
-    /// crafts (<c>DefCarpentry</c>: a <c>SmallForgeDeed</c> is five logs at 73.6 skill), and nothing on any
-    /// vendor's shelf sells one. So there is no engine number to take, unlike every other price on this
-    /// shard, and these are set against the one number that is already ours: a hall costs five thousand, and
-    /// fitting one out completely comes to about a third of that again.
-    /// </para>
-    ///
-    /// <para>
-    /// Named by guild rather than by trade, for the same reason <see cref="BotGuilds"/> reads classes by
-    /// name: a guild added later is fitted out by being listed here and nowhere else. A guild that is not
-    /// named wants nothing, which is right for the Blade and the Crown — a barracks is a place to be, not a
-    /// place to make things.
-    /// </para>
-    /// </summary>
     private static readonly Dictionary<string, Bench[]> _wanted = new()
     {
         ["The Hammer"] =
@@ -101,18 +75,57 @@ public static class BotFittings
         ]
     };
 
-    /// <summary>Benches bought and set up.</summary>
     public static long Bought { get; private set; }
 
-    /// <summary>Coin the guilds have spent on them.</summary>
     public static long Spent { get; private set; }
 
-    /// <summary>
-    /// The first thing this guild wants that its hall has not got, or false.
-    ///
-    /// Asked of the hall's own addon list rather than of a record kept here: the house is the fact, and a
-    /// second record of what is in it is a second record to go stale.
-    /// </summary>
+    public static int GroundHigh { get; set; } = 16;
+
+    public static List<Bench> Installed(BaseHouse hall, Guild guild)
+    {
+        List<Bench> had = [];
+
+        if (hall is not { Deleted: false } || !_wanted.TryGetValue(guild?.Name ?? string.Empty, out var list))
+        {
+            return had;
+        }
+
+        for (var i = 0; i < list.Length; i++)
+        {
+            if (Has(hall, list[i].Kind))
+            {
+                had.Add(list[i]);
+            }
+        }
+
+        return had;
+    }
+
+    public static int Strip(BaseHouse hall)
+    {
+        if (hall?.Addons == null)
+        {
+            return 0;
+        }
+
+        var taken = 0;
+
+        for (var i = hall.Addons.Count - 1; i >= 0; i--)
+        {
+            var addon = hall.Addons[i];
+
+            hall.Addons.RemoveAt(i);
+
+            if (addon is { Deleted: false })
+            {
+                addon.Delete();
+                taken++;
+            }
+        }
+
+        return taken;
+    }
+
     public static bool Wanting(BaseHouse hall, Guild guild, out Bench bench)
     {
         bench = default;
@@ -135,7 +148,6 @@ public static class BotFittings
         return false;
     }
 
-    /// <summary>Whether this hall already has one of these.</summary>
     private static bool Has(BaseHouse hall, Type kind)
     {
         if (hall.Addons == null)
@@ -154,16 +166,6 @@ public static class BotFittings
         return false;
     }
 
-    /// <summary>
-    /// Sets one bench up in a hall that has just paid for it. False if there is nowhere in the room it fits.
-    ///
-    /// <para>
-    /// Where it goes is the engine's decision, not ours: <c>BaseAddon.CouldFit</c> is the same test the addon
-    /// deeds use and it knows about walls, other addons and whether the spot is inside a house at all. What
-    /// is ours is the order the tiles are offered in — near the last thing set down, because an anvil is only
-    /// an anvil to this shard if it is within <c>BotGround.AnvilReach</c> of the fire.
-    /// </para>
-    /// </summary>
     public static bool Install(BaseHouse hall, Bench bench)
     {
         if (hall is not { Deleted: false } || hall.Map == null || hall.Map == Map.Internal)
@@ -216,12 +218,6 @@ public static class BotFittings
         return false;
     }
 
-    /// <summary>
-    /// One free tile inside a hall, furthest from the door, or Zero if the room is full.
-    ///
-    /// Public because two things outside this file need to stand in a room: a bot placing a merchant, and
-    /// the merchant itself. Both want the same answer, and it is the one this file already works out.
-    /// </summary>
     public static Point3D Spot(BaseHouse hall)
     {
         if (hall is not { Deleted: false } || hall.Map == null || hall.Map == Map.Internal)
@@ -243,16 +239,68 @@ public static class BotFittings
         return spare[0];
     }
 
-    /// <summary>
-    /// Whether this tile is part of the hall's room, as opposed to merely part of its multi.
-    ///
-    /// <para>
-    /// <b>The distinction the porch taught us, asked a second time.</b> <c>BaseHouse.FindHouseAt</c> answers
-    /// "yes, this is the house" for a tile on the front steps, so a bot standing in the doorway believes it
-    /// is indoors — and the first merchant this shard ever hired was set down there, in the one tile
-    /// everybody walks through, exactly as the first chest was. The room is what the flood reaches.
-    /// </para>
-    /// </summary>
+    public static long Unblocked { get; private set; }
+
+    public static long Cornered { get; private set; }
+
+    public static int Unblock(BaseHouse hall)
+    {
+        if (hall is not { Deleted: false } || hall.Map == null || hall.Map == Map.Internal
+            || hall.PlayerVendors == null || hall.Doors == null)
+        {
+            return 0;
+        }
+
+        var moved = 0;
+
+        for (var i = 0; i < hall.PlayerVendors.Count; i++)
+        {
+            if (hall.PlayerVendors[i] is not { Deleted: false } merchant)
+            {
+                continue;
+            }
+
+            var nearest = int.MaxValue;
+            Item way = null;
+
+            for (var d = 0; d < hall.Doors.Count; d++)
+            {
+                if (hall.Doors[d] is Item { Deleted: false } door)
+                {
+                    var gap = Math.Max(Math.Abs(door.X - merchant.X), Math.Abs(door.Y - merchant.Y));
+
+                    if (gap < nearest)
+                    {
+                        nearest = gap;
+                        way = door;
+                    }
+                }
+            }
+
+            if (way == null || nearest > Doorway + 1)
+            {
+                continue;
+            }
+
+            var spot = Spot(hall);
+
+            if (spot == Point3D.Zero
+                || Math.Max(Math.Abs(way.X - spot.X), Math.Abs(way.Y - spot.Y)) <= nearest)
+            {
+                Cornered++;
+
+                continue;
+            }
+
+            merchant.MoveToWorld(spot, hall.Map);
+            moved++;
+        }
+
+        Unblocked += moved;
+
+        return moved;
+    }
+
     public static bool InRoom(BaseHouse hall, Point3D at)
     {
         if (hall is not { Deleted: false })
@@ -263,7 +311,6 @@ public static class BotFittings
         return Within(Room(hall), at);
     }
 
-    /// <summary>Where the last bench went, so the next one goes beside it and a smithy stays one smithy.</summary>
     private static Point3D Nearest(BaseHouse hall)
     {
         if (hall.Addons == null)
@@ -282,10 +329,6 @@ public static class BotFittings
         return Point3D.Zero;
     }
 
-    /// <summary>
-    /// Puts a chest and the guild's fittings into a hall that has just gone up. Returns how many things
-    /// were set down.
-    /// </summary>
     public static int Furnish(BaseHouse house, Guild guild)
     {
         if (!Running || house is not { Deleted: false } || house.Map == null || house.Map == Map.Internal)
@@ -297,8 +340,6 @@ public static class BotFittings
         var map = house.Map;
         var spots = Free(Room(house), map);
 
-        // The guild is not read here any more — what it wants is bought later, by BotFitter — but it stays
-        // in the signature because the caller has it and the next thing to go in a new hall will need it.
         _ = guild;
 
         if (spots.Count == 0)
@@ -309,25 +350,13 @@ public static class BotFittings
         var placed = 0;
         var door = Doorstep(house);
 
-        // <b>A chest and nothing else, and the workshop is bought afterwards.</b> The benches used to come
-        // free with the walls; Patrick's order of 08.09.2026 is that a guild pays for its tools separately,
-        // one at a time, out of the same levy. See BotFitter, and see _wanted above for what each guild is
-        // then saving up for.
-        //
-        // The chest stays free because it is furniture rather than a tool: a hall with nowhere to put
-        // anything is not a hall that can be improved later, it is a room.
         if (spots.Count > 0)
         {
-            // Against the far wall. It was put nearest the door at first, on the reasoning that it is the
-            // thing a bot walks in to use — which is exactly how a chest ends up in a doorway.
             spots.Sort((a, b) => b.GetDistanceToSqrt(door).CompareTo(a.GetDistanceToSqrt(door)));
 
             var chest = new WoodenChest();
             chest.MoveToWorld(spots[0], map);
 
-            // Locked down so it is furniture rather than loot: a movable container on a floor is something
-            // the engine may decay and something a bot may pick up. If the house will not take the lockdown
-            // — no owner, or the count is full — the fallback does the half of it that matters.
             if (owner == null || !house.LockDown(owner, chest))
             {
                 chest.Movable = false;
@@ -339,15 +368,6 @@ public static class BotFittings
         return placed;
     }
 
-    /// <summary>
-    /// Moves anything of ours that is standing outside the room back into it.
-    ///
-    /// <para>
-    /// Called when a hall is adopted from the save, so that a hall furnished by an older, wronger version of
-    /// this file repairs itself at the next start rather than having to be razed and rebuilt. It moves; it
-    /// never deletes. Whatever is in the chest travels with it.
-    /// </para>
-    /// </summary>
     public static int Tidy(BaseHouse house)
     {
         if (!Running || house is not { Deleted: false } || house.Map == null || house.Map == Map.Internal)
@@ -364,12 +384,6 @@ public static class BotFittings
 
         var door = Doorstep(house);
 
-        // <b>Judged against the whole room and moved into the free part of it, and the difference between
-        // those two lists is a defect this had for one restart.</b> The room was being asked for with its
-        // occupied tiles already filtered out — right for putting something down, wrong for deciding whether
-        // something is already indoors, because the thing being judged is standing on the tile that its own
-        // presence removed from the list. The chest was therefore declared outside its own hall and moved one
-        // tile every time the shard started.
         var spare = Free(room, house.Map);
 
         spare.Sort((a, b) => b.GetDistanceToSqrt(door).CompareTo(a.GetDistanceToSqrt(door)));
@@ -409,9 +423,6 @@ public static class BotFittings
             moved++;
         }
 
-        // <b>And the merchants, which the sweep above cannot see.</b> A hired shopkeeper is a mobile rather
-        // than an item, so it is in none of the house's item lists; the first one hired stood on the porch
-        // for the same reason the first chest did, and nothing would ever have moved it.
         if (house.PlayerVendors != null)
         {
             for (var i = 0; i < house.PlayerVendors.Count && spare.Count > 0; i++)
@@ -447,25 +458,9 @@ public static class BotFittings
         return false;
     }
 
-    /// <summary>Where the front door is, so everything else can be put as far from it as the room allows.</summary>
     private static Point3D Doorstep(BaseHouse house) =>
         house.Doors is { Count: > 0 } && house.Doors[0] is Item door ? door.Location : house.Location;
 
-    /// <summary>
-    /// The room: every tile the inside of the house is made of, occupied or not.
-    ///
-    /// <para>
-    /// Found by flooding outwards from the middle of the multi across tiles that have a floor and no wall,
-    /// and refusing to step onto a doorway. A doorway is the only gap in the walls, so a flood that will not
-    /// use one cannot get out — which makes the porch, the steps and the street unreachable without this
-    /// file knowing anything about which way the house faces.
-    /// </para>
-    ///
-    /// <para>
-    /// The heights come off the multi's own components. A height worked out by arithmetic is a place nothing
-    /// can reach, and this project has paid for that twice.
-    /// </para>
-    /// </summary>
     private static List<Point3D> Room(BaseHouse house)
     {
         var mcl = house.Components;
@@ -486,6 +481,12 @@ public static class BotFittings
                 for (var t = 0; t < tiles.Length; t++)
                 {
                     var tile = tiles[t];
+
+                    if (tile.Z > GroundHigh)
+                    {
+                        continue;
+                    }
+
                     var data = TileData.ItemTable[tile.ID & TileData.MaxItemValue];
 
                     if ((data.Flags & TileFlag.Impassable) != 0)
@@ -511,8 +512,6 @@ public static class BotFittings
             }
         }
 
-        // The doorways, and the tiles beside them. A door is an item rather than a multi tile, so nothing
-        // above marks it — and it is the one gap the flood must not go through.
         var shut = new bool[wide, high];
 
         if (house.Doors != null)
@@ -568,8 +567,6 @@ public static class BotFittings
                 room.Add(at);
             }
 
-            // Four ways only. A diagonal between two wall corners is not a way out of a room in this engine
-            // and must not be one here either, or the flood leaks into the street through a corner.
             Step(open, seen, shut, queue, x + 1, y, wide, high);
             Step(open, seen, shut, queue, x - 1, y, wide, high);
             Step(open, seen, shut, queue, x, y + 1, wide, high);
@@ -579,7 +576,6 @@ public static class BotFittings
         return room;
     }
 
-    /// <summary>One step of the flood. A doorway is entered by nobody, so the room stays a room.</summary>
     private static void Step(
         bool[,] open, bool[,] seen, bool[,] shut, Queue<(int X, int Y)> queue, int x, int y, int wide, int high
     )
@@ -593,13 +589,6 @@ public static class BotFittings
         queue.Enqueue((x, y));
     }
 
-    /// <summary>
-    /// Somewhere to start the flood: the middle of the multi, or the nearest open tile to it.
-    ///
-    /// The middle of a house is inside it for every multi this shard will ever place, but it is not worth
-    /// depending on — a house whose centre tile is a staircase would otherwise be furnished with nothing at
-    /// all, silently.
-    /// </summary>
     private static (int X, int Y) Middle(bool[,] open, int wide, int high, int cx, int cy)
     {
         for (var ring = 0; ring < Math.Max(wide, high); ring++)
@@ -622,11 +611,6 @@ public static class BotFittings
         return (-1, -1);
     }
 
-    /// <summary>
-    /// The part of a room nothing is standing on, which is where something new may be put down.
-    ///
-    /// Separate from the room itself on purpose: see the note in <see cref="Tidy"/>.
-    /// </summary>
     private static List<Point3D> Free(List<Point3D> room, Map map)
     {
         var spare = new List<Point3D>(room.Count);
@@ -642,7 +626,6 @@ public static class BotFittings
         return spare;
     }
 
-    /// <summary>Whether something already stands on this tile — a fitting put down a moment ago, or loot.</summary>
     private static bool Taken(Map map, int x, int y)
     {
         foreach (var item in map.GetItemsAt(x, y))
@@ -656,11 +639,11 @@ public static class BotFittings
         return false;
     }
 
-    /// <summary>Part of the estate's line: what the halls have been fitted out with.</summary>
     public static string Fittings() =>
-        Bought == 0
+        (Bought == 0
             ? "no benches have been bought"
-            : $"{Bought} benches bought for {Spent}gp";
+            : $"{Bought} benches bought for {Spent}gp")
+        + $"; {Unblocked} merchants moved out of a doorway and {Cornered} left in one for want of anywhere further in";
 
     public static void Forget()
     {

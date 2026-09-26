@@ -1,4 +1,4 @@
-# `BotEstate/` — the guilds' halls
+﻿# `BotEstate/` — the guilds' halls
 
 Ordered by Patrick on 08.09.2026 as the second stage of `PLAN-guilds-houses-sparring.md`: houses, with
 chests and workbenches, and eventually a private place to spar in. This folder is that stage.
@@ -50,6 +50,9 @@ design silently if it had gone the other way.
 | `BotPlot.cs` | where a hall may stand — asked of `HousePlacement.Check`, never guessed |
 | `BotHall.cs` | the undertaking: walk, check the ground again, levy, place, furnish |
 | `BotSteward.cs` | whether the guild can afford one, and which member is away raising it |
+| `BotReeve.cs` | the guild's own company for the guild's own dire ground: a leader-class member is offered the Baron's harrow on the nearest square its guild holds at or below dire, and the Baron leaves such ground alone while the guild has a leader (build 92) |
+| `BotChest.cs` | the guild's chest: a tenth of the coin taken by work that braves a square the guild holds, and the first payer of the guild's next claim or hall before any member's pack (build 93) |
+| `BotChestStore.cs` | keeps the chests across restarts, as the claims are kept (build 93) |
 | `BotFittings.cs` | what goes inside: the chest, the room the flood-fill finds, and what each guild wants |
 | `BotBench.cs` | the undertaking: fetch one workbench the guild has paid for and set it up |
 | `BotFitter.cs` | whether the guild can afford its next bench, and which member is away getting it |
@@ -58,13 +61,33 @@ design silently if it had gone the other way.
 | `BotShelf.cs` | the guild's counter: stocking it, buying off it, paying its wages, emptying its till |
 | `BotSupply.cs` | the undertaking: fetch a batch of what the population runs short of and shelve it |
 | `BotSupplier.cs` | whether the guild's shelf is short of something, and which member is away buying it |
+| `BotWar.cs` | the wars themselves: who is fighting whom, the score, and the rules that begin, end and forbid one (13.09.2026); a lost war starts the loser's clock for declaring one (`LoserCools`, build 64) |
+| `BotRally.cs` | falling in with the guild's war company and fighting with it as a company until the company is done; the company is formed on the first beat of the rally that won its auction, not in the proposer (13–14.09.2026); a rally leaves a company already on a living enemy on it (build 49) |
+| `BotWarStore.cs` | keeps the war ledger across restarts under `Saves/BotWars`: wars with their run time, kills and plunder, truces and declaration clocks as time left, and the halls a lost war still owes a move; before it every restart was an amnesty (14.09.2026) |
+| `BotSeat.cs` | where each guild lives: the point its hall is raised near, its members rise at, and "home" means; hand-set seats kept in `Saves/BotSeats`; no seat, in the file or by hand, nearer another guild's than `BotRegard.Neighbouring` (`TooNear`, build 64) |
 | `BotOffice.cs` | one guild, one officer, one errand — and offering is not the same as being on it |
 | `BotLand.cs` | which guild the ground belongs to, and what that does to what work is worth |
 | `BotRegard.cs` | what one guild thinks of another, and the two thresholds that make it a war |
 | `BotEvict.cs` | the undertaking: walk over to somebody on your land and tell them to move along |
 | `BotBailiff.cs` | whether anybody is on this guild's land who should not be, and who says so |
+| `BotFeud.cs` | the board of the war: who each guild has called its members onto, and the four engine facts that let a blow land; a member too far from its company's leader for the door is not called to the company and quarrels where it stands (build 49), nor called to a company fighting inside a pocket proved closed from where it stands (`Pocketed`, build 53) |
+| `BotQuarrel.cs` | the undertaking: close with a member of a guild yours is at war with, and fight them |
+| `BotFeuder.cs` | offers a member of a guild at war somebody of the enemy — the guild's standing call before its own eyes |
+| `BotExile.cs` | who won a war, and the debt the loser owes: its hall goes outside the winner's yard |
+| `BotRemove.cs` | the undertaking and its offer: carry a beaten guild's hall out of the winner's yard and put it down again |
+| `BotClaim.cs` | what a guild has claimed of the island square by square, what a claim costs, and how one is won; a square where the guild's muster failed rests for that guild, thirty minutes doubling (build 61) |
+| `BotHold.cs` | the undertaking and its offer: declare a claim on a quadrant and stand in it until it is yours; no member is sent to a square the refusal memory holds, and no square is claimed again while its failed muster rests (build 61) |
+| `BotClaimStore.cs` | keeps who owns which square across restarts — the one board on this shard that survives, because it was paid for |
 | `BotEstateConfig.cs` | what `Configuration/bot-estate.json` is allowed to say |
 | `BotEstateModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Population` |
+| `BotToll.cs` | the toll on hunting a guild's land: posted (10% of a stranger's hunting coin) or patrolled (20%, once told), who pays, and the price it puts on hunting there (26.09.2026) |
+| `BotTollman.cs` | sends a fighter of a patrolling guild to a stranger hunting its land |
+| `BotWard.cs` | the tollman's walk and the sentence that makes the toll owed |
+| `BotHallKind.cs` | the four sizes of hall (small, sandstone patio, large patio, large marble), the members each holds and what each costs (26.09.2026) |
+| `BotEnlarge.cs` | a guild that has nearly filled its hall moves into the next size up, benches and counter carried across |
+| `BotOutpost.cs` | a guild's second house on its far land: a place to rise nearer the hunting, and a yard for the toll (26.09.2026) |
+| `BotAbode.cs` | houses of the population's own, bought by a bot that has done well, found again by the sign at every boot (26.09.2026) |
+| `BotRepose.cs` | a bored bot with a house goes home for a while: boredom falls, spare armour goes in the chest |
 
 ## Where a hall may not go, and what "inside" means
 

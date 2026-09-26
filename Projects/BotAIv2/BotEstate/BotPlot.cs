@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Logging;
 using Server.Multis;
@@ -37,122 +37,92 @@ public static class BotPlot
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPlot));
 
-    /// <summary>
-    /// Which house goes up: the smallest classic one, <c>SmallOldHouse</c> 0x0064.
-    ///
-    /// Small because ground this engine will accept is the scarce thing, not money — the rules demand five
-    /// clear tiles front and back of the foundation, and every tile of extra width is a worse chance of
-    /// finding anywhere at all near a town.
-    /// </summary>
     public static int MultiID { get; set; } = 0x0064;
 
-    /// <summary>No nearer to the population's home than this. A hall on top of the muster point is in the way.</summary>
     public static int Near { get; set; } = 14;
 
-    /// <summary>And no further, so the walk to it is part of the day rather than an expedition.</summary>
     public static int Far { get; set; } = 90;
 
-    /// <summary>How far apart two halls must stand. Four guilds in a terrace is not a village.</summary>
-    public static int Apart { get; set; } = 18;
+    public static int Apart { get; set; } = 40;
 
-    /// <summary>
-    /// How wide a belt round a no-housing region is kept clear as well.
-    ///
-    /// <para>
-    /// <b>Patrick's order of 08.09.2026, and the reason is what he could see out of the window.</b> The
-    /// engine forbids building <em>in</em> Britain's graveyard and says nothing about building against its
-    /// railings, so the first hall this shard ever raised went up three tiles from the north fence. Twenty
-    /// tiles is his figure. It applies to every <c>NoHousingRegion</c> on the map rather than to that one
-    /// graveyard, because the rule he is stating is about what a house should not be pressed up against.
-    /// </para>
-    /// </summary>
+    public static int Shy { get; set; } = 120;
+
+    public static long Neighboured { get; private set; }
+
     public static int Clearance { get; set; } = 20;
 
-    /// <summary>How many candidates one call may put through the engine's check.</summary>
     public static int Budget { get; set; } = 60;
 
-    /// <summary>Candidates put through the engine's own check.</summary>
     public static long Tested { get; private set; }
 
-    /// <summary>Candidates the engine would take a house on.</summary>
     public static long Fit { get; private set; }
 
-    /// <summary>Candidates with no floor to stand on — water, a hole, off the edge.</summary>
     public static long Floorless { get; private set; }
 
-    /// <summary>Candidates with something standing on them: an item, a creature, another hall.</summary>
     public static long Occupied { get; private set; }
 
-    /// <summary>Candidates passed over because a town watch stands there. Ours, and it comes before the engine.</summary>
     public static long InTown { get; private set; }
 
-    /// <summary>Candidates passed over for standing too near ground the engine will not build on.</summary>
     public static long Shunned { get; private set; }
 
-    /// <summary>Candidates the engine itself refused on the region: a graveyard, a dungeon, another house.</summary>
     public static long Forbidden { get; private set; }
 
-    /// <summary>Candidates whose ground is not level under the whole footprint. Rule 4, and the one that bites.</summary>
     public static long Uneven { get; private set; }
 
-    /// <summary>Candidates refused for the land: a road, a furrow, a slope against the wall.</summary>
     public static long BadLand { get; private set; }
 
-    /// <summary>Candidates refused for a static: a tree, a rock, a fence, or a yard that is not clear.</summary>
     public static long BadStatic { get; private set; }
 
-    /// <summary>Candidates refused for something immovable lying there.</summary>
     public static long BadItem { get; private set; }
 
-    /// <summary>Candidates where the foundation would rest on nothing. Rule 4, as the engine reports it.</summary>
     public static long Surfaceless { get; private set; }
 
-    /// <summary>How many times the spiral has been walked to its end without a plot.</summary>
     public static long Exhausted { get; private set; }
 
-    /// <summary>The ring of offsets, furthest last, built once — and again if the bounds are dialled.</summary>
     private static List<Point2D> _ring;
 
-    /// <summary>What <see cref="_ring"/> was built with, so a dialled bound is not a dial that does nothing.</summary>
     private static int _builtNear = -1;
 
     private static int _builtFar = -1;
 
-    /// <summary>How far through <see cref="_ring"/> the search has got.</summary>
-    private static int _cursor;
-
-    /// <summary>Ground kept clear round every no-housing region, grown by <see cref="Clearance"/>.</summary>
     private static List<Rectangle2D> _shunned;
 
     private static int _hallowedBy = -1;
 
-    /// <summary>A valid plot on ground nobody walks, held in case the look ends without a better one.</summary>
-    private static Point3D _spare;
-
-    private static bool _hasSpare;
-
     /// <summary>
-    /// The last piece of ground found to be good, kept until something is built on it.
+    /// One search, from one origin: how far round the spiral it has got and what it has found.
     ///
     /// <para>
-    /// <b>Searching and paying are two different clocks and they were blocking each other.</b> A search runs
-    /// only when somebody asks, somebody only asks when their guild can pay, and on this shard exactly one
-    /// guild could pay — a guild of two — so the island was being examined at a fiftieth of the rate the
-    /// population could have managed. Remembering the answer decouples them: whoever is nearest to affording
-    /// a hall does the looking, and whoever can actually pay is handed ground that was found minutes ago.
+    /// <b>One per origin, because every guild now looks from its own seat.</b> The first cut kept a single
+    /// cursor and a single remembered plot for the whole island, which was right while the whole island
+    /// looked from one point; with five guilds looking from five seats a shared cursor would be a search
+    /// that jumps three hundred tiles between one call and the next and remembers a plot found for the
+    /// wrong guild. See <c>BotSeat</c>.
     /// </para>
     /// </summary>
-    private static Point3D _kept;
+    private sealed class Search
+    {
+        public int Cursor;
 
-    private static bool _hasKept;
+        public Point3D Spare;
 
-    /// <summary>
-    /// The next place a hall could go, or false.
-    ///
-    /// <paramref name="by"/> is the bot that would place it: the engine's check reads its map and its access
-    /// level, and a staff member may build anywhere, which is exactly the answer we do not want.
-    /// </summary>
-    public static bool Find(Mobile by, out Point3D centre)
+        public bool HasSpare;
+
+        public Point3D Kept;
+
+        public bool HasKept;
+    }
+
+    private static readonly Dictionary<(int X, int Y, int Multi), Search> _searches = [];
+
+    public static bool Find(Mobile by, out Point3D centre) => Find(by, Point3D.Zero, Point3D.Zero, 0, out centre);
+
+    public static bool Find(Mobile by, Point3D from, out Point3D centre) => Find(by, from, Point3D.Zero, 0, out centre);
+
+    public static bool Find(Mobile by, Point3D from, Point3D shun, int clear, out Point3D centre) =>
+        Find(by, from, shun, clear, MultiID, null, out centre);
+
+    public static bool Find(Mobile by, Point3D from, Point3D shun, int clear, int multi, BaseHouse replacing, out Point3D centre)
     {
         centre = Point3D.Zero;
 
@@ -163,40 +133,44 @@ public static class BotPlot
             return false;
         }
 
-        // Already found, and still good. Re-checked rather than trusted: a woodsman may have dropped a tree
-        // across it, or another guild may have built there since.
-        if (_hasKept && Sound(map, _kept))
+        if (from == Point3D.Zero)
         {
-            centre = _kept;
+            from = BotPopulation.Where;
+        }
+
+        if (!_searches.TryGetValue((from.X, from.Y, multi), out var search))
+        {
+            search = new Search();
+            _searches[(from.X, from.Y, multi)] = search;
+        }
+
+        if (search.HasKept && Sound(map, search.Kept, multi, replacing) && Away(search.Kept, shun, clear)
+            && !BotRefused.Refusing(map, search.Kept) && !Foreign(by, map, search.Kept.X, search.Kept.Y)
+            && !Round(map, from, search.Kept.X, search.Kept.Y))
+        {
+            centre = search.Kept;
 
             return true;
         }
 
-        _hasKept = false;
-
-        var from = BotPopulation.Where;
+        search.HasKept = false;
 
         Build();
 
         for (var spent = 0; spent < Budget; spent++)
         {
-            if (_cursor >= _ring.Count)
+            if (search.Cursor >= _ring.Count)
             {
-                // Round the whole spiral. Begin again rather than stop: the island is not the same place it
-                // was an hour ago — trees fall to woodsmen, a hall goes up and moves its neighbours along —
-                // and a search that gives up for ever is a search that answers a stale question.
-                _cursor = 0;
+                search.Cursor = 0;
                 Exhausted++;
 
                 break;
             }
 
-            var offset = _ring[_cursor++];
+            var offset = _ring[search.Cursor++];
             var x = from.X + offset.X;
             var y = from.Y + offset.Y;
 
-            // A body has to be able to get here at all. Asked first because it is the cheapest of the three
-            // questions and the only one about walking rather than about building.
             if (!BotStep.Settle(map, x, y, out _))
             {
                 Floorless++;
@@ -204,24 +178,45 @@ public static class BotPlot
                 continue;
             }
 
-            // <b>The height is the land average, not the floor a bot would stand on, and the difference was
-            // a hard zero.</b> HousePlacement rule 4 sets hasSurface only where <c>landAvgZ == center.Z</c>
-            // on every foundation tile, so a centre taken from BotStep.Settle — which answers the standable
-            // height, and will happily stand a bot on a static two units up — is refused at every tile it is
-            // offered. 113 candidates and 113 refusals, before this line read the number the engine actually
-            // compares against.
+            if (BotRefused.Refusing(map, new Point3D(x, y, 0)))
+            {
+                Unreached++;
+
+                continue;
+            }
+
+            if (Foreign(by, map, x, y))
+            {
+                Foreigners++;
+
+                continue;
+            }
+
+            if (Round(map, from, x, y))
+            {
+                Roundabout++;
+
+                continue;
+            }
+
             map.GetAverageZ(x, y, out _, out var avg, out _);
 
             var at = new Point3D(x, y, avg);
 
-            if (Crowded(map, at))
+            if (!Away(at, shun, clear))
+            {
+                Overshadowed++;
+
+                continue;
+            }
+
+            if (Crowded(map, at, replacing))
             {
                 Occupied++;
 
                 continue;
             }
 
-            // Not up against a graveyard wall either. See Clearance.
             if (Hallowed(map, at))
             {
                 Shunned++;
@@ -229,11 +224,6 @@ public static class BotPlot
                 continue;
             }
 
-            // Out of town, and this is the engine's rule plus one of ours. The engine refuses housing only
-            // inside a NoHousingRegion, which on this island is the graveyard and little else — Britain's
-            // own town region would take a house on any square of open ground. A hall in a guarded town is
-            // a hall where the watch breaks up anything that happens in it, and what is meant to happen in
-            // these is two guildmates knocking each other about for the practice.
             if (Region.Find(at, map)?.IsPartOf<GuardedRegion>() == true)
             {
                 InTown++;
@@ -241,10 +231,7 @@ public static class BotPlot
                 continue;
             }
 
-            // Level under the whole footprint, tested here for a fraction of the price of asking the engine:
-            // the full check walks the multi, every static and every item on forty-nine tiles, and the great
-            // majority of ground near a town fails on this one rule alone.
-            if (!Level(map, at))
+            if (!Level(map, at, multi))
             {
                 Uneven++;
 
@@ -253,13 +240,10 @@ public static class BotPlot
 
             Tested++;
 
-            var result = HousePlacement.Check(by, MultiID, at, out var toMove, Direction.South);
+            var result = HousePlacement.Check(by, multi, at, out var toMove, Direction.South);
 
             if (result != HousePlacementResult.Valid)
             {
-                // One bucket per refusal, because a bucket holding four reasons answers none of them. See
-                // a-new-gate-needs-a-new-bucket: this counter was written lumped, reported 113 out of 113
-                // refused "for the ground", and said nothing whatever about which rule was doing it.
                 switch (result)
                 {
                     case HousePlacementResult.BadRegion:
@@ -302,8 +286,6 @@ public static class BotPlot
 
             if (toMove is { Count: > 0 })
             {
-                // The engine would shove whatever is there under the house sign. It is entitled to; we are
-                // not. Somebody's ore pile is not a building site.
                 Occupied++;
 
                 continue;
@@ -311,31 +293,35 @@ public static class BotPlot
 
             Fit++;
 
-            if (BotQuad.Trodden(map, at))
+            if (BotQuad.Trodden(map, at) && Nearest(map, at) >= Shy)
             {
                 centre = at;
-                _kept = at;
-                _hasKept = true;
-                Say(at, true);
+                search.Kept = at;
+                search.HasKept = true;
+                Say(at, from, true);
 
                 return true;
             }
 
-            if (!_hasSpare)
+            if (!search.HasSpare || Nearest(map, at) > Nearest(map, search.Spare))
             {
-                _spare = at;
-                _hasSpare = true;
+                search.Spare = at;
+                search.HasSpare = true;
             }
         }
 
-        // The look is over. Whatever it turned up is handed over now rather than kept for a better one.
-        if (_hasSpare)
+        if (search.HasSpare)
         {
-            _hasSpare = false;
-            centre = _spare;
-            _kept = centre;
-            _hasKept = true;
-            Say(centre, false);
+            if (Nearest(map, search.Spare) < Shy)
+            {
+                Neighboured++;
+            }
+
+            search.HasSpare = false;
+            centre = search.Spare;
+            search.Kept = centre;
+            search.HasKept = true;
+            Say(centre, from, false);
 
             return true;
         }
@@ -343,42 +329,70 @@ public static class BotPlot
         return false;
     }
 
-    /// <summary>Something has been built on the remembered ground, or it has been proved bad. Forget it.</summary>
-    public static void Spend() => _hasKept = false;
+    private static bool Away(Point3D at, Point3D shun, int clear) =>
+        clear <= 0 || shun == Point3D.Zero ||
+        Math.Max(Math.Abs(at.X - shun.X), Math.Abs(at.Y - shun.Y)) >= clear;
 
-    /// <summary>
-    /// Whether remembered ground is still worth walking to: level, empty, and not next door to a hall that
-    /// has gone up since. The engine's full check is left to the moment of building, where it must happen
-    /// again anyway.
-    /// </summary>
-    private static bool Sound(Map map, Point3D at) => !Crowded(map, at) && Level(map, at);
+    public static long Overshadowed { get; private set; }
 
-    /// <summary>
-    /// Says where the ground is, once per piece of it.
-    ///
-    /// A hall is raised perhaps four times in the life of an island, so the one line that says where it is
-    /// going is worth having in the session log rather than only in a five-minute total.
-    /// </summary>
-    private static void Say(Point3D at, bool trodden) =>
+    public static long Unreached { get; private set; }
+
+    public static long Foreigners { get; private set; }
+
+    public static long Roundabout { get; private set; }
+
+    public static int MostBehind { get; set; } = 60;
+
+    private static bool Foreign(Mobile by, Map map, int x, int y)
+    {
+        var owner = BotClaim.Owner(map, new Point3D(x, y, 0));
+
+        return owner != null && owner != (by?.Guild as Server.Guilds.Guild)?.Name;
+    }
+
+    private static bool Round(Map map, Point3D from, int x, int y)
+    {
+        if (!BotRoads.Covers(map, x, y))
+        {
+            return false;
+        }
+
+        if (BotRoads.FromHome(map, x, y) < 0)
+        {
+            return true;
+        }
+
+        return BotRoads.Behind(map, from, new Point3D(x, y, 0)) > MostBehind;
+    }
+
+    public static void Spend()
+    {
+        foreach (var search in _searches.Values)
+        {
+            search.HasKept = false;
+        }
+    }
+
+    private static bool Sound(Map map, Point3D at, int multi, BaseHouse replacing) =>
+        !Crowded(map, at, replacing) && Level(map, at, multi);
+
+    private static void Say(Point3D at, Point3D from, bool trodden) =>
         logger.Information(
-            "Ground a hall could stand on at {X},{Y},{Z}, on {Kind} ground: {Tested} candidates have been put to the engine and {Fit} would take one",
+            "Ground a hall could stand on at {X},{Y},{Z}, on {Kind} ground, {Gap} tiles from the seat at {FromX},{FromY}: {Tested} candidates have been put to the engine and {Fit} would take one",
             at.X,
             at.Y,
             at.Z,
             trodden ? "trodden" : "untrodden",
+            Math.Max(Math.Abs(at.X - from.X), Math.Abs(at.Y - from.Y)),
+            from.X,
+            from.Y,
             Tested,
             Fit
         );
 
-    /// <summary>
-    /// Whether the land is at one height under the whole footprint.
-    ///
-    /// The footprint is read off the multi itself rather than assumed to be seven by seven, so dialling
-    /// <see cref="MultiID"/> to a bigger house changes what is measured as well as what is built.
-    /// </summary>
-    private static bool Level(Map map, Point3D at)
+    private static bool Level(Map map, Point3D at, int multi)
     {
-        var mcl = MultiData.GetComponents(MultiID);
+        var mcl = MultiData.GetComponents(multi);
 
         for (var ix = 0; ix < mcl.Width; ix++)
         {
@@ -389,10 +403,6 @@ public static class BotPlot
 
                 for (var t = 0; t < tiles.Length && !foundation; t++)
                 {
-                    // The engine's own definition, word for word: a wall tile at the house's own height is
-                    // what has to rest on level land. Written as "every tile in the bounding box" first,
-                    // which threw away three candidates in five for the sake of the ground under a floor
-                    // nothing stands on.
                     foundation = tiles[t].Z == 0 &&
                                  TileData.ItemTable[tiles[t].ID & TileData.MaxItemValue].Wall;
                 }
@@ -414,15 +424,6 @@ public static class BotPlot
         return true;
     }
 
-    /// <summary>
-    /// Whether this spot is inside the belt kept clear round a region the engine forbids housing in.
-    ///
-    /// <para>
-    /// The rectangles are gathered once from the engine's own region list rather than written down here: a
-    /// graveyard's bounds are the world's business, and a copy of them in this file would be a second
-    /// opinion that goes stale the first time the map is decorated.
-    /// </para>
-    /// </summary>
     private static bool Hallowed(Map map, Point3D at)
     {
         if (Clearance <= 0)
@@ -445,7 +446,6 @@ public static class BotPlot
         return false;
     }
 
-    /// <summary>Gathers those rectangles, grown by <see cref="Clearance"/>, the first time anybody asks.</summary>
     private static void Hallow(Map map)
     {
         if (_shunned != null && _hallowedBy == Clearance)
@@ -489,12 +489,49 @@ public static class BotPlot
         );
     }
 
-    /// <summary>Whether a hall already stands near enough that another would be a terrace.</summary>
-    private static bool Crowded(Map map, Point3D at)
+    private static int Nearest(Map map, Point3D at)
+    {
+        var nearest = int.MaxValue;
+
+        foreach (var house in BotEstate.Halls)
+        {
+            if (house is not { Deleted: false } || house.Map != map)
+            {
+                continue;
+            }
+
+            var gap = Math.Max(Math.Abs(house.X - at.X), Math.Abs(house.Y - at.Y));
+
+            if (gap < nearest)
+            {
+                nearest = gap;
+            }
+        }
+
+        return nearest;
+    }
+
+    private static bool Crowded(Map map, Point3D at, BaseHouse replacing)
     {
         foreach (var house in BotEstate.Halls)
         {
-            if (house is { Deleted: false } && house.Map == map && house.Location.GetDistanceToSqrt(at) < Apart)
+            if (house is { Deleted: false } && house != replacing && house.Map == map && house.Location.GetDistanceToSqrt(at) < Apart)
+            {
+                return true;
+            }
+        }
+
+        foreach (var house in BotOutpost.Houses)
+        {
+            if (house is { Deleted: false } && house != replacing && house.Map == map && house.Location.GetDistanceToSqrt(at) < Apart)
+            {
+                return true;
+            }
+        }
+
+        foreach (var house in BotAbode.Houses)
+        {
+            if (house is { Deleted: false } && house != replacing && house.Map == map && house.Location.GetDistanceToSqrt(at) < BotAbode.Apart)
             {
                 return true;
             }
@@ -503,16 +540,8 @@ public static class BotPlot
         return false;
     }
 
-    /// <summary>
-    /// The offsets to try, nearest first.
-    ///
-    /// Built once and walked in order, so successive searches carry on rather than starting again at the
-    /// same refused tile — which is how a budgeted search turns into a budgeted loop.
-    /// </summary>
     private static void Build()
     {
-        // Rebuilt when the bounds move, because they are dials: a ring built once and kept for ever would
-        // make "dial BotPlot.Far 300" a line that is accepted, journalled, and does nothing at all.
         if (_ring != null && _builtNear == Near && _builtFar == Far)
         {
             return;
@@ -540,27 +569,33 @@ public static class BotPlot
         _ring = ring;
         _builtNear = Near;
         _builtFar = Far;
-        _cursor = 0;
+
+        foreach (var search in _searches.Values)
+        {
+            search.Cursor = 0;
+        }
     }
 
-    /// <summary>Part of the estate's line in the summary.</summary>
     public static string Describe() =>
-        $"plots: {Tested} put to the engine and {Fit} would take a hall; {Uneven} passed over as not level, {Floorless} with no floor at all, {InTown} for standing in a town, {Shunned} for pressing against a graveyard, {Occupied} with something standing on them; the engine refused {Forbidden} on its own regions, {Surfaceless} for resting on nothing, {BadLand} for the land, {BadStatic} for a static or an unclear yard, {BadItem} for something lying there; the spiral has been walked out {Exhausted} times";
+        $"plots: {Tested} put to the engine and {Fit} would take a hall; {Uneven} passed over as not level, {Floorless} with no floor at all, {Unreached} for ground somebody lately failed to reach, {Foreigners} for standing on another guild's square, {Roundabout} for lying round the far side of something by road, {InTown} for standing in a town, {Shunned} for pressing against a graveyard, {Occupied} with something standing on them, {Neighboured} taken within {Shy} tiles of another clan for want of anything further off; the engine refused {Forbidden} on its own regions, {Surfaceless} for resting on nothing, {BadLand} for the land, {BadStatic} for a static or an unclear yard, {BadItem} for something lying there; the spiral has been walked out {Exhausted} times";
 
     public static void Forget()
     {
         _ring = null;
-        _cursor = 0;
-        _hasSpare = false;
+        _searches.Clear();
         Tested = 0;
         Fit = 0;
         Floorless = 0;
+        Unreached = 0;
+        Foreigners = 0;
+        Roundabout = 0;
         Occupied = 0;
         InTown = 0;
         Shunned = 0;
         _shunned = null;
         _hallowedBy = -1;
         Forbidden = 0;
+        Neighboured = 0;
         Uneven = 0;
         BadLand = 0;
         BadStatic = 0;

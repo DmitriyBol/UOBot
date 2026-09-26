@@ -114,6 +114,17 @@ cannot be reinterpreted, and a sentence in a prompt always can.
   watcher that never revisits its own claims produces a log of confident paragraphs with no way to tell the
   true ones from the rest.
 
+**Two answers are turned away before anything is filed, believed or raised: a label, and an echo.** A label is
+a finding with no space in it, or with a run of more than 32 characters without one; an echo is word for word
+the claim a squad-mate, or this watcher, made last. Neither becomes the watcher's last claim, so neither reaches
+the others' briefs. Both are counted (`Labels`, `Echoes`, per watcher and in all). On the evening of 14.09.2026
+every one of twenty-six findings in ninety minutes was the same run-together token about five different bots:
+the prompt had quoted "SameTwoTiles" as its example of what a finding is not, beside example sentences with bot
+names and coordinates; the schema's minimum length made the model pad the word instead of writing a sentence;
+and the long memory merged every repetition as a fresh sighting, so "SameTwoTiles", found 102 times, was the
+strongest belief recited into every prompt. The examples now carry no label, name or number, labels are never
+believed or recited, and the ones already held are dropped at load with a log line each.
+
 The reflection asks a different question and has one field the finding does not: **`wrong`** — what would
 show this to be wrong, or what to measure next to tell. A conjecture that names nothing which could falsify
 it is not a conjecture, and a log full of those is a log that gets acted on and never checked.
@@ -169,6 +180,13 @@ has not been answered yet.
 | `dials <word>` | every dial whose `Class.Name` contains the word, with its live value |
 | `dial <Class.Name> <value>` | moves one. `reset` puts it back. Bare name reads it |
 
+Four hand verbs exist to put the shard into a known state on purpose and watch what answers it: `do jam <bot>`
+fills a pack to the engine's item cap, `do trip <bot> <kind>` puts in as many failures of one kind of work as trip
+`BotBreaker`, `do arm <bot>` puts a vanquishing copy of the bot's birth weapon in its pack so that the re-arm can be
+watched wielding the better one (build 56), and `do breaks` lists the rests standing. `Projects/BotAIv2/scenarios.py` drives them through this
+door after a build and checks the log for the lines that should follow; a state no verb can make yet is printed
+as not scripted rather than left out.
+
 **Dials are `BotDials`, and they are the reason a shard no longer has to be restarted to try a number.**
 Every `public static` property of a simple type in either bot assembly is reachable — 561 of them, found by
 reflection rather than from a list, so a new subsystem's numbers are there the day it is written. A change
@@ -198,10 +216,11 @@ Three things about it are deliberate:
 | `BotDebugNote.cs` | the schemas and the reading of answers |
 | `BotAudit.cs` | the roll-call: three questions to every bot, every two minutes |
 | `BotHail.cs` | being spoken to in the world, and answering there |
-| `BotHand.cs` | the ten verbs it may use, and the journal that makes them safe |
+| `BotHand.cs` | the ten verbs it may use, and the journal that makes them safe; the by-hand verbs no mind is offered, `roads [<x> <y> ...]` (the road map from home and the steps of road to any tile, build 63) and `peril <x> <y>` among them — what the death map and the quadrant record hold about a place (build 50), and `arm <bot>`, a better copy of the bot's own weapon for the re-arm to wield (build 56) |
 | `BotConsole.cs` | the door: `argus-in.txt` in, `argus-out.txt` out |
 | `BotDials.cs` | every tunable number in both assemblies, read and moved while the shard runs |
 | `BotRevel.cs` | the revels: what is declared, what it pays, the crown's purse and the tax that fills it |
+| `BotMarshal.cs` | the marshal of events, the fourth watcher: asked every ten minutes for a revel, a camp, a tournament, an errand on the board, a standing order, a bounty, a price on a head or a fair, and carries it out with the verbs the door already had; while it stands the revels are its (build 94); from build 102 its answer's form is one shape per event open now, each with only its fields, its words from lists and its numbers whole and in bounds |
 | `BotWaves.cs` | something to fight when a hunt is called into an empty field: waves that grow, and clear away after |
 | `BotDebugMemory.cs` | what it carries between reports |
 | `BotDebugLog.cs` | `logs/bot-debugger.log` |
@@ -218,6 +237,12 @@ it; these turn that opinion into something that happens.
 it. It invents no mechanism: bots know nothing of events, and what a revel moves is the price of a kind of
 work — `BotAppraisal.Revelry`, a factor competing honestly with crowding and caution. A revel nobody enters
 pays nobody, which is itself a measurement.
+
+**A revel cannot name prowl any more** (`BotRevel.Trades`, 14.09.2026). A prowl is a walk to wherever a fight might
+be and pays in the fights it finds, not in goods. At 20:35 that evening the watchers tripled it because it "hasn't
+produced any goods or skills", which is true of every prowl by design; companies went looking across the whole map,
+found plague beasts north-east of Britain, and twenty-eight bots died in that field in twenty minutes. A hunt revel
+with a camp puts the fighting where it was chosen to be.
 
 **It is two contests at once.** The best bot takes half the purse; the guild that did most of it between them
 splits the other half. That is how a guild takes part in an event without a war — Patrick's order of

@@ -35,7 +35,6 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotRegalia
 {
-    /// <summary>The red of the cloak. The dye tub's own deep red, so it reads as livery rather than as a stain.</summary>
     public const int RoyalRed = 0x26;
 }
 
@@ -72,8 +71,6 @@ public partial class BotBaronHalberd : Halberd
             return;
         }
 
-        // Maximum first: HitPoints refuses to move while the maximum is nought, so the other order would
-        // silently do nothing on the one blow that mattered.
         MaxHitPoints = max;
         HitPoints = hits;
     }
@@ -88,8 +85,6 @@ public partial class BotBaronChest : PlateChest
     {
         Name = "the Baron's cuirass";
 
-        // Resource first and the durability afterwards: setting the resource rescales the maximum, so a
-        // nought written before it would be scaled straight back up to a real number.
         Resource = CraftResource.Gold;
         MaxHitPoints = 0;
     }

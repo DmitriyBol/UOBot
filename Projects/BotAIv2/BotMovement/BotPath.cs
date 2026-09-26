@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Server.Engines.Pathing.Cache;
@@ -10,44 +10,24 @@ namespace Server.BotAI.V2;
 /// <summary>What a search concluded. Three answers, and the difference between two of them is load-bearing.</summary>
 public enum BotPathOutcome
 {
-    /// <summary>
-    /// Every tile the bot can reach from here was examined, and the goal is not among them.
-    ///
-    /// <b>A statement about the world, not about the search.</b> There is no way, and nothing whatever is
-    /// gained by walking a little way and asking again — the nearest reachable tile to a goal behind a
-    /// wall is a tile <em>against the wall</em>, and going there to ask again is exactly the fence-hugging
-    /// this whole design exists to end. Returned only when the search can prove it: the open set emptied
-    /// and nothing was ever clipped by the search box.
-    /// </summary>
     Sealed,
 
-    /// <summary>
-    /// The search ran out of its allowance, or out of ground inside its own box, and the path leads to the
-    /// best tile it did reach. Walking it is real progress: the next search starts from further along,
-    /// with the box re-centred and a fresh allowance.
-    /// </summary>
     Partial,
 
-    /// <summary>A walkable path to the goal, tile by tile.</summary>
     Reached
 }
 
 /// <summary>What asking about the far side of a journey concluded.</summary>
 public enum BotEnclosure
 {
-    /// <summary>The ground around the destination was walked to its edges. It is a pocket, and it is now filed.</summary>
     Enclosed,
 
-    /// <summary>The ground around the destination kept going past what is worth calling a pocket. Nothing learned.</summary>
     TooBig,
 
-    /// <summary>The probe ran out of its allowance. Nothing learned, and nothing concluded either.</summary>
     NoTime,
 
-    /// <summary>Nothing at or beside the destination will take a body. Nobody can ever arrive, whatever the road.</summary>
     NoFooting,
 
-    /// <summary>Not asked: the population has asked recently enough. Ask again later.</summary>
     Deferred
 }
 
@@ -75,178 +55,41 @@ public static class BotPath
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPath));
 
-    /// <summary>Cardinal cost, matching the engine's own A* so the two agree on what is shortest.</summary>
     private const int StraightCost = 10;
 
     private const int DiagonalCost = 14;
 
-    /// <summary>
-    /// How far outside the straight line between start and goal the search may look. Wide enough to walk
-    /// right round a walled graveyard rather than merely to sidestep a tree, because going the wrong way
-    /// first is exactly what leaving an enclosure requires.
-    ///
-    /// <para>
-    /// <b>Raised to the same width as <see cref="MaxMargin"/> on 03.09.2026, by Patrick's order that the
-    /// bots be able to cross the whole island and be given knowledge of the rock they cannot pass.</b> The
-    /// two are the same request. BotReach learns a pocket only from a search whose ground ran out without
-    /// the box ever getting in the way — and the box grew with the length of the journey, so a short one
-    /// got twenty-eight tiles. "Behind that rock" is a short journey. The box was smaller than the pocket,
-    /// every such search was clipped, and the proof was thrown away every time: on the morning of
-    /// 03.09.2026 the shard reported 9013 searches, 6796 of them partial and <b>0 refused outright</b>,
-    /// which is to say BotReach had not learned one pocket in a night of running. Bots walked at the same
-    /// cliff for hours because nothing on the shard was able to find out that it was a cliff.
-    /// </para>
-    ///
-    /// <para>
-    /// The cost is bounded elsewhere and was not the constraint: searches were averaging 5.43ms against a
-    /// ceiling of twenty, and the population was spending about 101ms a second of an allowance of 250. A
-    /// wider box does not make a search slower — it makes the time already granted buy a better answer, and
-    /// where the answer is "there is no way", buys it once for everybody for the life of the shard.
-    /// </para>
-    /// </summary>
     public static int MinMargin { get; set; } = 256;
 
-    /// <summary>
-    /// The widest that box may get, on a long journey.
-    ///
-    /// <para>
-    /// <b>Raised from ninety-six once the cost was actually measured.</b> Ninety-six tiles off the straight
-    /// line is enough to round a building and not enough to round a lake, so a bot whose way lay round one
-    /// hit the edge of its own search box, came back with a partial plan, walked to the water and asked
-    /// again. The box was never the thing keeping the cost down — the clock is, and the clock was idle: 1675
-    /// searches came to 256ms over five minutes, which is under one per cent of what the population is
-    /// allowed. A wider box does not make a search slower; it makes the time it is given buy a better answer.
-    /// </para>
-    /// </summary>
     public static int MaxMargin { get; set; } = 256;
 
-    /// <summary>
-    /// What one search may cost. The number asked for, and now the number that is actually enforced.
-    ///
-    /// <para>
-    /// Sixty from twenty on 03.09.2026, and by the same order: "their path search works for the whole
-    /// island, even if it takes longer to build; they have reflexes to defend themselves on the way". A
-    /// search that runs out of clock records nothing, exactly as a clipped one records nothing, so widening
-    /// the box without lengthening the clock would only have traded one silent failure for another.
-    /// </para>
-    /// </summary>
     public static double CeilingMs { get; set; } = 60.0;
 
-    /// <summary>
-    /// The largest pocket worth proving from the far side, in standing cells.
-    ///
-    /// <para>
-    /// <b>This is the bound, and it replaces geometry with a count on purpose.</b> A box around the
-    /// destination would have to be guessed at, and guessing it small makes every probe clip while guessing
-    /// it large makes every failed probe expensive. A count is the thing actually being asked about: a
-    /// walled yard is dozens of tiles, a crypt is hundreds, a ledge behind a rock is a handful — and ground
-    /// that keeps going past fifteen hundred is not a pocket, it is the world. So a probe that finds the
-    /// world stops the moment it has enough tiles to know that, which is the cheapest a wrong guess can be.
-    /// </para>
-    /// </summary>
     public static int EnclosureCells { get; set; } = 2500;
 
-    /// <summary>
-    /// What one look at the far side may cost. Small, because <see cref="EnclosureCells"/> already bounds
-    /// the work: the measured price is about forty microseconds an expansion on cold ground, and eight expansions discover up to eight cells apiece, and this
-    /// is only here so that a pathological surface cannot make it otherwise.
-    /// </summary>
     public static double EnclosureCeilingMs { get; set; } = 30.0;
 
-    /// <summary>
-    /// The shortest gap between two looks at the far side, across the whole population.
-    ///
-    /// A governor rather than a correctness bound. Each look is cheap and each one can buy a refusal that
-    /// lasts the life of the shard, so this is deliberately loose — it exists only so that thirty bots all
-    /// deciding at once cannot put a spike in a frame.
-    /// </summary>
     public static int EnclosureGapMs { get; set; } = 250;
 
-    /// <summary>
-    /// The largest pocket worth proving when the bot is standing in it and has been proved stranded.
-    ///
-    /// <para>
-    /// Ten times the ordinary bound, because it is a different question asked on far better evidence. The
-    /// ordinary look is a suspicion about somewhere the bot has never been, asked several times a minute, and
-    /// it has to be cheap. This one is asked when a dozen roads in a row have been refused from one tile, at
-    /// most a few dozen times a night, and what it buys is that no bot is ever sent into that ground again.
-    /// </para>
-    ///
-    /// <para>
-    /// It was set at the ordinary bound for an hour and the log says what that cost. Orin the Warrior was
-    /// carried out of (1757, 976, 0) on 03.09.2026 at 11:14 and the look reported TooBig — the same ground
-    /// that had taken Merrick, Torvin, Kerrin, Perri, Edda 2, Bryn, Ilsa, Calla, Doran and four more in
-    /// eighteen minutes that morning. A trap that catches fourteen bots is worth a hundred and fifty
-    /// milliseconds once.
-    /// </para>
-    /// </summary>
     public static int StrandedCells { get; set; } = 25000;
 
-    /// <summary>What that look may cost. Once per rescue, so a tenth of a second is affordable and a night of rescues is not.</summary>
     public static double StrandedCeilingMs { get; set; } = 150.0;
 
-    /// <summary>
-    /// The smallest search worth running, for when the population's allowance is spent. Below this a bot
-    /// cannot see round anything, and it is better to creep than to stop.
-    /// </summary>
     public static double FloorMs { get; set; } = 1.0;
 
-    /// <summary>
-    /// What a tile of distance is worth in clock.
-    ///
-    /// <para>
-    /// <b>The ceiling is what a journey across the island may cost, and it was being charged to a chase
-    /// three tiles long.</b> A search that reaches its goal is nearly free — it runs almost straight at it —
-    /// so the whole bill is the searches that fail, and a failing search spends every millisecond it is
-    /// given. With one flat ceiling that is sixty milliseconds whether the goal is over the hill or across
-    /// the continent. Measured on 03.09.2026 at 11:05: 69 per cent of searches partial, two thirds of those
-    /// going somewhere within thirty-two tiles, half of them ending no nearer than they started, and 469ms a
-    /// second against an allowance of five hundred — with 28 per cent of all searches handed less clock than
-    /// they asked for, and a starved search gets <see cref="FloorMs"/> and is partial by construction. The
-    /// shard was manufacturing its own failures.
-    /// </para>
-    ///
-    /// <para>
-    /// Budget the thing that was promised, which is this file's own rule and was being kept only for tiles.
-    /// A quarter of a millisecond a tile makes a chase cost four and an island crossing cost sixty, and the
-    /// journeys that genuinely need the long search get it back through <see cref="BotWalk.Plan"/>: one that
-    /// is not closing asks for the whole ceiling by name.
-    /// </para>
-    /// </summary>
     public static double MsPerTile { get; set; } = 0.25;
 
-    /// <summary>The least any search gets, however short the journey. Enough to see round a tree.</summary>
     public static double ShortMs { get; set; } = 4.0;
 
-    /// <summary>
-    /// What the whole population may spend on searching, per second.
-    ///
-    /// Not a correctness bound — a governor, and a generous one: the first version measured 215 ms of
-    /// searching across ninety seconds, about 2.4 ms a second for fifty bots. Twenty-five times that is
-    /// still under a tenth of the game loop, and when it does run out searches shrink to
-    /// <see cref="FloorMs"/> and come back <see cref="BotPathOutcome.Partial"/> more often, so the
-    /// population walks in shorter hops instead of the world stuttering.
-    /// </summary>
     public static double WindowMs { get; set; } = 500.0;
 
     private const int WindowLengthMs = 1000;
 
-    /// <summary>
-    /// How many expansions between glances at the clock. Reading a timestamp is not free, and sixty-four
-    /// tiles is a few hundred microseconds at most — fine granularity against a two millisecond ceiling.
-    /// </summary>
     private const int ClockEvery = 64;
 
     private const int InitialNodes = 4096;
 
-    /// <summary>
-    /// The smallest pocket worth writing down. Two, because one tile is never useful knowledge and is the
-    /// shape an invalid start takes — and a wrong entry in the reach ledger is permanent and silent.
-    /// </summary>
     private const int MinPocket = 2;
-
-    // ---- Search state. Reused across searches: one game thread, and a search that allocates is a
-    // ---- search that costs more in collection than it does in work.
 
     private static int[] _nodeX = new int[InitialNodes];
     private static int[] _nodeY = new int[InitialNodes];
@@ -266,21 +109,15 @@ public static class BotPath
 
     private static readonly List<Point3D> _reversed = [];
 
-    /// <summary>A scratch path, for callers who only want a yes or no.</summary>
     private static readonly List<Point3D> _scratch = [];
 
-    /// <summary>The flood's frontier, as node indices. Order does not matter: it is exhausting, not aiming.</summary>
     private static readonly List<int> _frontier = [];
-
-    // ---- The population's allowance.
 
     private static long _windowEnds;
 
     private static bool _windowStarted;
 
     private static double _spentThisWindow;
-
-    // ---- What it has all cost. For the summary.
 
     public static long Searches { get; private set; }
 
@@ -290,7 +127,6 @@ public static class BotPath
 
     public static long PartialRuns { get; private set; }
 
-    /// <summary>Proofs of a pocket thrown away, by the condition that threw them. See the note in the search.</summary>
     public static long LostToClock { get; private set; }
 
     public static long LostToBox { get; private set; }
@@ -301,7 +137,6 @@ public static class BotPath
 
     public static long LostToSize { get; private set; }
 
-    /// <summary>Whether the goal was found. Named so the veto tally above reads as prose.</summary>
     private static bool Reached2(int reached) => reached >= 0;
 
     public static long SealedRuns { get; private set; }
@@ -310,88 +145,36 @@ public static class BotPath
 
     public static double WorstMs { get; private set; }
 
-    // ---- What the partials actually are. Four numbers, because "84 per cent partial" is a symptom that has
-    // ---- two completely different causes and tuning the wrong one is how a governor gets raised for ever.
-
-    /// <summary>
-    /// Searches handed less clock than they asked for, because the population's second was already spent.
-    ///
-    /// The number that says whether the governor is a ceiling nobody touches or a wall everybody is against.
-    /// A starved search gets <see cref="FloorMs"/>, which buys a few hundred tiles, which comes back partial —
-    /// so once this starts climbing the shard is making its own partials.
-    /// </summary>
     public static long Starved { get; private set; }
 
-    /// <summary>
-    /// Searches given the whole ceiling by name, because the journey asking had stopped closing.
-    ///
-    /// The other half of charging by distance. A goal twenty tiles off whose road runs four hundred tiles
-    /// round a lake is a short journey by every measure this file has, and it is exactly the one that needs
-    /// the long search — so the cheap search is tried first and the expensive one is bought only where the
-    /// cheap one has already been shown to fail.
-    /// </summary>
+    public static bool LastStarved { get; private set; }
+
     public static long Lengthened { get; private set; }
 
-    /// <summary>Partial searches to somewhere inside <see cref="Near"/> tiles. A chase, not a journey.</summary>
     public static long PartialNear { get; private set; }
 
-    /// <summary>
-    /// Partial searches that ended no nearer the goal than they began.
-    ///
-    /// The signature of something in the way rather than something far off: A* aims at the goal, so a search
-    /// that cannot better its own starting distance has been stopped, not slowed.
-    /// </summary>
     public static long PartialStill { get; private set; }
 
-    /// <summary>How far the partials were going, added up, so the average can be printed.</summary>
     public static long PartialSpan { get; private set; }
 
-    /// <summary>
-    /// Partials that never began: the bot's own tile forbids all eight directions.
-    ///
-    /// Counted apart because it is the one partial that is not about the destination at all, and because it
-    /// leaves the other three counters — a search that returns before the loop adds nothing to them, so
-    /// without this the breakdown quietly fails to add up and the difference is invisible.
-    /// </summary>
     public static long PartialUnfooted { get; private set; }
 
-    /// <summary>What counts as near enough that a full search of the box is not what was wanted.</summary>
     public const int Near = 32;
 
-    // ---- What asking about the far side has cost, and bought.
-
-    /// <summary>Looks at the far side of a journey that actually ran.</summary>
     public static long Probes { get; private set; }
 
-    /// <summary>Looks that ended in a pocket being filed.</summary>
     public static long Enclosed { get; private set; }
 
-    /// <summary>Looks that ran out of ground worth calling a pocket. The ordinary answer, and a cheap one.</summary>
     public static long ProbedTooBig { get; private set; }
 
-    /// <summary>Looks that ran out of clock. Should be rare; if it is not, the cell bound is doing nothing.</summary>
     public static long ProbedNoTime { get; private set; }
 
-    /// <summary>
-    /// Destinations with nowhere to stand at or beside them.
-    ///
-    /// Its own kind of hopeless, and until now an invisible one: no road can end at a tile that will not
-    /// take a body, so a bot sent to one walks perfectly well for ever and never arrives.
-    /// </summary>
     public static long ProbedNoFooting { get; private set; }
 
     public static double ProbeMs { get; private set; }
 
     public static long ProbeTiles { get; private set; }
 
-    /// <summary>
-    /// Ground the looks found, in standing cells.
-    ///
-    /// Kept apart from <see cref="ProbeTiles"/> because the two answer different questions and the wrong one
-    /// was reported first. Tiles are nodes taken off the frontier; cells are ground discovered, and it is
-    /// cells that <see cref="EnclosureCells"/> is measured in — one expansion discovers up to eight of them,
-    /// so a look can settle "this is the world" having popped two hundred nodes.
-    /// </summary>
     public static long ProbeCells { get; private set; }
 
     private static long _probedAt;
@@ -436,38 +219,12 @@ public static class BotPath
             ? "no searches yet"
             : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; {Starved} were handed less clock than they asked for and {Lengthened} asked for the whole ceiling because they were not closing; of the partials {PartialNear} were going somewhere within {Near} tiles and {PartialStill} ended no nearer than they started and {PartialUnfooted} never began because the bot's own tile forbids every direction, the average one {(PartialRuns > PartialUnfooted ? PartialSpan / (PartialRuns - PartialUnfooted) : 0)} tiles out; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand";
 
-    /// <summary>
-    /// Whether there is a way at all, without keeping the path. For vetting a candidate before committing
-    /// to it — a place to wander to, a rally point, a spot to retreat onto.
-    /// </summary>
     public static bool CanReach(Map map, Point3D from, Point3D to, BotArrival arrival, double ceilingMs = 0.0) =>
         Find(map, from, to, arrival, _scratch, ceilingMs: ceilingMs) == BotPathOutcome.Reached;
 
-    /// <summary>
-    /// Whether there is a way there <em>without going through a door</em> — which is how "is that spot out
-    /// on the street" gets answered.
-    ///
-    /// Without it, a caller asking for somewhere outdoors is handed a point in somebody's pantry: a shut
-    /// door is passable to the planner by design, so the inside of every building in the world is
-    /// reachable and therefore a candidate. The distinction has to be a separate question rather than a
-    /// different rule, because both answers are wanted, about the same tile, by different callers.
-    ///
-    /// Nothing calls this yet. It exists now because the alternative was a parameter on
-    /// <see cref="BotStep.BlockedByItems"/> with no way to reach it from a search — plumbing that looks
-    /// finished and is not.
-    /// </summary>
     public static bool ReachableWithDoorsShut(Map map, Point3D from, Point3D to, BotArrival arrival) =>
         Find(map, from, to, arrival, _scratch, doorsShut: true) == BotPathOutcome.Reached;
 
-    /// <summary>
-    /// Finds a way from <paramref name="from"/> to <paramref name="to"/> and writes it into
-    /// <paramref name="path"/> as the tiles to walk, the bot's own tile excluded.
-    ///
-    /// On <see cref="BotPathOutcome.Partial"/> the path leads to the nearest point to the goal that
-    /// <em>can</em> be reached, so a caller that simply walks whatever comes back behaves correctly either
-    /// way: it arrives, or it gets as close as the world permits and asks again from there — which, from
-    /// further out, may well succeed.
-    /// </summary>
     public static BotPathOutcome Find(
         Map map,
         Point3D from,
@@ -491,22 +248,14 @@ public static class BotPath
             return BotPathOutcome.Reached;
         }
 
-        // Free refusal, from a pocket somebody else already walked to its edges. The most expensive
-        // question there is, answered by a dictionary lookup.
         if (BotReach.Ask(map, from, to, arrival) == BotReachVerdict.Sealed)
         {
-            // Counted as a search, because it answered one. Left out, the summary could report more
-            // refusals than searches and divide the total time by the wrong denominator — and a system
-            // whose entire premise is that measurement beats guessing cannot afford a lying counter.
             Searches++;
             SealedRuns++;
 
             return BotPathOutcome.Sealed;
         }
 
-        // One pathfind, as far as the step cache's promotion gate is concerned. It counts distinct
-        // searches rather than lookups, so without this a single search's thousands of probes read as
-        // thousands of separate visits and the gate builds chunks nothing revisits.
         StepCache.Instance.BeginFindGeneration();
 
         Searches++;
@@ -524,7 +273,9 @@ public static class BotPath
         var allowanceMs = Allowance(wanted);
         var deadline = started + (long)(allowanceMs * Stopwatch.Frequency / 1000.0);
 
-        if (allowanceMs < wanted)
+        LastStarved = allowanceMs < wanted;
+
+        if (LastStarved)
         {
             Starved++;
         }
@@ -543,15 +294,6 @@ public static class BotPath
 
         var startZ = (sbyte)Math.Clamp(from.Z, sbyte.MinValue, sbyte.MaxValue);
 
-        // Where the bot is standing has to be somewhere it could stand, and the caller is not obliged to
-        // have checked.
-        //
-        // A start whose mask forbids all eight directions makes the search empty its open set on the first
-        // expansion — which looks exactly like a pocket of ground walked to its edges, and would be written
-        // into the reach ledger as one. A one-tile pocket is never knowledge worth having, and this one
-        // would be poison: it seals that cell, and every other height sharing its band, against every
-        // journey for the rest of the shard's life. So an immovable start is reported as no progress rather
-        // than as a fact about the world, and the walker asks the engine directly instead.
         if (BotStep.Mask(map, from.X, from.Y, startZ).WalkMask == 0)
         {
             PartialRuns++;
@@ -566,8 +308,6 @@ public static class BotPath
         _lookup[BotStep.Cell(from.X, from.Y, startZ)] = start;
         _open.Enqueue(start, _nodeTotal[start]);
 
-        // The best thing found short of the goal, kept as the search runs. A* explores towards the goal,
-        // so this is genuinely the closest reachable point rather than the first one tried.
         var nearest = -1;
         var nearestScore = int.MaxValue;
 
@@ -575,12 +315,6 @@ public static class BotPath
         var expansions = 0;
         var outOfTime = false;
 
-        // Whether the search box ever stopped the search from looking somewhere.
-        //
-        // The single most important flag in this file. Without it, "the open set emptied" is ambiguous
-        // between "the bot can reach nothing else in the world" and "the bot can reach nothing else
-        // inside this rectangle" — and recording the second as a sealed pocket would wall off half a
-        // continent, permanently, with nothing in any log to say so.
         var clipped = false;
 
         while (_open.Count > 0)
@@ -596,7 +330,6 @@ public static class BotPath
                 break;
             }
 
-            // Lazily deleted duplicate: a cheaper route to this cell was found after it was queued.
             if (_nodeClosed[current] || _nodeTotal[current] != priority)
             {
                 continue;
@@ -638,22 +371,11 @@ public static class BotPath
                     continue;
                 }
 
-                // The diagonal rule, and it needs both of its halves.
-                //
-                // The engine will not let a player cut a corner unless BOTH flanking tiles pass the whole
-                // movement check — terrain and items. The first version calls getting this half-right the
-                // most expensive mistake in its pathfinder, and it can be got half-right in either
-                // direction: check only the terrain and every squeeze past a headstone fails at the moment
-                // of stepping; check only the items and the planner emits diagonals through wall corners
-                // that the engine then refuses. Both gates, in this order.
                 if ((d & 1) == 1)
                 {
                     var left = (d + 7) & 7;
                     var right = (d + 1) & 7;
 
-                    // Mask bits first, and not merely for speed: GetWalkZ for a direction the mask forbids
-                    // is a landing height for a step that does not exist, and FlankBlocked would then be
-                    // asking about the wrong tile at the wrong height.
                     if ((walk & (1 << left)) == 0 || (walk & (1 << right)) == 0)
                     {
                         continue;
@@ -683,9 +405,6 @@ public static class BotPath
 
                 var nz = mask.GetWalkZ((Direction)d);
 
-                // Items, which the mask does not know about. This world is built out of them — the
-                // graveyard railing, the headstones, the crates are all items — so a planner without this
-                // draws confident straight lines through the very fences it exists to see.
                 if (Blocked(map, nx, ny, nz, doorsShut))
                 {
                     continue;
@@ -738,12 +457,6 @@ public static class BotPath
             return BotPathOutcome.Reached;
         }
 
-        // <b>Why a proof was thrown away, named rather than counted as one number.</b> A search that empties
-        // its open set has enumerated a pocket and can hand BotReach the most expensive fact on the shard
-        // for nothing — but four different conditions veto that, and until 03.09.2026 all four looked
-        // identical from outside: "0 refused outright", every window, all night. Widening the box turned a
-        // quarter of searches reaching their goal into more than half and still left that nought, so the box
-        // was not the only veto. These say which one it is, in the same sentence as the count they explain.
         if (!Reached2(reached))
         {
             if (outOfTime)
@@ -768,12 +481,8 @@ public static class BotPath
             }
         }
 
-        // Ground genuinely exhausted: the open set emptied, the clock had time left, the box never got in
-        // the way, and no tactical exclusion was distorting the answer. Only then is this knowledge.
         if (!outOfTime && !clipped && avoid.Empty)
         {
-            // A search run with the doors treated as walls has mapped a room, not a pocket of the world.
-            // Recording it would seal every building on the shard against everybody outside it.
             if (!doorsShut && _lookup.Count >= MinPocket)
             {
                 BotReach.Record(map, _lookup.Keys, from);
@@ -797,8 +506,6 @@ public static class BotPath
             PartialNear++;
         }
 
-        // Measured against where it began rather than against the goal: the start's own estimate is the
-        // number to beat, and beating it by nothing is the whole finding.
         if (nearest < 0 || nearestScore >= Heuristic(from.X, from.Y, to))
         {
             PartialStill++;
@@ -807,39 +514,6 @@ public static class BotPath
         return BotPathOutcome.Partial;
     }
 
-    /// <summary>
-    /// Whether the destination sits in a pocket of ground, asked <b>from the destination's side</b>.
-    ///
-    /// <para>
-    /// <b>Why the question has to be turned round, and why no clock could have answered it the other way.</b>
-    /// A search refuses a journey only when its open set empties with nothing clipped — which is to say when
-    /// it has enumerated the whole pocket it started in. Started from the bot, that pocket is the mainland.
-    /// The box is two hundred and fifty-six tiles beyond the line to the goal, open ground carries on past
-    /// it, so a neighbour falls outside the box and <c>clipped</c> is set long before the open set can empty.
-    /// The clock happens to run out first today, which is why every lost proof was filed against it; give the
-    /// search six times the clock and the same proofs are lost to the box instead. Neither is the reason.
-    /// <b>The reason is that the bot is standing on the wrong side of the wall to prove anything about it.</b>
-    /// On the morning of 03.09.2026 that showed as 3564 proofs lost, 0 kept, in a ten-minute window — and it
-    /// would have shown the same in any window, at any ceiling, for the life of the shard.
-    /// </para>
-    ///
-    /// <para>
-    /// From the destination it is a different question and a cheap one. The ledge behind the rock, the walled
-    /// yard, the islet, the crypt: each is a few dozen to a few hundred tiles, so the flood either runs out of
-    /// ground almost at once — which is the proof, bought for everybody for the life of the shard — or it runs
-    /// past <see cref="EnclosureCells"/> and stops, which costs a few milliseconds and settles
-    /// that this destination is simply far away rather than walled off.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>What it actually proves, said plainly.</b> The flood follows steps the engine would allow, outwards
-    /// from the destination, so what it establishes is that <em>nothing standing there can get out</em>.
-    /// Stepping in might still be possible where the world allows a drop it will not allow back up. That is
-    /// not a hole in the reasoning, it is the answer: somewhere a bot could fall into and never leave is
-    /// somewhere it should not be sent, and this whole subsystem exists because bots were being sent to places
-    /// they never arrived at.
-    /// </para>
-    /// </summary>
     public static BotEnclosure Enclose(Map map, Point3D goal, BotArrival arrival, bool urgent = false)
     {
         if (map == null || map == Map.Internal)
@@ -849,9 +523,6 @@ public static class BotPath
 
         var now = Core.TickCount;
 
-        // The gap is there to stop thirty bots asking at once about thirty different destinations. It is not
-        // there to stop the one question that is asked on proof rather than on suspicion: a bot with a dozen
-        // roads refused in a row is standing in the pocket, and that is the cheapest and surest look there is.
         if (!urgent && _probeStarted && now - _probedAt < EnclosureGapMs)
         {
             return BotEnclosure.Deferred;
@@ -862,9 +533,6 @@ public static class BotPath
 
         Probes++;
 
-        // Somewhere at the destination that would take a body. The Z a caller hands in is where something is
-        // standing or floating, not necessarily a floor, and a flood begun at a height with no ground under it
-        // maps nothing and would file the emptiness as a pocket.
         if (!Footing(map, goal, arrival, out var start))
         {
             ProbedNoFooting++;
@@ -874,18 +542,6 @@ public static class BotPath
 
         var started = Stopwatch.GetTimestamp();
 
-        // <b>Its own clock, and deliberately not the population's.</b>
-        //
-        // The first hour of this running had four looks in five minutes and two of them came back having run
-        // out of time after two hundred tiles. They had been handed <see cref="FloorMs"/>: Allowance divides
-        // what is left of the window, the window was drained, and it was drained by exactly the failing
-        // searches this look exists to stop. An instrument paid for out of the waste it ends cannot run when
-        // the waste is worst, which is the only time it is wanted.
-        //
-        // What keeps it bounded instead is <see cref="EnclosureGapMs"/>, and that bound is a harder one: four
-        // looks a second at twenty-five milliseconds apiece is a hundred milliseconds a second in the very
-        // worst case, no matter what else the population is doing. The cost is still handed to Spend, because
-        // it is real and belongs in the window's accounting — it simply is not gated by it.
         var ceiling = urgent ? StrandedCeilingMs : EnclosureCeilingMs;
         var cells = urgent ? StrandedCells : EnclosureCells;
         var deadline = started + (long)(ceiling * Stopwatch.Frequency / 1000.0);
@@ -915,8 +571,6 @@ public static class BotPath
                 break;
             }
 
-            // The bound, and the only one. Ground that keeps going past this is the world, not a pocket, and
-            // the cheapest way to find that out is to stop counting as soon as the count settles it.
             if (_lookup.Count > cells)
             {
                 outcome = BotEnclosure.TooBig;
@@ -948,10 +602,6 @@ public static class BotPath
                     continue;
                 }
 
-                // The same two-part diagonal rule the planner uses, and here it is a safety property rather
-                // than an efficiency one. A flood stricter than the engine sees a smaller pocket than there is
-                // and would file ground that is genuinely open — the one mistake in this file that is silent,
-                // permanent, and worse than the problem it solves.
                 if ((d & 1) == 1)
                 {
                     var left = (d + 7) & 7;
@@ -974,8 +624,6 @@ public static class BotPath
 
                 CalcMoves.Offset((Direction)d, ref nx, ref ny);
 
-                // The edge of the map is a wall the world itself puts there, so a pocket that ends against it
-                // has genuinely ended. No box of our own: EnclosureCells is the bound.
                 if (nx < 0 || ny < 0 || nx >= map.Width || ny >= map.Height)
                 {
                     continue;
@@ -1026,7 +674,6 @@ public static class BotPath
 
         if (_lookup.Count < MinPocket)
         {
-            // One tile. Never knowledge worth having, and the shape an invalid footing takes.
             ProbedTooBig++;
 
             return BotEnclosure.TooBig;
@@ -1038,17 +685,6 @@ public static class BotPath
         return BotEnclosure.Enclosed;
     }
 
-    /// <summary>
-    /// Ground at or beside the destination that would take a body, and the height it would stand at.
-    ///
-    /// <para>
-    /// The destination's own height is preferred whenever a body could stand there, because that is the one
-    /// height known to belong to the thing being walked to. Only when it will not does this settle for the
-    /// surface underneath, and then only if that surface is within a person's height of what was asked for —
-    /// a destination on a bridge whose settled ground is the riverbed twenty units below is not the same
-    /// place, and flooding the riverbed would file a pocket that has nothing to do with the journey.
-    /// </para>
-    /// </summary>
     private static bool Footing(Map map, Point3D goal, BotArrival arrival, out Point3D at)
     {
         var goalZ = (sbyte)Math.Clamp(goal.Z, sbyte.MinValue, sbyte.MaxValue);
@@ -1067,8 +703,6 @@ public static class BotPath
             return true;
         }
 
-        // Nowhere on the tile itself. The arrival tolerance says where else would have counted as arriving,
-        // so those tiles are the rest of the destination and are asked about in rings, nearest first.
         var reach = Math.Min(arrival.Tiles, MaxFootingSweep);
 
         for (var r = 1; r <= reach; r++)
@@ -1098,17 +732,8 @@ public static class BotPath
         return false;
     }
 
-    /// <summary>How far out of the destination to look for footing. Matches the reach ledger's own sweep.</summary>
     private const int MaxFootingSweep = 2;
 
-    /// <summary>
-    /// What this search is allowed, given what the population has already spent this second.
-    ///
-    /// The window is seeded from a real tick the first time round rather than left at zero: tick counts
-    /// can start enormous or negative depending on the host, and a deadline field that defaults to zero is
-    /// either already past or unreachably far — the first shuts the window for ever, the second never
-    /// closes it.
-    /// </summary>
     private static double Allowance(double requested)
     {
         var now = Core.TickCount;
@@ -1127,18 +752,11 @@ public static class BotPath
             return FloorMs;
         }
 
-        // <b>A caller that names its own ceiling is asking for more than the ordinary one, and clamping it
-        // back down to the ordinary one made the request a lie.</b> BotScoutmaster asks for three hundred
-        // milliseconds before it commits six bots to a five-hundred-tile walk; clamped to sixty it would
-        // refuse every honest journey of that length. The population's window still binds — nobody gets more
-        // than is left of the second — and Starved says so when it bites, which is how a caller knows its
-        // answer was cut short rather than concluded.
         return Math.Clamp(Math.Min(requested, left), FloorMs, Math.Max(CeilingMs, requested));
     }
 
     private static void Spend(double ms) => _spentThisWindow += ms;
 
-    /// <summary>Octile distance in the same units as the step costs, so the estimate never overshoots.</summary>
     private static int Heuristic(int x, int y, Point3D goal)
     {
         var dx = Math.Abs(x - goal.X);
@@ -1149,23 +767,6 @@ public static class BotPath
             : DiagonalCost * dx + StraightCost * (dy - dx);
     }
 
-    /// <summary>
-    /// <see cref="BotStep.BlockedByItems"/>, remembered for the length of one search.
-    ///
-    /// Without this the diagonal rule costs two item lookups per diagonal candidate — eight a tile, where
-    /// the terrain mask costs one — and a tile is flanked by up to four diagonals from four different
-    /// neighbours, so nearly all of it would be the same answer fetched again.
-    ///
-    /// <para>
-    /// <b>Keyed on the exact height, not the height band.</b> <see cref="BotStep.Cell"/> folds Z into
-    /// twenty-unit bands, which is right for naming a place and wrong for this: whether an item is in the
-    /// way is decided by whether its own height overlaps the body standing there, and two heights thirteen
-    /// units apart share a band while disagreeing about a crate. Keyed by band, the first query to arrive
-    /// would answer for the second — silently, and differently depending on the order the search happened
-    /// to reach them. The first version keyed this by band. It is the same planner-versus-engine
-    /// disagreement the whole file exists to prevent, hiding in the cache rather than the rules.
-    /// </para>
-    /// </summary>
     private static bool Blocked(Map map, int x, int y, sbyte z, bool doorsShut)
     {
         var key = ((long)(z + 128) << 26) | ((long)x << 13) | (uint)y;
@@ -1229,7 +830,6 @@ public static class BotPath
     {
         _reversed.Clear();
 
-        // The bot's own tile is the root and is not a step, so the walk stops before it.
         while (_nodeParent[node] >= 0)
         {
             _reversed.Add(new Point3D(_nodeX[node], _nodeY[node], _nodeZ[node]));

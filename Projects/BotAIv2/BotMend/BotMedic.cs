@@ -29,7 +29,6 @@ public sealed class BotMedic : IBotProposer
 
     public string Name => "Medic";
 
-    /// <summary>The rung this was written for. Nothing else answers it.</summary>
     public BotStanding Rung => BotStanding.Failing;
 
     public BotDeed Propose(IBotWilful bot)
@@ -42,18 +41,6 @@ public sealed class BotMedic : IBotProposer
             return null;
         }
 
-        // <b>Nothing is bound up while something is standing over you, by order of 24.08.2026.</b>
-        //
-        // The engine does not forbid it: a blow past the disturb threshold calls BandageContext.Slip, which
-        // costs two per cent of the success chance and four points of the healing, and that is all — which is
-        // precisely why the code here used to reach for cloth rather than a spell under fire, since a cast is
-        // interrupted outright. The trade was defensible and it is not the one wanted. A bot winding a
-        // bandage is a bot standing still in front of whatever is hitting it, buying a fraction of a heal per
-        // blow taken, and the answer to being hit is to get away from it and say so — see BotCry — not to
-        // stand there dressing the wound while it is reopened.
-        //
-        // Said as "nothing hostile near", not "nothing is targeting me": a creature two tiles away that has
-        // not swung yet will swing during the bandage.
         Asked++;
 
         if (BotThreat.Anything(body, BotMend.Peril))
@@ -93,29 +80,14 @@ public sealed class BotMedic : IBotProposer
         return null;
     }
 
-    /// <summary>
-    /// Every gate apart, and the denominator with them.
-    ///
-    /// <para>
-    /// <b>The one question the consumables trade turns on, and nothing anywhere could answer it.</b> The
-    /// shopper's tally said the population was "most often short of Bandage (9637 times)" in four hours,
-    /// which is a count of beats and not of bots — a handful that cannot buy any counts thousands of times,
-    /// and so does a whole population. So "the healers are dry" and "one healer is dry and asks often" were
-    /// the same figure, and there was no honest way to decide whether this shard needs somebody making
-    /// bandages out of cloth. <see cref="Dry"/> is a count of bots that were hurt, safe, out of mana and out
-    /// of cloth — which is a bot about to die of it.
-    /// </para>
-    /// </summary>
     public static long Asked { get; private set; }
 
-    /// <summary>Hurt, but something was standing over it. Not a want of supplies.</summary>
     public static long Hostile { get; private set; }
 
     public static long Spelled { get; private set; }
 
     public static long Bandaged { get; private set; }
 
-    /// <summary>Hurt, safe, and nothing to mend with. The number that says whether bandages are scarce.</summary>
     public static long Dry { get; private set; }
 
     public static string Describe() =>
@@ -142,14 +114,11 @@ public sealed class BotMedic : IBotProposer
 
         _saidNoMeans = true;
 
-        // Once, by name. A bot that cannot mend itself will hold whatever it was doing while it dies, and in a
-        // log that is indistinguishable from a bot that is busy.
         logger.Error(
             "{Name} is hurt and has neither the mana, the herbs nor the cloth to do anything about it",
             body.Name
         );
     }
 
-    /// <summary>Lets the complaint be made again after a world reload.</summary>
     public static void Forget() => _saidNoMeans = false;
 }

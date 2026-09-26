@@ -22,34 +22,9 @@ namespace Server.BotAI.V2;
 /// </summary>
 public interface IBotProposer
 {
-    /// <summary>Short, stable name. Appears in the boot log and in the census.</summary>
     string Name { get; }
 
-    /// <summary>
-    /// Which rung this proposer answers. <see cref="BotStanding.Free"/> for ordinary wants; a rung above it
-    /// for work that exists to get a bot out of trouble — mending, unloading, flight.
-    ///
-    /// <para>
-    /// This is how the ladder is filled without the brain knowing what mending is. A rung with no proposer
-    /// is honest rather than broken: the bot keeps what it is doing and the shortage is reported once, by
-    /// name, in the same voice the module loader uses for a subsystem that should be running and is not.
-    /// </para>
-    /// </summary>
     BotStanding Rung { get; }
 
-    /// <summary>
-    /// The best piece of work this subsystem can offer this bot right now, or null for nothing.
-    ///
-    /// <para>
-    /// <b>One offer, not a list</b>, and the proposer picks it. It is the only party that can compare two
-    /// veins — richness, distance, whether somebody is already there — and a brain sorting forty candidate
-    /// tiles per bot per decision is the first version's cost model wearing a new hat.
-    /// </para>
-    ///
-    /// <para>
-    /// Called on the bot's own beat and only when the bot is free to take something on, so it may be a real
-    /// question of the world; it must not be an expensive one.
-    /// </para>
-    /// </summary>
     BotDeed Propose(IBotWilful bot);
 }

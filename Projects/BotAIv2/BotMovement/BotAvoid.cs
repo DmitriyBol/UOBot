@@ -33,8 +33,9 @@ public readonly struct BotAvoid
     private readonly int _y1;
     private readonly int _x2;
     private readonly int _y2;
+    private readonly Map _towns;
 
-    private BotAvoid(int tileX, int tileY, int x1, int y1, int x2, int y2)
+    private BotAvoid(int tileX, int tileY, int x1, int y1, int x2, int y2, Map towns = null)
     {
         _tileX = tileX;
         _tileY = tileY;
@@ -42,32 +43,31 @@ public readonly struct BotAvoid
         _y1 = y1;
         _x2 = x2;
         _y2 = y2;
+        _towns = towns;
 
         HasTile = tileX >= 0;
         HasSquare = x2 >= x1 && x1 >= 0;
     }
 
-    /// <summary>Nothing excluded. The ordinary case, and the only one that may teach the reach ledger.</summary>
     public static BotAvoid None => new(-1, -1, -1, -1, -1, -1);
 
     public bool HasTile { get; }
 
     public bool HasSquare { get; }
 
-    /// <summary>True when this plan is unconstrained, and therefore its refusal means something.</summary>
-    public bool Empty => !HasTile && !HasSquare;
+    public bool Empty => !HasTile && !HasSquare && _towns == null;
 
-    /// <summary>The tile somebody is standing on.</summary>
+    public bool HasTowns => _towns != null;
+
     public static BotAvoid Tile(Point3D where) => new(where.X, where.Y, -1, -1, -1, -1);
 
-    /// <summary>A patch of ground to route around, inclusive of its edges.</summary>
     public static BotAvoid Square(int x1, int y1, int x2, int y2) => new(-1, -1, x1, y1, x2, y2);
 
-    /// <summary>This exclusion plus a tile, for a plan that has both reasons.</summary>
-    public BotAvoid And(Point3D tile) => new(tile.X, tile.Y, _x1, _y1, _x2, _y2);
+    public BotAvoid And(Point3D tile) => new(tile.X, tile.Y, _x1, _y1, _x2, _y2, _towns);
 
-    /// <summary>This exclusion plus a square.</summary>
-    public BotAvoid And(int x1, int y1, int x2, int y2) => new(_tileX, _tileY, x1, y1, x2, y2);
+    public BotAvoid And(int x1, int y1, int x2, int y2) => new(_tileX, _tileY, x1, y1, x2, y2, _towns);
+
+    public BotAvoid Towns(Map map) => new(_tileX, _tileY, _x1, _y1, _x2, _y2, map);
 
     public bool Blocks(int x, int y)
     {
@@ -76,6 +76,11 @@ public readonly struct BotAvoid
             return true;
         }
 
-        return HasSquare && x >= _x1 && x <= _x2 && y >= _y1 && y <= _y2;
+        if (HasSquare && x >= _x1 && x <= _x2 && y >= _y1 && y <= _y2)
+        {
+            return true;
+        }
+
+        return _towns != null && BotOutlaw.Guarded(_towns, x, y);
     }
 }

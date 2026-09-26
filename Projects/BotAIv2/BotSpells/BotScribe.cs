@@ -45,15 +45,11 @@ public sealed class BotScribe : IBotProposer
 
         if (BotGrimoire.Book(body) == null)
         {
-            // A pen and no book. Nothing stops it writing for the market, but the choice of what to write
-            // leans on what its own book is short of, and there is no honest answer without one.
             return null;
         }
 
         if (BotQuill.System == null)
         {
-            // Content initialisation builds the craft systems, and anything that asks before that gets null.
-            // Said once: a scribe that never writes is otherwise indistinguishable from an idle one.
             if (!_saidNoSystem)
             {
                 _saidNoSystem = true;
@@ -63,8 +59,6 @@ public sealed class BotScribe : IBotProposer
 
             return null;
         }
-
-        // Asked after the paper is priced, below, so the choice can weigh what a scroll costs to make.
 
         BotShops.Survey(map, body.Location);
 
@@ -95,7 +89,6 @@ public sealed class BotScribe : IBotProposer
         return BotQuill.Choose(body, price, out _, out _) == null ? null : new BotInscribe(shop, price);
     }
 
-    /// <summary>Lets the complaints be made again after a world reload.</summary>
     public static void Forget()
     {
         _saidNoPaper = false;

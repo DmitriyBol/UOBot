@@ -40,7 +40,7 @@ ROOT = "(root)"
 ORDER = [
     ROOT, "BotModules", "BotPopulation", "BotWill", "BotMovement", "BotClasses", "BotOutfit",
     "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotAuction", "BotSpells",
-    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotEstate", "BotQuad", "BotRanger",
+    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotProving", "BotEstate", "BotQuest", "BotQuad", "BotRanger",
     "BotDashboard", "BotAlarm", "mindedBots", "mindedBots/debugger",
 ]
 
@@ -173,6 +173,16 @@ BLOCKS = {
         ["A stall and a want can both be healthy and never meet. When trade is low the question is not "
          "whether either side works but whether there is an edge between them."],
     ),
+    "BotQuest": (
+        "the board of errands",
+        "What the door and the marshal of events ask of the population, for a price: kill so many of a "
+        "creature near a place, bring so many of a thing to a place, scout a place. The reward is held by "
+        "the treasury from the moment of posting and paid to whichever bot does the errand; an errand "
+        "untaken for two hours lapses and gives the money back. One board instead of a list and a verb for "
+        "each thing somebody wants done; the marshal who posts on his own lives with the watchers.",
+        ["An offer is not an errand: the board marks an errand taken in the deed's Taken, never in the "
+         "proposer, so a bot that loses the auction has not taken anything."],
+    ),
     "BotSpells": (
         "a book that grows",
         "Scrolls, reagents and spellbooks: the first work in the project whose output no shopkeeper sells, "
@@ -222,6 +232,31 @@ BLOCKS = {
         "proved they kill. He raises a levy for it, walks his rounds, tours the towns, and pays a stipend out "
         "of his own account.",
         [],
+    ),
+    "BotDelve": (
+        "the dungeons",
+        "Five bots taken underground by the maker of their guild, for twenty minutes or twenty corpses. The "
+        "dungeon block has no walkable road from the island, so a party is put down and lifted back out; "
+        "which dungeon is decided by measuring what lives in each against what the band is worth. What they "
+        "take is swept into one pot as it fills and divided at the end, half to the leader.",
+        ["A refused road underground is ordinary rather than fatal — a wall between a bot and its place in "
+         "the line is what a cavern is made of — so `BotDelve.Bend` shrugs it off and moves the party. The "
+         "first party that ever went down was out again in forty-one seconds without it.",
+         "A bot left in a dungeon has no road home at all. `BotDelveParty.Watch` is the net under that, and "
+         "the count of what it lifts out is printed: a backstop doing the ordinary work has become the "
+         "design."],
+    ),
+    "BotProving": (
+        "Argus's proving ground",
+        "A bot's double against a creature in Green Acres, and a guild's company of doubles against a dungeon's "
+        "worst room: the engine fights, the doubles answer with the bots' own hands, and what comes of it is the "
+        "strength the delve judges a band by instead of health times weapon damage. Patrick's order of 26.09.2026.",
+        ["A walkover is a lower bound, not a measurement: R is capped at 5 and nothing measured on a lower rung is "
+         "carried up the ladder at more than the creature it beat, times 0.75. The first boot extrapolated an orcish "
+         "mage beaten at R 20 into a Balron beaten at R 1.4.",
+         "A band is as far as its weakest member goes, and a room is not its worst creature one at a time: the "
+         "delve counts the leader, wants every member at a fifth of the worst, and past the easiest dungeon wants "
+         "the guild's company to have cleared the worst room lately."],
     ),
     "BotEstate": (
         "the guilds' halls",
@@ -309,7 +344,10 @@ LINES = {
     "BotHunt": ["Companies:"],
     "BotDrill": ["The captain:"],
     "BotBaron": ["The Baron:"],
+    "BotDelve": ["Delving:"],
+    "BotProving": ["Proving:"],
     "BotEstate": ["Estate:"],
+    "BotQuest": ["Quests:"],
     "BotQuad": ["The captain:"],
     "mindedBots": ["Minds:"],
 }

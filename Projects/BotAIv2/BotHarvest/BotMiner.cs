@@ -30,7 +30,6 @@ public sealed class BotMiner : IBotProposer
 
     public string Name => "Miner";
 
-    /// <summary>An ordinary want, weighed against every other ordinary want.</summary>
     public BotStanding Rung => BotStanding.Free;
 
     public BotDeed Propose(IBotWilful bot)
@@ -48,8 +47,13 @@ public sealed class BotMiner : IBotProposer
             return null;
         }
 
-        // Whatever this bot is standing in the middle of, swept once for everybody. The first bot to ask is
-        // the one that pays for it; the sweep refuses politely once the ground here is known.
+        if (BotDig.Burdened(body))
+        {
+            Burdened++;
+
+            return null;
+        }
+
         BotGround.Survey(map, body.Location);
 
         if (BotGround.Fire(bot, body.Location) == Point3D.Zero)
@@ -73,15 +77,6 @@ public sealed class BotMiner : IBotProposer
             return new BotDig(seam);
         }
 
-        // <b>Nothing left to dig is a reason to go looking, not a reason to stop.</b> Patrick's order of
-        // 05.09.2026, and the ground had earned it: the seam list ran 509 to 84 in two hours and twenty
-        // minutes with 445 struck off as barren behind it, and every sweep this shard makes happens where a
-        // bot already is — so the map cannot grow without somebody walking off the edge of it on purpose.
-        // See BotProspect, which carries no pickaxe: its arrival is the whole of the work.
-        //
-        // Offered only to a bot that already has the tool, because that is who the ore is for, and only
-        // when there is genuinely nothing to swing at — a prospector sent out while rock is on the board is
-        // a miner not mining.
         var frontier = BotGround.Frontier(map, body.Location);
 
         if (frontier != Point3D.Zero && BotOre.Carried(body) < BotOre.WorthSmelting)
@@ -91,19 +86,11 @@ public sealed class BotMiner : IBotProposer
             return new BotProspect(map, frontier, BotGround.Seams.Count);
         }
 
-        // No rock on record, but a pack with ore in it. A seam at the bot's own feet is the honest way to
-        // say "there is nothing to dig here": the undertaking finds nothing to swing at, sees what it is
-        // already carrying, and goes straight to the fire with it. Ore left in a pack is ore nobody can buy.
         if (BotOre.Carried(body) < BotOre.WorthSmelting)
         {
             return null;
         }
 
-        // <b>Unless carrying it somewhere has just failed here.</b> This is the one offer in the subsystem
-        // whose place is the bot's own feet, so it is the one that repeats identically for as long as the bot
-        // stands still — and a bot holding ore it cannot melt stands very still indeed. Everything else is
-        // spared this by being keyed to a seam somewhere else; without the check, a miner whose forge cannot
-        // be reached takes the same trip and fails it three times a second until the shard restarts.
         var ledger = bot.Resolve?.Ledger;
 
         if (ledger != null && ledger.Cautious(BotDig.Trade, map, body.Location))
@@ -114,8 +101,9 @@ public sealed class BotMiner : IBotProposer
         return new BotDig(new BotSeam(map, body.Location, "ore", 0.0));
     }
 
-    /// <summary>Miners sent out past the frontier because there was no rock left on the board.</summary>
     public static long Sent { get; private set; }
+
+    public static long Burdened { get; private set; }
 
     private static void Missing(ref bool said, string what, Mobile body, Map map)
     {
@@ -126,16 +114,6 @@ public sealed class BotMiner : IBotProposer
 
         said = true;
 
-        // Once, by name, in the same voice the module loader uses for a subsystem that ought to be running.
-        // Silence here would look exactly like a population that did not feel like mining.
-        //
-        // <b>Said of this bot and not of the shard, which is the correction its sisters in BotTailor,
-        // BotShopper and BotAlchemist all had to make.</b> BotGround.Counter answers from ONE bot's
-        // position, so "Mining is not offered on Felucca" was a shard-wide claim built out of one miner
-        // standing somewhere awkward — read at 20:42 on 04.09.2026 beside forty finished mining trips, which
-        // is exactly how loudly a line has to disagree with the world before anybody checks it. The article
-        // went with it: the parameter carried "a counter" and the sentence supplied its own "no", so the log
-        // read "no a counter".
         logger.Error(
             "{Name} at {Where} could not be offered mining on {Map}: no {What} within its own reach, so the trip could not be finished",
             body?.Name ?? "a miner",
@@ -145,12 +123,9 @@ public sealed class BotMiner : IBotProposer
         );
     }
 
-    /// <summary>
-    /// Lets the complaints be made again. Called when the world is reloaded: the next world may well have a
-    /// forge in it, and a warning suppressed for ever is a warning about the wrong world.
-    /// </summary>
     public static void Forget()
     {
+        Burdened = 0;
         _saidNoFire = false;
         _saidNoCounter = false;
     }

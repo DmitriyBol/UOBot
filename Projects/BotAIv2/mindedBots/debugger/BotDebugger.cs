@@ -1,4 +1,4 @@
-using Server.Items;
+﻿using Server.Items;
 using Server.Mobiles;
 
 namespace Server.BotAI.Mind;
@@ -45,16 +45,10 @@ namespace Server.BotAI.Mind;
 /// </summary>
 public class BotDebugger : PlayerMobile
 {
-    /// <summary>
-    /// The robe's colour. Bright white, and it is the one thing about this body meant to be looked at:
-    /// the only person who can see it at all is the one who went looking for it.
-    /// </summary>
     public static int RobeHue { get; set; } = 0x481;
 
-    /// <summary>Who may see it. Anything above this rank sees it too — see the note on the class.</summary>
     public static AccessLevel SeenBy { get; set; } = AccessLevel.Administrator;
 
-    /// <summary>How many times it has moved itself across the world.</summary>
     public long Hops { get; private set; }
 
     public BotDebugger(Serial serial) : base(serial)
@@ -65,44 +59,33 @@ public class BotDebugger : PlayerMobile
     {
     }
 
-    /// <summary>
-    /// Makes this body what it is. Separate from the constructor because a deserialised one must not be
-    /// dressed again — it is about to be deleted, not used. See <see cref="BotVigil"/>.
-    /// </summary>
-    public void Awaken(string name)
+    public void Awaken(string name) => Awaken(name, RobeHue);
+
+    public void Awaken(string name, int hue)
     {
         Name = name;
 
-        // A player as far as the engine is concerned, for the same reason the bots are: a mobile without the
-        // flag is deleted outright by the death path and reads as alive while it is a ghost. This one is
-        // blessed and will never die, so the flag is precaution rather than cure — but the cure cost a whole
-        // evening once, and precaution here costs a line.
         Player = true;
 
         Body = 0x190;
         Female = false;
 
-        // The whole figure white rather than a skin tone: what is being dressed is not a person, and the one
-        // pair of eyes that can see it should be able to tell at a glance which of the shapes in a crowd is
-        // the one that is not part of the population.
-        Hue = RobeHue;
+        Hue = hue;
         HairItemID = 0x203C;
-        HairHue = RobeHue;
+        HairHue = hue;
 
         Blessed = true;
         Hidden = true;
         AccessLevel = SeenBy;
 
-        // Nothing regenerates, nothing starves, nothing poisons it. The timers would run for the life of the
-        // shard and settle nothing.
         Hits = HitsMax;
         Stam = StamMax;
         Mana = ManaMax;
 
         AddItem(new Backpack { Movable = false });
 
-        Dress(new Robe(RobeHue));
-        Dress(new Sandals(RobeHue));
+        Dress(new Robe(hue));
+        Dress(new Sandals(hue));
     }
 
     private void Dress(Item item)
@@ -121,18 +104,6 @@ public class BotDebugger : PlayerMobile
         }
     }
 
-    /// <summary>
-    /// Appears somewhere else. The only way this body ever moves, and it takes no time and no path.
-    ///
-    /// <para>
-    /// <b>A teleport rather than walking, and the reason is measurement rather than convenience.</b> An
-    /// observer that walked would spend its life in the same roads, doors and stalls it is watching for, and
-    /// would be subject to them: the one bot on the shard whose job is to notice that nobody can get out of
-    /// a yard must not be able to get stuck in one. It also has to be able to be beside a bot on the far side
-    /// of the map within the same second, because what is worth watching changes faster than anything can
-    /// walk.
-    /// </para>
-    /// </summary>
     public bool Hover(Map map, Point3D where)
     {
         if (Deleted || map == null || map == Map.Internal)
@@ -147,15 +118,12 @@ public class BotDebugger : PlayerMobile
 
         MoveToWorld(where, map);
 
-        // Re-asserted rather than assumed: nothing in this folder ever reveals it, but a shard is a large
-        // place and hiding is a state a great deal of content likes to change.
         Hidden = true;
         Hops++;
 
         return true;
     }
 
-    /// <summary>Nothing about this body is worth a save; see the note in <see cref="BotVigil.Purge"/>.</summary>
     public override void Serialize(IGenericWriter writer)
     {
         base.Serialize(writer);

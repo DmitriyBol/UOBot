@@ -28,38 +28,22 @@ public sealed class BotRounds : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRounds));
 
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "stroll";
 
-    /// <summary>
-    /// What a walk through the town is reckoned at per minute.
-    ///
-    /// <para>
-    /// Below everything, and above nothing, which is the whole of its place in the order — the same position
-    /// <see cref="BotProwl"/> holds for a fighter with nothing in sight. It must never beat a harrowing and
-    /// it must never lose to standing still, and since the Baron may be offered exactly two things, those
-    /// two facts are the entire specification of this number.
-    /// </para>
-    /// </summary>
     public static double Prior { get; set; } = 6.0;
 
-    /// <summary>How long one walk lasts before he looks up and asks again.</summary>
     public static double WorkMinutes { get; set; } = 4.0;
 
-    /// <summary>How far from the counter he will wander. A town, not a district.</summary>
     public static int Reach { get; set; } = 30;
 
-    /// <summary>How many places are tried before a walk gives up on finding one inside the walls.</summary>
     public static int Tries { get; set; } = 12;
 
-    /// <summary>How long he lingers at one place before choosing another.</summary>
     public static int LingerMs { get; set; } = 20000;
 
     public static long Walks { get; private set; }
 
     public static long Steps { get; private set; }
 
-    /// <summary>Walks that could find nowhere inside the walls to go. A named nought.</summary>
     public static long Walled { get; private set; }
 
     private readonly Map _map;
@@ -76,14 +60,6 @@ public sealed class BotRounds : BotDeed
 
     private bool _walking;
 
-    /// <summary>
-    /// Whether <see cref="_post"/> holds a real place yet.
-    ///
-    /// A flag rather than testing the point against <c>Point3D.Zero</c>. Nothing here can ever legitimately
-    /// choose the origin, so the sentinel would work — and that is exactly the argument this project has
-    /// already lost twice, once on a tick stamp of nought and once on a height of nought. A value that means
-    /// "unset" and is also a value stops being either the first time the world disagrees.
-    /// </summary>
     private bool _posted;
 
     public BotRounds(Map map, Point3D town)
@@ -103,10 +79,6 @@ public sealed class BotRounds : BotDeed
 
     public override double Minutes => WorkMinutes;
 
-    /// <summary>
-    /// It pays nothing and it is meant to. See <see cref="BotDeed.Unpaid"/> for the twelve minutes this cost
-    /// before it existed.
-    /// </summary>
     public override bool Unpaid => true;
 
     public override SkillName? Trains => null;
@@ -115,12 +87,6 @@ public sealed class BotRounds : BotDeed
 
     public override string Stage => $"walking the town, {_posts} corners of it so far";
 
-    /// <summary>
-    /// At a walk. It is the only errand on the shard that says so, and the reason is what it looks like: a
-    /// Baron sprinting laps of his own town reads as a bot with a bug rather than a bot with nothing pressing
-    /// to do. Everything else here runs because its errand is at the far end of the walk; this errand is the
-    /// walk.
-    /// </summary>
     public override bool Hurries => false;
 
     public override BotDoing Advance(IBotWilful bot)
@@ -138,8 +104,6 @@ public sealed class BotRounds : BotDeed
         {
             _walking = true;
 
-            // Stamped when the walk actually begins rather than when the offer was built: most offers are
-            // weighed and thrown away, and a clock started in the constructor is a clock already running.
             _began = now;
             _steppedTick = now;
 
@@ -172,16 +136,6 @@ public sealed class BotRounds : BotDeed
         return BotDoing.Walk(_map, _post, BotArrival.Within(1), "walking the town");
     }
 
-    /// <summary>
-    /// Somewhere else in the town: a place with ground under it, inside the walls, and not the one he is
-    /// standing on.
-    ///
-    /// <para>
-    /// Sampled rather than laid out in a ring. A ring is right for a patrol, whose job is to cover a square
-    /// evenly and be seen to; a town is a shape nothing here knows, and a bot walking a perfect circle around
-    /// a bank is more obviously a machine than one wandering.
-    /// </para>
-    /// </summary>
     private Point3D Corner(Mobile body)
     {
         for (var i = 0; i < Tries; i++)
@@ -201,8 +155,6 @@ public sealed class BotRounds : BotDeed
                 continue;
             }
 
-            // The engine's own walls. Asked of the destination and not of the bot: a Baron standing just
-            // inside the gate would otherwise be free to walk out of it.
             if (Region.Find(at, _map)?.IsPartOf<GuardedRegion>() != true)
             {
                 continue;
@@ -214,7 +166,6 @@ public sealed class BotRounds : BotDeed
         return Point3D.Zero;
     }
 
-    /// <summary>Somewhere else in the same town, because a town is the errand and a street corner is not.</summary>
     public override bool Bend(IBotWilful bot)
     {
         var body = bot?.Self;

@@ -27,58 +27,18 @@ public sealed class BotPeddler : IBotProposer
 
     private static bool _saidNoBuyer;
 
-    /// <summary>
-    /// How long a stall must sit unsold before its owner will carry the goods to a shopkeeper.
-    ///
-    /// <para>
-    /// <b>Its own number, and it had to become one: this used to read <c>BotAuction.StaleMs</c>, which is a
-    /// different question wearing the same clothes.</b> That number answers "when should a price come down",
-    /// and thirty minutes is right for it — a price that ratchets every five would be a population
-    /// undercutting itself all afternoon. This one answers "when has the market plainly said no", and thirty
-    /// minutes is far too long for that: no session on this shard had ever lived long enough to reach it, so
-    /// the one road by which gold enters this population from outside had never been walked once. The
-    /// counters said it in as many words — 1429 of 1452 looks refused for this reason and not one refused
-    /// for want of a buyer.
-    /// </para>
-    ///
-    /// <para>
-    /// Ten minutes, reckoned from how often the goods are actually looked at rather than chosen for feeling
-    /// about right. Thirty bots reconsider their wants every twenty seconds or so, so a stall standing for
-    /// ten minutes has been in front of the whole population something like nine hundred times. Anything
-    /// that has been refused nine hundred times is not going to sell here, and the shopkeeper's lower price
-    /// is better than the nothing it is earning now. Still three times longer than the market needs to show
-    /// the thing around, so a stall is never whisked away before the population has had its look.
-    /// </para>
-    /// </summary>
     public static int IgnoredMs { get; set; } = 600000;
 
-    // ---- Every gate, counted apart. This proposer had none at all. ------------------------------
-    //
-    // <b>The one road by which gold enters this population from outside, and it was completely silent.</b>
-    // On the afternoon of 27.08.2026 the shops line read "473 things bought for 3172gp, 0 sold for 0gp"
-    // while 1707gp came off corpses in the same ten minutes — a population losing money at twice the rate
-    // it earns it, with a median purse of 340gp and every price on the shard being refused for want of
-    // funds. Nothing said whether this proposer was being asked and refusing, or never being asked. It
-    // turned out to be neither exactly: a stall must sit unsold for BotAuction.StaleMs — thirty minutes —
-    // before it may be taken to a counter, and no session that week had lived that long.
-
-    /// <summary>Bots looked at for something to peddle.</summary>
     public static long Asked { get; private set; }
 
-    /// <summary>Bots holding no stall of their own at all.</summary>
     public static long Stallless { get; private set; }
 
-    /// <summary>Stalls that have sold before, so somebody here does want them.</summary>
     public static long Wanted { get; private set; }
 
-    /// <summary>Stalls not yet old enough to count as ignored. The thirty-minute gate.</summary>
     public static long Fresh { get; private set; }
 
-    /// <summary>Ignored stalls with no shopkeeper in reach who buys the thing.</summary>
     public static long NoBuyer { get; private set; }
 
-    /// <summary>Trips to a counter actually offered.</summary>
-    /// <summary>Stalls left alone because the board has money down for that kind. See Propose.</summary>
     public static long Spoken { get; private set; }
 
     public static long Offered { get; private set; }
@@ -120,14 +80,6 @@ public sealed class BotPeddler : IBotProposer
 
             mine++;
 
-            // Never sold one, and it has been on offer for a full stale period. Both halves matter: a stall
-            // that has sold before has a buyer somewhere worth waiting for, and a stall that went up a minute
-            // ago has not been in front of anybody long enough to know.
-            //
-            // Measured from when the stall opened rather than from the last thing that happened to it. A price
-            // cut counts as something happening, so the other clock is never more than one beat old and this
-            // test would never fire — and it would fire even less for goods opened at a gold apiece, whose
-            // price has no room to fall at all.
             if (stall.Traded)
             {
                 Wanted++;
@@ -142,17 +94,6 @@ public sealed class BotPeddler : IBotProposer
                 continue;
             }
 
-            // <b>Somebody on this island has money down for this, so it does not go to a shopkeeper.</b> A
-            // counter is where goods go when nobody wanted them, and a want on the board with escrow behind
-            // it is the plainest possible statement that somebody did. On the night of 05.09.2026 the
-            // peddler carried twenty-five loads of feathers across to counters for 2034gp while 613 asks to
-            // fletch were refused for want of a feather and 439 arrow orders stood on the board unfilled:
-            // the island's scarcest material, sold out of the world by the one errand meant to clear what
-            // nobody needs. The price is the only thing between the two, and BotAuction.BeatStalls is
-            // already walking it down every StaleMs — ten minutes since Patrick's order the same night — so
-            // waiting costs a stall slot and buys a trade. Its own want does not count: a bot cannot buy
-            // from itself, and holding goods for an order only it has raised would be a stall that never
-            // clears.
             if (BotAuction.Demand(bot, stall.Kind) != null)
             {
                 Spoken++;
@@ -202,9 +143,6 @@ public sealed class BotPeddler : IBotProposer
 
         _saidNoBuyer = true;
 
-        // Once, by name. Goods that no bot wants and no shopkeeper buys are goods that will sit on a stall for
-        // the life of the shard, and a population slowly filling the market with them looks exactly like a
-        // population that is trading.
         logger.Error(
             "No shopkeeper within reach of the bots on {Map} buys {Item}, and no bot wants it either; it will sit on the market",
             map,
@@ -212,7 +150,6 @@ public sealed class BotPeddler : IBotProposer
         );
     }
 
-    /// <summary>Lets the complaint be made again after a world reload.</summary>
     public static void Forget()
     {
         _saidNoBuyer = false;

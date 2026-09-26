@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Logging;
 using Server.Regions;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -28,100 +29,28 @@ public static class BotPopulation
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPopulation));
 
-    /// <summary>Which facet the population lives on.</summary>
     public static Map Home { get; set; }
 
-    /// <summary>
-    /// Where on it. Britain by default, and specifically the point this shard's own location list calls
-    /// Britain — <c>Data/Locations/felucca.json</c> — rather than a coordinate somebody remembered.
-    ///
-    /// It matters more than it looks: the first bot to want work sweeps the ground around itself for seams,
-    /// fires and counters, so where the population is born decides what it can do at all.
-    /// </summary>
     public static Point3D Where { get; set; } = new(1592, 1680, 10);
 
-    /// <summary>
-    /// How far around that point bots are scattered, so they do not all arrive on one tile.
-    ///
-    /// <para>
-    /// <b>Six put forty-nine bots into a thirteen-tile square, and the rescue kept dropping them into it.</b>
-    /// On the night of 07-08.09.2026 fifty-four bots were carried home for being able to reach nothing, and
-    /// fifteen of them - twenty-eight per cent - then reported that they could reach nothing from home
-    /// either, seconds apart, standing on the population's own doorstep on ground the shard itself called
-    /// good. What refuses the roads there is the other bots. Ten makes the patch twenty-one tiles across and
-    /// the same population eleven per cent of it rather than twenty-nine.
-    /// </para>
-    /// </summary>
     public static int Spread { get; set; } = 10;
 
-    /// <summary>Placements that had to take a tile with no way off it. See <see cref="TryPlace"/>.</summary>
     public static long Boxedin { get; private set; }
 
-    /// <summary>
-    /// How far from home this population is allowed to want anything. Two hundred tiles: Britain and its
-    /// outskirts.
-    ///
-    /// <para>
-    /// <b>A bound on wanting, not on walking.</b> Nothing stops a bot being chased across a field; what this
-    /// does is keep every <em>offer</em> inside one town, so the population does not spread itself across a
-    /// continent it cannot survive. A seam, a forge, a counter or a shop outside it is simply not proposed.
-    /// </para>
-    ///
-    /// <para>
-    /// It is deliberately crude and deliberately temporary. The real answer is travel — stones to the banks of
-    /// the big cities — and when that exists this becomes a bound per city instead of one bound in total.
-    /// </para>
-    /// </summary>
     public static int Roam { get; set; } = 200;
 
-    /// <summary>
-    /// Whether this place is somewhere the population may work.
-    ///
-    /// With no home configured there is no bound at all: an unconfigured population is not a population that
-    /// may not work, it is one nobody has placed yet.
-    /// </summary>
+    public static int Scatter { get; set; } = 350;
+
     public static bool Within(Map map, Point3D where) =>
         Home == null || map == Home && Utility.InRange(Where, where, Roam);
 
-    /// <summary>
-    /// How far out the walk looks for the edge of the guarded ground, and how coarsely.
-    ///
-    /// Britain's wall is a hundred-odd tiles from where the population lives, so four hundred is generous
-    /// and eight-tile strides find the edge to within eight — which is the right grain for a place to stand
-    /// and wait, and turns a walk of four hundred lookups into fifty.
-    /// </summary>
     public static int GateReach { get; set; } = 400;
 
     public static int GateStride { get; set; } = 8;
 
-    /// <summary>Gates found. A named nought: if this stays at nought nobody is gathering anywhere new.</summary>
     public static long Gates { get; private set; }
 
-    /// <summary>
-    /// The edge of the guarded ground, in the direction of somewhere worth going.
-    ///
-    /// <para>
-    /// <b>Patrick's order of 03.09.2026: a company gathers at the edge of the town rather than inside it,
-    /// so the march out is shorter.</b> Bots live and bank and buy in the middle of Britain, so that is
-    /// where one of them is standing when it decides it needs help — and the company it raises then walks
-    /// the whole width of the town before it has gone anywhere at all. The edge in the right direction is
-    /// the shortest honest place to meet, and it is also where more of the population passes by than
-    /// anywhere inside the walls.
-    /// </para>
-    ///
-    /// <para>
-    /// Found by walking rather than by geometry: guarded regions are drawn as whatever shape somebody drew
-    /// them, so the only reliable way to find their edge is to ask the engine at points along the line. The
-    /// first point outside is the answer, stepped back onto ground a body can stand on.
-    /// </para>
-    ///
-    /// <para>
-    /// Returns <see cref="Point3D.Zero"/> when there is no edge to find — the bot is not in a town, or the
-    /// line leaves the map — and every caller treats that as "gather where you stand", which is what it did
-    /// before this existed.
-    /// </para>
-    /// </summary>
-    public static Point3D Gate(Map map, Point3D from, Point3D toward)
+    public static Point3D Gate(Map map, Point3D from, Point3D toward, bool counted = true)
     {
         if (map == null || map == Map.Internal || Region.Find(from, map)?.IsPartOf<GuardedRegion>() != true)
         {
@@ -159,7 +88,10 @@ public static class BotPopulation
                 continue;
             }
 
-            Gates++;
+            if (counted)
+            {
+                Gates++;
+            }
 
             return here;
         }
@@ -167,26 +99,20 @@ public static class BotPopulation
         return Point3D.Zero;
     }
 
-    /// <summary>How long a dead bot lies there before it is put back on its feet.</summary>
     public static int ReviveMs { get; set; } = 60000;
 
-    /// <summary>How many placements are tried before falling back to the configured point itself.</summary>
     private const int Attempts = 20;
 
-    /// <summary>
-    /// Everybody, including holes.
-    ///
-    /// <b>Deleted bots leave a null rather than shifting the list</b>, because a bot can be deleted by its own
-    /// turn — and a list that shifts underneath the clock's loop skips whoever moved into the gap. Holes are
-    /// filled when the population is next raised.
-    /// </summary>
     private static readonly List<BotMobile> _bots = [];
 
     private static int _holes;
 
     public static IReadOnlyList<BotMobile> Bots => _bots;
 
-    /// <summary>How many bots actually exist.</summary>
+    private static readonly List<BotMobile> _away = [];
+
+    public static IReadOnlyList<BotMobile> Away => _away;
+
     public static int Count => _bots.Count - _holes;
 
     public static int Living
@@ -207,17 +133,54 @@ public static class BotPopulation
         }
     }
 
-    /// <summary>
-    /// Deletes every bot that came back from the world save.
-    ///
-    /// <para>
-    /// <b>The one place in this assembly that walks the whole world, and it is deliberate.</b> The shard's
-    /// own rules forbid iterating <c>World.Mobiles</c> in favour of spatial queries, for good reason — but
-    /// there is no spatial query for "everywhere", this runs once per world load, and the alternative is a
-    /// population that doubles every restart. The first version reached the same conclusion for the same
-    /// reason.
-    /// </para>
-    /// </summary>
+    public static int Reclaim(IReadOnlyDictionary<string, int> mix, out Dictionary<string, int> kept)
+    {
+        List<BotMobile> saved = [];
+        kept = [];
+
+        foreach (var mobile in World.Mobiles.Values)
+        {
+            if (mobile is BotMobile bot)
+            {
+                saved.Add(bot);
+            }
+        }
+
+        var deleted = 0;
+
+        for (var i = 0; i < saved.Count; i++)
+        {
+            var bot = saved[i];
+            var name = bot.Was;
+            var klass = name == null ? null : BotClasses.Find(name);
+
+            var resting = BotRest.Resting(bot.Name);
+
+            if (klass == null || mix == null || !mix.TryGetValue(klass.Name, out var want)
+                || kept.GetValueOrDefault(klass.Name) >= want || !bot.Revive(klass, resting))
+            {
+                bot.Delete();
+                deleted++;
+
+                continue;
+            }
+
+            kept[klass.Name] = kept.GetValueOrDefault(klass.Name) + 1;
+
+            if (resting)
+            {
+                _away.Add(bot);
+                continue;
+            }
+
+            Enlist(bot);
+        }
+
+        Unduplicate();
+
+        return deleted;
+    }
+
     public static int PurgeSaved()
     {
         List<BotMobile> stale = [];
@@ -238,11 +201,9 @@ public static class BotPopulation
         return stale.Count;
     }
 
-    /// <summary>
-    /// Raises the population described by configuration: so many of this class, so many of that. Returns how
-    /// many were actually born.
-    /// </summary>
-    public static int Raise(IReadOnlyDictionary<string, int> mix)
+    public static int Raise(IReadOnlyDictionary<string, int> mix) => Raise(mix, null);
+
+    public static int Raise(IReadOnlyDictionary<string, int> mix, IReadOnlyDictionary<string, int> already)
     {
         if (mix == null || mix.Count == 0)
         {
@@ -259,13 +220,16 @@ public static class BotPopulation
 
             if (klass == null)
             {
-                // By name, because this is a typo in a config file and the only useful answer names it.
                 logger.Error("No class is called {Name}, so none of the {Count} asked for were raised", name, count);
 
                 continue;
             }
 
-            for (var i = 0; i < count; i++)
+            var wanted = already != null && already.TryGetValue(klass.Name, out var standing)
+                ? count - standing
+                : count;
+
+            for (var i = 0; i < wanted; i++)
             {
                 if (Raise(klass) != null)
                 {
@@ -277,20 +241,137 @@ public static class BotPopulation
         return born;
     }
 
-    /// <summary>One bot of the given class, placed, outfitted and put on the clock.</summary>
     public static BotMobile Raise(BotClass klass) => Raise(klass, null);
 
-    /// <summary>
-    /// The same, under a name of the caller's choosing.
-    ///
-    /// <para>
-    /// <b>For bots that are not drawn from the population, and the King's Rangers are the first of them.</b>
-    /// The name pool is the population's own roll of townsfolk, dealt out in order — so a company raised from
-    /// it comes out as "Kerrin 2" and "Lysa 2", which reads as two ordinary bots with duplicate names rather
-    /// than as the crown's. Who a bot is meant to be is the caller's to say when the caller is not the
-    /// population.
-    /// </para>
-    /// </summary>
+    public static BotMobile RaiseNewcomer(BotClass klass)
+    {
+        for (var index = 0; index < Names.Length * (Houses.Length + 1); index++)
+        {
+            var name = NameAt(index);
+
+            if (!InUse(name) && !BotProgress.Remembers(name))
+            {
+                return Raise(klass, name);
+            }
+        }
+
+        return null;
+    }
+
+    public static long Renamed { get; private set; }
+
+    private static void Unduplicate()
+    {
+        List<BotMobile> everybody = [];
+
+        for (var i = 0; i < _bots.Count; i++)
+        {
+            if (_bots[i] is { Deleted: false } bot)
+            {
+                everybody.Add(bot);
+            }
+        }
+
+        everybody.AddRange(_away);
+        everybody.Sort((a, b) => a.Serial.CompareTo(b.Serial));
+
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < everybody.Count; i++)
+        {
+            var bot = everybody[i];
+
+            if (string.IsNullOrEmpty(bot.Name) || seen.Add(bot.Name))
+            {
+                continue;
+            }
+
+            string fresh = null;
+
+            for (var index = 0; index < Names.Length * (Houses.Length + 1); index++)
+            {
+                var name = NameAt(index);
+
+                if (!seen.Contains(name) && !InUse(name) && !BotProgress.Remembers(name))
+                {
+                    fresh = name;
+                    break;
+                }
+            }
+
+            if (fresh == null)
+            {
+                continue;
+            }
+
+            logger.Warning(
+                "{Old} the {Class} answered to the same name as an older bot; it is {New} from now on",
+                bot.Name,
+                bot.Class?.Name,
+                fresh
+            );
+
+            bot.Name = fresh;
+            seen.Add(fresh);
+            Renamed++;
+        }
+    }
+
+    public static void Park(BotMobile bot)
+    {
+        if (bot == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < _bots.Count; i++)
+        {
+            if (!ReferenceEquals(_bots[i], bot))
+            {
+                continue;
+            }
+
+            _bots[i] = null;
+            _holes++;
+
+            break;
+        }
+
+        bot.Scheduled = false;
+
+        if (!_away.Contains(bot))
+        {
+            _away.Add(bot);
+        }
+    }
+
+    public static bool Unpark(BotMobile bot)
+    {
+        if (bot == null)
+        {
+            return false;
+        }
+
+        _away.Remove(bot);
+
+        var map = bot.LogoutMap;
+        var at = bot.LogoutLocation;
+        var own = map != null && map != Map.Internal && map.CanSpawnMobile(at);
+
+        if (own)
+        {
+            bot.MoveToWorld(at, map);
+        }
+        else if (!TryPlace(bot) && Home != null)
+        {
+            bot.MoveToWorld(Where, Home);
+        }
+
+        Enlist(bot);
+
+        return own;
+    }
+
     public static BotMobile Raise(BotClass klass, string called)
     {
         if (klass == null || Home == null || Home == Map.Internal)
@@ -302,9 +383,6 @@ public static class BotPopulation
 
         bot.Become(klass, string.IsNullOrWhiteSpace(called) ? Christen() : called, Utility.Random(2) == 0);
 
-        // After Become, never before: the class deals out its starting skills in there, and a restore that
-        // ran first would be overwritten by them. See BotProgress for why only the learning comes back and
-        // the belongings are still built from nothing.
         BotProgress.Restore(bot);
 
         if (!TryPlace(bot))
@@ -327,16 +405,6 @@ public static class BotPopulation
         return bot;
     }
 
-    /// <summary>
-    /// Puts a fallen bot back on its feet once it has lain there long enough, and returns whether it did.
-    ///
-    /// <para>
-    /// Somebody has to: nothing else in this project resurrects anybody, and a dead bot is a ghost for the
-    /// rest of the shard's life. The delay is not decoration — dying has to cost something, and what it costs
-    /// a bot is time. The decision layer charges it separately in its own units; this is the same fact in
-    /// wall-clock.
-    /// </para>
-    /// </summary>
     public static bool Revive(BotMobile bot)
     {
         if (bot == null || bot.Deleted || bot.Alive || !bot.Fallen)
@@ -344,21 +412,22 @@ public static class BotPopulation
             return false;
         }
 
+        if (BotDelveParty.Raise(bot))
+        {
+            return true;
+        }
+
         if (Core.TickCount - bot.FellTick < ReviveMs)
         {
             return false;
         }
 
-        // Home first, then up: a ghost resurrected where it died is a bot standing in whatever killed it.
         TryPlace(bot);
 
         bot.Resurrect();
 
         if (!bot.Alive)
         {
-            // The engine refused. It does that silently — <c>Mobile.Resurrect</c> returns nothing and simply
-            // does not raise a mobile whose region or state says no — so without this a ghost lies there for
-            // the rest of the shard's life and the only symptom is a bot that never moves again.
             if (!bot.ReviveComplained)
             {
                 bot.ReviveComplained = true;
@@ -380,38 +449,14 @@ public static class BotPopulation
         return true;
     }
 
-    /// <summary>
-    /// How many roads a bot may be refused, one after another, before it is presumed to be somewhere it
-    /// cannot get out of.
-    ///
-    /// A refusal is proof: the search walked every tile the bot can reach and the destination was not among
-    /// them. One of those is ordinary — an island across the water, a locked crypt. A dozen in a row, to a
-    /// dozen different places, is not a statement about the destinations. It is a statement about where the
-    /// bot is standing.
-    /// </summary>
     public static int StrandedLimit { get; set; } = 12;
 
-    /// <summary>Bots carried home after getting themselves somewhere with no way out. For the summary.</summary>
     public static long Rescued { get; private set; }
 
-    /// <summary>
-    /// Puts a stranded bot back where the population lives.
-    ///
-    /// <para>
-    /// <b>The one thing in this project that moves a bot without it walking, and it earns that.</b> A bot on a
-    /// spit of land in the water, or inside a yard whose gate was built over, cannot be argued out of it: every
-    /// undertaking it takes is refused on its first beat, it fails, the proposer offers another, and that is
-    /// the whole of its life from then on — measured at a hundred and eighty failures in twenty minutes,
-    /// from two bots, while everything else on the shard worked perfectly. No amount of choosing better work
-    /// helps, because the problem is not the work.
-    /// </para>
-    ///
-    /// <para>
-    /// It is deliberately not a teleport a bot can want or plan around: nothing offers it, nothing prices it,
-    /// and it fires only on proof — a dozen destinations proved unreachable one after another, without a
-    /// single step taken in between. Anything less and it would become a way of travelling.
-    /// </para>
-    /// </summary>
+    public static long Delving { get; private set; }
+
+    public static long Unbound { get; private set; }
+
     public static bool Rescue(BotMobile bot)
     {
         if (bot == null || bot.Deleted || Home == null || Home == Map.Internal)
@@ -419,12 +464,33 @@ public static class BotPopulation
             return false;
         }
 
+        if (BotDelveParty.Delving(bot) && bot is IBotSquadMember { Squad: not null })
+        {
+            Delving++;
+
+            return false;
+        }
+
+        if (bot is IBotSquadMember { Squad: { } company } member && !ReferenceEquals(company.Leader, member))
+        {
+            BotSquads.Leave(member);
+            Unbound++;
+            bot.Refusals = 0;
+
+            logger.Information(
+                "{Name} the {Class} was let go of company {Squad} at {Where}: it could not reach its place in it {Limit} times running",
+                bot.Name,
+                bot.Class?.Name,
+                company.Id,
+                bot.Location,
+                StrandedLimit
+            );
+
+            return false;
+        }
+
         var from = bot.Location;
 
-        // Already home. Then the bot is not stranded and moving it three tiles proves nothing — whatever is
-        // refusing its roads is refusing them here too, and carrying it "home" only wipes the errand it was
-        // holding and hides the real fault. Eighteen of these in twenty minutes were the symptom of a starved
-        // path-search budget, not of bad ground, and every one of them read in the log as a rescue.
         if (Utility.InRange(from, Where, Spread * 2))
         {
             if (!bot.ReviveComplained)
@@ -444,22 +510,8 @@ public static class BotPopulation
             return false;
         }
 
-        // Before it is moved: what has just been proved about this ground, written where everybody reads it.
-        //
-        // A dozen roads refused in a row from one tile is the strongest evidence of a pocket the shard ever
-        // produces, and until now the whole of it was spent carrying one bot home. The same ground goes on
-        // catching the next bot, and the log for the night says so — (1757, 976) took three, (1623, 1179) took
-        // three, (1651, 1112) took two. A look from where the bot is standing costs a couple of milliseconds
-        // and files the trap for the life of the shard, so the next bot is refused the road in rather than
-        // rescued out of it.
         var trap = BotPath.Enclose(bot.Map, from, BotArrival.Exactly, urgent: true);
 
-        // <b>And what the tile itself says, because "could get nowhere at all" named no cause and there are
-        // three quite different ones.</b> A walk mask of nought is a tile the planner agrees is closed. A
-        // mask with bits in it, against an engine that refuses every step, is the planner and the engine
-        // disagreeing — which is the fault this whole subsystem exists to catch. And a floor that is not the
-        // height the bot believes it is standing at is the oldest of them: a Z that came out of arithmetic
-        // rather than out of Settle, working on the flat and failing on a hill.
         var footing = (sbyte)Math.Clamp(from.Z, sbyte.MinValue, sbyte.MaxValue);
         var allowed = BotStep.Mask(bot.Map, from.X, from.Y, footing).WalkMask;
         var floor = BotStep.Settle(bot.Map, from.X, from.Y, out var under) ? under.ToString() : "no floor at all";
@@ -488,10 +540,6 @@ public static class BotPopulation
         return true;
     }
 
-    /// <summary>
-    /// This bot is gone. Its slot becomes a hole rather than being removed, so the clock's loop cannot skip
-    /// its neighbour. Called from <see cref="BotMobile.OnAfterDelete"/>.
-    /// </summary>
     public static void Forget(BotMobile bot)
     {
         BotStall.Forget(bot);
@@ -501,6 +549,8 @@ public static class BotPopulation
         {
             return;
         }
+
+        _away.Remove(bot);
 
         for (var i = 0; i < _bots.Count; i++)
         {
@@ -516,10 +566,6 @@ public static class BotPopulation
         }
     }
 
-    /// <summary>
-    /// The whole population deleted and forgotten. Called before a world is replaced: every bot in the list
-    /// belongs to a world that is about to stop existing.
-    /// </summary>
     public static void Reset()
     {
         for (var i = 0; i < _bots.Count; i++)
@@ -527,7 +573,13 @@ public static class BotPopulation
             _bots[i]?.Delete();
         }
 
+        for (var i = _away.Count - 1; i >= 0; i--)
+        {
+            _away[i]?.Delete();
+        }
+
         _bots.Clear();
+        _away.Clear();
 
         _holes = 0;
         _named = 0;
@@ -545,15 +597,11 @@ public static class BotPopulation
             }
         }
 
-        return $"{Count} bots, {Living} on their feet, {fallen} waiting to be revived";
+        return $"{Count} bots, {Living} on their feet, {fallen} waiting to be revived, {_away.Count} resting";
     }
 
-    /// <summary>Fills a hole if there is one, so the list does not grow for ever across a long session.</summary>
     private static void Enlist(BotMobile bot)
     {
-        // Staggered across one step's worth of turns, which is what spreads the population's work across the
-        // clock's ticks. Seeded from a real tick rather than left at zero, because a due time of zero is
-        // already overdue — and on a host whose counter starts enormous, zero is not even in the past.
         var step = Math.Max(1, BotWalk.StepDelayMs(BotMobile.Runs));
 
         bot.Scheduled = true;
@@ -578,14 +626,20 @@ public static class BotPopulation
         _bots.Add(bot);
     }
 
-    /// <summary>
-    /// Somewhere near home that the engine agrees a body can stand.
-    ///
-    /// <b>Asked of the engine rather than assumed</b> — <see cref="Map.CanSpawnMobile"/> is the same test the
-    /// shard's own spawners use, including the region's opinion and a search for a floor within a few units
-    /// of the configured height. A bot placed inside a wall is a bot whose first act is to prove that there
-    /// is no way out of it.
-    /// </summary>
+    public static long Carried { get; private set; }
+
+    public static bool Carry(BotMobile bot)
+    {
+        if (bot is not { Deleted: false } || !TryPlace(bot))
+        {
+            return false;
+        }
+
+        Carried++;
+
+        return true;
+    }
+
     private static bool TryPlace(BotMobile bot)
     {
         var map = Home;
@@ -595,23 +649,25 @@ public static class BotPopulation
             return false;
         }
 
-        // <b>A tile a body fits on is not the same as a tile a body can leave.</b> CanSpawnMobile counts the
-        // other bots, so nobody is put on top of anybody; what it does not ask is whether all eight
-        // neighbours are taken too. With forty-nine bots living in one patch that is a common shape, and it
-        // is what the rescue kept producing: carried home at 01:29:26, "can reach nothing" at 01:29:58, from
-        // ground the shard's own line called good.
-        //
-        // So the first pass wants a way out as well as a place to stand, and only the second settles for a
-        // place to stand. The second is counted, because the day this reads high the patch is full and the
-        // number to change is Spread.
-        for (var pass = 0; pass < 2; pass++)
+        var at = BotSeat.Home(bot);
+
+        if (at != Where)
         {
+            BotSeat.Placed();
+        }
+
+        var span = at == Where && Scatter > Spread ? Scatter : Spread;
+
+        for (var pass = 0; pass < 3; pass++)
+        {
+            var reach = pass < 2 ? span : Spread;
+
             for (var attempt = 0; attempt < Attempts; attempt++)
             {
-                var x = Where.X + Utility.RandomMinMax(-Spread, Spread);
-                var y = Where.Y + Utility.RandomMinMax(-Spread, Spread);
+                var x = at.X + Utility.RandomMinMax(-reach, reach);
+                var y = at.Y + Utility.RandomMinMax(-reach, reach);
 
-                if (!map.CanSpawnMobile(x, y, Where.Z - 8, Where.Z + 8, false, false, out var z))
+                if (!map.CanSpawnMobile(x, y, at.Z - 8, at.Z + 8, false, false, out var z))
                 {
                     continue;
                 }
@@ -632,7 +688,6 @@ public static class BotPopulation
             }
         }
 
-        // The configured point itself, whatever is standing on it. Better a crowded tile than no population.
         if (!map.CanSpawnMobile(Where))
         {
             return false;
@@ -643,17 +698,6 @@ public static class BotPopulation
         return true;
     }
 
-    /// <summary>
-    /// Whether a body standing here would have somewhere to put its first step: a neighbouring tile the
-    /// planner allows and nobody is standing on.
-    ///
-    /// <para>
-    /// Both halves are needed and they come from different places. <see cref="BotStep.Mask"/> is the
-    /// planner's own answer about the ground and knows nothing about who is on it - creatures move, so a
-    /// planner that treated them as walls would teach itself walls that are not there. Whether anybody is
-    /// standing on the tile is a question about this second, and this is the one second it matters.
-    /// </para>
-    /// </summary>
     private static bool Roomy(Map map, int x, int y, int z)
     {
         var footing = (sbyte)Math.Clamp(z, sbyte.MinValue, sbyte.MaxValue);
@@ -687,45 +731,87 @@ public static class BotPopulation
 
     private static int _named;
 
-    /// <summary>
-    /// A name, and it is not decoration. The population is rebuilt every world load, so a name is the only
-    /// thing about a bot that survives a restart — which is why the slow tier files what a bot has learned
-    /// under one, and why the log is readable at all.
-    /// </summary>
+    public static void Reserve(IReadOnlyList<string> names, string who)
+    {
+        if (names == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < names.Count; i++)
+        {
+            var name = names[i];
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            for (var j = 0; j < Names.Length; j++)
+            {
+                if (!Names[j].InsensitiveEquals(name))
+                {
+                    continue;
+                }
+
+                logger.Error(
+                    "{Name} is both the {Which} name the population hands out and a name {Who} gives away, so two bots will answer to it and share one record of what they have learned. Take it out of BotPopulation.Names",
+                    name,
+                    (j + 1).ToString(),
+                    who
+                );
+            }
+        }
+    }
+
     private static string Christen()
     {
+        string name;
+
+        do
+        {
+            name = NameAt(_named++);
+        }
+        while (InUse(name) && _named < Names.Length * (Houses.Length + 1));
+
+        return name;
+    }
+
+    private static bool InUse(string name)
+    {
+        for (var i = 0; i < _bots.Count; i++)
+        {
+            if (_bots[i] is { Deleted: false } bot && bot.Name.InsensitiveEquals(name))
+            {
+                return true;
+            }
+        }
+
+        for (var i = 0; i < _away.Count; i++)
+        {
+            if (_away[i] is { Deleted: false } bot && bot.Name.InsensitiveEquals(name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string NameAt(int index)
+    {
         var pool = Names;
-        var index = _named++;
 
         if (index < pool.Length)
         {
             return pool[index];
         }
 
-        // <b>Past the end of the pool, a house name and never a number.</b> "Doran 2" is not a name, it is a
-        // collision handled in public: it reads as a second copy of somebody rather than as a person, and
-        // every line of the log, every stall report and every remark the population makes about itself then
-        // carries the seam. A surname costs nothing, keeps the given name — which is what makes a bot
-        // recognisable across a session — and gives twenty-two rounds of the pool before anything repeats.
-        //
-        // The name is the only thing about a bot that survives a restart, and what a bot has learned is
-        // filed under it, so widening the pool starts whoever was past the end of the old one over again.
-        // That is the price of the change and it is paid once.
         var round = index / pool.Length - 1;
 
         return $"{pool[index % pool.Length]} {Houses[round % Houses.Length]}";
     }
 
-    /// <summary>
-    /// Given names, in the order they are handed out. Wide enough that a population of the size this shard
-    /// actually runs never reaches <see cref="Houses"/> at all.
-    ///
-    /// <para>
-    /// Four names are deliberately absent — Aldric, Godric, Cedric and Baldric — because <c>BotMinds</c>
-    /// renames the bots it gives a mind to, and a pool able to hand out one of those would put two bots
-    /// answering to the same name in the same log.
-    /// </para>
-    /// </summary>
     private static readonly string[] Names =
     [
         "Alden", "Bryn", "Calla", "Doran", "Edda", "Faron", "Gerda", "Hale",
@@ -733,12 +819,11 @@ public static class BotPopulation
         "Quill", "Rowan", "Sable", "Torvin", "Ulla", "Vance", "Wynn", "Yarrow",
         "Aric", "Brannoc", "Corwin", "Delwyn", "Emrys", "Fenna", "Garrow", "Hollis",
         "Isolde", "Jarek", "Kelda", "Lorcan", "Maeve", "Neriah", "Oswin", "Pell",
-        "Quenna", "Ronan", "Selwyn", "Talia", "Ulric", "Vesna", "Wulfric", "Ysolt",
+        "Quenna", "Ronan", "Selwyn", "Talia", "Ulwin", "Vesna", "Wystan", "Ysolt",
         "Bertram", "Cassia", "Dain", "Elspeth", "Fendrel", "Gwendra", "Harlan", "Ivo",
         "Jorunn", "Kestrel", "Leofric", "Marek", "Nyla", "Otho", "Piers", "Rhiannon"
     ];
 
-    /// <summary>Houses, for when the given names run out. See <see cref="Christen"/>.</summary>
     private static readonly string[] Houses =
     [
         "Ashdown", "Blackbriar", "Coldwell", "Duskmere", "Eastmarch", "Fairholt",

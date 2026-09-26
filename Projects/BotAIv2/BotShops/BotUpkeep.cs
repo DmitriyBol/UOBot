@@ -30,30 +30,22 @@ public sealed class BotUpkeep : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotUpkeep));
 
-    /// <summary>
-    /// The share of an item's life left at which a replacement is worth ordering.
-    ///
-    /// <para>
-    /// Ordered before it breaks, not after. A weapon that shatters mid-fight leaves a bot swinging its fists
-    /// against something that is already hitting it, and the order it would then place takes minutes to be
-    /// filled — so the whole point is to be holding the new one before the old one goes. A third of the life
-    /// left is several fights' worth of warning.
-    /// </para>
-    /// </summary>
     public static double Worn { get; set; } = 0.34;
 
-    /// <summary>Coin a bot keeps back rather than spending on gear. The same rule the scroll shopping uses.</summary>
-    public static int Reserve { get; set; } = 200;
+    public static int Reserve
+    {
+        get => _reserve ?? BotPurse.KeepBack;
+        set => _reserve = value;
+    }
 
-    /// <summary>What ordering a replacement is reckoned at per minute before the ledger corrects it.</summary>
+    private static int? _reserve;
+
     public static double Prior { get; set; } = 30.0;
 
-    /// <summary>What a piece of gear is guessed to be worth when nothing on the shard has priced one.</summary>
     public static int Guess { get; set; } = 60;
 
     private static bool _said;
 
-    /// <summary>Every gate, counted apart. There is no bucket called "other".</summary>
     public static long Asked { get; private set; }
 
     public static long Sound { get; private set; }
@@ -64,31 +56,14 @@ public sealed class BotUpkeep : IBotProposer
 
     public static long Raised { get; private set; }
 
-    /// <summary>Bots that already had something on the way. See the note in <see cref="Propose"/>.</summary>
     public static long Waiting { get; private set; }
 
-    /// <summary>Asks turned away for coming again inside the minute. See BotNeeds.</summary>
     public static long Soon { get; private set; }
 
-    /// <summary>
-    /// The most worn thing anybody has been seen wearing, as a percentage of its life, and what it was.
-    ///
-    /// <para>
-    /// <b>A nought beside an unset maximum is unreadable, and this counter has been printing one for
-    /// weeks.</b> "60203 asked, 60203 are carrying nothing worn out" over four hours says the gate never
-    /// opened; it does not say whether that is because nothing on this shard ever wears — a weapon that is
-    /// re-issued, a mender that repairs, a layer nobody is reading — or because gear wears perfectly well
-    /// and never reaches a third of its life inside one session. Those are different faults with different
-    /// repairs, and the shard has spent a fortnight unable to tell them apart. The same correction
-    /// BotShopper.Richest and BotStable.Richest were given.
-    /// </para>
-    /// </summary>
     public static double Worst { get; private set; } = 1.0;
 
-    /// <summary>What that thing was, so the answer names something rather than a number.</summary>
     public static string WorstKind { get; private set; }
 
-    /// <summary>Pieces of gear looked at. Zero here means nothing is being read at all, which is its own fault.</summary>
     public static long Looked { get; private set; }
 
     public string Name => "Upkeep";
@@ -107,8 +82,6 @@ public sealed class BotUpkeep : IBotProposer
 
         Asked++;
 
-        // Once a minute per bot, on the same clock the rest of the needs keep. See BotNeeds. Counted, or
-        // the gates below stop adding up to Asked.
         if (!BotNeeds.Due(body, "gear"))
         {
             Soon++;
@@ -116,13 +89,6 @@ public sealed class BotUpkeep : IBotProposer
             return null;
         }
 
-        // <b>Goods already made and paid for are not ordered again, and they are not fetched here either.</b>
-        // Collecting used to be this proposer's first branch, on the sound reasoning that goods a bot has paid
-        // for and left on the board are goods it is not wearing. It was in the wrong place: an errand that
-        // costs nothing and takes no time cannot win an auction against work that pays, and it never did. It
-        // is a reflex on the population's beat now — see BotAuction.Fetch — so by the time this is asked the
-        // shelf is already empty. What remains here is the half that was always right: a bot with something
-        // on the way does not order a second one.
         if (BotAuction.Owed(bot) > 0)
         {
             Waiting++;
@@ -141,8 +107,6 @@ public sealed class BotUpkeep : IBotProposer
 
         var kind = tired.GetType();
 
-        // Already on the board under this bot's name. The want raises its own offer on the market's beat and
-        // gives up at the ceiling; asking again would only turn one order into nine.
         if (BotAuction.Wanted(bot, kind) != null)
         {
             Standing++;
@@ -165,19 +129,6 @@ public sealed class BotUpkeep : IBotProposer
         return BotOrder.For(map, body.Location, bot, kind, offer);
     }
 
-    /// <summary>
-    /// The worn-out thing this bot is wearing, or null.
-    ///
-    /// <para>
-    /// Worn rather than owned: only what is on the body counts, and that is the wearability rule doing its
-    /// work. A pickaxe in the pack is a tool and has its own shopping; the blade in a bot's hand and the mail
-    /// on its back are the things whose failure is a fight lost.
-    /// </para>
-    ///
-    /// <para>
-    /// The worst first, so a bot with a nearly-dead sword and slightly scuffed boots orders the sword.
-    /// </para>
-    /// </summary>
     private static Item Failing(Mobile body)
     {
         Item worst = null;
@@ -196,8 +147,6 @@ public sealed class BotUpkeep : IBotProposer
 
             var left = now / (double)max;
 
-            // Recorded before the threshold is applied, which is the whole point of it: what the gate
-            // refuses is exactly what nobody could see.
             if (left < Worst)
             {
                 Worst = left;
@@ -216,7 +165,6 @@ public sealed class BotUpkeep : IBotProposer
         return worst;
     }
 
-    /// <summary>How much life a thing has, and how much it had new. Zeroes for anything that does not wear out.</summary>
     private static (int Now, int Max) Life(Item item) =>
         item switch
         {

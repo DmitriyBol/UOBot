@@ -28,27 +28,14 @@ public sealed class BotFletch : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFletch));
 
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "fletch";
 
-    /// <summary>What a fletching chain is reckoned at before the ledger knows better.</summary>
     public static double Prior { get; set; } = 90.0;
 
-    /// <summary>How long one is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 1.5;
 
-    /// <summary>
-    /// How often an attempt is made.
-    ///
-    /// <para>
-    /// Not every beat: CraftItem.Craft takes the CraftSystem action lock and returns silently when it is
-    /// already held, so a bot that swings on every beat spends its afternoon waiting for itself. The
-    /// needle's figure, for the needle's reason — see BotSew.SwingMs.
-    /// </para>
-    /// </summary>
     public static int SwingMs { get; set; } = 3000;
 
-    /// <summary>How long the tool may produce nothing and spend nothing before the chain is given up.</summary>
     public static int StallMs { get; set; } = SwingMs * 8;
 
     private enum Leg
@@ -62,7 +49,9 @@ public sealed class BotFletch : BotDeed
 
     private readonly Point3D _where;
 
-    private readonly BaseVendor _shop;
+    private BaseVendor _shop;
+
+    private int _repicks;
 
     private readonly int _price;
 
@@ -78,17 +67,14 @@ public sealed class BotFletch : BotDeed
 
     private int _made;
 
-    /// <summary>Arrows in the pack when the work began, so its own quiver is not counted as made.</summary>
     private int _had;
 
-    /// <summary>Seeded on the first pass through the work, because the quiver is not empty when it starts.</summary>
     private bool _counting;
 
     private bool _swung;
 
     private long _swungTick;
 
-    /// <summary>Material left at the last look. Minus one, which no amount can equal — see BotSew.</summary>
     private int _lastLeft = -1;
 
     private long _stirTick;
@@ -101,10 +87,6 @@ public sealed class BotFletch : BotDeed
         _price = price;
         _take = take;
         _order = order;
-        // <b>The leg is chosen by whether wood is wanted, not by whether a shopkeeper was found.</b> There is
-        // no carpenter within reach of anybody on this island — the shard says so once, at error level — so
-        // "no shop" is the ordinary case here and it must not mean "skip the buying leg". See Wood, which
-        // reads the population's own stalls first.
         _leg = take > 0 ? Leg.Wood : Leg.Work;
     }
 
@@ -114,7 +96,6 @@ public sealed class BotFletch : BotDeed
 
     public override Point3D Where => _where;
 
-    /// <summary>An order is worth more than speculation: the money for it is already down. See BotSmith.</summary>
     public override double Expects => _order == null ? Prior : Prior * 1.6;
 
     public override double Minutes => WorkMinutes;
@@ -123,7 +104,8 @@ public sealed class BotFletch : BotDeed
 
     public override int Outlay => _take * _price;
 
-    /// <summary>Nothing here is coin. What it produces is arrows, and those are counted as goods.</summary>
+    public override bool AtCounter => _shop != null;
+
     public override double Coin => 0.0;
 
     public override int Made => _made;
@@ -136,7 +118,6 @@ public sealed class BotFletch : BotDeed
             _ => $"putting {_arrows} arrows out"
         };
 
-    /// <summary>The carpenter could not be reached. Written under the counter's name, as the porter does.</summary>
     public override bool Bend(IBotWilful bot)
     {
         if (_shop is { Deleted: false })
@@ -174,15 +155,6 @@ public sealed class BotFletch : BotDeed
         return BotDoing.Failed("could not settle on a next step");
     }
 
-    /// <summary>
-    /// Enough wood to feather every feather it holds, and not a log more.
-    ///
-    /// <para>
-    /// The feather is the binding half — nobody sells one — so the wood is bought to match it rather than by
-    /// the armful. A fletcher standing on two hundred logs and four feathers has spent money to make four
-    /// arrows.
-    /// </para>
-    /// </summary>
     private BotDoing Wood(IBotWilful bot, Mobile body)
     {
         if (BotFletching.Possible(body) >= BotFletching.LeastArrows)
@@ -192,8 +164,6 @@ public sealed class BotFletch : BotDeed
             return default;
         }
 
-        // Its own logs back off the market before paying anybody for the same thing. Same rule, same reason
-        // as the tailor's: a seller cannot buy from its own stall.
         if (BotAuction.Reclaim(bot, typeof(Log)) > 0 && BotFletching.Possible(body) >= BotFletching.LeastArrows)
         {
             _leg = Leg.Work;
@@ -201,12 +171,6 @@ public sealed class BotFletch : BotDeed
             return default;
         }
 
-        // <b>Another bot's wood before a shopkeeper's, and it needs no walk: the market holds its goods out
-        // of the world, so a stall is bought from wherever the bot is standing.</b> This leg only ever knew
-        // about counters, and there is no carpenter within reach of anybody here — so a fletcher stood on
-        // twenty feathers reporting "could not find wood" while the woodcutters' logs sat on stalls three
-        // streets away: 163 of 284 at 16:01 on 04.09.2026, against 568 woodcutters answering that they were
-        // already carrying enough. Same shape as the tailor's leather leg, which was opened first.
         var lot = BotAuction.Cheapest(typeof(Log), bot);
 
         if (lot is { IsEmpty: false } && BotAuction.Buy(body, lot, Math.Min(_take, lot.Amount)) > 0)
@@ -223,12 +187,20 @@ public sealed class BotFletch : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
-            // Followed rather than aimed at: a shopkeeper wanders. See BotPeddle.
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for wood");
         }
 
         if (BotShops.Buy(bot, _shop, typeof(Log), _take, out var refused) <= 0)
         {
+            var next = BotShops.Next(bot, _shop, typeof(Log), ref _repicks);
+
+            if (next != null)
+            {
+                _shop = next;
+
+                return BotDoing.Walk(next.Map, next, BotArrival.Within(BotShops.CounterReach), $"on to {next.Name} for wood");
+            }
+
             return BotDoing.Failed(refused ?? "no wood to be had");
         }
 
@@ -237,19 +209,6 @@ public sealed class BotFletch : BotDeed
         return default;
     }
 
-    /// <summary>
-    /// Shafts first, then arrows, one attempt every SwingMs and counted out of the pack <b>before</b> the
-    /// next one is made.
-    ///
-    /// <para>
-    /// <b>Crafting is asynchronous, and this leg read the pack in the same breath as the swing.</b>
-    /// <c>CraftItem.Craft</c> ends at <c>new InternalTimer(...).Start()</c> — the arrow appears a second or
-    /// so later — so "after" was always equal to "before", every round decided nothing had come of it, and
-    /// the chain gave itself up twenty seconds later. It was never caught because no fletcher on this shard
-    /// had ever had a feather to start a round with: 0 rounds taken on, ever, across every log. The needle
-    /// has always done this correctly; this is its shape. Same fault, same repair, in <c>BotBrew</c>.
-    /// </para>
-    /// </summary>
     private BotDoing Fletching(Mobile body)
     {
         var tool = BotFletching.Kit(body);
@@ -265,7 +224,6 @@ public sealed class BotFletch : BotDeed
             _had = BotFletching.Made(body, typeof(Arrow));
         }
 
-        // What the last attempt produced, counted before the next one is made.
         var have = BotFletching.Made(body, typeof(Arrow));
 
         if (have > _had)
@@ -279,14 +237,9 @@ public sealed class BotFletch : BotDeed
 
         if (feathers <= 0)
         {
-            // Not a fault of this bot's: the feather is the half nobody sells. Said plainly so that a reader
-            // looking at a run of these goes to the hunters rather than to the carpenter.
             return Finish("no feathers left to fletch with");
         }
 
-        // Everything the chain eats on one number, for the reason the needle watches its cloth: a craft that
-        // consumes on failure too moves this through an honest run of bad luck and leaves it stock still
-        // when the action lock has jammed.
         var left = feathers + BotFletching.Shafts(body) + BotFletching.Logs(body);
 
         if (_lastLeft != left)
@@ -314,7 +267,6 @@ public sealed class BotFletch : BotDeed
             return BotDoing.Work($"fletching, {_arrows} arrows so far");
         }
 
-        // Wood into shafts when the shafts have run out, otherwise shafts into arrows. One swing either way.
         var cutting = BotFletching.Shafts(body) <= 0;
 
         if (cutting && BotFletching.Logs(body) <= 0)
@@ -324,8 +276,6 @@ public sealed class BotFletch : BotDeed
 
         var material = cutting ? typeof(Log) : typeof(Shaft);
 
-        // The arrow has two resources and the general lookup refuses anything with more than one. See
-        // BotFletching.Feathering, which is the whole reason an arrow had never been made on this shard.
         var recipe = cutting
             ? BotFletching.Recipe(body, typeof(Log), typeof(Shaft))
             : BotFletching.Feathering(body);
@@ -356,10 +306,6 @@ public sealed class BotFletch : BotDeed
         return default;
     }
 
-    /// <summary>
-    /// The order first, because its money is already down, and the rest onto the market at the provisioner's
-    /// own price.
-    /// </summary>
     private BotDoing Selling(IBotWilful bot, Mobile body)
     {
         var ordered = 0;
@@ -385,8 +331,6 @@ public sealed class BotFletch : BotDeed
                 }
             }
 
-            // The market's own price once anybody has bid on or bought an arrow, and the provisioner's ask
-            // only until then — the same reckoning every other trade lists at.
             if (BotAuction.List(bot, stack, BotAuction.Worth(typeof(Arrow), BotFletching.Worth)) != null)
             {
                 listed++;

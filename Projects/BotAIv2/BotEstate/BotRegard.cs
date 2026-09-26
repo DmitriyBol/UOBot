@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Logging;
@@ -42,126 +42,116 @@ public static class BotRegard
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRegard));
 
-    /// <summary>Whether guilds form opinions of each other at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>
-    /// Whether a bad enough opinion is allowed to become a war.
-    ///
-    /// <para>
-    /// <b>On, by Patrick's order of 09.09.2026: "they should feel the consequences."</b> It was built off,
-    /// because he had named this the one part of the plan that can shrink the population; it ran for an
-    /// evening with the opinions moving and nothing dying of them, and the numbers behaved — a quarrel driven
-    /// by trespass and by bots refusing to move along, mended by trade, reaching -94 of the -100 it takes.
-    /// </para>
-    ///
-    /// <para>
-    /// What to read now that it bites, and none of it can be read before: deaths an hour, skill lost per
-    /// death, and how much of what was looted was ever used by whoever took it. Those are Patrick's own three
-    /// from <c>PLAN-guild-lands.md</c>. Off again is one dial — <c>dial BotRegard.Warring false</c> through
-    /// Argus, or <c>"War": false</c> in <c>bot-estate.json</c> — and a war already declared ends by itself
-    /// when the two guilds trade their way back above <see cref="Amity"/>.
-    /// </para>
-    /// </summary>
     public static bool Warring { get; set; } = true;
 
-    /// <summary>Below this, one guild declares war on another.</summary>
-    public static double Enmity { get; set; } = -100.0;
+    public static double Enmity { get; set; } = -40.0;
 
-    /// <summary>And above this, the war ends. The gap is what stops it flickering.</summary>
-    public static double Amity { get; set; } = -20.0;
+    public static double Amity { get; set; } = -15.0;
 
-    /// <summary>As low and as high as an opinion may go, so one bad afternoon cannot be past mending.</summary>
     public static double Floor { get; set; } = -200.0;
 
-    /// <summary>And the ceiling. Friendship does not accumulate for ever either.</summary>
     public static double Ceiling { get; set; } = 100.0;
 
-    // ---- What moves an opinion. Every one of these has a bucket, because a war nobody can explain is a war
-    // nobody can tune. ------------------------------------------------------------------------------------
-
-    /// <summary>What finishing a piece of work on another guild's land costs, each time.</summary>
     public static double Trespass { get; set; } = -0.5;
 
-    /// <summary>What being told to move along and not going costs.</summary>
-    public static double Defiance { get; set; } = -6.0;
+    public static double Defiance { get; set; } = -12.0;
 
-    /// <summary>What killing one of theirs costs.</summary>
+    public static double Claim { get; set; } = -50.0;
+
+    public static double HallClaim { get; set; } = -100.0;
+
+    public static long Claims { get; private set; }
+
     public static double Blood { get; set; } = -25.0;
 
-    /// <summary>
-    /// What two halls standing on top of each other costs, per drift, before distance softens it.
-    ///
-    /// <para>
-    /// <b>Four, and the first cut of one was measured wrong within five minutes.</b> At one a drift, against
-    /// trade at two a sale both ways, the first reading was 22 trades against 12 drifts — so every opinion on
-    /// the island was rising and the whole of stage four was inert: a system that can only ever end in peace
-    /// is not a system, it is a decoration. The two numbers had never been put beside each other.
-    /// </para>
-    ///
-    /// <para>
-    /// At four, softened by distance, the closest pair of halls on the island loses about thirty-seven an
-    /// hour and reaches war in something under three hours of shard time. That is slow enough to be a
-    /// quarrel rather than a switch and fast enough that an evening shows one.
-    /// </para>
-    /// </summary>
     public static double Border { get; set; } = -4.0;
 
-    /// <summary>
-    /// How near two halls must be for their guilds to count as neighbours at all.
-    ///
-    /// <para>
-    /// Twice the reach of a land claim, and taken from it rather than chosen: two guilds are neighbours
-    /// exactly when their yards touch, which is a fact about <see cref="BotLand.Reach"/> and not a second
-    /// number to keep in step with it. Moving the claim moves this.
-    /// </para>
-    /// </summary>
     public static int Neighbouring => BotLand.Reach * 2;
 
-    /// <summary>How often the border drift is applied, in milliseconds.</summary>
     public static int DriftMs { get; set; } = 300000;
 
-    /// <summary>
-    /// What trading with them is worth. The only thing that mends an opinion.
-    ///
-    /// Half, and small on purpose: a sale is one bot buying one thing, it happens a few times a minute
-    /// across the island, and at two it drowned every other mover put together. Mending a quarrel should
-    /// take a trading relationship rather than a transaction.
-    /// </summary>
     public static double Trade { get; set; } = 0.5;
 
-    /// <summary>Opinions worsened by somebody working on land that was not theirs.</summary>
+    public static double Comradeship { get; set; } = 0.5;
+
+    public static int MostAllies { get; set; } = 1;
+
+    public static double Aid { get; set; } = 5.0;
+
+    public static double Alliance { get; set; } = 60.0;
+
+    public static double Estrangement { get; set; } = 20.0;
+
+    public static long Comradeships { get; private set; }
+
+    public static long Aids { get; private set; }
+
+    public static long Allied { get; private set; }
+
+    public static long Estranged { get; private set; }
+
+    public static void Comraded(string one, string other)
+    {
+        if (one == null || other == null || one == other)
+        {
+            return;
+        }
+
+        Comradeships++;
+        Move(one, other, Comradeship, "a corpse shared");
+        Move(other, one, Comradeship, "a corpse shared");
+    }
+
+    public static void Helped(string helper, string helped)
+    {
+        if (helper == null || helped == null || helper == helped)
+        {
+            return;
+        }
+
+        Aids++;
+        Move(helped, helper, Aid, "help in a fight");
+        Move(helper, helped, Aid / 2.0, "help given");
+    }
+
+    public static bool AreAllied(string one, string other) =>
+        one != null && other != null && one != other
+        && BaseGuild.FindByName(one) is Guild a && BaseGuild.FindByName(other) is Guild b && a.IsAlly(b);
+
     public static long Trespasses { get; private set; }
 
-    /// <summary>Opinions worsened by somebody refusing to move.</summary>
     public static long Defiances { get; private set; }
 
-    /// <summary>Opinions worsened by a killing.</summary>
+    public static long Expected { get; private set; }
+
     public static long Bloodshed { get; private set; }
 
-    /// <summary>Opinions worsened for sharing a border.</summary>
     public static long Borders { get; private set; }
 
-    /// <summary>Opinions mended by trade.</summary>
     public static long Trades { get; private set; }
 
-    /// <summary>Wars declared.</summary>
     public static long Declared { get; private set; }
 
-    /// <summary>Wars ended.</summary>
     public static long Ended { get; private set; }
 
-    /// <summary>Times a war would have been declared and the switch was off.</summary>
     public static long Withheld { get; private set; }
 
     private static readonly Dictionary<(string Of, string For), double> _regard = [];
 
+    private static readonly List<(string Of, string For, double Held)> _mending = [];
+
+    private static readonly List<(string Of, string For, double Held)> _grieving = [];
+
+    public static long Waiting { get; private set; }
+
+    public static long Overdue { get; private set; }
+
     private static long _drifted;
 
-    /// <summary>Whether the drift has ever run. A tick count of nought is a legitimate reading; see rule 20.</summary>
     private static bool _everDrifted;
 
-    /// <summary>What <paramref name="of"/> thinks of <paramref name="about"/>. Nought between strangers.</summary>
     public static double Of(string of, string about)
     {
         if (of == null || about == null || of == about)
@@ -172,18 +162,18 @@ public static class BotRegard
         return _regard.TryGetValue((of, about), out var held) ? held : 0.0;
     }
 
-    /// <summary>The same, of two guilds.</summary>
     public static double Of(Guild of, Guild about) => Of(of?.Name, about?.Name);
 
-    /// <summary>
-    /// Moves an opinion, and asks afterwards whether it has crossed either threshold.
-    ///
-    /// <para>
-    /// Both ways round, because an opinion is between two guilds and not one: a bot of the Blade digging on
-    /// the Crown's land is a thing the Crown minds, and it is the Crown's opinion of the Blade that moves.
-    /// Only that one. The Blade has no opinion about having been somewhere.
-    /// </para>
-    /// </summary>
+    public static IEnumerable<KeyValuePair<(string Of, string For), double>> Opinions => _regard;
+
+    public static void Restore(string of, string about, double value)
+    {
+        if (!string.IsNullOrEmpty(of) && !string.IsNullOrEmpty(about) && of != about)
+        {
+            _regard[(of, about)] = value;
+        }
+    }
+
     public static void Move(string of, string about, double by, string why)
     {
         if (!Running || of == null || about == null || of == about || by == 0.0)
@@ -204,7 +194,6 @@ public static class BotRegard
         Reckon(of, about, was, now, why);
     }
 
-    /// <summary>Somebody of <paramref name="who"/> finished a piece of work on <paramref name="whose"/> land.</summary>
     public static void Trespassed(string who, string whose)
     {
         if (who == null || whose == null || who == whose)
@@ -216,7 +205,6 @@ public static class BotRegard
         Move(whose, who, Trespass, "working our land");
     }
 
-    /// <summary>Somebody of <paramref name="who"/> was told to move along and did not.</summary>
     public static void Defied(string who, string whose)
     {
         if (who == null || whose == null || who == whose)
@@ -228,7 +216,25 @@ public static class BotRegard
         Move(whose, who, Defiance, "refusing to move along");
     }
 
-    /// <summary>Somebody of <paramref name="killer"/> killed a member of <paramref name="fallen"/>.</summary>
+    public static void Claimed(string who, string whose, bool byTheHall = false)
+    {
+        if (who == null || whose == null || who == whose)
+        {
+            return;
+        }
+
+        Claims++;
+
+        if (byTheHall)
+        {
+            Move(whose, who, Math.Min(HallClaim, Enmity - Of(whose, who) - 1.0), "claiming the ground by our hall");
+
+            return;
+        }
+
+        Move(whose, who, Claim, "claiming our ground");
+    }
+
     public static void Killed(string killer, string fallen)
     {
         if (killer == null || fallen == null || killer == fallen)
@@ -237,10 +243,20 @@ public static class BotRegard
         }
 
         Bloodshed++;
+
+        BotWar.Killed(killer, fallen);
+
+        if (BaseGuild.FindByName(fallen) is Guild ours && BaseGuild.FindByName(killer) is Guild theirs &&
+            ours.IsWar(theirs))
+        {
+            Expected++;
+
+            return;
+        }
+
         Move(fallen, killer, Blood, "blood");
     }
 
-    /// <summary>Somebody of <paramref name="buyer"/> bought from or filled an order of <paramref name="seller"/>.</summary>
     public static void Traded(string buyer, string seller)
     {
         if (buyer == null || seller == null || buyer == seller)
@@ -253,16 +269,6 @@ public static class BotRegard
         Move(buyer, seller, Trade, "trade");
     }
 
-    /// <summary>
-    /// The slow souring between neighbours, applied on a timer rather than by an event.
-    ///
-    /// <para>
-    /// This is the one mover with no incident behind it, and it is here because without it nothing ever
-    /// happens: two guilds whose members never meet have no reason to quarrel, and quarrels between guilds
-    /// at opposite ends of the island would be arbitrary. Sharing a border is the reason, and it is a fact
-    /// about the ground rather than a number anybody chose.
-    /// </para>
-    /// </summary>
     public static void Drift()
     {
         if (!Running || Border == 0.0)
@@ -279,6 +285,70 @@ public static class BotRegard
 
         _drifted = now;
         _everDrifted = true;
+
+        if (Mend > 0.0)
+        {
+            _mending.Clear();
+
+            foreach (var (pair, held) in _regard)
+            {
+                if (held != 0.0)
+                {
+                    _mending.Add((pair.Of, pair.For, held));
+                }
+            }
+
+            for (var i = 0; i < _mending.Count; i++)
+            {
+                var (of, about, held) = _mending[i];
+                var step = held < 0.0 ? Math.Min(Mend, -held) : -Math.Min(Mend, held);
+
+                Mended++;
+                Move(of, about, step, "time");
+            }
+        }
+
+        if (Warring)
+        {
+            _grieving.Clear();
+
+            foreach (var (pair, held) in _regard)
+            {
+                if (held <= Enmity)
+                {
+                    _grieving.Add((pair.Of, pair.For, held));
+                }
+            }
+
+            for (var i = 0; i < _grieving.Count; i++)
+            {
+                var (of, about, held) = _grieving[i];
+
+                if ((BotGuilds.Named(of) ?? BaseGuild.FindByName(of) as Guild) is not Guild mine
+                    || (BotGuilds.Named(about) ?? BaseGuild.FindByName(about) as Guild) is not Guild theirs
+                    || mine.IsWar(theirs))
+                {
+                    continue;
+                }
+
+                if (!BotWar.MayDeclare(of, about, out _))
+                {
+                    Waiting++;
+
+                    continue;
+                }
+
+                if (mine.IsAlly(theirs))
+                {
+                    mine.RemoveAlly(theirs);
+                    Estranged++;
+                }
+
+                BotWar.Declare(mine, theirs, $"a standing grievance (regard {held:F1})");
+                Declared++;
+                Overdue++;
+            }
+        }
 
         foreach (var (mine, ours) in BotEstate.Held)
         {
@@ -301,26 +371,14 @@ public static class BotRegard
                     continue;
                 }
 
-                // <b>How much their yards actually overlap, not merely that they do.</b> A flat penalty for
-                // every pair within reach makes an island of four halls one quarrel — every guild at war
-                // with every other within the same three hours, which is not neighbours falling out, it is
-                // a scheduled event. Scaled, the two halls eighteen tiles apart lose four times as much a
-                // drift as the two seventy-six apart, and the shard produces a rivalry rather than a war.
                 Borders++;
                 Move(mine, theirs, Border * (1.0 - gap / (double)Neighbouring), "a shared border");
             }
         }
     }
 
-    /// <summary>
-    /// Whether these two guilds are at war, asked of the engine rather than of the number above.
-    ///
-    /// The opinion decides when to declare; the engine holds whether it is declared. Keeping a second copy
-    /// of that here is how a bot ends up striking somebody the engine still calls an ally.
-    /// </summary>
     public static bool AtWar(Guild a, Guild b) => a != null && b != null && a != b && a.IsWar(b);
 
-    /// <summary>Whether these two bots' guilds are at war.</summary>
     public static bool AtWar(Mobile a, Mobile b) => AtWar(a?.Guild as Guild, b?.Guild as Guild);
 
     private static void Reckon(string of, string about, double was, double now, string why)
@@ -332,6 +390,25 @@ public static class BotRegard
 
         var warring = mine.IsWar(theirs);
 
+        if (!warring)
+        {
+            if (!mine.IsAlly(theirs) && now >= Alliance && Of(about, of) >= Alliance
+                && (mine.Allies?.Count ?? 0) < MostAllies && (theirs.Allies?.Count ?? 0) < MostAllies)
+            {
+                mine.AddAlly(theirs);
+                Allied++;
+
+                logger.Warning("{Mine} and {Theirs} are allies: regard {Now:F1} and {Back:F1} over {Why}", of, about, now, Of(about, of), why);
+            }
+            else if (mine.IsAlly(theirs) && now < Estrangement)
+            {
+                mine.RemoveAlly(theirs);
+                Estranged++;
+
+                logger.Warning("{Mine} is no longer allied with {Theirs}: regard fell to {Now:F1} over {Why}", of, about, now, why);
+            }
+        }
+
         if (!warring && now <= Enmity && was > Enmity)
         {
             if (!Warring)
@@ -341,30 +418,64 @@ public static class BotRegard
                 return;
             }
 
-            mine.AddEnemy(theirs);
-            Declared++;
+            if (mine.IsAlly(theirs))
+            {
+                mine.RemoveAlly(theirs);
+                Estranged++;
+            }
 
-            logger.Warning(
-                "{Mine} has declared war on {Theirs}: regard fell to {Now:F1} over {Why}",
-                of,
-                about,
-                now,
-                why
-            );
+            if (!BotWar.MayDeclare(of, about, out var refused))
+            {
+                Refused++;
+
+                logger.Information(
+                    "{Mine} would declare war on {Theirs} (regard {Now:F1} over {Why}) but for {Refused}",
+                    of,
+                    about,
+                    now,
+                    why,
+                    refused
+                );
+
+                return;
+            }
+
+            BotWar.Declare(mine, theirs, $"{why} (regard {now:F1})");
+            Declared++;
 
             return;
         }
 
-        if (warring && now >= Amity)
+        if (warring && now >= Amity && Of(about, of) >= Amity && BotWar.MayPeace(of, about))
         {
-            mine.RemoveEnemy(theirs);
             Ended++;
 
             logger.Information("{Mine} is at peace with {Theirs} again: regard back up to {Now:F1}", of, about, now);
+
+            BotWar.Peace(of, about);
         }
     }
 
-    /// <summary>The worst opinion anybody holds, for the summary.</summary>
+    public static long Refused { get; private set; }
+
+    public static long Settled { get; private set; }
+
+    public static long Mended { get; private set; }
+
+    public static double Mend { get; set; } = 1.0;
+
+    public static void Settle(string one, string other)
+    {
+        if (one == null || other == null || one == other)
+        {
+            return;
+        }
+
+        _regard.Remove((one, other));
+        _regard.Remove((other, one));
+        Settled++;
+    }
+
     private static string Worst()
     {
         string worst = null;
@@ -386,8 +497,8 @@ public static class BotRegard
         !Running
             ? "guilds form no opinions of each other"
             : $"{_regard.Count} opinions between guilds, worst {Worst()}; moved by {Trespasses} pieces of work on somebody else's land, "
-              + $"{Defiances} refusals to move along, {Bloodshed} killings, {Borders} border drifts and {Trades} trades; "
-              + $"{Declared} wars declared, {Ended} ended"
+              + $"{Defiances} refusals to move along, {Bloodshed} killings ({Expected} more between guilds already at war, which move nothing), {Borders} border drifts, {Claims} claims on somebody's ground, {Trades} trades, {Comradeships} corpses shared between guilds, {Aids} rescues across guilds and {Mended} steps of forgetting at {Mend:F1} a drift; {Allied} alliances made at {Alliance:F0} and {Estranged} ended below {Estrangement:F0}; "
+              + $"{Declared} wars declared, {Refused} called for and refused by the war's rules, {Waiting} drifts a standing grievance waited on them and {Overdue} wars it got when they allowed, {Ended} ended in peace, {Settled} pairs settled to nought by a war ending"
               + (Warring ? "" : $", and {Withheld} withheld because war is switched off");
 
     public static void Forget()
@@ -398,10 +509,22 @@ public static class BotRegard
         Trespasses = 0;
         Defiances = 0;
         Bloodshed = 0;
+        Expected = 0;
+        Claims = 0;
         Borders = 0;
         Trades = 0;
         Declared = 0;
         Ended = 0;
         Withheld = 0;
+        Refused = 0;
+        Waiting = 0;
+        Overdue = 0;
+        Settled = 0;
+        Mended = 0;
+        Comradeships = 0;
+        Aids = 0;
+        Allied = 0;
+        Estranged = 0;
+        _mending.Clear();
     }
 }

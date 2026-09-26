@@ -12,37 +12,22 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotCraftSettings
 {
-    /// <summary>How far below its own skill a bot keeps its work.</summary>
     public double? Margin { get; set; }
 
-    /// <summary>How much cloth is bought in one go.</summary>
     public int? Bolt { get; set; }
 
-    /// <summary>How often an attempt is made, in milliseconds.</summary>
     public int? SwingMs { get; set; }
 
-    /// <summary>What a finished piece is taken to be worth, and what the stall opens at.</summary>
     public int? GoldPerPiece { get; set; }
 
-    /// <summary>What an afternoon at the needle is reckoned at per minute before experience corrects it.</summary>
     public double? Expects { get; set; }
 
-    /// <summary>How long the sewing itself is expected to take.</summary>
     public double? WorkMinutes { get; set; }
 
-    /// <summary>
-    /// What an afternoon at an anvil is reckoned at per minute before experience corrects it.
-    ///
-    /// Added on 07.09.2026 with the rest of the smith's dials: this file was written when sewing was the
-    /// only craft on the shard, and every number the forge runs on was reachable only by rebuilding. A
-    /// number that cannot be moved on a living shard is a number nobody tries.
-    /// </summary>
     public double? ForgePrior { get; set; }
 
-    /// <summary>How long a stint at the anvil is expected to take.</summary>
     public double? ForgeMinutes { get; set; }
 
-    /// <summary>How many recipes and metals the smith will try before giving a stint up.</summary>
     public int? AnvilTries { get; set; }
 }
 

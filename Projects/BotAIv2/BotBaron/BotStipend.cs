@@ -37,43 +37,20 @@ public static class BotStipend
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStipend));
 
-    /// <summary>
-    /// How low the account may fall before the crown makes it up.
-    ///
-    /// A tenth of the grant, by order. It is a threshold rather than a trickle so that the ledger shows
-    /// occasional large payments instead of a permanent drip — one line an evening that says what the Baron
-    /// has cost, rather than a number that has to be inferred.
-    /// </summary>
     public static int Floor { get; set; } = 1000;
 
-    /// <summary>What he carries. Enough for bandages and a few scrolls, and nothing worth robbing a corpse for.</summary>
     public static int Float { get; set; } = 600;
 
-    /// <summary>How often the steward looks. Twice a minute is far more often than any of this can move.</summary>
     public static int EveryMs { get; set; } = 30000;
 
-    /// <summary>Payments made, and what they came to. Read this to know what the crown has spent.</summary>
     public static long Grants { get; private set; }
 
     public static long Minted { get; private set; }
 
-    /// <summary>Coin moved from his own account into his own pocket. Not minted, and counted apart from what is.</summary>
     public static long Drawn { get; private set; }
 
-    /// <summary>
-    /// When each stipended bot was last looked at.
-    ///
-    /// Per bot rather than one shared clock, even though there is one Baron today. A single static stamp
-    /// works perfectly for a population of one and silently starves every bot but the first the moment there
-    /// are two — which is exactly the shape of defect that survives testing and then appears months later as
-    /// "the second Baron never buys bandages".
-    /// </summary>
     private static readonly Dictionary<Serial, long> _looked = [];
 
-    /// <summary>
-    /// Keeps a stipended bot solvent. Cheap enough for the population's beat: one clock, then a balance and a
-    /// count of coins for the one bot in the population this is true of.
-    /// </summary>
     public static void Keep(BotMobile bot)
     {
         var grant = bot?.Class?.Stipend ?? 0;
@@ -92,10 +69,6 @@ public static class BotStipend
 
         var now = Core.TickCount;
 
-        // Compared by subtraction against a stamp that was itself a real tick, never against a zero default.
-        // On some hosts the counter is the machine's uptime passed through, so it starts enormous and can
-        // wrap negative — a bot measured against a nought it never held would be looked at once and then not
-        // again for weeks.
         if (_looked.TryGetValue(bot.Serial, out var last) && now - last < EveryMs)
         {
             return;
@@ -152,9 +125,6 @@ public static class BotStipend
             return;
         }
 
-        // The coin exists before the account is debited nowhere in this order — the withdrawal has already
-        // happened, so the drop must not be allowed to fail silently. A pack that will not take it gets it
-        // put back.
         var coins = new Gold(take);
 
         if (!pack.TryDropItem(bot, coins, false))

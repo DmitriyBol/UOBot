@@ -1,4 +1,4 @@
-using Server.Logging;
+﻿using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -26,26 +26,38 @@ public sealed class BotEstateModule : BotModule
     {
         BotEstateConfig.Load();
 
-        // The world first: whatever was raised on a previous evening is standing out there right now with a
-        // deleted owner, and every minute before this runs is a minute it is decaying.
         BotEstate.Adopt();
+
+        BotWar.Reconcile();
 
         BotWill.Offer(new BotSteward());
 
-        // The second half of an estate: a hall is bought once, and then fitted out one bench at a time for
-        // as long as the guild can afford it. See BotFitter.
+        BotWill.Offer(new BotReeve());
+
         BotWill.Offer(new BotFitter());
 
-        // And the third: a shopkeeper of the guild's own, once the workshop is finished. See BotHirer.
         BotWill.Offer(new BotHirer());
 
-        // And the fourth, which is what makes the third worth 1,252gp: something on the shopkeeper's shelf.
-        // See BotSupplier.
         BotWill.Offer(new BotSupplier());
 
-        // And the yard round the hall, which is what a hall makes of the ground. See BotLand and BotBailiff:
-        // the claim is a preference and the eviction it makes possible is deliberately almost nothing.
         BotWill.Offer(new BotBailiff());
+
+        BotWill.Offer(new BotTollman());
+
+        BotWill.Offer(new BotFeuder());
+
+        BotWill.Offer(new BotRemover());
+
+        BotWill.Offer(new BotEnlarger());
+
+        BotAbode.Adopt();
+        BotWill.Offer(new BotAbodeBuyer());
+        BotWill.Offer(new BotReposer());
+
+        BotOutpost.Adopt();
+        BotWill.Offer(new BotOutposter());
+
+        BotWill.Offer(new BotHolder());
 
         logger.Information(
             "Estate ready: a guild raises a hall at {Price}gp levied off its members, each keeping {Keep}gp back, up to {Max} on the island; plots are looked for between {Near} and {Far} tiles of home, {Apart} apart, {Budget} put to the engine at a time",
@@ -73,6 +85,26 @@ public sealed class BotEstateModule : BotModule
             BotRegard.Amity,
             BotRegard.Warring ? "ON — bots of guilds at war may strike and loot each other" : "off, so a bad enough quarrel is counted and nothing more"
         );
+
+        logger.Information(
+            "Wars: won at {Kills} dead or {Loot}gp of plunder, no peace before {Least} minutes, judged at {Longest}, a truce of {Truce} after, one declaration a guild per {Every} minutes and {Most} at a time; an enemy on a guild's own ground is answered from {Defend} tiles at {DefendPrior}/min; opinions forget {Mend} a drift",
+            BotWar.Kills,
+            BotWar.Loot,
+            BotWar.LeastMs / 60000,
+            BotWar.LongestMs / 60000,
+            BotWar.TruceMs / 60000,
+            BotWar.DeclareEveryMs / 60000,
+            BotWar.MostWars,
+            BotFeud.Defend,
+            BotQuarrel.DefendPrior,
+            BotRegard.Mend
+        );
+
+        logger.Information(
+            "Seats: {Seats}; a hall is at home within {Settled} tiles of its seat, members are born and rise beside their hall, and a hall further off is carried to the seat",
+            BotSeat.Tell(),
+            BotSeat.Settled
+        );
     }
 
     public override void Reset()
@@ -87,6 +119,27 @@ public sealed class BotEstateModule : BotModule
         BotLand.Forget();
         BotRegard.Forget();
         BotBailiff.Forget();
+        BotFeuder.Forget();
+        BotQuarrel.Forget();
+        BotFeud.Forget();
+        BotExile.Forget();
+        BotWar.Forget();
+        BotSeat.Forget();
+        BotClaim.Forget();
+        BotHolder.Forget();
+        BotReeve.Forget();
+        BotChest.Forget();
+        BotToll.Forget();
+        BotTollman.Forget();
+        BotHold.Forget();
+        BotRemover.Forget();
+        BotRemove.Forget();
+        BotEnlarger.Forget();
+        BotAbode.Forget();
+        BotAbodeBuyer.Forget();
+        BotReposer.Forget();
+        BotOutpost.Forget();
+        BotOutposter.Forget();
         BotShelf.Forget();
         BotFittings.Forget();
     }

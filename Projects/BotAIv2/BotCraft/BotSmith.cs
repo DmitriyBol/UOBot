@@ -24,8 +24,9 @@ public sealed class BotSmith : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSmith));
 
-    /// <summary>How much metal makes a trip to the anvil worth taking at all.</summary>
     public static int LeastMetal { get; set; } = 6;
+
+    public static int OrderPieces { get; set; } = 2;
 
     private static bool _saidNoSystem;
 
@@ -33,7 +34,6 @@ public sealed class BotSmith : IBotProposer
 
     private static bool _said;
 
-    /// <summary>Every gate apart, with the denominator. There is no bucket called "other".</summary>
     public static long Asked { get; private set; }
 
     public static long NoHammer { get; private set; }
@@ -44,13 +44,10 @@ public sealed class BotSmith : IBotProposer
 
     public static long ToOrder { get; private set; }
 
-    /// <summary>Orders passed over for want of iron rather than for want of skill. Counted apart on purpose.</summary>
     public static long ShortOfMetal { get; private set; }
 
-    /// <summary>Ingots taken back off the smith's own stall so that it could work at all.</summary>
     public static long Fetched { get; private set; }
 
-    /// <summary>Smiths past the metal floor whose pack could still not fill any recipe their skill allows.</summary>
     public static long NothingAffordable { get; private set; }
 
     public static long OnSpec { get; private set; }
@@ -80,8 +77,6 @@ public sealed class BotSmith : IBotProposer
 
         if (BotAnvil.System == null)
         {
-            // Content initialisation builds the craft systems, and anything that asks before that gets null.
-            // Said once: a smith that never works is otherwise indistinguishable from a lazy one.
             if (!_saidNoSystem)
             {
                 _saidNoSystem = true;
@@ -92,16 +87,11 @@ public sealed class BotSmith : IBotProposer
             return null;
         }
 
-        // Its own metal back off its own stall before it is told it has none — the fletcher's rule about its
-        // feathers and the tailor's about its leather, on the trade that was locked out of the anvil by it.
-        // See BotAnvil.Fetch for the ring of three gates this breaks.
         if (BotAnvil.Ingots(body, BotAnvil.Best(body, LeastMetal)) < LeastMetal)
         {
             Fetched += BotAnvil.Fetch(bot, body, LeastMetal);
         }
 
-        // Any metal it can work, not iron alone. A smith standing on forty bronze ingots was being told it
-        // had no metal, which is how a population that digs mostly bronze came to forge almost nothing.
         if (BotAnvil.Ingots(body, BotAnvil.Best(body, LeastMetal)) < LeastMetal)
         {
             NoMetal++;
@@ -109,8 +99,6 @@ public sealed class BotSmith : IBotProposer
             return null;
         }
 
-        // A forge with an anvil beside it. BotGround only records the pair — the miner needs both to smelt —
-        // so this is the same list, already surveyed, already reachable.
         var smithy = BotGround.Fire(bot, body.Location);
 
         if (smithy == Point3D.Zero)
@@ -127,7 +115,6 @@ public sealed class BotSmith : IBotProposer
             return null;
         }
 
-        // The board first. Nearest order this bot could actually make, and the money on it is already down.
         var order = Order(bot, body);
 
         if (order != null)
@@ -138,9 +125,6 @@ public sealed class BotSmith : IBotProposer
             return new BotForge(map, smithy, order);
         }
 
-        // Nothing the pack can pay for. A named nought rather than a silent return: this is the branch that
-        // now catches what used to walk to the forge and report "out of metal" there, so if it ever reads
-        // high next to a healthy NoMetal the two floors have drifted apart again.
         if (BotAnvil.Choose(body) == null)
         {
             NothingAffordable++;
@@ -153,12 +137,6 @@ public sealed class BotSmith : IBotProposer
         return new BotForge(map, smithy);
     }
 
-    /// <summary>
-    /// The most valuable standing order this bot could fill out of iron, or null.
-    ///
-    /// Worth rather than nearness: everything on this board is within a few minutes' walk of everything else,
-    /// and what separates two orders is what they are paying.
-    /// </summary>
     private static BotWant Order(IBotWilful bot, Mobile body)
     {
         var wants = BotAuction.Wants;
@@ -166,8 +144,6 @@ public sealed class BotSmith : IBotProposer
         BotWant best = null;
         var bestWorth = 0;
 
-        // Raised once for the bot rather than once for every want it walked past — this counts against
-        // Asked, which is a count of bots, and the tailor's twin of it read 567 against a denominator of 264.
         var starved = false;
 
         for (var i = 0; i < wants.Count; i++)
@@ -186,18 +162,7 @@ public sealed class BotSmith : IBotProposer
                 continue;
             }
 
-            // <b>Skill enough and metal enough are two different questions, and only the first was asked.</b>
-            // Recipe() answers "is this bot good enough to make one"; it says nothing about whether there is
-            // any iron in the pack to make it out of. The proposer's own gate is LeastMetal — six ingots,
-            // which is enough to be worth walking to an anvil for — and a ringmail tunic wants eighteen. So a
-            // smith holding anything between the two took the order, walked to the forge and failed "out of
-            // metal", over and over: fifty-six of the hundred and eight attempts at a hauberk on the night of
-            // 25.08.2026, against two that were actually made. And because orders are picked by what they are
-            // worth, it reliably chose the dearest one on the board — which is the one needing the most iron.
-            //
-            // Two numbers on one shelf, and the band between them is where the whole armour trade sat all
-            // night. The recipe knows what it costs; nothing had to be invented, only asked.
-            var cost = BotCraftwork.Cost(recipe);
+            var cost = BotCraftwork.Cost(recipe) * System.Math.Max(1, OrderPieces);
 
             if (BotAnvil.Ingots(body, BotAnvil.Best(body, cost)) < cost)
             {
@@ -240,7 +205,7 @@ public sealed class BotSmith : IBotProposer
         Asked == 0
             ? "nobody with a hammer has been asked to forge"
             : $"{Asked} asked: {ToOrder} took an order off the board, {ShortOfMetal} passed one over for want of iron, {OnSpec} forged on spec, "
-              + $"{NoMetal} short of metal ({Fetched} ingots fetched back off their own stalls to stop being it), {NothingAffordable} with metal but not enough for any recipe they can work, {NoForge} with no forge in reach; the board's metal reads {BotAnvil.Reading}, so an empty smith orders {BotAnvil.Metal.Name}; "
+              + $"{NoMetal} short of metal ({Fetched} ingots fetched back off their own stalls to stop being it), {NothingAffordable} with metal but not enough for any recipe they can work, {NoForge} with no forge in reach; {BotCraftwork.Unlikely} recipes passed over across the crafts for less than {BotCraftwork.LeastChance:P0} of making them; the board's metal reads {BotAnvil.Reading}, so an empty smith orders {BotAnvil.Metal.Name}; "
               + $"{BotForge.Describe()}";
 
     public static void Forget()

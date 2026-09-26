@@ -1,8 +1,9 @@
 # BotMindAI
 
-**The four crafters think, and nothing else on this shard does.** Patrick's order of 07.09.2026: the
-Captain, the Architect, the Sage and the Baron were stood down, and the whole of the Crafter class — four
-bodies, `Roderic`, `Emeric`, `Ulric` and `Wulfric` — is held by minds. There are no unthinking crafters.
+**The five crafters think, and nothing else on this shard does.** Patrick's order of 07.09.2026: the
+Captain, the Architect, the Sage and the Baron were stood down, and the whole of the Crafter class — five
+bodies since 11.09.2026, `Roderic`, `Emeric`, `Ulric`, `Wulfric` and `Alaric` — is held by minds. There are no
+unthinking crafters.
 
 This is the first office where thinking is not a supplement to the arithmetic but the whole of how the trade
 is run, and the reason is the shape of the work. A crafter's job is a chain: a want on the board, a material
@@ -121,7 +122,11 @@ The mind's weight in the auction is a constant nothing the model says can move.
    (`BotResolve.Offered`), never re-asked of the proposers: `Propose` leaves a mark in at least one place
    and every proposer counts its own refusals, so a second round of questions would corrupt both. Before
    this, the menu listed trades that merely *existed*, and 45 of Aldric's 48 decisions in one evening named
-   a trade with no shopkeeper, no ore and no quarry behind it.
+   a trade with no shopkeeper, no ore and no quarry behind it. **A trade that keeps losing rests** (build 102,
+   Patrick's decision of 17.09.2026): three choices of it running that go untaken with the bot at other work
+   take it off that mind's own menu for five minutes, five more for each repeat up to half an hour, never below
+   three trades; a choice outbid while the bot does that very trade is agreement and forgives it. The guild's
+   `gather` and `make` still name any trade with work in it.
 2. **Measure.** `BotMindDeed` records the bot's total worth (pack + bank) when the work starts and when it
    ends, over the wall-clock minutes it took. The mind is judged on the number it predicted, measured by
    something that is not the mind.
@@ -152,6 +157,7 @@ rules belong to. Without that, "it learns" is a claim nothing can support.
 | `BotMindLog.cs` | `logs/bot-minds.log` — decisions and reckonings, in order. |
 | `BotMindConfig.cs` | what Configuration/bot-mind.json is allowed to say |
 | `BotMindTalk.cs` | the one place the thinking bots can hear each other |
+| `BotMindClaims.cs` | which mind has claimed which row of the guild board (`take`), for a quarter of an hour, so two makers do not both start the same order (build 68) |
 
 ## Configuration
 

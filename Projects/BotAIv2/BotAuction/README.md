@@ -7,7 +7,9 @@ on the table**, and move their own prices by what actually sells and what actual
 |---|---|
 | `BotListing.cs` | one stall: what, how much, at what price, what has gone and how the price moved |
 | `BotWant.cs` | one want: the same thing with the sign turned round, plus the escrow |
-| `BotAuction.cs` | the market itself: list, ask, buy, fill, move a price, forget |
+| `BotAuction.cs` | the market itself: list, ask, buy, fill, move a price, forget; a want's raise waits `RaiseMs`, which follows `StaleMs` unless dialled apart (build 64) |
+| `BotCity.cs` | the city's treasury: the one purse that mints, on a clock and up to a cap; buys whole lots off the longest-standing stalls, stands orders served tick by tick, and is in Argus's hands through the door because a purse with a cap is a lever a model may hold (build 75) |
+| `BotCityStore.cs` | keeps the treasury, its standing orders and its bounties across restarts; every restart used to open the purse at its opening sum again (build 89) |
 | `BotAuctionConfig.cs` | `Configuration/bot-auction.json` — speeds, not prices |
 | `BotAuctionModule.cs` | module, phase `World`, depends on nothing |
 | `BotHaggle.cs` | a seller looking at what buyers are offering for what it has out, and moving its price towards them |
@@ -50,6 +52,12 @@ configuration file that decides the economy, and then the market is decoration.
 The opening ask comes from whoever is listing, and it asks `BotAuction.Worth` first — so the bot asks what the
 shard reckons the thing is worth, and falls back to its own stand-in only when the shard has never had an
 opinion. From there it is the market's business.
+
+**A stall that has stood at its lowest price for `StuckMs` goes back to its seller, and only as far as the pack will
+take it** (`BotListing.Return`, by the engine's own `TryDropItem`); the rest stays on the stall and is counted as
+`Unreclaimed`. Until 14.09.2026 the goods were dropped into the pack without asking it, and a tailor's 197 unsold oil
+cloths took a pack that holds 125 things past its cap, after which no coin could be paid into it or drawn into it. A
+stall withdrawn into the bank box is still emptied whole.
 
 ---
 

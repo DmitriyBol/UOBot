@@ -12,18 +12,20 @@ produced, less what was spent.
 |---|---|
 | `BotStanding.cs` | the ladder's rungs, top to bottom. The order *is* the content |
 | `BotLadder.cs` | the rung from facts: alive, overloaded, health, being hit, in a squad |
-| `BotDeed.cs` | an obligation: work with its own stages. The subclass is written by the subsystem |
+| `BotDeed.cs` | an obligation: work with its own stages. The subclass is written by the subsystem; `Taken` is told when it wins, `Foe` names what it fights, `Paperwork` never takes a bot off work in hand (build 50), `Guess` is not turned round for another guess of the same kind (build 56) |
 | `BotDoing.cs` | what the obligation wants done now: walk, work, done, failed |
 | `IBotProposer.cs` | offer work. The extension point, and the slow tier's vote |
 | `BotUrges.cs` | boredom and need — all that is left of motives-as-deficits |
 | `BotLedger.cs` | what has paid this bot, and where. All the memory of work there is |
-| `BotYield.cs` | the takings: the skill-to-gold rate, the price of death, the measurement ceiling |
-| `BotAppraisal.cs` | the appraisal: estimate × considerations, geometric mean, inertia |
-| `BotResolve.cs` | state on the bot: feelings, ledger, what was taken on and why |
-| `BotWill.cs` | the decision itself: settle → advance → auction. And the census |
+| `BotYield.cs` | the takings: the skill-to-gold rate, the price of death, the measurement ceiling, and the aside ledger — money moved by somebody else's decision, kept out of the work in hand |
+| `BotAppraisal.cs` | the appraisal: estimate × considerations, geometric mean, inertia; the work in hand is not asked the price of starting (build 50); the root is the dial `Root`, 5, named on the take line (build 64) |
+| `BotBreaker.cs` | work one bot keeps failing for the same reason is not offered to that bot for a while; and the loudest loop of an alarm window, for the alarm (`Loudest`, build 64) |
+| `BotResolve.cs` | state on the bot: feelings, ledger, what was taken on and why, what it scored then and how long it reckoned; and `BotPause`, work put down for something that would not wait |
+| `BotWill.cs` | the decision itself: settle → advance → auction. And the census. A refused road the work in hand never sent — a company's station — is not charged to that work (`Foreign`, build 52); a prowl displaced by the fighting it went for is settled finished without crediting its place (`Met`, switch `MetCounts`, build 65) |
 | `BotWillConfig.cs` | `Configuration/bot-will.json` |
 | `BotWillModule.cs` | module, phase `World`, requires `Classes` |
 | `BotCommons.cs` | what the population as a whole has found out about what pays where |
+| `BotCommonsStore.cs` | keeps what pays where across restarts — every patch, trade and seam written with its age so the half-life goes on from where it was; a restart used to be an hour of relearning (build 74) |
 | `IBotWilful.cs` | what deciding needs a bot to be |
 
 ---
@@ -101,6 +103,33 @@ way the journey in `BotJourney` waits under a fight. After `AsideCapMs` (10 minu
 after all: the market has closed, the vein is worked out, and a bot returning to a task an hour later acts on an
 hour-old fact.
 
+### And since 14.09.2026, held until something happens
+
+Those three mechanisms stopped a bot changing its mind every tick; they did not stop it changing its mind at two
+minutes. Fresh work was protected for its own reckoning but never longer than `DwellCapMs`, and past that any offer
+worth about half as much again took the bot off — whether it was half a minute into a trip or half a trip. On the
+morning of 14.09.2026, 224 of 734 drops happened between 1.95 and 2.25 minutes in, and four bots in five took the
+same trade up again within ten minutes. Mining finished 52% of its trips and dropped 28%, thirty-one of them on
+the walk to the fire with the ore already in the pack.
+
+The repair follows Kinny and Georgeff's reactive bold agent (see `RESEARCH-decisions.md` §2):
+
+| Mechanism | What it does |
+|---|---|
+| `BotDeed.Steadfast` | work a bot sees through: mining, woodcutting, herbs, cooking, peddling, unloading, getting a spell, standing for the guild |
+| `CommitStretch` ×1.5, `CommitCapMs` 8 min | a steadfast deed is held against ordinary offers for its own reckoning — the walk it expected plus its `Minutes` — stretched and capped |
+| `BotDeed.Summons` | what gets through a hold besides `Pressing`: a comrade in trouble, a wound to bind, the guild's muster, a war company, a paid lesson, a prisoner |
+| trouble | a walk told its way is blocked, or one that has stopped closing for `TroubleShare` of the trek limit, lifts the hold |
+| `BotPause`, `Resume`, `ResumeHealth` 0.5 | work displaced by something that would not wait is put down and taken up again when that ends, unless the bot died, came back too hurt, changed map or was away past `AsideCapMs`; its stake is moved so the interruption's takings are not booked to it |
+
+The watchdogs — the trek limit, the labour clock, the stall watch — run whether a hold stands or not, which is
+what makes a hold of eight minutes safe: nothing stuck can hide behind one. `CommitStretch` 0 puts the auction back
+exactly as it was, and the `Resolve:` census line and Argus's `resolve <bot>` / `resolves` say what the holds did.
+
+Measured over the first twenty-two minutes of a shard, the hold off against the hold on: drops 12% → 8% of all
+endings; mining 44% finished / 37% dropped → 74% / 5%; cooking 63/21 → 79/7; unloading 75/19 → 97/3; woodcutting
+62/10 → 100/0; herbs 79/17 → 92/4. Work the hold does not touch — looking for a fight, hunting — was unchanged.
+
 ---
 
 ## The auction and the proposers
@@ -121,6 +150,30 @@ advisor, and the brain took 85 of the 135 plans it managed to review — the mod
 the brain had of its own, and nothing recorded that it had lost, so it spent the night learning from noise and
 finished with 0 of 119 predictions borne out. A model proposing through this interface bids in the same units,
 loses on the same arithmetic, and has its actual takings written into the same ledger.
+
+**Some refusals are about whether the work can happen at all, and those are vetoes, not factors.** Among the refusals
+`BotAppraisal.Weigh` names are another map, an outlay the bot cannot afford, and — since 14.09.2026 — work that changes
+money over a shopkeeper's counter offered to a bot whose pack has no room for a coin (`BotDeed.AtCounter`,
+`BotYield.Pocket`). A factor under a fifth root cannot say "cannot": a fiftieth still comes out at 0.46. The third was
+needed because of `Unpaid`: a deed paid nothing on purpose learns nothing from failing, so the reasons it fails must be
+asked before it is offered. Restocking, made unpaid that morning, failed 8,719 times in half an hour for one bot whose
+pack had gone past the cap.
+
+Two more since that evening, both of them the auction reading a record that already existed:
+
+- **A rest after a loop** (`BotBreaker`). Six failures of one kind of work for one bot, for the same reason with its
+  numbers taken out, inside five minutes and since the bot last finished that work, rest that kind for that bot for five
+  minutes, doubled at every further trip up to forty and lifted by a finish. It is a backstop for the class of defect
+  this project has met most — a failure offered again unchanged — and it logs every trip with the bot, the work and the
+  reason, because the loop it stops still has to be mended where it starts. Replayed over the logs of 14.09.2026 before
+  it was written, it stopped every loop of the day and tripped at most once in a session without one.
+- **Ground where bots have been dying** (`BotPeril.Lethal`). The danger map held every death and was read only by
+  captains; the appraisal's caution was the bot's own ledger, keyed by trade. Work whose place lies in or beside squares
+  where two bots have died lately is refused, unless it goes where the fighting is on purpose (`BotDeed.Braves`: hunt,
+  prowl, sweep, pickings, plunder, band, harrow, delve, escort, scout, flee) or is a call from outside (`Summons`) —
+  those are how such ground is dealt with. Twenty-eight bots died in one field in twenty minutes on 14.09.2026 on
+  offers that read "safe 1.00". The map lives in memory, so after a restart it starts empty and the refusal begins
+  again only after new deaths.
 
 ---
 

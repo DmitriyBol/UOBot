@@ -28,22 +28,28 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotStrike
 {
-    /// <summary>
-    /// Attack spells, weakest first, by the engine's own spell id.
-    ///
-    /// Only the ones that simply do damage to one thing. Fields, curses and summons are all reasonable in a
-    /// fight and every one of them needs its own judgement about when it helps; a bot that can reliably throw
-    /// a fireball is already an enormous step from a bot swinging a stick.
-    /// </summary>
     private static readonly int[] Ladder =
     [
-        BotArsenal.SpellMagicArrow, // 1st circle
-        SpellHarm,                  // 2nd
-        SpellFireball,              // 3rd
-        SpellLightning,             // 4th
-        SpellMindBlast,             // 5th
-        SpellEnergyBolt             // 6th
+        BotArsenal.SpellMagicArrow,
+        SpellHarm,
+        SpellFireball,
+        SpellLightning,
+        SpellMindBlast,
+        SpellEnergyBolt
     ];
+
+    public static int Strongest(Mobile bot)
+    {
+        for (var i = Ladder.Length - 1; i >= 0; i--)
+        {
+            if (BotGrimoire.Holds(bot, Ladder[i]))
+            {
+                return Ladder[i];
+            }
+        }
+
+        return -1;
+    }
 
     public const int SpellHarm = 11;
 
@@ -55,82 +61,18 @@ public static class BotStrike
 
     public const int SpellEnergyBolt = 41;
 
-    /// <summary>
-    /// How far a caster fights from.
-    ///
-    /// Eight, inside the engine's own ten to twelve for a targeted spell, and the same number mending uses for
-    /// the same reason: standing at the edge of your range means a target that takes one step is out of it.
-    /// </summary>
     public static int Range { get; set; } = 8;
 
-    /// <summary>
-    /// How long to leave between attempts at starting a spell.
-    ///
-    /// <para>
-    /// <b>The first version's casters threw spells faster than the engine would take them, and so threw
-    /// none.</b> A cast has a recovery — <c>NextSpellTime</c> — and calling for another inside it is refused
-    /// with a message to a client that a bot has not got; under AOS rules a fresh cast disturbs the one in
-    /// flight outright. A bot beating on it every two hundred milliseconds therefore produces a great deal of
-    /// nothing. A second and a half is longer than any first-circle recovery and short enough that a caster
-    /// is not idling between spells.
-    /// </para>
-    /// </summary>
     public static int CastMs { get; set; } = 1500;
 
-    /// <summary>
-    /// Mana a circle costs, read off the era's own ladder — the numbers inscription charges to write one.
-    ///
-    /// The engine keeps the true cost inside the spell where nothing outside can ask it. If this is wrong the
-    /// price is a cast that fizzles and a bot that swings instead, which is the failure it already has.
-    /// </summary>
     private static readonly int[] ManaByCircle = [4, 6, 9, 11, 14, 20, 40, 50];
 
-    /// <summary>
-    /// The Magery a scroll of each circle wants before the engine will let it go off, taken from
-    /// <c>MagerySpell.GetCastSkills</c> rather than guessed.
-    ///
-    /// <para>
-    /// The engine keeps one table and reads it at two offsets: a spell cast from the book is asked for the
-    /// entry two circles higher than its own, and a spell cast <em>from a scroll</em> is asked for its own.
-    /// That gap is what a scroll is for. These are the scroll numbers, so circle one is free to anybody and
-    /// circle eight wants fifty — and full reliability comes forty points above each, which is what
-    /// <see cref="SkillMargin"/> is measured against.
-    /// </para>
-    /// </summary>
     private static readonly double[] ScrollSkillByCircle = [-50.0, -30.0, 0.0, 10.0, 20.0, 30.0, 40.0, 50.0];
 
-    /// <summary>
-    /// How far above the bare requirement a bot must be before a circle is worth stocking.
-    ///
-    /// Twenty of the forty points between "might work" and "always works", so a bot buys into a circle at
-    /// about even odds rather than at the first roll it could theoretically pass. Scrolls cost money and a
-    /// coin flip is not a supply.
-    /// </summary>
     public static double SkillMargin { get; set; } = 20.0;
 
-    /// <summary>
-    /// How many casts of a circle a bot's whole pool must cover before that circle is worth buying.
-    ///
-    /// Two. A scroll the bot can throw exactly once on a full pool is a scroll it throws at the start of one
-    /// fight a day, which is not a weapon — it is an ornament that cost twelve gold.
-    /// </summary>
     public static int PoolCasts { get; set; } = 2;
 
-    /// <summary>
-    /// The strongest attack this bot should be <em>stocking</em>, or -1 if none.
-    ///
-    /// <para>
-    /// <b>A different question from <see cref="Best"/>, and conflating them is why every bot bought magic
-    /// arrows for ever.</b> Best asks what can be thrown this instant: it reads current mana and what is
-    /// actually in the pack, because that is a decision inside a fight. This asks what is worth owning, which
-    /// depends on the pool rather than the moment, and on the skill the engine will roll when the scroll is
-    /// used. The shopping side used to skip the question altogether and name one spell as a constant —
-    /// reasonably, since a ladder that ignored either fact would have had warriors buying energy bolts — but
-    /// the answer to "a warrior cannot afford this" is to ask about the warrior, not to freeze everybody at
-    /// the bottom rung for life. A mage that has doubled its Magery since morning should be buying something
-    /// better than it bought as a novice, and until now there was nothing better it was allowed to want.
-    /// </para>
-    /// </summary>
     public static int Stock(Mobile bot)
     {
         if (bot == null)
@@ -150,8 +92,6 @@ public static class BotStrike
                 continue;
             }
 
-            // The pool rather than what is left this instant: this is shopping, and a fight it cannot pay for
-            // twice is a fight it should not be equipping for.
             if (bot.ManaMax < ManaByCircle[circle - 1] * PoolCasts)
             {
                 continue;
@@ -166,24 +106,6 @@ public static class BotStrike
         return -1;
     }
 
-    /// <summary>
-    /// Whether this bot has anything at all it could throw — a book with an attack in it, or a scroll.
-    ///
-    /// <para>
-    /// <b>It used to mean "is a mage", and that is a different question.</b> A book was required before
-    /// anything else was looked at, so a warrior carrying five magic arrow scrolls answered no and was
-    /// treated as a bot with a stick — it never chose a spell, never stood off, and the scrolls sat in its
-    /// pack until it died. Being a caster is a fact about a class; having something to throw is a fact about
-    /// a pack, and only the second one decides anything here.
-    /// </para>
-    ///
-    /// <para>
-    /// Note what this deliberately does <em>not</em> change: how far the bot stands off. That is worked out
-    /// from whether a spell can actually be paid for this instant — see the <c>armed</c> test in
-    /// <see cref="BotSlay"/> — so a warrior down to its last scroll closes and swings like a warrior rather
-    /// than keeping a mage's distance on the strength of one arrow.
-    /// </para>
-    /// </summary>
     public static bool Can(Mobile bot)
     {
         var booked = BotGrimoire.Book(bot) != null;
@@ -204,12 +126,6 @@ public static class BotStrike
         return false;
     }
 
-    /// <summary>
-    /// The strongest attack this bot could actually get off right now, or -1.
-    ///
-    /// Strongest first and downwards, so a mage with the mana for lightning throws lightning and the same mage
-    /// at the end of its pool still throws magic arrow rather than reaching for a stick.
-    /// </summary>
     public static int Best(Mobile bot)
     {
         for (var i = Ladder.Length - 1; i >= 0; i--)
@@ -223,18 +139,6 @@ public static class BotStrike
         return -1;
     }
 
-    /// <summary>
-    /// A scroll for this spell sitting in the bot's pack, or null.
-    ///
-    /// <para>
-    /// <b>The whole of what makes a scroll different, and it is the engine's rule rather than one of
-    /// ours.</b> <c>Spell.ConsumeReagents</c> returns true the moment a scroll is attached, and nothing
-    /// anywhere asks a scroll-caster for a spellbook — so a warrior with no Magery, no book and no reagents
-    /// can throw the thing in its pack, and it is spent doing it. That last part is what makes this worth
-    /// building at all: every cast destroys a scroll, so the scribe who writes them has customers for as
-    /// long as anybody fights.
-    /// </para>
-    /// </summary>
     public static SpellScroll Scroll(Mobile bot, int spell)
     {
         var pack = bot?.Backpack;
@@ -248,15 +152,6 @@ public static class BotStrike
         return pack.FindItemByType(kind) as SpellScroll;
     }
 
-    /// <summary>
-    /// Whether this bot can throw this spell right now, by book or by scroll.
-    ///
-    /// <para>
-    /// Two routes and one of them costs nothing but the scroll: a book wants reagents in the pack, a scroll
-    /// wants only the mana. Mana is asked either way, because the pool is the one thing neither route can
-    /// borrow.
-    /// </para>
-    /// </summary>
     public static bool Ready(Mobile bot, int spell)
     {
         var scroll = Scroll(bot, spell);
@@ -273,7 +168,6 @@ public static class BotStrike
             return false;
         }
 
-        // From here the book is the only route that can still be refused, and it is refused on herbs.
         if (scroll != null)
         {
             return true;
@@ -300,22 +194,6 @@ public static class BotStrike
         return true;
     }
 
-    /// <summary>
-    /// Which gate closed on the whole attack ladder, in words, for whoever has to read the log.
-    ///
-    /// <para>
-    /// <b>Written because the refusal was reported by its symptom.</b> The complaint said "best -1, 35 of 35
-    /// mana, book holds 5" — the pool full, the book stocked, and no mention anywhere of the third thing
-    /// <see cref="Ready"/> checks. There are exactly three ways to be refused and the answer is always one of
-    /// them, so it costs nothing to say which.
-    /// </para>
-    ///
-    /// <para>
-    /// The gates are reported in the order they are checked, and the <em>least</em> excuse across the ladder
-    /// is the honest one: a bot that owns no attack spell at all is in a different position from one that
-    /// owns three and is out of herbs for all of them.
-    /// </para>
-    /// </summary>
     public static string Why(Mobile bot)
     {
         if (bot == null)
@@ -360,13 +238,6 @@ public static class BotStrike
         return $"it owns {owned} attack spells, can pay for {affordable}, and is out of reagents for every one";
     }
 
-    /// <summary>
-    /// Begins a cast. Returns whether it started; what it is aimed at is settled on a later beat.
-    ///
-    /// Two beats, because that is how the engine casts: the cast starts a delay, the delay puts a target on
-    /// the caster, and somebody has to fill that target in. A bot has no client to click with, so
-    /// <see cref="Aim"/> is the click.
-    /// </summary>
     public static bool Begin(Mobile bot, int spell)
     {
         if (bot == null || bot.Spell != null)
@@ -374,15 +245,11 @@ public static class BotStrike
             return false;
         }
 
-        // The scroll is handed to the spell, not merely checked for. That reference is what tells the engine
-        // to skip the reagents and to spend the scroll when the cast lands — passing null here with a scroll
-        // in the pack would ask for herbs the bot has not got and fail for a reason nothing would report.
         var made = SpellRegistry.NewSpell(spell, bot, Scroll(bot, spell));
 
         return made != null && made.Cast();
     }
 
-    /// <summary>Points a finished cast at the quarry. Returns whether there was one to point.</summary>
     public static bool Aim(Mobile bot, Mobile at)
     {
         var aiming = bot?.Target;

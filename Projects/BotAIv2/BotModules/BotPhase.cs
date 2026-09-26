@@ -12,15 +12,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public enum BotPhase
 {
-    /// <summary>
-    /// Before the world exists. Numbers, files, settings — anything that can be known without looking
-    /// at the map.
-    /// </summary>
     Settings,
 
-    /// <summary>
-    /// After the world is in memory. Anything that has to ask where something is, whether a tile can be
-    /// stood on, which region a point falls in, or what is standing there right now.
-    /// </summary>
     World
 }

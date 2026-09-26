@@ -50,71 +50,38 @@ public sealed class BotListing
 
     public int Id { get; }
 
-    /// <summary>Whose stall it is. Held as a reference, so a deleted bot's stall goes with it.</summary>
     public IBotWilful Seller { get; }
 
     public Type Kind { get; }
 
-    /// <summary>What to call it in a gump. Taken from the first thing listed, never guessed from the type.</summary>
     public string Label { get; }
 
-    /// <summary>The art, so a dashboard can show the thing rather than its name.</summary>
     public int ItemId { get; }
 
     public int Hue { get; }
 
-    /// <summary>Gold per unit, as this bot currently reckons it.</summary>
     public int Price { get; private set; }
 
-    /// <summary>
-    /// What it first asked. Both bounds on price movement are multiples of this, so a run of luck in either
-    /// direction cannot walk the price off the map.
-    /// </summary>
     public int Anchor { get; }
 
-    /// <summary>Units sold over the life of the stall, and what they came to.</summary>
     public int Sold { get; private set; }
 
     public int Earned { get; private set; }
 
-    /// <summary>Whether anything has ever sold here, and when the last one did.</summary>
     public bool Traded { get; private set; }
 
-    /// <summary>
-    /// When somebody last bought from this stall, or when it was opened if nobody ever has.
-    ///
-    /// <para>
-    /// <b>Kept apart from <see cref="TouchedTick"/> because the market was reading the wrong one.</b> Touched
-    /// moves when the seller adds to its own pitch, which is what a bot does every time it comes back from a
-    /// hunt — so a stall nobody buys from, restocked every few minutes by its owner, reads as fresh for ever
-    /// and never falls due for a markdown. On 03.09.2026 a run of two and three quarter hours ended with
-    /// 1902 things listed at 13066gp, 18 prices raised and <em>nought</em> cut, which is the shape of a
-    /// market that cannot lower a price it set wrong.
-    /// </para>
-    /// </summary>
     public long DealtTick { get; private set; }
 
     public long SoldTick { get; private set; }
 
-    /// <summary>When anything last happened to this stall — a sale, a top-up or a price move.</summary>
     public long TouchedTick { get; private set; }
 
-    /// <summary>
-    /// When the stall opened, and it never moves again.
-    ///
-    /// Separate from <see cref="TouchedTick"/> because the two answer different questions and only this one
-    /// answers the useful one. "Has anybody wanted this in half an hour" cannot be asked of a tick that a
-    /// price cut resets — that clock restarts every time the stall gives up a little more, so it is never
-    /// more than one beat old. How long the goods have been on offer is what matters, and that is this.
-    /// </summary>
     public long ListedTick { get; }
 
-    /// <summary>How many times the price has moved, and which way. For the dashboard and the log.</summary>
     public int Raises { get; private set; }
 
     public int Cuts { get; private set; }
 
-    /// <summary>How much is on offer. Counted rather than cached: stacks are mutated in place when sold.</summary>
     public int Amount
     {
         get
@@ -137,13 +104,6 @@ public sealed class BotListing
 
     public bool IsEmpty => Amount <= 0;
 
-    /// <summary>
-    /// One of the things on offer, or null when there are none.
-    ///
-    /// Exists because a shopkeeper can only be asked whether it buys <em>this object</em> — <c>IsSellable</c>
-    /// looks at the item, not the type — so anybody wondering what a stall's goods would fetch over a counter
-    /// needs something to show.
-    /// </summary>
     public Item Sample
     {
         get
@@ -160,13 +120,8 @@ public sealed class BotListing
         }
     }
 
-    /// <summary>What the stall is worth at the asking price.</summary>
     public int Worth => Amount * Price;
 
-    /// <summary>
-    /// Adds goods. The stock list holds whole objects rather than one merged stack, because merging is what
-    /// makes a partial sale need to invent an item — see <see cref="Deliver"/>.
-    /// </summary>
     public void Add(Item item)
     {
         if (item == null || item.Deleted)
@@ -181,17 +136,6 @@ public sealed class BotListing
         TouchedTick = Core.TickCount;
     }
 
-    /// <summary>
-    /// Hands over up to <paramref name="units"/> units into <paramref name="into"/>, and says how many
-    /// actually went. Does not touch money — see <see cref="BotAuction.Buy"/>.
-    ///
-    /// <para>
-    /// Whole objects while they fit and a split for the remainder. The split is the only fiddly part: nothing
-    /// in the engine hands back "half of this stack", so a new one of the same type is made and the original
-    /// is reduced. A type that cannot be made that way — no parameterless constructor — is sold in whole
-    /// objects only, which is the honest fallback rather than a broken sale.
-    /// </para>
-    /// </summary>
     public int Deliver(int units, Container into)
     {
         if (units <= 0 || into == null)
@@ -245,21 +189,6 @@ public sealed class BotListing
         return given;
     }
 
-    /// <summary>
-    /// Takes up to <paramref name="units"/> off the stall and hands them back as one object, or null.
-    ///
-    /// <para>
-    /// <b>The half <see cref="Deliver"/> could not do: a sale with no container to deliver into.</b> A want
-    /// filled off a stall never touches anybody's pack — the market holds the goods on the buyer's behalf
-    /// until it comes for them — so there is nowhere to drop them, and every existing route out of a stall
-    /// wanted somewhere to drop them. See <c>BotAuction.Cross</c>, which is the whole reason this exists.
-    /// </para>
-    ///
-    /// <para>
-    /// Whole objects while they fit and a split for the remainder, exactly as Deliver does it, and for the
-    /// same reason: nothing in the engine hands back half of a stack.
-    /// </para>
-    /// </summary>
     public Item Lift(int units)
     {
         if (units <= 0)
@@ -303,7 +232,6 @@ public sealed class BotListing
         return null;
     }
 
-    /// <summary>Everything left, dropped into a container. For a stall being withdrawn.</summary>
     public int Reclaim(Container into)
     {
         var moved = 0;
@@ -333,15 +261,47 @@ public sealed class BotListing
         return moved;
     }
 
-    /// <summary>Everything left, destroyed. For a world that is being replaced.</summary>
+    public int Return(Mobile owner)
+    {
+        var pack = owner?.Backpack;
+
+        if (pack == null)
+        {
+            return 0;
+        }
+
+        var moved = 0;
+
+        for (var i = _stock.Count - 1; i >= 0; i--)
+        {
+            var item = _stock[i];
+
+            if (item == null || item.Deleted)
+            {
+                _stock.RemoveAt(i);
+
+                continue;
+            }
+
+            if (!pack.TryDropItem(owner, item, false))
+            {
+                break;
+            }
+
+            _stock.RemoveAt(i);
+            moved++;
+        }
+
+        if (moved > 0)
+        {
+            TouchedTick = Core.TickCount;
+        }
+
+        return moved;
+    }
+
     public void Discard() => Reclaim(null);
 
-    /// <summary>
-    /// Notes a sale and returns whether it was brisk enough to be worth putting the price up.
-    ///
-    /// <b>Brisk means "again, soon" rather than "a lot".</b> Volume says how much somebody wanted at the
-    /// price already asked; the gap between two sales is the thing that says the price was too low.
-    /// </summary>
     public bool Note(int units, int gold, int briskMs)
     {
         var now = Core.TickCount;
@@ -357,28 +317,6 @@ public sealed class BotListing
         return brisk;
     }
 
-    /// <summary>Puts the price up, within the bound. Returns whether it actually moved.</summary>
-    /// <summary>
-    /// Moves the price towards what a named buyer is offering, within the same two bounds the beat's own
-    /// cut and raise keep. Returns whether it actually moved.
-    ///
-    /// <para>
-    /// <b>The market's clock walks a price down blindly; this walks it towards a number somebody has
-    /// actually put money behind.</b> Patrick's order of 05.09.2026. Every want on the board carries an
-    /// offer and an escrow, so "what a buyer will pay" is a fact this shard already knows and never used:
-    /// the summary read "1416 wants found the thing on a stall dearer than they would pay" against 200
-    /// crossings, which is a market where both sides are present, funded, and looking past each other. A
-    /// seller that can see the bid can meet it.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>A step towards it rather than a jump onto it</b>, for the reason the beat cuts by a tenth rather
-    /// than to the floor: a seller that matches the first offer it sees has no way back up if the offer was
-    /// a lowball, and a market of instant capitulation prices everything at whatever the poorest buyer
-    /// happens to have. The bounds are the listing's own — a quarter of the opening ask below, four times it
-    /// above — so haggling can never take a price somewhere the beat could not have taken it.
-    /// </para>
-    /// </summary>
     public bool Meet(int offer, double step, double leastMultiple, double mostMultiple)
     {
         if (offer <= 0 || step <= 0.0)
@@ -395,7 +333,6 @@ public sealed class BotListing
             return false;
         }
 
-        // At least a coin, so a step of a tenth on a price of three is a move rather than a rounding.
         var stride = Math.Max(1, (int)(Math.Abs(want - Price) * step));
         var asking = want > Price ? Math.Min(want, Price + stride) : Math.Max(want, Price - stride);
 
@@ -441,14 +378,6 @@ public sealed class BotListing
         return true;
     }
 
-    /// <summary>
-    /// Puts the price down, within the bound. Returns whether it actually moved.
-    ///
-    /// <b>Two floors, and the market's own is the harder of them.</b> A quarter of the opening ask is what
-    /// this stall may fall to; <see cref="BotAuction.Floor"/> is what anything on this market may fall to,
-    /// and a cut that ignored it would walk straight past a rule the listing side enforces. See that field
-    /// for why the number exists at all.
-    /// </summary>
     public bool Cut(double step, double leastMultiple)
     {
         var floor = Math.Max(BotAuction.Floor, (int)(Anchor * leastMultiple));
@@ -471,14 +400,6 @@ public sealed class BotListing
         return true;
     }
 
-    /// <summary>
-    /// Takes <paramref name="units"/> off a stack as a new object, leaving the rest where it was, or null if
-    /// the type cannot be made from nothing.
-    ///
-    /// Public because the demand side needs exactly the same thing for exactly the same reason: a supplier
-    /// delivering a slice of what it carries is a partial stack, and nothing in the engine hands back half of
-    /// one.
-    /// </summary>
     public static Item Portion(Item from, int units)
     {
         if (!from.Stackable || units <= 0 || units >= from.Amount)
@@ -486,17 +407,10 @@ public sealed class BotListing
             return null;
         }
 
-        // The engine's own activator rather than the framework's, and it is not a preference.
-        // <c>Activator.CreateInstance</c> looks for a genuinely parameterless constructor; almost every
-        // stackable in the game declares <c>Foo(int amount = 1)</c> instead, which has none. So the old call
-        // threw for ore, reagents, scrolls and bandages alike, and every one of them was quietly sold in whole
-        // objects only. This one fills optional parameters with <c>Type.Missing</c> and gets the object.
         var made = from.GetType().CreateInstance<Item>();
 
         if (made == null)
         {
-            // A type that cannot be made from nothing after all. Whole objects only, and every caller is
-            // already written to cope with a short delivery.
             return null;
         }
 
@@ -517,8 +431,6 @@ public sealed class BotListing
             return name;
         }
 
-        // The type's own name, spaced out: "IronIngot" reads as "Iron Ingot". Better than a cliloc number a
-        // dashboard cannot render and better than "Unknown".
         var raw = item.GetType().Name;
 
         using var spaced = Server.Text.ValueStringBuilder.Create(raw.Length + 8);

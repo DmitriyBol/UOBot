@@ -42,7 +42,6 @@ public sealed class BotArcher : BotClass
             (SkillName.Healing, 100.0)
         ];
 
-        // A thousandth per point: 3% at the thirty a novice starts with, 10% at a hundred.
         CritChancePerSkill = 0.001;
         CritMultiplier = 3;
 
@@ -50,14 +49,6 @@ public sealed class BotArcher : BotClass
         {
             Ranged = BotArsenal.Bow(100.0),
 
-            // <b>A blade for when the quiver is empty, and its absence was worth measuring.</b> This class
-            // was issued a bow and nothing else, so an archer that ran out of arrows had literally nothing
-            // in its hands that could hurt anything: on the morning of 04.09.2026 five archers between them
-            // failed sixty-seven fights in ten minutes with "100% of it left and not a scratch in 45s",
-            // against a mongbat and an ettin alike — the flat signature of no swing rather than a bad one.
-            // Nobody on this shard fletches, the shopkeepers carry few, and the population was born with
-            // about nineteen hundred arrows between thirteen shooters, so running dry is not an accident,
-            // it is the arithmetic. The warrior-archer beside this class has had a sidearm all along.
             Sidearm = BotArsenal.Sidearm(40.0)
         };
     }

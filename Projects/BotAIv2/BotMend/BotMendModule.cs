@@ -37,10 +37,10 @@ public sealed class BotMendModule : BotModule
         BotWill.Offer(new BotMedic());
         BotWill.Offer(new BotSurgeon());
 
-        // The other half of looking after yourself, and it belongs here rather than with the hunt: a bot
-        // does not have to have gone looking for a fight to be in one. Registered from this module because
-        // this module owns <c>Failing</c>, and a rung whose two answers are handed out by two different
-        // subsystems is a rung that can be half switched off by accident.
+        BotWill.Offer(new BotAttendant());
+
+        BotWill.Offer(new BotHouseCalls());
+
         BotWill.Offer(new BotFugitive());
 
         logger.Information(
@@ -61,7 +61,12 @@ public sealed class BotMendModule : BotModule
     public override void Reset()
     {
         BotMedic.Forget();
+        BotMend.Forget();
         BotSurgeon.Forget();
+        BotAttendant.Forget();
+        BotHouseCalls.Forget();
+        BotSalve.Forget();
+        BotRetainer.Forget();
         BotFugitive.Forget();
     }
 }

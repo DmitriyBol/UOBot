@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Server.Guilds;
 using Server.Mobiles;
 
@@ -32,52 +32,20 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotLand
 {
-    /// <summary>Whether halls make land at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>
-    /// How far a hall's claim reaches, in tiles.
-    ///
-    /// <para>
-    /// Forty. A hall stands somewhere between eighty and a hundred and eighty tiles from home and the halls
-    /// are kept <c>BotPlot.Apart</c> from each other, so forty is a yard a guild can plausibly keep an eye
-    /// on and small enough that the island does not become wholly spoken for. Chebyshev, like every other
-    /// distance on this shard, because that is how a bot walks.
-    /// </para>
-    /// </summary>
     public static int Reach { get; set; } = 40;
 
-    /// <summary>What work on your own guild's ground is worth, as a multiplier.</summary>
     public static double Home { get; set; } = 1.25;
 
-    /// <summary>
-    /// And on another guild's.
-    ///
-    /// <para>
-    /// Seven tenths — a discount a bot will happily ignore for work worth doing, which is the point. It is
-    /// well above the floor the other factors use, because the ground belonging to a neighbour is a much
-    /// weaker objection than a full pack or an empty purse.
-    /// </para>
-    /// </summary>
     public static double Abroad { get; set; } = 0.7;
 
-    /// <summary>Times work was weighed on its own guild's land.</summary>
     public static long AtHome { get; private set; }
 
-    /// <summary>Times work was weighed on somebody else's.</summary>
     public static long Away { get; private set; }
 
-    /// <summary>Times the ground belonged to nobody, which is most of the island.</summary>
     public static long Open { get; private set; }
 
-    /// <summary>
-    /// Which guild claims this ground, or nothing.
-    ///
-    /// <para>
-    /// The nearest hall wins where two claims overlap, so a tile is only ever one guild's and the answer
-    /// does not depend on the order the halls happen to be stored in.
-    /// </para>
-    /// </summary>
     public static string Holder(Map map, Point3D where)
     {
         if (!Running || map == null || map == Map.Internal)
@@ -86,43 +54,37 @@ public static class BotLand
         }
 
         string held = null;
-        var closest = int.MaxValue;
 
-        // <b>Answered as a name, and that is a hot-path decision rather than a stylistic one.</b> The
-        // register is keyed by guild name, so turning a hall into a <c>Guild</c> means a search of the
-        // engine's roll — inside a loop over the halls, inside the appraisal, which runs a few thousand
-        // times a second. A name compares against <c>bot.Guild.Name</c> exactly as well and costs nothing.
-        // See Holding for the times an actual guild is wanted, which are rare and none of them hot.
+        var here = BotQuad.Key(map, where);
+
         foreach (var (name, hall) in BotEstate.Held)
         {
-            if (hall is not { Deleted: false } || hall.Map != map)
+            if (hall is { Deleted: false } && hall.Map == map && BotQuad.Key(map, hall.Location) == here)
             {
-                continue;
+                held = name;
+
+                break;
             }
-
-            var gap = Math.Max(Math.Abs(hall.X - where.X), Math.Abs(hall.Y - where.Y));
-
-            if (gap > Reach || gap >= closest)
-            {
-                continue;
-            }
-
-            held = name;
-            closest = gap;
         }
 
-        return held;
+        if (held == null)
+        {
+            foreach (var (name, post) in BotOutpost.Held)
+            {
+                if (post is { Deleted: false } && post.Map == map && BotQuad.Key(map, post.Location) == here)
+                {
+                    held = name;
+
+                    break;
+                }
+            }
+        }
+
+        return held ?? BotClaim.Owner(map, where);
     }
 
-    /// <summary>The same question when the guild itself is wanted rather than its name. Never on a hot path.</summary>
     public static Guild Holding(Map map, Point3D where) => BaseGuild.FindByName(Holder(map, where)) as Guild;
 
-    /// <summary>
-    /// What this ground does to what a piece of work is worth to this bot.
-    ///
-    /// One on ground nobody claims, which is nearly all of it — so a shard with no halls behaves exactly as
-    /// it did before this existed, and the factor costs nothing until a guild builds.
-    /// </summary>
     public static double Worth(Mobile bot, Map map, Point3D where)
     {
         if (!Running || bot == null)
@@ -151,19 +113,24 @@ public static class BotLand
         return Abroad;
     }
 
-    /// <summary>Whether this bot is standing on ground belonging to a guild that is not its own.</summary>
     public static bool Trespassing(Mobile bot, out string whose)
     {
         whose = bot == null ? null : Holder(bot.Map, bot.Location);
 
-        return whose != null && bot.Guild?.Name != whose;
+        if (whose == null || bot.Guild?.Name == whose)
+        {
+            return false;
+        }
+
+        return !BotRegard.AreAllied(bot.Guild?.Name, whose);
     }
 
     public static string Describe() =>
         !Running
             ? "halls make no land"
             : $"land reaches {Reach} tiles from a hall, worth ×{Home:F2} to its own and ×{Abroad:F2} to anybody else; "
-              + $"{AtHome} pieces of work weighed at home, {Away} on somebody else's ground, {Open} on ground nobody claims";
+              + $"{AtHome} pieces of work weighed at home, {Away} on somebody else's ground, {Open} on ground nobody claims; "
+              + BotClaim.Describe();
 
     public static void Forget()
     {

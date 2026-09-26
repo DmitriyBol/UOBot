@@ -32,43 +32,14 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotSalve : BotDeed
 {
-    /// <summary>The ledger's key. One kind of work whoever the patient is.</summary>
     public const string Trade = "mend";
 
-    /// <summary>
-    /// What mending is reckoned at per minute before experience corrects it.
-    ///
-    /// <para>
-    /// It produces nothing and earns nothing, so everything it is worth is skill — and that is real: a heal
-    /// cast trains Magery and a bandage trains Healing, both by the engine's own check. Thirty puts it above
-    /// an errand to the shops and below every trade, which is the right place for looking after each other on
-    /// a shard where nobody has yet been paid to do it.
-    /// </para>
-    /// </summary>
     public static double Prior { get; set; } = 30.0;
 
-    /// <summary>How long a patch-up is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 1.0;
 
-    /// <summary>How often another attempt is made once one has been begun.</summary>
     public static int TryMs { get; set; } = 1500;
 
-    /// <summary>
-    /// How much more urgent mending is at death's door than at the threshold.
-    ///
-    /// <para>
-    /// <b>Without this there was a band where nobody healed at all.</b> A bot drops onto <c>Failing</c> at
-    /// thirty-five per cent and looks after itself; above seventy it does not want mending; and in between the
-    /// estimate was a flat thirty a minute, which loses to a mining trip at forty-five. So a bot at forty per
-    /// cent went and dug ore.
-    /// </para>
-    ///
-    /// <para>
-    /// Three, meaning a bot on its last legs reckons mending at four times what a barely-scratched one does —
-    /// which beats every trade on the shard, and should. It is the same trick used everywhere here rather than a
-    /// new mechanism: the number is made to reflect the fact instead of a rung being added to carry it.
-    /// </para>
-    /// </summary>
     public static double Urgency { get; set; } = 3.0;
 
     private readonly Mobile _patient;
@@ -93,6 +64,32 @@ public sealed class BotSalve : BotDeed
 
     private long _triedTick;
 
+    private bool _reasoned;
+
+    public static long ForFight { get; private set; }
+
+    public static long ForCalm { get; private set; }
+
+    public static long UnderFire { get; private set; }
+
+    public static long Bare { get; private set; }
+
+    public static long Turned { get; private set; }
+
+    public static string Describe() =>
+        ForFight + ForCalm + UnderFire + Bare == 0
+            ? "no mending has been begun"
+            : $"{ForFight + ForCalm + UnderFire + Bare} mendings begun: {ForFight} by spell for a patient in a fight, {ForCalm} by cloth out of one, {UnderFire} by cloth with the healer under fire, {Bare} with only one means to hand";
+
+    public static void Forget()
+    {
+        ForFight = 0;
+        ForCalm = 0;
+        UnderFire = 0;
+        Bare = 0;
+        Turned = 0;
+    }
+
     public BotSalve(Mobile patient, Map map, bool onSelf, SkillName trains)
     {
         _patient = patient;
@@ -104,16 +101,12 @@ public sealed class BotSalve : BotDeed
 
     public override string Kind => Trade;
 
+    public override bool Summons => true;
+
     public override Map Map => _map;
 
-    public override Point3D Where => _found;
+    public override Point3D Where => _onSelf && _patient is { Deleted: false } ? _patient.Location : _found;
 
-    /// <summary>
-    /// Worth what the wound is worth: the same prior, multiplied by how far past caring the patient is.
-    ///
-    /// Live rather than fixed at proposal, and that is right — a patient that got worse while the healer walked
-    /// is a more urgent job than the one it set out on.
-    /// </summary>
     public override double Expects
     {
         get
@@ -127,17 +120,10 @@ public sealed class BotSalve : BotDeed
 
     public override double Minutes => WorkMinutes;
 
-    /// <summary>
-    /// Magery for a caster, Healing for everybody else, decided by the proposer from what this bot can do.
-    ///
-    /// Named rather than inferred, like every other undertaking's skill — and it is the entire payment for this
-    /// one, which makes getting it right worth a line.
-    /// </summary>
     public override SkillName? Trains => _trains;
 
     public override int Outlay => 0;
 
-    /// <summary>Not a coin either way. Bandages were paid for at a counter long before this.</summary>
     public override double Coin => 0.0;
 
     public override int Made => 0;
@@ -166,15 +152,13 @@ public sealed class BotSalve : BotDeed
             return Ending("the patient is past mending");
         }
 
-        // <b>Arriving to find nobody hurt is not a failure, and calling it one had a price.</b> Ending()
-        // reports Failed whenever nothing was administered — right for a patient who died on the way, wrong
-        // for one who got better — and a failure writes caution against the ground under the trade's name.
-        // So a healer that walked to somebody who recovered, or whom a second healer reached first, was
-        // taught to avoid that spot. The sentence was worse than the ending: "failed at mend — mended" is two
-        // words contradicting each other in six characters.
-        //
-        // Finished, and it took nothing, which the ledger reads as a trade that paid nothing here. That is
-        // the honest signal and it needs no caution to carry it.
+        if (!_onSelf && BotMend.ShunsOutlaws && BotMend.Abetting(body, _patient) is { } crime)
+        {
+            Turned++;
+
+            return BotDoing.Done($"{_patient.Name} is {crime}, and mending it would be a crime");
+        }
+
         if (BotMend.Whole(_patient))
         {
             return _casts + _cloths + _draughts > 0
@@ -182,8 +166,6 @@ public sealed class BotSalve : BotDeed
                 : BotDoing.Done("there was nothing left to mend");
         }
 
-        // A bottle first when it is nearly over, and only then: it is the one mending that works while
-        // something is hitting you, and there are two of them.
         if (_onSelf)
         {
             var bottle = BotMend.Draught(body);
@@ -196,25 +178,41 @@ public sealed class BotSalve : BotDeed
             }
         }
 
-        // <b>Which means decides how close to stand, and standing too close is what stops the means working.</b>
-        // A heal reaches eight tiles; cloth reaches one. Walking to the cloth distance to cast put the healer
-        // inside melee range of whatever was hitting the patient, and a caster that is being hit cannot cast.
-        var cloth = BotMend.UnderFire(bot) || BotMend.Spell(body, _patient) < 0;
+        var spell = BotMend.Spell(body, _patient);
+        var fired = BotMend.UnderFire(bot);
+        var embattled = !fired && BotMend.Embattled(_patient);
+        var hasCloth = BotMend.Cloth(body) > 0;
+        var cloth = fired || spell < 0 || (!embattled && hasCloth);
+
+        if (!_reasoned)
+        {
+            _reasoned = true;
+
+            if (spell < 0 || !hasCloth)
+            {
+                Bare++;
+            }
+            else if (fired)
+            {
+                UnderFire++;
+            }
+            else if (embattled)
+            {
+                ForFight++;
+            }
+            else
+            {
+                ForCalm++;
+            }
+        }
+
         var near = cloth ? BotMend.Touch : BotMend.Cast;
 
         if (!_onSelf && !body.InRange(_patient.Location, near))
         {
-            // Following the patient rather than the place it was standing: hurt things move, usually away
-            // from whatever hurt them.
             return BotDoing.Walk(_map, _patient, BotArrival.Within(near), $"to {_patient.Name}");
         }
 
-        // A cast of <em>ours</em> that has come round to its target. This is the click a bot has no client to
-        // make.
-        //
-        // <b>Guarded by having started one.</b> A cursor on a bot is not necessarily this undertaking's: mining
-        // puts one up to point at rock, and pointing a harvest target at a wounded friend would be this file
-        // reaching into somebody else's work through a field they happen to share.
         if (_awaiting && body.Target != null)
         {
             _awaiting = false;
@@ -227,7 +225,6 @@ public sealed class BotSalve : BotDeed
             return BotDoing.Work("healing");
         }
 
-        // Mid-cast. The engine is holding the delay and movement already knows to stand still for it.
         if (body.Spell != null)
         {
             return BotDoing.Work("casting");
@@ -241,9 +238,6 @@ public sealed class BotSalve : BotDeed
         _tried = true;
         _triedTick = Core.TickCount;
 
-        // <b>Cloth under fire, spell out of it.</b> Not a preference: a blow destroys a cast outright and only
-        // makes a bandage slip. Out of a fight the order is the other way round for three reasons of its own —
-        // two seconds against ten, mana against money, and herbs a caster walks to town for anyway.
         if (BotMend.Winding(body))
         {
             return BotDoing.Work("bandaging");
@@ -258,7 +252,6 @@ public sealed class BotSalve : BotDeed
                 return BotDoing.Work("bandaging");
             }
 
-            // Out of cloth. A cast under fire is mostly wasted, but wasted beats nothing at all.
             var last = BotMend.Spell(body, _patient);
 
             if (last >= 0 && BotMend.Begin(body, last))
@@ -270,8 +263,6 @@ public sealed class BotSalve : BotDeed
         }
         else
         {
-            var spell = BotMend.Spell(body, _patient);
-
             if (spell >= 0 && BotMend.Begin(body, spell))
             {
                 _awaiting = true;
@@ -287,18 +278,9 @@ public sealed class BotSalve : BotDeed
             }
         }
 
-        // No mana, no herbs, no cloth. Ending rather than waiting: what is missing is bought at a counter, and
-        // the errand that does that is somebody else's to offer.
         return Ending("nothing left to mend with");
     }
 
-    /// <summary>
-    /// Over, and never as a failure when something was actually done.
-    ///
-    /// <b>A failure marks the place with caution</b>, and the place a bot mends itself is wherever it was
-    /// standing when it got hurt — usually its own work. Teaching the ledger that the mine is dangerous because
-    /// a bot bandaged itself at the mouth of it would be the mining trip paying for the fight it survived.
-    /// </summary>
     private BotDoing Ending(string why) =>
         _casts + _cloths + _draughts > 0
             ? BotDoing.Done($"{why} after {_casts} casts, {_cloths} bandages and {_draughts} bottles")

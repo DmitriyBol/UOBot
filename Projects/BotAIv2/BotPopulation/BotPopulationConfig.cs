@@ -17,53 +17,28 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotPopulationSettings
 {
-    /// <summary>Which facet, by name — <c>Felucca</c>, <c>Trammel</c> and so on.</summary>
     public string Map { get; set; }
 
-    /// <summary>Where on it, as <c>[x, y, z]</c>.</summary>
     public int[] Home { get; set; }
 
-    /// <summary>
-    /// How many of each class, by the class's own name. Names must match the nine — a typo is reported by
-    /// name at boot rather than quietly producing a smaller population.
-    /// </summary>
     public Dictionary<string, int> Classes { get; set; }
 
-    /// <summary>How far around home bots are scattered when they are born.</summary>
     public int? Spread { get; set; }
 
-    /// <summary>
-    /// Coin every bot is born holding. See <see cref="BotOutfit.Purse"/> for why a population needs a float
-    /// at all.
-    ///
-    /// It lives in this file rather than beside the kit because the kit has no configuration of its own, and
-    /// this is the one file that already ships with real values. That makes it the same small debt the
-    /// market's file owes the mine: a dial that belongs to one subsystem, read by another's file.
-    /// </summary>
     public int? Purse { get; set; }
 
-    /// <summary>
-    /// Whether savings survive a restart along with skills. Off by default — see
-    /// <see cref="BotProgress.Savings"/> for what turning it back on cures and what it hides.
-    /// </summary>
     public bool? KeepEarnings { get; set; }
 
-    /// <summary>How far from home the population may want anything at all.</summary>
     public int? Roam { get; set; }
 
-    /// <summary>How often the population's clock looks at everybody. Not the pace of a bot.</summary>
     public int? BeatMs { get; set; }
 
-    /// <summary>How long a dead bot lies there before it is put back on its feet.</summary>
     public int? ReviveMs { get; set; }
 
-    /// <summary>Whether bots run rather than walk. Sets the beat as well as the pace.</summary>
     public bool? Run { get; set; }
 
-    /// <summary>How far a bot reckons the fight it is in when something hits it.</summary>
     public int? NoticeRange { get; set; }
 
-    /// <summary>How much health a bot needs to count as help in somebody else's fight.</summary>
     public double? FitFraction { get; set; }
 }
 
@@ -74,16 +49,6 @@ public static class BotPopulationConfig
 
     private const string ConfigPath = "Configuration/bot-population.json";
 
-    /// <summary>
-    /// The population a fresh shard gets.
-    ///
-    /// <para>
-    /// Four, and the mix is not arbitrary: two gatherers and a crafter are born with a pickaxe, which is what
-    /// decides who can mine, and mining is the only work that exists yet. The warrior is there precisely
-    /// <em>because</em> it has nothing to do — it is the visible proof that the census's "nothing was worth
-    /// doing" counts a fact about the world and not a broken bot.
-    /// </para>
-    /// </summary>
     private static Dictionary<string, int> StarterMix() =>
         new()
         {
@@ -117,14 +82,10 @@ public static class BotPopulationConfig
         Apply(settings);
     }
 
-    /// <summary>What was read, or the working default where nothing was said.</summary>
     public static IReadOnlyDictionary<string, int> Mix { get; private set; } = StarterMix();
 
     private static void Apply(BotPopulationSettings settings)
     {
-        // TryParse rather than Parse: a facet name out of a configuration file is user input, and Parse
-        // throws on nonsense. A typo in a config file must produce a named complaint and a working shard, not
-        // an exception on the way up.
         Map map = null;
 
         if (!string.IsNullOrWhiteSpace(settings.Map) && !Map.TryParse(settings.Map, null, out map))
@@ -134,8 +95,6 @@ public static class BotPopulationConfig
 
         if (map == null || map == Map.Internal)
         {
-            // Named, because "no bots appeared" is not a diagnosis and "Felucca is not a facet on this shard"
-            // is. Felucca by default: it is where a population that wants a smithy and a bank should live.
             if (!string.IsNullOrWhiteSpace(settings.Map))
             {
                 logger.Error("There is no facet called {Map}; the population falls back to Felucca", settings.Map);

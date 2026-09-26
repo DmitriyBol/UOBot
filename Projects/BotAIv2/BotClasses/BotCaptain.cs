@@ -35,42 +35,24 @@ public sealed class BotCaptain : BotClass
 {
     public override string Name => "Captain";
 
-    /// <summary>
-    /// Ranged, because that is what it opens with and what the standoff arithmetic reads.
-    ///
-    /// The role is a statement about distance rather than about damage, and the captain's answer to distance
-    /// is an archer's until the distance runs out.
-    /// </summary>
     public override BotRole Role => BotRole.Ranged;
 
-    /// <summary>The bow. The sword is equal to it in skill and second to it in order.</summary>
     public override SkillName? MainSkill => SkillName.Archery;
 
-    /// <summary>Calls companies together for places. The one class that may.</summary>
     public override bool Leads => true;
 
-    /// <summary>Born holding its trade rather than starting it. The one class that does.</summary>
     public override bool Seasoned => true;
 
-    /// <summary>Born strong and still with somewhere to go. See BotClass.Seasoning.</summary>
     public override double Seasoning => 0.78;
 
-    /// <summary>Draws steel rather than giving ground. The one class that does.</summary>
     public override bool Closes => true;
 
     protected override void Defaults()
     {
-        // Heavier than an archer and lighter than a brawler: it has to survive the moment it chooses to
-        // stand in, and it has to be able to walk a company across half a map to get there.
         Str = 80;
         Dex = 75;
         Int = 25;
 
-        // <b>Declared in full rather than left to the ladder, and both weapon skills are named here.</b>
-        // Ordinarily a class leaves its weapon skill out and lets the roll settle it — the captain's roll
-        // cannot settle anything, because it is going to hold both. Archery leads because it is what the
-        // fight opens with; the sword is one point behind so that the highest skill, and therefore the
-        // title over its head, is the one it is known for.
         Skills =
         [
             (SkillName.Archery, 100.0),
@@ -84,12 +66,8 @@ public sealed class BotCaptain : BotClass
         {
             Ranged = BotArsenal.Bow(100.0),
 
-            // A broadsword rather than a dagger, at the bow's own standing. This is the line that separates
-            // the captain from the hybrid archer.
             Sidearm = new BotWeaponOption(typeof(Server.Items.Broadsword), SkillName.Swords, 77.0),
 
-            // It expects to be the last one standing in a bad square, and it expects to be patching other
-            // people up on the way home.
             Bandages = 50
         };
     }

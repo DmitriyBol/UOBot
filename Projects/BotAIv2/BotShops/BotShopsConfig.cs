@@ -12,25 +12,18 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotShopsSettings
 {
-    /// <summary>How far around a bot one sweep looks for shopkeepers.</summary>
     public int? Reach { get; set; }
 
-    /// <summary>How near a shopkeeper a bot must stand to trade.</summary>
     public int? CounterReach { get; set; }
 
-    /// <summary>How many shopkeepers the population may remember.</summary>
     public int? MaxShops { get; set; }
 
-    /// <summary>How far below its birth allowance a supply falls before the bot goes shopping.</summary>
     public double? Short { get; set; }
 
-    /// <summary>What a trip to the shops is reckoned at per minute before experience corrects it.</summary>
     public double? Expects { get; set; }
 
-    /// <summary>How long the errand itself is expected to take.</summary>
     public double? WorkMinutes { get; set; }
 
-    /// <summary>How long a stall sits unsold before its owner takes the goods to a shopkeeper.</summary>
     public int? PeddleAfterMs { get; set; }
 }
 

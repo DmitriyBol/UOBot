@@ -31,21 +31,10 @@ public sealed class BotProspect : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotProspect));
 
-    /// <summary>The ledger's key.</summary>
     public const string Trade = "prospect";
 
-    /// <summary>
-    /// What prospecting is reckoned at before the ledger knows better.
-    ///
-    /// <para>
-    /// Low, and deliberately below every craft and every dig: this is what a miner does when there is
-    /// nothing left to dig, not something it does instead of digging. The ledger will mark it up on its own
-    /// if the walks keep ending in rock, because <c>Made</c> below counts the seams found.
-    /// </para>
-    /// </summary>
     public static double Prior { get; set; } = 30.0;
 
-    /// <summary>How long one is expected to take. A long walk and a look round.</summary>
     public static double WorkMinutes { get; set; } = 4.0;
 
     private readonly Map _map;
@@ -75,20 +64,12 @@ public sealed class BotProspect : BotDeed
 
     public override double Minutes => WorkMinutes;
 
-    /// <summary>Nothing is swung, so nothing is trained. The walk is the work.</summary>
     public override SkillName? Trains => null;
 
     public override int Outlay => 0;
 
-    /// <summary>Nothing here is coin, and what it produces is not goods either — it is a place to work.</summary>
     public override double Coin => 0.0;
 
-    /// <summary>
-    /// Seams put on the board, valued at what the ore in one is worth.
-    ///
-    /// So that the ledger can learn that a walk into the mountains pays, which is the only thing that will
-    /// make the second one happen without being told.
-    /// </summary>
     public override int Made => _found * BotOre.WorthSmelting;
 
     public override string Stage =>
@@ -96,7 +77,6 @@ public sealed class BotProspect : BotDeed
             ? $"prospected ({_found} new seams)"
             : $"prospecting out towards ({_where.X}, {_where.Y})";
 
-    /// <summary>The ground out there turned out to be unreachable. Written under the ground's own name.</summary>
     public override bool Bend(IBotWilful bot)
     {
         bot?.Resolve?.Ledger?.Beware(Trade, _map, _where);
@@ -118,9 +98,6 @@ public sealed class BotProspect : BotDeed
             return BotDoing.Walk(_map, _where, BotArrival.Within(BotGround.Reach / 2), $"prospecting towards ({_where.X}, {_where.Y})");
         }
 
-        // Standing where nobody has stood. The sweep is the errand, and it refuses politely if this ground
-        // turns out to have been swept after all — which is why the count below is taken from the board
-        // rather than from what Survey says it did.
         BotGround.Survey(_map, body.Location);
 
         _looked = true;

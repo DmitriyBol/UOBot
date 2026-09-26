@@ -2,7 +2,7 @@
 
 **Read this instead of searching.** `ARCHITECTURE.md` says why the design is the way it is; this file says
 *where things are*, so that a question can be answered by opening one or two files rather than by walking a
-tree of 212 of them. Every table here is a lookup. Nothing here explains a decision.
+tree of 315 of them. Every table here is a lookup. Nothing here explains a decision.
 
 The tables in §2 are generated from each file's own class summary. When a file's purpose changes, its doc
 comment is the thing to change; this file is regenerated from those, never edited row by row.
@@ -27,12 +27,14 @@ generated from the source, for facts.
 | | |
 |---|---|
 | Start | `./start-shard.ps1` from the repo root — hidden, waits until it reports listening |
-| Stop | `taskkill /F /IM ModernUO.exe` |
+| Stop | `do save` through Argus first (a kill without it rolls the world back to the last autosave, up to five minutes of halls and moves), then `taskkill /F /IM ModernUO.exe`. Not while a war stands or a hall is owed a move if the running build is older than 17: until `BotWarStore`, a restart ended every war and forgot every truce |
+| Watch while working | `bash shard-status.sh` — one screen: process, wars with score and clock, blood, halls and seats, work, newest alarms; see `PLAN-wars-and-seats.md` §1 |
 | Log | `logs/session-<yyyy-MM-dd_HH-mm>.log`, one file per start |
 | Port | `127.0.0.1:2593` |
 | Build | `dotnet build ModernUO.slnx -c Release` |
 | Configuration | `Distribution/Configuration/bot-*.json`, one file per subsystem |
 | Watch for trouble | `tail -f logs/alerts.ndjson` — the shard raises its own alarms there, one JSON line each, with an hourly heartbeat so silence can be trusted |
+| Move a guild | `do seat <guild> <x> <y>` through Argus; `do seats` and `do wars` to look |
 | Change a number without restarting | write `dial <Class.Name> <value>` into `Distribution/argus-in.txt`, read `argus-out.txt`; `dials <word>` to find one. All 571 are reachable, journalled to `logs/bot-dials.log`, and lost on restart |
 | Rebuild §2 and `DIALS.md` | `python regen-map.py` from this folder |
 
@@ -40,7 +42,8 @@ Three facts worth having in front of you rather than rediscovering:
 
 **A running shard holds the assemblies.** Building while it runs still *compiles* — it fails only at the copy
 into `Distribution/Assemblies`. So `dotnet build … | grep "error CS"` is a valid syntax check against a live
-shard; `Ошибок: 2` with nothing but `MSB3021`/`MSB3027` means the code is fine and the shard is up.
+shard; `Errors: 2` (localised on a non-English SDK) with nothing but `MSB3021`/`MSB3027` means the code is fine
+and the shard is up.
 
 **Configuration keys are PascalCase and a wrong key is silent.** A lowercase key is not an error and not a
 warning — the value is simply the code default. The only proof of what a dial is actually set to is the boot
@@ -103,6 +106,10 @@ there is.
 | `The captain:` | `BotDrill/BotDrillModule.cs` | `BotDrill`, `BotSchool`, `BotLesson`, `BotAttend`, `BotArmourer` |
 | `The Baron:` | `BotBaron/BotBaronModule.cs` | `BotHarrow`, `BotRounds`, `BotStroll`, `BotStipend` |
 | `Minds:` | `mindedBots/BotMinds.cs` | `BotMind`, `BotMindChoice`, `BotOllama` |
+| `The clock:` | `BotPopulation/BotBeat.cs` | itself, `BotWill.SpentMs`, `BotWalk.SpentMs` — loop milliseconds spent on the population, split into deciding and walking (13.09.2026) |
+| `Wars:` | `BotPopulation/BotBeat.cs` | `BotWar` (the wars standing, their score and rules), `BotSeat` (where each guild lives) — split off `Estate:` on 13.09.2026 |
+| `Resolve:` | `BotWill/BotWill.cs` | itself — commitment: endings by kind, drops by cause (would not wait, summoned, a rung above, a full pack, outbid), offers a hold refused, holds lifted for trouble, work put down and taken up again, trades taken back within ten minutes of being dropped; the same per trade (14.09.2026) |
+| `Roles:` | `BotClasses/BotCalling.cs` | `BotWill.Settle` — each class's working minutes split into its own trade, anybody's work and another class's trade, with the four kinds it spent most on (14.09.2026) |
 
 `Spells ready:` is written once at boot by `BotSpells/BotSpellsModule.cs`, not every five minutes.
 
@@ -114,6 +121,9 @@ Per-bot lines, which are the other half of the log:
 | `X finished <trade>: … — <why>` | `BotWill/BotWill.cs` | a round ended having produced something |
 | `X failed at <trade>: … — <why>` | `BotWill/BotWill.cs` | a round ended having produced nothing; `<why>` is the deed's own words |
 | `over <trade>: <stage> at N/min` | `BotWill/BotWill.cs` | what the winner beat — the runner-up and its price |
+| `; put down <trade> to take up again (<cause> by …)` on a take line | `BotWill/BotWill.cs` | steadfast work paused rather than dropped, because what took the bot off it would not wait |
+| `X took up <trade> again after <other>, Ns after putting it down` | `BotWill/BotWill.cs` | the paused work resumed when the interruption ended |
+| `X dropped <trade>: … — outbid by <other> at N/min after A of B minutes reckoned, taken at T/min and worth W/min by then` | `BotWill/BotWill.cs` | a real change of mind, with the numbers that decided it |
 
 ---
 
@@ -158,6 +168,10 @@ Holds the subsystems, works out what order to start them in, starts them, and sa
 | file | decides |
 |---|---|
 | `BotBeat.cs` | The population's clock. |
+| `BotCharter.cs` | What a guild's maker has told the guild to be doing: a trade to gather at, a trade to make at, and somewhere to be. |
+| `BotGrowth.cs` | Newcomers: a couple of novices raised every two hours, so the island has old hands and beginners at once. |
+| `BotGrowthStore.cs` | Keeps the newcomers across restarts. |
+| `BotGuildWidenStore.cs` | Keeps the guilds' widenings across restarts. |
 | `BotGuilds.cs` | Who each bot belongs to, and what that belonging is worth. |
 | `BotHomeward.cs` | Walking back to where the population lives, when there is nothing else to do and the bot is a long way from it. |
 | `BotMobile.cs` | An autonomous inhabitant of the shard. |
@@ -167,7 +181,11 @@ Holds the subsystems, works out what order to start them in, starts them, and sa
 | `BotProgress.cs` | What a bot has become, kept across restarts: its skills, its fame, its karma and its savings. |
 | `BotPurse.cs` | What a bot keeps in its pocket, and what it puts away the moment it is standing somewhere it can. |
 | `BotReclaim.cs` | Going back for what death took. |
+| `BotRest.cs` | How long a bot plays before it is tired, and the rest it takes before it plays again. |
+| `BotRestStore.cs` | Keeps every bot's play and rest across restarts. |
+| `BotRoster.cs` | Who a guild's leader may put out and who it may take in, and how often. |
 | `BotStall.cs` | Notices a bot that has stopped getting anywhere, and says so as an error. |
+| `BotTidy.cs` | What a bot carries and wears, kept in order: an unidentified thing is identified — off a corpse, in the pack or worn — and the robe the engine dresses a risen body in is taken off. |
 | `BotUnload.cs` | Going to the counter when the pack is getting heavy: coin into the account, everything spare onto the market. |
 
 ### `BotWill/` — the decision
@@ -183,7 +201,9 @@ Every turn a bot asks one question and this answers it. Three stages: the ladder
 | file | decides |
 |---|---|
 | `BotAppraisal.cs` | What a score was made of. |
+| `BotBreaker.cs` | Work one bot keeps failing for the same reason is not offered to that bot for a while. |
 | `BotCommons.cs` | What the population as a whole has found out about what pays where. |
+| `BotCommonsStore.cs` | Keeps what the population has found out about what pays where across restarts. |
 | `BotDeed.cs` | One undertaking: a piece of work with stages, held until it finishes, fails or is dropped. |
 | `BotDoing.cs` | What an undertaking wants of the bot at this moment. |
 | `BotLadder.cs` | Which rung the bot is on, from facts only. |
@@ -211,13 +231,16 @@ Getting a bot from where it is to where the work is. The most expensive part of 
 |---|---|
 | `BotArrival.cs` | What counts as having got there. |
 | `BotAvoid.cs` | Ground a single plan is to keep out of. |
+| `BotBarred.cs` | Ground the population is never to want, however attractive whatever is standing on it. |
 | `BotErrand.cs` | One thing a bot is trying to get to. |
+| `BotFooting.cs` | Tiles a walk has proved nobody can stand at, kept for everybody for half an hour. |
 | `BotJourney.cs` | What a bot is trying to get to, what it has put aside to do first, and the plan it is walking now. |
 | `BotMovementConfig.cs` | What Configuration/bot-movement.json is allowed to say. |
 | `BotMovementModule.cs` | Movement as a module: reads its numbers, lets the population walk, and puts its counters back on a world reload. |
 | `BotPath.cs` | What a search concluded. |
 | `BotReach.cs` | What the reach ledger can say about a journey before anybody searches for it. |
 | `BotRefused.cs` | Places the population could not get to, remembered for everybody and forgotten again when somebody proves otherwise. |
+| `BotRoads.cs` | How far each piece of ground around the population's home lies from it by road, rather than in a straight line. |
 | `BotStep.cs` | One tile, and everything the engine knows about stepping off it. |
 | `BotWalk.cs` | Something standing in the way that can be asked to move. |
 
@@ -236,6 +259,7 @@ Thirteen classes, one file each, plus a registry. A class is **a description and
 | `BotArsenal.cs` | The weapons of the era, named once, each beside the skill that swings it. |
 | `BotBaron.cs` | The one bot on the shard that is not trying to make a living. |
 | `BotBrawler.cs` | Fights with its hands, and is therefore never holding anything it has to put down. |
+| `BotCalling.cs` | Whether a piece of work is this bot's own trade, another class's trade, or anybody's work — what that does to its price, and how the population's working minutes actually divide between the three. |
 | `BotCaptain.cs` | The one bot on the shard that exists for the others rather than for itself. |
 | `BotClass.cs` | What a bot is: its build, what it is born owning, what it may carry, and the one thing it can do that nobody else can. |
 | `BotClassConfig.cs` | What Configuration/bot-classes.json is allowed to say. |
@@ -268,6 +292,7 @@ Turns a class's kit into items actually in a pack, decides what death has no rig
 | `BotBond.cs` | What one bot was given, and therefore what death may not take from it. |
 | `BotBrawlerGloves.cs` | The gloves a brawler fights in. |
 | `BotCasterStaff.cs` | The staff a caster leans on. |
+| `BotChampionSteed.cs` | A champion's steed: a mount of a kind no stable sells, won in the championship. |
 | `BotHarness.cs` | What a bot ought to be wearing, worked out from what this shard can actually make and what it costs. |
 | `BotOutfit.cs` | Turns a class's kit into things a bot is actually holding. |
 | `BotStable.cs` | Buying a horse, and calling it up. |
@@ -316,6 +341,7 @@ Five trades that make things: the smith at a forge, the tailor out of leather or
 | `BotFletcher` | Fletcher | Free | `BotFletch` |
 | `BotSmith` | Smith | Free | `BotForge` |
 | `BotTailor` | Tailor | Free | `BotSew` |
+| `BotTutor` | Tutor | Free | — |
 
 - **Trap.** Crafting is asynchronous: `CraftItem.Craft` starts a timer. Count what the *last* swing produced at the top of the next tick, never after the swing you just made.
 - **Trap.** The engine refuses in silence, because it answers a refusal by sending a message to a screen the bot does not have. Requirements live on the *recipe* (`SetNeedHeat`, `SetNeedOven`, `SetNeedMill`), not on the system's `CanCraft`.
@@ -329,6 +355,7 @@ Five trades that make things: the smith at a forge, the tailor out of leather or
 | `BotBrew.cs` | Brewing: buy the glass if it is short of it, work the mortar, and hand the bottles to whoever put the money down. |
 | `BotCook.cs` | Offers a turn at the skillet to anybody carrying one and some meat. |
 | `BotCraftConfig.cs` | What Configuration/bot-craft.json is allowed to say. |
+| `BotCraftEar.cs` | What the craft system last told each bot, and how often it has said each thing. |
 | `BotCraftModule.cs` | Making things, as a module. |
 | `BotCraftwork.cs` | The part of making things that is the same whatever is being made. |
 | `BotFlask.cs` | Brewing: what a potion is made of, and the swing that makes it. |
@@ -342,6 +369,7 @@ Five trades that make things: the smith at a forge, the tailor out of leather or
 | `BotSmith.cs` | Offers a bot with a hammer and some metal a turn at an anvil, and offers it the board's orders first. |
 | `BotTailor.cs` | Offers the needle to anybody carrying a sewing kit. |
 | `BotThread.cs` | Sewing: what can be made out of cloth, and the swing that makes it. |
+| `BotTutor.cs` | The first steps of a trade, bought from a shopkeeper who knows it — the engine's own teaching, paid for in gold. |
 
 ### `BotHunt/` — the only new gold in the world
 
@@ -358,18 +386,40 @@ Everything else on this shard moves money about; this brings it in. Choosing wha
 
 | file | decides |
 |---|---|
+| `BotAmbush.cs` | The blow struck out of hiding: three swings' worth in one, and the victim stunned where it stands. |
 | `BotBand.cs` | Calling a company together for something one bot cannot take, and seeing it through. |
+| `BotBarrier.cs` | Where walks have stopped getting any nearer, and which way they were heading, so the hunt stops throwing darts past those places. |
+| `BotBurgle.cs` | A bandit breaks into a guild's hall: creeps up hidden, picks the lock of the guild's chest, and carries off a share of what the guild has put by. |
+| `BotFence.cs` | The band's fence: the one member of The Shadow who commits no crime, and keeps its goods and its errands. |
+| `BotFetch.cs` | The fence's run out to the chest for the band's goods. |
 | `BotFreedom.cs` | Getting a prisoner out of a camp and home again. |
 | `BotGlean.cs` | Picking spent ammunition up off the ground. |
+| `BotHoleUp.cs` | The keeper going to ground at the hideout while a price stands on its head. |
 | `BotHuntConfig.cs` | What Configuration/bot-hunt.json is allowed to say. |
 | `BotHuntModule.cs` | Fighting for a living, as a module. |
 | `BotHunter.cs` | Offers a fight to any bot healthy enough to want one. |
+| `BotInquest.cs` | A murdered bot's body found: the finder searches for the killer with Detect Hidden, calls out, and tells the Baron. |
+| `BotLair.cs` | The Shadow's camp at its hideout: a fire at the middle of it and a chest beside the fire that only the band opens. |
+| `BotLawful.cs` | The law-abiding set on a murderer they can take between them. |
+| `BotLieLow.cs` | A murderer getting away from the body and lying low: a dozen tiles off, hidden, not moving, for a few minutes. |
 | `BotMuster.cs` | Offers a bot the chance to call a company against something it must otherwise walk past. |
+| `BotOutlaw.cs` | Who has murdered lately, who is in a cell for it, and the clock that lets both go. |
+| `BotOutlawStore.cs` | Keeps the murderers and the cells across restarts. |
 | `BotPickings.cs` | Going through something this bot killed without meaning to. |
 | `BotPlunder.cs` | Going through a chest, a crate or a barrel standing out in the world. |
 | `BotProwl.cs` | Going to look for a fight, when there is nothing to fight where the bot is standing. |
 | `BotQuarry.cs` | Finding something worth fighting, and finding what it left behind. |
+| `BotQuarter.cs` | What a mark does when a robbery has beaten it down to a quarter of its health. |
+| `BotRaid.cs` | The Baron's raid on The Shadow's hideout, once a caught thief has given it away: the Baron and a posse march there, search it with Detect Hidden, and set on eve |
+| `BotRob.cs` | Setting on one of our own for what is in its pack: kill it, go through the corpse, and go red for it. |
+| `BotShadow.cs` | Hiding, moving unseen and searching for the hidden, as a bot does them: the engine's own three skills, used without a client. |
+| `BotSilence.cs` | The fence's chase after a witness it could not buy: kill it before it gets away, or it tells. |
+| `BotSkulk.cs` | Practising being unseen: hiding again and again where it stands, and once it hides well enough for the engine to allow it, moving a few quiet steps at a time. |
 | `BotSlay.cs` | Close, fight, go through what is left. |
+| `BotStash.cs` | Carrying the takings to the band's chest at the hideout. |
+| `BotUnderworld.cs` | The island's criminal record, and The Shadow: the sixth guild, of thieves and brigands, founded by murderers. |
+| `BotUnderworldStore.cs` | Keeps the island's criminal record and The Shadow across restarts: each bot's murders, robberies and times caught by name, and the guild's members and hideout. |
+| `BotWaylay.cs` | A thief that has thought of robbery and found nobody to rob, going to where the work is and waiting there. |
 
 ### `BotShops/` — buying and selling over a counter
 
@@ -414,6 +464,8 @@ Both sides of trade between bots. A stall is a standing offer of one kind of thi
 | `BotAuction.cs` | The bots' own market. |
 | `BotAuctionConfig.cs` | What Configuration/bot-auction.json is allowed to say. |
 | `BotAuctionModule.cs` | The market as a module: reads how fast bots may change their minds, and starts its own beat. |
+| `BotCity.cs` | The city's treasury: the one purse on the shard that mints coin, and everything the city does is paid from it. |
+| `BotCityStore.cs` | Keeps the city's treasury, its standing orders and its bounties across restarts. |
 | `BotHaggle.cs` | A seller looking at what buyers are offering for what it has out, and moving its price towards them. |
 | `BotListing.cs` | One bot's standing offer of one kind of thing: what it is, how much of it is left, what it is asking, and what it has learned from selling it. |
 | `BotWant.cs` | One bot's standing offer to buy one kind of thing: what it wants, how many, what it is paying, and the money it has already put down. |
@@ -452,7 +504,7 @@ The fight itself belongs to the engine — `Warmode` and `Combatant` are enough,
 | offers work | as | on the rung | handing out |
 |---|---|---|---|
 | `BotFugitive` | Fugitive | Failing | `BotBolt` |
-| `BotRescuer` | Rescuer | Free | `BotRescue`, `BotSlay` |
+| `BotRescuer` | Rescuer | Free | `BotBrawl`, `BotRescue`, `BotSlay` |
 
 - **Trap.** Three separate reasons a bot fails to land a blow on something it is standing next to — no line to it, a shooter that moved too recently, a broken cast — and none of the three says anything in the log unless a counter is put there.
 
@@ -460,7 +512,9 @@ The fight itself belongs to the engine — `Warmode` and `Combatant` are enough,
 |---|---|
 | `BotArms.cs` | Whether a bot has anything in its hands, asked at the moment it matters. |
 | `BotBolt.cs` | Getting away from whatever is killing it. |
+| `BotBrawl.cs` | A fight with one of our own — a duel, a robbery, a manhunt — as a piece of work: close, hit, and stop when told. |
 | `BotCry.cs` | Somebody of ours is being killed and has said so out loud. |
+| `BotDuel.cs` | Two of ours set against each other on purpose, and the rule that says when it is over. |
 | `BotFugitive.cs` | Offers a bot whose health is going the one thing that was missing from that rung: leaving. |
 | `BotPeril.cs` | Where the shard is dangerous, learned from the only two facts that actually say so: where bots are being hit, and where they are dying. |
 | `BotRescue.cs` | Going to somebody's aid, or hitting back at whatever is hitting you. |
@@ -480,10 +534,13 @@ The smallest subsystem here, and the only thing that puts a bot on the `Failing`
 
 | file | decides |
 |---|---|
+| `BotAccompany.cs` | A healer standing by one of ours who is fighting, close enough to bind a wound the moment there is one. |
+| `BotHouseCall.cs` | A healer with nobody to mend going to where our fighters are. |
 | `BotMedic.cs` | Offers a bot the chance to look after itself, and it is the only thing on the rung that says so. |
 | `BotMend.cs` | Mending: what a bot can heal with, who needs it, and the two ways of doing it. |
 | `BotMendConfig.cs` | What Configuration/bot-mend.json is allowed to say. |
 | `BotMendModule.cs` | Looking after each other, as a module. |
+| `BotRetainer.cs` | A fighter with money hiring a healer to stand by it, and the wage that changes hands. |
 | `BotSalve.cs` | Patching somebody up — itself or somebody else, by spell if it can and by cloth if it cannot. |
 | `BotSurgeon.cs` | Offers whoever can mend the worst-hurt bot within sight — itself included — as ordinary work. |
 
@@ -544,7 +601,7 @@ Every other class answers *how does this bot get by*. The Baron answers the one 
 
 | offers work | as | on the rung | handing out |
 |---|---|---|---|
-| `BotHarrower` | Baron | Free | `BotHarrow` |
+| `BotHarrower` | Baron | Free | `BotHarrow`, `BotRaid` |
 | `BotStroll` | Stroll | Free | `BotRounds` |
 
 | file | decides |
@@ -557,6 +614,48 @@ Every other class answers *how does this bot get by*. The Baron answers the one 
 | `BotStipend.cs` | The one purse on this shard that is not earned, and the argument for allowing exactly one. |
 | `BotStroll.cs` | Offers the Baron his own town to walk through. |
 
+### `BotDelve/` — the dungeons
+
+Five bots taken underground by the maker of their guild, for twenty minutes or twenty corpses. The dungeon block has no walkable road from the island, so a party is put down and lifted back out; which dungeon is decided by measuring what lives in each against what the band is worth. What they take is swept into one pot as it fills and divided at the end, half to the leader.
+
+**Module** `BotDelveModule` · **Config** `bot-delve.json` · **Writes** `Delving:`
+
+| offers work | as | on the rung | handing out |
+|---|---|---|---|
+| `BotDelver` | Delver | Free | `BotDelve` |
+
+- **Trap.** A refused road underground is ordinary rather than fatal — a wall between a bot and its place in the line is what a cavern is made of — so `BotDelve.Bend` shrugs it off and moves the party. The first party that ever went down was out again in forty-one seconds without it.
+- **Trap.** A bot left in a dungeon has no road home at all. `BotDelveParty.Watch` is the net under that, and the count of what it lifts out is printed: a backstop doing the ordinary work has become the design.
+
+| file | decides |
+|---|---|
+| `BotDelve.cs` | Five bots taken down a dungeon by the maker of their guild, and kept there for twenty minutes or twenty corpses. |
+| `BotDelveModule.cs` | What Configuration/bot-delve.json may say. |
+| `BotDelveParty.cs` | Five bots underground: what they have taken, whose it is, how many of them may still be put back on their feet, and the promise that every one of them comes home. |
+| `BotDelver.cs` | Offers the maker of a guild a dungeon its band could actually come back out of. |
+| `BotDungeon.cs` | The dungeons of this era: where each one is, what rooms it has, and how hard it is. |
+| `BotHalls.cs` | Which rooms of a dungeon can actually be walked between, found by walking between them. |
+
+### `BotProving/` — Argus's proving ground
+
+A bot's double against a creature in Green Acres, and a guild's company of doubles against a dungeon's worst room: the engine fights, the doubles answer with the bots' own hands, and what comes of it is the strength the delve judges a band by instead of health times weapon damage. Patrick's order of 26.09.2026.
+
+**Module** `BotProvingModule` · **Config** `bot-proving.json` · **Writes** `Proving:`
+
+- **Trap.** A walkover is a lower bound, not a measurement: R is capped at 5 and nothing measured on a lower rung is carried up the ladder at more than the creature it beat, times 0.75. The first boot extrapolated an orcish mage beaten at R 20 into a Balron beaten at R 1.4.
+- **Trap.** A band is as far as its weakest member goes, and a room is not its worst creature one at a time: the delve counts the leader, wants every member at a fifth of the worst, and past the easiest dungeon wants the guild's company to have cleared the worst room lately.
+
+| file | decides |
+|---|---|
+| `BotDriver.cs` | One double's hands in a fight: the bot's own reflexes, beat by beat, against whatever it is set on. |
+| `BotProving.cs` | Argus's proving ground in Green Acres: who is fought against what, what each fight measured, and the strength a bot is judged by once it has been measured. |
+| `BotProvingModule.cs` | What Configuration/bot-proving.json may say. |
+| `BotProvingStore.cs` | Keeps what the proving ground has measured across restarts. |
+| `BotRoomTrial.cs` | A guild's company of doubles against a dungeon's worst room, on the proving ground: whether the band clears it, what it cost, and who fell. |
+| `BotStandIn.cs` | A bot's double for one fight on the proving ground: the same body, build, skills and kit, and nothing that makes it one of the population. |
+| `BotTrial.cs` | What a bot is built of, as far as a fight is concerned: enough to say whether a measurement made last hour still describes it. |
+| `BotWake.cs` | Wakes the ground round the bots the way the engine wakes it round a player. |
+
 ### `BotEstate/` — the guilds' halls
 
 The one thing this population builds that outlives it. A guild levies its members, finds ground the engine will take a house on, raises a hall, and fits it out with the tools of its own trade. Next start the halls are read back out of the world by the name on their signs and handed to whoever leads that guild now.
@@ -566,35 +665,83 @@ The one thing this population builds that outlives it. A guild levies its member
 | offers work | as | on the rung | handing out |
 |---|---|---|---|
 | `BotBailiff` | bailiff | Free | `BotEvict` |
+| `BotFeuder` | feuder | Free | `BotQuarrel` |
 | `BotFitter` | fitter | Free | `BotBench` |
 | `BotHirer` | hirer | Free | `BotHire` |
+| `BotReeve` | Reeve | Free | `BotHarrow` |
 | `BotSteward` | steward | Free | `BotHall` |
 | `BotSupplier` | supplier | Free | `BotSupply` |
+| `BotTollman` | tollman | Free | `BotWard` |
 
 - **Trap.** A house is permanent and a population is not, so an unowned hall decays: `BotEstate.Adopt` is the only thing standing between an evening's building and an empty ruin.
 - **Trap.** The price is a dial rather than the engine's 35,250gp, which no bot on this shard could ever reach. Watch the `short` clause in the summary before moving it.
 
 | file | decides |
 |---|---|
+| `BotAbode.cs` | Houses of the population's own: a bot that has done well buys one, spends its leisure there, and keeps its belongings in a chest by the wall. |
 | `BotBailiff.cs` | Whether anybody is standing on this guild's land who should not be, and who is going to say so. |
 | `BotBench.cs` | Buying one workbench for the guild's hall and setting it up. |
+| `BotChest.cs` | The guild's chest: what the guild's ground earns, and what it pays for before any member's pack is asked. |
+| `BotChestStore.cs` | Keeps the guilds' chests across restarts. |
+| `BotClaim.cs` | What a guild has claimed of the island itself, square by square, and how a claim is won. |
+| `BotClaimStore.cs` | Keeps who owns which square of the island across restarts. |
+| `BotEnlarge.cs` | Moves a guild out of the hall it has filled and into the next size up: new ground proved, the price levied, the old hall taken down with its counter and benches carried across, the bigger one raised. |
 | `BotEstate.cs` | The halls the guilds own: where they stand, who paid for them, and what they hold. |
 | `BotEstateConfig.cs` | What Configuration/bot-estate.json is allowed to say. |
 | `BotEstateModule.cs` | The guilds' halls, as a module. |
 | `BotEvict.cs` | Walking over to somebody working your guild's land and telling them to move along. |
+| `BotExile.cs` | Who won a war, and the debt the loser owes because of it: its hall goes outside the winner's yard. |
+| `BotFeud.cs` | Who each guild at war has called its members onto, and how long the call stands. |
+| `BotFeuder.cs` | Offers a member of a guild at war somebody of the enemy to fight. |
 | `BotFitter.cs` | Who decides the guild can afford its next workbench, and sends somebody to fetch it. |
 | `BotFittings.cs` | What goes inside a hall: a chest, and the guild's own tools of the trade. |
 | `BotHall.cs` | Raising the guild's hall: walk to the plot, call the levy, put the house up. |
+| `BotHallKind.cs` | The sizes a guild's hall comes in, smallest first: what each is, how many members it holds, and what it costs. |
 | `BotHire.cs` | Hiring a merchant for the guild's hall: buy the contract in town, walk it home, and set the shopkeeper up. |
 | `BotHirer.cs` | Whether the guild wants a merchant in its hall, can pay for one, and who is going to fetch it. |
+| `BotHold.cs` | Standing in a square your guild has laid claim to, for as long as the claim takes. |
 | `BotLand.cs` | The ground round a guild's hall, and what belonging to a guild does to work done on it. |
 | `BotOffice.cs` | One guild, one officer, one errand at a time — and the difference between having been offered an errand and actually being on one. |
+| `BotOutpost.cs` | A guild's second house, out on the far edge of its land: where its members rise when they fall nearer to it than to the hall, and a yard of the guild's own out there — land the toll can be charged on. |
 | `BotPlot.cs` | Finding ground a house will actually stand on. |
+| `BotQuarrel.cs` | Closing with a member of a guild yours is at war with, and fighting them. |
+| `BotRally.cs` | Falling in with the guild's war company and fighting with it, as a company, until the company is done. |
+| `BotReeve.cs` | The guild's own company for the guild's own ground. |
 | `BotRegard.cs` | What one guild thinks of another, and the two thresholds that turn an opinion into a war. |
+| `BotRemove.cs` | Carrying a beaten guild's hall out of the winner's yard and putting it down again. |
+| `BotRepose.cs` | Offers a bored bot with a house of its own the walk home, to pass some time there. |
+| `BotSeat.cs` | Where each guild lives: the point its hall is raised near, its members are born at and rise again at, and the place "home" means to them. |
 | `BotShelf.cs` | The guild's own counter: finding the merchant in the hall, putting goods on it, buying off it, and carrying its takings back to the guild. |
 | `BotSteward.cs` | Who decides the guild can afford a hall, and offers to go and raise one. |
 | `BotSupplier.cs` | Whether the guild's counter is short of something its members keep running out of, and who is going to fetch it. |
 | `BotSupply.cs` | Fetching a batch of something the population keeps running out of and leaving it on the guild's own counter, so that the other nine members do not each walk to Britain for it. |
+| `BotToll.cs` | How a guild charges strangers for hunting its land. |
+| `BotTollman.cs` | Sends a fighter of a patrolling guild to a stranger hunting the guild's land, to tell it the hunting there is tolled. |
+| `BotWar.cs` | The wars themselves: which pairs are fighting, what each side has taken off the other, and the rules that begin, end and forbid one. |
+| `BotWarStore.cs` | Keeps the war ledger across restarts: the wars standing, with their clocks, kills and plunder; the truces and the once-a-day declaration clocks; and the halls a lost war still owes a move. |
+| `BotWard.cs` | A warden's walk to a stranger hunting the guild's land, and the sentence that makes the toll owed. |
+
+### `BotQuest/` — the board of errands
+
+What the door and the marshal of events ask of the population, for a price: kill so many of a creature near a place, bring so many of a thing to a place, scout a place. The reward is held by the treasury from the moment of posting and paid to whichever bot does the errand; an errand untaken for two hours lapses and gives the money back. One board instead of a list and a verb for each thing somebody wants done; the marshal who posts on his own lives with the watchers.
+
+**Module** `BotQuestModule` · **Writes** `Quests:`
+
+| offers work | as | on the rung | handing out |
+|---|---|---|---|
+| `BotQuester` | Quester | Free | `BotQuestDeed` |
+
+- **Trap.** An offer is not an errand: the board marks an errand taken in the deed's Taken, never in the proposer, so a bot that loses the auction has not taken anything.
+
+| file | decides |
+|---|---|
+| `BotLairs.cs` | Where a creature lives on the island, read from the spawners that keep it. |
+| `BotQuest.cs` | What an errand on the board asks for. |
+| `BotQuestDeed.cs` | Doing an errand off the board: killing what it names, bringing what it asks, or standing where it points. |
+| `BotQuestModule.cs` | The board of errands as a module: opens the board's clock and offers the errands to the population. |
+| `BotQuestStore.cs` | Keeps the board of errands across restarts, each errand with its count and its held reward; a taker is not kept, so every errand is open again after a boot. |
+| `BotQuester.cs` | Offers a bot the errand on the board that fits it best: a kill to a fighter who is no novice and dares the ground, a delivery to a bot already carrying the goods, a scouting to anybody. |
+| `BotQuests.cs` | The board of errands: what the watchers and the door ask of the population, for a price. |
 
 ### `BotQuad/` — the island as squares
 
@@ -611,6 +758,7 @@ The map cut into squares thirty tiles across, each carrying one number: how safe
 
 | file | decides |
 |---|---|
+| `BotKept.cs` | What the island's spawners keep alive near a place, reckoned as a fight and set beside what the square asks and what a bot brought there — counted and written down, and nothing refused. |
 | `BotMarkers.cs` | Writes what the population knows about the island into the client's own world-map pins. |
 | `BotQuad.cs` | The island cut into squares thirty tiles across, each carrying one number: how safe the population has found it to be. |
 | `BotQuadStore.cs` | Keeps the island's reputation across restarts. |
@@ -652,6 +800,7 @@ The one place the shard speaks first. Six rules are read once a minute, each div
 |---|---|
 | `BotAlarm.cs` | The channel the shard raises its own alarms into: one line of JSON per event in logs/alerts.ndjson, meant to be watched rather than searched. |
 | `BotAlarmModule.cs` | What Configuration/bot-alarm.json may say. |
+| `BotBoot.cs` | The one question asked once, at the boot: did the world come back? Written after five hours on an empty island. |
 | `BotSigns.cs` | The rules that decide when the shard should speak up: read once a minute, each one comparing a number the shard already keeps against a threshold, over a window it names. |
 | `BotTail.cs` | Counts the errors the shard is printing, by reading the tail of its own session log. |
 
@@ -672,6 +821,7 @@ The four crafters — and from 07.09.2026 nobody else — choose what to do next
 |---|---|
 | `BotMind.cs` | One thing a mind chose, and what it turned out to be worth. |
 | `BotMindChoice.cs` | What a mind came back with: one trade, one number it is prepared to be judged on, and its reason. |
+| `BotMindClaims.cs` | Which mind has said it will fill which row of the board, so the others leave it alone. |
 | `BotMindConfig.cs` | What Configuration/bot-mind.json is allowed to say. |
 | `BotMindCore.cs` | The way in, and the whole of this assembly's contact with the rest of the shard. |
 | `BotMindDeed.cs` | A real piece of the shard's work, taken up because a mind asked for it, and measured because a mind predicted something about it. |
@@ -706,9 +856,12 @@ A thinking thing that is not one of the population: an invisible figure that nob
 | `BotDials.cs` | Every tunable number in the bot assemblies, readable and settable while the shard is running. |
 | `BotHail.cs` | The debugger's ear, and the one door in the world through which a person can reach it. |
 | `BotHand.cs` | The debugger's hands: the handful of things a person with an administrator's account would type at a stuck shard, made available to Argus by name, bounded, and written down every single time. |
+| `BotMarshal.cs` | The marshal of events: the fourth of Argus's watchers, who organises rather than diagnoses. |
 | `BotRevel.cs` | Something for the population to do that nobody planned: a bounty, a hunt, a contest. |
+| `BotTourney.cs` | The championship: once a week Argus calls the strongest of the population to a ring, sets them against each other one pair at a time, heals them between fights, and crowns the one left standing. |
 | `BotVigil.cs` | The debugger itself: the body, the watch it keeps, and the two questions it asks. |
 | `BotWatch.cs` | One bot as the debugger has actually seen it: everything here was measured by this file, on this file's own clock, since the moment the debugger first laid eyes on the bot. |
+| `BotWatcher.cs` | One watcher of the squad: a name, a robe, a body, a charge, and what it has said. |
 | `BotWaves.cs` | Something to fight, when the watcher has called a hunt and the island has nothing to offer. |
 <!--SECTION2:END-->
 
@@ -797,6 +950,26 @@ counter. Demand was lopsided fourfold (sulfurous ash was over half of it) while 
 random. The ash ran dry at once; the garlic nobody wanted made up a thousand unsold. **No single number shows
 this.** It appears only when two distributions are laid side by side — what is bought outside against what
 the population itself supplies. Picking the scarcest kind on the stalls took it to 96%.
+
+**A bonus moves the oscillation; it does not remove it.** A reward for the work already under way — inertia, a
+margin, a protection window — only shifts the scores at which two choices trade places, which is Mike Lewis's
+warning in *Game AI Pro 3* and was this shard's two-minute cap: 224 of 734 drops on 14.09.2026 came between 1.95 and
+2.25 minutes in, and four in five went straight back to the same trade. **The symptom is drops piled on a
+boundary.** The cure was not a bigger bonus but a rule about *when* to look again — events, not opportunities — see
+`BotDeed.Steadfast` and `RESEARCH-decisions.md` §2.
+
+**A rule nobody sets reads exactly like a rule that holds.** `BotClass.DefendsOnly` was enforced by `BotHunter` for
+twelve days after the only class that set it was deleted, and healers spent a quarter of their time looking for
+fights under it. A flag read in one file and set in another can lose its setter without a compile error or a log
+line. **Check who sets a safety rule, not only who reads it.**
+
+**Taking the price off a piece of work takes its brake off too.** The auction learns from what work pays, and that
+learning is also what stops a failing errand being chosen again: a trip that fails at nought a minute prices itself
+out within a few reviews. `BotDeed.Unpaid` switches the pricing off and the learning with it, so an unpaid deed repeats
+a failure for as long as its proposer keeps offering it. Restocking was made unpaid on 14.09.2026 so that it would stop
+being refused for costing money; five hours later one bot whose pack had gone past the engine's cap of 125 things
+failed it 8,719 times in half an hour, and the shard's alarm read 11% of work finished. **Every `Unpaid` needs the
+reasons it fails asked before it is offered**, the way `BotYield.Pocket` now asks the one a counter fails on.
 
 **Instrument before you fix.** Both of the entries above were first diagnosed wrong, on theories that were
 plausible and had the shape of defects this project has really had. What settled them was making the sentence

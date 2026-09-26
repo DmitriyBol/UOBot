@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Server.Commands;
 using Server.Logging;
@@ -42,24 +42,15 @@ public static class BotHail
 
         public DateTime When { get; init; }
 
-        /// <summary>Whether this has been put in front of the model at least once.</summary>
         public bool Read { get; set; }
     }
 
-    /// <summary>
-    /// How many notes are kept and recited.
-    ///
-    /// Every one of them stays in the log for ever; this is only how many are carried into the next prompt,
-    /// and it is bounded because a prompt that grows without limit eventually pushes out the measurements
-    /// the note is asking about.
-    /// </summary>
     public static int MostNotes { get; set; } = 10;
 
     private static readonly List<Note> _notes = [];
 
     private static bool _listening;
 
-    /// <summary>How many notes have been left, and how many are still waiting to be looked at.</summary>
     public static int Heard { get; private set; }
 
     public static int Waiting
@@ -90,13 +81,21 @@ public static class BotHail
         _listening = true;
         EventSink.Speech += Said;
 
-        // Registered under the debugger's own name, so it follows a rename, and under a stable word as well
-        // so that somebody who has forgotten what it is called can still find it.
         CommandSystem.Register(BotVigil.Name, AccessLevel.Administrator, Summon);
 
         if (!string.Equals(BotVigil.Name, "debugger", StringComparison.OrdinalIgnoreCase))
         {
             CommandSystem.Register("debugger", AccessLevel.Administrator, Summon);
+        }
+
+        for (var i = 0; i < BotVigil.Helpers.Length; i++)
+        {
+            var helper = BotVigil.Helpers[i];
+
+            if (!string.IsNullOrWhiteSpace(helper) && !string.Equals(helper, BotVigil.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                CommandSystem.Register(helper.Trim(), AccessLevel.Administrator, e => Summon(e, helper.Trim()));
+            }
         }
 
         logger.Information(
@@ -116,7 +115,6 @@ public static class BotHail
         EventSink.Speech -= Said;
     }
 
-    /// <summary>Somebody spoke. Almost always not to the debugger, so this must be cheap to refuse.</summary>
     private static void Said(SpeechEventArgs e)
     {
         var from = e?.Mobile;
@@ -140,8 +138,6 @@ public static class BotHail
 
         _notes.Add(note);
 
-        // And into the long memory, because a question outlives the process it was asked in. A note left at
-        // midnight and a shard restarted at one o'clock used to mean the question had never been asked.
         BotDebugMemory.Ask(from.Name, text);
 
         while (_notes.Count > MostNotes * 2)
@@ -157,18 +153,10 @@ public static class BotHail
 
         logger.Information("{Who} left the debugger a note: {What}", from.Name, text);
 
-        // Answered on the spot and privately. It has no voice in the world — nobody but staff can see it at
-        // all, and a shout from an invisible thing is a message from nowhere.
         from.SendMessage(0x35, $"{BotVigil.Name}: noted. {Answer()}");
         from.SendMessage(0x35, $"{BotVigil.Name}: it is in my log and goes in front of me at my next report.");
     }
 
-    /// <summary>
-    /// Whether this was addressed to the debugger, and what was left once the greeting is taken off.
-    ///
-    /// Two forms, both natural: <c>Hey Argus, ...</c> and <c>Argus, ...</c>. Anything else is somebody
-    /// talking to somebody else.
-    /// </summary>
     private static string Addressed(string said)
     {
         var name = BotVigil.Name;
@@ -191,7 +179,6 @@ public static class BotHail
             return false;
         }
 
-        // The next character has to end the word, or "Argusson" would be talking to it.
         if (said.Length > opening.Length && char.IsLetterOrDigit(said[opening.Length]))
         {
             return false;
@@ -202,16 +189,6 @@ public static class BotHail
         return rest.Length > 0;
     }
 
-    /// <summary>
-    /// What the debugger can say back without asking anything of a model: where it is, what the last
-    /// roll-call found, and when it will next think.
-    ///
-    /// <para>
-    /// It is deliberately not "noted, I will look into it". A person who has just told the watcher something
-    /// wants to know whether the watcher is awake and what it already believes, and both are known here
-    /// without a single token being spent.
-    /// </para>
-    /// </summary>
     private static string Answer()
     {
         var body = BotVigil.Body;
@@ -225,8 +202,6 @@ public static class BotHail
                     : "I have no body this moment"
             );
 
-            // BotVigil.Describe already ends with the roll-call's own line; saying it here as well printed
-            // the same sentence twice in the one answer a person actually reads.
             sb.Append(". ");
             sb.Append(BotVigil.Describe());
 
@@ -238,19 +213,8 @@ public static class BotHail
         }
     }
 
-    /// <summary>
-    /// The notes as the model is shown them, newest last, with the unread ones marked.
-    ///
-    /// <para>
-    /// Read notes are still recited. A person who asked yesterday whether the smith was making anything is
-    /// still owed an answer today, and a note that vanishes the moment it has been seen once turns a standing
-    /// question into a single missed opportunity.
-    /// </para>
-    /// </summary>
     public static string Recite()
     {
-        // Anything still unanswered from before this session comes first: it has been waiting longest and is
-        // the likeliest thing to be forgotten by a watcher whose memory used to end at the restart.
         var standing = Standing();
 
         if (_notes.Count == 0)
@@ -293,7 +257,6 @@ public static class BotHail
         }
     }
 
-    /// <summary>Questions left in earlier sessions that were never put in front of the model.</summary>
     private static string Standing()
     {
         var notes = BotDebugMemory.Notes;
@@ -328,7 +291,6 @@ public static class BotHail
         }
     }
 
-    /// <summary>Everything back to nothing, for a world reload.</summary>
     public static void Reset()
     {
         _notes.Clear();
@@ -337,10 +299,13 @@ public static class BotHail
 
     [Usage("argus [here]")]
     [Description("Goes to the debugger, or with \"here\" brings the debugger to you.")]
-    private static void Summon(CommandEventArgs e)
+    private static void Summon(CommandEventArgs e) => Summon(e, BotVigil.Name);
+
+    private static void Summon(CommandEventArgs e, string name)
     {
         var from = e?.Mobile;
-        var body = BotVigil.Body;
+        var watcher = BotVigil.Called(name);
+        var body = watcher?.Body;
 
         if (from == null)
         {
@@ -349,28 +314,26 @@ public static class BotHail
 
         if (body is not { Deleted: false } || body.Map == null || body.Map == Map.Internal)
         {
-            from.SendMessage(0x22, $"{BotVigil.Name} has no body at the moment, so there is nowhere to go.");
+            from.SendMessage(0x22, $"{name} has no body at the moment, so there is nowhere to go.");
 
             return;
         }
 
-        // "here" brings it to you; anything else takes you to it. Two directions, because half the time the
-        // thing worth looking at is where you are and half the time it is where the debugger went.
         if (e.Length > 0 && e.GetString(0).InsensitiveEquals("here"))
         {
             body.Hover(from.Map, from.Location);
 
-            from.SendMessage(0x35, $"{BotVigil.Name} is beside you. {Answer()}");
+            from.SendMessage(0x35, $"{name} is beside you. {Answer()}");
 
-            BotDebugLog.Write($"{from.Name} called me over to {from.Location.X},{from.Location.Y} in {from.Region?.Name ?? "nowhere"}");
+            BotDebugLog.Write($"{from.Name} called {name} over to {from.Location.X},{from.Location.Y} in {from.Region?.Name ?? "nowhere"}");
 
             return;
         }
 
         from.MoveToWorld(body.Location, body.Map);
 
-        from.SendMessage(0x35, $"{BotVigil.Name} is here. {Answer()}");
+        from.SendMessage(0x35, $"{name} is here. {Answer()}");
 
-        BotDebugLog.Write($"{from.Name} came to look over my shoulder at {body.Location.X},{body.Location.Y}");
+        BotDebugLog.Write($"{from.Name} came to look over {name}'s shoulder at {body.Location.X},{body.Location.Y}");
     }
 }

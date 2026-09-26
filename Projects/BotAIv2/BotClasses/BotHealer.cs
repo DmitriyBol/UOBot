@@ -25,8 +25,23 @@ public sealed class BotHealer : BotClass
 
     public override bool Casts => true;
 
-    /// <summary>Healing, not Magery. Its spells support the trade; the bandages are the trade.</summary>
     public override SkillName? MainSkill => SkillName.Healing;
+
+    public override bool DefendsOnly => Defends;
+
+    public static bool Defends { get; set; } = true;
+
+    private static readonly int[] _bookFirst =
+    [
+        BotArsenal.SpellCure,
+        BotArsenal.SpellProtection,
+        BotArsenal.SpellGreaterHeal,
+        BotArsenal.SpellArchCure,
+        BotArsenal.SpellArchProtection,
+        BotArsenal.SpellResurrection
+    ];
+
+    public override int[] BookFirst => _bookFirst;
 
     protected override void Defaults()
     {
@@ -45,6 +60,8 @@ public sealed class BotHealer : BotClass
 
         NeedsMeditation = true;
 
+        HerbIntervalMs = 1800000;
+
         StaffManaTrickle = 4;
         StaffHue = 0x48F;
 
@@ -52,13 +69,6 @@ public sealed class BotHealer : BotClass
 
         Kit = new BotKit
         {
-            // <b>The robe, which is dress and not armour, and that is why it had to be issued here.</b>
-            // BotHarness surveys the craft systems for BaseArmor and covers six layers, none of them the
-            // outer torso — so a robe cannot enter the catalogue and cannot be ordered from it, whatever a
-            // caster is willing to pay. It stops nothing and is not meant to: this era gives a robe no
-            // armour rating at all. What it is is the one garment that reads as a mage from across a
-            // street, worn from birth and bound like everything else issued, so nobody sells it at a
-            // counter with a full pack.
             Armour = [typeof(Robe)],
             Staff = true,
             Reagents = 30,

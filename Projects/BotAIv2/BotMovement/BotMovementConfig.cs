@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using Server.Json;
 using Server.Logging;
@@ -15,71 +16,67 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotMovementSettings
 {
-    /// <summary>Milliseconds one search may cost before it returns what it has.</summary>
     public double? CeilingMs { get; set; }
 
-    /// <summary>Milliseconds a search still gets when the population's allowance for the second is spent.</summary>
     public double? FloorMs { get; set; }
 
-    /// <summary>Milliseconds of clock a tile of distance is worth.</summary>
     public double? MsPerTile { get; set; }
 
-    /// <summary>Milliseconds the shortest journey still gets.</summary>
     public double? ShortMs { get; set; }
 
-    /// <summary>Milliseconds the whole population may spend searching per second.</summary>
     public double? WindowMs { get; set; }
 
-    /// <summary>How far off the straight line a short search may look.</summary>
     public int? MinMargin { get; set; }
 
-    /// <summary>How far off it a long one may — what it takes to round a lake rather than a building.</summary>
     public int? MaxMargin { get; set; }
 
-    /// <summary>How long a plan is trusted before being drawn again.</summary>
     public int? PlanStaleMs { get; set; }
 
-    /// <summary>How many fruitless attempts at stepping before the journey is given up.</summary>
     public int? StallAttempts { get; set; }
 
-    /// <summary>How many plans in a row with nowhere to walk before the destination is given up.</summary>
     public int? MaxEmptyPlans { get; set; }
 
-    /// <summary>How many plans in a row may fail to bring the errand any closer before it is given up.</summary>
     public int? MaxPlansWithoutCloser { get; set; }
 
-    /// <summary>How long ground that nearly killed a bot stays out of its plans.</summary>
     public int? DangerAvoidMs { get; set; }
 
-    /// <summary>The largest pocket, in tiles, worth proving from the destination's side.</summary>
     public int? EnclosureCells { get; set; }
 
-    /// <summary>Milliseconds one look at the far side of a journey may cost.</summary>
     public double? EnclosureCeilingMs { get; set; }
 
-    /// <summary>The shortest gap between two such looks, across the whole population.</summary>
     public int? EnclosureGapMs { get; set; }
 
-    /// <summary>The largest pocket worth proving around a bot that has been proved stranded.</summary>
     public int? StrandedCells { get; set; }
 
-    /// <summary>Milliseconds that one look may cost.</summary>
     public double? StrandedCeilingMs { get; set; }
 
-    /// <summary>Plans in a row that get no closer before the far side is asked about.</summary>
     public int? PlansBeforeAskingTheFarSide { get; set; }
 
-    /// <summary>How wide a square one refusal of the ground covers.</summary>
     public int? RefusalGrain { get; set; }
 
-    /// <summary>How long one refusal rests a square, before the doubling.</summary>
     public int? RefusalRestMs { get; set; }
 
-    /// <summary>The ceiling on that doubling.</summary>
     public int? MostRefusalRestMs { get; set; }
 
-    /// <summary>Most refused squares remembered at once.</summary>
     public int? MostRefusedPlaces { get; set; }
+
+    public bool? Barring { get; set; }
+
+    public BotBarSettings[] Barred { get; set; }
+}
+
+/// <summary>One rectangle of ground the population may not choose, as a configuration file writes it.</summary>
+public sealed class BotBarSettings
+{
+    public int? X1 { get; set; }
+
+    public int? Y1 { get; set; }
+
+    public int? X2 { get; set; }
+
+    public int? Y2 { get; set; }
+
+    public string Why { get; set; }
 }
 
 /// <summary>Reads the movement file and moves the numbers it names.</summary>
@@ -129,5 +126,31 @@ public static class BotMovementConfig
         BotRefused.RestMs = settings.RefusalRestMs ?? BotRefused.RestMs;
         BotRefused.MostRestMs = settings.MostRefusalRestMs ?? BotRefused.MostRestMs;
         BotRefused.MostPlaces = settings.MostRefusedPlaces ?? BotRefused.MostPlaces;
+        BotBarred.Running = settings.Barring ?? BotBarred.Running;
+
+        if (settings.Barred != null)
+        {
+            List<BotBarred.Bar> bars = [];
+
+            for (var i = 0; i < settings.Barred.Length; i++)
+            {
+                var bar = settings.Barred[i];
+
+                if (bar?.X1 == null || bar.Y1 == null || bar.X2 == null || bar.Y2 == null)
+                {
+                    logger.Warning(
+                        "Barred entry {Index} in {Path} is missing one of X1, Y1, X2, Y2 and is ignored",
+                        i,
+                        ConfigPath
+                    );
+
+                    continue;
+                }
+
+                bars.Add(new BotBarred.Bar(bar.X1.Value, bar.Y1.Value, bar.X2.Value, bar.Y2.Value, bar.Why ?? "no reason given"));
+            }
+
+            BotBarred.Set(bars);
+        }
     }
 }

@@ -29,9 +29,6 @@ public sealed class BotClassModule : BotModule
     {
         BotClassConfig.Load();
 
-        // Every one of these numbers is a claim the nine class files make. A boot that reports two
-        // producers when configuration was meant to add a third is the cheapest place there will ever
-        // be to notice.
         logger.Information(
             "Classes: {Count} — {Melee} melee, {Ranged} ranged, {Casters} caster, {Medics} medic, {Producers} producing; {Casting} of them cast",
             BotClasses.All.Count,

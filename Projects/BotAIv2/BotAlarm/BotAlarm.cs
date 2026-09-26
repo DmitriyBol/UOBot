@@ -45,10 +45,8 @@ public static class BotAlarm
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAlarm));
 
-    /// <summary>How long an alarm that is still true waits before it says so again.</summary>
     public static int RestMs { get; set; } = 900000;
 
-    /// <summary>Longest a single sentence in an event may be, so one line stays one line.</summary>
     public static int MostChars { get; set; } = 400;
 
     private sealed class Held
@@ -66,16 +64,12 @@ public static class BotAlarm
 
     private static bool _broken;
 
-    /// <summary>Events written this session.</summary>
     public static long Written { get; private set; }
 
-    /// <summary>Repeats swallowed because the same alarm was already standing.</summary>
     public static long Swallowed { get; private set; }
 
-    /// <summary>Alarms standing right now.</summary>
     public static int Standing => _up.Count;
 
-    /// <summary>Where the channel is, once it is known.</summary>
     public static string Path => _path;
 
     public static void Open()
@@ -93,8 +87,6 @@ public static class BotAlarm
 
             _path = System.IO.Path.Combine(folder, "alerts.ndjson");
 
-            // Appended to rather than replaced: the file is a record across restarts, and the restarts are
-            // themselves events worth being able to see in it.
             Note("shard", "the shard is up and the channel is open", 0, 0, "-");
 
             logger.Information("The alarm channel is open at {Path}: one line of JSON per event", _path);
@@ -107,14 +99,6 @@ public static class BotAlarm
         }
     }
 
-    /// <summary>
-    /// Raises one alarm, or counts a repeat of one already standing.
-    /// </summary>
-    /// <param name="kind">Short stable key. The same condition must always use the same one.</param>
-    /// <param name="say">One sentence, in the shard's own words, that a person can act on.</param>
-    /// <param name="n">What was counted.</param>
-    /// <param name="of">What it was counted out of. Zero only where there genuinely is no denominator.</param>
-    /// <param name="window">The stretch of time <paramref name="n"/> was counted over, as "5m" or "1h".</param>
     public static void Raise(string kind, string say, long n, long of, string window)
     {
         if (_broken || kind == null)
@@ -148,10 +132,6 @@ public static class BotAlarm
         Write("raised", kind, say, n, of, window, standing);
     }
 
-    /// <summary>
-    /// Says an alarm is over. Silent if it was never up: a clear for something that never happened is an
-    /// event that has to be explained by whoever reads it, and there is nothing to explain.
-    /// </summary>
     public static void Clear(string kind, string say, long n, long of, string window)
     {
         if (_broken || kind == null || !_up.TryGetValue(kind, out var standing))
@@ -164,13 +144,8 @@ public static class BotAlarm
         Write("clear", kind, say, n, of, window, standing);
     }
 
-    /// <summary>Whether this alarm is standing right now.</summary>
     public static bool Up(string kind) => kind != null && _up.ContainsKey(kind);
 
-    /// <summary>
-    /// A one-off event with no beginning and no end — a finding, a restart, a person's remark. Never
-    /// repeated and never cleared, so it needs no key of its own beyond its kind.
-    /// </summary>
     public static void Note(string kind, string say, long n, long of, string window)
     {
         if (_broken)
@@ -181,10 +156,6 @@ public static class BotAlarm
         Write("note", kind, say, n, of, window, null);
     }
 
-    /// <summary>
-    /// The heartbeat: what the channel would say if asked and nothing is wrong. Written on a slow clock by
-    /// <see cref="BotSigns"/>, and the reason quiet can be trusted.
-    /// </summary>
     public static void Alive(string say, long n, long of, string window) => Write("alive", "alive", say, n, of, window, null);
 
     private static void Write(string state, string kind, string say, long n, long of, string window, Held standing)
@@ -220,7 +191,6 @@ public static class BotAlarm
         }
     }
 
-    /// <summary>One line has to stay one line, so the sentence is cut rather than allowed to wrap.</summary>
     private static string Short(string say)
     {
         if (say == null)
@@ -231,10 +201,6 @@ public static class BotAlarm
         return say.Length <= MostChars ? say : say[..MostChars] + "...";
     }
 
-    /// <summary>
-    /// Enough JSON escaping for what is written here, which is the shard's own sentences: quotes,
-    /// backslashes and the control characters a summary line can pick up out of an item name.
-    /// </summary>
     private static string Escape(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -287,13 +253,11 @@ public static class BotAlarm
         return clean.ToString();
     }
 
-    /// <summary>One line for the boot log and the summaries.</summary>
     public static string Describe() =>
         _broken
             ? "the alarm channel is not being written"
             : $"{Written} events written, {_up.Count} alarms standing, {Swallowed} repeats swallowed, at {_path}";
 
-    /// <summary>A world reload is a different world; nothing standing in this one is standing in that one.</summary>
     public static void Forget()
     {
         _up.Clear();

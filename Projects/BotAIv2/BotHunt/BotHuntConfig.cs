@@ -16,52 +16,36 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotHuntSettings
 {
-    /// <summary>How far a hunter looks for something to fight.</summary>
     public int? Reach { get; set; }
 
-    /// <summary>How close something has to be before it is worth putting other work down for.</summary>
     public int? Notice { get; set; }
 
-    /// <summary>How much stronger than itself a bot will deliberately set out after.</summary>
     public double? Daring { get; set; }
 
-    /// <summary>How far a bot looks for a company and for something worth calling one against.</summary>
     public int? MusterReach { get; set; }
 
-    /// <summary>How many others have to be free and able before a company is worth calling.</summary>
     public int? MusterLeast { get; set; }
 
-    /// <summary>What fighting in company is reckoned at per minute before experience corrects it.</summary>
     public double? BandExpects { get; set; }
 
-    /// <summary>How long a company that has nothing to fight is left standing before it is let go.</summary>
     public int? SquadIdleCapMs { get; set; }
 
-    /// <summary>The share of health at which a fight is given up.</summary>
     public double? FleeAt { get; set; }
 
-    /// <summary>The share of health needed before setting out for one.</summary>
     public double? FitAt { get; set; }
 
-    /// <summary>How far from home a square the map calls dangerous may be and still be worth setting out for.</summary>
     public int? FearedReach { get; set; }
 
-    /// <summary>What a fight is reckoned at per minute before experience corrects it.</summary>
     public double? Expects { get; set; }
 
-    /// <summary>How long one hunt is expected to take.</summary>
     public double? WorkMinutes { get; set; }
 
-    /// <summary>How full a pack may get with loot before the rest is left on the corpse.</summary>
     public double? FillFraction { get; set; }
 
-    /// <summary>How near the ground a prowl has to get before the look counts as taken.</summary>
     public int? ProwlArriveWithin { get; set; }
 
-    /// <summary>How long one bot keeps at a quarry whose health will not fall.</summary>
     public int? SlayNoProgressMs { get; set; }
 
-    /// <summary>The ceiling on one solo hunt, walking and fighting together.</summary>
     public int? SlayCapMs { get; set; }
 }
 
