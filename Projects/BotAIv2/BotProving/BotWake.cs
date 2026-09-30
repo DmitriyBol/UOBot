@@ -49,6 +49,10 @@ public static class BotWake
 
     public static long LeftToClients { get; private set; }
 
+    public static long LeftToTour { get; private set; }
+
+    public static bool Needed(Map map, int x, int y) => _needed.ContainsKey((map, x, y));
+
     private static readonly Dictionary<(Map Map, int X, int Y), long> _needed = [];
 
     private static readonly List<(Map Map, int X, int Y)> _expired = [];
@@ -156,6 +160,13 @@ public static class BotWake
                 continue;
             }
 
+            if (BotZoneTour.Adopt(map, x, y))
+            {
+                LeftToTour++;
+
+                continue;
+            }
+
             var sector = map.GetRealSector(x, y);
 
             if (sector.Active)
@@ -168,7 +179,7 @@ public static class BotWake
         _expired.Clear();
     }
 
-    private static bool ClientNear(Map map, int x, int y)
+    public static bool ClientNear(Map map, int x, int y)
     {
         foreach (var state in NetState.Instances)
         {
@@ -258,13 +269,15 @@ public static class BotWake
     public static string Describe() =>
         (Running ? DeepsOnly ? "is on inside dungeons" : "is on everywhere a bot goes" : "is off (the world sleeps wherever no client is)")
         + $": {_needed.Count} sectors held awake now, {Woken} woken and {PutBack} put back to sleep since the boot"
-        + (LeftToClients > 0 ? $", {LeftToClients} left awake for a client" : "");
+        + (LeftToClients > 0 ? $", {LeftToClients} left awake for a client" : "")
+        + (LeftToTour > 0 ? $", {LeftToTour} left awake for the zones' tour" : "");
 
     public static void Forget()
     {
         Woken = 0;
         PutBack = 0;
         LeftToClients = 0;
+        LeftToTour = 0;
     }
 
     private sealed class WakeTimer : Timer

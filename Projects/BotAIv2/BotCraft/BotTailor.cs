@@ -25,6 +25,12 @@ public sealed class BotTailor : IBotProposer
 
     private static bool _saidNoCloth;
 
+    public static long OwnCloth { get; private set; }
+
+    public static bool BuysCloth { get; set; }
+
+    public static long NoBoughtCloth { get; private set; }
+
     private static bool _saidNoSystem;
 
     private static bool _said;
@@ -85,6 +91,25 @@ public sealed class BotTailor : IBotProposer
         if (leather != null)
         {
             return leather;
+        }
+
+        if (BotThread.Amount(body, typeof(Cloth)) >= BotSew.Bolt)
+        {
+            var own = BotThread.Choose(body, typeof(Cloth), BotSew.Bolt);
+
+            if (own != null)
+            {
+                OwnCloth++;
+
+                return new BotSew(map, body.Location, BotThread.Units(own));
+            }
+        }
+
+        if (!BuysCloth)
+        {
+            NoBoughtCloth++;
+
+            return null;
         }
 
         var shop = BotShops.Nearest(bot, typeof(Cloth));
@@ -246,7 +271,8 @@ public sealed class BotTailor : IBotProposer
         Asked == 0
             ? $"nobody has been offered sewing ({NoKit} answers went to bots with no kit)"
             : $"{Asked} asked: {ToOrder} took an order off the board, {ShortOfLeather} passed one over for want of hide, "
-              + $"{OnSpec} sewed on spec, {NoRecipe} had nothing they could sew out of hide, {NoLeather} found no leather anywhere and fell back on cloth";
+              + $"{OnSpec} sewed on spec, {NoRecipe} had nothing they could sew out of hide, {NoLeather} found no leather anywhere and fell back on cloth, "
+              + $"{NoBoughtCloth} refused cloth off a counter for spec work ({OwnCloth} sewed the pack's own)";
 
     public static void Forget()
     {
@@ -260,5 +286,6 @@ public sealed class BotTailor : IBotProposer
         OnSpec = 0;
         NoLeather = 0;
         NoRecipe = 0;
+        NoBoughtCloth = 0;
     }
 }

@@ -69,6 +69,8 @@ public static class BotProvision
 
     private static readonly List<int> _spells = [];
 
+    public static long Cut { get; private set; }
+
     public static bool Fit(Mobile body, out string why) => Check(body, true, out why);
 
     public static bool Short(Mobile body) => !Check(body, false, out _);
@@ -102,6 +104,12 @@ public static class BotProvision
         {
             var need = (int)Math.Ceiling(kit.Bandages * BandageShare);
             var have = pack.GetAmount(typeof(Bandage));
+
+            if (have < need && pack.GetAmount(typeof(Cloth)) > 0)
+            {
+                Cut += BotWeave.Bandages(body, need - have);
+                have = pack.GetAmount(typeof(Bandage));
+            }
 
             if (have < need)
             {
@@ -269,7 +277,15 @@ public static class BotProvision
         }
 
         var paid = 0;
-        var drawn = BotChest.Draw(guild.Name, short0);
+
+        var spare = BotDues.Spare(guild);
+
+        if (spare < short0)
+        {
+            BotDues.Keep(guild, short0, spare);
+        }
+
+        var drawn = BotChest.Draw(guild.Name, Math.Min(short0, spare));
 
         if (drawn > 0)
         {

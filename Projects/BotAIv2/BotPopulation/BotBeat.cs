@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using Server.Logging;
 
@@ -103,7 +103,7 @@ public static class BotBeat
 
         _summaryTick = now;
 
-        logger.Information("Getting about: {Paths}; {Walk}; {Reach}; {Refused}; {Footing}", BotPath.Describe(), BotWalk.Describe(), BotReach.Describe(), BotRefused.Describe(), BotFooting.Describe());
+        logger.Information("Getting about: {Paths}; {Walk}; {Reach}; {Refused}; {Footing}; gates: {Gates}; {Danger}", BotPath.Describe(), BotWalk.Describe(), BotReach.Describe(), BotRefused.Describe(), BotFooting.Describe(), BotGates.Describe(), BotDanger.Describe());
         logger.Information("Navigation: {Tiers}; {Chart}", Server.Engines.Pathing.Tiered.NavigationService.Describe(), BotChart.Describe());
 
         logger.Information("The market: {What}", BotAuction.Describe());
@@ -150,15 +150,31 @@ public static class BotBeat
             BotPopulation.Describe()
         );
 
-        logger.Information("Rest: {Rest}; {Growth}", BotRest.Describe(), BotGrowth.Describe());
+        logger.Information("Rest: {Rest}; {Growth}; inns: {Inns}", BotRest.Describe(), BotGrowth.Describe(), BotInns.Describe());
+
+        logger.Information("Travel: {Towns}; {Roads}; {Travel}; peoples: {Peoples}", BotTowns.Describe(), BotRoadbook.Describe(), BotTraveller.Describe(), BotPeoples.Describe());
+
+        logger.Information("Residences: {What}", BotResidence.Describe());
+
+        logger.Information("Runes: {Runes}", BotRunes.Describe());
+
+        logger.Information("Sea: {Sea}", BotSea.Describe());
 
         logger.Information("Lessons: {Lessons}", BotTutor.Describe());
+
+        logger.Information("Camp: {Camp}", BotCamp.Describe());
 
         logger.Information("Guilds: {What}", BotGuilds.Describe());
 
         logger.Information("Estate: {What}", BotEstate.Describe());
 
+        logger.Information("Treasuries: {What}", BotDues.Describe());
+
+        logger.Information("Houses: {What}", BotGuildHouses.Describe());
+
         logger.Information("Wars: {Wars}; {Seats}", BotWar.Describe(), BotSeat.Describe());
+
+        logger.Information("Diplomacy: {Meetings}; {Towns}; {Watch}", BotParley.Describe(), BotBurgh.Describe(), BotTownWatch.Describe());
 
         logger.Information("The clock: {What}", Describe());
     }
@@ -270,6 +286,11 @@ public static class BotBeat
             BotStall.Look(bot);
 
             bot.DueTick = now + BotWalk.StepDelayMs(bot, bot.Running);
+
+            if (bot.Squad is { } marching && ReferenceEquals(marching.Leader, bot) && marching.Lagging())
+            {
+                bot.DueTick = now + BotWalk.StepDelayMs(bot, false) * Math.Max(1, BotSquad.PacedSteps);
+            }
 
             Turns++;
 

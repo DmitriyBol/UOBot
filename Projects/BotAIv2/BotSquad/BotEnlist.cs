@@ -1,4 +1,5 @@
-﻿using Server.Logging;
+using System;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -72,12 +73,19 @@ public sealed class BotEnlist : BotDeed
 
     private bool _joined;
 
-    public BotEnlist(BotSquad squad, Map map, Point3D where)
+    public BotEnlist(BotSquad squad, Map map, Point3D where) : this(squad, map, where, false)
+    {
+    }
+
+    public BotEnlist(BotSquad squad, Map map, Point3D where, bool levied)
     {
         _squad = squad;
         _map = map;
         _where = where;
+        _pressedIn = levied;
     }
+
+    public static long Released { get; private set; }
 
     public override string Kind => Trade;
 
@@ -101,12 +109,18 @@ public sealed class BotEnlist : BotDeed
 
     public override bool Alongside => true;
 
+    public override bool Resumes => true;
+
+    public override bool Committed => true;
+
     public override bool Pressing(IBotWilful bot) => Standing();
 
     public override string Stage =>
-        _joined
-            ? $"fell in with company {_squad?.Id}"
+        _joined || _pressedIn
+            ? $"with company {_squad?.Id}, {_squad?.Count} of them"
             : $"falling in with company {_squad?.Id}, {_squad?.Count} of them";
+
+    private bool _pressedIn;
 
     public override BotDoing Advance(IBotWilful bot)
     {
@@ -124,16 +138,28 @@ public sealed class BotEnlist : BotDeed
 
         if (!Standing())
         {
-            return _joined
+            return _joined || _pressedIn
                 ? BotDoing.Done("the company broke up")
                 : BotDoing.Failed("the company was gone before it got there");
         }
 
         if (member.Squad != null)
         {
-            return member.Squad == _squad
-                ? Holding(member)
-                : BotDoing.Done("fell in with another company on the way");
+            if (member.Squad == _squad)
+            {
+                _pressedIn = true;
+
+                return Holding(member);
+            }
+
+            return BotDoing.Done("fell in with another company on the way");
+        }
+
+        if (_pressedIn || _joined)
+        {
+            Released++;
+
+            return BotDoing.Done($"company {_squad.Id} went on without it");
         }
 
         var anchor = _squad.Anchor;
@@ -155,10 +181,163 @@ public sealed class BotEnlist : BotDeed
         return BotDoing.Work($"fell in with company {_squad.Id}");
     }
 
-    private BotDoing Holding(IBotSquadMember member) =>
-        member.Squad == null
-            ? BotDoing.Done("the company broke up")
-            : BotDoing.Work($"with company {_squad.Id}, {_squad.Count} of us");
+    private BotDoing Holding(IBotSquadMember member)
+    {
+        if (member.Squad == null)
+        {
+            return BotDoing.Done("the company broke up");
+        }
+
+        if (BotPassage.Steer(member, _squad, out var steered))
+        {
+            return steered;
+        }
+
+        var self = member.Self;
+        var anchor = _squad.Anchor;
+
+        if (_squad.Stance == BotSquadStance.Fighting && _squad.Focus is { Deleted: false, Alive: true } foe
+            && self is { Deleted: false, Alive: true } && foe.Map == self.Map)
+        {
+            _closeTries = 0;
+            _stillUntil = 0;
+
+            var going = member.Journey is { Active: true } road && road.Target != Point3D.Zero
+                        && Math.Max(Math.Abs(road.Target.X - foe.X), Math.Abs(road.Target.Y - foe.Y)) <= BotSquad.PressReach;
+
+            if (going || self.InRange(foe.Location, BotSquad.PressReach))
+            {
+                return BotDoing.Work($"in company {_squad.Id}'s fight with {foe.Name}");
+            }
+
+            if (!ReferenceEquals(_toFight, foe))
+            {
+                _toFight = foe;
+                ToTheFight++;
+            }
+
+            return BotDoing.Walk(_map, foe, BotArrival.Within(BotSquad.PressReach - 2), $"to company {_squad.Id}'s fight with {foe.Name}");
+        }
+
+        if (self is { Deleted: false, Alive: true } && anchor != Point3D.Zero && self.InRange(anchor, CloseUp))
+        {
+            _closeTries = 0;
+            _closeAt = Point3D.Zero;
+        }
+
+        if (self is { Deleted: false, Alive: true } && anchor != Point3D.Zero && !self.InRange(anchor, CloseUp))
+        {
+            var journey = member.Journey;
+            var bound = journey is { Moving: true } && journey.Target != Point3D.Zero
+                && Math.Max(Math.Abs(journey.Target.X - anchor.X), Math.Abs(journey.Target.Y - anchor.Y)) <= CloseUp;
+
+            if (!bound)
+            {
+                var off = Math.Max(Math.Abs(self.X - anchor.X), Math.Abs(self.Y - anchor.Y));
+
+                if (Core.TickCount - _stillUntil < 0)
+                {
+                    return BotDoing.Work($"with company {_squad.Id}, {off} tiles off and no nearer to be had");
+                }
+
+                if (member is BotMobile { LastWalk: BotWalkResult.GaveUp } && off <= HoldNear)
+                {
+                    GaveUpNear++;
+                    HeldNear++;
+                    _closeTries = 0;
+                    _stillUntil = Core.TickCount + HoldStillMs;
+
+                    return BotDoing.Work($"with company {_squad.Id}, {off} tiles off and no nearer to be had");
+                }
+
+                if (Core.TickCount - _closeTick >= CloseTryMs || _closeTries == 0)
+                {
+                    _closeTick = Core.TickCount;
+                    _closeTries++;
+                }
+
+                if (_closeTries >= CloseTries)
+                {
+                    _closeTries = 0;
+
+                    if (off <= HoldNear)
+                    {
+                        HeldNear++;
+                        _stillUntil = Core.TickCount + HoldStillMs;
+
+                        return BotDoing.Work($"with company {_squad.Id}, {off} tiles off and no nearer to be had");
+                    }
+
+                    Unclosed++;
+                    BotSquads.Leave(member);
+
+                    return BotDoing.Failed($"could not close on company {_squad.Id}: {off} tiles off after {CloseTries} walks that came no nearer");
+                }
+
+                ClosedUp++;
+
+                var lead = _squad.Leader?.Self;
+
+                var arrive = CloseUp > 2 ? CloseUp - 2 : 1;
+
+                if (lead is { Deleted: false, Alive: true } && lead.Map == _map && !ReferenceEquals(lead, self))
+                {
+                    var stale = _closeAt != Point3D.Zero && self.InRange(_closeAt, arrive);
+
+                    if (_closeAt == Point3D.Zero || !lead.InRange(_closeAt, CloseUp) || stale)
+                    {
+                        if (stale && lead.InRange(_closeAt, CloseUp))
+                        {
+                            Reaimed++;
+                        }
+
+                        _closeAt = lead.Location;
+                        Repointed++;
+                    }
+
+                    return BotDoing.Walk(_map, _closeAt, BotArrival.Within(arrive), $"closing up on {lead.Name}, company {_squad.Id}");
+                }
+
+                return BotDoing.Walk(_map, anchor, BotArrival.Within(arrive), $"closing up on company {_squad.Id}");
+            }
+        }
+
+        return BotDoing.Work($"with company {_squad.Id}, {_squad.Count} of us");
+    }
+
+    public static long ClosedUp { get; private set; }
+
+    public static long ToTheFight { get; private set; }
+
+    private Mobile _toFight;
+
+    public static int CloseTries { get; set; } = 8;
+
+    public static int HoldNear { get; set; } = 24;
+
+    public static int HoldStillMs { get; set; } = 30000;
+
+    public static long HeldNear { get; private set; }
+
+    public static long GaveUpNear { get; private set; }
+
+    private Point3D _closeAt;
+
+    public static long Repointed { get; private set; }
+
+    public static long Reaimed { get; private set; }
+
+    public static long Unclosed { get; private set; }
+
+    private long _closeTick;
+
+    public static int CloseTryMs { get; set; } = 5000;
+
+    private int _closeTries;
+
+    private long _stillUntil;
+
+    public static int CloseUp { get; set; } = 6;
 
     public override void Drop(IBotWilful bot)
     {
@@ -324,7 +503,7 @@ public sealed class BotEnlister : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a place in a company"
-            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it, {BotEnlist.Ending} passed one over whose fight was nearly won, {BotEnlist.Lonely} passed over a company of one, {BotEnlist.Hostile} passed over the enemy's, {BotEnlist.Unlawful} passed over one whose fight would have made it a criminal, {BotEnlist.Remote} passed over one whose leader stood more than {BotSquads.JoinReach} tiles off";
+            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it, {BotEnlist.Ending} passed one over whose fight was nearly won, {BotEnlist.Lonely} passed over a company of one, {BotEnlist.Hostile} passed over the enemy's, {BotEnlist.Unlawful} passed over one whose fight would have made it a criminal, {BotEnlist.Remote} passed over one whose leader stood more than {BotSquads.JoinReach} tiles off; in the companies, {BotEnlist.ClosedUp} walks to close up ({BotEnlist.Repointed} points set afresh as the leader moved on, {BotEnlist.Reaimed} of them because the member stood at its point still more than {BotEnlist.CloseUp} tiles from the leader), {BotEnlist.ToTheFight} walks to the company's fight rather than to its leader, {BotEnlist.HeldNear} stood near their company for want of a nearer tile ({BotEnlist.GaveUpNear} at once, the walker having given the close-up up) and {BotEnlist.Unclosed} let go for want of any, {BotEnlist.Released} levied members released when their company went on";
 
     public static void Forget()
     {

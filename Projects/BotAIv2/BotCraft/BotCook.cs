@@ -108,7 +108,7 @@ public sealed class BotCook : IBotProposer
             ? $"nobody has been offered the skillet ({NoKit} answers went to bots with none)"
             : $"{Asked} asked to cook: {Offered} put something on, {NoMeat} had no meat worth cooking, "
               + $"{Unskilled} had meat but no recipe their skill would carry, {NoFire} had both and no fire "
-              + $"they could get to (of {BotGround.Hearths.Count} known); {BotOven.Spared} stacks of raw meat "
+              + $"they could get to (of {BotGround.Hearths.Count} known), {BotBake.Hopped} sent on to another fire from a cold or roadless one; {BotOven.Spared} stacks of raw meat "
               + $"kept back off a corpse for their own pan against {BotOven.Sold} sold on past the cap; {BotMeal.Describe()}";
 
     public static void Forget()

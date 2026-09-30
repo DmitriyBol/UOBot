@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Engines.Craft;
 using Server.Items;
@@ -26,6 +26,14 @@ public sealed class BotShopper : IBotProposer
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotShopper));
 
     public static double Short { get; set; } = 0.5;
+
+    public static bool CutsBandages { get; set; } = true;
+
+    public static long AsCloth { get; private set; }
+
+    public static long ScissorsFirst { get; private set; }
+
+    private static bool _cutting;
 
     private static readonly Type[] Reagents =
     [
@@ -175,14 +183,45 @@ public sealed class BotShopper : IBotProposer
             Provisioned++;
         }
 
+        _cutting = false;
+
+        if (wanted == typeof(Bandage) && CutsBandages && ClothCheaper(bot))
+        {
+            if (BotOutfit.Oldest<Scissors>(pack) != null)
+            {
+                wanted = typeof(Cloth);
+                _cutting = true;
+                AsCloth++;
+            }
+            else if (BotShops.Nearest(bot, typeof(Scissors)) != null)
+            {
+                wanted = typeof(Scissors);
+                amount = 1;
+                spare = true;
+                ScissorsFirst++;
+            }
+        }
+
         Fade();
 
         _short.TryGetValue(wanted, out var seen);
         _short[wanted] = seen + 1;
 
         var shop = BotShops.Nearest(bot, wanted);
-        var counter = shop == null ? 0 : BotShops.Price(shop, wanted);
+        var counter = shop == null ? 0 : BotBurgh.Dear(body, shop, BotShops.Price(shop, wanted));
         var stall = BotAuction.Cheapest(wanted, bot);
+
+        var front = BotShopkeep.Beats(bot, wanted, amount, shop, counter, stall, out var frontUnit, out var frontUnits);
+
+        if (front != null)
+        {
+            if (needy)
+            {
+                BotProvision.Fund(body, frontUnit * frontUnits);
+            }
+
+            return Ordered(new BotRestock(front, wanted, frontUnits, frontUnit), band, spare);
+        }
 
         if (stall != null && (counter <= 0 || stall.Price <= counter))
         {
@@ -263,12 +302,37 @@ public sealed class BotShopper : IBotProposer
         return Ordered(new BotRestock(shop, wanted, amount, counter), band, spare);
     }
 
+    private static bool ClothCheaper(IBotWilful bot)
+    {
+        var cloth = BotShops.Nearest(bot, typeof(Cloth));
+
+        if (cloth == null)
+        {
+            return false;
+        }
+
+        var clothPrice = BotShops.Price(cloth, typeof(Cloth));
+
+        if (clothPrice <= 0)
+        {
+            return false;
+        }
+
+        var bandages = BotShops.Nearest(bot, typeof(Bandage));
+        var bandagePrice = bandages == null ? 0 : BotShops.Price(bandages, typeof(Bandage));
+
+        return bandagePrice <= 0 || clothPrice < bandagePrice;
+    }
+
     private static BotDeed Ordered(BotRestock errand, bool band, bool spare)
     {
         if (errand == null)
         {
             return null;
         }
+
+        errand.Cuts = _cutting;
+        _cutting = false;
 
         if (band)
         {
@@ -324,8 +388,8 @@ public sealed class BotShopper : IBotProposer
         Looks == 0
             ? "nobody has been looked at for supplies"
             : $"{Looks} looks for supplies: {Stocked} were short of nothing, {ToCounter} sent to a shopkeeper, "
-              + $"{ToStall} to a cheaper stall, {ToHall} to their own guild's counter ({HallWalled} times it was passed over as out of reach), {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
-              + $"{Spares} trips were for a tool bought again before the last gave out, "
+              + $"{ToStall} to a cheaper stall, {BotShopkeep.ToFront} to a bot's shop by the bank, {ToHall} to their own guild's counter ({HallWalled} times it was passed over as out of reach), {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
+              + $"{Spares} offers were for a tool bought again before the last gave out, {BotRestock.ToolsBound} working tools bound as they were bought, {AsCloth} bandage trips sent for cloth to cut ({BotRestock.CutInto} bandages cut at the counter) and {ScissorsFirst} for scissors first, "
               + $"{Broke} wanted something nobody sells and could not afford one made (the fattest purse among them held {Richest}gp); "
               + $"most often short of {Commonest()} lately";
 
@@ -379,21 +443,6 @@ public sealed class BotShopper : IBotProposer
             }
         }
 
-        for (var i = 0; i < tools.Count; i++)
-        {
-            if (Kept(body, pack, tools[i], out var spent))
-            {
-                continue;
-            }
-
-            wanted = tools[i];
-            amount = 1;
-
-            spare = spent || Trade(klass, tools[i]);
-
-            return true;
-        }
-
         if (Lacking(pack, typeof(Bandage), kit.Bandages, out amount))
         {
             wanted = typeof(Bandage);
@@ -415,6 +464,21 @@ public sealed class BotShopper : IBotProposer
 
             wanted = kind;
             amount = count - held;
+
+            return true;
+        }
+
+        for (var i = 0; i < tools.Count; i++)
+        {
+            if (Kept(body, pack, tools[i], out var spent))
+            {
+                continue;
+            }
+
+            wanted = tools[i];
+            amount = 1;
+
+            spare = spent || Trade(klass, tools[i]) || tools[i] == typeof(Scissors) && Trade(klass, typeof(SewingKit));
 
             return true;
         }

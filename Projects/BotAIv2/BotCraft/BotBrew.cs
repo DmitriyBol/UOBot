@@ -231,6 +231,7 @@ public sealed class BotBrew : BotDeed
         if (have > _had)
         {
             _bottled += have - _had;
+            BotCraftwork.Produced(_potion, have - _had);
             _had = have;
             _made = _bottled * BotFlask.Worth;
         }
@@ -348,7 +349,7 @@ public sealed class BotBrew : BotDeed
                 }
             }
 
-            if (BotAuction.List(bot, stack, BotAuction.Worth(_potion, BotFlask.Worth)) != null)
+            if (BotAuction.List(bot, stack, BotAuction.Worth(_potion, BotFlask.Worth), true, true) != null)
             {
                 listed++;
             }

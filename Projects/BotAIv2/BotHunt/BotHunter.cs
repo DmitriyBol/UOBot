@@ -74,7 +74,6 @@ public sealed class BotHunter : IBotProposer
         var quarry = BotQuarry.Best(body, BotQuarry.Reach);
 
         if (quarry != null
-            && !Utility.InRange(body.Location, quarry.Location, Near)
             && BotThreat.Overrun(body, quarry, BotMobile.NoticeRange))
         {
             BotQuarry.Crowd(quarry);
@@ -104,8 +103,8 @@ public sealed class BotHunter : IBotProposer
         company = false;
 
         var ledger = bot?.Resolve?.Ledger;
-        var home = BotPopulation.Where;
-        var roam = Math.Clamp(BotPopulation.Roam / 2, BotQuarry.Reach, Walkable);
+        var home = BotPopulation.HomeOf(body);
+        var roam = Math.Clamp(BotPopulation.Leash(body) / 2, BotQuarry.Reach, Walkable);
 
         var best = Point3D.Zero;
         var bestPaid = -1.0;
@@ -129,7 +128,13 @@ public sealed class BotHunter : IBotProposer
         var yielding = material == null ? Point3D.Zero : BotQuad.Yielding(map, body.Location, roam, material);
         var bestBoarded = false;
 
-        for (var tries = 0; tries <= Samples + 3; tries++)
+        var mainland = BotGates.Ready ? BotGates.LandOf(map, BotPopulation.Where) : -1;
+        var overWater = mainland >= 0 ? BotGates.NearestMoongate(map, body.Location, mainland, Walkable) : null;
+        var landing = overWater?.To ?? Point3D.Zero;
+
+        var zoned = Zoned(body, map, home, roam);
+
+        for (var tries = 0; tries <= Samples + 4; tries++)
         {
             Point3D where;
 
@@ -171,10 +176,20 @@ public sealed class BotHunter : IBotProposer
 
                 where = yielding;
             }
+            else if (tries == 4)
+            {
+                if (zoned == Point3D.Zero)
+                {
+                    continue;
+                }
+
+                where = zoned;
+            }
             else
             {
-                var x = home.X + Utility.RandomMinMax(-roam, roam);
-                var y = home.Y + Utility.RandomMinMax(-roam, roam);
+                var centre = landing != Point3D.Zero && (tries & 1) == 0 ? landing : home;
+                var x = centre.X + Utility.RandomMinMax(-roam, roam);
+                var y = centre.Y + Utility.RandomMinMax(-roam, roam);
 
                 if (!BotStep.Settle(map, x, y, out var z))
                 {
@@ -189,9 +204,33 @@ public sealed class BotHunter : IBotProposer
                 continue;
             }
 
-            if (!Utility.InRange(body.Location, where, Walkable))
+            if (!BotPopulation.Within(map, where, body))
+            {
+                continue;
+            }
+
+            if (!BotPopulation.Reachable(map, body.Location, where))
+            {
+                continue;
+            }
+
+            var overland = landing != Point3D.Zero && BotGates.LandOf(map, where) == mainland;
+
+            if (overland ? !Utility.InRange(landing, where, Walkable) : !Utility.InRange(body.Location, where, Walkable))
             {
                 Distant++;
+
+                continue;
+            }
+
+            if (overland)
+            {
+                OverWater++;
+            }
+
+            if (BotGates.Ready && !BotGates.Joined(map, body.Location, where))
+            {
+                Unjoined++;
 
                 continue;
             }
@@ -245,6 +284,22 @@ public sealed class BotHunter : IBotProposer
             var dares = BotQuad.Dares(body, map, where);
             var lethal = BotPeril.Overwhelms(map, where, body.Location, BotQuad.Strength(body), out _, count: false);
 
+            if (ReadsZones)
+            {
+                var level = BotZones.LevelAt(map, where.X, where.Y, out _, out var threat);
+
+                if (level == BotZoneLevel.Deadly && !lethal)
+                {
+                    lethal = true;
+                    ZoneDeadly++;
+                }
+                else if (level == BotZoneLevel.Hostile && dares && threat > BotQuad.Strength(body) * ZoneDare)
+                {
+                    dares = false;
+                    ZoneTooStrong++;
+                }
+            }
+
             if (lethal && dares)
             {
                 Deadly++;
@@ -252,6 +307,14 @@ public sealed class BotHunter : IBotProposer
 
             if (lethal || !dares)
             {
+                if (overland)
+                {
+                    Overmatched++;
+                    AbroadTooHard++;
+
+                    continue;
+                }
+
                 var gate = BotPopulation.Gate(map, body.Location, where, counted: false);
 
                 if (!BotQuad.Together(body, map, where, BotMuster.Reach, gate))
@@ -338,6 +401,11 @@ public sealed class BotHunter : IBotProposer
             return quietest;
         }
 
+        if (zoned != Point3D.Zero && best == zoned)
+        {
+            ZoneChosen++;
+        }
+
         return best;
     }
 
@@ -371,7 +439,7 @@ public sealed class BotHunter : IBotProposer
 
     private static Point3D Feared(Mobile body, Map map)
     {
-        var middle = BotQuad.WorstNear(map, BotPopulation.Where, FearedReach);
+        var middle = BotQuad.WorstNear(map, BotPopulation.HomeOf(body), FearedReach);
 
         if (middle == Point2D.Zero || !BotStep.Settle(map, middle.X, middle.Y, out var z))
         {
@@ -515,6 +583,86 @@ public sealed class BotHunter : IBotProposer
 
     public static int FearedReach { get; set; } = 800;
 
+    public static long Unjoined { get; private set; }
+
+    public static bool ReadsZones { get; set; } = true;
+
+    public static double ZoneDare { get; set; } = 1.0;
+
+    public static long ZoneOffered { get; private set; }
+
+    public static long ZoneDeadly { get; private set; }
+
+    public static long ZoneChosen { get; private set; }
+
+    public static long ZoneTooStrong { get; private set; }
+
+    private static Point3D Zoned(Mobile body, Map map, Point3D home, int roam)
+    {
+        if (!ReadsZones || BotZones.State is not { } state || state.Zones.Length == 0)
+        {
+            return Point3D.Zero;
+        }
+
+        var strength = BotQuad.Strength(body);
+        var best = Point3D.Zero;
+        var bestScore = 0.0;
+
+        for (var i = 0; i < state.Zones.Length; i++)
+        {
+            var zone = state.Zones[i];
+
+            if (zone.Water || zone.Live <= 0 || zone.Level == BotZoneLevel.Deadly || zone.Stand == Point3D.Zero)
+            {
+                continue;
+            }
+
+            if (!Utility.InRange(home, zone.Stand, roam))
+            {
+                continue;
+            }
+
+            double quarry;
+            double worth;
+
+            if (zone.Level == BotZoneLevel.Hostile)
+            {
+                if (zone.Threat > strength * ZoneDare)
+                {
+                    continue;
+                }
+
+                quarry = Math.Min(zone.Aggressive, 20);
+                worth = strength > 0.0 ? 0.5 + zone.Threat / strength : 1.0;
+            }
+            else
+            {
+                quarry = Math.Min(zone.Live, 20) * 0.5;
+                worth = 0.5;
+            }
+
+            var away = Math.Max(Math.Abs(zone.Stand.X - body.X), Math.Abs(zone.Stand.Y - body.Y));
+            var score = quarry * worth / (1.0 + away / 150.0);
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = zone.Stand;
+            }
+        }
+
+        if (best != Point3D.Zero)
+        {
+            ZoneOffered++;
+        }
+
+        return best;
+    }
+
+    public static long OverWater { get; private set; }
+
+    public static long AbroadTooHard { get; private set; }
+
     public static int Walkable
     {
         get => _walkable > 0 ? _walkable : Default;
@@ -560,7 +708,7 @@ public sealed class BotHunter : IBotProposer
     public static long Boarded { get; private set; }
 
     public static string Describe() =>
-        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Boarded} picked for a creature the guild's board asks for, {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overmatched} grounds passed over for asking more strength than whoever looked had, {Deadly} grounds where bots had lately died kept to companies, {Green} grounds that had hurt somebody passed over for a novice (main skill under {BotLadder.NoviceSkill:F0}), {Claimed} for somebody already raising a company for them, {Overrun} quarry passed over for the crowd already round it, {Rested} named grounds passed over as resting after refusing somebody and {Darted} sampled ones, {Revisits} for lying where the asker had lately found nothing, {Distant} further from the asker than {Walkable} tiles, which is as far as a road is ever searched for, {Roundabout} whose road from home runs more than {Detour} tiles past the straight line from the asker ({(ReadsRoads ? "passed over" : "only counted")}),{Untrodden} on squares nobody has ever stood in or beside, {BotProwl.Baulked} prowls that stopped getting nearer ({BotProwl.RoadKept} beats kept going along a road that was not closing as the crow flies), {BotProwl.Redarted} of them sent on to ground they could walk to on their own side and {BotProwl.Unredarted} given up for finding none ({BotBarrier.Stops} of their stopping places remembered and {BotBarrier.Behind} grounds passed over for lying beyond them), {BotProwl.Turned} refused a road on the way and sent on to ground on their own side and {BotProwl.Unturned} given up for finding none,{BotProwl.Raised} companies raised for ground one bot could not take, {BotProwl.Unraised} given up for not raising one; {BotSlay.Undaring} of {BotSlay.Begun} hunts begun at a quarry on ground asking more strength than the hunter brought (counted, not refused)";
+        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Boarded} picked for a creature the guild's board asks for, {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overmatched} grounds passed over for asking more strength than whoever looked had, {Deadly} grounds where bots had lately died kept to companies, {Green} grounds that had hurt somebody passed over for a novice (main skill under {BotLadder.NoviceSkill:F0}), {Claimed} for somebody already raising a company for them, {Overrun} quarry passed over for the crowd already round it, {Rested} named grounds passed over as resting after refusing somebody and {Darted} sampled ones, {Revisits} for lying where the asker had lately found nothing, {Distant} further from the asker than {Walkable} tiles, which is as far as a road is ever searched for, {Unjoined} on ground no gate joins to the hunter, {OverWater} weighed over the water beyond a moongate for a hunter living on another land ({AbroadTooHard} of them passed over for asking more than it alone brings), {Roundabout} whose road from home runs more than {Detour} tiles past the straight line from the asker ({(ReadsRoads ? "passed over" : "only counted")}),{Untrodden} on squares nobody has ever stood in or beside, {BotProwl.Baulked} prowls that stopped getting nearer ({BotProwl.RoadKept} beats kept going along a road that was not closing as the crow flies), {BotProwl.Redarted} of them sent on to ground they could walk to on their own side and {BotProwl.Unredarted} given up for finding none ({BotBarrier.Stops} of their stopping places remembered and {BotBarrier.Behind} grounds passed over for lying beyond them), {BotProwl.Turned} refused a road on the way and sent on to ground on their own side and {BotProwl.Unturned} given up for finding none,{BotProwl.Raised} companies raised for ground one bot could not take, {BotProwl.Regathered} that came up short and went to ground they could take instead, {BotProwl.Unraised} given up for raising none they could use anywhere; {BotSlay.Undaring} of {BotSlay.Begun} hunts begun at a quarry on ground asking more strength than the hunter brought (counted, not refused); the zones: {ZoneOffered} zones named as ground the hunter could take and {ZoneChosen} of them chosen, {ZoneDeadly} grounds made lethal for lying in a deadly zone and {ZoneTooStrong} too strong for a zone's fight outweighing the hunter";
 
     public static void Forget()
     {

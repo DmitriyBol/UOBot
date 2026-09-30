@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Items;
@@ -236,7 +236,7 @@ public sealed class BotHarrow : BotDeed
     }
 
     public static string Describe() =>
-        $"{Musters} musters called and {Called} bots called up, {Marches} of them marched, {Undermanned} could not raise the company asked for in {MusterMs / 60000} minutes of calling ({Rested} times the idea was then left alone for {RestMs / 60000} minutes), {Held} bells held while the company fought, {Engaged} looks at a bot already answering to a company or a class passed over, {Unsupplied} without their supplies, {Across} round the far side of something by road from the muster, {Doubled} harrows let go or not offered for a square another already stood on, {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them, {FellBack} times the leader put the harrow down and the company fell back with him, {TookUp} of them taken up again";
+        $"{Musters} musters called and {Called} bots called up ({Pressed} of them pressed to fall in), {Marches} of them marched, {Undermanned} could not raise the company asked for in {MusterMs / 60000} minutes of calling ({Rested} times the idea was then left alone for {RestMs / 60000} minutes), {Held} bells held while the company fought, {Engaged} looks at a bot already answering to a company or a class passed over, {Unsupplied} without their supplies, {Across} round the far side of something by road from the muster, {Doubled} harrows let go or not offered for a square another already stood on, {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them, {FellBack} times the leader put the harrow down and the company fell back with him, {TookUp} of them taken up again";
 
     public override string Kind => Trade;
 
@@ -707,7 +707,27 @@ public sealed class BotHarrow : BotDeed
         return false;
     }
 
-    private static bool Callable(BotMobile other)
+    public static int Supply(Map map, Point3D muster, Mobile caller)
+    {
+        if (map == null || map == Map.Internal || muster == Point3D.Zero)
+        {
+            return 0;
+        }
+
+        var supply = 0;
+
+        foreach (var mobile in map.GetMobilesInRange<Mobile>(muster, Reach))
+        {
+            if (mobile != caller && mobile is BotMobile other && Callable(other, count: false) && Reaches(map, other.Location, muster, count: false))
+            {
+                supply++;
+            }
+        }
+
+        return supply;
+    }
+
+    private static bool Callable(BotMobile other, bool count = true)
     {
         if (other.Squad != null || other is not IBotAlly { AbleToFight: true })
         {
@@ -721,14 +741,20 @@ public sealed class BotHarrow : BotDeed
 
         if (other.Resolve?.Deed is { Alongside: true })
         {
-            Engaged++;
+            if (count)
+            {
+                Engaged++;
+            }
 
             return false;
         }
 
         if (!BotProvision.Fit(other, out _))
         {
-            Unsupplied++;
+            if (count)
+            {
+                Unsupplied++;
+            }
 
             return false;
         }
@@ -962,9 +988,16 @@ public sealed class BotHarrow : BotDeed
             {
                 taken++;
                 Called++;
+
+                if (BotWill.Press(other, new BotEnlist(squad, _map, _muster, true), $"called to {squad.Leader?.Self?.Name ?? "a leader"}'s harrowing"))
+                {
+                    Pressed++;
+                }
             }
         }
     }
+
+    public static long Pressed { get; private set; }
 
     private static int Apart(Mobile a, Mobile b) =>
         Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));

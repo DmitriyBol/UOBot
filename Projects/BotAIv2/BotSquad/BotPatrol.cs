@@ -63,7 +63,7 @@ public sealed class BotPatrol : IBotProposer
             return null;
         }
 
-        if (body is not BotMobile { Class.Leads: true })
+        if (body is not BotMobile { Class.Leads: true } && !(body is BotMobile head && BotGuilds.Leads(head)))
         {
             NotACaptain++;
 
@@ -91,6 +91,15 @@ public sealed class BotPatrol : IBotProposer
             return null;
         }
 
+        if (body is BotMobile { Guild: Server.Guilds.Guild guild } && Clearing(guild.Name, map, body.Location) is var clearing
+            && clearing != Point3D.Zero && Free(body, BotSweep.Reach) >= BotSweep.Least - 1)
+        {
+            Offered++;
+            ForTown++;
+
+            return new BotSweep(map, clearing, BotPeril.Reading(map, clearing));
+        }
+
         var square = BotPeril.Worst(
             map,
             body.Location,
@@ -116,6 +125,29 @@ public sealed class BotPatrol : IBotProposer
         Offered++;
 
         return new BotSweep(map, square, reading);
+    }
+
+    public static long ForTown { get; private set; }
+
+    private static Point3D Clearing(string guild, Map map, Point3D from)
+    {
+        foreach (var standing in BotBurgh.All)
+        {
+            if (standing.Guild != guild || standing.Task is not { Kind: BotTownTask.Kinds.Clear } task || task.Map != map
+                || task.Presence >= BotTownTask.ClearPresence && BotQuad.Safety(map, task.Target) >= task.Goal)
+            {
+                continue;
+            }
+
+            if (!Utility.InRange(from, task.Target, Range) || !BotGates.Joined(map, from, task.Target) || !Reachable(map, from, task.Target))
+            {
+                continue;
+            }
+
+            return task.Target;
+        }
+
+        return Point3D.Zero;
     }
 
     private static bool Reachable(Map map, Point3D from, Point3D square)
@@ -154,7 +186,7 @@ public sealed class BotPatrol : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"no captain has ever been offered a patrol ({NotACaptain} answers went to bots that are not captains)"
-            : $"{Asked} times a captain was asked: {Offered} were offered a square, {Held} were already in a company, {Unfit} were too hurt, {Peaceful} found nowhere dangerous enough, {Sealed} found the worst of it behind something, {TooFewNear} had too few free bots near; {BotSweep.Describe()}; {BotPeril.Describe()}";
+            : $"{Asked} times a captain was asked: {Offered} were offered a square ({ForTown} of them their town's clearing), {Held} were already in a company, {Unfit} were too hurt, {Peaceful} found nowhere dangerous enough, {Sealed} found the worst of it behind something, {TooFewNear} had too few free bots near; {BotSweep.Describe()}; {BotPeril.Describe()}";
 
     public static void Forget()
     {

@@ -76,6 +76,10 @@ public abstract class BotDeed
 
     public virtual bool Steadfast => false;
 
+    public virtual bool ResumesHurt => Foe == null && !Braves;
+
+    public virtual bool Resumes => Steadfast;
+
     public virtual bool Summons => false;
 
     public virtual bool Braves => false;

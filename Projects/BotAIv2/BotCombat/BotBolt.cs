@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -28,6 +29,63 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotBolt : BotDeed
 {
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBolt));
+
+    public static int StuckMs { get; set; } = 4000;
+
+    public static long Shed { get; private set; }
+
+    public static long Stuck { get; private set; }
+
+    private Point3D _lastAt;
+
+    private long _movedTick;
+
+    private bool _saidStuck;
+
+    private bool _saidShed;
+
+    private int _beats;
+
+    private int _walkBeats;
+
+    private int _leastStam = int.MaxValue;
+
+    public static long Fell { get; private set; }
+
+    public static long FellWalking { get; private set; }
+
+    public void Died(Mobile body, Point3D fellAt)
+    {
+        if (body == null || !_started)
+        {
+            return;
+        }
+
+        Fell++;
+
+        if (_walkBeats * 2 > _beats)
+        {
+            FellWalking++;
+        }
+
+        logger.Information(
+            "{Name} died running from ({FromX}, {FromY}) at ({X}, {Y}), {Tiles} tiles in {Seconds}s: {Walked} of {Beats} beats at a walk, stamina at least {Least} of {StamMax}{Mounted}",
+            body.Name,
+            _from.X,
+            _from.Y,
+            fellAt.X,
+            fellAt.Y,
+            Math.Max(Math.Abs(fellAt.X - _from.X), Math.Abs(fellAt.Y - _from.Y)),
+            (Core.TickCount - _begun) / 1000,
+            _walkBeats,
+            _beats,
+            _leastStam == int.MaxValue ? body.Stam : _leastStam,
+            body.StamMax,
+            body.Mounted ? ", mounted" : ""
+        );
+    }
+
     public const string Trade = "flee";
 
     public static double Prior { get; set; } = 2000.0;
@@ -37,6 +95,81 @@ public sealed class BotBolt : BotDeed
     public static int Watch { get; set; } = 14;
 
     public static int Bound { get; set; } = 18;
+
+    public static double VetMs { get; set; } = 6.0;
+
+    public static long Vetoed { get; private set; }
+
+    public static double HelpWeight { get; set; } = 0.75;
+
+    public static int HelpReach { get; set; } = 60;
+
+    public static long TowardAllies { get; private set; }
+
+    public static long TowardHome { get; private set; }
+
+    private static bool Help(Map map, Mobile body, bool under, out int hx, out int hy)
+    {
+        hx = 0;
+        hy = 0;
+
+        if (HelpWeight <= 0.0)
+        {
+            return false;
+        }
+
+        Mobile nearest = null;
+        var nearestAt = int.MaxValue;
+
+        foreach (var mobile in map.GetMobilesInRange<Mobile>(body.Location, HelpReach))
+        {
+            if (mobile == body || mobile is not IBotAlly { AbleToFight: true } || !mobile.Alive)
+            {
+                continue;
+            }
+
+            var at = Math.Max(Math.Abs(mobile.X - body.X), Math.Abs(mobile.Y - body.Y));
+
+            if (at <= 3 || at >= nearestAt)
+            {
+                continue;
+            }
+
+            nearest = mobile;
+            nearestAt = at;
+        }
+
+        int tx, ty;
+
+        if (nearest != null)
+        {
+            tx = nearest.X;
+            ty = nearest.Y;
+            TowardAllies++;
+        }
+        else if (!under)
+        {
+            var home = BotPopulation.HomeOf(body);
+
+            if (home == Point3D.Zero || Math.Max(Math.Abs(home.X - body.X), Math.Abs(home.Y - body.Y)) <= 3)
+            {
+                return false;
+            }
+
+            tx = home.X;
+            ty = home.Y;
+            TowardHome++;
+        }
+        else
+        {
+            return false;
+        }
+
+        hx = Math.Sign(tx - body.X);
+        hy = Math.Sign(ty - body.Y);
+
+        return hx != 0 || hy != 0;
+    }
 
     public static int GiveUpMs { get; set; } = 30000;
 
@@ -69,6 +202,10 @@ public sealed class BotBolt : BotDeed
 
     public override bool Braves => true;
 
+    public override bool Resumes => true;
+
+    public override bool Repeats(BotDeed other) => other is BotBolt;
+
     public override Map Map => _map;
 
     public override Point3D Where => _from;
@@ -87,6 +224,39 @@ public sealed class BotBolt : BotDeed
 
     public override string Stage => _to == Point3D.Zero ? "getting away" : $"getting away to {_to}";
 
+    public static int ClearCalmMs { get; set; } = 4000;
+
+    public static int Pursuit { get; set; } = 24;
+
+    public static long Pursuits { get; private set; }
+
+    private Server.Mobiles.BaseCreature _pursuer;
+
+    private bool Pursued(IBotWilful bot, Mobile body, long now)
+    {
+        _pursuer = null;
+
+        foreach (var creature in body.Map.GetMobilesInRange<Server.Mobiles.BaseCreature>(body.Location, Pursuit))
+        {
+            if (creature is { Deleted: false, Alive: true } && creature.Combatant == body)
+            {
+                _pursuer = creature;
+                Pursuits++;
+
+                return true;
+            }
+        }
+
+        if (bot?.Resolve is { Struck: true } resolve && now - resolve.HurtTick < ClearCalmMs)
+        {
+            Pursuits++;
+
+            return true;
+        }
+
+        return false;
+    }
+
     public override BotDoing Advance(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -102,6 +272,46 @@ public sealed class BotBolt : BotDeed
         {
             _started = true;
             _begun = now;
+            _lastAt = body.Location;
+            _movedTick = now;
+        }
+
+        if (body.Location != _lastAt)
+        {
+            _lastAt = body.Location;
+            _movedTick = now;
+        }
+
+        _beats++;
+
+        if (body is BotMobile { Running: false })
+        {
+            _walkBeats++;
+        }
+
+        if (body.Stam < _leastStam)
+        {
+            _leastStam = body.Stam;
+        }
+
+        if (body is BotMobile { Journey: { } road })
+        {
+            var top = road.Current is { Interruption: true } over ? over.Reason : null;
+
+            if (road.Shed() > 0)
+            {
+                Shed++;
+
+                if (!_saidShed)
+                {
+                    _saidShed = true;
+                    logger.Information(
+                        "{Name} drops its {Top} to run: the walk away had been kept under it",
+                        body.Name,
+                        top ?? "detour"
+                    );
+                }
+            }
         }
 
         body.Combatant = null;
@@ -121,6 +331,11 @@ public sealed class BotBolt : BotDeed
         }
 
         var worst = BotThreat.Strongest(body, Watch);
+
+        if (worst == null && Pursued(bot, body, now))
+        {
+            worst = _pursuer;
+        }
 
         if (worst == null && now - _begun >= _least)
         {
@@ -143,6 +358,33 @@ public sealed class BotBolt : BotDeed
         if (_to == Point3D.Zero)
         {
             return BotDoing.Failed($"cornered by {worst.Name}");
+        }
+
+        if (!_saidStuck && now - _movedTick >= StuckMs)
+        {
+            _saidStuck = true;
+            Stuck++;
+
+            var mobile = body as BotMobile;
+            var queue = mobile?.Journey;
+
+            logger.Information(
+                "{Name} has not taken a step in {Seconds}s of running from {Foe} ({Tiles} tiles off) towards {To}: the walker last said {Walk}, the road's top is {Top} ({Errands} errands), stamina {Stam} of {StamMax} ({Gait}){Spell}{Paralyzed}{Frozen}",
+                body.Name,
+                (now - _movedTick) / 1000,
+                worst?.Name ?? "nothing it can see",
+                worst == null ? -1 : (int)body.GetDistanceToSqrt(worst),
+                _to,
+                mobile?.LastWalk.ToString() ?? "nothing",
+                queue?.Current?.Reason ?? "nothing",
+                queue?.Queued ?? 0,
+                body.Stam,
+                body.StamMax,
+                mobile?.Running == true ? "running" : "walking",
+                body.Spell != null ? ", mid-spell" : "",
+                body.Paralyzed ? ", paralyzed" : "",
+                body.Frozen ? ", frozen" : ""
+            );
         }
 
         return BotDoing.Walk(_map, _to, BotArrival.Within(1), $"away from {worst.Name}");
@@ -185,6 +427,27 @@ public sealed class BotBolt : BotDeed
 
     public static long Bent { get; private set; }
 
+    public static int Clearance { get; set; } = 8;
+
+    public static long Skirted { get; private set; }
+
+    private static bool Occupied(Map map, Mobile body, Point3D landing, Mobile from)
+    {
+        foreach (var creature in map.GetMobilesInRange<Server.Mobiles.BaseCreature>(landing, Clearance))
+        {
+            if (creature is { Deleted: false, Alive: true } && !ReferenceEquals(creature, from) && BotThreat.Menacing(body, creature))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static string Describe() =>
+        $"{Fell} flights ended in death ({FellWalking} of them mostly at a walk), {Shed} fleeing bots' detours dropped from the road away, {Stuck} flights {StuckMs / 1000}s without a step, {Pursuits} beats a flight went on past Watch for a blow still landing or a pursuer still coming, {Bent} flights turned another way after a refused road, {Skirted} legs taken a lesser way for something else hostile at the better one's end (within {Clearance}), {Vetoed} retreats refused by the look ahead ({VetMs:F0} ms) before anybody walked, {Tended} bandages and bottles taken on the run, "
+        + $"{TowardAllies} retreats bent towards allies and {TowardHome} towards home (×{HelpWeight:F2})";
+
     public static long Tended { get; private set; }
 
     public static Point3D Retreat(Map map, Mobile body, Mobile from) => Retreat(map, body, from, null);
@@ -208,16 +471,17 @@ public sealed class BotBolt : BotDeed
         if (step > 0)
         {
             var under = BotDungeon.Under(body.Location);
+            var helped = Help(map, body, under, out var hx, out var hy);
 
-            var best = Point3D.Zero;
-            var bestScore = 0;
+            Span<(int Score, Point3D Back)> ways = stackalloc (int, Point3D)[_ways.Length];
+            var found = 0;
 
             for (var i = 0; i < _ways.Length; i++)
             {
                 var (wx, wy) = _ways[i];
                 var score = wx * dx + wy * dy;
 
-                if (score <= 0 || score <= bestScore)
+                if (score <= 0)
                 {
                     continue;
                 }
@@ -237,18 +501,53 @@ public sealed class BotBolt : BotDeed
                     continue;
                 }
 
-                if (under ? !BotDungeon.Under(back) : !BotPopulation.Within(map, back) || BotBarred.Barred(map, back))
+                if (under ? !BotDungeon.Under(back) : !BotPopulation.Within(map, back) && BotPopulation.Within(map, body.Location) || BotBarred.Barred(map, back))
                 {
                     continue;
                 }
 
-                best = back;
-                bestScore = score;
+                var rank = (int)(1000.0 * (score / (double)step + (helped ? HelpWeight * (wx * hx + wy * hy) : 0.0)));
+                var at = found;
+
+                while (at > 0 && ways[at - 1].Score < rank)
+                {
+                    ways[at] = ways[at - 1];
+                    at--;
+                }
+
+                ways[at] = (rank, back);
+                found++;
             }
 
-            if (best != Point3D.Zero)
+            var skirting = false;
+
+            for (var pass = 0; pass < 2; pass++)
             {
-                return best;
+                for (var i = 0; i < found; i++)
+                {
+                    var back = ways[i].Back;
+
+                    if (pass == 0 && Occupied(map, body, back, from))
+                    {
+                        skirting = true;
+
+                        continue;
+                    }
+
+                    if (VetMs > 0.0 && !BotPath.CanReach(map, body.Location, back, BotArrival.Within(1), VetMs))
+                    {
+                        Vetoed++;
+
+                        continue;
+                    }
+
+                    if (pass == 0 && skirting)
+                    {
+                        Skirted++;
+                    }
+
+                    return back;
+                }
             }
 
             if (under)
@@ -264,7 +563,7 @@ public sealed class BotBolt : BotDeed
 
     private static Point3D Homeward(Map map, Mobile body)
     {
-        var home = BotPopulation.Where;
+        var home = BotPopulation.HomeOf(body);
         var dx = home.X - body.X;
         var dy = home.Y - body.Y;
         var step = Math.Max(Math.Abs(dx), Math.Abs(dy));

@@ -107,6 +107,16 @@ public sealed class BotSew : BotDeed
         _need = Math.Max(1, need);
     }
 
+    public BotSew(Map map, Point3D where, int need)
+    {
+        _stuff = typeof(Cloth);
+        _map = map;
+        _where = where;
+        _price = 1;
+        _take = 0;
+        _need = Math.Max(1, need);
+    }
+
     public BotSew(Map map, Point3D where, BotListing stall, int price, int take, int need)
         : this(map, where, stall, price, take, need, null)
     {
@@ -308,6 +318,7 @@ public sealed class BotSew : BotDeed
             have += BotCraftwork.Bonus(body, _kind);
 
             _pieces += have - _had;
+            BotCraftwork.Produced(_kind, have - _had);
             _had = have;
             _made = _pieces * _worth;
         }

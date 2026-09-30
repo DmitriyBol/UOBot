@@ -108,6 +108,12 @@ public static class BotRest
         public double OwedHours;
 
         public long CallOverTick;
+
+        public string Inn;
+
+        public int Paid;
+
+        public DateTime BuffUntil;
     }
 
     private static readonly Dictionary<string, Record> _records = new(StringComparer.OrdinalIgnoreCase);
@@ -383,7 +389,7 @@ public static class BotRest
                 continue;
             }
 
-            record.PlayedMinutes += minutes;
+            record.PlayedMinutes = Math.Max(0.0, record.PlayedMinutes + BotCamp.Played(bot, minutes, record.Hours));
 
             var over = record.PlayedMinutes - record.Hours * 60;
 
@@ -453,7 +459,23 @@ public static class BotRest
 
             if (held == null)
             {
+                if (BotCamp.Beds(bot))
+                {
+                    Leave(bot, record, null);
+                    continue;
+                }
+
                 if (BotRepose.HomeToRest(bot))
+                {
+                    continue;
+                }
+
+                if (BotInns.ToInn(bot, RestHours(record)))
+                {
+                    continue;
+                }
+
+                if (BotCamp.ToFire(bot))
                 {
                     continue;
                 }
@@ -634,23 +656,59 @@ public static class BotRest
         bot.LogoutLocation = where;
         bot.LogoutMap = map;
 
+        var inn = BotInns.Settle(bot, out var paid);
+        var from = inn?.Name;
+
+        if (inn == null && BotAbode.Of(bot) is { Deleted: false } house && house.Map == map && house.IsInside(bot))
+        {
+            from = "its own house";
+            paid = 1;
+            BotInns.NotedAtHome();
+        }
+
+        var fire = inn == null && from == null ? BotCamp.Settle(bot) : null;
+
+        if (fire != null)
+        {
+            from = fire;
+        }
+
+        record.Inn = from;
+        record.Paid = paid;
+
         BotPopulation.Park(bot);
         bot.Internalize();
 
         Left++;
 
         logger.Information(
-            "{Name} the {Class}, {Kind}, leaves the world at {Where} after {Played:0.0}h of play{How} and rests {Rest:0.0}h, back about {Back:HH:mm}",
+            "{Name} the {Class}, {Kind}, leaves the world at {Where}{Inn} after {Played:0.0}h of play{How} and rests {Rest:0.0}h, back about {Back:HH:mm}",
             bot.Name,
             bot.Class?.Name,
             KindName(record),
             where,
+            from == null ? " on the open ground" : fire != null ? $" by {fire}, unpaid" : inn == null ? " in its own house" : paid > 0 ? $" in {inn.Name}, a bed paid for at {paid}gp" : $" in {inn.Name}, the bed unpaid",
             played,
             (called == null ? "" : $", the fight {called} called it back for being over")
             + (letGoOf == null ? "" : $", let go of what held it an hour ({letGoOf})"),
             rest,
             record.RestUntil.ToLocalTime()
         );
+    }
+
+    private static double RestHours(Record record)
+    {
+        if (record == null)
+        {
+            return LeastRestHours;
+        }
+
+        if (record.CalledBy != null)
+        {
+            return Math.Max(CalledLeastRestHours, record.OwedHours);
+        }
+
+        return (LeastRestHours + MostRestHours) / 2.0;
     }
 
     private static void Return(BotMobile bot, Record record, string call = null)
@@ -677,14 +735,39 @@ public static class BotRest
             ReturnedHome++;
         }
 
+        var buff = "";
+
+        if (record is { Paid: > 0, Inn: not null } && call == null && rested > 0.0)
+        {
+            BotInns.Rested(bot, rested, out var until);
+            record.BuffUntil = until;
+            buff = $", rested well at {record.Inn}: regenerating until {until.ToLocalTime():HH:mm}";
+        }
+        else if (call == null && rested > 0.0 && BotCamp.Rested(bot, record?.Inn, rested, out var fireUntil))
+        {
+            record.BuffUntil = fireUntil;
+            buff = $", rested by {record.Inn}: regenerating until {fireUntil.ToLocalTime():HH:mm}";
+        }
+        else if (record is { BuffUntil: var kept } && kept > Core.Now)
+        {
+            bot.WellRestedUntil = kept;
+        }
+
+        if (record != null)
+        {
+            record.Inn = null;
+            record.Paid = 0;
+        }
+
         logger.Information(
-            "{Name} the {Class} is back after {Rested:0.0}h of rest, at {Where}{Home}{Call}",
+            "{Name} the {Class} is back after {Rested:0.0}h of rest, at {Where}{Home}{Call}{Buff}",
             bot.Name,
             bot.Class?.Name,
             rested,
             bot.Location,
             own ? "" : " (the ground it left would not take a body, so at home)",
-            call == null ? "" : $" - {call}"
+            call == null ? "" : $" - {call}",
+            buff
         );
     }
 
@@ -770,7 +853,9 @@ public static class BotRest
             return null;
         }
 
-        return $"resting, back about {record.RestUntil.ToLocalTime():HH:mm}";
+        return record.Inn == null
+            ? $"resting, back about {record.RestUntil.ToLocalTime():HH:mm}"
+            : $"resting at {record.Inn}{(record.Paid > 0 ? "" : " (unpaid)")}, back about {record.RestUntil.ToLocalTime():HH:mm}";
     }
 
     public static string CalledBy(BotMobile bot) =>
@@ -832,6 +917,9 @@ public static class BotRest
             writer.WriteEncodedInt(record.Sessions);
             writer.Write(record.CalledBy ?? "");
             writer.Write(record.OwedHours);
+            writer.Write(record.Inn ?? "");
+            writer.WriteEncodedInt(record.Paid);
+            writer.Write(record.BuffUntil);
         }
     }
 
@@ -862,6 +950,15 @@ public static class BotRest
 
                 record.CalledBy = string.IsNullOrEmpty(called) ? null : called;
                 record.OwedHours = reader.ReadDouble();
+            }
+
+            if (shape >= 4)
+            {
+                var inn = reader.ReadString();
+
+                record.Inn = string.IsNullOrEmpty(inn) ? null : inn;
+                record.Paid = reader.ReadEncodedInt();
+                record.BuffUntil = reader.ReadDateTime();
             }
 
             if (!string.IsNullOrEmpty(name))

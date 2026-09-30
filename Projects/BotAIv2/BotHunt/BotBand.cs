@@ -59,6 +59,8 @@ public sealed class BotBand : BotDeed
 
     public override bool Braves => true;
 
+    public override bool Resumes => true;
+
     public override Mobile Foe => _quarry;
 
     public override void Taken(IBotWilful bot) => BotQuarry.Claim(bot?.Self, _quarry);

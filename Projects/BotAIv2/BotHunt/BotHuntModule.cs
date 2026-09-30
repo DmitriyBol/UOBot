@@ -1,4 +1,4 @@
-﻿using Server.Logging;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -34,6 +34,8 @@ public sealed class BotHuntModule : BotModule
         BotHuntConfig.Load();
 
         BotWill.Offer(new BotHunter());
+
+        BotWill.Offer(new BotTamerProposer());
 
         BotWill.Offer(new BotGleaner());
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Engines.Craft;
 using Server.Logging;
@@ -52,7 +52,13 @@ public sealed class BotBake : BotDeed
 
     private readonly Map _map;
 
-    private readonly Point3D _where;
+    private Point3D _where;
+
+    private int _hops;
+
+    public static int MostHops { get; set; } = 2;
+
+    public static long Hopped { get; private set; }
 
     private Leg _leg;
 
@@ -156,6 +162,7 @@ public sealed class BotBake : BotDeed
         if (have > _had)
         {
             _cooked += have - _had;
+            BotCraftwork.Produced(_meal, have - _had);
             _had = have;
         }
 
@@ -218,8 +225,15 @@ public sealed class BotBake : BotDeed
         {
             Refuse(bot);
 
+            var cold = _where;
+
+            if (Next(bot, body))
+            {
+                return BotDoing.Walk(_map, _where, BotArrival.Beside, "to another fire");
+            }
+
             return BotDoing.Failed(
-                $"no fire the engine will cook over within {BotOven.Reach} of ({_where.X}, {_where.Y})"
+                $"no fire the engine will cook over within {BotOven.Reach} of ({cold.X}, {cold.Y})"
             );
         }
 
@@ -236,7 +250,31 @@ public sealed class BotBake : BotDeed
     {
         Refuse(bot);
 
-        return false;
+        return Next(bot, bot?.Self);
+    }
+
+    public override bool BendIsTrouble => false;
+
+    private bool Next(IBotWilful bot, Mobile body)
+    {
+        if (body == null || _hops >= MostHops)
+        {
+            return false;
+        }
+
+        var next = BotGround.Hearth(bot, body.Location, _where);
+
+        if (next == Point3D.Zero || next == _where)
+        {
+            return false;
+        }
+
+        _hops++;
+        Hopped++;
+        _where = next;
+        _leg = Leg.Walk;
+
+        return true;
     }
 
     private BotDoing Finish(IBotWilful bot, Mobile body, string why)

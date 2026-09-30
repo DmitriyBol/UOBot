@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Logging;
 
@@ -89,6 +89,7 @@ public static class BotSquads
         Yields = 0;
         Buried = 0;
         Rebuffs = 0;
+        LeaderGuarded = 0;
         Friendly = 0;
         Enemies = 0;
         Inside = 0;
@@ -116,7 +117,7 @@ public static class BotSquads
     {
         var bound = Bound;
 
-        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {BotSquad.Sundered} stations withheld for lying across a dungeon's edge from the member, {Rescues} times one of them was set upon and the company turned on it, {Steady} blows that left the company on the enemy it was already fighting ({Friendly} more by a bot of a guild not at war with it, passed over as friendly fire, {Inside} from inside the company itself, {Enemies} bots refused a place for being at war with the leader, {Distant} for standing more than {JoinReach} tiles from it), {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing, {Rebuffs} times one of them was handed back something it had already given up on, {BotSquad.Unowned} charges taken back because the errand holding them had ended; {BotSquad.Blinded} beats stood near enough to fight with no line to the thing, {BotSquad.Refused} refused the blow by the engine and {BotSquad.Unsteadied} were shooters that had moved too recently to fire, {BotSquad.Blindfights} fights given up because nobody could land one at all, {BotFormation.Unanchored} stations answered with standing fast because nothing round the enemy could be walked to, {BotSquad.Conjured} spells thrown by the back ranks and {BotSquad.Mended} heals landed by their medics, against {BotSquad.Dry} beats with nothing they could pay for; {BotSpoils.Describe()}";
+        return $"{Count} squads standing holding {bound} bots, {Formed} formed and {Disbanded} disbanded, {BotSquad.Sundered} stations withheld for lying across a dungeon's edge from the member, {BotSquad.StationRested} withheld from a member resting after a place it could not reach ({BotSquad.StationShorted} set resting for a search that came back short of its place, {BotWalk.ShortStations} as the short plan was drawn, {BotWalk.StationsLetGo} places let go at their second short plan), {Rescues} times one of them was set upon and the company turned on it, {Steady} blows that left the company on the enemy it was already fighting ({Friendly} more by a bot of a guild not at war with it, passed over as friendly fire, {Inside} from inside the company itself, {Enemies} bots refused a place for being at war with the leader, {Distant} for standing more than {JoinReach} tiles from it), {Yields} tiles given up to whoever belonged on them, {Buried} turned away from a company that no longer existed, {BotSquad.Released} let go for doing nothing for a company that was doing nothing, {Rebuffs} times one of them was handed back something it had already given up on, {BotSquad.Unowned} charges taken back because the errand holding them had ended; {BotSquad.Blinded} beats stood near enough to fight with no line to the thing ({BotSquad.NearLeader} of them set on the enemy nearest the leader instead), {LeaderGuarded} blows in melee on a leader that turned its company to what struck it, {BotSquad.Refused} refused the blow by the engine and {BotSquad.Unsteadied} were shooters that had moved too recently to fire, {BotSquad.Blindfights} fights given up because nobody could land one at all, {BotFormation.Unanchored} stations answered with standing fast because nothing round the enemy could be walked to ({BotFormation.Uncomponented} candidates passed over for lying in another part of the walkers' graph), {BotSquad.Conjured} spells thrown by the back ranks and {BotSquad.Mended} heals landed by their medics, against {BotSquad.Dry} beats with nothing they could pay for; {BotSquad.Defended} beats a member struck in melee was left on what struck it, {BotSquad.Excused} places not handed to a member running or binding its own wounds, {BotSquad.RoadSpared} looks for a fight a delve's company skipped on its road, {BotSquad.Paced} turns a marching leader was slowed to for a member behind it (beats a member behind was not waited for, by what it held instead of the enlistment: {BotSquad.Unpaced()}); first blows on the company's enemy, by what the leader was doing when the company took it on: {BotSquad.Responsiveness()}; {BotSpoils.Describe()}";
     }
 
     public static BotSquad Form(IBotSquadMember leader)
@@ -229,6 +230,14 @@ public static class BotSquads
             return;
         }
 
+        if (ReferenceEquals(member, squad.Leader) && Guards(squad, member.Self, attacker))
+        {
+            LeaderGuarded++;
+            squad.Engage(attacker, member);
+
+            return;
+        }
+
         var worst = BotThreat.Strongest(member.Self, Reach);
         var pick = worst ?? attacker;
 
@@ -253,6 +262,15 @@ public static class BotSquads
     }
 
     public static long Rebuffs { get; private set; }
+
+    public static long LeaderGuarded { get; private set; }
+
+    public static int LeaderReach { get; set; } = 2;
+
+    private static bool Guards(BotSquad squad, Mobile lead, Mobile attacker) =>
+        lead is { Deleted: false, Alive: true } && attacker.Map == lead.Map && lead.InRange(attacker.Location, LeaderReach)
+        && squad.Focus is { Deleted: false, Alive: true } enemy && !ReferenceEquals(enemy, attacker)
+        && !ReferenceEquals(enemy.Combatant, lead) && !BotQuarry.Shunned(attacker);
 
     public static int JoinReach { get; set; } = 400;
 
@@ -332,15 +350,16 @@ public static class BotSquads
             logger.Information("Companies: {Standing}; {Muster}; {Enlist}", Describe(), BotMuster.Describe(), BotEnlister.Describe());
 
             logger.Information(
-                "Arms: {Cries}; {Hands}; {Scrolls}; {Mending}; {Salve}; {Standing}; {Hire}; {Flight}; {Brawls}; {Outlaws}; {Robbers}; {Patrols}; {Assailed} times a bot set upon by a red hit back",
+                "Arms: {Cries}, {Outmatched} rescues passed over for the crowd round the foe; {Hands}; {Scrolls}; {Mending}; {Salve}; {Standing}; {Hire}; {Flight}; {Brawls}; {Outlaws}; {Robbers}; {Patrols}; {Assailed} times a bot set upon by a red hit back",
                 BotCry.Describe(),
+                BotRescuer.Outmatched,
                 BotArms.Describe(),
                 BotArmoury.Describe(),
                 BotMedic.Describe(),
                 BotSalve.Describe() + ", " + BotSurgeon.Describe() + "; " + BotMend.Describe(),
                 BotAttendant.Describe() + "; " + BotHouseCalls.Describe(),
                 BotRetainer.Describe(),
-                BotFugitive.Describe(),
+                BotFugitive.Describe() + "; " + BotBolt.Describe(),
                 BotBrawl.Describe(),
                 BotOutlaw.Describe(),
                 BotRobber.Describe(),
@@ -353,10 +372,11 @@ public static class BotSquads
             logger.Information("Bows: {Kites}", BotSlay.Bows());
 
             logger.Information(
-                "Needs: {Gear}; {Metal}; {Forge}; {Thread}; {Arrows}; {Bottles}; {Skillet}; {Stores}; {Filled} things off a pack went straight to somebody's standing order, {Bespoken} trips to a counter were begun because the board wanted something in the pack, {Shed} things were listed on the spot by bots too heavy to walk, {Exposed} trips were begun because a pack was worth more than a bot should be carrying about, {Hoarding} because it held more stones of somebody else's goods than it should, {Stored} lots of {Stowed} things the market would not take went into bank boxes ({Boxless} times the box would not take them either), {Dumped} things nobody would buy were left on the ground by bots that could not walk ({Stranded} of these errands were finished with no counter known at all, {Cornered} were offered to a bot with nothing the market wants so that the dropping could be reached, and {Immovable} of those found nothing to drop either), and {Sent} kills were chosen because the board wanted what the carcass carries",
+                "Needs: {Gear}; {Metal}; {Forge}; {Tinker}; {Thread}; {Arrows}; {Bottles}; {Skillet}; {Stores}; {Filled} things off a pack went straight to somebody's standing order, {Bespoken} trips to a counter were begun because the board wanted something in the pack, {Shed} things were listed on the spot by bots too heavy to walk, {Exposed} trips were begun because a pack was worth more than a bot should be carrying about, {Hoarding} because it held more stones of somebody else's goods than it should, {Stored} lots of {Stowed} things the market would not take went into bank boxes ({Boxless} times the box would not take them either; {Unlotted} things the porter left out of its count for having neither a lot nor room in the box), {Dumped} things nobody would buy were left on the ground by bots that could not walk ({Stranded} of these errands were finished with no counter known at all, {Cornered} were offered to a bot with nothing the market wants so that the dropping could be reached, and {Immovable} of those found nothing to drop either), and {Sent} kills were chosen because the board wanted what the carcass carries",
                 BotUpkeep.Describe(),
                 BotBullion.Describe(),
                 BotSmith.Describe(),
+                BotTinkerer.Describe() + "; bows: " + BotBowyer.Describe() + "; weaving: " + BotWeaver.Describe() + $"; {BotTailor.OwnCloth} sewing stints on the weaver's own cloth, {BotProvision.Cut} bandages cut instead of bought",
                 BotTailor.Describe(),
                 BotFletcher.Describe(),
                 BotAlchemist.Describe(),
@@ -370,6 +390,7 @@ public static class BotSquads
                 BotUnload.Stored,
                 BotUnload.Stowed,
                 BotUnload.Boxless,
+                BotUnload.Unlotted,
                 BotUnload.Dumped,
                 BotUnload.Stranded,
                 BotUnload.Cornered,

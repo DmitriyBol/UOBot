@@ -274,7 +274,7 @@ public static class BotArms
     public static string Describe() =>
         Caught == 0
             ? $"nobody has been caught bare-handed; {Dry} found with an empty quiver and {Restrung} took the bow back up; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body"
-            : $"{Caught} found bare-handed: {Rearmed} had one in the pack, {Empty} had nothing at all, {Casting} had a spell going up; {Dry} found with an empty quiver and {Restrung} took the bow back up; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body, {BotMobile.Rewielded} weapons put away for a better one of the bot's own kind, {BotMobile.Reverted} not put in a hand again so soon, {BotBinding.Refused} bound things turned away from a stall or a want";
+            : $"{Caught} found bare-handed: {Rearmed} had one in the pack, {Empty} had nothing at all, {Casting} had a spell going up; {Dry} found with an empty quiver and {Restrung} took the bow back up; {Dressed} things put on, {Declined} refused by the engine, {BotMobile.Misfits} passed over as beyond this body, {BotMobile.Rewielded} weapons put away for a better one of the bot's own kind, {BotMobile.LeftToTheFight} blades left in hand for a fight rather than put away for the bow, {BotMobile.Reverted} not put in a hand again so soon, {BotBinding.Refused} bound things turned away from a stall or a want";
 
     public static void Forget()
     {

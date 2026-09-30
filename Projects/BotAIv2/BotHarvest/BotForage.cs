@@ -60,6 +60,36 @@ public sealed class BotForage : BotDeed
 
     private readonly List<Item> _taken = [];
 
+    public static int ApproachBeats { get; set; } = 20;
+
+    public static int ShunMs { get; set; } = 600000;
+
+    public static long Shunned { get; private set; }
+
+    public static int MostDoublings { get; set; } = 4;
+
+    public static int MostPiles { get; set; } = 2;
+
+    public static long WentOn { get; private set; }
+
+    private static readonly Dictionary<Serial, (long Since, int Times)> _shunned = [];
+
+    private int _piles;
+
+    private int _approach;
+
+    private int _nearestSeen = int.MaxValue;
+
+    private static bool IsShunned(Item item)
+    {
+        if (item == null || !_shunned.TryGetValue(item.Serial, out var shun))
+        {
+            return false;
+        }
+
+        return Core.TickCount - shun.Since < (long)ShunMs << Math.Min(Math.Max(0, shun.Times - 1), MostDoublings);
+    }
+
     private int _gathered;
 
     private int _worth;
@@ -135,8 +165,45 @@ public sealed class BotForage : BotDeed
 
         if (!body.InRange(lying.GetWorldLocation(), Touch))
         {
-            return BotDoing.Walk(_map, lying.GetWorldLocation(), BotArrival.Within(Touch), "after reagents");
+            var at = lying.GetWorldLocation();
+            var away = Math.Max(Math.Abs(body.X - at.X), Math.Abs(body.Y - at.Y));
+
+            if (away < _nearestSeen)
+            {
+                _nearestSeen = away;
+                _approach = 0;
+            }
+            else if (++_approach >= ApproachBeats)
+            {
+                if (_shunned.Count > 2048)
+                {
+                    _shunned.Clear();
+                }
+
+                var times = _shunned.TryGetValue(lying.Serial, out var before) ? before.Times + 1 : 1;
+
+                _shunned[lying.Serial] = (Core.TickCount, times);
+                Shunned++;
+                BotRefused.Refuse(_map, at);
+                _lying = null;
+                _approach = 0;
+                _nearestSeen = int.MaxValue;
+
+                if (++_piles <= MostPiles)
+                {
+                    WentOn++;
+
+                    return BotDoing.Work($"giving up the reagents at ({at.X}, {at.Y}), {away} tiles off, for another pile");
+                }
+
+                return BotDoing.Failed($"could not get nearer than {away} tiles to the reagents at ({at.X}, {at.Y}) in {ApproachBeats} beats; the pile is shunned for {ShunMs / 60000} minutes");
+            }
+
+            return BotDoing.Walk(_map, at, BotArrival.Within(Touch), "after reagents");
         }
+
+        _approach = 0;
+        _nearestSeen = int.MaxValue;
 
         _lying = null;
 
@@ -161,6 +228,11 @@ public sealed class BotForage : BotDeed
 
     private BotDoing Finish(IBotWilful bot, Mobile body, string why)
     {
+        if (_gathered == 0 && _piles > 0)
+        {
+            return BotDoing.Failed($"{why}, after giving up {_piles} pile(s) nobody could get to");
+        }
+
         if (_gathered == 0)
         {
             return BotDoing.Done(why);
@@ -235,7 +307,7 @@ public sealed class BotForage : BotDeed
 
         foreach (var item in map.GetItemsInRange<BaseReagent>(bot.Location, range))
         {
-            if (item.Deleted || item.Parent != null || !item.Movable)
+            if (item.Deleted || item.Parent != null || !item.Movable || IsShunned(item))
             {
                 continue;
             }
@@ -320,7 +392,7 @@ public sealed class BotForager : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered anything lying about"
-            : $"{Asked} asked: {Sent} sent after reagents on the ground, {Bare} had none in sight, {Laden} were carrying too much to stoop, {BotForage.Unreachable} were lying somewhere already known to be shut off";
+            : $"{Asked} asked: {Sent} sent after reagents on the ground, {Bare} had none in sight, {Laden} were carrying too much to stoop, {BotForage.Unreachable} were lying somewhere already known to be shut off, {BotForage.Shunned} piles given up as unreachable and shunned ({BotForage.WentOn} trips went on to another pile)";
 
     public static void Forget()
     {

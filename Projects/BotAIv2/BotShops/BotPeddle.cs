@@ -66,13 +66,24 @@ public sealed class BotPeddle : BotDeed
 
     public static long HandedBack { get; private set; }
 
-    public BotPeddle(BaseVendor shop, Type kind, string label, int units, int price)
+    private readonly bool _fromPack;
+
+    private readonly double _factor;
+
+    private readonly int _passed;
+
+    private int _premium;
+
+    public BotPeddle(BaseVendor shop, Type kind, string label, int units, int price, bool fromPack = false, double factor = 1.0, int passed = 0)
     {
+        _fromPack = fromPack;
         _shop = shop;
         _kind = kind;
         _label = label;
         _units = Math.Max(1, units);
         _price = Math.Max(1, price);
+        _factor = Math.Max(1.0, factor);
+        _passed = Math.Max(0, passed);
     }
 
     public override string Kind => Trade;
@@ -83,7 +94,7 @@ public sealed class BotPeddle : BotDeed
 
     public override Point3D Where => _shop?.Location ?? Point3D.Zero;
 
-    public override double Expects => Math.Max(1.0, _units * (double)_price / Math.Max(0.5, WorkMinutes));
+    public override double Expects => Math.Max(1.0, _units * (double)_price * _factor / Math.Max(0.5, WorkMinutes));
 
     public override double Minutes => WorkMinutes;
 
@@ -91,7 +102,7 @@ public sealed class BotPeddle : BotDeed
 
     public override int Outlay => 0;
 
-    public override bool AtCounter => true;
+    public override bool AtCounter => false;
 
     public override double Coin => 1.0;
 
@@ -142,7 +153,10 @@ public sealed class BotPeddle : BotDeed
 
         if (taken <= 0 && Gather(body, _kind).Count > 0)
         {
-            HandedBack++;
+            if (!_fromPack)
+            {
+                HandedBack++;
+            }
         }
         else if (taken <= 0 && _listing != null && _listing.Sold > _soldBefore)
         {
@@ -159,7 +173,7 @@ public sealed class BotPeddle : BotDeed
 
         var goods = Gather(body, _kind);
 
-        _earned = BotShops.Sell(bot, _shop, goods, out var units);
+        _earned = BotShops.Sell(bot, _shop, goods, out var units, out _premium);
 
         if (_earned <= 0)
         {
@@ -173,7 +187,14 @@ public sealed class BotPeddle : BotDeed
 
         _sold = units;
 
-        return BotDoing.Done($"{units} {_label} for {_earned}gp");
+        if (_passed > 0 && BotCapital.In(_shop.Location))
+        {
+            BotCapital.Delivered(units, _earned + _premium, _passed);
+        }
+
+        return _premium > 0
+            ? BotDoing.Done($"{units} {_label} for {_earned}gp and {_premium}gp more from the city at the capital's counter")
+            : BotDoing.Done($"{units} {_label} for {_earned}gp");
     }
 
     private static List<Item> Gather(Mobile body, Type kind)

@@ -196,9 +196,11 @@ public static class BotFormation
     private static bool Sighted(Map map, int x, int y, int z, Point3D at) =>
         map.LineOfSight(new Point3D(x, y, z + Eye), new Point3D(at.X, at.Y, at.Z + Eye));
 
+    public static int PressReach { get; set; } = 8;
+
     private static bool Stand(Map map, int x, int y, Point3D near, out Point3D spot)
     {
-        if (BotStep.Ground(map, x, y, near.Z, BotStep.StandingReach, out var z) && Sighted(map, x, y, z, near))
+        if (BotStep.Ground(map, x, y, near.Z, PressReach, out var z) && Sighted(map, x, y, z, near))
         {
             spot = new Point3D(x, y, z);
 
@@ -223,6 +225,21 @@ public static class BotFormation
         return 0;
     }
 
+    public static long Uncomponented { get; private set; }
+
+    private static bool OtherComponent(Map map, Point3D from, Point3D to)
+    {
+        if (!Server.Engines.Pathing.Tiered.NavigationService.ComponentsCounted(map))
+        {
+            return false;
+        }
+
+        var a = Server.Engines.Pathing.Tiered.NavigationService.ComponentOf(map, from);
+        var b = Server.Engines.Pathing.Tiered.NavigationService.ComponentOf(map, to);
+
+        return a >= 0 && b >= 0 && a != b;
+    }
+
     internal static Point3D Reachable(Map map, int x, int y, Point3D anchor, IBotSquadMember member)
     {
         var steps = Math.Max(Math.Abs(x - anchor.X), Math.Abs(y - anchor.Y));
@@ -241,6 +258,13 @@ public static class BotFormation
 
             if (BotReach.Ask(map, member.Self.Location, candidate, BotArrival.Within(2)) == BotReachVerdict.Sealed)
             {
+                continue;
+            }
+
+            if (OtherComponent(map, member.Self.Location, candidate))
+            {
+                Uncomponented++;
+
                 continue;
             }
 

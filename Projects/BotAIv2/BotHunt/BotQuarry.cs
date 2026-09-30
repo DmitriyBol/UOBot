@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Mobiles;
@@ -256,7 +256,7 @@ public static class BotQuarry
         var worth = 0.0;
 
         var hides = Demanded(typeof(Hides)) || BotCharter.Wants(hunter, "hides");
-        var feathers = Demanded(typeof(Feather)) || Demanded(typeof(Arrow)) || BotCharter.Wants(hunter, "feathers");
+        var feathers = Demanded(typeof(Feather)) || Demanded(typeof(Arrow)) || BotCharter.Wants(hunter, "feathers") || BotFletcher.Starved;
         var wool = Demanded(typeof(Wool)) || BotCharter.Wants(hunter, "wool");
         var meat = BotCharter.Wants(hunter, "meat");
 
@@ -360,7 +360,7 @@ public static class BotQuarry
 
         foreach (var creature in map.GetMobilesInRange<BaseCreature>(bot.Location, range))
         {
-            if (!BotThreat.Hostile(bot, creature) || !BotPopulation.Within(map, creature.Location))
+            if (!BotThreat.Hostile(bot, creature) || !BotPopulation.Within(map, creature.Location, bot))
             {
                 continue;
             }
@@ -490,7 +490,7 @@ public static class BotQuarry
 
         foreach (var creature in map.GetMobilesInRange<BaseCreature>(bot.Location, range))
         {
-            if (!BotThreat.Hostile(bot, creature) || !BotPopulation.Within(map, creature.Location))
+            if (!BotThreat.Hostile(bot, creature) || !BotPopulation.Within(map, creature.Location, bot))
             {
                 continue;
             }

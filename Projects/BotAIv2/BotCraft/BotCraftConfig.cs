@@ -29,6 +29,16 @@ public sealed class BotCraftSettings
     public double? ForgeMinutes { get; set; }
 
     public int? AnvilTries { get; set; }
+
+    public double? TinkerPrior { get; set; }
+
+    public double? TinkerMinutes { get; set; }
+
+    public int? TinkerBatch { get; set; }
+
+    public int? TinkerLeastOnMarket { get; set; }
+
+    public int? TinkerLeastMetal { get; set; }
 }
 
 /// <summary>Reads the craft file and moves the numbers it names.</summary>
@@ -67,5 +77,11 @@ public static class BotCraftConfig
         BotForge.WorkMinutes = settings.ForgeMinutes ?? BotForge.WorkMinutes;
 
         BotAnvil.Tries = settings.AnvilTries ?? BotAnvil.Tries;
+
+        BotTinker.Prior = settings.TinkerPrior ?? BotTinker.Prior;
+        BotTinker.WorkMinutes = settings.TinkerMinutes ?? BotTinker.WorkMinutes;
+        BotTinker.Batch = settings.TinkerBatch ?? BotTinker.Batch;
+        BotTinkerer.LeastOnMarket = settings.TinkerLeastOnMarket ?? BotTinkerer.LeastOnMarket;
+        BotTinkerer.LeastMetal = settings.TinkerLeastMetal ?? BotTinkerer.LeastMetal;
     }
 }

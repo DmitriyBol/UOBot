@@ -250,6 +250,24 @@ public sealed class BotRoomTrial
             return Decide("called at the cap");
         }
 
+        Mobile lead = null;
+
+        for (var i = 0; i < _drivers.Count; i++)
+        {
+            if (_drivers[i].Me is { Deleted: false, Alive: true } first)
+            {
+                lead = first;
+
+                break;
+            }
+        }
+
+        var focus = lead == null
+            ? null
+            : lead.Combatant is BaseCreature { Deleted: false, Alive: true } leading && _foes.Contains(leading)
+                ? leading
+                : NearestFoe(lead);
+
         for (var i = 0; i < _drivers.Count; i++)
         {
             var me = _drivers[i].Me;
@@ -259,9 +277,24 @@ public sealed class BotRoomTrial
                 continue;
             }
 
-            var target = me.Combatant is BaseCreature { Deleted: false, Alive: true } fighting && _foes.Contains(fighting)
-                ? fighting
-                : NearestFoe(me);
+            BaseCreature target;
+
+            if (!Doctrine)
+            {
+                target = me.Combatant is BaseCreature { Deleted: false, Alive: true } fighting && _foes.Contains(fighting)
+                    ? fighting
+                    : NearestFoe(me);
+            }
+            else if (focus != null && (ReferenceEquals(me, lead) || me.InLOS(focus)))
+            {
+                target = focus;
+                OnLeaders++;
+            }
+            else
+            {
+                target = (lead == null ? null : NearestSeen(lead, me)) ?? NearestFoe(me);
+                ByLeader++;
+            }
 
             if (target != null)
             {
@@ -270,6 +303,38 @@ public sealed class BotRoomTrial
         }
 
         return false;
+    }
+
+    public static bool Doctrine { get; set; } = true;
+
+    public long OnLeaders { get; private set; }
+
+    public long ByLeader { get; private set; }
+
+    private BaseCreature NearestSeen(Mobile lead, Mobile me)
+    {
+        BaseCreature best = null;
+        var bestRange = double.MaxValue;
+
+        for (var i = 0; i < _foes.Count; i++)
+        {
+            var foe = _foes[i];
+
+            if (foe is not { Deleted: false, Alive: true } || !me.InLOS(foe))
+            {
+                continue;
+            }
+
+            var range = lead.GetDistanceToSqrt(foe);
+
+            if (range < bestRange)
+            {
+                bestRange = range;
+                best = foe;
+            }
+        }
+
+        return best;
     }
 
     private bool Decide(string verdict)
@@ -370,7 +435,8 @@ public sealed class BotRoomTrial
 
         return $"{Guild}'s company ({string.Join(", ", names)}) against the worst room of {Deep.Name} ({string.Join(", ", room)}): "
             + $"{Verdict} in {Seconds:F0}s, {Downed} of {_foes.Count} down, {Killed:P0} of the room's health taken, "
-            + $"{Deaths} of {_drivers.Count} fell, {Spent:P0} of the company's health spent";
+            + $"{Deaths} of {_drivers.Count} fell, {Spent:P0} of the company's health spent; "
+            + (Doctrine ? $"on the leader's target {OnLeaders} beats, on the one nearest the leader {ByLeader}" : "each on its own nearest");
     }
 
     public static List<string> Worst(Map map, BotDungeon.Deep deep, int most)

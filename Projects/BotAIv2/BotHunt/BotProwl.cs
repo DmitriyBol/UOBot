@@ -140,6 +140,8 @@ public sealed class BotProwl : BotDeed
 
     public static long Unraised { get; private set; }
 
+    public static long Regathered { get; private set; }
+
     public static int ClaimMs { get; set; } = 60000;
 
     private static readonly Dictionary<(int Map, int X, int Y), long> _raising = [];
@@ -156,6 +158,16 @@ public sealed class BotProwl : BotDeed
     public override string Kind => Trade;
 
     public override bool Braves => true;
+
+    public override bool Resumes => true;
+
+    public override void Resumed(IBotWilful bot)
+    {
+        _plans = -1;
+        _planLeast = int.MaxValue;
+        _nearest = int.MaxValue;
+        _stalled = 0;
+    }
 
     public override bool Guess => true;
 
@@ -237,6 +249,30 @@ public sealed class BotProwl : BotDeed
 
             if (!BotQuad.Dares(body, _map, _where))
             {
+                var instead = Redart(body);
+
+                if (instead != Point3D.Zero)
+                {
+                    Regathered++;
+
+                    logger.Information(
+                        "{Name} raised {Strength:F0} of the {Asked:F0} that ({X}, {Y}) asks, so the company of {Count} goes to ({IX}, {IY}), which asks {Less:F0}, instead",
+                        body.Name,
+                        BotQuad.Strength(body),
+                        BotQuad.Muscle(_map, _where),
+                        _where.X,
+                        _where.Y,
+                        _squad?.Count ?? 1,
+                        instead.X,
+                        instead.Y,
+                        BotQuad.Muscle(_map, instead)
+                    );
+
+                    _where = instead;
+
+                    return BotDoing.Walk(_map, _where, BotArrival.Within(ArriveWithin), $"to ({_where.X}, {_where.Y}) with what was raised");
+                }
+
                 Unraised++;
 
                 return BotDoing.Failed(

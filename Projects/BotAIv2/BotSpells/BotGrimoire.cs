@@ -153,6 +153,13 @@ public static class BotGrimoire
             }
         }
 
+        var travel = BotRunes.Wanted(bot, book);
+
+        if (travel >= 0 && _scrollOf[travel] != null)
+        {
+            return travel;
+        }
+
         for (var id = 0; id < Spells; id++)
         {
             if (_scrollOf[id] != null && !book.HasSpell(id))

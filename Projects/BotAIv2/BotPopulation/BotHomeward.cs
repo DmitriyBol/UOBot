@@ -47,6 +47,8 @@ public sealed class BotHomeward : BotDeed
 
     private readonly Point3D _home;
 
+    private BotRecall _recall;
+
     public BotHomeward(Map map, Point3D home)
     {
         _map = map;
@@ -85,6 +87,11 @@ public sealed class BotHomeward : BotDeed
         if (Utility.InRange(body.Location, _home, Arrived))
         {
             return BotDoing.Done("home");
+        }
+
+        if (BotRecall.Instead(bot, _map, _home, Arrived, "home", ref _recall) is { } cast)
+        {
+            return cast;
         }
 
         return BotDoing.Walk(_map, _home, BotArrival.Within(Arrived), "going home");
@@ -130,7 +137,7 @@ public sealed class BotHomer : IBotProposer
 
         Asked++;
 
-        var hearth = body is BotMobile own ? BotSeat.Home(own) : BotPopulation.Where;
+        var hearth = BotPopulation.HomeOf(body);
 
         if (Utility.InRange(body.Location, hearth, BotHomeward.Away))
         {
@@ -149,7 +156,8 @@ public sealed class BotHomer : IBotProposer
             return null;
         }
 
-        if (body is BotMobile below && BotDungeon.Under(body.Location) && !BotDelveParty.Delving(body))
+        if (body is BotMobile below && BotDungeon.Under(body.Location) && !BotDelveParty.Delving(body)
+            && !BotGates.Joined(body.Map, body.Location, hearth))
         {
             if (BotPopulation.Carry(below))
             {

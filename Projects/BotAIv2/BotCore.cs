@@ -1,4 +1,4 @@
-﻿using Server.Logging;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -90,10 +90,32 @@ public static class BotCore
 
         BotModules.Register(new BotDelveModule());
 
+        BotModules.Register(new BotTravelModule());
+
+        BotModules.Register(new BotResidenceModule());
+
+        BotModules.Register(new BotGuildHouseModule());
+
+        BotModules.Register(new BotShopkeepModule());
+
+        BotModules.Register(new BotCampModule());
+
+        BotModules.Register(new BotDiplomacyModule());
+
+        BotModules.Register(new BotRunesModule());
+
+        BotModules.Register(new BotSeaModule());
+
         BotModules.Register(new BotProvingModule());
+
+        BotModules.Register(new BotZonesModule());
         BotModules.Register(new BotDashboardModule());
 
         BotModules.Register(new BotAlarmModule());
+
+        BotModules.Register(new BotVoiceModule());
+
+        BotModules.Register(new BotWebModule());
 
         BotModules.Start(BotPhase.Settings);
 

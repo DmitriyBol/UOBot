@@ -129,7 +129,7 @@ public static class BotQuarter
         PaidGold += coin;
         PaidThings += things;
 
-        mark.Say($"Take it, {robber.Name}! Take it and let me be!");
+        BotVoice.Aloud(mark, $"Take it, {robber.Name}! Take it and let me be!");
 
         logger.Information(
             "{Name} is down to {Hits} of {Max} and throws {Gold}gp and {Things} things to {Robber} for its life",

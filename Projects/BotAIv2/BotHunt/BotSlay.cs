@@ -151,6 +151,20 @@ public sealed class BotSlay : BotDeed
 
     public override bool Braves => true;
 
+    public override bool Resumes => true;
+
+    private int _kited;
+
+    public override void Resumed(IBotWilful bot)
+    {
+        var now = Core.TickCount;
+
+        _tookTick = now;
+        _progressTick = now;
+        _seenTick = now;
+        _leg = Leg.Close;
+    }
+
     public override Mobile Foe => _quarry;
 
     public override Map Map => _map;
@@ -327,13 +341,21 @@ public sealed class BotSlay : BotDeed
             {
                 BotQuarry.Crowd(_quarry);
 
-                return BotDoing.Failed($"{_quarry.Name} would not go down: {left}% of it left and not a scratch in {NoProgressMs / 1000}s");
+                var pack = body.Backpack;
+                var ammo = (pack?.GetAmount(typeof(Arrow)) ?? 0) + (pack?.GetAmount(typeof(Bolt)) ?? 0);
+                var apart = Math.Max(Math.Abs(body.X - _quarry.X), Math.Abs(body.Y - _quarry.Y));
+
+                return BotDoing.Failed(
+                    $"{_quarry.Name} would not go down: {left}% of it left and not a scratch in {NoProgressMs / 1000}s "
+                    + $"(holding {body.Weapon?.GetType().Name ?? "nothing"}, {ammo} arrows or bolts, {apart} tiles off, {_kited} kites, "
+                    + $"{(body is BotMobile { Journey.Moving: true } ? "moving" : "still")}, in sight {body.InLOS(_quarry)})"
+                );
             }
 
             return BotDoing.Failed($"ran out of time on {_quarry.Name} with {left}% of it left");
         }
 
-        if (body.HitsMax > 0 && body.Hits < body.HitsMax * FleeAt)
+        if (body.HitsMax > 0 && body.Hits < body.HitsMax * FleeAt && _quarry is not Server.Mobiles.BaseCreature { AI: Server.Mobiles.AIType.AI_Mage })
         {
             body.Combatant = null;
             body.Warmode = false;
@@ -352,6 +374,7 @@ public sealed class BotSlay : BotDeed
                 body.Warmode = false;
 
                 BotQuarry.Crowd(_quarry);
+                BotMuster.Urge(body, _quarry);
 
                 return BotDoing.Failed($"too many of them around {_quarry.Name}");
             }
@@ -802,6 +825,7 @@ public sealed class BotSlay : BotDeed
         }
 
         Kited++;
+        _kited++;
 
         return true;
     }

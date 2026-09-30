@@ -82,6 +82,8 @@ public sealed class BotHarrower : IBotProposer
 
     public static long Overwhelmed { get; private set; }
 
+    public static long Unmanned { get; private set; }
+
     private static bool _said;
 
     public BotDeed Propose(IBotWilful bot)
@@ -204,6 +206,13 @@ public sealed class BotHarrower : IBotProposer
             return null;
         }
 
+        if (BotHarrow.Supply(map, body.Location, body) < BotHarrow.Least)
+        {
+            Unmanned++;
+
+            return null;
+        }
+
         Offered++;
 
         Once(body, square, quad.Deaths);
@@ -289,7 +298,7 @@ public sealed class BotHarrower : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"no Baron has ever been offered a harrowing ({NotABaron} answers went to bots that are not Barons)"
-            : $"{Asked} times a Baron was asked: {Offered} were offered ground, {Hunting} a patrol against a murderer, {Guilded} dire squares left to the guild that holds them, {Overwhelmed} passed over for a fight {BotPeril.Overwhelm:F1} times the company a levy would raise, {Bountied} ground the city put a bounty on, {Held} were already leading a company, {Unfit} were too hurt, {Quiet} found nowhere reading at or below {BotQuad.Dire:F2}, {Sealed} found the worst of it behind something, {Roadless} on ground the road map says has no road from home, {Roundabout} more than {MostDetour} tiles round by road, {Unfooted} found nowhere in it to stand, {Resting} came too soon after a muster that failed, {Unready} passed over damned ground the island cannot yet raise a company for ({BotHarrow.Musterable()} of the {BotHarrow.Grandmasters} needed are fit for it today); {BotHarrow.Describe()}";
+            : $"{Asked} times a Baron was asked: {Offered} were offered ground, {Hunting} a patrol against a murderer, {Guilded} dire squares left to the guild that holds them, {Overwhelmed} passed over for a fight {BotPeril.Overwhelm:F1} times the company a levy would raise, {Bountied} ground the city put a bounty on, {Held} were already leading a company, {Unfit} were too hurt, {Quiet} found nowhere reading at or below {BotQuad.Dire:F2}, {Sealed} found the worst of it behind something, {Roadless} on ground the road map says has no road from home, {Roundabout} more than {MostDetour} tiles round by road, {Unfooted} found nowhere in it to stand, {Unmanned} found fewer than {BotHarrow.Least} within call, {Resting} came too soon after a muster that failed, {Unready} passed over damned ground the island cannot yet raise a company for ({BotHarrow.Musterable()} of the {BotHarrow.Grandmasters} needed are fit for it today); {BotHarrow.Describe()}";
 
     public static void Forget()
     {

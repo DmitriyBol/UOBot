@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Logging;
 using Server.Regions;
@@ -42,7 +42,60 @@ public static class BotPopulation
     public static int Scatter { get; set; } = 350;
 
     public static bool Within(Map map, Point3D where) =>
-        Home == null || map == Home && Utility.InRange(Where, where, Roam);
+        Home == null || map == Home && (Utility.InRange(Where, where, Roam) || BotDungeon.Under(where) || BotTowns.Within(where) || BotResidence.Around(where));
+
+    public static double GrownProgress { get; set; } = 1.0;
+
+    public static double LeashFloor { get; set; } = 0.3;
+
+    public static long Leashed { get; private set; }
+
+    public static int Leash(Mobile body)
+    {
+        if (body is not BotMobile bot || GrownProgress <= 0.0)
+        {
+            return Roam;
+        }
+
+        var share = Math.Clamp(bot.Progress / GrownProgress, Math.Clamp(LeashFloor, 0.0, 1.0), 1.0);
+
+        return (int)Math.Round(Roam * share);
+    }
+
+    public static bool Reachable(Map map, Point3D from, Point3D to)
+    {
+        if (BotGates.Joined(map, from, to))
+        {
+            return true;
+        }
+
+        Unjoined++;
+
+        return false;
+    }
+
+    public static long Unjoined { get; private set; }
+
+    public static Point3D HomeOf(Mobile body) => body is BotMobile bot ? BotResidence.Home(bot) : Where;
+
+    public static Point3D Centre(Mobile body) => HomeOf(body);
+
+    public static bool Within(Map map, Point3D where, Mobile body)
+    {
+        if (!Within(map, where))
+        {
+            return false;
+        }
+
+        if (body == null || BotDungeon.Under(where) || BotTowns.Within(where) || Utility.InRange(Centre(body), where, Leash(body)))
+        {
+            return true;
+        }
+
+        Leashed++;
+
+        return false;
+    }
 
     public static int GateReach { get; set; } = 400;
 
@@ -245,6 +298,26 @@ public static class BotPopulation
 
     public static BotMobile RaiseNewcomer(BotClass klass)
     {
+        var people = BotPeoples.Pick(klass);
+
+        if (people != null)
+        {
+            var female = Utility.Random(2) == 0;
+            var fresh = BotPeoples.Christen(people, female, n => InUse(n) || BotProgress.Remembers(n));
+
+            if (fresh != null)
+            {
+                var born = Raise(klass, fresh);
+
+                if (born != null)
+                {
+                    born.Female = female;
+                }
+
+                return born;
+            }
+        }
+
         for (var index = 0; index < Names.Length * (Houses.Length + 1); index++)
         {
             var name = NameAt(index);
@@ -380,10 +453,26 @@ public static class BotPopulation
         }
 
         var bot = new BotMobile();
+        var female = Utility.Random(2) == 0;
 
-        bot.Become(klass, string.IsNullOrWhiteSpace(called) ? Christen() : called, Utility.Random(2) == 0);
+        BotPeoples.People people = null;
+        var name = called;
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            people = BotPeoples.Pick(klass);
+            name = BotPeoples.Christen(people, female, InUse) ?? Christen();
+        }
+        else
+        {
+            people = BotPeoples.Of(name);
+        }
+
+        bot.Become(klass, name, female, people);
 
         BotProgress.Restore(bot);
+
+        BotResidence.Raised(bot);
 
         if (!TryPlace(bot))
         {
@@ -491,7 +580,7 @@ public static class BotPopulation
 
         var from = bot.Location;
 
-        if (Utility.InRange(from, Where, Spread * 2))
+        if (Utility.InRange(from, HomeOf(bot), Spread * 2))
         {
             if (!bot.ReviveComplained)
             {
@@ -597,7 +686,8 @@ public static class BotPopulation
             }
         }
 
-        return $"{Count} bots, {Living} on their feet, {fallen} waiting to be revived, {_away.Count} resting";
+        return $"{Count} bots, {Living} on their feet, {fallen} waiting to be revived, {_away.Count} resting; "
+            + $"roam {Roam} tiles, a leash of {(int)(Roam * Math.Clamp(LeashFloor, 0.0, 1.0))} to {Roam} from where the bot lives by trade progress against {GrownProgress:F2}, {Leashed} choices refused by one, {Unjoined} places refused for lying on a land no gate joins";
     }
 
     private static void Enlist(BotMobile bot)
@@ -640,6 +730,8 @@ public static class BotPopulation
         return true;
     }
 
+    public static bool PlaceAtHome(BotMobile bot) => TryPlace(bot);
+
     private static bool TryPlace(BotMobile bot)
     {
         var map = Home;
@@ -649,14 +741,14 @@ public static class BotPopulation
             return false;
         }
 
-        var at = BotSeat.Home(bot);
+        var at = HomeOf(bot);
 
         if (at != Where)
         {
-            BotSeat.Placed();
+            BotResidence.Placed(bot, at);
         }
 
-        var span = at == Where && Scatter > Spread ? Scatter : Spread;
+        var span = at == Where && Scatter > Spread ? Scatter : BotResidence.Span(at, Spread);
 
         for (var pass = 0; pass < 3; pass++)
         {
@@ -745,6 +837,15 @@ public static class BotPopulation
             if (string.IsNullOrWhiteSpace(name))
             {
                 continue;
+            }
+
+            if (BotPeoples.Knows(name))
+            {
+                logger.Error(
+                    "{Name} is both a name the bank of peoples hands out (Configuration/bot-names.json) and a name {Who} gives away, so two bots will answer to it and share one record of what they have learned. Take it out of one of them",
+                    name,
+                    who
+                );
             }
 
             for (var j = 0; j < Names.Length; j++)

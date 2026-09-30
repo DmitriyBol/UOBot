@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using Server.Json;
 using Server.Logging;
@@ -20,6 +20,14 @@ public sealed class BotEstateSettings
     public int? Price { get; set; }
 
     public int? Keep { get; set; }
+
+    public bool? DuesRunning { get; set; }
+
+    public double? Dues { get; set; }
+
+    public int? DuesCeiling { get; set; }
+
+    public bool? DuesSaving { get; set; }
 
     public int? MaxHalls { get; set; }
 
@@ -91,6 +99,8 @@ public sealed class BotEstateSettings
 
     public int? SeatSettled { get; set; }
 
+    public double? SeatAbroadShare { get; set; }
+
     public double? Comradeship { get; set; }
 
     public double? Aid { get; set; }
@@ -128,6 +138,10 @@ public static class BotEstateConfig
         BotEstate.Running = settings.Running ?? BotEstate.Running;
         BotEstate.Price = settings.Price ?? BotEstate.Price;
         BotEstate.Keep = settings.Keep ?? BotEstate.Keep;
+        BotDues.Running = settings.DuesRunning ?? BotDues.Running;
+        BotDues.Share = settings.Dues ?? BotDues.Share;
+        BotDues.Ceiling = settings.DuesCeiling ?? BotDues.Ceiling;
+        BotDues.Saving = settings.DuesSaving ?? BotDues.Saving;
         BotEstate.MaxHalls = settings.MaxHalls ?? BotEstate.MaxHalls;
 
         BotPlot.MultiID = settings.MultiID ?? BotPlot.MultiID;
@@ -177,5 +191,6 @@ public static class BotEstateConfig
 
         BotSeat.Configure(settings.Seats);
         BotSeat.Settled = settings.SeatSettled ?? BotSeat.Settled;
+        BotSeat.AbroadShare = settings.SeatAbroadShare ?? BotSeat.AbroadShare;
     }
 }

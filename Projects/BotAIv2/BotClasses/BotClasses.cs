@@ -35,7 +35,8 @@ public static class BotClasses
         new BotMage(),
         new BotHealer(),
         new BotCrafter(),
-        new BotGatherer()
+        new BotGatherer(),
+        new BotTamer()
     ];
 
     private static readonly Dictionary<string, BotClass> _byName =

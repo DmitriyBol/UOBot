@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Logging;
 
@@ -159,6 +159,12 @@ public sealed class BotJourney
 
     public static long Routed { get; private set; }
 
+    public static long Gated { get; private set; }
+
+    public static int StationDirect { get; set; } = 160;
+
+    public bool LegExact { get; private set; }
+
     public static long Charted { get; private set; }
 
     public static long NoWay { get; private set; }
@@ -181,16 +187,33 @@ public sealed class BotJourney
     {
         leg = Point3D.Zero;
         Legging = false;
+        LegExact = false;
         _legErrand = null;
 
         var errand = Current;
 
-        if (errand == null || map == null || errand.RouteSpent || errand.Reason is "station" or "sweep")
+        if (errand == null || map == null || errand.RouteSpent)
         {
             return false;
         }
 
         var target = errand.Target;
+
+        if (errand.Reason is "station" or "sweep" && Away(at, target) <= StationDirect)
+        {
+            return false;
+        }
+
+        if (errand.Gate != Point3D.Zero && Away(at, errand.GateTo) <= BotGates.Through)
+        {
+            errand.Gate = Point3D.Zero;
+            errand.GateTo = Point3D.Zero;
+            errand.RouteGoal = Point3D.Zero;
+            errand.Route.Clear();
+            errand.Leg = 0;
+            BotGates.NotedPassed();
+        }
+
         var live = errand.RouteGoal != Point3D.Zero && errand.Leg < errand.Route.Count;
         var round = _plansSinceCloser > 0 && BotRoads.Farther(map, at, target) >= RoundTiles;
 
@@ -225,11 +248,25 @@ public sealed class BotJourney
 
         while (errand.Leg < errand.Route.Count && Away(at, errand.Route[errand.Leg]) <= LegReached)
         {
+            if (errand.Gate != Point3D.Zero && errand.Leg == errand.Route.Count - 1
+                && (at.X != errand.Route[errand.Leg].X || at.Y != errand.Route[errand.Leg].Y))
+            {
+                break;
+            }
+
             errand.Leg++;
         }
 
         if (errand.Leg >= errand.Route.Count)
         {
+            if (errand.Gate != Point3D.Zero)
+            {
+                BotGates.NotedRefused();
+                errand.Gate = Point3D.Zero;
+                errand.GateTo = Point3D.Zero;
+                errand.RouteSpent = true;
+            }
+
             return false;
         }
 
@@ -252,6 +289,7 @@ public sealed class BotJourney
         errand.Aim = errand.Route[pick];
         leg = errand.Aim;
         Legging = true;
+        LegExact = errand.Gate != Point3D.Zero && pick == errand.Route.Count - 1;
         _legErrand = errand;
 
         return true;
@@ -261,6 +299,8 @@ public sealed class BotJourney
     {
         errand.Unreachable = false;
         errand.FromChart = false;
+        errand.Gate = Point3D.Zero;
+        errand.GateTo = Point3D.Zero;
         RouteStamp++;
 
         switch (Server.Engines.Pathing.Tiered.NavigationService.Route(map, at, target, errand.Route, errand.Arrival.Tiles))
@@ -279,6 +319,26 @@ public sealed class BotJourney
                 }
             case Server.Engines.Pathing.Tiered.NavStatus.Unreachable:
                 {
+                    if (BotGates.Next(map, at, target, out var gate))
+                    {
+                        var toGate = Server.Engines.Pathing.Tiered.NavigationService.Route(map, at, gate.From, errand.Route, 0);
+
+                        if (toGate is Server.Engines.Pathing.Tiered.NavStatus.Ok or Server.Engines.Pathing.Tiered.NavStatus.Direct)
+                        {
+                            if (toGate == Server.Engines.Pathing.Tiered.NavStatus.Direct)
+                            {
+                                errand.Route.Clear();
+                            }
+
+                            errand.Route.Add(gate.From);
+                            errand.Gate = gate.From;
+                            errand.GateTo = gate.To;
+                            Gated++;
+
+                            return;
+                        }
+                    }
+
                     NoWay++;
                     errand.Unreachable = true;
                     errand.Route.Clear();
@@ -472,6 +532,31 @@ public sealed class BotJourney
         return dropped;
     }
 
+    public int Shed()
+    {
+        var dropped = 0;
+
+        for (var i = _errands.Count - 1; i >= 0; i--)
+        {
+            if (!_errands[i].Interruption)
+            {
+                continue;
+            }
+
+            var top = i == _errands.Count - 1;
+
+            _errands.RemoveAt(i);
+            dropped++;
+
+            if (top)
+            {
+                Discard();
+            }
+        }
+
+        return dropped;
+    }
+
     public void Finish()
     {
         _errands.Clear();
@@ -481,7 +566,13 @@ public sealed class BotJourney
         _dangerous = false;
     }
 
-    public bool Arrived(Point3D at) => Active && Arrival.Reached(at, Target);
+    private bool _beside;
+
+    public void Beside() => _beside = true;
+
+    public static int BesideTiles(string reason) => reason is "station" or "sweep" ? 2 : 1;
+
+    public bool Arrived(Point3D at) => Active && (Arrival.Reached(at, Target) || _beside && Away(at, Target) <= BesideTiles(Reason));
 
     public bool NeedsPlan(Point3D at)
     {
@@ -670,6 +761,7 @@ public sealed class BotJourney
     {
         _plan.Clear();
         _step = 0;
+        _beside = false;
         _planErrand = null;
         _planGoal = Point3D.Zero;
         _planBuiltTick = 0;

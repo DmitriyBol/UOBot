@@ -60,14 +60,17 @@ public sealed class BotEstateModule : BotModule
         BotWill.Offer(new BotHolder());
 
         logger.Information(
-            "Estate ready: a guild raises a hall at {Price}gp levied off its members, each keeping {Keep}gp back, up to {Max} on the island; plots are looked for between {Near} and {Far} tiles of home, {Apart} apart, {Budget} put to the engine at a time",
+            "Estate ready: a guild raises a hall at {Price}gp levied off its chest and then its members, each keeping {Keep}gp back, up to {Max} on the island; plots are looked for between {Near} and {Far} tiles of home, {Apart} apart, {Budget} put to the engine at a time; {Dues}",
             BotEstate.Price,
             BotEstate.Keep,
             BotEstate.MaxHalls,
             BotPlot.Near,
             BotPlot.Far,
             BotPlot.Apart,
-            BotPlot.Budget
+            BotPlot.Budget,
+            BotDues.Running
+                ? $"members pay {BotDues.Share:P0} of what their work brings in into their guild's chest, up to {BotDues.Ceiling}gp a chest, and a chest {(BotDues.Saving ? "keeps the price of the hall (or of a house in Britain) back from everyday draws" : "keeps nothing back")}"
+                : "no dues are paid"
         );
 
         logger.Information(
@@ -129,6 +132,7 @@ public sealed class BotEstateModule : BotModule
         BotHolder.Forget();
         BotReeve.Forget();
         BotChest.Forget();
+        BotDues.Forget();
         BotToll.Forget();
         BotTollman.Forget();
         BotHold.Forget();

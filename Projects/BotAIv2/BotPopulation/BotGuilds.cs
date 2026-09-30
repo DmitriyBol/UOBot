@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Items;
@@ -98,7 +98,7 @@ public static class BotGuilds
             return false;
         }
 
-        if (BotChest.Holds(guild.Name) + BotEstate.Fund(guild) < WidenPrice)
+        if (BotEstate.Fund(guild) < WidenPrice)
         {
             Unwidened++;
 
@@ -213,6 +213,31 @@ public static class BotGuilds
     public static int Count => _guilds.Count;
 
     public static IEnumerable<Guild> Standing => _guilds.Values;
+
+    public static bool Leads(BotMobile bot) => bot?.Guild is Guild guild && ReferenceEquals(Head(guild), bot);
+
+    public static string Lacking(BotRole role, int least)
+    {
+        foreach (var guild in _guilds.Values)
+        {
+            var members = 0;
+
+            for (var i = 0; i < guild.Members.Count; i++)
+            {
+                if (guild.Members[i] is BotMobile { Deleted: false })
+                {
+                    members++;
+                }
+            }
+
+            if (members >= least && OfRole(guild, role) == 0)
+            {
+                return guild.Name;
+            }
+        }
+
+        return null;
+    }
 
     public static Guild Named(string name) => name == null ? null : _guilds.GetValueOrDefault(name);
 
@@ -457,7 +482,7 @@ public static class BotGuilds
 
         var cooling = Cools(bot);
 
-        if (!cooling && Roomiest(Band) is { } small)
+        if (!cooling && Roomiest(Band, bot) is { } small)
         {
             Admit(small, bot);
 
@@ -529,9 +554,14 @@ public static class BotGuilds
         Unplaced++;
     }
 
-    private static Guild Roomiest(int under)
+    private static Guild Roomiest(int under) => Roomiest(under, null);
+
+    private static Guild Roomiest(int under, BotMobile bot)
     {
-        Guild smallest = null;
+        Guild best = null;
+        var bestShare = double.MaxValue;
+        var bestCount = int.MaxValue;
+        var role = bot?.Class?.Role;
 
         foreach (var guild in _guilds.Values)
         {
@@ -540,13 +570,33 @@ public static class BotGuilds
                 continue;
             }
 
-            if (smallest == null || guild.Members.Count < smallest.Members.Count)
+            var count = guild.Members.Count;
+            var share = role == null || count == 0 ? 0.0 : (double)OfRole(guild, role.Value) / count;
+
+            if (share < bestShare - 0.001 || Math.Abs(share - bestShare) <= 0.001 && count < bestCount)
             {
-                smallest = guild;
+                best = guild;
+                bestShare = share;
+                bestCount = count;
             }
         }
 
-        return smallest;
+        return best;
+    }
+
+    private static int OfRole(Guild guild, BotRole role)
+    {
+        var n = 0;
+
+        for (var i = 0; i < guild.Members.Count; i++)
+        {
+            if (guild.Members[i] is BotMobile { Deleted: false } member && member.Class?.Role == role)
+            {
+                n++;
+            }
+        }
+
+        return n;
     }
 
     private static Guild Widest()
@@ -561,7 +611,7 @@ public static class BotGuilds
                 continue;
             }
 
-            var fund = BotChest.Holds(guild.Name) + BotEstate.Fund(guild);
+            var fund = BotEstate.Fund(guild);
 
             if (fund > bestFund)
             {
@@ -607,12 +657,34 @@ public static class BotGuilds
 
         found.Sort((a, b) => founder.GetDistanceToSqrt(a.Location).CompareTo(founder.GetDistanceToSqrt(b.Location)));
 
-        if (found.Count > many)
+        List<BotMobile> band = [];
+        List<BotRole> roles = [];
+
+        if (founder.Class != null)
         {
-            found.RemoveRange(many, found.Count - many);
+            roles.Add(founder.Class.Role);
         }
 
-        return found;
+        for (var i = 0; i < found.Count && band.Count < many; i++)
+        {
+            var role = found[i].Class?.Role;
+
+            if (role != null && !roles.Contains(role.Value))
+            {
+                roles.Add(role.Value);
+                band.Add(found[i]);
+            }
+        }
+
+        for (var i = 0; i < found.Count && band.Count < many; i++)
+        {
+            if (!band.Contains(found[i]))
+            {
+                band.Add(found[i]);
+            }
+        }
+
+        return band;
     }
 
     private static void Admit(Guild guild, BotMobile bot)
@@ -667,6 +739,8 @@ public static class BotGuilds
         _guilds[named.Name] = guild;
 
         Stone(guild);
+
+        BotSeat.Choose(named.Name, leader.Map);
 
         for (var i = 0; i < band.Count; i++)
         {
@@ -776,6 +850,11 @@ public static class BotGuilds
         var worth = BotEstate.Hall(guild) is { Deleted: false } ? 2 : 0;
 
         worth += BotClaim.Holds(guild.Name);
+
+        if (BotGuildHouses.Held(guild))
+        {
+            worth++;
+        }
 
         if (BotEstate.Fund(guild) >= BotEstate.Price / 2)
         {

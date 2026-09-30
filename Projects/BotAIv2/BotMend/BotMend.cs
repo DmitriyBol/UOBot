@@ -92,7 +92,7 @@ public static class BotMend
     }
 
     public static string Describe() =>
-        $"{Robbing + Red + Criminal} looks at which a healer {(ShunsOutlaws ? "left alone" : "only counted")} somebody it would have been a crime to help ({Robbing} at a robbery, {Red} red, {Criminal} a criminal by the engine alone), {BotAccompany.Turned} stints and {BotSalve.Turned} mendings of another ended when the one helped turned";
+        $"{Robbing + Red + Criminal} looks at which a healer {(ShunsOutlaws ? "left alone" : "only counted")} somebody it would have been a crime to help ({Robbing} at a robbery, {Red} red, {Criminal} a criminal by the engine alone), {BotAccompany.Turned} stints and {BotSalve.Turned} mendings of another ended when the one helped turned; {BotAwaitMend.Describe()}";
 
     public static void Forget()
     {

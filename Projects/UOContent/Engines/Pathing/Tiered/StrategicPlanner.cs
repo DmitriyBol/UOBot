@@ -78,6 +78,10 @@ public sealed class StrategicPlanner
 
     public int Regions => _regions.Count;
 
+    public long Cycles { get; private set; }
+
+    public int LastCycleNode { get; private set; } = -1;
+
     public bool Prebuilt(NavGraph graph) => _prebuilt >= RegionsX(graph) * RegionsY(graph);
 
     public static int RegionsX(NavGraph graph) => (graph.ClustersX + RegionClusters - 1) / RegionClusters;
@@ -361,6 +365,7 @@ public sealed class StrategicPlanner
             {
                 if (_startCost.TryGetValue(n, out var toHere))
                 {
+                    Relax(graph, n, toHere, s, gx, gy);
                     RelaxGoal(g, toHere + c, n);
                 }
             }
@@ -412,7 +417,7 @@ public sealed class StrategicPlanner
 
                     if (_closed[to] != _search)
                     {
-                        Relax(graph, to, here + cost, node, gx, gy);
+                        Relax(graph, to, here + cost + NavigationService.DangerAt(graph, to), node, gx, gy);
                     }
                 }
             }
@@ -428,7 +433,7 @@ public sealed class StrategicPlanner
                         continue;
                     }
 
-                    Relax(graph, to, here + weights[e], node, gx, gy);
+                    Relax(graph, to, here + weights[e] + NavigationService.DangerAt(graph, to), node, gx, gy);
                 }
             }
         }
@@ -441,6 +446,11 @@ public sealed class StrategicPlanner
 
     private void Relax(NavGraph graph, int node, int cost, int parent, int gx, int gy)
     {
+        if (cost < 0 || cost > NavCost.Unaffordable)
+        {
+            return;
+        }
+
         if (_seen[node] == _search && _g[node] <= cost)
         {
             return;
@@ -493,8 +503,18 @@ public sealed class StrategicPlanner
         Add(rs);
         Add(rg);
 
+        var steps = 0;
+
         for (var node = _parent[g]; node >= 0 && node != s; node = _parent[node])
         {
+            if (++steps > graph.Capacity + 2)
+            {
+                Cycles++;
+                LastCycleNode = node;
+
+                break;
+            }
+
             Add(RegionOf(graph, graph.ClusterOfNode(node)));
         }
     }

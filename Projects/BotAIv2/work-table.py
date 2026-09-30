@@ -36,6 +36,9 @@ WHAT = {
     "ward": "telling a stranger hunting the guild's land about the toll",
     "cook": "cooking meat at a fire",
     "forge": "smithing weapons and armour",
+    "tinker": "making tools out of iron for the other trades",
+    "bowyer": "making bows and crossbows out of logs",
+    "weave": "shearing sheep, spinning, weaving and cutting cloth and bandages",
     "supply": "stocking its guild's counter from the shops",
     "herbs": "picking reagents",
     "pickings": "going through a corpse",
@@ -45,6 +48,10 @@ WHAT = {
     "stake": "standing on a square its guild is claiming",
     "forage": "picking up reagents lying about",
     "delve": "going down into a dungeon as a party",
+    "venture": "walking into a dungeon alone by its mouth",
+    "travel": "walking to another town",
+    "lodge": "walking to an inn to rest",
+    "tame": "bringing a beast to heel",
     "reclaim": "going back to its own corpse for its things",
     "homeward": "walking home",
     "inscribe": "writing spell scrolls",
@@ -140,7 +147,7 @@ def main():
             print(f"| other | {len(other)} rarer kinds: {', '.join(r[0] for r in other)} | {taken:,} | {finished:,} | "
                   f"{100.0 * finished / taken:.0f} % |")
         print(f"| **all work** | | **{pooled_taken:,}** | **{pooled_finished:,}** | "
-              f"**{100.0 * pooled_finished / pooled_taken:.0f} %** |")
+              f"**{(100.0 * pooled_finished / pooled_taken) if pooled_taken else 0.0:.0f} %** |")
         return
 
     print(f"{len(logs)} sessions, {len(rows)} kinds")

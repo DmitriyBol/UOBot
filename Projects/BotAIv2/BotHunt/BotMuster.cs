@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Server.Logging;
+using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
@@ -57,6 +59,24 @@ public sealed class BotMuster : IBotProposer
 
     public static long Called { get; private set; }
 
+    public static int UrgeMs { get; set; } = 15000;
+
+    public static long UrgedBands { get; private set; }
+
+    public static long UrgedAlone { get; private set; }
+
+    private static readonly Dictionary<Serial, (BaseCreature Quarry, long Tick)> _urged = [];
+
+    public static void Urge(Mobile body, BaseCreature quarry)
+    {
+        if (body == null || quarry == null)
+        {
+            return;
+        }
+
+        _urged[body.Serial] = (quarry, Core.TickCount);
+    }
+
     public BotDeed Propose(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -95,6 +115,25 @@ public sealed class BotMuster : IBotProposer
             Unfit++;
 
             return null;
+        }
+
+        if (_urged.TryGetValue(body.Serial, out var urge) && Core.TickCount - urge.Tick < UrgeMs)
+        {
+            _urged.Remove(body.Serial);
+
+            if (urge.Quarry is { Deleted: false, Alive: true } foe && foe.Map == map && body.InRange(foe, Reach * 2))
+            {
+                if (Free(body, Reach) >= Least)
+                {
+                    UrgedBands++;
+                    Called++;
+                    Once(body, foe);
+
+                    return new BotBand(foe, BotThreat.OurPower(body, Reach));
+                }
+
+                UrgedAlone++;
+            }
         }
 
         var quarry = BotQuarry.Company(body, Reach, out var why);
@@ -181,7 +220,7 @@ public sealed class BotMuster : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a company yet"
-            : $"{Asked} asked: {Called} called, {Enough} refused because {BotSquads.Bound} of us are already in one, {Alone} had nobody of ours near enough, {AllSmall} found only one-bot work, "
+            : $"{Asked} asked: {Called} called ({UrgedBands} of them on a foe a bot had just found too many round, {UrgedAlone} such urges with too few free near), {Enough} refused because {BotSquads.Bound} of us are already in one, {Alone} had nobody of ours near enough, {AllSmall} found only one-bot work, "
               + $"{AllTooBig} found something beyond all of us together, {NothingBig} found nothing hostile at all, "
               + $"{TooFewNear} found one but fewer than {Least} free, {Unfit} too hurt, {Held} already in one";
 

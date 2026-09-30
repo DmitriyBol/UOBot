@@ -1,0 +1,2037 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>BotWeb</title>
+<style>
+/* ---------- tokens (dark by default, light via prefers-color-scheme or data-theme) ---------- */
+:root {
+  color-scheme: dark;
+  --bg: #0d0d0d; --surface: #1a1a19; --surface-2: #232322; --surface-3: #2c2c2a;
+  --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --good: #0ca30c; --warn: #fab219; --serious: #ec835a; --crit: #d03b3b;
+  --accent: #3987e5; --map-bg: #141416;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f9f9f7; --surface: #fcfcfb; --surface-2: #f0efec; --surface-3: #e6e5df;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+    --accent: #2a78d6; --map-bg: #f3f2ee;
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f9f9f7; --surface: #fcfcfb; --surface-2: #f0efec; --surface-3: #e6e5df;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  --accent: #2a78d6; --map-bg: #f3f2ee;
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+html { overflow-x: hidden; } /* on html only: overflow on body would break position: sticky */
+button, select, input { font: inherit; color: inherit; }
+button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+button:hover { background: var(--surface-3); }
+button.on { background: var(--accent); color: #fff; border-color: transparent; }
+select, input[type=text], input[type=search] { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 7px; min-width: 0; }
+input[type=text], input[type=search] { width: 160px; }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+.ink2 { color: var(--ink-2); }
+.mono { font-family: ui-monospace, Consolas, "Cascadia Mono", Menlo, monospace; }
+.num { font-variant-numeric: tabular-nums; }
+.hidden { display: none !important; }
+
+#app { display: grid; gap: 12px; padding: 12px; grid-template-columns: minmax(0, 1fr) 400px; grid-template-rows: auto auto auto auto 1fr; grid-template-areas: "top top" "tiles tiles" "alarms alarms" "map side" "tabs side"; max-width: 100%; align-items: start; }
+@media (max-width: 1279px) {
+  #app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "tiles" "alarms" "map" "side" "tabs"; }
+}
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.card-h { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.card-h h2 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: .02em; }
+.card-b { padding: 10px 12px; }
+
+/* ---------- header ---------- */
+#top { grid-area: top; display: flex; align-items: center; gap: 16px; padding: 8px 14px; flex-wrap: wrap; }
+#top .brand { font-weight: 700; font-size: 16px; letter-spacing: .02em; }
+#top .brand small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+#top .facts { display: flex; gap: 18px; flex-wrap: wrap; color: var(--ink-2); }
+#top .facts b { color: var(--ink); font-weight: 600; }
+#top .spacer { flex: 1; }
+#conn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
+#conn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+#conn.sse .dot { background: var(--good); }
+#conn.polling .dot { background: var(--warn); }
+#conn.lost .dot { background: var(--crit); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+#lost { width: 100%; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--crit) 18%, var(--surface)); border: 1px solid var(--crit); }
+
+/* ---------- stat tiles ---------- */
+#tiles { grid-area: tiles; display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.tile { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.tile .lbl { color: var(--ink-2); font-size: 12px; }
+.tile .val { font-size: 30px; font-weight: 600; line-height: 1.1; }
+.tile .val.hero { font-size: 40px; }
+.tile .val small { font-size: 14px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+.tile .sub { color: var(--muted); font-size: 11.5px; min-height: 1.3em; }
+.tile .sub b { color: var(--ink-2); font-weight: 600; }
+.meter { position: relative; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: visible; margin: 4px 0 2px; }
+.meter .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--good); transition: width .4s; }
+.meter .fill.warn { background: var(--warn); }
+.meter .fill.crit { background: var(--crit); }
+.meter .tgt { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); opacity: .8; transform: translateX(-1px); }
+canvas.spark { width: 100%; height: 34px; display: block; margin-top: 4px; }
+.pp-list { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+.pp { display: grid; grid-template-columns: 52px minmax(30px, 1fr) max-content; gap: 6px; align-items: center; font-size: 11px; color: var(--ink-2); }
+.pp .k { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp .bar { height: 4px; background: var(--surface-3); border-radius: 2px; }
+.pp .bar i { display: block; height: 100%; background: var(--good); border-radius: 2px; }
+.pp .bar i.warn { background: var(--warn); }
+.pp .bar i.crit { background: var(--crit); }
+.pp .v { color: var(--muted); }
+.status { display: inline-flex; align-items: center; gap: 6px; }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ---------- alarms ---------- */
+#alarms { grid-area: alarms; display: flex; gap: 8px; flex-wrap: wrap; }
+#alarms:empty { display: none; }
+.alarm { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--surface)); }
+.alarm b { margin-right: 6px; }
+
+/* ---------- map ---------- */
+#mapCard { grid-area: map; display: flex; flex-direction: column; min-height: 460px; height: clamp(460px, 64vh, 760px); }
+#mapCard .card-h { gap: 6px; }
+#mapCard .card-h .grp { display: inline-flex; gap: 4px; align-items: center; margin-left: 4px; }
+#mapWrap { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 0 0 8px 8px; }
+#map { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+#map.dragging { cursor: grabbing; }
+#map.hover { cursor: pointer; }
+#legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 6px 12px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--ink-2); }
+#legend .li { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+#legend .li.off { opacity: .35; text-decoration: line-through; }
+#legend .sw { width: 9px; height: 9px; border-radius: 50%; }
+#legend .glyph { width: 12px; height: 12px; display: inline-block; }
+#mapNote { position: absolute; left: 8px; bottom: 6px; font-size: 11px; color: var(--muted); pointer-events: none; }
+#mapScale { position: absolute; right: 8px; bottom: 6px; font-size: 11px; color: var(--muted); pointer-events: none; }
+#tip { position: fixed; z-index: 50; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; box-shadow: 0 4px 16px rgba(0,0,0,.35); max-width: 280px; font-size: 12px; display: none; }
+#tip b { display: block; font-size: 13px; }
+#tip .muted { display: block; }
+#tip .row { display: flex; gap: 8px; justify-content: space-between; }
+#tip .row b { display: inline; font-size: 12px; }
+/* danger zones (/api/zones): a line under the legend with the level filters, the counts and the tour; a card in the side column */
+#dangerBar { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 5px 12px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--ink-2); align-items: center; }
+#dangerBar .li { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+#dangerBar .li.off { opacity: .35; text-decoration: line-through; }
+#dangerBar .sw { width: 12px; height: 9px; border-radius: 2px; border: 1px solid transparent; }
+#dangerBar .sw.dash { border-style: dashed; }
+#dangerBar b { color: var(--ink); font-weight: 600; }
+#dangerBar .note { margin-left: auto; color: var(--muted); }
+#zoneDetail { flex: 0 1 auto; max-height: 42%; display: flex; flex-direction: column; min-height: 0; }
+#zoneDetail .card-b { overflow: auto; min-height: 0; }
+#zoneDetail h3 { margin: 10px 0 4px; }
+#zoneDetail .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#zoneDetail .head b { font-size: 15px; }
+@media (max-width: 1279px) { #zoneDetail { max-height: 460px; } }
+.badge.lv-clear { background: var(--good); color: #fff; }
+.badge.lv-edge { background: var(--warn); color: #0b0b0b; }
+.badge.lv-hostile { background: var(--serious); color: #0b0b0b; }
+.badge.lv-deadly { background: var(--crit); color: #fff; }
+
+/* ---------- side: detail + events ---------- */
+#side { grid-area: side; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+@media (min-width: 1280px) { #side { position: sticky; top: 12px; align-self: start; height: calc(100vh - 24px); } }
+#detail { flex: 0 1 auto; max-height: 48%; display: flex; flex-direction: column; min-height: 0; }
+#detail .card-b { overflow: auto; min-height: 0; }
+#detail.hidden + #events { flex: 1 1 auto; }
+#events { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+@media (max-width: 1279px) { #events { height: 420px; } #detail { max-height: 460px; } }
+#evList { flex: 1; overflow: auto; padding: 4px 0; min-height: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; user-select: none; color: var(--ink-2); }
+.chip.on { background: var(--surface-3); color: var(--ink); border-color: var(--ink-2); }
+.chip .n { color: var(--muted); margin-left: 3px; }
+#evPaused { font-size: 11px; color: var(--warn); }
+.ev { display: grid; grid-template-columns: 52px 46px minmax(0, 1fr); gap: 6px; padding: 3px 10px; border-left: 3px solid transparent; font-size: 12px; align-items: baseline; }
+.ev:hover { background: var(--surface-2); }
+.ev .at { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 11px; }
+.ev .k { color: var(--muted); font-size: 11px; text-transform: lowercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev .body { min-width: 0; overflow-wrap: anywhere; }
+.ev .bot { font-weight: 600; cursor: pointer; }
+.ev .bot:hover { text-decoration: underline; }
+.ev .tag { color: var(--muted); font-size: 11px; margin: 0 4px 0 3px; }
+.ev.say .txt { color: var(--ink); }
+.ev.say.mood .txt { color: var(--ink-2); font-style: italic; }
+.ev.say.cry { border-left-color: var(--serious); }
+.ev.say.guild .k { color: var(--ink-2); }
+.ev.death { border-left-color: var(--crit); }
+.ev.alarm { border-left-color: var(--warn); }
+.ev.war { border-left-color: var(--serious); }
+.ev.path { border-left-color: var(--axis); }
+.ev.work.finished .k, .ev.work.finished .body { color: var(--ink-2); }
+.ev.work .body { color: var(--ink-2); }
+.ev.market .body, .ev.craft .body { color: var(--ink-2); }
+
+/* ---------- tabs ---------- */
+#tabs { grid-area: tabs; display: flex; flex-direction: column; min-width: 0; }
+#tabbar { display: flex; gap: 2px; padding: 6px 8px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+#tabbar button { border: 0; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; background: transparent; padding: 6px 12px; color: var(--ink-2); }
+#tabbar button:hover { background: var(--surface-2); }
+#tabbar button.on { color: var(--ink); border-bottom-color: var(--accent); background: transparent; }
+#tabbar button .badge { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--surface-3); color: var(--ink-2); font-size: 11px; margin-left: 5px; text-align: center; }
+#tabbar button .badge.warn { background: var(--warn); color: #0b0b0b; }
+.pane { display: none; padding: 10px 12px; }
+.pane.on { display: block; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.toolbar .sp { flex: 1; }
+
+/* table */
+.tblWrap { overflow: auto; max-height: 560px; border: 1px solid var(--border); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--surface-2); color: var(--ink-2); font-weight: 600; cursor: pointer; user-select: none; z-index: 1; }
+th.sorted::after { content: " ▲"; font-size: 9px; color: var(--muted); }
+th.sorted.desc::after { content: " ▼"; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr.sel { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.num.crit, b.crit { color: var(--crit); }
+td .stage { display: block; color: var(--muted); font-size: 11px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+td .sw { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+td .hp { display: inline-block; width: 60px; height: 6px; background: var(--surface-3); border-radius: 3px; vertical-align: middle; margin-right: 6px; overflow: hidden; }
+td .hp i { display: block; height: 100%; background: var(--good); border-radius: 3px; }
+td .hp i.warn { background: var(--warn); }
+td .hp i.crit { background: var(--crit); }
+.badge { display: inline-block; padding: 0 6px; border-radius: 999px; font-size: 11px; background: var(--surface-3); color: var(--ink-2); }
+.badge.Hunted { background: var(--serious); color: #0b0b0b; }
+.badge.Failing { background: var(--crit); color: #fff; }
+.badge.Dead { background: transparent; border: 1px solid var(--muted); color: var(--muted); }
+.badge.Bound { background: var(--surface-3); color: var(--ink); }
+.badge.stuck { background: var(--warn); color: #0b0b0b; }
+.dead td { color: var(--muted); }
+.resting td { color: var(--muted); font-style: italic; }
+.count { color: var(--muted); font-size: 12px; }
+
+/* bar lists */
+.bars { display: grid; grid-template-columns: max-content minmax(60px, 1fr) max-content; gap: 5px 10px; align-items: center; font-size: 12px; }
+.bars .lbl { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bars .lbl.click { cursor: pointer; }
+.bars .lbl.click:hover { text-decoration: underline; }
+.bars .bar { position: relative; height: 10px; background: transparent; }
+.bars .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--s1); border-radius: 0 4px 4px 0; min-width: 2px; }
+.bars .bar i.warn { background: var(--warn); }
+.bars .bar i.crit { background: var(--crit); }
+.bars .bar .tgt { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); opacity: .7; }
+.bars .v { color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bars .v b { color: var(--ink); font-weight: 600; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.cols h3, .pane h3 { font-size: 12px; font-weight: 600; margin: 0 0 6px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .05em; }
+.list { display: flex; flex-direction: column; gap: 4px; }
+.list .it { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.list .it:hover { background: var(--surface-2); }
+.list .it .t { display: flex; justify-content: space-between; gap: 8px; }
+.list .it .t b { font-weight: 600; }
+.list .it .d { color: var(--muted); font-size: 11.5px; }
+.sparkBox { position: relative; }
+.sparkBox canvas { width: 100%; height: 70px; display: block; }
+.sparkBox .cap { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.sparkBox .cap b { color: var(--ink); }
+
+/* guilds */
+.gcard { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; }
+.gcard .t { display: flex; justify-content: space-between; align-items: baseline; }
+.gcard .t b { font-size: 13px; }
+.gcard .d { color: var(--muted); font-size: 11.5px; }
+.gcard .d a { cursor: pointer; }
+.war { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; }
+.war .t { display: flex; justify-content: space-between; gap: 8px; }
+.war .score { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; height: 8px; margin: 6px 0 4px; }
+.war .score i { display: block; height: 100%; background: var(--surface-3); position: relative; }
+.war .score i b { position: absolute; top: 0; bottom: 0; background: var(--s1); }
+.war .score i.a b { right: 0; border-radius: 4px 0 0 4px; }
+.war .score i.b b { left: 0; border-radius: 0 4px 4px 0; background: var(--s2); }
+
+/* craft */
+.craftTbl td, .craftTbl th { white-space: normal; }
+.prod { display: inline-block; margin: 1px 6px 1px 0; padding: 1px 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 11.5px; }
+.prod .m { color: var(--muted); }
+.prod.want { border-color: var(--warn); }
+
+/* log */
+#logOut { max-height: 520px; overflow: auto; font-size: 12px; white-space: pre; margin: 0; padding: 8px; background: var(--surface-2); border-radius: 6px; }
+
+/* detail */
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 10px; font-size: 12px; }
+.kv .k { color: var(--muted); }
+.kv .v { overflow-wrap: anywhere; }
+.skill { display: grid; grid-template-columns: 110px 1fr 44px; gap: 6px; align-items: center; font-size: 12px; }
+.skill .bar { height: 6px; background: var(--surface-3); border-radius: 3px; }
+.skill .bar i { display: block; height: 100%; background: var(--s1); border-radius: 3px; }
+#detail h3 { margin: 10px 0 4px; }
+#detail .head { display: flex; align-items: center; gap: 8px; }
+#detail .head b { font-size: 15px; }
+.mini td, .mini th { padding: 3px 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="top" class="card">
+    <div class="brand">BotWeb<small id="mapName">Felucca</small></div>
+    <div class="facts">
+      <span>time <b id="hTime">–</b></span>
+      <span>up <b id="hUp">–</b></span>
+      <span>build <b id="hBuild">–</b></span>
+      <span>Bots <b id="hTotal">–</b><span class="muted"> online </span><b id="hOffline">–</b><span class="muted"> offline · (</span><b id="hAlive">–</b><span class="muted"> alive · </span><b id="hDead">–</b><span class="muted"> dead)</span></span>
+    </div>
+    <div class="spacer"></div>
+    <span id="conn" class="polling"><span class="dot"></span><span id="connTxt">connecting</span></span>
+    <button id="themeBtn" title="Theme: auto / dark / light">theme</button>
+    <div id="lost" class="hidden"></div>
+  </header>
+
+  <section id="tiles">
+    <div class="card tile">
+      <div class="lbl">Bots alive</div>
+      <div class="val"><span id="tAlive">–</span><small id="tAliveOf">of –</small></div>
+      <div class="sub" id="tAliveSub">–</div>
+      <canvas class="spark" id="spAlive"></canvas>
+    </div>
+    <div class="card tile">
+      <div class="lbl">Work finished</div>
+      <div class="val hero" id="tWork">–</div>
+      <div class="meter"><div class="fill" id="tWorkFill" style="width:0"></div><div class="tgt" style="left:95%"></div></div>
+      <div class="sub" id="tWorkSub">target 95 %</div>
+      <canvas class="spark" id="spWork"></canvas>
+    </div>
+    <div class="card tile" id="tileMoney" style="cursor:pointer" title="Coin the bots' work brought into their packs over the last hour; the special classes are left out. Click for the table.">
+      <div class="lbl">Money earned</div>
+      <div class="val"><span id="tCoin">–</span><small>gp / hour</small></div>
+      <div class="sub" id="tCoinSub">–</div>
+      <div class="sub" id="tWealthSub">–</div>
+    </div>
+    <div class="card tile">
+      <div class="lbl">Paths reached</div>
+      <div class="val hero" id="tPath">–</div>
+      <div class="meter"><div class="fill" id="tPathFill" style="width:0"></div><div class="tgt" style="left:99%"></div></div>
+      <div class="sub" id="tPathSub">target 99 %</div>
+      <div id="tPathPurpose" class="pp-list"></div>
+      <canvas class="spark" id="spPath"></canvas>
+    </div>
+    <div class="card tile">
+      <div class="lbl">Stuck now</div>
+      <div class="val" id="tStuck">–</div>
+      <div class="sub" id="tStuckSub">–</div>
+      <div class="sub" id="tStuckTop"></div>
+    </div>
+    <div class="card tile">
+      <div class="lbl">Routes &amp; graph</div>
+      <div class="val"><span id="tRouted">–</span><small id="tRoutedOf">routed</small></div>
+      <div class="sub" id="tRouteSub">–</div>
+      <div class="sub" id="tGraphSub">–</div>
+    </div>
+    <div class="card tile">
+      <div class="lbl">Minds</div>
+      <div class="val"><span id="tAwake">–</span><small>awake</small></div>
+      <div class="sub"><span class="status"><span class="dot" id="mindDot" style="background:var(--muted)"></span><span id="mindReach">–</span></span> · <b id="mindModel">–</b></div>
+      <div class="sub"><span id="mindEndpoint">–</span> · last <b id="mindMs">–</b> · <b id="mindChoices">–</b> choices</div>
+    </div>
+  </section>
+
+  <div id="alarms"></div>
+
+  <section id="mapCard" class="card">
+    <div class="card-h">
+      <h2>Map</h2>
+      <span class="muted" id="mapSize">6144 × 4096</span>
+      <span class="grp">
+        <button id="btnFit" title="Fit the whole map">fit</button>
+        <button id="btnFollow" title="Keep the selected bot centred">follow</button>
+      </span>
+      <span class="grp muted">layers</span>
+      <span class="grp" id="layerBtns">
+        <button data-layer="zones" class="on" title="Squares the guilds hold (BotClaim)">claims</button>
+        <button data-layer="danger" class="on" title="Danger and safety round the mobs' spawns (/api/zones): the filled core is where they patrol, the dashed halo how far they see and come for a walker. Green clear (safe passage, hunting ground), yellow edge, orange hostile, red deadly for a bot. Hover or click a zone for its mobs">danger zones</button>
+        <button data-layer="halls" class="on">halls</button>
+        <button data-layer="gates" class="on" title="Cave mouths and other teleporters the bots walk through (BotGates)">gates</button>
+        <button data-layer="towns" class="on" title="Towns the bots can walk to (BotTowns)">towns</button>
+        <button data-layer="shops" class="on" title="Bots keeping shop by a bank: keeper, what it holds, what it has sold (BotShopkeep)">shops</button>
+        <button data-layer="barred" class="on" title="Ground closed to the bots: standing bars, quarantines and killing fields (BotBarred)">barred</button>
+        <button data-layer="roads" class="on" title="Roads between towns, drawn once somebody has walked them (BotRoadbook)">roads</button>
+        <button data-layer="squads" class="on">squads</button>
+        <button data-layer="hot" class="on">hot spots</button>
+        <button data-layer="routes">all routes</button>
+        <button data-layer="names">names</button>
+        <button data-layer="grid" class="on">grid</button>
+      </span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="muted" id="mapCount"></span>
+    </div>
+    <div id="legend"></div>
+    <div id="dangerBar" class="hidden"></div>
+    <div id="mapWrap">
+      <canvas id="map"></canvas>
+      <div id="mapNote" class="muted"></div>
+      <div id="mapScale"></div>
+    </div>
+  </section>
+
+  <aside id="side">
+    <section id="zoneDetail" class="card hidden">
+      <div class="card-h"><h2>Zone</h2><span class="muted" id="zoneId"></span><span class="spacer" style="flex:1"></span><button id="zoneCentre" title="Centre the map on this zone">centre</button><button id="zoneClose">close</button></div>
+      <div class="card-b" id="zoneBody"></div>
+    </section>
+    <section id="detail" class="card hidden">
+      <div class="card-h"><h2>Bot</h2><span class="spacer" style="flex:1"></span><button id="btnCentre" title="Centre the map on this bot">centre</button><button id="btnClose">close</button></div>
+      <div class="card-b" id="detailBody"></div>
+    </section>
+    <section id="events" class="card">
+      <div class="card-h">
+        <h2>Events</h2>
+        <span class="count" id="evCount"></span>
+        <span id="evPaused" class="hidden">paused</span>
+        <span class="spacer" style="flex:1"></span>
+        <button id="evClear" title="Clear the feed">clear</button>
+      </div>
+      <div class="card-h" style="padding-top:6px;padding-bottom:6px">
+        <div class="chips" id="evKinds"></div>
+      </div>
+      <div class="card-h" style="padding-top:4px;padding-bottom:6px">
+        <span class="muted" style="font-size:11px">say</span>
+        <div class="chips" id="evChannels"></div>
+      </div>
+      <div id="evList"></div>
+    </section>
+  </aside>
+
+  <section id="tabs" class="card">
+    <div id="tabbar">
+      <button data-tab="bots" class="on">Bots<span class="badge" id="bBots">0</span></button>
+      <button data-tab="stuck">Stuck<span class="badge" id="bStuck">0</span></button>
+      <button data-tab="paths">Paths</button>
+      <button data-tab="work">Work</button>
+      <button data-tab="money">Money</button>
+      <button data-tab="guilds">Guilds &amp; wars</button>
+      <button data-tab="craft">Craft</button>
+      <button data-tab="log">Log</button>
+    </div>
+
+    <div class="pane on" data-pane="bots">
+      <div class="toolbar">
+        <input type="search" id="fText" placeholder="name, work, stage, rank…">
+        <select id="fClass"><option value="">all classes</option></select>
+        <select id="fStanding"><option value="">all standings</option></select>
+        <select id="fWork"><option value="">all work</option></select>
+        <select id="fGuild"><option value="">all guilds</option></select>
+        <label><input type="checkbox" id="fStuckOnly"> stuck only</label>
+        <span class="sp"></span>
+        <span class="count" id="tblCount"></span>
+      </div>
+      <div class="tblWrap"><table id="botTbl"><thead><tr></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="pane" data-pane="stuck">
+      <div class="cols">
+        <div><h3>Stuck bots <span class="count" id="stuckN"></span></h3><div class="list" id="stuckList"></div></div>
+        <div><h3>Alarm log</h3><div class="list" id="alarmList"></div></div>
+      </div>
+    </div>
+
+    <div class="pane" data-pane="paths">
+      <div class="toolbar"><span class="muted" id="pathsSummary"></span><span class="sp"></span><span class="muted" id="pathsAt"></span></div>
+      <div class="cols">
+        <div><h3>By purpose <span class="count">(reached share, all searches)</span></h3><div class="bars" id="pPurpose"></div><h3 style="margin-top:14px">By outcome</h3><div class="bars" id="pOutcome"></div><h3 style="margin-top:14px">By bot</h3><div class="bars" id="pBot"></div></div>
+        <div><h3>By reason</h3><div class="bars" id="pReason"></div></div>
+        <div><h3>Recent failures</h3><div class="list" id="pRecent" style="max-height:520px;overflow:auto"></div></div>
+      </div>
+    </div>
+
+    <div class="pane" data-pane="work">
+      <div class="cols">
+        <div style="grid-column: span 1"><h3>Finished share by kind <span class="count">(target 95 %)</span></h3><div class="bars" id="wKinds"></div></div>
+        <div>
+          <h3>History</h3>
+          <div class="sparkBox"><div class="cap"><span>Work finished share</span><b id="hWorkNow">–</b></div><canvas id="chWork"></canvas></div>
+          <div class="sparkBox" style="margin-top:8px"><div class="cap"><span>Paths reached share</span><b id="hPathNow">–</b></div><canvas id="chPath"></canvas></div>
+          <div class="sparkBox" style="margin-top:8px"><div class="cap"><span>Alive</span><b id="hAliveNow">–</b></div><canvas id="chAlive"></canvas></div>
+          <div class="sparkBox" style="margin-top:8px"><div class="cap"><span>Stuck</span><b id="hStuckNow">–</b></div><canvas id="chStuck"></canvas></div>
+          <div class="cap muted" style="font-size:11px;margin-top:6px" id="hRange"></div>
+        </div>
+        <div><h3>Totals</h3><div class="kv" id="wTotals"></div><h3 style="margin-top:14px">Population by work</h3><div class="bars" id="wByWork"></div></div>
+      </div>
+    </div>
+
+    <div class="pane" data-pane="money">
+      <div class="toolbar"><span class="muted" id="moneyNote"></span></div>
+      <div class="cols">
+        <div style="grid-column: span 2">
+          <h3>By class <span class="count">(per bot, last hour)</span></h3>
+          <div class="tblWrap" style="max-height:none"><table class="mini" id="moneyTbl"><thead><tr><th>Class</th><th class="num">Bots</th><th class="num">Earned gp/h</th><th class="num">Per bot gp/h</th><th class="num">Spent at work gp/h</th><th class="num">Made gp/h</th><th class="num">Purse + bank per bot</th><th class="num">Net per bot gp/h</th><th class="num">Earned since boot</th></tr></thead><tbody></tbody></table></div>
+          <h3 style="margin-top:14px">Earned per bot per hour</h3><div class="bars" id="moneyBars"></div>
+        </div>
+        <div><h3>Top earners <span class="count">(last hour)</span></h3><div class="bars" id="moneyTop"></div><h3 style="margin-top:14px">Totals</h3><div class="kv" id="moneyTotals"></div></div>
+      </div>
+    </div>
+
+    <div class="pane" data-pane="guilds">
+      <div class="cols">
+        <div><h3>Guilds</h3><div class="list" id="guildList"></div></div>
+        <div><h3>Wars</h3><div class="list" id="warList"></div><h3 style="margin-top:14px">Squads</h3><div class="list" id="squadList"></div><h3 style="margin-top:14px">Diplomacy</h3><div class="list" id="dipList"></div></div>
+      </div>
+    </div>
+
+    <div class="pane" data-pane="craft">
+      <div class="toolbar"><button id="craftRefresh">refresh</button><span class="muted" id="craftAt"></span></div>
+      <h3>Chains</h3>
+      <div class="tblWrap" style="max-height:none"><table class="craftTbl" id="craftTbl"><thead><tr><th>Material</th><th class="num">Gatherers</th><th class="num">On market</th><th class="num">Cheapest</th><th>Into</th><th class="num">Makers</th><th>Products (skill · needs · makers · on market · wanted · made today)</th></tr></thead><tbody></tbody></table></div>
+      <div class="cols" style="margin-top:14px">
+        <div><h3>Refusals</h3><div class="bars" id="craftRefusals"></div></div>
+        <div><h3>Open wants</h3><div class="tblWrap" style="max-height:none"><table class="mini" id="wantTbl"><thead><tr><th>Item</th><th class="num">Amount</th><th class="num">Price</th><th class="num">Lodged</th><th class="num">Raised</th><th>Since</th><th>By</th><th>Makeable</th></tr></thead><tbody></tbody></table></div></div>
+      </div>
+    </div>
+
+    <div class="pane" data-pane="log">
+      <div class="toolbar">
+        <input type="search" id="logGrep" placeholder="grep…">
+        <select id="logN"><option>100</option><option selected>300</option><option>1000</option></select>
+        <button id="logRefresh">refresh</button>
+        <label><input type="checkbox" id="logAuto"> auto 10 s</label>
+        <span class="sp"></span><span class="muted" id="logInfo"></span>
+      </div>
+      <pre id="logOut" class="mono"></pre>
+    </div>
+  </section>
+</div>
+<div id="tip"></div>
+
+<script>
+'use strict';
+(() => {
+// ================================================================ helpers
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'class') n.className = v;
+    else if (k === 'style') n.style.cssText = v;
+    else if (k === 'text') n.textContent = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v);
+  }
+  for (const c of kids.flat(Infinity)) {
+    if (c === null || c === undefined || c === false) continue;
+    n.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return n;
+}
+const isNum = v => typeof v === 'number' && Number.isFinite(v);
+const fmtInt = n => isNum(n) ? Math.round(n).toLocaleString('en-US') : '–';
+const fmtPct = (v, d) => isNum(v) ? (v * 100).toFixed(d ?? (v >= 0.995 && v < 1 ? 2 : 1)) + '%' : '–';
+const fmtGold = n => isNum(n) ? (n >= 100000 ? (n / 1000).toFixed(0) + 'k' : n >= 10000 ? (n / 1000).toFixed(1) + 'k' : fmtInt(n)) : '–';
+function fmtDur(ms) {
+  if (!isNum(ms)) return '–';
+  let s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60); s -= m * 60;
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  if (m) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+const timeOf = at => typeof at === 'string' ? (at.includes('T') ? at.slice(11, 19) : at) : '–';
+const hhmm = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+const str = v => (v === null || v === undefined) ? '' : String(v);
+const pair = p => Array.isArray(p) && isNum(p[0]) && isNum(p[1]) ? p : null;
+const ptOf = p => p && isNum(p.x) && isNum(p.y) ? [p.x, p.y] : pair(p);
+const fmtPt = p => { const q = ptOf(p); return q ? `(${Math.round(q[0])}, ${Math.round(q[1])})` : '–'; };
+
+// ================================================================ class → colour family (8 categorical slots + Other)
+const FAMILY = { Warrior: 'Warrior', Archer: 'Archer', Gatherer: 'Gatherer', Mage: 'Mage', Crafter: 'Crafter', Healer: 'Healer', WarriorMage: 'Hybrid', WarriorArcher: 'Hybrid', Captain: 'Leader', Baron: 'Leader' };
+const FAMILIES = ['Warrior', 'Archer', 'Gatherer', 'Mage', 'Crafter', 'Healer', 'Hybrid', 'Leader', 'Other'];
+const FAMILY_NOTE = { Hybrid: 'WarriorMage, WarriorArcher', Leader: 'Captain, Baron', Other: 'Architect, Sage, Brawler, …' };
+const familyOf = c => FAMILY[c] || 'Other';
+const LEVELS = ['Novice', 'Apprentice', 'Journeyman', 'Expert', 'Adept', 'Master', 'Grandmaster'];
+let CSS = {};
+function readCss() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  CSS = { s: [1, 2, 3, 4, 5, 6, 7, 8].map(i => g('--s' + i)), surface: g('--surface'), mapBg: g('--map-bg'), ink: g('--ink'), ink2: g('--ink-2'), muted: g('--muted'), grid: g('--grid'), axis: g('--axis'), good: g('--good'), warn: g('--warn'), serious: g('--serious'), crit: g('--crit'), accent: g('--accent'), surface3: g('--surface-3') };
+}
+const colorOfFamily = f => { const i = FAMILIES.indexOf(f); return i >= 0 && i < 8 ? CSS.s[i] : CSS.muted; };
+const colorOfClass = c => colorOfFamily(familyOf(c));
+
+// ================================================================ state
+const EV_KINDS = ['say', 'work', 'path', 'death', 'war', 'alarm', 'market', 'craft'];
+const EV_CHANNELS = ['world', 'guild', 'local', 'mood', 'cry'];
+const S = {
+  state: null, bots: [], botByName: new Map(), paths: null, history: null, craft: null, roads: null,
+  events: [], lastSeq: 0, seen: new Set(),
+  selected: null, detail: null, follow: false,
+  conn: 'polling', lostSince: null, lastOk: 0,
+  hidden: new Set(), tab: 'bots',
+  layers: { zones: true, halls: true, gates: true, towns: true, barred: true, roads: true, squads: true, hot: true, routes: false, names: false, grid: true },
+  sort: { key: 'name', dir: 1 }, filters: { q: '', cls: '', standing: '', work: '', guild: '', stuckOnly: false },
+  evKinds: new Set(EV_KINDS), evChannels: new Set(EV_CHANNELS), evPaused: false, evPending: 0,
+  evCounts: {},
+};
+
+// ================================================================ fetch
+async function getJSON(url) {
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) { return null; }
+}
+async function getText(url) {
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) return null;
+    return await r.text();
+  } catch (e) { return null; }
+}
+
+// ================================================================ connection state
+const connEl = $('#conn'), connTxt = $('#connTxt'), lostEl = $('#lost');
+function setConn(mode) {
+  S.conn = mode;
+  connEl.className = mode;
+  connTxt.textContent = mode === 'sse' ? 'live (SSE)' : mode === 'polling' ? 'polling' : 'lost';
+}
+function markOnline() {
+  S.lastOk = Date.now();
+  if (S.lostSince) { S.lostSince = null; lostEl.classList.add('hidden'); setConn(sse.open ? 'sse' : 'polling'); if (map.imgState === 'missing') loadMapImage('/api/map.png'); }
+}
+function markOffline() {
+  if (!S.lostSince) { S.lostSince = hhmm(); }
+  lostEl.textContent = `shard unreachable since ${S.lostSince} — retrying…`;
+  lostEl.classList.remove('hidden');
+  setConn('lost');
+}
+
+// ================================================================ state polling
+async function pollState() {
+  const st = await getJSON('/api/state');
+  if (st && typeof st === 'object') {
+    try { applyState(st); markOnline(); } catch (e) { console.warn('applyState', e); }
+    setTimeout(pollState, 2500);
+  } else {
+    markOffline();
+    setTimeout(pollState, 3000);
+  }
+}
+function applyState(st) {
+  S.state = st;
+  S.bots = Array.isArray(st.bots) ? st.bots.filter(b => b && typeof b === 'object') : [];
+  S.botByName = new Map(S.bots.map(b => [str(b.name), b]));
+  if (isNum(st.eventsSeq) && S.lastSeq === 0 && S.events.length === 0) S.lastSeq = 0; // first events call uses the default window
+  renderHeader(st);
+  renderTiles(st);
+  renderAlarms(st);
+  renderTable();
+  renderStuck(st);
+  renderGuilds(st);
+  renderWorkKinds(st);
+  renderMoney(st);
+  updateFilterOptions(st);
+  updateDetailFromState();
+  map.dirty = true;
+}
+
+// ================================================================ header + tiles
+function renderHeader(st) {
+  $('#hTime').textContent = timeOf(st.at);
+  $('#hUp').textContent = fmtDur(st.uptimeMs);
+  $('#hBuild').textContent = str(st.build) || '–';
+  const p = st.population || {};
+  $('#hAlive').textContent = fmtInt(p.alive);
+  $('#hDead').textContent = fmtInt(p.dead);
+  // online = in the world (alive or dead); offline = resting; the total is the tooltip
+  $('#hTotal').textContent = fmtInt(isNum(p.total) && isNum(p.offline) ? p.total - p.offline : p.total);
+  $('#hTotal').title = `${fmtInt(p.total)} bots in all`;
+  $('#hOffline').textContent = fmtInt(p.offline);
+  if (st.map && st.map.name) $('#mapName').textContent = st.map.name;
+  if (st.map && isNum(st.map.width) && isNum(st.map.height)) {
+    if (map.W !== st.map.width || map.H !== st.map.height) { map.W = st.map.width; map.H = st.map.height; fit(); }
+    $('#mapSize').textContent = `${map.W} × ${map.H}`;
+  }
+}
+function meterClass(v, target) { return !isNum(v) ? '' : v >= target ? '' : v >= target - 0.1 ? 'warn' : 'crit'; }
+// paths.byPurpose: { fixed | chase | flight | station | any future key: { searches, reached, share } } — rendered generically, "fixed" first, then the order given
+function purposeRows(bp) {
+  if (!bp || typeof bp !== 'object' || Array.isArray(bp)) return [];
+  const keys = Object.keys(bp);
+  const order = keys.includes('fixed') ? ['fixed', ...keys.filter(k => k !== 'fixed')] : keys;
+  const rows = [];
+  for (const k of order) {
+    const v = bp[k]; let share = null, searches = null, reached = null;
+    if (isNum(v)) share = v;
+    else if (v && typeof v === 'object') {
+      searches = isNum(v.searches) ? v.searches : null; reached = isNum(v.reached) ? v.reached : null;
+      share = isNum(v.share) ? v.share : (searches ? (reached || 0) / searches : null);
+      if (searches === 0) share = null; // no searches yet: show "–", not a red 0 %
+    }
+    if (share !== null || searches !== null) rows.push({ purpose: k, share, searches, reached });
+  }
+  return rows;
+}
+function renderPurposes(pa) {
+  const rows = purposeRows(pa.byPurpose);
+  $('#tPathPurpose').replaceChildren(...rows.map(r => el('div', { class: 'pp', title: `${r.purpose}: ${fmtInt(r.reached)} reached of ${fmtInt(r.searches)} searches` },
+    el('span', { class: 'k', text: r.purpose }),
+    el('span', { class: 'bar' }, el('i', { class: meterClass(r.share, 0.99), style: `width:${isNum(r.share) ? Math.min(1, r.share) * 100 : 0}%` })),
+    el('span', { class: 'v num', text: `${fmtPct(r.share)}${r.searches !== null ? ` · ${fmtInt(r.reached)}/${fmtInt(r.searches)}` : ''}` }))));
+  barList($('#pPurpose'), rows.map(r => ({ label: r.purpose, value: isNum(r.share) ? r.share : 0, cls: meterClass(r.share, 0.99), sub: r.searches !== null ? `${fmtInt(r.reached)}/${fmtInt(r.searches)}` : '' })), { max: 1, target: 0.99, fmt: v => fmtPct(v) });
+}
+function renderTiles(st) {
+  const p = st.population || {}, w = st.work || {}, pa = st.paths || {}, m = st.minds || {};
+  $('#tAlive').textContent = fmtInt(p.alive);
+  $('#tAliveOf').textContent = `of ${fmtInt(p.total)}`;
+  $('#tAliveSub').textContent = `${fmtInt(p.dead)} dead${isNum(p.offline) && p.offline ? ` · ${fmtInt(p.offline)} offline` : ''}`;
+
+  $('#tWork').textContent = fmtPct(w.share);
+  $('#tWorkFill').style.width = isNum(w.share) ? (Math.min(1, w.share) * 100) + '%' : '0';
+  $('#tWorkFill').className = 'fill ' + meterClass(w.share, 0.95);
+  $('#tWorkSub').replaceChildren('target 95 % · ', el('b', { text: fmtInt(w.finished) }), ` finished · ${fmtInt(w.failed)} failed · ${fmtInt(w.dropped)} dropped · ${fmtInt(w.died)} died`);
+
+  // The headline is the journeys by purpose (fixed, chase, flight, station): did the walk get where it was going. The raw
+  // count of every search includes the walker's re-plans beside a moving target, most of which end partial by design
+  // and are not a walk that failed; it stays underneath as "all searches" (29.09.2026).
+  const jRows = purposeRows(pa.byPurpose);
+  const jSearches = jRows.reduce((a, r) => a + (r.searches || 0), 0), jReached = jRows.reduce((a, r) => a + (r.reached || 0), 0);
+  const jShare = jSearches > 0 ? jReached / jSearches : pa.share;
+  $('#tPath').textContent = fmtPct(jShare);
+  $('#tPathFill').style.width = isNum(jShare) ? (Math.min(1, jShare) * 100) + '%' : '0';
+  $('#tPathFill').className = 'fill ' + meterClass(jShare, 0.99);
+  $('#tPathSub').replaceChildren(`target 99 % · journeys by purpose: ${fmtInt(jReached)} of ${fmtInt(jSearches)} · all searches: `, el('b', { text: fmtInt(pa.reached) }), ` of ${fmtInt(pa.searches)} (${fmtPct(pa.share)}) · ${fmtInt(pa.partial)} partial · ${fmtInt(pa.refused)} refused`);
+  renderPurposes(pa);
+
+  const stuck = Array.isArray(st.stuck) ? st.stuck : [];
+  $('#tStuck').textContent = fmtInt(stuck.length);
+  $('#tStuckSub').textContent = stuck.length ? `longest ${fmtDur(Math.max(...stuck.map(s => isNum(s.sinceMs) ? s.sinceMs : 0)))}` : 'nobody is stuck';
+  $('#tStuckTop').replaceChildren(...stuck.slice(0, 3).map(s => el('span', { text: str(s.name), style: 'margin-right:8px;cursor:pointer;color:var(--ink-2)', onclick: () => selectBot(s.name) })));
+
+  const r = pa.routes || {}, g = pa.graph || {};
+  $('#tRouted').textContent = fmtInt(r.routed);
+  $('#tRoutedOf').textContent = `of ${fmtInt(r.asked)} routed`;
+  $('#tRouteSub').textContent = `${fmtInt(r.direct)} direct · ${fmtInt(r.unreachable)} unreachable · ${fmtInt(r.unplaced)} unplaced · ${fmtInt(r.overBudget)} over budget`;
+  $('#tGraphSub').textContent = `graph ${g.complete === true ? 'complete' : g.complete === false ? 'incomplete' : '–'} · ${fmtInt(g.nodes)} nodes · ${fmtInt(g.components)} components`;
+
+  $('#tAwake').textContent = fmtInt(m.awake);
+  $('#mindReach').textContent = m.reachable === true ? 'reachable' : m.reachable === false ? 'unreachable' : 'unknown';
+  $('#mindDot').style.background = m.reachable === true ? 'var(--good)' : m.reachable === false ? 'var(--crit)' : 'var(--muted)';
+  $('#mindModel').textContent = str(m.model) || '–';
+  $('#mindEndpoint').textContent = str(m.endpoint) || '–';
+  $('#mindMs').textContent = isNum(m.lastMs) ? fmtInt(m.lastMs) + ' ms' : '–';
+  $('#mindChoices').textContent = fmtInt(m.choices);
+  $('#bBots').textContent = fmtInt(S.bots.length);
+  const bs = $('#bStuck'); bs.textContent = fmtInt(stuck.length); bs.classList.toggle('warn', stuck.length > 0);
+}
+function renderAlarms(st) {
+  const list = Array.isArray(st.alarms) ? st.alarms.filter(a => a && typeof a === 'object') : [];
+  const last = new Map();
+  for (const a of list) last.set(str(a.kind), a);
+  const active = [...last.values()].filter(a => a.state === 'raised');
+  $('#alarms').replaceChildren(...active.map(a => el('span', { class: 'alarm' }, el('b', { text: '⚠ ' + str(a.kind) }), str(a.say) || '', isNum(a.n) ? ` (${a.n}${isNum(a.of) ? ' of ' + a.of : ''}${a.window ? ' in ' + a.window : ''})` : '')));
+  $('#alarmList').replaceChildren(...list.slice().reverse().map(a => el('div', { class: 'it', style: 'cursor:default' },
+    el('div', { class: 't' }, el('b', { text: `${str(a.state)} · ${str(a.kind)}` }), el('span', { class: 'muted', text: timeOf(a.at) })),
+    el('div', { class: 'd', text: `${str(a.say)}${isNum(a.n) ? ` · ${a.n}${isNum(a.of) ? ' of ' + a.of : ''}` : ''}${a.window ? ' · ' + a.window : ''}` }))));
+  if (!list.length) $('#alarmList').replaceChildren(el('div', { class: 'muted', text: 'no alarm lines' }));
+}
+
+// ================================================================ sparklines (single series, hairline target, hover readout)
+function drawSpark(canvas, values, opts) {
+  if (!canvas) return;
+  const o = opts || {};
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 200, h = canvas.clientHeight || 34;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const vals = (values || []).map(v => isNum(v) ? v : null);
+  const nums = vals.filter(v => v !== null);
+  if (nums.length < 2) { ctx.fillStyle = CSS.muted; ctx.font = '11px system-ui'; ctx.fillText('no history yet', 4, h / 2 + 4); return; }
+  let lo = isNum(o.min) ? o.min : Math.min(...nums), hi = isNum(o.max) ? o.max : Math.max(...nums);
+  if (isNum(o.target)) { lo = Math.min(lo, o.target); hi = Math.max(hi, o.target); }
+  if (hi - lo < 1e-9) { hi = lo + 1; }
+  const pad = 3, px = 4;
+  const X = i => px + (i / (vals.length - 1)) * (w - px * 2);
+  const Y = v => h - pad - ((v - lo) / (hi - lo)) * (h - pad * 2 - 2);
+  if (isNum(o.target)) { ctx.strokeStyle = CSS.axis; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, Math.round(Y(o.target)) + .5); ctx.lineTo(w - px, Math.round(Y(o.target)) + .5); ctx.stroke(); }
+  const col = o.color || CSS.s[0];
+  ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath(); let pen = false;
+  vals.forEach((v, i) => { if (v === null) { pen = false; return; } if (!pen) { ctx.moveTo(X(i), Y(v)); pen = true; } else ctx.lineTo(X(i), Y(v)); });
+  ctx.stroke();
+  if (o.area) { ctx.globalAlpha = .1; ctx.fillStyle = col; ctx.lineTo(X(vals.length - 1), h - pad); ctx.lineTo(X(0), h - pad); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; }
+  let li = vals.length - 1; while (li >= 0 && vals[li] === null) li--;
+  if (li >= 0) { ctx.fillStyle = CSS.surface; ctx.beginPath(); ctx.arc(X(li), Y(vals[li]), 5, 0, 7); ctx.fill(); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X(li), Y(vals[li]), 3.5, 0, 7); ctx.fill(); }
+  if (o.hoverI !== undefined && o.hoverI !== null && vals[o.hoverI] !== null) {
+    const hx = X(o.hoverI); ctx.strokeStyle = CSS.ink2; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(Math.round(hx) + .5, 0); ctx.lineTo(Math.round(hx) + .5, h); ctx.stroke();
+    ctx.fillStyle = CSS.surface; ctx.beginPath(); ctx.arc(hx, Y(vals[o.hoverI]), 5, 0, 7); ctx.fill(); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(hx, Y(vals[o.hoverI]), 3.5, 0, 7); ctx.fill();
+  }
+}
+const sparkDefs = [];
+function bindSpark(canvas, getSamples, key, opts) {
+  const def = { canvas, key, opts, hoverI: null };
+  sparkDefs.push(def);
+  const render = () => { const s = getSamples(); drawSpark(canvas, s.map(x => x ? x[key] : null), Object.assign({}, opts, { hoverI: def.hoverI })); };
+  def.render = render;
+  canvas.addEventListener('mousemove', e => {
+    const s = getSamples(); if (s.length < 2) return;
+    const r = canvas.getBoundingClientRect(); const i = Math.max(0, Math.min(s.length - 1, Math.round(((e.clientX - r.left - 4) / (r.width - 8)) * (s.length - 1))));
+    def.hoverI = i; render();
+    const smp = s[i] || {}; const v = smp[key];
+    showTip(e.clientX, e.clientY, [['b', `${opts.fmt ? opts.fmt(v) : str(v)}`], ['muted', `${opts.label || key} at ${str(smp.at) || '–'}`]]);
+  });
+  canvas.addEventListener('mouseleave', () => { def.hoverI = null; render(); hideTip(); });
+  return def;
+}
+const samples = () => (S.history && Array.isArray(S.history.samples)) ? S.history.samples.filter(x => x && typeof x === 'object') : [];
+function renderHistory() {
+  for (const d of sparkDefs) d.render();
+  const s = samples(); const last = s[s.length - 1] || {};
+  $('#hWorkNow').textContent = fmtPct(last.workShare);
+  $('#hPathNow').textContent = fmtPct(last.pathShare);
+  $('#hAliveNow').textContent = fmtInt(last.alive);
+  $('#hStuckNow').textContent = fmtInt(last.stuck);
+  $('#hRange').textContent = s.length ? `${s.length} samples · ${str(s[0].at)} → ${str(last.at)} · every ${fmtDur(S.history.everyMs)}` : 'no history yet';
+}
+async function pollHistory() {
+  const h = await getJSON('/api/history');
+  if (h && typeof h === 'object') { S.history = h; try { renderHistory(); } catch (e) { console.warn('history', e); } }
+  if (map.imgState === 'missing' && !S.lostSince) loadMapImage('/api/map.png'); // the shard may find its client files later
+  setTimeout(pollHistory, 60000);
+}
+
+// ================================================================ map
+const map = { canvas: $('#map'), ctx: null, w: 0, h: 0, dpr: 1, W: 6144, H: 4096, k: 0.1, x: 0, y: 0, fitK: 0.1, img: null, imgState: 'loading', dirty: true, hover: null, drag: null, lastDraw: 0, sized: false };
+map.ctx = map.canvas.getContext('2d');
+function resizeMap() {
+  const wrap = $('#mapWrap'); const w = wrap.clientWidth, h = wrap.clientHeight;
+  if (!w || !h) return;
+  map.dpr = window.devicePixelRatio || 1;
+  const first = !map.sized;
+  map.w = w; map.h = h; map.canvas.width = Math.round(w * map.dpr); map.canvas.height = Math.round(h * map.dpr);
+  map.sized = true;
+  if (first) fit(); else map.dirty = true;
+}
+function fit() {
+  if (!map.w || !map.h) return;
+  const k = Math.min(map.w / map.W, map.h / map.H) * 0.98;
+  map.k = k; map.fitK = k; map.x = (map.w - map.W * k) / 2; map.y = (map.h - map.H * k) / 2; map.dirty = true;
+}
+function centreOn(x, y, k) {
+  if (isNum(k)) map.k = Math.max(map.fitK * 0.5, Math.min(40, k));
+  map.x = map.w / 2 - x * map.k; map.y = map.h / 2 - y * map.k; map.dirty = true;
+}
+const toS = (x, y) => [x * map.k + map.x, y * map.k + map.y];
+const toW = (sx, sy) => [(sx - map.x) / map.k, (sy - map.y) / map.k];
+function loadMapImage(src) {
+  const img = new Image();
+  img.onload = () => { map.img = img; map.imgState = 'ok'; map.dirty = true; $('#mapNote').textContent = ''; };
+  img.onerror = () => { map.img = null; map.imgState = 'missing'; map.dirty = true; $('#mapNote').textContent = 'no map image (map.png missing) — grid only'; };
+  img.src = src;
+}
+function colorOfGuild(name) {
+  // one steady hue per guild name, so a zone keeps its colour across snapshots
+  let hsh = 0; const s = str(name); for (let i = 0; i < s.length; i++) hsh = (hsh * 31 + s.charCodeAt(i)) >>> 0;
+  return `hsl(${hsh % 360} 70% ${document.documentElement.dataset.theme === 'light' ? 38 : 62}%)`;
+}
+function drawHouse(ctx, sx, sy, size, abbr) {
+  ctx.save();
+  ctx.lineWidth = 1.5; ctx.strokeStyle = CSS.ink2; ctx.fillStyle = CSS.surface;
+  ctx.beginPath(); ctx.rect(sx - size / 2, sy - size * 0.2, size, size * 0.7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx - size * 0.65, sy - size * 0.2); ctx.lineTo(sx, sy - size * 0.75); ctx.lineTo(sx + size * 0.65, sy - size * 0.2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (abbr) { ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.lineWidth = 3; ctx.strokeStyle = CSS.surface; ctx.strokeText(abbr, sx, sy + size * 0.55); ctx.fillStyle = CSS.ink; ctx.fillText(abbr, sx, sy + size * 0.55); }
+  ctx.restore();
+}
+// a guild's house in a town: a small walled square in the guild's colour with a door in it (BotGuildHouses, 29.09.2026)
+function drawTownHouse(ctx, sx, sy, size, abbr, col) {
+  ctx.save();
+  ctx.lineWidth = 1.5; ctx.strokeStyle = CSS.ink; ctx.fillStyle = col;
+  ctx.beginPath(); ctx.rect(sx - size / 2, sy - size / 2, size, size); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = CSS.surface; ctx.fillRect(sx - size * 0.15, sy + size * 0.05, size * 0.3, size * 0.45);
+  if (abbr) { ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.lineWidth = 3; ctx.strokeStyle = CSS.surface; ctx.strokeText(abbr, sx, sy + size * 0.6); ctx.fillStyle = CSS.ink; ctx.fillText(abbr, sx, sy + size * 0.6); }
+  ctx.restore();
+}
+function haloText(ctx, text, x, y, color, font, align) {
+  ctx.font = font || '11px system-ui'; ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 3; ctx.strokeStyle = CSS.surface; ctx.strokeText(text, x, y); ctx.fillStyle = color || CSS.ink; ctx.fillText(text, x, y);
+}
+function botVisible(b) { return !S.hidden.has(familyOf(b.class)) && isNum(b.x) && isNum(b.y); }
+function drawMap(now) {
+  const { ctx, w, h, k, dpr } = map;
+  const sel = S.selected ? S.botByName.get(S.selected) : null;
+  if (S.follow && sel && isNum(sel.x) && isNum(sel.y)) { map.x = w / 2 - sel.x * k; map.y = h / 2 - sel.y * k; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = CSS.surface; ctx.fillRect(0, 0, w, h);
+  const [ox, oy] = toS(0, 0); const ww = map.W * k, wh = map.H * k;
+  if (map.img) { ctx.imageSmoothingEnabled = k < 1; try { ctx.drawImage(map.img, ox, oy, ww, wh); } catch (e) { /* broken image */ } }
+  else { ctx.fillStyle = CSS.mapBg; ctx.fillRect(ox, oy, ww, wh); }
+  // grid every 512 tiles + coordinate frame
+  if (S.layers.grid) {
+    ctx.strokeStyle = CSS.grid; ctx.lineWidth = 1; ctx.globalAlpha = map.img ? 0.35 : 1; ctx.beginPath();
+    for (let x = 512; x < map.W; x += 512) { const sx = Math.round(ox + x * k) + .5; if (sx < 0 || sx > w) continue; ctx.moveTo(sx, Math.max(0, oy)); ctx.lineTo(sx, Math.min(h, oy + wh)); }
+    for (let y = 512; y < map.H; y += 512) { const sy = Math.round(oy + y * k) + .5; if (sy < 0 || sy > h) continue; ctx.moveTo(Math.max(0, ox), sy); ctx.lineTo(Math.min(w, ox + ww), sy); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+    if (512 * k >= 36) {
+      ctx.fillStyle = CSS.muted; ctx.font = '10px system-ui'; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
+      for (let x = 0; x <= map.W; x += 512) { const sx = ox + x * k; if (sx < -30 || sx > w) continue; ctx.fillText(String(x), sx + 2, Math.max(2, oy + 2)); }
+      for (let y = 512; y < map.H; y += 512) { const sy = oy + y * k; if (sy < 0 || sy > h) continue; ctx.fillText(String(y), Math.max(2, ox + 2), sy + 2); }
+    }
+  }
+  ctx.strokeStyle = CSS.axis; ctx.lineWidth = 1; ctx.strokeRect(Math.round(ox) + .5, Math.round(oy) + .5, Math.round(ww), Math.round(wh));
+  const st = S.state || {};
+  // danger zones under everything else: the cached fills of the mobs' patrol and aggro areas (see drawDangerZones)
+  drawDangerZones(ctx);
+  // hot failed-path bins (32 tiles)
+  if (S.layers.hot && S.paths && Array.isArray(S.paths.hot)) {
+    const size = Math.max(6, 32 * k);
+    for (const hsp of S.paths.hot) {
+      if (!hsp || !isNum(hsp.x) || !isNum(hsp.y)) continue;
+      const [sx, sy] = toS(hsp.x, hsp.y);
+      if (sx < -size || sy < -size || sx > w + size || sy > h + size) continue;
+      ctx.globalAlpha = Math.min(0.6, 0.12 + (isNum(hsp.count) ? hsp.count : 1) * 0.04);
+      ctx.fillStyle = CSS.crit; ctx.fillRect(sx, sy, size, size);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // squads: thin lines leader → members
+  if (S.layers.squads && Array.isArray(st.squads)) {
+    ctx.strokeStyle = CSS.ink2; ctx.lineWidth = 1; ctx.globalAlpha = 0.5; ctx.beginPath();
+    for (const sq of st.squads) {
+      if (!sq) continue; const L = S.botByName.get(str(sq.leader)); if (!L || !isNum(L.x) || !isNum(L.y)) continue;
+      const [lx, ly] = toS(L.x, L.y);
+      for (const mn of (Array.isArray(sq.members) ? sq.members : [])) { const M = S.botByName.get(str(mn)); if (!M || M === L || !isNum(M.x) || !isNum(M.y)) continue; const [mx, my] = toS(M.x, M.y); ctx.moveTo(lx, ly); ctx.lineTo(mx, my); }
+    }
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  // guild zones: the squares each guild holds, in the guild's colour; paid-for squares are fuller
+  if (S.layers.zones && Array.isArray(st.guilds)) {
+    const side = Math.max(1, (isNum(st.quad) ? st.quad : 30) * k);
+    for (const g of st.guilds) {
+      if (!g || !Array.isArray(g.squares) || !g.squares.length) continue;
+      const col = colorOfGuild(g.name);
+      for (const q of g.squares) {
+        if (!Array.isArray(q) || !isNum(q[0]) || !isNum(q[1])) continue;
+        const [sx, sy] = toS(q[0], q[1]);
+        if (sx < -side || sy < -side || sx > w + side || sy > h + side) continue;
+        ctx.globalAlpha = q[2] ? 0.28 : 0.14; ctx.fillStyle = col; ctx.fillRect(sx, sy, side, side);
+        ctx.globalAlpha = 0.6; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(Math.round(sx) + .5, Math.round(sy) + .5, Math.round(side), Math.round(side));
+      }
+      if (side >= 26) {
+        // the abbreviation once, on the square nearest the hall (or the first)
+        const hall = ptOf(g.hall) || ptOf(g.seat); let best = g.squares[0], bd = Infinity;
+        if (hall) for (const q of g.squares) { const d = Math.abs(q[0] - hall[0]) + Math.abs(q[1] - hall[1]); if (d < bd) { bd = d; best = q; } }
+        const [bx, by] = toS(best[0], best[1]);
+        ctx.globalAlpha = 0.9; ctx.fillStyle = col; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(str(g.abbr), bx + 3, by + 2);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // roads between towns: drawn once somebody has walked them, coloured by what the ground along them reads
+  if (S.layers.roads && S.roads && Array.isArray(S.roads.roads)) {
+    ctx.lineWidth = Math.max(1, Math.min(3, 1.5 * k)); ctx.lineJoin = 'round';
+    for (const r of S.roads.roads) {
+      if (!r || !Array.isArray(r.points) || r.points.length < 2) continue;
+      const walked = isNum(r.walked) && r.walked > 0;
+      ctx.globalAlpha = walked ? 0.85 : 0.18;
+      ctx.strokeStyle = r.band === 'dangerous' || r.band === 'unsafe' ? CSS.crit : r.band === 'safe' || r.band === 'positive' ? CSS.good : CSS.ink2;
+      if (!walked) ctx.setLineDash([4, 6]); else ctx.setLineDash([]);
+      ctx.beginPath(); let first = true;
+      for (const p of r.points) { const q = pair(p); if (!q) continue; const [sx, sy] = toS(q[0], q[1]); if (first) { ctx.moveTo(sx, sy); first = false; } else ctx.lineTo(sx, sy); }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+  // towns: a ring on the square and the name, reachable ones bright
+  if (S.layers.towns && Array.isArray(st.towns)) {
+    for (const t of st.towns) {
+      if (!t || !isNum(t.x) || !isNum(t.y)) continue;
+      const [sx, sy] = toS(t.x, t.y);
+      if (sx < -40 || sy < -40 || sx > w + 40 || sy > h + 40) continue;
+      ctx.globalAlpha = t.reachable ? 0.9 : 0.35;
+      ctx.strokeStyle = t.home ? CSS.accent : CSS.ink; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(sx, sy, 6, 0, 7); ctx.stroke();
+      ctx.fillStyle = CSS.ink; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      const housed = isNum(t.houses) && t.houses > 0 ? ` · ${t.houses} guild house${t.houses > 1 ? 's' : ''}` : isNum(t.guilds) && t.guilds > 0 ? ` · ${t.guilds} guild${t.guilds > 1 ? 's' : ''}` : '';
+      ctx.fillText(str(t.name) + housed + (isNum(t.free) && t.free > 0 && k >= 0.25 ? ` · ${t.free} free` : ''), sx, sy - 8);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // bots' shops by the banks (BotShopkeep): a small filled square at the keeper's pitch, with the keeper and its takings when
+  // zoomed in. The layer's flag starts on here rather than in S.layers, so the list other layers share is left alone.
+  if (S.layers.shops === undefined) S.layers.shops = true;
+  if (S.layers.shops && Array.isArray(st.shops)) {
+    const r = Math.max(3, Math.min(6, 2 * k));
+    for (const sh of st.shops) {
+      if (!sh || !isNum(sh.x) || !isNum(sh.y)) continue;
+      const [sx, sy] = toS(sh.x, sh.y);
+      if (sx < -r || sy < -r || sx > w + r || sy > h + r) continue;
+      ctx.globalAlpha = 0.95; ctx.fillStyle = CSS.good; ctx.fillRect(sx - r, sy - r, 2 * r, 2 * r);
+      ctx.strokeStyle = CSS.ink; ctx.lineWidth = 1; ctx.strokeRect(Math.round(sx - r) + .5, Math.round(sy - r) + .5, Math.round(2 * r), Math.round(2 * r));
+      if (k >= 0.35) {
+        const goods = Array.isArray(sh.goods) ? sh.goods.slice(0, 2).map(g => Array.isArray(g) ? `${str(g[0])} ${isNum(g[1]) ? g[1] : ''}@${isNum(g[2]) ? g[2] : '?'}` : '').join(', ') : '';
+        ctx.fillStyle = CSS.ink; ctx.font = '10px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(`${str(sh.keeper)}'s shop · sold ${isNum(sh.sold) ? sh.sold : 0} for ${isNum(sh.takings) ? sh.takings : 0}gp${goods ? ' · ' + goods : ''}`, sx + r + 3, sy);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // barred ground: standing bars (solid amber), quarantines (dashed) and killing fields (dashed red, with the dead and the minutes left)
+  if (S.layers.barred && Array.isArray(st.barred)) {
+    for (const b of st.barred) {
+      if (!b || !isNum(b.x1) || !isNum(b.y1) || !isNum(b.x2) || !isNum(b.y2)) continue;
+      const [ax, ay] = toS(b.x1, b.y1), [bx, by] = toS(b.x2 + 1, b.y2 + 1);
+      if (bx < 0 || by < 0 || ax > w || ay > h) continue;
+      const field = b.kind === 'field', quar = b.kind === 'quarantine';
+      const col = field ? CSS.crit : quar ? CSS.serious : CSS.warn;
+      ctx.globalAlpha = 0.16; ctx.fillStyle = col; ctx.fillRect(ax, ay, bx - ax, by - ay);
+      ctx.globalAlpha = 0.9; ctx.lineWidth = 1.5; ctx.strokeStyle = col; ctx.setLineDash(b.kind === 'bar' ? [] : [5, 3]); ctx.strokeRect(ax, ay, bx - ax, by - ay); ctx.setLineDash([]);
+      if (k >= 0.3) {
+        ctx.fillStyle = CSS.ink; ctx.font = '10px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        const label = field ? `killing field · ${isNum(b.deaths) ? b.deaths : '?'} dead · ${isNum(b.left) ? b.left : '?'} min` : quar ? `quarantine · ${isNum(b.left) ? b.left : '?'} min` : 'barred';
+        ctx.fillText(label, ax + 3, ay + 2);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // gates: cave mouths and other teleporters, a small diamond where a walker steps on
+  if (S.layers.gates && Array.isArray(st.gates)) {
+    const r = Math.max(3, Math.min(7, 2 * k));
+    for (const g of st.gates) {
+      if (!g || !isNum(g.x) || !isNum(g.y)) continue;
+      const [sx, sy] = toS(g.x, g.y);
+      if (sx < -r || sy < -r || sx > w + r || sy > h + r) continue;
+      const into = /^into /.test(str(g.name)), out = /^out of /.test(str(g.name));
+      ctx.globalAlpha = g.landed === false ? 0.35 : 0.9;
+      ctx.fillStyle = into ? CSS.good : out ? CSS.warn : CSS.ink2;
+      ctx.beginPath(); ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r, sy); ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r, sy); ctx.closePath(); ctx.fill();
+      if (k >= 0.35 && into) { ctx.fillStyle = CSS.ink; ctx.font = '10px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(str(g.name), sx + r + 2, sy); }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // guild halls in the fields, guild houses in the towns (a coloured square with a door), and a bare seat as a ring
+  if (S.layers.halls && Array.isArray(st.guilds)) {
+    const near = (sx, sy) => !(sx < -20 || sy < -20 || sx > w + 20 || sy > h + 20);
+    for (const g of st.guilds) {
+      if (!g) continue;
+      const hall = ptOf(g.hall), house = ptOf(g.house), seat = ptOf(g.seat);
+      if (hall) { const [sx, sy] = toS(hall[0], hall[1]); if (near(sx, sy)) drawHouse(ctx, sx, sy, 12, str(g.abbr)); }
+      if (house) { const [sx, sy] = toS(house[0], house[1]); if (near(sx, sy)) drawTownHouse(ctx, sx, sy, 10, hall ? '' : str(g.abbr), colorOfGuild(g.name)); }
+      if (!hall && !house && seat) { const [sx, sy] = toS(seat[0], seat[1]); if (near(sx, sy)) { ctx.save(); ctx.globalAlpha = 0.8; ctx.setLineDash([3, 3]); ctx.strokeStyle = colorOfGuild(g.name); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy, 7, 0, 7); ctx.stroke(); ctx.restore(); haloText(ctx, str(g.abbr), sx, sy + 12, CSS.ink, 'bold 10px system-ui', 'center'); } }
+    }
+  }
+  // the danger zone under the pointer and the selected one, outlined above the roads and under the bots
+  drawDangerFocus(ctx);
+  // all routes (faint)
+  if (S.layers.routes) {
+    ctx.lineWidth = 1; ctx.globalAlpha = 0.45;
+    for (const b of S.bots) {
+      if (!botVisible(b) || !Array.isArray(b.route) || !b.route.length || b === sel) continue;
+      ctx.strokeStyle = colorOfClass(b.class); ctx.beginPath(); let [px, py] = toS(b.x, b.y); ctx.moveTo(px, py);
+      for (const p of b.route) { const q = pair(p); if (!q) continue; [px, py] = toS(q[0], q[1]); ctx.lineTo(px, py); }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // selected bot's route + target
+  if (sel && isNum(sel.x) && isNum(sel.y)) {
+    const col = colorOfClass(sel.class);
+    if (Array.isArray(sel.route) && sel.route.length) {
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath();
+      let [px, py] = toS(sel.x, sel.y); ctx.moveTo(px, py);
+      for (const p of sel.route) { const q = pair(p); if (!q) continue; [px, py] = toS(q[0], q[1]); ctx.lineTo(px, py); }
+      ctx.stroke();
+      ctx.fillStyle = col; for (const p of sel.route) { const q = pair(p); if (!q) continue; const [sx, sy] = toS(q[0], q[1]); ctx.beginPath(); ctx.arc(sx, sy, 2, 0, 7); ctx.fill(); }
+    }
+    const t = ptOf(sel.target);
+    if (t) { const [tx, ty] = toS(t[0], t[1]); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx - 6, ty - 6); ctx.lineTo(tx + 6, ty + 6); ctx.moveTo(tx + 6, ty - 6); ctx.lineTo(tx - 6, ty + 6); ctx.stroke(); }
+  }
+  // bots
+  const showNames = S.layers.names || k >= 0.5;
+  const pulse = 0.5 + 0.5 * Math.sin(now / 220);
+  let drawn = 0;
+  for (const b of S.bots) {
+    if (!botVisible(b)) continue;
+    const [sx, sy] = toS(b.x, b.y);
+    if (sx < -12 || sy < -12 || sx > w + 12 || sy > h + 12) continue;
+    drawn++;
+    const col = colorOfClass(b.class);
+    if (b.stuck) { ctx.strokeStyle = CSS.warn; ctx.lineWidth = 2; ctx.globalAlpha = 0.25 + 0.55 * pulse; ctx.beginPath(); ctx.arc(sx, sy, 7 + 4 * pulse, 0, 7); ctx.stroke(); ctx.globalAlpha = 1; }
+    if (b.offline) {
+      // resting (offline at an inn, a house or a fire): a pale disc in the class colour with a "z" — neither the solid
+      // dot of a bot at work nor the thin ring of a dead one
+      ctx.fillStyle = CSS.surface; ctx.beginPath(); ctx.arc(sx, sy, 5.5, 0, 7); ctx.fill();
+      ctx.fillStyle = col; ctx.globalAlpha = 0.3; ctx.beginPath(); ctx.arc(sx, sy, 4.5, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(sx, sy, 4.5, 0, 7); ctx.stroke();
+      ctx.fillStyle = col; ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('z', sx, sy + 0.5);
+    }
+    else if (b.alive === false) { ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy, 3.5, 0, 7); ctx.stroke(); }
+    else { ctx.fillStyle = CSS.surface; ctx.beginPath(); ctx.arc(sx, sy, 5.5, 0, 7); ctx.fill(); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(sx, sy, 4, 0, 7); ctx.fill(); }
+    if (b.minded) { ctx.fillStyle = CSS.ink; ctx.beginPath(); ctx.moveTo(sx, sy - 9); ctx.lineTo(sx - 3, sy - 5); ctx.lineTo(sx + 3, sy - 5); ctx.closePath(); ctx.fill(); }
+    if (showNames && b !== sel) haloText(ctx, str(b.name), sx + 7, sy, CSS.ink2, '10px system-ui');
+  }
+  // the debuggers on the zones tour, over the bots: they stand where the bots fight
+  drawTourWalkers(ctx);
+  if (sel && isNum(sel.x) && isNum(sel.y)) {
+    const [sx, sy] = toS(sel.x, sel.y);
+    ctx.strokeStyle = CSS.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, 9, 0, 7); ctx.stroke();
+    haloText(ctx, str(sel.name), sx + 12, sy, CSS.ink, 'bold 12px system-ui');
+  }
+  if (map.hover && map.hover.kind === 'bot') { const b = map.hover.bot; if (isNum(b.x) && isNum(b.y)) { const [sx, sy] = toS(b.x, b.y); ctx.strokeStyle = CSS.ink2; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(sx, sy, 8, 0, 7); ctx.stroke(); } }
+  $('#mapCount').textContent = `${drawn} of ${S.bots.length} bots in view`;
+  $('#mapScale').textContent = `zoom ${(k / (map.fitK || 1)).toFixed(1)}× · 1 px = ${(1 / k).toFixed(1)} tiles`;
+}
+function loop(now) {
+  const needPulse = S.bots.some(b => b && b.stuck && botVisible(b));
+  const need = map.dirty || (S.follow && S.selected) || (needPulse && now - map.lastDraw > 40);
+  if (need && map.w && map.h) { try { drawMap(now); } catch (e) { console.warn('draw', e); } map.dirty = false; map.lastDraw = now; }
+  requestAnimationFrame(loop);
+}
+// --- map interaction
+function hitTest(sx, sy) {
+  let best = null, bd = 100; // 10px
+  for (const b of S.bots) { if (!botVisible(b)) continue; const [bx, by] = toS(b.x, b.y); const d = (bx - sx) ** 2 + (by - sy) ** 2; if (d < bd) { bd = d; best = { kind: 'bot', bot: b }; } }
+  if (best) return best;
+  const gs = S.state && Array.isArray(S.state.guilds) ? S.state.guilds : [];
+  for (const g of gs) {
+    if (!g) continue;
+    for (const [what, p] of [['hall', ptOf(g.hall)], ['house', ptOf(g.house)], ['seat', !g.hall && !g.house ? ptOf(g.seat) : null]]) {
+      if (!p) continue; const [gx, gy] = toS(p[0], p[1]);
+      if (Math.abs(gx - sx) < 9 && Math.abs(gy - sy) < 9) return { kind: 'hall', guild: g, what, at: p };
+    }
+  }
+  return hitDanger(sx, sy); // last: a tour walker, then the zone the point lies in
+}
+const tip = $('#tip');
+function showTip(cx, cy, rows) {
+  tip.replaceChildren(...rows.map(([cls, txt]) => cls === 'b' ? el('b', { text: txt }) : el('span', { class: cls, text: txt })));
+  tip.style.display = 'block';
+  const r = tip.getBoundingClientRect();
+  let x = cx + 14, y = cy + 14;
+  if (x + r.width > window.innerWidth - 8) x = cx - r.width - 10;
+  if (y + r.height > window.innerHeight - 8) y = cy - r.height - 10;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+// a guild's place on the map: which of its three it is, and how far along the ladder it stands — house, hall, ground
+function guildTipRows(g, what) {
+  const h = g.house;
+  const kind = what === 'house' ? `house of ${str(g.abbr)} in ${str(h && h.town)}${h && h.britain ? ' — its home, bought for ' + fmtGold(h.paid) : ''}` : what === 'seat' ? `seat of ${str(g.abbr)} (no house, no hall)` : `hall of ${str(g.abbr)}`;
+  const rows = [['b', str(g.name)], ['muted', `${kind} · ${fmtInt(g.alive)}/${fmtInt(g.members)} alive`]];
+  rows.push(['ink2', `chest ${fmtGold(g.chest)} · can pay ${fmtGold(g.fund)}${isNum(g.goal) && g.goal > 0 ? ` of ${fmtGold(g.goal)} for ${str(g.saving)}` : ''}`]);
+  rows.push(['muted', `${g.hall ? 'hall' : 'no hall'} · ${Array.isArray(g.squares) ? g.squares.length : 0} squares held`]);
+  return rows;
+}
+function botTipRows(b) {
+  const rows = [['b', str(b.name)], ['muted', `${str(b.class)}${b.guild ? ' · ' + str(b.guild) : ''}${b.minded ? ' · minded' : ''}${b.offline ? ' · resting' : b.alive === false ? ' · dead' : ''}`]];
+  rows.push(['ink2', `${str(b.work) || 'no work'}${b.standing ? ' · ' + str(b.standing) : ''}`]);
+  if (b.stage) rows.push(['muted', str(b.stage)]);
+  if (b.stuck) rows.push(['muted', 'stuck: ' + (str(b.stuckReason) || 'unknown reason')]);
+  rows.push(['muted', `(${fmtInt(b.x)}, ${fmtInt(b.y)}) · hp ${fmtInt(b.hp)}/${fmtInt(b.hpMax)}`]);
+  return rows;
+}
+(() => {
+  const c = map.canvas;
+  c.addEventListener('pointerdown', e => { c.setPointerCapture(e.pointerId); map.drag = { sx: e.clientX, sy: e.clientY, x0: map.x, y0: map.y, moved: false }; c.classList.add('dragging'); });
+  c.addEventListener('pointermove', e => {
+    const r = c.getBoundingClientRect(); const sx = e.clientX - r.left, sy = e.clientY - r.top;
+    if (map.drag) {
+      const dx = e.clientX - map.drag.sx, dy = e.clientY - map.drag.sy;
+      if (Math.abs(dx) + Math.abs(dy) > 3) map.drag.moved = true;
+      if (map.drag.moved) { map.x = map.drag.x0 + dx; map.y = map.drag.y0 + dy; if (S.follow) setFollow(false); map.dirty = true; }
+      return;
+    }
+    const hv = hitTest(sx, sy);
+    map.hover = hv; c.classList.toggle('hover', !!hv); map.dirty = true;
+    if (hv && hv.kind === 'bot') showTip(e.clientX, e.clientY, botTipRows(hv.bot));
+    else if (hv && hv.kind === 'hall') showTip(e.clientX, e.clientY, guildTipRows(hv.guild, hv.what));
+    else if (hv && (hv.kind === 'zone' || hv.kind === 'walker')) showTip(e.clientX, e.clientY, dangerTipRows(hv, sx, sy));
+    else { const [wx, wy] = toW(sx, sy); showTip(e.clientX, e.clientY, [['muted', `(${Math.round(wx)}, ${Math.round(wy)})`]]); }
+  });
+  const end = e => {
+    if (!map.drag) return;
+    const moved = map.drag.moved; map.drag = null; c.classList.remove('dragging');
+    if (!moved) { const r = c.getBoundingClientRect(); const hv = hitTest(e.clientX - r.left, e.clientY - r.top); if (hv && hv.kind === 'bot') selectBot(hv.bot.name); else if (hv && hv.kind === 'hall') { const p = hv.at; if (p) centreOn(p[0], p[1], Math.max(map.k, map.fitK * 4)); } else if (hv && hv.kind === 'zone') selectZone(hv.zone.id); else if (hv && hv.kind === 'walker') { if (hv.zone) selectZone(hv.zone.id); } else { selectBot(null); selectZone(null); } }
+  };
+  c.addEventListener('pointerup', end); c.addEventListener('pointercancel', () => { map.drag = null; c.classList.remove('dragging'); });
+  c.addEventListener('pointerleave', () => { map.hover = null; c.classList.remove('hover'); hideTip(); map.dirty = true; });
+  c.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = c.getBoundingClientRect(); const sx = e.clientX - r.left, sy = e.clientY - r.top;
+    const f = Math.exp(-e.deltaY * 0.0015); const nk = Math.max(map.fitK * 0.5, Math.min(40, map.k * f));
+    const [wx, wy] = toW(sx, sy); map.k = nk; map.x = sx - wx * nk; map.y = sy - wy * nk; map.dirty = true;
+  }, { passive: false });
+  c.addEventListener('dblclick', e => { const r = c.getBoundingClientRect(); const [wx, wy] = toW(e.clientX - r.left, e.clientY - r.top); centreOn(wx, wy, map.k * 2); });
+  $('#btnFit').addEventListener('click', () => { setFollow(false); fit(); });
+  $('#btnFollow').addEventListener('click', () => setFollow(!S.follow));
+  $$('#layerBtns button').forEach(b => b.addEventListener('click', () => { const L = b.dataset.layer; S.layers[L] = !S.layers[L]; b.classList.toggle('on', S.layers[L]); map.dirty = true; }));
+  new ResizeObserver(() => resizeMap()).observe($('#mapWrap'));
+})();
+function setFollow(on) { S.follow = !!on && !!S.selected; $('#btnFollow').classList.toggle('on', S.follow); map.dirty = true; }
+function renderLegend() {
+  const counts = {}; for (const b of S.bots) { const f = familyOf(b.class); counts[f] = (counts[f] || 0) + 1; }
+  const items = FAMILIES.map(f => el('span', { class: 'li' + (S.hidden.has(f) ? ' off' : ''), title: (FAMILY_NOTE[f] ? FAMILY_NOTE[f] + ' — ' : '') + 'click to hide/show', onclick: () => { if (S.hidden.has(f)) S.hidden.delete(f); else S.hidden.add(f); renderLegend(); map.dirty = true; } },
+    el('span', { class: 'sw', style: `background:${colorOfFamily(f)}` }), f, FAMILY_NOTE[f] ? el('span', { class: 'muted', text: ` (${FAMILY_NOTE[f]})` }) : null, el('span', { class: 'muted', text: counts[f] ? ` ${counts[f]}` : '' })));
+  items.push(el('span', { class: 'li', style: 'cursor:default;margin-left:8px' }, el('span', { class: 'sw', style: `background:transparent;border:1.5px solid ${CSS.ink2}` }), 'dead'));
+  items.push(el('span', { class: 'li', style: 'cursor:default' }, el('span', { class: 'sw', style: `background:transparent;border:2px solid ${CSS.warn}` }), 'stuck (pulsing)'));
+  items.push(el('span', { class: 'li', style: 'cursor:default' }, el('span', { text: '▲', style: `font-size:9px;color:${CSS.ink}` }), 'minded'));
+  items.push(el('span', { class: 'li', style: 'cursor:default' }, el('span', { class: 'sw', style: `background:${CSS.crit};opacity:.5;border-radius:1px` }), 'failed-path hot spot'));
+  $('#legend').replaceChildren(...items);
+}
+
+// ================================================================ danger zones (/api/zones, 30.09.2026)
+// Where the mobs live and how far they reach. The shard reads the spawners and sharpens each zone with what the
+// debuggers' tour sees awake: the core is where the creatures patrol, the dashed halo is that patrol widened by how far
+// they see — where a walker gets noticed. Levels: clear (passive animals or nothing: safe passage, hunting ground), edge,
+// hostile, deadly. The payload runs to a couple of MB, so it has its own slower poll (10 s, paused while the layer is off)
+// and is rebuilt only when its text changes. The rings are traced once per payload into Path2D in tile coordinates — one
+// per zone for its outline, one per level holding all that level's rings for the fill — and the filled layer is drawn once
+// per view into a canvas of its own and blitted each frame, so the stuck-bot pulse (25 frames a second) does not refill
+// thousands of points. ?zonesMock=zones-mock.json reads a file beside the page instead (a static server, for testing).
+const DZ_LEVELS = ['clear', 'edge', 'hostile', 'deadly'];
+const DZ_ORDER = ['clear', 'other', 'edge', 'hostile', 'deadly']; // drawn in this order: the deadly on top
+const DZ_VAR = { clear: '--good', edge: '--warn', hostile: '--serious', deadly: '--crit', other: '--muted' };
+const DZ_CSS = { clear: 'good', edge: 'warn', hostile: 'serious', deadly: 'crit', other: 'muted' };
+const DZ_NOTE = { clear: 'no creature that attacks first: safe passage, a hunting ground', edge: 'the aggro fringe of hostile ground: potentially dangerous', hostile: 'creatures that attack on sight patrol here', deadly: 'hostile, and far stronger than a bot or a company can take' };
+const DZ_FILL = { clear: 0.1, other: 0.12, edge: 0.16, hostile: 0.2, deadly: 0.28 }; // the core; the aggro halo is 0.06 under it
+const DZ_RANK = { clear: 0, other: 1, edge: 2, hostile: 3, deadly: 4 };
+const dz = { url: '/api/zones', mock: false, state: 'loading', text: null, data: null, zones: [], byId: new Map(), groups: null, walkers: [], sel: null, hide: new Set(), aggro: true, layer: null, layerKey: '', rev: 0, timer: null, busy: false, keptSince: null };
+if (S.layers.danger === undefined) S.layers.danger = true;
+(() => {
+  // the mock switch takes a plain relative path only, so a link cannot point the page at another host
+  let m = null; try { m = new URLSearchParams(location.search).get('zonesMock'); } catch (e) { m = null; }
+  if (m && /^[\w.-]+(\/[\w.-]+)*\.json$/.test(m)) { dz.url = m; dz.mock = true; }
+  let v = null; try { v = JSON.parse(localStorage.getItem('botweb.danger') || 'null'); } catch (e) { v = null; }
+  if (v && typeof v === 'object') { if (Array.isArray(v.hide)) for (const lv of v.hide) { if (DZ_LEVELS.includes(lv)) dz.hide.add(lv); } if (v.aggro === false) dz.aggro = false; }
+})();
+function dzSave() { try { localStorage.setItem('botweb.danger', JSON.stringify({ hide: [...dz.hide], aggro: dz.aggro })); } catch (e) { /* storage blocked */ } }
+const dzColor = lv => CSS[DZ_CSS[lv] || 'muted'];
+const dzShown = z => !dz.hide.has(z.level);
+const fmtVs = v => isNum(v) ? '×' + (v >= 10 ? Math.round(v) : v.toFixed(1)) : '–';
+const dzTiles = v => isNum(v) ? `${fmtInt(v)} tiles` : '–';
+function dzForeign() {
+  // a survey of another facet: its tiles would land on the wrong ground, so it is not drawn
+  const a = dz.data && str(dz.data.map), b = S.state && S.state.map && str(S.state.map.name);
+  return !!(a && b && a !== b);
+}
+
+// --- fetch: its own cadence; a 404 (a build without the survey) or a lost shard keeps the last survey drawn
+async function pollZones() {
+  if (dz.timer) { clearTimeout(dz.timer); dz.timer = null; }
+  if (dz.busy) return;
+  if (S.layers.danger) {
+    dz.busy = true;
+    let t = null, status = 0;
+    try { const r = await fetch(dz.url, { cache: 'no-store' }); status = r.status; if (r.ok) t = await r.text(); } catch (e) { t = null; }
+    dz.busy = false;
+    try { applyZones(t, status); } catch (e) { console.warn('zones', e); }
+  }
+  dz.timer = setTimeout(pollZones, 10000);
+}
+function applyZones(t, status) {
+  if (t === null) {
+    dz.state = status === 404 ? 'missing' : status ? 'error ' + status : 'unreachable';
+    if (dz.data && !dz.keptSince) dz.keptSince = hhmm();
+    renderDangerBar(); return;
+  }
+  dz.keptSince = null;
+  if (t === dz.text) { dz.state = dz.zones.length ? 'ok' : 'empty'; renderDangerBar(); return; } // the same survey: nothing to rebuild
+  let d; try { d = t.trim() ? JSON.parse(t) : {}; } catch (e) { d = undefined; }
+  if (d === undefined || (d !== null && typeof d !== 'object')) { dz.state = 'unreadable'; renderDangerBar(); return; }
+  dz.text = t; dz.data = d || {};
+  dzBuild(dz.data);
+  dz.state = dz.zones.length ? 'ok' : 'empty';
+  if (map.hover && (map.hover.kind === 'zone' || map.hover.kind === 'walker')) map.hover = null; // it points into the old survey
+  renderDangerBar(); renderZoneDetail(); map.dirty = true;
+}
+
+// --- geometry, once per payload
+function dzSigned(pts) { let a = 0; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]); return a / 2; }
+function dzRings(v) {
+  // closed rings of [x, y] tile pairs; stray entries are skipped, and every ring is wound the same way, so the rings of a
+  // level filled together as one path make a union (nonzero) instead of cutting a hole where two of them overlap
+  const out = [];
+  for (const ring of Array.isArray(v) ? v : []) {
+    if (!Array.isArray(ring)) continue;
+    const pts = []; for (const p of ring) { const q = pair(p); if (q) pts.push(q); }
+    if (pts.length < 3) continue;
+    if (dzSigned(pts) < 0) pts.reverse();
+    out.push(pts);
+  }
+  return out;
+}
+function dzBox(rings) { const b = [Infinity, Infinity, -Infinity, -Infinity]; for (const r of rings) for (const [x, y] of r) { if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y; } return b; }
+function dzDisc(c, rad) { const pts = []; for (let i = 0; i < 16; i++) { const a = i / 8 * Math.PI; pts.push([c[0] + Math.cos(a) * rad, c[1] + Math.sin(a) * rad]); } return pts; }
+function dzTrace(rings, ...paths) { for (const p of paths) for (const r of rings) { p.moveTo(r[0][0], r[0][1]); for (let i = 1; i < r.length; i++) p.lineTo(r[i][0], r[i][1]); p.closePath(); } }
+const dzInBox = (b, x, y) => !!b && x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3];
+function dzInRings(rings, x, y) {
+  for (const r of rings) {
+    let inside = false;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const xi = r[i][0], yi = r[i][1], xj = r[j][0], yj = r[j][1]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside; }
+    if (inside) return true;
+  }
+  return false;
+}
+function dzBuild(d) {
+  const groups = {}, zones = [], byId = new Map();
+  for (const lv of DZ_ORDER) groups[lv] = { core: new Path2D(), aggro: new Path2D(), n: 0, halo: 0 };
+  (Array.isArray(d.zones) ? d.zones : []).forEach((r, i) => {
+    if (!r || typeof r !== 'object') return;
+    const level = DZ_LEVELS.includes(r.level) ? r.level : 'other';
+    const c0 = pair(r.center);
+    let core = dzRings(r.core); const aggro = dzRings(r.aggro);
+    if (!core.length && c0) core = dzRings([dzDisc(c0, r.patrol && isNum(r.patrol.declared) ? Math.max(2, r.patrol.declared) : 4)]); // no rings sent: the declared disc, so the zone still shows
+    if (!core.length) return;
+    const cbb = dzBox(core), abb = aggro.length ? dzBox(aggro) : null;
+    const z = { id: r.id !== undefined && r.id !== null ? str(r.id) : '#' + i, level, r, core, aggro, cbb, abb, bb: abb ? [Math.min(cbb[0], abb[0]), Math.min(cbb[1], abb[1]), Math.max(cbb[2], abb[2]), Math.max(cbb[3], abb[3])] : cbb, c: c0 || [(cbb[0] + cbb[2]) / 2, (cbb[1] + cbb[3]) / 2], area: core.reduce((a, q) => a + Math.abs(dzSigned(q)), 0), points: core.concat(aggro).reduce((a, q) => a + q.length, 0), coreP: new Path2D(), aggroP: new Path2D() };
+    const g = groups[level];
+    dzTrace(core, z.coreP, g.core); dzTrace(aggro, z.aggroP, g.aggro); g.n++; if (aggro.length) g.halo++;
+    zones.push(z); byId.set(z.id, z);
+  });
+  zones.sort((a, b) => DZ_RANK[a.level] - DZ_RANK[b.level] || b.area - a.area); // dots and names: the harmless first, the deadly last (on top)
+  const walkers = d.tour && Array.isArray(d.tour.walkers) ? d.tour.walkers.filter(w => w && typeof w === 'object' && pair(w.at)) : [];
+  Object.assign(dz, { zones, byId, groups, walkers }); dz.rev++;
+}
+function dzKinds(r) { return (r.mobs && Array.isArray(r.mobs.kinds) ? r.mobs.kinds.filter(k => k && typeof k === 'object') : []).slice().sort((a, b) => (b.power || 0) - (a.power || 0) || (b.live || 0) - (a.live || 0)); }
+function dzLine(z) { const m = z.r.mobs || {}, p = z.r.power || {}; return z.level === 'clear' ? `${fmtInt(m.live)} passive` : `${fmtInt(m.live)}/${fmtInt(m.max)} · ${fmtVs(p.vsBot)} a bot`; }
+
+// --- drawing
+function dzLayer() {
+  // the fills and outlines of every shown zone at the current view; redrawn only when the view, the survey, the filters or
+  // the theme change — a pan redraws it each frame, a still map with a pulsing stuck bot never does
+  const { w, h, dpr, k } = map;
+  const key = [dz.rev, k, map.x, map.y, w, h, dpr, dz.aggro, [...dz.hide].join(), CSS.good, CSS.warn, CSS.serious, CSS.crit, CSS.surface, CSS.ink].join('|');
+  if (dz.layer && dz.layerKey === key) return dz.layer;
+  const cv = dz.layer || (dz.layer = document.createElement('canvas'));
+  const cw = Math.round(w * dpr), chh = Math.round(h * dpr);
+  if (cv.width !== cw || cv.height !== chh) { cv.width = cw; cv.height = chh; }
+  const c = cv.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cw, chh);
+  // tile space: the canvas scales the cached paths, so a pan or a zoom never retraces them; one pixel is 1/k tiles
+  c.setTransform(dpr * k, 0, 0, dpr * k, dpr * map.x, dpr * map.y);
+  const px = 1 / k; c.lineJoin = 'round';
+  if (dz.aggro) {
+    c.lineWidth = px; c.setLineDash([4 * px, 3 * px]);
+    for (const lv of DZ_ORDER) { const g = dz.groups[lv]; if (!g.halo || dz.hide.has(lv)) continue; c.fillStyle = c.strokeStyle = dzColor(lv); c.globalAlpha = 0.06; c.fill(g.aggro); c.globalAlpha = 0.45; c.stroke(g.aggro); }
+    c.setLineDash([]);
+  }
+  for (const lv of DZ_ORDER) { const g = dz.groups[lv]; if (!g.n || dz.hide.has(lv)) continue; c.fillStyle = c.strokeStyle = dzColor(lv); c.globalAlpha = DZ_FILL[lv]; c.fill(g.core); c.globalAlpha = lv === 'clear' ? 0.4 : 0.75; c.lineWidth = px; c.stroke(g.core); }
+  // back to screen pixels: a zone too small to see at this zoom gets a dot, a big one its name and strength
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.globalAlpha = 1;
+  for (const z of dz.zones) {
+    if (!dzShown(z)) continue;
+    const [ax, ay] = toS(z.bb[0], z.bb[1]), [bx, by] = toS(z.bb[2], z.bb[3]);
+    if (bx < 0 || by < 0 || ax > w || ay > h) continue;
+    const zw = (z.cbb[2] - z.cbb[0]) * k, [sx, sy] = toS(z.c[0], z.c[1]);
+    if (zw < 5) { const clear = z.level === 'clear'; c.globalAlpha = clear ? 0.45 : 0.9; c.fillStyle = dzColor(z.level); c.beginPath(); c.arc(sx, sy, clear ? 1.5 : 2.5, 0, 7); c.fill(); c.globalAlpha = 1; }
+    else if (zw >= 110) { haloText(c, str(z.r.label) || 'zone ' + z.id, sx, sy - 6, CSS.ink, 'bold 10px system-ui', 'center'); haloText(c, dzLine(z), sx, sy + 7, CSS.ink2, '10px system-ui', 'center'); }
+  }
+  dz.layerKey = key;
+  return cv;
+}
+function drawDangerZones(ctx) {
+  if (!S.layers.danger || !dz.zones.length || dzForeign()) return;
+  ctx.drawImage(dzLayer(), 0, 0, map.w, map.h);
+}
+function drawDangerFocus(ctx) {
+  if (!S.layers.danger || !dz.zones.length || dzForeign()) return;
+  const hv = map.hover && map.hover.kind === 'zone' ? map.hover.zone : null, sel = dz.sel !== null ? dz.byId.get(dz.sel) || null : null;
+  if (!hv && !sel) return;
+  const { dpr, k } = map;
+  ctx.save();
+  ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * map.x, dpr * map.y); ctx.lineJoin = 'round';
+  if (hv && hv !== sel) { ctx.globalAlpha = 0.9; ctx.strokeStyle = CSS.ink2; ctx.lineWidth = 1.5 / k; ctx.stroke(hv.coreP); }
+  if (sel) {
+    ctx.globalAlpha = 1;
+    if (sel.aggro.length) { ctx.strokeStyle = CSS.ink2; ctx.lineWidth = 1 / k; ctx.setLineDash([5 / k, 3 / k]); ctx.stroke(sel.aggroP); ctx.setLineDash([]); }
+    ctx.strokeStyle = CSS.surface; ctx.lineWidth = 4 / k; ctx.stroke(sel.coreP);
+    ctx.strokeStyle = CSS.ink; ctx.lineWidth = 2 / k; ctx.stroke(sel.coreP);
+  }
+  ctx.restore();
+  if (sel) {
+    const [sx, sy] = toS(sel.c[0], sel.c[1]), zw = (sel.cbb[2] - sel.cbb[0]) * k;
+    if (zw < 8) { ctx.strokeStyle = CSS.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, 7, 0, 7); ctx.stroke(); } // a speck at this zoom: ring it
+    const [tx, ty] = toS((sel.cbb[0] + sel.cbb[2]) / 2, sel.cbb[1]);
+    if (zw < 110) haloText(ctx, str(sel.r.label) || 'zone ' + sel.id, tx, Math.min(ty, sy - 7) - 8, CSS.ink, 'bold 11px system-ui', 'center'); // a big one carries its name already
+  }
+}
+function drawTourWalkers(ctx) {
+  if (!S.layers.danger || !dz.walkers.length || dzForeign()) return;
+  const { w, h } = map;
+  ctx.save();
+  for (const wk of dz.walkers) {
+    const at = pair(wk.at), tg = pair(wk.target); if (!at) continue;
+    const [sx, sy] = toS(at[0], at[1]);
+    if (tg) {
+      const [tx, ty] = toS(tg[0], tg[1]);
+      ctx.globalAlpha = 0.8; ctx.strokeStyle = CSS.ink2; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tx, ty); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(tx, ty, 3, 0, 7); ctx.stroke();
+    }
+    if (sx < -20 || sy < -20 || sx > w + 20 || sy > h + 20) continue;
+    // an eye: a ring with four ticks and a pupil — neither a bot's disc, a gate's diamond nor a town's ring
+    ctx.globalAlpha = 1; ctx.fillStyle = CSS.surface; ctx.beginPath(); ctx.arc(sx, sy, 6.5, 0, 7); ctx.fill();
+    ctx.strokeStyle = CSS.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7);
+    ctx.moveTo(sx - 9, sy); ctx.lineTo(sx - 6, sy); ctx.moveTo(sx + 6, sy); ctx.lineTo(sx + 9, sy); ctx.moveTo(sx, sy - 9); ctx.lineTo(sx, sy - 6); ctx.moveTo(sx, sy + 6); ctx.lineTo(sx, sy + 9); ctx.stroke();
+    ctx.fillStyle = CSS.ink; ctx.beginPath(); ctx.arc(sx, sy, 1.8, 0, 7); ctx.fill();
+    haloText(ctx, str(wk.name), sx + 11, sy, CSS.ink, 'bold 10px system-ui');
+  }
+  ctx.restore();
+}
+
+// --- hover, click, tooltip and the zone card
+function hitDanger(sx, sy) {
+  if (!S.layers.danger || (!dz.zones.length && !dz.walkers.length) || dzForeign()) return null;
+  for (const wk of dz.walkers) { const at = pair(wk.at); if (!at) continue; const [wx, wy] = toS(at[0], at[1]); if ((wx - sx) ** 2 + (wy - sy) ** 2 < 100) return { kind: 'walker', walker: wk, zone: dz.byId.get(str(wk.zone)) || null }; }
+  const [x, y] = toW(sx, sy), tiny = 6 / map.k;
+  let best = null, rank = -1, area = Infinity;
+  for (const z of dz.zones) {
+    if (!dzShown(z)) continue;
+    // the core wins over another zone's aggro halo; then the more dangerous; then the smaller (the one drawn inside)
+    const speck = (z.cbb[2] - z.cbb[0]) * map.k < 5;
+    const core = (dzInBox(z.cbb, x, y) && dzInRings(z.core, x, y)) || (speck && (z.c[0] - x) ** 2 + (z.c[1] - y) ** 2 < tiny * tiny);
+    const reach = !core && dz.aggro && dzInBox(z.abb, x, y) && dzInRings(z.aggro, x, y);
+    if (!core && !reach) continue;
+    const rk = (core ? 10 : 0) + DZ_RANK[z.level];
+    if (rk > rank || (rk === rank && z.area < area)) { best = z; rank = rk; area = z.area; }
+  }
+  return best ? { kind: 'zone', zone: best, ring: rank >= 10 ? 'core' : 'aggro' } : null;
+}
+function dangerTipRows(hv, sx, sy) {
+  const [wx, wy] = toW(sx, sy), where = ['muted', `(${Math.round(wx)}, ${Math.round(wy)})`];
+  if (hv.kind === 'walker') {
+    const wk = hv.walker, tg = pair(wk.target);
+    const rows = [['b', str(wk.name)], ['muted', 'on the zones tour: wakes the ground, watches the patrols'], ['ink2', `at ${fmtPt(wk.at)}${tg ? ' → ' + fmtPt(tg) : ' · no target'}`]];
+    rows.push(['muted', hv.zone ? `visiting #${hv.zone.id} ${str(hv.zone.r.label)} — click for it` : 'between zones']);
+    if (wk.state) rows.push(['muted', str(wk.state)]);
+    return rows;
+  }
+  const z = hv.zone, r = z.r, m = r.mobs || {}, p = r.power || {}, pt = r.patrol || {}, ob = r.observed || {}, dd = r.deaths || {};
+  const rows = [['b', str(r.label) || 'zone ' + z.id], ['muted', `${z.level}${hv.ring === 'aggro' ? ' — in its aggro reach' : ''} · #${z.id} · confidence ${fmtPct(r.confidence, 0)}`]];
+  rows.push(['ink2', `${fmtInt(m.live)}/${fmtInt(m.max)} mobs · ${fmtInt(m.aggressive)} attack on sight · ${fmtInt(m.casters)} casters`]);
+  if (z.level !== 'clear' || (isNum(p.threat) && p.threat > 0)) rows.push(['muted', `${fmtVs(p.vsBot)} a bot · threat ${fmtInt(p.threat)} · worst ${fmtInt(p.worst)}`]);
+  const kinds = dzKinds(r).slice(0, 3);
+  if (kinds.length) rows.push(['muted', kinds.map(q => `${str(q.kind)} ${fmtInt(q.live)}/${fmtInt(q.max)}`).join(' · ')]);
+  rows.push(['muted', `patrol ${isNum(pt.declared) ? pt.declared : '–'} declared, ${isNum(pt.observed) ? pt.observed : '–'} seen · aggro ${isNum(pt.aggroRange) ? pt.aggroRange : '–'} tiles`]);
+  rows.push(['muted', `${fmtInt(dd.bots)} bot deaths${dd.window ? ' in ' + str(dd.window) : ''} · ${ob.lastSeen ? 'seen ' + timeOf(ob.lastSeen) : 'never seen awake'}`]);
+  rows.push(where);
+  return rows;
+}
+function dzAgo(t) { const a = Date.parse(str(dz.data && dz.data.at)), b = Date.parse(str(t)); return isNum(a) && isNum(b) && a >= b ? ` (${fmtDur(a - b)} before the survey)` : ''; }
+function dzCentre(z) {
+  const b = z.bb, bw = Math.max(24, b[2] - b[0]), bh = Math.max(24, b[3] - b[1]);
+  if (S.follow) setFollow(false);
+  centreOn((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, Math.min(map.w / bw, map.h / bh) * 0.75);
+}
+function selectZone(id) {
+  // by id: the survey keeps a zone's id while it grows, so the card follows it across refreshes
+  dz.sel = id === null || id === undefined ? null : str(id);
+  $('#zoneDetail').classList.toggle('hidden', dz.sel === null);
+  renderZoneDetail(); map.dirty = true;
+}
+function renderZoneDetail() {
+  if (dz.sel === null) return;
+  const z = dz.byId.get(dz.sel), body = $('#zoneBody');
+  $('#zoneId').textContent = '#' + dz.sel;
+  if (!z) { body.replaceChildren(el('div', { class: 'muted', text: `zone #${dz.sel} is not in the latest survey${dz.data && dz.data.at ? ' (' + timeOf(dz.data.at) + ')' : ''} — it may have merged into a neighbour or emptied` })); return; }
+  const r = z.r, m = r.mobs || {}, p = r.power || {}, pt = r.patrol || {}, ob = r.observed || {}, dd = r.deaths || {};
+  const kv = (k, ...v) => [el('span', { class: 'k', text: k }), el('span', { class: 'v' }, ...v)];
+  const conf = isNum(r.confidence) ? Math.max(0, Math.min(1, r.confidence)) : null;
+  const frag = document.createDocumentFragment();
+  frag.append(el('div', { class: 'head' }, el('span', { style: `display:inline-block;width:12px;height:10px;border-radius:2px;background:var(${DZ_VAR[z.level]})` }), el('b', { text: str(r.label) || 'zone ' + z.id }), el('span', { class: 'badge lv-' + z.level, text: str(r.level) || 'unknown' })));
+  frag.append(el('div', { class: 'muted', style: 'margin:4px 0', text: DZ_NOTE[z.level] || `a level this page does not know` }));
+  if (r.why) frag.append(el('div', { class: 'ink2', text: str(r.why) }));
+  frag.append(el('h3', { text: 'Mobs' }), el('div', { class: 'kv' }, kv('live / max', el('b', { text: `${fmtInt(m.live)} / ${fmtInt(m.max)}` })), kv('attack on sight', fmtInt(m.aggressive)), kv('casters', fmtInt(m.casters))));
+  const kinds = dzKinds(r);
+  if (kinds.length) frag.append(el('div', { class: 'tblWrap', style: 'max-height:200px;margin-top:6px' }, el('table', { class: 'mini' },
+    el('thead', null, el('tr', null, el('th', { text: 'kind' }), el('th', { class: 'num', text: 'live / max' }), el('th', { class: 'num', text: 'power' }), el('th', { text: '' }))),
+    el('tbody', null, kinds.map(q => el('tr', { style: 'cursor:default' }, el('td', { text: str(q.kind) }), el('td', { class: 'num', text: `${fmtInt(q.live)} / ${fmtInt(q.max)}` }), el('td', { class: 'num', text: fmtInt(q.power) }), el('td', { class: 'muted', text: [q.aggressive ? 'attacks' : 'passive', q.caster ? 'caster' : ''].filter(Boolean).join(' · ') })))))));
+  if (isNum(m.others) && m.others > 0) frag.append(el('div', { class: 'muted', text: `and ${fmtInt(m.others)} more kinds` }));
+  frag.append(el('h3', { text: 'Strength' }), el('div', { class: 'kv' },
+    kv('against a bot', el('b', { class: z.level === 'deadly' ? 'crit' : '', text: fmtVs(p.vsBot) }), el('span', { class: 'muted', text: isNum(dz.data.refBotPower) ? ` (a bot's power ${fmtInt(dz.data.refBotPower)})` : '' })),
+    kv('threat', fmtInt(p.threat)), kv('worst creature', fmtInt(p.worst)), kv('all together', fmtInt(p.total))));
+  frag.append(el('h3', { text: 'Reach' }), el('div', { class: 'kv' },
+    kv('patrol declared', dzTiles(pt.declared)), kv('patrol observed', dzTiles(pt.observed)), kv('aggro range', dzTiles(pt.aggroRange)),
+    kv('centre', el('a', { text: fmtPt(z.c), style: 'cursor:pointer', onclick: () => dzCentre(z) })), kv('bounds', `${fmtPt([z.bb[0], z.bb[1]])} – ${fmtPt([z.bb[2], z.bb[3]])}`),
+    kv('rings', `${z.core.length} core · ${z.aggro.length} aggro · ${fmtInt(z.points)} points`)));
+  frag.append(el('h3', { text: 'Observation' }), el('div', { class: 'kv' },
+    kv('confidence', el('span', { style: 'display:inline-flex;align-items:center;gap:6px' }, el('div', { class: 'meter', style: 'width:80px;margin:0' }, el('div', { class: 'fill ' + (conf === null || conf >= 0.7 ? '' : conf >= 0.3 ? 'warn' : 'crit'), style: `width:${conf === null ? 0 : conf * 100}%` })), fmtPct(conf, 0))),
+    kv('samples', fmtInt(ob.samples)), kv('awake', isNum(ob.awakeSeconds) ? fmtDur(ob.awakeSeconds * 1000) : '–'),
+    kv('last seen', ob.lastSeen ? `${timeOf(ob.lastSeen)}${dzAgo(ob.lastSeen)}` : 'never seen awake — declared from the spawners'),
+    kv('bot deaths', `${fmtInt(dd.bots)}${dd.window ? ' in ' + str(dd.window) : ''}`)));
+  const ws = dz.walkers.filter(wk => str(wk.zone) === z.id);
+  if (ws.length) frag.append(el('div', { class: 'muted', style: 'margin-top:8px', text: `on the tour here: ${ws.map(wk => str(wk.name)).join(', ')}` }));
+  body.replaceChildren(frag);
+}
+
+// --- the line under the legend: level filters (kept in this browser), counts, the tour, and where the survey came from
+function dzCounts() {
+  const d = dz.data || {}, pc = d.counts && typeof d.counts === 'object' ? d.counts : {}, c = { zones: dz.zones.length, spawners: null, creatures: null };
+  for (const lv of DZ_LEVELS) c[lv] = 0;
+  for (const z of dz.zones) if (z.level in c) c[z.level]++;
+  for (const key of [...DZ_LEVELS, 'zones', 'spawners', 'creatures']) if (isNum(pc[key])) c[key] = pc[key]; // the shard's own counts win: it may cap the list it sends
+  return c;
+}
+function dzNote() {
+  const d = dz.data, src = dz.mock ? `mock ${dz.url} · ` : '';
+  if (dz.state === 'loading') return 'loading zones…';
+  if (d && dzForeign()) return `${src}the survey is of ${str(d.map)}, not drawn on ${str(S.state.map.name)}`;
+  const why = dz.state === 'missing' ? `${dz.url} is not served by this build` : dz.state === 'unreachable' ? 'zones unreachable' : dz.state === 'unreadable' ? `${dz.url} sent something unreadable` : dz.state.startsWith('error') ? `${dz.url}: ${dz.state}` : '';
+  if (why) return d && dz.zones.length ? `${src}survey ${timeOf(d.at)} kept since ${dz.keptSince || hhmm()}: ${why}` : `${src}no danger zones — ${why}`;
+  if (dz.state === 'empty') return `${src}the survey has no zones yet`;
+  return `${src}survey ${timeOf(d && d.at)}`;
+}
+function renderDangerBar() {
+  const bar = $('#dangerBar');
+  bar.classList.toggle('hidden', !S.layers.danger);
+  if (!S.layers.danger) return;
+  const d = dz.data || {}, c = dzCounts(), tour = d.tour && typeof d.tour === 'object' ? d.tour : null;
+  const items = [el('span', { class: 'muted', text: (dz.zones.length || (isNum(c.zones) && c.zones)) ? `${fmtInt(c.zones)} zones` : 'danger' })];
+  for (const lv of DZ_LEVELS) items.push(el('span', { class: 'li' + (dz.hide.has(lv) ? ' off' : ''), title: `${lv}: ${DZ_NOTE[lv]} — click to hide/show`, onclick: () => { if (dz.hide.has(lv)) dz.hide.delete(lv); else dz.hide.add(lv); dzSave(); renderDangerBar(); map.dirty = true; } },
+    el('span', { class: 'sw', style: `background:color-mix(in srgb, var(${DZ_VAR[lv]}) 40%, transparent);border-color:var(${DZ_VAR[lv]})` }), lv, el('span', { class: 'muted', text: dz.data ? ' ' + fmtInt(c[lv]) : '' })));
+  items.push(el('span', { class: 'li' + (dz.aggro ? '' : ' off'), title: 'aggro reach: the patrol widened by how far its creatures see (RangePerception), where a walker gets noticed — click to hide/show', onclick: () => { dz.aggro = !dz.aggro; dzSave(); renderDangerBar(); map.dirty = true; } },
+    el('span', { class: 'sw dash', style: 'background:transparent;border-color:var(--ink-2)' }), 'aggro reach'));
+  if (tour) {
+    const nw = Array.isArray(tour.walkers) ? tour.walkers.length : 0;
+    items.push(el('span', { class: 'li', style: 'cursor:default', title: 'The debuggers walk to the zones least seen awake, wake the ground there and hold while the patrols move' },
+      el('span', { text: '◎', style: 'color:var(--ink)' }), 'tour ', el('b', { text: `${fmtInt(tour.visited)}/${fmtInt(tour.total)}` }), el('span', { class: 'muted', text: ` visited · ${nw} walker${nw === 1 ? '' : 's'}${tour.running === false ? ' · stopped' : ''}` })));
+  }
+  if (dz.data) items.push(el('span', { class: 'muted', text: `${fmtInt(c.spawners)} spawners · ${fmtInt(c.creatures)} creatures${isNum(d.refBotPower) ? ' · a bot ' + fmtInt(d.refBotPower) : ''}` }));
+  items.push(el('span', { class: 'note', text: dzNote() }));
+  bar.replaceChildren(...items);
+}
+$('#layerBtns button[data-layer="danger"]').addEventListener('click', () => { if (map.hover && (map.hover.kind === 'zone' || map.hover.kind === 'walker')) map.hover = null; renderDangerBar(); if (S.layers.danger) pollZones(); });
+$('#zoneClose').addEventListener('click', () => selectZone(null));
+$('#zoneCentre').addEventListener('click', () => { const z = dz.sel !== null && dz.byId.get(dz.sel); if (z) dzCentre(z); });
+
+// ================================================================ selection + detail
+let detailTimer = null;
+function selectBot(name, opts) {
+  const o = opts || {};
+  const nm = name ? str(name) : null;
+  if (nm && !S.botByName.has(nm) && !o.force) { /* unknown bot: still try the detail endpoint */ }
+  S.selected = nm;
+  if (!nm) { S.follow = false; $('#btnFollow').classList.remove('on'); $('#detail').classList.add('hidden'); S.detail = null; if (detailTimer) { clearTimeout(detailTimer); detailTimer = null; } }
+  else {
+    $('#detail').classList.remove('hidden');
+    const b = S.botByName.get(nm);
+    if (b && isNum(b.x) && isNum(b.y) && o.centre !== false) { const [sx, sy] = toS(b.x, b.y); if (sx < 0 || sy < 0 || sx > map.w || sy > map.h) centreOn(b.x, b.y); }
+    renderDetail(b || { name: nm }, null);
+    fetchDetail();
+  }
+  for (const [n, tr] of tableRows) tr.classList.toggle('sel', n === nm);
+  if (nm && o.scroll !== false) {
+    // scroll the table container only — never the page
+    const tr = tableRows.get(nm), wrap = $('#botTbl').parentElement;
+    if (tr && tr.isConnected && wrap) {
+      const top = tr.offsetTop, bottom = top + tr.offsetHeight, head = 30;
+      if (top < wrap.scrollTop + head || bottom > wrap.scrollTop + wrap.clientHeight) wrap.scrollTop = Math.max(0, top - wrap.clientHeight / 2);
+    }
+  }
+  map.dirty = true;
+}
+async function fetchDetail() {
+  if (detailTimer) { clearTimeout(detailTimer); detailTimer = null; }
+  const nm = S.selected; if (!nm) return;
+  const d = await getJSON('/api/bot/' + encodeURIComponent(nm));
+  if (S.selected !== nm) return;
+  if (d && typeof d === 'object') { S.detail = d; renderDetail(d, d); }
+  else renderDetail(S.botByName.get(nm) || { name: nm }, null, true);
+  detailTimer = setTimeout(fetchDetail, 5000);
+}
+function updateDetailFromState() {
+  if (!S.selected || S.detail) return;
+  const b = S.botByName.get(S.selected); if (b) renderDetail(b, null);
+}
+const DETAIL_SKIP = new Set(['name', 'class', 'skills', 'recent', 'ledger', 'route', 'target', 'lastPath']);
+function kvRows(obj, skip) {
+  const rows = [];
+  for (const [k, v] of Object.entries(obj || {})) {
+    if (skip && skip.has(k)) continue;
+    let txt;
+    if (v === null || v === undefined) txt = '–';
+    else if (typeof v === 'boolean') txt = v ? 'yes' : 'no';
+    else if (typeof v === 'number') txt = (k.endsWith('Ms') ? fmtDur(v) : (k === 'mood' || k === 'progress') ? fmtPct(v, 0) : Number.isInteger(v) ? fmtInt(v) : v.toFixed(2));
+    else if (typeof v === 'object') { try { txt = JSON.stringify(v); } catch (e) { txt = String(v); } }
+    else txt = String(v);
+    rows.push(el('span', { class: 'k', text: k }), el('span', { class: 'v', text: txt }));
+  }
+  return rows;
+}
+function renderDetail(b, full, failed) {
+  const body = $('#detailBody'); const frag = document.createDocumentFragment();
+  frag.append(el('div', { class: 'head' }, el('span', { class: 'sw', style: `display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorOfClass(b.class)}` }), el('b', { text: str(b.name) }), el('span', { class: 'muted', text: `${str(b.class)}${b.role ? ' · ' + str(b.role) : ''}${b.guild ? ' · ' + str(b.guild) : ''}` }), b.stuck ? el('span', { class: 'badge stuck', text: 'stuck' }) : null, b.alive === false ? el('span', { class: 'badge Dead', text: 'dead' }) : null));
+  if (failed) frag.append(el('div', { class: 'muted', text: '/api/bot failed — showing the snapshot from /api/state' }));
+  if (b.stage || b.work) frag.append(el('div', { style: 'margin:4px 0' }, el('b', { text: str(b.work) || 'no work' }), el('span', { class: 'muted', text: b.stage ? ' — ' + str(b.stage) : '' })));
+  const t = ptOf(b.target);
+  frag.append(el('div', { class: 'muted', text: `at (${fmtInt(b.x)}, ${fmtInt(b.y)})${t ? ` → target ${fmtPt(t)}` : ' · no target'}${Array.isArray(b.route) ? ` · ${b.route.length} route points` : ''}` }));
+  if (b.lastPath && typeof b.lastPath === 'object') frag.append(el('div', { class: 'muted', text: `last path: ${str(b.lastPath.outcome)} ${b.lastPath.reason ? '· ' + str(b.lastPath.reason) : ''} ${b.lastPath.at ? '· ' + timeOf(b.lastPath.at) : ''} ${fmtPt(b.lastPath.from)} → ${fmtPt(b.lastPath.to)}` }));
+  frag.append(el('h3', { text: 'Fields' }), el('div', { class: 'kv' }, kvRows(b, DETAIL_SKIP)));
+  const sk = Array.isArray(b.skills) ? b.skills.filter(s => s && typeof s === 'object') : [];
+  if (sk.length) frag.append(el('h3', { text: 'Skills' }), el('div', { class: 'list', style: 'gap:2px' }, sk.slice().sort((a, c) => (c.value || 0) - (a.value || 0)).map(s => el('div', { class: 'skill' }, el('span', { text: str(s.name) }), el('span', { class: 'bar' }, el('i', { style: `width:${Math.max(0, Math.min(100, isNum(s.value) ? s.value : 0))}%` })), el('span', { class: 'num muted', text: isNum(s.value) ? s.value.toFixed(1) : '–' })))));
+  if (full) {
+    const led = full.ledger;
+    frag.append(el('h3', { text: 'Ledger' }));
+    if (Array.isArray(led) && led.length && typeof led[0] === 'object') {
+      const keys = [...new Set(led.flatMap(r => Object.keys(r || {})))];
+      frag.append(el('div', { class: 'tblWrap', style: 'max-height:200px' }, el('table', { class: 'mini' }, el('thead', null, el('tr', null, keys.map(k => el('th', { text: k })))), el('tbody', null, led.map(r => el('tr', { style: 'cursor:default' }, keys.map(k => { const v = r ? r[k] : null; return el('td', { class: isNum(v) ? 'num' : '', text: isNum(v) ? (Number.isInteger(v) ? fmtInt(v) : v.toFixed(2)) : v === null || v === undefined ? '–' : typeof v === 'object' ? JSON.stringify(v) : String(v) }); })))))));
+    } else if (led && typeof led === 'object' && !Array.isArray(led)) frag.append(el('div', { class: 'kv' }, kvRows(led)));
+    else frag.append(el('div', { class: 'muted', text: 'no ledger' }));
+    const rec = Array.isArray(full.recent) ? full.recent.filter(e => e && typeof e === 'object') : [];
+    frag.append(el('h3', { text: `Recent events (${rec.length})` }));
+    frag.append(el('div', null, rec.slice().reverse().map(e => eventRow(e))));
+    if (!rec.length) frag.append(el('div', { class: 'muted', text: 'none' }));
+  } else if (!failed) frag.append(el('div', { class: 'muted', style: 'margin-top:8px', text: 'loading ledger and recent events…' }));
+  body.replaceChildren(frag);
+}
+$('#btnClose').addEventListener('click', () => selectBot(null));
+$('#btnCentre').addEventListener('click', () => { const b = S.selected && S.botByName.get(S.selected); if (b && isNum(b.x) && isNum(b.y)) centreOn(b.x, b.y, Math.max(map.k, map.fitK * 6)); });
+
+// ================================================================ bots table
+const COLS = [
+  { key: 'name', label: 'Name', get: b => str(b.name) },
+  { key: 'class', label: 'Class', get: b => str(b.class) },
+  { key: 'guild', label: 'Guild', get: b => str(b.guildAbbr || b.guild) },
+  { key: 'standing', label: 'Standing', get: b => str(b.standing) },
+  { key: 'work', label: 'Work · stage', get: b => str(b.work) },
+  { key: 'hp', label: 'HP', num: true, get: b => isNum(b.hp) && isNum(b.hpMax) && b.hpMax ? b.hp / b.hpMax : -1 },
+  { key: 'mood', label: 'Mood', num: true, get: b => isNum(b.mood) ? b.mood : -1 },
+  { key: 'purse', label: 'Purse', num: true, get: b => isNum(b.purse) ? b.purse : -1 },
+  { key: 'level', label: 'Level · rank', get: b => LEVELS.indexOf(str(b.level)), num: true },
+  { key: 'stuck', label: 'Stuck', num: true, get: b => b.stuck ? (isNum(b.sinceMs) ? b.sinceMs : 1) : 0 },
+  { key: 'lastPath', label: 'Last path', get: b => str(b.lastPath && b.lastPath.outcome) },
+];
+const tableRows = new Map(); // name → tr
+(() => {
+  const tr = $('#botTbl thead tr');
+  for (const c of COLS) {
+    const th = el('th', { class: c.num ? 'num' : '', text: c.label, 'data-key': c.key });
+    th.addEventListener('click', () => { if (S.sort.key === c.key) S.sort.dir = -S.sort.dir; else { S.sort.key = c.key; S.sort.dir = c.num ? -1 : 1; } renderTable(); });
+    tr.append(th);
+  }
+  const rerender = () => { S.filters.q = $('#fText').value.trim().toLowerCase(); S.filters.cls = $('#fClass').value; S.filters.standing = $('#fStanding').value; S.filters.work = $('#fWork').value; S.filters.guild = $('#fGuild').value; S.filters.stuckOnly = $('#fStuckOnly').checked; renderTable(); };
+  ['#fText', '#fClass', '#fStanding', '#fWork', '#fGuild', '#fStuckOnly'].forEach(s => { $(s).addEventListener('input', rerender); $(s).addEventListener('change', rerender); });
+})();
+function makeRow(b) {
+  const tr = el('tr');
+  tr.addEventListener('click', () => selectBot(b.name, { scroll: false }));
+  const cells = {};
+  for (const c of COLS) { const td = el('td', { class: c.num ? 'num' : '' }); cells[c.key] = td; tr.append(td); }
+  tr._cells = cells;
+  return tr;
+}
+function fillRow(tr, b) {
+  const c = tr._cells;
+  tr.classList.toggle('dead', b.alive === false && !b.offline);
+  tr.classList.toggle('resting', !!b.offline);
+  c.name.replaceChildren(el('span', null, el('span', { class: 'sw', style: `background:${colorOfClass(b.class)}` }), str(b.name), b.minded ? el('span', { class: 'muted', text: ' ▲', title: 'minded' }) : null));
+  c.class.textContent = str(b.class);
+  c.guild.textContent = str(b.guildAbbr || b.guild) || '–';
+  c.guild.title = str(b.guild);
+  c.standing.replaceChildren(el('span', { class: 'badge ' + str(b.standing), text: str(b.standing) || '–' }));
+  c.work.replaceChildren(str(b.work) || el('span', { class: 'muted', text: 'idle' }), el('span', { class: 'stage', text: str(b.stage), title: str(b.stage) }));
+  const frac = isNum(b.hp) && isNum(b.hpMax) && b.hpMax ? Math.max(0, Math.min(1, b.hp / b.hpMax)) : null;
+  c.hp.replaceChildren(el('span', { class: 'hp' }, el('i', { class: frac === null ? '' : frac < 0.3 ? 'crit' : frac < 0.6 ? 'warn' : '', style: `width:${frac === null ? 0 : frac * 100}%` })), `${fmtInt(b.hp)}/${fmtInt(b.hpMax)}`);
+  c.mood.textContent = isNum(b.mood) ? b.mood.toFixed(2) : '–';
+  c.purse.replaceChildren(fmtInt(b.purse), el('span', { class: 'muted', text: isNum(b.bank) ? ` +${fmtGold(b.bank)}` : '', title: 'bank' }));
+  c.level.replaceChildren(str(b.level) || '–', el('span', { class: 'stage', text: `${str(b.rank)}${isNum(b.progress) ? ' · ' + fmtPct(b.progress, 0) : ''}` }));
+  c.stuck.replaceChildren(b.stuck ? el('span', { class: 'badge stuck', text: 'stuck', title: str(b.stuckReason) }) : b.noWay ? el('span', { class: 'badge', text: 'no way' }) : '');
+  const lp = b.lastPath && typeof b.lastPath === 'object' ? b.lastPath : null;
+  c.lastPath.replaceChildren(lp ? str(lp.outcome) : '–', lp ? el('span', { class: 'stage', text: `${str(lp.reason)}${lp.at ? ' · ' + timeOf(lp.at) : ''}` }) : '');
+}
+function botMatches(b) {
+  const f = S.filters;
+  if (f.cls && str(b.class) !== f.cls) return false;
+  if (f.standing && str(b.standing) !== f.standing) return false;
+  if (f.work && str(b.work) !== f.work) return false;
+  if (f.guild && str(b.guild) !== f.guild) return false;
+  if (f.stuckOnly && !b.stuck) return false;
+  if (f.q) { const hay = `${b.name} ${b.class} ${b.guild} ${b.work} ${b.stage} ${b.rank} ${b.standing} ${b.stuckReason || ''}`.toLowerCase(); if (!hay.includes(f.q)) return false; }
+  return true;
+}
+function renderTable() {
+  const col = COLS.find(c => c.key === S.sort.key) || COLS[0];
+  $$('#botTbl th').forEach(th => { th.classList.toggle('sorted', th.dataset.key === col.key); th.classList.toggle('desc', th.dataset.key === col.key && S.sort.dir < 0); });
+  const seen = new Set();
+  const list = [];
+  for (const b of S.bots) {
+    const nm = str(b.name); if (!nm || seen.has(nm)) continue; seen.add(nm);
+    let tr = tableRows.get(nm); if (!tr) { tr = makeRow(b); tableRows.set(nm, tr); }
+    fillRow(tr, b); tr.classList.toggle('sel', nm === S.selected);
+    if (botMatches(b)) list.push([b, tr]);
+  }
+  for (const nm of [...tableRows.keys()]) if (!seen.has(nm)) { tableRows.get(nm).remove(); tableRows.delete(nm); }
+  list.sort((a, b) => { const va = col.get(a[0]), vb = col.get(b[0]); const r = col.num ? (va - vb) : String(va).localeCompare(String(vb)); return (r || String(a[0].name).localeCompare(String(b[0].name))) * S.sort.dir; });
+  $('#botTbl tbody').replaceChildren(...list.map(x => x[1]));
+  $('#tblCount').textContent = `${list.length} of ${S.bots.length}`;
+  renderLegend();
+}
+function updateFilterOptions(st) {
+  const p = st.population || {};
+  const setOpts = (sel, keys) => {
+    const cur = sel.value; const want = ['', ...keys];
+    const have = Array.from(sel.options).map(o => o.value);
+    if (have.length === want.length && have.every((v, i) => v === want[i])) return;
+    sel.replaceChildren(sel.options[0], ...keys.map(k => el('option', { value: k, text: k })));
+    sel.value = want.includes(cur) ? cur : '';
+  };
+  setOpts($('#fClass'), Object.keys(p.byClass || {}).sort());
+  setOpts($('#fStanding'), Object.keys(p.byStanding || {}));
+  setOpts($('#fWork'), Object.keys(p.byWork || {}).sort());
+  setOpts($('#fGuild'), (Array.isArray(st.guilds) ? st.guilds : []).map(g => str(g && g.name)).filter(Boolean));
+}
+
+// ================================================================ stuck panel
+function renderStuck(st) {
+  const list = Array.isArray(st.stuck) ? st.stuck.filter(s => s && typeof s === 'object') : [];
+  $('#stuckN').textContent = list.length ? `(${list.length})` : '';
+  $('#stuckList').replaceChildren(...list.map(s => {
+    const b = S.botByName.get(str(s.name));
+    return el('div', { class: 'it', onclick: () => selectBot(s.name) },
+      el('div', { class: 't' }, el('b', null, el('span', { class: 'sw', style: `display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:${colorOfClass(b && b.class)}` }), str(s.name), el('span', { class: 'muted', text: b ? ` ${str(b.class)} · ${str(b.work) || 'idle'}` : '' })), el('span', { class: 'num', text: fmtDur(s.sinceMs) })),
+      el('div', { class: 'd', text: `${str(s.reason) || 'no reason given'} · at (${fmtInt(s.x)}, ${fmtInt(s.y)})${ptOf(s.target) ? ' → ' + fmtPt(s.target) : ''}` }));
+  }));
+  if (!list.length) $('#stuckList').replaceChildren(el('div', { class: 'muted', text: 'nobody is stuck' }));
+}
+
+// ================================================================ bar lists
+function barList(container, rows, o) {
+  // rows: [{label, value, sub?, cls?, onclick?}], o: {max, fmt, target}
+  const opts = o || {};
+  const vals = rows.map(r => isNum(r.value) ? r.value : 0);
+  const max = isNum(opts.max) ? opts.max : Math.max(1e-9, ...vals);
+  const frag = document.createDocumentFragment();
+  for (const r of rows) {
+    const v = isNum(r.value) ? r.value : 0;
+    frag.append(el('span', { class: 'lbl' + (r.onclick ? ' click' : ''), text: r.label, title: r.title || r.label, onclick: r.onclick }));
+    frag.append(el('span', { class: 'bar' }, el('i', { class: r.cls || '', style: `width:${Math.max(0, Math.min(100, v / max * 100))}%` }), isNum(opts.target) ? el('span', { class: 'tgt', style: `left:${opts.target / max * 100}%` }) : null));
+    frag.append(el('span', { class: 'v' }, el('b', { text: opts.fmt ? opts.fmt(v, r) : fmtInt(v) }), r.sub ? el('span', { class: 'muted', text: ' ' + r.sub }) : null));
+  }
+  container.replaceChildren(frag);
+  if (!rows.length) container.replaceChildren(el('span', { class: 'muted', text: 'nothing yet' }));
+}
+
+// ================================================================ roads (BotRoadbook): once a minute, they change slowly
+async function pollRoads() {
+  const r = await getJSON('/api/roads');
+  if (r && typeof r === 'object') { S.roads = r; map.dirty = true; }
+  setTimeout(pollRoads, 60000);
+}
+// ================================================================ paths panel
+async function pollPaths() {
+  const p = await getJSON('/api/paths');
+  if (p && typeof p === 'object') { S.paths = p; try { renderPaths(p); } catch (e) { console.warn('paths', e); } map.dirty = true; }
+  setTimeout(pollPaths, 10000);
+}
+function renderPaths(p) {
+  const bo = p.byOutcome && typeof p.byOutcome === 'object' ? Object.entries(p.byOutcome).filter(([, v]) => isNum(v)).sort((a, b) => b[1] - a[1]) : [];
+  barList($('#pOutcome'), bo.map(([k, v]) => ({ label: k, value: v, cls: k === 'NoWay' || k === 'Sealed' ? 'crit' : k === 'GaveUp' || k === 'Stalled' ? 'warn' : '' })));
+  const bb = Array.isArray(p.byBot) ? p.byBot.filter(x => x && typeof x === 'object').slice(0, 25) : [];
+  barList($('#pBot'), bb.map(x => ({ label: str(x.bot), value: x.count, sub: x.lastAt ? 'last ' + timeOf(x.lastAt) : '', onclick: () => selectBot(x.bot) })));
+  const br = Array.isArray(p.byReason) ? p.byReason.filter(x => x && typeof x === 'object').slice(0, 30) : [];
+  barList($('#pReason'), br.map(x => ({ label: str(x.reason) || '(none)', value: x.count })));
+  const rec = Array.isArray(p.recent) ? p.recent.filter(x => x && typeof x === 'object') : [];
+  $('#pRecent').replaceChildren(...rec.slice().reverse().slice(0, 100).map(r => el('div', { class: 'it', onclick: () => { selectBot(r.bot); const t = pair(r.to); if (t) centreOn(t[0], t[1], Math.max(map.k, map.fitK * 6)); } },
+    el('div', { class: 't' }, el('b', { text: `${str(r.bot)} · ${str(r.outcome)}` }), el('span', { class: 'muted', text: timeOf(r.at) })),
+    el('div', { class: 'd', text: `${str(r.work) ? r.work + ' · ' : ''}${str(r.reason)} · ${fmtPt(r.from)} → ${fmtPt(r.to)}${isNum(r.span) ? ' · span ' + r.span : ''}${isNum(r.plans) ? ' · ' + r.plans + ' plans' : ''}${isNum(r.tiles) ? ' · ' + fmtInt(r.tiles) + ' tiles' : ''}${isNum(r.ms) ? ' · ' + r.ms.toFixed(1) + ' ms' : ''}` }))));
+  if (!rec.length) $('#pRecent').replaceChildren(el('div', { class: 'muted', text: 'no failures recorded' }));
+  const hot = Array.isArray(p.hot) ? p.hot.length : 0;
+  $('#pathsSummary').textContent = `${rec.length} recent failures · ${bb.length} bots · ${br.length} reasons · ${hot} hot spots`;
+  $('#pathsAt').textContent = 'updated ' + hhmm();
+}
+
+// ================================================================ work panel
+function renderWorkKinds(st) {
+  const w = st.work || {};
+  const kinds = Array.isArray(w.byKind) ? w.byKind.filter(k => k && typeof k === 'object') : [];
+  kinds.sort((a, b) => (isNum(a.share) ? a.share : -1) - (isNum(b.share) ? b.share : -1));
+  barList($('#wKinds'), kinds.map(k => ({ label: str(k.kind), value: isNum(k.share) ? k.share : 0, cls: !isNum(k.share) ? '' : k.share >= 0.95 ? '' : k.share >= 0.5 ? 'warn' : 'crit', sub: `${fmtInt(k.finished)}/${fmtInt(k.taken)}${isNum(k.failed) ? ' · ' + k.failed + ' failed' : ''}${isNum(k.dropped) ? ' · ' + k.dropped + ' dropped' : ''}`, onclick: () => { $('#fWork').value = str(k.kind); $('#fWork').dispatchEvent(new Event('change')); showTab('bots'); } })), { max: 1, target: 0.95, fmt: v => fmtPct(v, 0) });
+  $('#wTotals').replaceChildren(...kvRows({ taken: w.taken, finished: w.finished, failed: w.failed, dropped: w.dropped, died: w.died, share: isNum(w.share) ? fmtPct(w.share) : null }));
+  const bw = st.population && st.population.byWork && typeof st.population.byWork === 'object' ? Object.entries(st.population.byWork).filter(([, v]) => isNum(v)).sort((a, b) => b[1] - a[1]) : [];
+  barList($('#wByWork'), bw.map(([k, v]) => ({ label: k, value: v, onclick: () => { $('#fWork').value = k; $('#fWork').dispatchEvent(new Event('change')); showTab('bots'); } })));
+}
+
+// ================================================================ money (BotEarnings): what the work pays, special classes left out
+function renderMoney(st) {
+  const m = st.money;
+  if (!m || typeof m !== 'object') { $('#tCoin').textContent = '–'; $('#tCoinSub').textContent = 'no money figures from this build'; return; }
+  const sign = v => isNum(v) ? (v > 0 ? '+' : '') + fmtGold(v) : '–';
+  $('#tCoin').textContent = fmtGold(m.coinPerHour);
+  $('#tCoinSub').replaceChildren(el('b', { text: isNum(m.perBotPerHour) ? m.perBotPerHour.toFixed(1) : '–' }), ` gp/h a bot · ${fmtInt(m.bots)} bots · over ${isNum(m.windowMin) ? Math.round(m.windowMin) : '–'} min`);
+  $('#tWealthSub').replaceChildren(`spent at work ${fmtGold(m.spentPerHour)} gp/h · purse + bank ${fmtGold(m.wealth)} (${fmtGold(m.wealthPerBot)} a bot) · net `, el('b', { class: isNum(m.netPerHour) && m.netPerHour < 0 ? 'crit' : '', text: sign(m.netPerHour) }), ' gp/h');
+  const ex = Array.isArray(m.excluded) ? m.excluded.join(', ') : '';
+  $('#moneyNote').textContent = `Earned: coin the bots' undertakings brought into their packs. Spent at work: what undertakings paid out (supplies, reagents, cloth). Made: the value of goods made. Net: how purses and banks together moved — everything earned less everything spent. Left out: ${ex}.`;
+  const cls = Array.isArray(m.classes) ? m.classes.filter(c => c && typeof c === 'object') : [];
+  cls.sort((a, b) => (b.perBotPerHour || 0) - (a.perBotPerHour || 0));
+  const tb = $('#moneyTbl tbody');
+  tb.replaceChildren(...cls.map(c => el('tr', {},
+    el('td', { text: str(c.cls) }),
+    el('td', { class: 'num', text: fmtInt(c.bots) }),
+    el('td', { class: 'num', text: fmtGold(c.coinPerHour) }),
+    el('td', { class: 'num', text: isNum(c.perBotPerHour) ? c.perBotPerHour.toFixed(1) : '–' }),
+    el('td', { class: 'num', text: fmtGold(c.spentPerHour) }),
+    el('td', { class: 'num', text: fmtGold(c.madePerHour) }),
+    el('td', { class: 'num', text: fmtGold(c.wealthPerBot) }),
+    el('td', { class: 'num' + (isNum(c.netPerBotPerHour) && c.netPerBotPerHour < 0 ? ' crit' : ''), text: isNum(c.netPerBotPerHour) ? (c.netPerBotPerHour > 0 ? '+' : '') + c.netPerBotPerHour.toFixed(1) : '–' }),
+    el('td', { class: 'num', text: fmtGold(c.coinSinceBoot) }))));
+  barList($('#moneyBars'), cls.map(c => ({ label: str(c.cls), value: Math.max(0, c.perBotPerHour || 0), sub: `${fmtInt(c.bots)} bots`, onclick: () => { $('#fClass').value = str(c.cls); $('#fClass').dispatchEvent(new Event('change')); showTab('bots'); } })), { fmt: v => v.toFixed(1) });
+  const top = Array.isArray(m.top) ? m.top.filter(x => x && typeof x === 'object') : [];
+  barList($('#moneyTop'), top.map(x => ({ label: str(x.name), value: Math.max(0, x.coin || 0), sub: str(x.cls), onclick: () => selectBot(x.name) })), { fmt: v => fmtGold(v) });
+  $('#moneyTotals').replaceChildren(...kvRows({ 'earned gp/h': fmtGold(m.coinPerHour), 'spent at work gp/h': fmtGold(m.spentPerHour), 'made gp/h': fmtGold(m.madePerHour), 'a bot gp/h': isNum(m.perBotPerHour) ? m.perBotPerHour.toFixed(1) : null, 'purse + bank': fmtGold(m.wealth), 'a bot holds': fmtGold(m.wealthPerBot), 'net gp/h': sign(m.netPerHour), 'bots counted': fmtInt(m.bots) }));
+}
+
+// ================================================================ guilds & wars
+function renderGuilds(st) {
+  const gs = Array.isArray(st.guilds) ? st.guilds.filter(g => g && typeof g === 'object') : [];
+  $('#guildList').replaceChildren(...gs.map(g => {
+    const hall = ptOf(g.hall), house = ptOf(g.house), seat = ptOf(g.seat);
+    const go = p => () => centreOn(p[0], p[1], Math.max(map.k, map.fitK * 6));
+    const squares = Array.isArray(g.squares) ? g.squares.length : 0;
+    return el('div', { class: 'gcard' },
+      el('div', { class: 't' }, el('b', { text: `${str(g.name)}${g.abbr ? ' [' + g.abbr + ']' : ''}` }), el('span', { class: 'num ink2', text: `${fmtInt(g.alive)} / ${fmtInt(g.members)} alive` })),
+      el('div', { class: 'd' }, 'house ', house ? el('a', { text: `${str(g.house.town)}${g.house.britain ? ' (home)' : ''}`, onclick: go(house) }) : seat ? el('a', { text: `none — seat ${fmtPt(seat)}`, onclick: go(seat) }) : 'none', ' · hall ', hall ? el('a', { text: fmtPt(hall), onclick: go(hall) }) : 'none', ` · ${fmtInt(squares)} square${squares === 1 ? '' : 's'}`),
+      el('div', { class: 'd' }, 'chest ', el('b', { class: 'ink2', text: fmtGold(g.chest) }), ` · can pay ${fmtGold(g.fund)}`, isNum(g.goal) && g.goal > 0 ? ` of ${fmtGold(g.goal)} for ${str(g.saving)}` : '', Array.isArray(g.wars) && g.wars.length ? ` · at war with ${g.wars.map(str).join(', ')}` : ' · at peace'),
+      el('div', { class: 'd', style: 'margin-top:4px' }, el('a', { text: 'show members', onclick: () => { $('#fGuild').value = str(g.name); $('#fGuild').dispatchEvent(new Event('change')); showTab('bots'); } })));
+  }));
+  if (!gs.length) $('#guildList').replaceChildren(el('div', { class: 'muted', text: 'no guilds' }));
+  const ws = Array.isArray(st.wars) ? st.wars.filter(w => w && typeof w === 'object') : [];
+  $('#warList').replaceChildren(...ws.map(w => {
+    const ka = isNum(w.killsA) ? w.killsA : 0, kb = isNum(w.killsB) ? w.killsB : 0, mx = Math.max(1, ka, kb);
+    return el('div', { class: 'war' },
+      el('div', { class: 't' }, el('b', { text: `${str(w.a)} vs ${str(w.b)}` }), el('span', { class: 'muted', text: isNum(w.minutes) ? `${fmtInt(w.minutes)} min` : '' })),
+      el('div', { class: 'score' }, el('i', { class: 'a' }, el('b', { style: `width:${ka / mx * 100}%` })), el('i', { class: 'b' }, el('b', { style: `width:${kb / mx * 100}%` }))),
+      el('div', { class: 'd', style: 'display:flex;justify-content:space-between' }, el('span', { text: `${str(w.a)}: ${fmtInt(ka)} kills · ${fmtGold(w.plunderA)} plunder` }), el('span', { text: `${str(w.b)}: ${fmtInt(kb)} kills · ${fmtGold(w.plunderB)} plunder` })),
+      el('div', { class: 'd', text: w.rule ? 'ends at ' + str(w.rule) : '' }));
+  }));
+  if (!ws.length) $('#warList').replaceChildren(el('div', { class: 'muted', text: 'no wars — peace across the land' }));
+  const sq = Array.isArray(st.squads) ? st.squads.filter(s => s && typeof s === 'object') : [];
+  $('#squadList').replaceChildren(...sq.map(s => el('div', { class: 'it', onclick: () => selectBot(s.leader) },
+    el('div', { class: 't' }, el('b', { text: `squad ${str(s.id)} · ${str(s.leader)}` }), el('span', { class: 'muted', text: `${str(s.stance)}${s.warring ? ' · warring' : ''}` })),
+    el('div', { class: 'd', text: `${Array.isArray(s.members) ? s.members.length : 0} members: ${(Array.isArray(s.members) ? s.members : []).map(str).join(', ')} · at (${fmtInt(s.x)}, ${fmtInt(s.y)})` }))));
+  if (!sq.length) $('#squadList').replaceChildren(el('div', { class: 'muted', text: 'no squads' }));
+  renderDiplomacy(st);
+}
+
+// Meetings between guilds and with towns, the relations and agreements between guilds, and each guild's standing in its
+// towns (29.09.2026). Every figure is one the log's "Diplomacy:" line prints. See BotDiplomacyWeb.
+function renderDiplomacy(st) {
+  const d = st.diplomacy && typeof st.diplomacy === 'object' ? st.diplomacy : {};
+  const rows = [];
+  (Array.isArray(d.meetings) ? d.meetings : []).forEach(m => rows.push(el('div', { class: 'it', onclick: () => centreOn(m.x, m.y, Math.max(map.k, map.fitK * 6)) },
+    el('div', { class: 't' }, el('b', { text: `meeting #${str(m.id)}: ${str(m.guest)} → ${m.host ? str(m.host) : 'the town'} at ${str(m.town)}` }), el('span', { class: 'muted', text: `${str(m.topic)} · ${str(m.stage)} · ${fmtInt(m.minutes)} min` })),
+    el('div', { class: 'd', text: `envoy ${m.envoy ? str(m.envoy) : '—'} · answerer ${m.answerer ? str(m.answerer) : '—'} · witness ${m.witness ? str(m.witness) : '—'} · ${str(m.why)}` }))));
+  (Array.isArray(d.relations) ? d.relations : []).forEach(r => rows.push(el('div', { class: 'it' },
+    el('div', { class: 't' }, el('b', { text: `${str(r.a)} ⇄ ${str(r.b)}` }), el('span', { class: 'muted', text: `${r.war ? 'at war · ' : ''}${r.allied ? 'allied · ' : ''}${isNum(r.ab) ? r.ab : 0} / ${isNum(r.ba) ? r.ba : 0}` })),
+    el('div', { class: 'd', text: (Array.isArray(r.pacts) && r.pacts.length ? r.pacts.map(p => `${str(p.kind)} ${fmtInt(p.minutesLeft)} min`).join(', ') + ' · ' : '') + `${str(r.a)} holds: ${str(r.aHolds)} · ${str(r.b)} holds: ${str(r.bHolds)}` }))));
+  (Array.isArray(d.standing) ? d.standing : []).forEach(t => rows.push(el('div', { class: 'it' },
+    el('div', { class: 't' }, el('b', { text: `${str(t.guild)} in ${str(t.town)}` }), el('span', { class: 'muted', text: `prices ×${isNum(t.prices) ? t.prices.toFixed(3) : '1.000'}${t.exiled ? ' · put out' : ''}` })),
+    el('div', { class: 'd', text: `${fmtInt(t.done)} done · ${fmtInt(t.failed)} failed · ${fmtInt(t.failsInARow)} in a row` + (t.task && typeof t.task === 'object' ? ` · task: ${str(t.task.offer)} — ${str(t.task.progress)}, ${fmtInt(t.task.minutesLeft)} min left` : '') }))));
+  (Array.isArray(d.recent) ? d.recent : []).slice(0, 4).forEach(line => rows.push(el('div', { class: 'd muted', text: str(line) })));
+  $('#dipList').replaceChildren(...rows);
+  if (!rows.length) $('#dipList').replaceChildren(el('div', { class: 'muted', text: 'no meetings, agreements or dealings with towns yet' }));
+}
+
+// ================================================================ craft
+async function loadCraft() {
+  const c = await getJSON('/api/craft');
+  if (c && typeof c === 'object') { S.craft = c; try { renderCraft(c); } catch (e) { console.warn('craft', e); } $('#craftAt').textContent = 'updated ' + hhmm(); }
+  else $('#craftAt').textContent = 'craft endpoint unavailable';
+}
+function renderCraft(c) {
+  const chains = Array.isArray(c.chains) ? c.chains.filter(x => x && typeof x === 'object') : [];
+  $('#craftTbl tbody').replaceChildren(...chains.map(ch => el('tr', { style: 'cursor:default' },
+    el('td', null, el('b', { text: str(ch.material) })),
+    el('td', { class: 'num', text: fmtInt(ch.gatherers) }), el('td', { class: 'num', text: fmtInt(ch.onMarket) }), el('td', { class: 'num', text: isNum(ch.cheapest) ? fmtInt(ch.cheapest) + ' gp' : '–' }),
+    el('td', { text: str(ch.into) || '–' }), el('td', { class: 'num', text: fmtInt(ch.makers) }),
+    el('td', null, (Array.isArray(ch.products) ? ch.products.filter(p => p && typeof p === 'object') : []).map(p => el('span', { class: 'prod' + (isNum(p.wanted) && p.wanted > (isNum(p.onMarket) ? p.onMarket : 0) ? ' want' : ''), title: `${str(p.item)}: skill ${str(p.skill)}, needs ${fmtInt(p.needs)}, ${fmtInt(p.makers)} makers, ${fmtInt(p.onMarket)} on market, ${fmtInt(p.wanted)} wanted, ${fmtInt(p.madeToday)} made today` }, el('b', { text: str(p.item) }), el('span', { class: 'm', text: ` ${str(p.skill)} · ${fmtInt(p.needs)} · ${fmtInt(p.makers)} · ${fmtInt(p.onMarket)} · ${fmtInt(p.wanted)} · ${fmtInt(p.madeToday)}` })))))));
+  if (!chains.length) $('#craftTbl tbody').replaceChildren(el('tr', null, el('td', { colspan: 7, class: 'muted', text: 'no chains' })));
+  const refs = Array.isArray(c.refusals) ? c.refusals.filter(x => x && typeof x === 'object') : [];
+  barList($('#craftRefusals'), refs.sort((a, b) => (b.count || 0) - (a.count || 0)).map(r => ({ label: str(r.what) || '(unnamed)', value: r.count, cls: 'warn' })));
+  const wants = Array.isArray(c.wants) ? c.wants.filter(x => x && typeof x === 'object') : [];
+  $('#wantTbl tbody').replaceChildren(...wants.map(w => el('tr', { style: 'cursor:default' }, el('td', { text: str(w.item) }), el('td', { class: 'num', text: fmtInt(w.amount) }), el('td', { class: 'num', text: fmtInt(w.price) }), el('td', { class: 'num', text: fmtInt(w.lodged) }), el('td', { class: 'num', text: fmtInt(w.raised) }), el('td', { text: str(w.since) }), el('td', null, el('a', { text: str(w.by), onclick: () => selectBot(w.by) })), el('td', { text: w.makeable === true ? 'yes' : w.makeable === false ? 'no' : '–' }))));
+  if (!wants.length) $('#wantTbl tbody').replaceChildren(el('tr', null, el('td', { colspan: 8, class: 'muted', text: 'no open wants' })));
+}
+$('#craftRefresh').addEventListener('click', loadCraft);
+
+// ================================================================ log
+async function loadLog() {
+  const n = parseInt($('#logN').value, 10) || 300, grep = $('#logGrep').value.trim();
+  $('#logInfo').textContent = 'loading…';
+  const t = await getText(`/api/log?n=${n}${grep ? '&grep=' + encodeURIComponent(grep) : ''}`);
+  const out = $('#logOut');
+  if (t === null) { $('#logInfo').textContent = 'log unavailable'; return; }
+  out.textContent = t;
+  out.scrollTop = out.scrollHeight;
+  $('#logInfo').textContent = `${t.split('\n').filter(Boolean).length} lines · ${hhmm()}`;
+}
+$('#logRefresh').addEventListener('click', loadLog);
+$('#logGrep').addEventListener('keydown', e => { if (e.key === 'Enter') loadLog(); });
+$('#logN').addEventListener('change', loadLog);
+setInterval(() => { if ($('#logAuto').checked && S.tab === 'log') loadLog(); }, 10000);
+
+// ================================================================ tabs
+function showTab(name) {
+  S.tab = name;
+  $$('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  $$('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
+  if (name === 'craft' && !S.craft) loadCraft();
+  if (name === 'log' && !$('#logOut').textContent) loadLog();
+  if (name === 'work') renderHistory();
+}
+$$('#tabbar button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+$('#tileMoney').addEventListener('click', () => { showTab('money'); $('#tabs').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+
+// ================================================================ events
+const evList = $('#evList');
+function eventRow(ev) {
+  const kind = str(ev.kind) || 'event';
+  const chan = kind === 'say' ? str(ev.channel) : '';
+  const ending = kind === 'work' && ev.data ? str(ev.data.ending) : '';
+  const row = el('div', { class: `ev ${kind} ${chan} ${ending}`.trim() });
+  row.append(el('span', { class: 'at', text: timeOf(ev.at) }));
+  row.append(el('span', { class: 'k', text: kind === 'say' ? (chan || 'say') : kind }));
+  const body = el('span', { class: 'body' });
+  const bot = str(ev.bot);
+  if (bot) {
+    const b = S.botByName.get(bot);
+    const cls = str(ev.class) || (b ? str(b.class) : '');
+    body.append(el('span', { class: 'bot', style: `color:${colorOfClass(cls)}`, text: bot, title: cls, onclick: () => selectBot(bot) }));
+    const g = str(ev.guild) || (b ? str(b.guildAbbr || b.guild) : '');
+    if (g) body.append(el('span', { class: 'tag', text: `[${g}]` }));
+    body.append(kind === 'say' ? ': ' : ' ');
+  }
+  let text = str(ev.text);
+  if (!text && ev.data && typeof ev.data === 'object') { try { text = JSON.stringify(ev.data); } catch (e) { text = ''; } }
+  body.append(el('span', { class: 'txt', text: kind === 'say' ? `“${text}”` : text }));
+  if (kind === 'death' && ev.data && ev.data.killer) body.append(el('span', { class: 'muted', text: ` (killed by ${str(ev.data.killer)})` }));
+  if (isNum(ev.x) && isNum(ev.y)) { body.append(el('span', { class: 'muted', text: ` (${ev.x}, ${ev.y})`, style: 'cursor:pointer;font-size:11px', onclick: () => centreOn(ev.x, ev.y, Math.max(map.k, map.fitK * 6)) })); }
+  row.append(body);
+  return row;
+}
+function evMatches(ev) {
+  const kind = str(ev.kind);
+  if (!S.evKinds.has(kind)) return false;
+  if (kind === 'say' && !S.evChannels.has(str(ev.channel) || 'local')) return false;
+  return true;
+}
+function addEvents(list) {
+  const fresh = [];
+  for (const ev of list) {
+    if (!ev || typeof ev !== 'object') continue;
+    if (isNum(ev.seq)) { if (S.seen.has(ev.seq)) continue; S.seen.add(ev.seq); if (ev.seq > S.lastSeq) S.lastSeq = ev.seq; }
+    S.events.push(ev); fresh.push(ev);
+    const k = str(ev.kind); S.evCounts[k] = (S.evCounts[k] || 0) + 1;
+    if (k === 'say') { const c = str(ev.channel) || 'local'; S.evCounts['say:' + c] = (S.evCounts['say:' + c] || 0) + 1; }
+  }
+  if (S.events.length > 500) { S.events.splice(0, S.events.length - 500); if (S.seen.size > 2000) S.seen = new Set(S.events.map(e => e.seq).filter(isNum)); }
+  if (!fresh.length) return;
+  if (S.evPaused) { S.evPending += fresh.length; $('#evPaused').textContent = `paused · ${S.evPending} new`; return; }
+  const frag = document.createDocumentFragment();
+  for (const ev of fresh.slice().reverse()) if (evMatches(ev)) frag.append(eventRow(ev));
+  if (frag.childNodes.length) { evList.prepend(frag); while (evList.childNodes.length > 500) evList.lastChild.remove(); }
+  renderChips();
+}
+function renderEvents() {
+  const frag = document.createDocumentFragment();
+  for (let i = S.events.length - 1; i >= 0; i--) if (evMatches(S.events[i])) frag.append(eventRow(S.events[i]));
+  evList.replaceChildren(frag);
+  renderChips();
+}
+function renderChips() {
+  $('#evKinds').replaceChildren(...EV_KINDS.map(k => el('span', { class: 'chip' + (S.evKinds.has(k) ? ' on' : ''), onclick: () => { if (S.evKinds.has(k)) S.evKinds.delete(k); else S.evKinds.add(k); renderEvents(); } }, k, el('span', { class: 'n', text: S.evCounts[k] ? String(S.evCounts[k]) : '' }))));
+  $('#evChannels').replaceChildren(...EV_CHANNELS.map(c => el('span', { class: 'chip' + (S.evChannels.has(c) ? ' on' : ''), onclick: () => { if (S.evChannels.has(c)) S.evChannels.delete(c); else S.evChannels.add(c); renderEvents(); } }, c, el('span', { class: 'n', text: S.evCounts['say:' + c] ? String(S.evCounts['say:' + c]) : '' }))));
+  $('#evCount').textContent = `${S.events.length} kept`;
+}
+evList.addEventListener('mouseenter', () => { S.evPaused = true; S.evPending = 0; $('#evPaused').textContent = 'paused'; $('#evPaused').classList.remove('hidden'); });
+evList.addEventListener('mouseleave', () => { S.evPaused = false; $('#evPaused').classList.add('hidden'); if (S.evPending) { S.evPending = 0; renderEvents(); } });
+$('#evClear').addEventListener('click', () => { S.events = []; S.evCounts = {}; renderEvents(); });
+
+// --- SSE with polling fallback
+const sse = { es: null, open: false, retryAt: 0 };
+let pollTimer = null;
+function startSSE() {
+  if (!('EventSource' in window)) { startPolling(); return; }
+  try {
+    const es = new EventSource('/api/stream');
+    sse.es = es;
+    const onEv = e => { try { const ev = JSON.parse(e.data); addEvents(Array.isArray(ev) ? ev : [ev]); } catch (err) { /* ignore malformed line */ } };
+    es.addEventListener('bot', onEv);
+    es.onmessage = onEv;
+    es.onopen = () => { sse.open = true; if (!S.lostSince) setConn('sse'); stopPolling(); };
+    es.onerror = () => {
+      const wasOpen = sse.open; sse.open = false;
+      try { es.close(); } catch (err) { /* ignore */ }
+      sse.es = null;
+      if (!S.lostSince) setConn('polling');
+      startPolling();
+      setTimeout(startSSE, wasOpen ? 5000 : 30000);
+    };
+  } catch (e) { startPolling(); }
+}
+function startPolling() { if (pollTimer) return; pollTimer = setTimeout(pollEvents, 0); }
+function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } }
+async function pollEvents() {
+  pollTimer = null;
+  if (sse.open) return;
+  const url = S.lastSeq > 0 ? `/api/events?since=${S.lastSeq}&limit=200` : '/api/events';
+  const r = await getJSON(url);
+  if (r && Array.isArray(r.events)) { addEvents(r.events); if (isNum(r.seq) && r.seq > S.lastSeq && r.events.length === 0) S.lastSeq = r.seq; }
+  if (!sse.open) pollTimer = setTimeout(pollEvents, 2000);
+}
+
+// ================================================================ theme
+function applyTheme(t) {
+  if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
+  $('#themeBtn').textContent = 'theme: ' + (t || 'auto');
+  readCss(); renderLegend(); map.dirty = true; for (const d of sparkDefs) d.render();
+}
+(() => {
+  let t = null; try { t = localStorage.getItem('botweb.theme'); } catch (e) { t = null; }
+  applyTheme(t);
+  $('#themeBtn').addEventListener('click', () => { const cur = document.documentElement.getAttribute('data-theme'); const next = cur === null ? 'dark' : cur === 'dark' ? 'light' : null; try { if (next) localStorage.setItem('botweb.theme', next); else localStorage.removeItem('botweb.theme'); } catch (e) { /* storage blocked */ } applyTheme(next); });
+  const mq = window.matchMedia('(prefers-color-scheme: light)');
+  if (mq.addEventListener) mq.addEventListener('change', () => applyTheme(document.documentElement.getAttribute('data-theme')));
+})();
+
+// ================================================================ boot
+readCss();
+bindSpark($('#spAlive'), samples, 'alive', { label: 'alive', fmt: fmtInt, area: true });
+bindSpark($('#spWork'), samples, 'workShare', { label: 'work finished share', fmt: fmtPct, target: 0.95, max: 1 });
+bindSpark($('#spPath'), samples, 'pathShare', { label: 'paths reached share', fmt: fmtPct, target: 0.99, max: 1 });
+bindSpark($('#chWork'), samples, 'workShare', { label: 'work finished share', fmt: fmtPct, target: 0.95, max: 1 });
+bindSpark($('#chPath'), samples, 'pathShare', { label: 'paths reached share', fmt: fmtPct, target: 0.99, max: 1 });
+bindSpark($('#chAlive'), samples, 'alive', { label: 'alive', fmt: fmtInt, area: true, min: 0 });
+bindSpark($('#chStuck'), samples, 'stuck', { label: 'stuck', fmt: fmtInt, area: true, min: 0, color: CSS.warn });
+renderLegend(); renderChips(); renderDangerBar();
+resizeMap();
+loadMapImage('/api/map.png');
+requestAnimationFrame(loop);
+pollState();
+pollPaths();
+pollRoads();
+pollZones();
+pollHistory();
+startSSE();
+window.addEventListener('resize', () => { for (const d of sparkDefs) d.render(); });
+window.addEventListener('error', e => { /* keep the page alive on any stray error */ });
+})();
+</script>
+</body>
+</html>

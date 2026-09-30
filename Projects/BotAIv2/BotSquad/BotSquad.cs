@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
 using Server.Mobiles;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -81,6 +82,10 @@ public sealed class BotSquad
 
     private long _focusSinceTick;
 
+    private readonly HashSet<Serial> _answered = [];
+
+    private string _engagedBy;
+
     private Point3D _stationedAt;
 
     private BotSquadStance _stationedStance;
@@ -109,6 +114,130 @@ public sealed class BotSquad
     public IBotSquadMember Leader { get; private set; }
 
     public IReadOnlyList<IBotSquadMember> Members => _members;
+
+    public IBotSquadMember Straggler(int spread, out int distance)
+    {
+        distance = 0;
+        var lead = Leader?.Self;
+
+        if (lead == null)
+        {
+            return null;
+        }
+
+        IBotSquadMember worst = null;
+
+        for (var i = 0; i < _members.Count; i++)
+        {
+            var member = _members[i];
+
+            if (ReferenceEquals(member, Leader) || member?.Self is not { Deleted: false, Alive: true } self || self.Map != lead.Map)
+            {
+                continue;
+            }
+
+            var at = Math.Max(Math.Abs(self.X - lead.X), Math.Abs(self.Y - lead.Y));
+
+            if (at > spread && at > distance)
+            {
+                distance = at;
+                worst = member;
+            }
+        }
+
+        return worst;
+    }
+
+    public static bool Coming(IBotSquadMember straggler, int behind) =>
+        behind <= MarchFar && straggler?.Journey is { Moving: true } && straggler.Self is { Deleted: false, Alive: true };
+
+    public static bool MarchUnstationed { get; set; } = true;
+
+    public static int MarchFar { get; set; } = 200;
+
+    public bool OnTheMarch { get; set; }
+
+    public static int LagBeyond { get; set; } = 6;
+
+    public static int PacedSteps { get; set; } = 1;
+
+    public bool Lagging()
+    {
+        if (!OnTheMarch || Leader?.Self is not { Deleted: false, Alive: true } lead)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < _members.Count; i++)
+        {
+            var member = _members[i];
+
+            if (ReferenceEquals(member, Leader) || member.Self is not { Deleted: false, Alive: true } body || body.Map != lead.Map)
+            {
+                continue;
+            }
+
+            if (Math.Max(Math.Abs(body.X - lead.X), Math.Abs(body.Y - lead.Y)) <= BotEnlist.CloseUp + LagBeyond)
+            {
+                continue;
+            }
+
+            if ((member as IBotWilful)?.Resolve?.Deed is not BotEnlist)
+            {
+                UnpacedFor[(member as IBotWilful)?.Resolve?.Deed?.Kind ?? "nothing"] =
+                    UnpacedFor.TryGetValue((member as IBotWilful)?.Resolve?.Deed?.Kind ?? "nothing", out var had) ? had + 1 : 1;
+
+                continue;
+            }
+
+            Paced++;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public static readonly Dictionary<string, long> UnpacedFor = [];
+
+    public static string Unpaced()
+    {
+        if (UnpacedFor.Count == 0)
+        {
+            return "none";
+        }
+
+        var say = ValueStringBuilder.Create(128);
+
+        try
+        {
+            foreach (var (kind, n) in UnpacedFor)
+            {
+                if (say.Length > 0)
+                {
+                    say.Append(", ");
+                }
+
+                say.Append($"{kind} {n}");
+            }
+
+            return say.ToString();
+        }
+        finally
+        {
+            say.Dispose();
+        }
+    }
+
+    public static long Paced { get; private set; }
+
+    public static long RoadSpared { get; private set; }
+
+    public static int MarchHuntReach { get; set; } = 16;
+
+    public static long Defended { get; private set; }
+
+    public static long Excused { get; private set; }
 
     public bool Has(Mobile who)
     {
@@ -228,6 +357,8 @@ public sealed class BotSquad
             return;
         }
 
+        Tally();
+
         Focus = focus;
         Contact = contact ?? Leader;
         Stance = BotSquadStance.Fighting;
@@ -235,6 +366,8 @@ public sealed class BotSquad
         _focusLowest = focus.Hits;
         _focusProgressTick = Core.TickCount;
         _focusSinceTick = Core.TickCount;
+        _answered.Clear();
+        _engagedBy = (Leader as IBotWilful)?.Resolve?.Deed?.Kind ?? "nothing";
         _ableTick = Core.TickCount;
         _closedTick = Core.TickCount;
 
@@ -282,6 +415,8 @@ public sealed class BotSquad
             BotQuarry.Shun(Focus, BotQuarry.HopelessMs);
         }
 
+        Tally();
+
         Focus = null;
         Contact = null;
         Attempt = 0;
@@ -324,6 +459,40 @@ public sealed class BotSquad
         }
 
         return Math.Max(BotFormation.PressRingFor(role), arm);
+    }
+
+    public static long NearLeader { get; private set; }
+
+    private Mobile NearestToLeader(Mobile body)
+    {
+        var lead = Leader?.Self;
+
+        if (lead is not { Deleted: false, Alive: true } || lead.Map != body.Map)
+        {
+            return null;
+        }
+
+        Mobile best = null;
+        var bestRange = double.MaxValue;
+
+        foreach (var creature in lead.Map.GetMobilesInRange<BaseCreature>(lead.Location, PressReach))
+        {
+            if (creature is not { Deleted: false, Alive: true } || !BotThreat.Menacing(body, creature) || !body.InLOS(creature)
+                || !body.CanBeHarmful(creature, false) || body.IsHarmfulCriminal(creature))
+            {
+                continue;
+            }
+
+            var range = lead.GetDistanceToSqrt(creature);
+
+            if (range < bestRange)
+            {
+                bestRange = range;
+                best = creature;
+            }
+        }
+
+        return best;
     }
 
     private BotBlow Strike(IBotSquadMember member, out int away)
@@ -483,7 +652,14 @@ public sealed class BotSquad
 
         _huntedTick = now;
 
-        var quarry = Quarry != null ? Quarry(leader) : BotQuarry.Company(leader, BotMuster.Reach);
+        if (OnTheMarch && (Leader as IBotWilful)?.Resolve?.Deed is BotDelve)
+        {
+            RoadSpared++;
+
+            return;
+        }
+
+        var quarry = Quarry != null ? Quarry(leader) : BotQuarry.Company(leader, OnTheMarch ? MarchHuntReach : BotMuster.Reach);
 
         if (quarry == null)
         {
@@ -516,10 +692,43 @@ public sealed class BotSquad
                 continue;
             }
 
-            switch (Strike(_members[i], out _))
+            if (body is BotMobile { Resolve.Deed: BotBolt })
+            {
+                continue;
+            }
+
+            if (Defending(body, focus))
+            {
+                Defended++;
+                body.Warmode = true;
+
+                if (BotFormation.RoleOf(_members[i]) == BotRole.Medic)
+                {
+                    Mend(body);
+                }
+
+                continue;
+            }
+
+            var blow = Strike(_members[i], out _);
+
+            switch (blow)
             {
                 case BotBlow.Blind:
                     Blinded++;
+
+                    if (NearestToLeader(body) is { } near)
+                    {
+                        NearLeader++;
+                        body.Warmode = true;
+
+                        if (!ReferenceEquals(body.Combatant, near))
+                        {
+                            body.Combatant = near;
+                        }
+
+                        continue;
+                    }
 
                     break;
 
@@ -545,6 +754,11 @@ public sealed class BotSquad
                 body.Combatant = focus;
             }
 
+            if (blow == BotBlow.Able)
+            {
+                Answer(_members[i], body);
+            }
+
             switch (BotFormation.RoleOf(_members[i]))
             {
                 case BotRole.Medic:
@@ -562,6 +776,117 @@ public sealed class BotSquad
             }
         }
     }
+
+    private void Answer(IBotSquadMember member, Mobile body)
+    {
+        if (ReferenceEquals(member, Leader) || !_answered.Add(body.Serial))
+        {
+            return;
+        }
+
+        var answers = Answers(_engagedBy);
+        var ms = Core.TickCount - _focusSinceTick;
+
+        answers.Count++;
+        answers.SumMs += ms;
+
+        if (ms <= QuickMs)
+        {
+            answers.Quick++;
+        }
+        else if (ms > SlowMs)
+        {
+            answers.Slow++;
+        }
+    }
+
+    private void Tally()
+    {
+        if (Focus == null || _engagedBy == null)
+        {
+            return;
+        }
+
+        var answers = Answers(_engagedBy);
+
+        answers.Fights++;
+
+        for (var i = 0; i < _members.Count; i++)
+        {
+            if (!ReferenceEquals(_members[i], Leader) && _members[i]?.Self is { Deleted: false, Alive: true } body
+                && !_answered.Contains(body.Serial))
+            {
+                answers.Never++;
+            }
+        }
+    }
+
+    private static Answering Answers(string kind)
+    {
+        if (!_answers.TryGetValue(kind, out var answers))
+        {
+            _answers[kind] = answers = new Answering();
+        }
+
+        return answers;
+    }
+
+    public static int QuickMs { get; set; } = 2000;
+
+    public static int SlowMs { get; set; } = 10000;
+
+    private sealed class Answering
+    {
+        public long Fights;
+
+        public long Count;
+
+        public long SumMs;
+
+        public long Quick;
+
+        public long Slow;
+
+        public long Never;
+    }
+
+    private static readonly Dictionary<string, Answering> _answers = [];
+
+    public static string Responsiveness()
+    {
+        if (_answers.Count == 0)
+        {
+            return "no company has engaged anything yet";
+        }
+
+        var say = ValueStringBuilder.Create(256);
+
+        try
+        {
+            foreach (var (kind, a) in _answers)
+            {
+                if (say.Length > 0)
+                {
+                    say.Append(", ");
+                }
+
+                var mean = a.Count == 0 ? 0.0 : a.SumMs / 1000.0 / a.Count;
+
+                say.Append($"{kind} {a.Count} over {a.Fights} fights (a mean of {mean:F1}s; {a.Quick} inside {QuickMs / 1000}s, {a.Slow} past {SlowMs / 1000}s; {a.Never} members never had one)");
+            }
+
+            return say.ToString();
+        }
+        finally
+        {
+            say.Dispose();
+        }
+    }
+
+    private bool Defending(Mobile body, Mobile focus) =>
+        body.Combatant is Mobile { Deleted: false, Alive: true } striker && !ReferenceEquals(striker, focus)
+        && ReferenceEquals(striker.Combatant, body) && striker.Map == body.Map && body.InRange(striker.Location, 2)
+        && !Has(striker);
 
     private bool Mend(Mobile body)
     {
@@ -731,6 +1056,9 @@ public sealed class BotSquad
         Unowned = 0;
         Dry = 0;
         Blindfights = 0;
+        Defended = 0;
+        Excused = 0;
+        _answers.Clear();
     }
 
     private void Release()
@@ -971,9 +1299,32 @@ public sealed class BotSquad
 
         var leader = Leader?.Self;
 
-        Stance = leader != null && Leader.Journey?.Active != true
+        Stance = leader != null && Leader.Journey?.Active != true && !OnTheMarch
             ? BotSquadStance.Scouting
             : BotSquadStance.Marching;
+    }
+
+    private static readonly Dictionary<Serial, long> _stationRefused = [];
+
+    public static int StationRestMs { get; set; } = 15000;
+
+    public static long StationRested { get; private set; }
+
+    public static long StationShorted { get; private set; }
+
+    public static void StationRefused(Mobile member)
+    {
+        if (member == null)
+        {
+            return;
+        }
+
+        if (_stationRefused.Count > 512)
+        {
+            _stationRefused.Clear();
+        }
+
+        _stationRefused[member.Serial] = Core.TickCount;
     }
 
     private void Station()
@@ -1025,8 +1376,48 @@ public sealed class BotSquad
                 continue;
             }
 
+            if (member.Self is BotMobile { Resolve.Deed: BotBolt or BotSalve })
+            {
+                Excused++;
+
+                continue;
+            }
+
             if (Stance == BotSquadStance.Fighting && Strike(member, out _) is BotBlow.Able or BotBlow.Unsteady)
             {
+                continue;
+            }
+
+            if (Stance == BotSquadStance.Fighting && member.Self is { Deleted: false, Alive: true } struck && Focus is { } enemy
+                && Defending(struck, enemy))
+            {
+                continue;
+            }
+
+            if (Stance == BotSquadStance.Marching && !ReferenceEquals(member, Leader) && member.Self is { } far
+                && !far.InRange(anchor, PressReach))
+            {
+                continue;
+            }
+
+            if (Stance == BotSquadStance.Marching && !ReferenceEquals(member, Leader) && MarchUnstationed)
+            {
+                continue;
+            }
+
+            if (member.Self is { } resting && _stationRefused.TryGetValue(resting.Serial, out var refusedAt)
+                && Core.TickCount - refusedAt < StationRestMs)
+            {
+                StationRested++;
+
+                continue;
+            }
+
+            if (member.Self is { } shorted && member.Journey is { Partial: true, Reason: "station" or "sweep" })
+            {
+                StationRefused(shorted);
+                StationShorted++;
+
                 continue;
             }
 
@@ -1039,7 +1430,7 @@ public sealed class BotSquad
                 continue;
             }
 
-            if (member.Self is { } self && BotDungeon.Under(self.Location) != BotDungeon.Under(where))
+            if (member.Self is { } self && !BotGates.Joined(map, self.Location, where))
             {
                 Sundered++;
 

@@ -141,4 +141,21 @@ public static class BotCraftEar
 
         return $"the craft system said to bots: {string.Join(", ", parts)}";
     }
+
+    public static IEnumerable<(int Number, string Text, long Count)> Tallies()
+    {
+        List<KeyValuePair<int, long>> heard = [.. _tally];
+
+        heard.Sort(static (a, b) => b.Value.CompareTo(a.Value));
+
+        for (var i = 0; i < heard.Count; i++)
+        {
+            yield return (heard[i].Key, Words(heard[i].Key, null), heard[i].Value);
+        }
+
+        if (_unnumbered > 0)
+        {
+            yield return (0, "in plain words", _unnumbered);
+        }
+    }
 }

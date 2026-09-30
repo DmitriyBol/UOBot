@@ -172,6 +172,32 @@ public static class BotVigil
         return null;
     }
 
+    public static IReadOnlyList<(string Name, Mobile Body)> Walkers()
+    {
+        List<(string, Mobile)> free = [];
+
+        for (var i = 0; i < Squad.Count; i++)
+        {
+            var w = Squad[i];
+
+            if (w.Body is not { Deleted: false } || BotWitness.Busy(w))
+            {
+                continue;
+            }
+
+            if (i == 0 && !BotHalls.Charted && BotHalls.Probing != Point3D.Zero)
+            {
+                continue;
+            }
+
+            free.Add((w.Name, w.Body));
+        }
+
+        return free;
+    }
+
+    public static bool Carry(Mobile body, Map map, Point3D at) => body is BotDebugger debugger && debugger.Hover(map, at);
+
     public static IReadOnlyList<(string Name, Map Map, Point3D At)> Standing()
     {
         List<(string, Map, Point3D)> rows = [];
@@ -363,6 +389,11 @@ public static class BotVigil
             for (var i = 0; i < Squad.Count; i++)
             {
                 var w = Squad[i];
+
+                if (BotWitness.Busy(w) || BotZoneTour.Holding(w.Body))
+                {
+                    continue;
+                }
 
                 if (i == 0 && !BotHalls.Charted && BotHalls.Probing != Point3D.Zero && w.Body is { Deleted: false })
                 {

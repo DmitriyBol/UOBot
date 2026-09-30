@@ -1,4 +1,4 @@
-﻿using Server.Mobiles;
+using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
@@ -47,6 +47,8 @@ public sealed class BotRescue : BotDeed
     public bool Own => _own;
 
     public override Mobile Foe => _foe;
+
+    public override bool Resumes => true;
 
     public override string Kind => Trade;
 

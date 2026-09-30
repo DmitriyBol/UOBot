@@ -530,7 +530,7 @@ public sealed class BotMind
 
         _spokeTick = Core.TickCount;
 
-        body.Say(line.Length > BotMindTalk.MostLetters ? line[..BotMindTalk.MostLetters] : line);
+        BotVoice.Say(body, "local", line.Length > BotMindTalk.MostLetters ? line[..BotMindTalk.MostLetters] : line, force: true);
     }
 
     private static bool Known(IReadOnlyList<string> trades, string intent)

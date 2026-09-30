@@ -1,4 +1,4 @@
-﻿using Server.Logging;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -37,7 +37,15 @@ public sealed class BotCraftModule : BotModule
 
         BotWill.Offer(new BotSmith());
 
+        BotWill.Offer(new BotTinkerer());
+
+        BotWill.Offer(new BotBowyer());
+
+        BotWill.Offer(new BotWeaver());
+
         BotWill.Offer(new BotFletcher());
+
+        BotAuction.Staple(typeof(Server.Items.Feather));
 
         BotWill.Offer(new BotAlchemist());
 
@@ -56,17 +64,31 @@ public sealed class BotCraftModule : BotModule
         );
 
         logger.Information(
-            "Brewing ready: a brewer works {Margin} points below its own Alchemy, sets up once it holds {Least} bottles, buys {Batch} empties at a time and opens a draught at {Worth}gp against the alchemist's fifteen; it brews only what the population drinks",
+            "Brewing ready: a brewer works {Margin} points below its own Alchemy, sets up once it holds {Least} bottles, buys as many empties as its herbs can fill (at least {Floor}, at most {Batch}) and opens a draught at {Worth}gp against the alchemist's fifteen; it brews only what the population drinks",
             BotFlask.Margin,
+            BotFlask.LeastBottles,
             BotFlask.LeastBottles,
             BotFlask.Batch,
             BotFlask.Worth
+        );
+
+        logger.Information(
+            "Supplies from our own benches: a weaver walks to the flock with the least road per sheep within {Pasture} tiles and its leash, gathers up to {Wool} wool, and puts cloth over {Keep} out at no more than the tailor asks; a tinker short of iron buys a batch's worth off the cheapest stall; a fletcher short of feathers buys them off a stall; what a maker makes goes out past the auction's lot cap: {Uncapped}",
+            BotWeaver.PastureReach,
+            BotWeave.WoolAfield,
+            BotSew.Bolt * 2,
+            BotAuction.MadeUncapped
         );
 
     }
 
     public override void Reset()
     {
+        BotLooms.Forget();
+        BotPastures.Forget();
+        BotWeaver.Forget();
+        BotTinkerer.Forget();
+        BotTinker.Forget();
         BotTailor.Forget();
         BotSmith.Forget();
         BotFletcher.Forget();

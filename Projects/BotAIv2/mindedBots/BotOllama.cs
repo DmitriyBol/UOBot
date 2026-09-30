@@ -43,6 +43,27 @@ public static class BotOllama
 
     public static string Model { get; set; } = "qwen3.5:9b";
 
+    public static string Api { get; set; } = "ollama";
+
+    public static string ApiKey { get; set; }
+
+    public static bool OpenAi => string.Equals(Api, "openai", StringComparison.OrdinalIgnoreCase);
+
+    public static string Url
+    {
+        get
+        {
+            var root = (Endpoint ?? "").TrimEnd('/');
+
+            if (!OpenAi)
+            {
+                return $"{root}/api/chat";
+            }
+
+            return root.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? $"{root}/chat/completions" : $"{root}/v1/chat/completions";
+        }
+    }
+
     public static string KeepAlive { get; set; } = "30m";
 
     public static int TimeoutMs { get; set; } = 120000;
@@ -60,6 +81,10 @@ public static class BotOllama
     public static long Answered { get; private set; }
 
     public static long Refused { get; private set; }
+
+    public static bool Reachable { get; private set; } = true;
+
+    public static long LastMs { get; private set; }
 
     public static long WaitedMs { get; private set; }
 
@@ -103,16 +128,25 @@ public static class BotOllama
     private static async Task Run(string body, bool think, Action<string, long> then, int timeoutMs)
     {
         string answer = null;
+        var reached = false;
         var clock = Stopwatch.StartNew();
 
         try
         {
             using var content = new StringContent(body, Encoding.UTF8, "application/json");
             using var giveUp = new CancellationTokenSource(TimeSpan.FromMilliseconds(Math.Max(1000, timeoutMs)));
+            using var request = new HttpRequestMessage(HttpMethod.Post, Url) { Content = content };
+
+            if (!string.IsNullOrWhiteSpace(ApiKey))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ApiKey.Trim());
+            }
 
             using var response = await _http
-                .PostAsync($"{Endpoint}/api/chat", content, giveUp.Token)
+                .SendAsync(request, giveUp.Token)
                 .ConfigureAwait(false);
+
+            reached = true;
 
             if (response.IsSuccessStatusCode)
             {
@@ -158,6 +192,9 @@ public static class BotOllama
                     Answered++;
                 }
 
+                Reachable = reached;
+                LastMs = waited;
+
                 then(answer, waited);
             },
             null
@@ -177,6 +214,17 @@ public static class BotOllama
 
                 return string.IsNullOrWhiteSpace(text) ? null : text;
             }
+
+            if (document.RootElement.TryGetProperty("choices", out var choices)
+                && choices.ValueKind == JsonValueKind.Array
+                && choices.GetArrayLength() > 0
+                && choices[0].TryGetProperty("message", out var first)
+                && first.TryGetProperty("content", out var said))
+            {
+                var text = said.GetString();
+
+                return string.IsNullOrWhiteSpace(text) ? null : text;
+            }
         }
         catch (Exception)
         {
@@ -187,6 +235,11 @@ public static class BotOllama
 
     private static string Body(string system, string user, string schema, bool think, string model, string keepAlive)
     {
+        if (OpenAi)
+        {
+            return OpenAiBody(system, user, schema, think, model);
+        }
+
         var buffer = new System.IO.MemoryStream();
 
         using (var writer = new Utf8JsonWriter(buffer))
@@ -228,6 +281,51 @@ public static class BotOllama
             }
 
             writer.WriteEndObject();
+
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    private static string OpenAiBody(string system, string user, string schema, bool think, string model)
+    {
+        var buffer = new System.IO.MemoryStream();
+
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("model", model);
+            writer.WriteBoolean("stream", false);
+            writer.WriteNumber("temperature", 0.4);
+
+            if (think && ThinkingMostTokens > 0)
+            {
+                writer.WriteNumber("max_tokens", ThinkingMostTokens);
+            }
+
+            writer.WriteStartArray("messages");
+            writer.WriteStartObject();
+            writer.WriteString("role", "system");
+            writer.WriteString("content", system);
+            writer.WriteEndObject();
+            writer.WriteStartObject();
+            writer.WriteString("role", "user");
+            writer.WriteString("content", user);
+            writer.WriteEndObject();
+            writer.WriteEndArray();
+
+            if (schema != null)
+            {
+                writer.WriteStartObject("response_format");
+                writer.WriteString("type", "json_schema");
+                writer.WriteStartObject("json_schema");
+                writer.WriteString("name", "answer");
+                writer.WritePropertyName("schema");
+                writer.WriteRawValue(schema);
+                writer.WriteEndObject();
+                writer.WriteEndObject();
+            }
 
             writer.WriteEndObject();
         }

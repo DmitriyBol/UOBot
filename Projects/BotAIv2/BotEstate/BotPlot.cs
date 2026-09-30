@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Logging;
 using Server.Multis;
@@ -122,7 +122,23 @@ public static class BotPlot
     public static bool Find(Mobile by, Point3D from, Point3D shun, int clear, out Point3D centre) =>
         Find(by, from, shun, clear, MultiID, null, out centre);
 
-    public static bool Find(Mobile by, Point3D from, Point3D shun, int clear, int multi, BaseHouse replacing, out Point3D centre)
+    public static bool Find(Mobile by, Point3D from, Point3D shun, int clear, int multi, BaseHouse replacing, out Point3D centre) =>
+        Find(by, from, shun, clear, multi, replacing, Mainland, out centre);
+
+    public static bool FindHome(Mobile by, Point3D from, int multi, out Point3D centre) =>
+        Find(by, from, Point3D.Zero, 0, multi, null, false, out centre);
+
+    public static bool Mainland { get; set; } = true;
+
+    public static long Ashore { get; private set; }
+
+    public static long OffMainland { get; private set; }
+
+    public static long GatesUnread { get; private set; }
+
+    private static bool Find(
+        Mobile by, Point3D from, Point3D shun, int clear, int multi, BaseHouse replacing, bool mainlandOnly, out Point3D centre
+    )
     {
         centre = Point3D.Zero;
 
@@ -138,13 +154,34 @@ public static class BotPlot
             from = BotPopulation.Where;
         }
 
+        var mainland = -1;
+
+        if (mainlandOnly)
+        {
+            if (!BotGates.Ready)
+            {
+                GatesUnread++;
+
+                return false;
+            }
+
+            mainland = BotGates.LandOf(map, BotPopulation.Where);
+
+            if (mainland >= 0 && BotGates.LandOf(map, from) != mainland)
+            {
+                Ashore++;
+                from = BotPopulation.Where;
+            }
+        }
+
         if (!_searches.TryGetValue((from.X, from.Y, multi), out var search))
         {
             search = new Search();
             _searches[(from.X, from.Y, multi)] = search;
         }
 
-        if (search.HasKept && Sound(map, search.Kept, multi, replacing) && Away(search.Kept, shun, clear)
+        if (search.HasKept && (mainland < 0 || BotGates.LandOf(map, search.Kept) == mainland)
+            && Sound(map, search.Kept, multi, replacing) && Away(search.Kept, shun, clear)
             && !BotRefused.Refusing(map, search.Kept) && !Foreign(by, map, search.Kept.X, search.Kept.Y)
             && !Round(map, from, search.Kept.X, search.Kept.Y))
         {
@@ -181,6 +218,13 @@ public static class BotPlot
             if (BotRefused.Refusing(map, new Point3D(x, y, 0)))
             {
                 Unreached++;
+
+                continue;
+            }
+
+            if (mainland >= 0 && BotGates.LandOf(map, new Point3D(x, y, 0)) != mainland)
+            {
+                OffMainland++;
 
                 continue;
             }
@@ -577,7 +621,7 @@ public static class BotPlot
     }
 
     public static string Describe() =>
-        $"plots: {Tested} put to the engine and {Fit} would take a hall; {Uneven} passed over as not level, {Floorless} with no floor at all, {Unreached} for ground somebody lately failed to reach, {Foreigners} for standing on another guild's square, {Roundabout} for lying round the far side of something by road, {InTown} for standing in a town, {Shunned} for pressing against a graveyard, {Occupied} with something standing on them, {Neighboured} taken within {Shy} tiles of another clan for want of anything further off; the engine refused {Forbidden} on its own regions, {Surfaceless} for resting on nothing, {BadLand} for the land, {BadStatic} for a static or an unclear yard, {BadItem} for something lying there; the spiral has been walked out {Exhausted} times";
+        $"plots: {Tested} put to the engine and {Fit} would take a hall; {Uneven} passed over as not level, {Floorless} with no floor at all, {Unreached} for ground somebody lately failed to reach, {Foreigners} for standing on another guild's square, {Roundabout} for lying round the far side of something by road, {InTown} for standing in a town, {Shunned} for pressing against a graveyard, {Occupied} with something standing on them, {Neighboured} taken within {Shy} tiles of another clan for want of anything further off; the engine refused {Forbidden} on its own regions, {Surfaceless} for resting on nothing, {BadLand} for the land, {BadStatic} for a static or an unclear yard, {BadItem} for something lying there; the spiral has been walked out {Exhausted} times; guild buildings kept to the mainland: {Ashore} searches begun from an island seat moved to the home, {OffMainland} candidates off it passed over, {GatesUnread} searches refused before the gates were read";
 
     public static void Forget()
     {

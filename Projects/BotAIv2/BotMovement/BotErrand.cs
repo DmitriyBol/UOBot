@@ -43,6 +43,10 @@ public sealed class BotErrand
 
     internal bool Unreachable;
 
+    internal Point3D Gate;
+
+    internal Point3D GateTo;
+
     internal bool FromChart;
 
     internal bool NoWaySaid;

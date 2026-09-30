@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
@@ -173,7 +173,7 @@ public sealed class BotUnload : BotDeed
 
         return _banked > 0 || _listed > 0 || _stored > 0
             ? BotDoing.Done($"{_banked}gp banked, {_listed} things put on the market, {_stored} put away in the bank")
-            : BotDoing.Done(
+            : BotDoing.Failed(
                 $"nothing to leave here: {carried} things in the pack — {kept} its own kit or supplies, "
                 + $"{skipped} gold or fixed in place, {refused} the market would not take; "
                 + $"the porter counted {_expected} worth leaving when it set out"
@@ -267,6 +267,11 @@ public sealed class BotUnload : BotDeed
     }
 
     public static long Stored { get; private set; }
+
+    public static long Unlotted { get; private set; }
+
+    private static bool Boxable(Container box, Item item) =>
+        box == null || box.Deleted || box.MaxItems == 0 || box.TotalItems + item.TotalItems + 1 <= box.MaxItems;
 
     public static long Stowed { get; private set; }
 
@@ -499,6 +504,9 @@ public sealed class BotUnload : BotDeed
         var keep = Needed(bot);
         Dictionary<Type, int> seen = [];
 
+        var atLots = BotAuction.AtLots(bot);
+        var box = body.FindBankNoCreate();
+
         for (var i = 0; i < pack.Items.Count; i++)
         {
             var item = pack.Items[i];
@@ -522,6 +530,13 @@ public sealed class BotUnload : BotDeed
 
             if (BotAuction.Worthless(item.GetType()))
             {
+                continue;
+            }
+
+            if (atLots && !BotAuction.Selling(bot, item.GetType()) && !Boxable(box, item))
+            {
+                Unlotted++;
+
                 continue;
             }
 

@@ -63,6 +63,8 @@ public sealed class BotReclaim : BotDeed
 
     public override double Coin => 1.0;
 
+    public override bool Steadfast => true;
+
     public override int Made => 0;
 
     public override string Stage =>
@@ -189,6 +191,28 @@ public sealed class BotUndertaker : IBotProposer
             return null;
         }
 
-        return !BotPopulation.Within(body.Map, corpse.Location) ? null : new BotReclaim(corpse);
+        if (!BotPopulation.Within(body.Map, corpse.Location))
+        {
+            return null;
+        }
+
+        if (BotDungeon.Holding(corpse.Location) is { } deep && !BotDelveParty.Delving(mobile)
+            && BotThreat.Power(body) < deep.Worst * BotVenturer.Odds)
+        {
+            Outmatched++;
+
+            return null;
+        }
+
+        if (BotQuad.Muscle(body.Map, corpse.Location) > BotThreat.Power(body) * BotVenturer.Odds)
+        {
+            Outmatched++;
+
+            return null;
+        }
+
+        return new BotReclaim(corpse);
     }
+
+    public static long Outmatched { get; private set; }
 }

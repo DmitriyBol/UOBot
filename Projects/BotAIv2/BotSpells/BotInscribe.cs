@@ -229,6 +229,7 @@ public sealed class BotInscribe : BotDeed
         if (have > _had)
         {
             _scrolls += have - _had;
+            BotCraftwork.Produced(_kind, have - _had);
             _had = have;
         }
 

@@ -294,7 +294,7 @@ public sealed class BotSupplier : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been looked at for a supply run"
-            : $"the supplier looked {Asked} times and sent {Offered}: {Shopless} guilds had no counter, {Claimed} already had somebody on it, "
+            : $"the supplier looked {Asked} times and sent {Offered} ({BotSupply.FromChest}gp of it paid from the guilds' chests): {Shopless} guilds had no counter, {Claimed} already had somebody on it, "
               + $"{Stocked} shelves held enough, {Unsold} wanted what nobody within reach sells, {Wanting} could not raise a batch"
               + (Wanting > 0 ? $" (the best-off had {Nearest}gp free and was {Short} short)" : "")
               + $", {Unmeasured} asked before the population had run short of anything, {Laden} could not have carried it, {Below} were underground, "

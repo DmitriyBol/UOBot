@@ -32,7 +32,7 @@ public static class BotShops
 
     public static int CounterReach { get; set; } = 3;
 
-    public static int MaxShops { get; set; } = 96;
+    public static int MaxShops { get; set; } = 1024;
 
     private static readonly List<BaseVendor> _shops = [];
 
@@ -249,7 +249,7 @@ public static class BotShops
         {
             var vendor = _shops[i];
 
-            if (vendor.Deleted || vendor.Map != map || !BotPopulation.Within(map, vendor.Location))
+            if (vendor.Deleted || vendor.Map != map || !BotPopulation.Within(map, vendor.Location, bot?.Self))
             {
                 continue;
             }
@@ -259,7 +259,7 @@ public static class BotShops
                 continue;
             }
 
-            if (BotReach.Ask(map, body.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
+            if (Unplaced(map, vendor) || BotReach.Ask(map, body.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
             {
                 Walled++;
 
@@ -280,6 +280,62 @@ public static class BotShops
         return best;
     }
 
+    private static readonly Dictionary<Serial, (bool Placed, int Epoch)> _placed = [];
+
+    public static long Unplaceable { get; private set; }
+
+    private static bool Unplaced(Map map, BaseVendor vendor)
+    {
+        if (map == null || vendor == null || !Server.Engines.Pathing.Tiered.NavigationService.ComponentsCounted(map))
+        {
+            return false;
+        }
+
+        var epoch = Server.Engines.Pathing.Tiered.NavigationService.ComponentEpoch(map);
+
+        if (_placed.TryGetValue(vendor.Serial, out var known) && known.Epoch == epoch)
+        {
+            return !known.Placed;
+        }
+
+        var placed = false;
+        var at = vendor.Location;
+
+        for (var dx = -CounterReach; dx <= CounterReach && !placed; dx++)
+        {
+            for (var dy = -CounterReach; dy <= CounterReach; dy++)
+            {
+                if (BotStep.Settle(map, at.X + dx, at.Y + dy, out var z)
+                    && Server.Engines.Pathing.Tiered.NavigationService.ComponentOf(map, new Point3D(at.X + dx, at.Y + dy, z)) >= 0)
+                {
+                    placed = true;
+
+                    break;
+                }
+            }
+        }
+
+        if (_placed.Count >= 4096)
+        {
+            _placed.Clear();
+        }
+
+        _placed[vendor.Serial] = (placed, epoch);
+
+        if (!placed)
+        {
+            Unplaceable++;
+            logger.Information(
+                "{Name} at {Where} stands where the walkers' graph places no tile within {Reach} of the counter; no bot is sent there",
+                vendor.Name,
+                vendor.Location,
+                CounterReach
+            );
+        }
+
+        return !placed;
+    }
+
     public static BaseVendor Nearest(Mobile bot, Type wanted)
     {
         var map = bot?.Map;
@@ -296,7 +352,7 @@ public static class BotShops
         {
             var vendor = _shops[i];
 
-            if (vendor.Deleted || vendor.Map != map || !BotPopulation.Within(map, vendor.Location))
+            if (vendor.Deleted || vendor.Map != map || !BotPopulation.Within(map, vendor.Location, bot))
             {
                 continue;
             }
@@ -306,7 +362,7 @@ public static class BotShops
                 continue;
             }
 
-            if (BotReach.Ask(map, bot.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
+            if (Unplaced(map, vendor) || BotReach.Ask(map, bot.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
             {
                 Walled++;
 
@@ -328,6 +384,51 @@ public static class BotShops
     }
 
     public static int Price(BaseVendor vendor, Type wanted) => Sells(vendor, wanted, out var entry) ? entry.Price : 0;
+
+    public static int LowestMs { get; set; } = 300000;
+
+    private static readonly Dictionary<Type, (int Price, long At)> _lowest = [];
+
+    public static int Lowest(Type kind)
+    {
+        if (kind == null)
+        {
+            return 0;
+        }
+
+        var now = Core.TickCount;
+
+        if (_lowest.TryGetValue(kind, out var known) && now - known.At < LowestMs)
+        {
+            return known.Price;
+        }
+
+        var lowest = 0;
+
+        for (var i = 0; i < _shops.Count; i++)
+        {
+            var vendor = _shops[i];
+
+            if (vendor == null || vendor.Deleted || !vendor.IsActiveSeller)
+            {
+                continue;
+            }
+
+            var offered = vendor.GetBuyInfo();
+
+            for (var j = 0; j < offered.Length; j++)
+            {
+                if (offered[j] is GenericBuyInfo info && info.Type == kind && info.Price > 0 && (lowest == 0 || info.Price < lowest))
+                {
+                    lowest = info.Price;
+                }
+            }
+        }
+
+        _lowest[kind] = (lowest, now);
+
+        return lowest;
+    }
 
     public static int Shelf(IBotWilful bot, Type kind, int fallback, bool survey = false)
     {
@@ -377,9 +478,13 @@ public static class BotShops
         return false;
     }
 
-    public static BaseVendor Buyer(IBotWilful bot, Item item, out int price)
+    public static BaseVendor Buyer(IBotWilful bot, Item item, out int price) => Buyer(bot, item, 1, false, out price, out _, out _);
+
+    public static BaseVendor Buyer(IBotWilful bot, Item item, int units, bool stall, out int price, out double factor, out int nearer)
     {
         price = 0;
+        factor = 1.0;
+        nearer = -1;
 
         var body = bot?.Self;
         var ledger = bot?.Resolve?.Ledger;
@@ -401,14 +506,21 @@ public static class BotShops
             return null;
         }
 
+        units = Math.Max(1, units);
+
+        var kind = item.GetType();
         BaseVendor best = null;
-        var bestAway = double.MaxValue;
+        var bestNet = double.MinValue;
+        var bestTiles = int.MaxValue;
+        var refused = BotCapital.Why.NotCapital;
+        var refusedWith = double.MinValue;
+        var road = Math.Max(0.0, BotPeddler.PettyPerTile);
 
         for (var i = 0; i < _shops.Count; i++)
         {
             var vendor = _shops[i];
 
-            if (vendor.Deleted || vendor.Map != map || !BotPopulation.Within(map, vendor.Location))
+            if (vendor.Deleted || vendor.Map != map || !BotPopulation.Within(map, vendor.Location, bot?.Self))
             {
                 continue;
             }
@@ -418,16 +530,58 @@ public static class BotShops
                 continue;
             }
 
-            var away = body.GetDistanceToSqrt(vendor.Location);
+            if (Unplaced(map, vendor) || BotReach.Ask(map, body.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
+            {
+                Walled++;
 
-            if (away >= bestAway)
+                continue;
+            }
+
+            var tiles = Math.Max(Math.Abs(vendor.X - body.X), Math.Abs(vendor.Y - body.Y));
+
+            if (nearer < 0 || tiles < nearer)
+            {
+                nearer = tiles;
+            }
+
+            var gross = units * (double)paying;
+            var net = gross - tiles * road;
+            var f = 1.0;
+
+            var premium = BotCapital.Factor(kind, paying);
+            var with = gross * premium - tiles * road;
+
+            if (premium > 1.0 && (with > bestNet || with == bestNet && tiles < bestTiles))
+            {
+                var why = BotCapital.Pull(bot, vendor, stall);
+
+                if (why == BotCapital.Why.Pulled)
+                {
+                    net = with;
+                    f = premium;
+                }
+                else if (why != BotCapital.Why.NotCapital && with > refusedWith)
+                {
+                    refused = why;
+                    refusedWith = with;
+                }
+            }
+
+            if (net < bestNet || net == bestNet && tiles >= bestTiles)
             {
                 continue;
             }
 
             best = vendor;
-            bestAway = away;
+            bestNet = net;
+            bestTiles = tiles;
             price = paying;
+            factor = f;
+        }
+
+        if (best != null && refusedWith > bestNet && !BotCapital.In(best.Location))
+        {
+            BotCapital.Passed(refused);
         }
 
         return best;
@@ -451,7 +605,7 @@ public static class BotShops
         {
             var vendor = _shops[i];
 
-            if (vendor.Deleted || vendor.Map != map || !BotPopulation.Within(map, vendor.Location))
+            if (vendor.Deleted || vendor.Map != map || !BotPopulation.Within(map, vendor.Location, bot))
             {
                 continue;
             }
@@ -479,9 +633,12 @@ public static class BotShops
     public static int Sell(IBotWilful bot, BaseVendor vendor, List<Item> goods) =>
         Sell(bot, vendor, goods, out _);
 
-    public static int Sell(IBotWilful bot, BaseVendor vendor, List<Item> goods, out int units)
+    public static int Sell(IBotWilful bot, BaseVendor vendor, List<Item> goods, out int units) => Sell(bot, vendor, goods, out units, out _);
+
+    public static int Sell(IBotWilful bot, BaseVendor vendor, List<Item> goods, out int units, out int premium)
     {
         units = 0;
+        premium = 0;
 
         var body = bot?.Self;
         var pack = body?.Backpack;
@@ -498,6 +655,9 @@ public static class BotShops
 
         List<SellItemResponse> order = [];
 
+        var capital = BotCapital.In(vendor.Location);
+        long owed = 0;
+
         for (var i = 0; i < goods.Count; i++)
         {
             var item = goods[i];
@@ -507,7 +667,7 @@ public static class BotShops
                 continue;
             }
 
-            if (item.RootParent != body || !Buys(vendor, item, out _))
+            if (item.RootParent != body || !Buys(vendor, item, out var paying))
             {
                 continue;
             }
@@ -515,6 +675,11 @@ public static class BotShops
             var amount = Math.Max(1, item.Amount);
 
             units += amount;
+
+            if (capital)
+            {
+                owed += BotCapital.Owed(item.GetType(), amount, paying);
+            }
 
             order.Add(new SellItemResponse(item, amount));
         }
@@ -554,6 +719,8 @@ public static class BotShops
             vendor.Name,
             earned
         );
+
+        premium = BotCapital.Sold(body, vendor, units, earned, owed);
 
         return earned;
     }
@@ -608,12 +775,15 @@ public static class BotShops
 
         var price = entry.Price;
         var purse = BotYield.Wealth(body);
-        var affordable = Math.Min(Math.Min(amount, entry.Amount), purse / price);
+
+        var factor = BotBurgh.Factor(body, vendor);
+        var dear = factor > 1.0 ? (int)Math.Ceiling(price * factor) : price;
+        var affordable = Math.Min(Math.Min(amount, entry.Amount), purse / dear);
 
         if (affordable <= 0)
         {
-            refused = purse < price
-                ? $"{purse}gp will not buy one {wanted.Name} at {price}gp"
+            refused = purse < dear
+                ? $"{purse}gp will not buy one {wanted.Name} at {dear}gp"
                 : $"the shelf is down to {entry.Amount} {wanted.Name}";
 
             return 0;
@@ -658,6 +828,10 @@ public static class BotShops
         Bought += affordable;
         Spent += affordable * price;
 
+        BotCapital.Bought(vendor, affordable * price);
+
+        BotBurgh.Settle(body, affordable * price, factor);
+
         logger.Information(
             "{Name} bought {Amount} {Item} from {Vendor} for {Cost}gp",
             body.Name,
@@ -672,6 +846,7 @@ public static class BotShops
 
     public static void Reset()
     {
+        _lowest.Clear();
         _shops.Clear();
         _swept.Clear();
 
@@ -687,5 +862,5 @@ public static class BotShops
     }
 
     public static string Describe() =>
-        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp, {Walled} counters passed over for having no way through to them, {Refills} shelves refilled on their own hour, {Repicked} errands sent on to another shopkeeper when the shelf emptied before they arrived, {BotPeddle.SoldOnTheWay} loads bought off their stall while they were being carried to one and {BotPeddle.HandedBack} handed back into the pack on the way and sold from it, {BotRestock.FellThrough} errands that found their guild's shelf bought out and went on to one, {BotRestock.Restalled} stall purchases that found the stall bought out and took the next cheapest; the town is oftenest out of {Driest()}";
+        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp, {Walled} counters passed over for having no way through to them, {Refills} shelves refilled on their own hour, {Repicked} errands sent on to another shopkeeper when the shelf emptied before they arrived, {BotPeddle.SoldOnTheWay} loads bought off their stall while they were being carried to one and {BotPeddle.HandedBack} handed back into the pack on the way and sold from it, {BotRestock.FellThrough} errands that found their guild's shelf bought out and went on to one, {BotRestock.Restalled} stall purchases that found the stall bought out and took the next cheapest; the town is oftenest out of {Driest()}; {BotCapital.Describe()}";
 }
