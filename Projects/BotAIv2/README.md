@@ -49,7 +49,7 @@
 | other | 21 rarer kinds: shopkeep, camp, fireside, stroll, drill, sweep, envoy, plunder, watch, errand, liberate, drill-in, prospect, remove, voyage, hall, hire, venture, fit, sailhome, blanks | 2,957 | 2,236 | 76 % |
 | **all work** | | **34,364** | **28,469** | **83 %** |
 
-## Working on now — 1 October 2026
+## Working on now — October 2026
 
 - **Danger and safety zones.** Every spawner on the map and every living creature is read into zones: where each pack
   actually patrols, how far it sees and comes for a walker, how many can close on one bot at once and how that fight
