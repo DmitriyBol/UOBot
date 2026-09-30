@@ -137,9 +137,9 @@ The mind's weight in the auction is a constant nothing the model says can move.
 4. **Remember.** Rules go to `Configuration/bot-minds.json`, keyed by name, written the moment one is
    added rather than at shutdown — a shard is usually killed, not stopped.
 
-Bots do not survive a restart; the population raises fifteen new ones every session. So the two bodies are
-**claimed and renamed** on the way in (`Aldric` the warrior, `Godric` the archer). The name is what the
-rules belong to. Without that, "it learns" is a claim nothing can support.
+Bots survive a restart now, but a mind is still tied to a **name** rather than to a body: the bodies are
+claimed and renamed on the way in (`CrafterNames`, in order), and the name is what the rules belong to.
+Without that, "it learns" is a claim nothing can support.
 
 ## Files
 
@@ -169,11 +169,9 @@ a warning, it is a value silently left at its default.
   "Model": "qwen3.5:9b",
   "Endpoint": "http://127.0.0.1:11434",
   "KeepAlive": "30m",
-  "WarriorName": "Aldric",
-  "ArcherName": "Godric",
+  "CrafterNames": ["Roderic", "Emeric", "Ulric", "Wulfric"],
   "ThinkEveryMs": 20000,
-  "ReviewEveryMs": 180000,
-  "Ceiling": 400
+  "ReviewEveryMs": 180000
 }
 ```
 

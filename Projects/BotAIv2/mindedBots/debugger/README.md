@@ -151,9 +151,9 @@ means "keep the numbers the code chose", which is what is written on the first b
   "RobeHue": 1153,
   "SampleMs": 2000,
   "HoverMs": 20000,
-  "ReportMs": 120000,
-  "ReflectMs": 900000,
-  "Rows": 8,
+  "ReportMs": 600000,
+  "ReflectMs": 1800000,
+  "Rows": 6,
   "FrozenMs": 90000,
   "ImmortalMs": 300000,
   "SettledMs": 1200000

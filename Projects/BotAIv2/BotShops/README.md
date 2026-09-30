@@ -17,6 +17,8 @@ buys cloth to work with — and whatever the population refused goes back over t
 | `BotOrder.cs` | putting an order on the board, and going back for it when somebody has filled it; paperwork, taken at the next choice rather than over work in hand (build 50) |
 | `BotStores.cs` | a crafter short of the raw material of its trade, putting the order to the population; keeps back `BotPurse.KeepBack` (build 64) |
 | `BotUpkeep.cs` | asking the population, by name, for a replacement for something that is wearing out; keeps back `BotPurse.KeepBack` (build 64) |
+| `BotProvision.cs` | What a bot must carry before it goes into a fight it chose — a dungeon's delve, or a war company sent against somebody else's ground — and the guild's money for what it cannot buy itself. |
+| `BotCapital.cs` | Britain as the centre of trade: the capital's shopkeepers pay better, a stall's load walks to them when that pays for the road, a trader's journey goes there (30.09.2026) |
 
 ---
 
@@ -152,6 +154,26 @@ number to hear. No "is this junk" test, no table of worthless things.
 are never on a stall, so they are never candidates. That is the same sign rule that kills the ginseng carousel —
 in v1 two bots sold the same shopkeeper the same reagents four thousand times because nothing distinguished
 "goods" from "the things I need to do my job".
+
+---
+
+## The capital: Britain as the centre of trade
+
+Patrick's order of 30.09.2026, evening: *«rework the trade: the traders must put Britain first as the centre of trade»*.
+Britain already carried half the counter trade, all of it from its own ring: every chooser of a counter was "the nearest",
+and every other town stands 800 to 2200 tiles off. `BotCapital` makes the capital worth a road without ordering anybody down
+one, because a long road kills (restocks of 600 tiles and more died 11.5 % of the time on 30.09, journeys 26 %).
+
+| what | how |
+|---|---|
+| **the capital's price** | Britain's shopkeepers pay `BotCapital.Premium` (×1.25) of their price, never above the island's lowest ask for the thing (`Factor`: no counter may pay more than a shelf asks); the difference is paid by the city out of its treasury above `Reserve` (`BotCity.Draw`), into the pack, the account, or the pack regardless |
+| **the sale's counter** | `BotShops.Buyer` weighs every buyer at `units × price × premium − tiles × BotPeddler.PettyPerTile`, the premium counted only for a load on a stall, a counter within the bot's leash and `Reach` (1000), on a joined land, with the treasury able to pay (`Pull`); pack goods go to the best buyer at its own price. Sealed and unplaceable counters are passed over, as `Nearest` has done since build 357 |
+| **the trader's journey** | a bot holding a shop's worth of what the island asks for (`Trader`: `BotShopkeep.Look` against `OpenWorth`), offered a journey by `BotTraveller`, goes to the capital when its road is on offer; standing in the capital, it is not offered a journey away. Its shift then opens at Britain's bank (`BotShopkeeper.Britain`, which now reads the capital's name) |
+| **not changed** | buying (a consumer buys at the nearest counter: no price difference between towns pays for 800 tiles of road), the porter (the bank box is global and the market placeless, so the bank chosen changes only the walk), the guild's courier, the town prices of `BotBurgh` |
+
+Everything is counted in the `Trade:` line (`the capital (Britain) — …`): sales over its counters against elsewhere, the premium
+paid and short, peddles offered past a nearer buyer and sold there, the reasons its price did not pull, purchases, shop shifts,
+and the traders' journeys; the city's line says what the premium has cost the treasury.
 
 ---
 

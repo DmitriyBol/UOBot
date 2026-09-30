@@ -1,4 +1,4 @@
-﻿# Population: the bot, and the beat
+# Population: the bot, and the beat
 
 The object six subsystems were waiting for, and the clock that drives them. **This is the folder from which the
 project first does anything at all.**
@@ -20,6 +20,13 @@ project first does anything at all.**
 | `BotReclaim.cs` | going back for what death took |
 | `BotStall.cs` | notices a bot that has stopped getting anywhere, and says so as an error |
 | `BotUnload.cs` | going to the counter when the pack is getting heavy: coin into the account, everything spare onto the market |
+| `BotGrowth.cs` | Newcomers: a couple of novices raised every two hours, so the island has old hands and beginners at once. Since 29.09.2026 a guild of `LeastToWant` (3) bots with nobody of a role gets the next newcomer in that role — a producer first, a medic second — instead of a roll of the mix (`BotGuilds.Lacking`). |
+| `BotGrowthStore.cs` | Keeps the newcomers across restarts. |
+| `BotGuildWidenStore.cs` | Keeps the guilds' widenings across restarts. |
+| `BotRest.cs` | How long a bot plays before it is tired, and the rest it takes before it plays again. |
+| `BotRestStore.cs` | Keeps every bot's play and rest across restarts. |
+| `BotInns.cs` | the inns and taverns read from the world; a tired bot walks to one, pays for a bed and leaves from there; a paid night buys a third of the rest as regeneration (29.09.2026) |
+| `BotPeoples.cs` | who a bot is born as: three peoples and two hundred names from `bot-names.json`, the people drawn for the class, the race before the body; see `NAMES.md` |
 
 ---
 
@@ -149,6 +156,27 @@ decision layer counts the same price in its own units (`BotYield.DeathMinutes`);
    loaded and nobody to use them. The cleanest A/B for "is this the bots or is this the shard".
 
 ---
+
+## Rest at an inn, and what a paid night buys (29.09.2026)
+
+A tired bot (`BotRest`) no longer logs out where it stands. After the walk home to a house of its own
+(`BotRepose.HomeToRest`), `BotInns.ToInn` presses `BotLodge` on it: the walk to the nearest inn or tavern within
+`InnReach` (400) that the gates join it to. The inns are read from the world twice over — the engine's `NoLogoutDelay`
+regions, one per town, and the spawners of `TavernKeeper` and `Innkeeper` — and never written down. At the door the bed
+is paid for at `InnPricePerHour` (5) from the purse and then the bank; `BotRest.Leave` writes the inn and the price into
+the rest's record (store shape 4). On return a paid night gives `WellRestedUntil` — `InnBuffShare` (a third) of the rest —
+during which `BotInns.Regen` on the bot's beat returns 2 points of hits, stamina and mana every 4 s on top of the engine's
+own rate, and 200 of cheer comes off the day's boredom, so the mood the dashboard shows rises. A bot that cannot pay
+sleeps under the roof and gets nothing for it; one with no inn within reach leaves where it stands and is counted
+(`LeftOutside`). Four keys in `bot-population.json`: `Inns`, `InnReach`, `InnPricePerHour`, `InnBuffShare`.
+
+## The peoples: who a bot is born as (29.09.2026)
+
+`BotPeoples` reads `Configuration/bot-names.json` — written from the bank in the code at first boot — and the population
+deals a newborn's people for its class (share × the class's weight in the people), its sex by a coin, and its name as the
+next unworn one of that people and sex, a house past the end and never a number. `BotMobile.Become` sets the race before
+the body (`Race.Human`, `Race.Elf`), the race's own skin and hair hues, and a beard where the people wears one. Which
+people a bot is, is read off its name, so nothing new is saved. `NAMES.md` beside this file is the settings document.
 
 ## Known rough edges
 

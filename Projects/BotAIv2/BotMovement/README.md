@@ -16,13 +16,16 @@ The analysis all of this is built on is in `RESEARCH.md`. This file is only what
 | `BotPath.cs` | a tile A\* with a ceiling in **time**. Three outcomes |
 | `BotReach.cs` | sealed pockets of ground, harvested out of failures. Refusal in one comparison |
 | `BotRefused.cs` | places the population could not get to, remembered for everybody and cleared by anyone arriving; written when an errand ends unreached and, since build 51, when a proven refusal sends the work elsewhere (`BotWill.Rerouted`); read by the seam chooser too |
-| `BotBarred.cs` | ground nobody may ever choose: stated rather than measured, never expiring, never cleared by arriving; four boxes since build 64 — the walled pocket east of Britain, the traps north and south-west of it (sized from where bots were carried home), and the plague beast's bog until groups of thirty to fifty can go there (Patrick's order) |
+| `BotBarred.cs` | ground nobody may ever choose: stated rather than measured, never expiring, never cleared by arriving; four boxes since build 64 — the walled pocket east of Britain, the traps north and south-west of it (sized from where bots were carried home), and the plague beast's bog until groups of thirty to fifty can go there (Patrick's order). Since 29.09.2026 also the **quarantines**: a death at the plague's hands or a creature's past `QuarantinePower` closes `QuarantineHalf` (45) each way for `QuarantineMs` (2 h), and a **killing field** — `KillingDeaths` (3) bot deaths within that distance inside `KillingWindowMs` (30 min), whoever killed them — closes the same way; the home ground, halls and seats are never closed. Kept across restarts in `Data/bot-quarantines.json` (not under `Saves`, which the engine archives wholesale at every save); drawn on the dashboard's `barred` layer. |
 | `BotRoads.cs` | the road distance from home to every tile within `Reach` (640) each way, drawn once per world load by a breadth-first flood that steps as the planner does, a slice of the loop at a time; proves a lower bound on any bot's road to a place, counted by the hunt's darts (`BotHunter.Roundabout`, dial `ReadsRoads`, build 63) |
 | `BotJourney.cs` | the A→B obligation. Lives on the bot |
 | `BotWalk.cs` | the moment of the step: doors, occupied tiles, casting, a last line of defence |
 | `BotMovementConfig.cs` | `Configuration/bot-movement.json` — budgets and deadlines only |
 | `BotMovementModule.cs` | module, phase `World`, depends on nothing |
 | `BotErrand.cs` | one thing a bot is trying to get to |
+| `BotChart.cs` | The coarse chart of the ground round home: squares of tiles, the ways across each square's edges, and which of those ways join inside the square — so that a wal |
+| `BotFooting.cs` | Tiles a walk has proved nobody can stand at, kept for everybody for half an hour. |
+| `BotGates.cs` | the world's teleporters read as gates between the graph's components, Dijkstra over them, the first gate handed to the journey; the entrances the world lacked raised from `Data/teleporters.json` (29.09.2026) |
 
 ---
 
@@ -313,6 +316,28 @@ search, so the summary could show more refusals than searches.
 at Z=25 and the road under it at Z=12 land in the same band and the same A\* node. Same as v1. This now has a
 second consequence — the band also keys the pocket registry — so if oddities with bridges and balconies show up
 live, look here first.
+
+## Gates: the world's teleporters as a walk (29.09.2026)
+
+The dungeon block from x 5120 eastward shares no ground with the island, and the graph's components say so provably;
+until 29.09 every walk to a room in it ended "no way through" and the delve carried its party by `MoveToWorld`.
+`BotGates` reads every plain `Teleporter` on the map once (raising from `Data/teleporters.json` the ones the world
+lacked), folds a doorway's three into one gate, and places each gate's two ends in the graph's component they stand in
+(`NavigationService.ComponentOf`, one flood of a cluster's window). A land is a component; a route from one land to
+another is Dijkstra over the gates by straight distance, and what the journey gets is the first gate on the way.
+
+In `BotJourney.Draw`, when the graph answers `Unreachable` and the gates know a way, the route is drawn to the first
+gate and ends on its tile, walked `Exactly` (`LegExact`); the engine teleports on the step; the next beat finds the
+walker within `Through` (6) of the gate's far side and draws the next leg from there, not counted as a reroute. A walker
+standing on a gate and not put through — a criminal at a guarded gate, a body mid-fight where the gate checks — is
+counted (`Refused`) and walks straight, as before. Stations and sweeps further than `StationDirect` (160) are routed
+too, so a company follows its leader through a mouth.
+
+Everything that asked "is this underground and that not" asks the gates now: the appraisal's veto
+(`BotGates.Joined`), the company's sundered stations, the walk home, and `BotPopulation.Within`, which counts the
+dungeons as the population's ground. Check at boot: `Gates: N teleporters ... read as M gates`, `{Deep} is reached from
+home through {Gate}`; in play: `leads N ... to {Deep} by {Gate}`, `has led N into {Deep} by its mouth after N minutes'
+march`, and `Passed` against `Refused` in the movement summary.
 
 ## Known unknowns
 
