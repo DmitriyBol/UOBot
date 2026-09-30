@@ -29,6 +29,7 @@ Fifty-nine kinds of work. These are the names that appear in the log.
 | `sew` | leather off a carcass, or cloth off a counter | armour and clothing |
 | `brew` | a reagent and an empty bottle | potions |
 | `fletch` | shafts and feathers | arrows and bolts |
+| `tinker` | iron ingots, anywhere the bot stands | the tools every other trade wears out: pickaxes, hatchets, hammers, sewing kits, scissors, skinning knives, skillets, mortars, pens, fletcher's and tinker's tools — made to the board's orders first, then whenever the stalls hold fewer than two of one |
 | `cook` | raw meat off a kill, at any fire | meals, which are eaten and quicken recovery for ten minutes |
 | `inscribe` | a blank scroll and reagents | spell scrolls, which no shopkeeper on this shard sells |
 
@@ -337,7 +338,18 @@ seats, work and commitment, and the newest alarms.
 
 ## Watching it
 
-**The dashboard.** `[bots` in game, as an administrator: eleven tabs — the population, their market, what they are
+**The web dashboard.** `http://127.0.0.1:2599/` while the shard runs: every bot on a picture of the map with its
+route and target, the work finished share against 95 %, the paths reached share against 99 %, who is stuck and why,
+the guilds and their wars, the crafting chain, and a live feed of everything the bots say and do. It is one page,
+`Distribution/Data/bot-web/index.html`, over a JSON API (`/api/state`, `/api/events`, `/api/stream`, `/api/paths`,
+`/api/craft`, `/api/history`, `/api/log`). Nothing on it can change the shard. See `BotWeb/README.md`.
+
+**The event stream and the transcript.** `logs/bot-events.ndjson` is one JSON line per thing that happened — work
+taken up and ended with the reason, a search that did not reach its goal with where it was headed, a death, a war,
+an alarm, a line said — and `logs/bot-speech.log` is what the bots said, by channel. Both are appended across
+restarts.
+
+**The dashboard in game.** `[bots` as an administrator: eleven tabs — the population, their market, what they are
 short of, the city, what they have learned, the island's squares, revels, halls, claims, guilds, and the band.
 
 **The summary.** Every five minutes the population writes a block of lines, each one a complete accounting of one
@@ -381,8 +393,14 @@ One file per subsystem in `Distribution/Configuration/`:
 ```
 bot-alarm     bot-auction   bot-baron     bot-classes   bot-craft      bot-debugger   bot-delve
 bot-drill     bot-estate    bot-harvest   bot-hunt      bot-mend       bot-mind       bot-movement
-bot-population  bot-shops   bot-spells    bot-squad     bot-will
+bot-names     bot-population  bot-proving bot-shops    bot-spells     bot-squad      bot-travel
+bot-voice     bot-web       bot-will
 ```
+
+`bot-names.json` is the bank of names and peoples the bots are born from — see `BotPopulation/NAMES.md`;
+`bot-travel.json` is the journeys between towns; the inns are four keys in `bot-population.json` (`Inns`, `InnReach`,
+`InnPricePerHour`, `InnBuffShare`); the guilds' seats and the share that settle by another town are in
+`bot-estate.json` (`Seats`, `SeatAbroadShare`).
 
 and two that the shard writes for itself: `bot-minds.json` (the rules the thinking bots have written) and
 `bot-dungeon-halls.json` (which rooms of each dungeon a party has found it can walk between).
@@ -436,6 +454,14 @@ instead of the auction. The choice still runs as an ordinary undertaking under t
 commitment, and its forecast is measured rather than believed — so it can only win a place by being right. They
 have been off since 18.09.2026. `mindedBots/README.md` describes the minds and the state they are shown; `INSTALL.md`
 has the models to pull.
+
+**Two protocols.** The transport (`BotOllama`) speaks either Ollama's own `/api/chat` with a `format` schema
+(`"Api": "ollama"`, the default) or the OpenAI chat-completions API with `response_format` (`"Api": "openai"`), which
+is what LM Studio, llama.cpp's server, vLLM, OpenRouter and the hosted services all answer to; an `ApiKey` goes as a
+bearer token. The questions, the schemas and the reading of answers are the same either way — only the envelope
+differs, and a hosted model is paid per token at the minds' asking rate. Every key, every default, the models
+measured on this card, what the model is shown and how to write a prompt for a bot are in
+[`mindedBots/LLM.md`](mindedBots/LLM.md).
 
 ---
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
@@ -61,6 +61,12 @@ public sealed class BotDelveParty
     public static double LeadersShare { get; set; } = 0.5;
 
     public static int GraceMs { get; set; } = 60000;
+
+    public static int LeaveMs { get; set; } = 600000;
+
+    public static long WalkedOut { get; private set; }
+
+    private long _settledTick;
 
     public static long Delves { get; private set; }
 
@@ -284,7 +290,9 @@ public sealed class BotDelveParty
         return true;
     }
 
-    public void Settle(string why)
+    public void Settle(string why) => Settle(why, true);
+
+    public void Settle(string why, bool lift)
     {
         if (Ended)
         {
@@ -292,6 +300,7 @@ public sealed class BotDelveParty
         }
 
         Ended = true;
+        _settledTick = Core.TickCount;
 
         Sweep();
 
@@ -313,12 +322,15 @@ public sealed class BotDelveParty
                 Paid += share.Credit;
             }
 
-            if (share.Down || (_deep != null && _deep.Holds(body.Location)))
+            if (lift && (share.Down || (_deep != null && _deep.Holds(body.Location))))
             {
                 Surface(body);
             }
 
-            share.Down = false;
+            if (lift)
+            {
+                share.Down = false;
+            }
         }
 
         logger.Information(
@@ -331,7 +343,36 @@ public sealed class BotDelveParty
             Left
         );
 
+        if (lift)
+        {
+            _parties.Remove(this);
+        }
+    }
+
+    public int Lift()
+    {
+        var lifted = 0;
+
+        for (var i = 0; i < _shares.Count; i++)
+        {
+            var share = _shares[i];
+
+            if (share.Who is { Deleted: false } body && _deep != null && _deep.Holds(body.Location))
+            {
+                Surface(body);
+                lifted++;
+            }
+            else if (share.Down)
+            {
+                WalkedOut++;
+            }
+
+            share.Down = false;
+        }
+
         _parties.Remove(this);
+
+        return lifted;
     }
 
     private static void Surface(BotMobile bot)
@@ -411,6 +452,28 @@ public sealed class BotDelveParty
         {
             var party = _parties[i];
 
+            if (party.Ended)
+            {
+                if (now - (party._settledTick + LeaveMs) >= 0)
+                {
+                    var lifted = party.Lift();
+
+                    if (lifted > 0)
+                    {
+                        Stranded += lifted;
+
+                        logger.Information(
+                            "{Lifted} of a settled party were still in {Deep} {Minutes} minutes after their delve ended and have been lifted out; the rest walked out by the mouth",
+                            lifted,
+                            party._deep?.Name ?? "a dungeon",
+                            LeaveMs / 60000
+                        );
+                    }
+                }
+
+                continue;
+            }
+
             var gone = party.Leader is not { Deleted: false };
             var overrun = now - (party._bornTick + BotDelve.CapMs + GraceMs) >= 0;
 
@@ -445,7 +508,7 @@ public sealed class BotDelveParty
             ? "nobody has been down a dungeon"
             : $"{Delves} parties went down, {_parties.Count} are down now: {Taken}gp swept into their pots and {Paid}gp handed out, "
             + $"{Raised} raised where they fell out of {Raisings} to a party, {Lost} went home for want of one, "
-            + $"{Stranded} had to be lifted out";
+            + $"{WalkedOut} walked out by the mouth and {Stranded} had to be lifted out";
 
     public static void Forget()
     {
@@ -456,5 +519,6 @@ public sealed class BotDelveParty
         Raised = 0;
         Lost = 0;
         Stranded = 0;
+        WalkedOut = 0;
     }
 }

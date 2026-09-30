@@ -66,6 +66,14 @@ public sealed class BotSalve : BotDeed
 
     private bool _reasoned;
 
+    private bool _askedToWait;
+
+    private long _askedTick;
+
+    private bool _askedEver;
+
+    public static int AskEveryMs { get; set; } = 5000;
+
     public static long ForFight { get; private set; }
 
     public static long ForCalm { get; private set; }
@@ -79,7 +87,7 @@ public sealed class BotSalve : BotDeed
     public static string Describe() =>
         ForFight + ForCalm + UnderFire + Bare == 0
             ? "no mending has been begun"
-            : $"{ForFight + ForCalm + UnderFire + Bare} mendings begun: {ForFight} by spell for a patient in a fight, {ForCalm} by cloth out of one, {UnderFire} by cloth with the healer under fire, {Bare} with only one means to hand";
+            : $"{ForFight + ForCalm + UnderFire + Bare} mendings begun ({Bent} walks to a patient bent into another try): {ForFight} by spell for a patient in a fight, {ForCalm} by cloth out of one, {UnderFire} by cloth with the healer under fire, {Bare} with only one means to hand";
 
     public static void Forget()
     {
@@ -102,6 +110,41 @@ public sealed class BotSalve : BotDeed
     public override string Kind => Trade;
 
     public override bool Summons => true;
+
+    public override bool Repeats(BotDeed other) => other is BotSalve salve && salve._patient == _patient;
+
+    public override bool Steadfast => _onSelf;
+
+    public static int MostBends { get; set; } = 3;
+
+    public static long Bent { get; private set; }
+
+    private int _bends;
+
+    public override bool Bend(IBotWilful bot)
+    {
+        var body = bot?.Self;
+
+        if (_onSelf || body == null || _patient is not { Deleted: false, Alive: true } || _patient.Map != body.Map
+            || ++_bends > MostBends || !body.InRange(_patient, BotMend.Cast * 2))
+        {
+            return false;
+        }
+
+        Bent++;
+
+        return true;
+    }
+
+    public override bool ResumesHurt => true;
+
+    public override bool Resumes => true;
+
+    public override void Resumed(IBotWilful bot)
+    {
+        _tried = false;
+        _awaiting = false;
+    }
 
     public override Map Map => _map;
 
@@ -210,6 +253,13 @@ public sealed class BotSalve : BotDeed
 
         if (!_onSelf && !body.InRange(_patient.Location, near))
         {
+            if (!_askedToWait && (!_askedEver || Core.TickCount - _askedTick >= AskEveryMs))
+            {
+                _askedEver = true;
+                _askedTick = Core.TickCount;
+                _askedToWait = BotAwaitMend.Ask(body, _patient);
+            }
+
             return BotDoing.Walk(_map, _patient, BotArrival.Within(near), $"to {_patient.Name}");
         }
 

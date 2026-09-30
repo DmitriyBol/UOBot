@@ -47,6 +47,8 @@ public sealed class HierarchicalPlanner
 
     public long Shunned { get; private set; }
 
+    public bool Shunning => _shunned.Count > 0;
+
     public void Shun(NavGraph graph, int x, int y)
     {
         for (var s = 0; s < NavWindow.MaxStrata; s++)
@@ -63,19 +65,21 @@ public sealed class HierarchicalPlanner
 
     private int Penalty(NavGraph graph, int node)
     {
+        var danger = NavigationService.DangerAt(graph, node);
+
         if (_shunned.Count == 0 || !_shunned.TryGetValue(((long)graph.Id << 32) | (uint)node, out var until))
         {
-            return 0;
+            return danger;
         }
 
         if (Core.TickCount - until >= 0)
         {
             _shunned.Remove(((long)graph.Id << 32) | (uint)node);
 
-            return 0;
+            return danger;
         }
 
-        return ShunCost;
+        return ShunCost + danger;
     }
 
     public HashSet<int> Corridor { get; set; }
@@ -112,9 +116,13 @@ public sealed class HierarchicalPlanner
 
     public long Expanded { get; private set; }
 
+    public long Cycles { get; private set; }
+
     public int LastExpanded { get; private set; }
 
     public int LastCost { get; private set; }
+
+    public IReadOnlyList<int> LastPath => _path;
 
     public NavStatus Route(NavGraph graph, int sx, int sy, int sz, int gx, int gy, int gz, List<Point3D> points) =>
         Route(graph, sx, sy, sz, gx, gy, gz, points, 0);
@@ -124,6 +132,7 @@ public sealed class HierarchicalPlanner
     public NavStatus Route(NavGraph graph, int sx, int sy, int sz, int gx, int gy, int gz, List<Point3D> points, int reach)
     {
         points.Clear();
+        _path.Clear();
         LastExpanded = 0;
         LastCost = 0;
         Asked++;
@@ -250,6 +259,48 @@ public sealed class HierarchicalPlanner
         own.Reset(graph.Terrain, cluster, cluster % graph.ClustersX * NavGraph.Side, cluster / graph.ClustersX * NavGraph.Side);
 
         return own;
+    }
+
+    public int ComponentAt(NavGraph graph, int x, int y, int z)
+    {
+        if (graph == null || !graph.ComponentsValid || !graph.Contains(x, y))
+        {
+            return -1;
+        }
+
+        var c = graph.ClusterOf(x, y);
+
+        if (!graph.IsJoined(c))
+        {
+            return -1;
+        }
+
+        var w = Window(graph, c, _ownStart);
+
+        if (!Anchor(w, ref x, ref y, z, Anchorage, out var s))
+        {
+            return -1;
+        }
+
+        var cost = w.Flood(x, y, s, false);
+        var nodes = graph.NodesOf(c);
+
+        if (nodes == null)
+        {
+            return -1;
+        }
+
+        for (var i = 0; i < nodes.Count; i++)
+        {
+            var n = nodes[i];
+
+            if (cost[w.State(graph.X(n), graph.Y(n), graph.Stratum(n))] >= 0)
+            {
+                return graph.Component(n);
+            }
+        }
+
+        return -1;
     }
 
     public string Explain(NavGraph graph, int sx, int sy, int sz, int gx, int gy, int gz)
@@ -475,6 +526,11 @@ public sealed class HierarchicalPlanner
 
     private void Relax(int node, int cost, int parent, int estimate)
     {
+        if (cost < 0 || cost > NavCost.Unaffordable)
+        {
+            return;
+        }
+
         if (_seen[node] == _search && _g[node] <= cost)
         {
             return;
@@ -492,9 +548,18 @@ public sealed class HierarchicalPlanner
     private void Unwind(NavGraph graph, int s, int g, List<Point3D> points)
     {
         _path.Clear();
+        var steps = 0;
 
         for (var node = _parent[g]; node >= 0 && node != s; node = _parent[node])
         {
+            if (++steps > graph.Capacity + 2)
+            {
+                Cycles++;
+                _path.Clear();
+
+                break;
+            }
+
             _path.Add(node);
         }
 

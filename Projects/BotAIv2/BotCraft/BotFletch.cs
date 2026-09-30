@@ -38,6 +38,16 @@ public sealed class BotFletch : BotDeed
 
     public static int StallMs { get; set; } = SwingMs * 8;
 
+    public static long PlumesBought { get; private set; }
+
+    public static long PlumesGone { get; private set; }
+
+    public static void Forget()
+    {
+        PlumesBought = 0;
+        PlumesGone = 0;
+    }
+
     private enum Leg
     {
         Wood,
@@ -79,7 +89,13 @@ public sealed class BotFletch : BotDeed
 
     private long _stirTick;
 
-    public BotFletch(Map map, Point3D where, BaseVendor shop, int price, int take, BotWant order = null)
+    private readonly int _plumes;
+
+    private readonly int _plumePrice;
+
+    private bool _plumed;
+
+    public BotFletch(Map map, Point3D where, BaseVendor shop, int price, int take, BotWant order = null, int plumes = 0, int plumePrice = 0)
     {
         _map = map;
         _where = where;
@@ -87,7 +103,10 @@ public sealed class BotFletch : BotDeed
         _price = price;
         _take = take;
         _order = order;
-        _leg = take > 0 ? Leg.Wood : Leg.Work;
+        _plumes = Math.Max(0, plumes);
+        _plumePrice = Math.Max(0, plumePrice);
+        _plumed = _plumes <= 0;
+        _leg = take > 0 || _plumes > 0 ? Leg.Wood : Leg.Work;
     }
 
     public override string Kind => Trade;
@@ -102,7 +121,7 @@ public sealed class BotFletch : BotDeed
 
     public override SkillName? Trains => SkillName.Fletching;
 
-    public override int Outlay => _take * _price;
+    public override int Outlay => _take * _price + _plumes * _plumePrice;
 
     public override bool AtCounter => _shop != null;
 
@@ -113,7 +132,7 @@ public sealed class BotFletch : BotDeed
     public override string Stage =>
         _leg switch
         {
-            Leg.Wood => $"after {_take} Log for arrows",
+            Leg.Wood => _plumed ? $"after {_take} Log for arrows" : $"after {_plumes} Feather for arrows",
             Leg.Work => $"fletching ({_arrows} arrows in {_swings} attempts)",
             _ => $"putting {_arrows} arrows out"
         };
@@ -157,7 +176,31 @@ public sealed class BotFletch : BotDeed
 
     private BotDoing Wood(IBotWilful bot, Mobile body)
     {
+        if (!_plumed)
+        {
+            _plumed = true;
+
+            var plumes = BotAuction.Cheapest(typeof(Feather), bot);
+            var got = plumes is { IsEmpty: false } ? BotAuction.Buy(body, plumes, Math.Min(_plumes, plumes.Amount)) : 0;
+
+            PlumesBought += got;
+
+            if (got <= 0 && BotFletching.Feathers(body) <= 0)
+            {
+                PlumesGone++;
+
+                return BotDoing.Failed("the feathers on the stalls were bought before it could buy them");
+            }
+        }
+
         if (BotFletching.Possible(body) >= BotFletching.LeastArrows)
+        {
+            _leg = Leg.Work;
+
+            return default;
+        }
+
+        if (_take <= 0)
         {
             _leg = Leg.Work;
 
@@ -229,6 +272,7 @@ public sealed class BotFletch : BotDeed
         if (have > _had)
         {
             _arrows += have - _had;
+            BotCraftwork.Produced(typeof(Arrow), have - _had);
             _had = have;
             _made = _arrows * BotFletching.Worth;
         }
@@ -331,7 +375,7 @@ public sealed class BotFletch : BotDeed
                 }
             }
 
-            if (BotAuction.List(bot, stack, BotAuction.Worth(typeof(Arrow), BotFletching.Worth)) != null)
+            if (BotAuction.List(bot, stack, BotAuction.Worth(typeof(Arrow), BotFletching.Worth), true, true) != null)
             {
                 listed++;
             }

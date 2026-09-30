@@ -61,7 +61,8 @@ public sealed class BotCrafter : BotClass
                 typeof(Server.Items.Pickaxe),
                 typeof(Server.Items.SewingKit),
                 typeof(Server.Items.FletcherTools),
-                typeof(Server.Items.Hatchet)
+                typeof(Server.Items.Hatchet),
+                typeof(Server.Items.TinkerTools)
             ]
         };
     }

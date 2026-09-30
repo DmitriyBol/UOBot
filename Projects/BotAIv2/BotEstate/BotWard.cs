@@ -133,11 +133,11 @@ public sealed class BotWard : BotDeed
             return BotDoing.Walk(_them.Map, _them, BotArrival.Within(Reach), $"over to {_them.Name}, who hunts our land");
         }
 
-        body.Say($"You hunt the land of {_ours}. {BotToll.PatrolRate:P0} of what you take here is ours.");
+        BotVoice.Aloud(body, $"You hunt the land of {_ours}. {BotToll.PatrolRate:P0} of what you take here is ours.");
 
         var theirs = (_them.Guild as Guilds.Guild)?.Name;
 
-        _them.Say(theirs != null && BotRegard.Of(theirs, _ours) <= Surly ? "We will see about that." : "So be it.");
+        BotVoice.Aloud(_them, theirs != null && BotRegard.Of(theirs, _ours) <= Surly ? "We will see about that." : "So be it.");
 
         BotToll.Warn(_them, _ours);
         _said = true;

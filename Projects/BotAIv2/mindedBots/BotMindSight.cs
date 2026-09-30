@@ -464,7 +464,7 @@ public static class BotMindSight
 
         sb.AppendLine(".");
 
-        var home = BotPopulation.Where;
+        var home = BotPopulation.HomeOf(body);
         var away = (int)body.GetDistanceToSqrt(home);
 
         sb.Append("Your camp is ");

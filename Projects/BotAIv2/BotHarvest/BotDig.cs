@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Server.Engines.Harvest;
 using Server.Items;
 using Server.Mobiles;
@@ -89,6 +89,96 @@ public sealed class BotDig : BotDeed
     private int _swings;
 
     private int _approaches;
+
+    private Point3D _standRock;
+
+    private Point3D _standAt;
+
+    private int _standRing;
+
+    public static int SeamStandTiles { get; set; } = 4;
+
+    public static long Standless { get; private set; }
+
+    private static Point3D Stand(Map map, Point3D point, int most, Point3D toward, out int ring, bool level = false)
+    {
+        if (level)
+        {
+            var chosen = Point3D.Zero;
+            var cheapest = int.MaxValue;
+            var chosenRing = -1;
+
+            for (var dx = -most; dx <= most; dx++)
+            {
+                for (var dy = -most; dy <= most; dy++)
+                {
+                    var x = point.X + dx;
+                    var y = point.Y + dy;
+
+                    if (!BotStep.Settle(map, x, y, out var z) || BotFooting.Footless(map, x, y) || BotStep.Wet(map, x, y))
+                    {
+                        continue;
+                    }
+
+                    var climb = System.Math.Max(0, System.Math.Abs(z - toward.Z) - 4);
+                    var cost = climb * 3 + System.Math.Max(System.Math.Abs(toward.X - x), System.Math.Abs(toward.Y - y));
+
+                    if (cost < cheapest)
+                    {
+                        cheapest = cost;
+                        chosen = new Point3D(x, y, z);
+                        chosenRing = System.Math.Max(System.Math.Abs(dx), System.Math.Abs(dy));
+                    }
+                }
+            }
+
+            ring = chosenRing;
+
+            return chosen;
+        }
+
+        for (ring = 0; ring <= most; ring++)
+        {
+            var best = Point3D.Zero;
+            var least = int.MaxValue;
+
+            for (var dx = -ring; dx <= ring; dx++)
+            {
+                for (var dy = -ring; dy <= ring; dy++)
+                {
+                    if (System.Math.Max(System.Math.Abs(dx), System.Math.Abs(dy)) != ring)
+                    {
+                        continue;
+                    }
+
+                    var x = point.X + dx;
+                    var y = point.Y + dy;
+
+                    if (!BotStep.Settle(map, x, y, out var z) || BotFooting.Footless(map, x, y) || BotStep.Wet(map, x, y))
+                    {
+                        continue;
+                    }
+
+                    var away = System.Math.Max(System.Math.Abs(toward.X - x), System.Math.Abs(toward.Y - y));
+
+                    if (away < least)
+                    {
+                        least = away;
+                        best = new Point3D(x, y, z);
+                    }
+                }
+            }
+
+            if (best != Point3D.Zero)
+            {
+                return best;
+            }
+        }
+
+        ring = -1;
+
+        return Point3D.Zero;
+    }
 
     private int _nearest = int.MaxValue;
 
@@ -356,7 +446,9 @@ public sealed class BotDig : BotDeed
                 );
             }
 
-            return BotDoing.Walk(_map, _seam.Where, BotArrival.Within(2), $"to the {_seam.Ore}");
+            var seamStand = Stand(_map, _seam.Where, SeamStandTiles, _seam.Where, out _);
+
+            return BotDoing.Walk(_map, seamStand == Point3D.Zero ? _seam.Where : seamStand, BotArrival.Within(2), $"to the {_seam.Ore}");
         }
 
         if (_tile == null && _spent.Count < MaxSpent)
@@ -429,9 +521,23 @@ public sealed class BotDig : BotDeed
 
         if (!body.InRange(at, BotOre.SwingReach))
         {
-            if (++_approaches < ApproachLimit)
+            if (_standRock != at)
             {
-                return BotDoing.Walk(_map, at, BotArrival.Within(BotOre.SwingReach - 1), "up to the rock");
+                _standRock = at;
+                _standAt = Stand(_map, at, BotOre.SwingReach, body.Location, out _standRing, true);
+            }
+
+            var rockStand = _standAt;
+            var ring = _standRing;
+
+            if (rockStand == Point3D.Zero)
+            {
+                Standless++;
+                _approaches = ApproachLimit;
+            }
+            else if (++_approaches < ApproachLimit)
+            {
+                return BotDoing.Walk(_map, rockStand, BotArrival.Within(System.Math.Max(0, BotOre.SwingReach - ring)), "up to the rock");
             }
 
             _spent.Add(at);

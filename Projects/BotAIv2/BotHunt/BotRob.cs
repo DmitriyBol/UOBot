@@ -421,7 +421,7 @@ public sealed class BotRob : BotDeed
         var theirs = Math.Max(1.0, BotThreat.Power(_victim));
         var ratio = ours / theirs;
 
-        body.Say($"Your purse, {_victim.Name}, or your life.");
+        BotVoice.Aloud(body, $"Your purse, {_victim.Name}, or your life.");
 
         if (coins > 0 && Utility.RandomDouble() < Math.Clamp(ratio - 0.5, 0.0, 1.0))
         {
@@ -429,7 +429,7 @@ public sealed class BotRob : BotDeed
 
             _victim.Backpack.ConsumeTotal(typeof(Gold), amount);
             body.AddToBackpack(new Gold(amount));
-            _victim.Say("Take it, and go.");
+            BotVoice.Aloud(_victim, "Take it, and go.");
 
             Paid++;
             Extorted += amount;
@@ -456,7 +456,7 @@ public sealed class BotRob : BotDeed
             return true;
         }
 
-        _victim.Say("Not one coin.");
+        BotVoice.Aloud(_victim, "Not one coin.");
         Refused++;
         BotOutlaw.Want(body as BotMobile, _victim.Name, $"threatening {_victim.Name}");
 

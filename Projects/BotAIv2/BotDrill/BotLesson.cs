@@ -116,7 +116,7 @@ public sealed class BotLesson : BotDeed
             _openedTick = Core.TickCount;
             _beatTick = Core.TickCount;
 
-            body.Say("Warriors and archers — form up, and I will make something of you.");
+            BotVoice.Aloud(body, "Warriors and archers — form up, and I will make something of you.");
         }
 
         return _teaching ? Teaching(body) : Gathering(body);
@@ -147,7 +147,7 @@ public sealed class BotLesson : BotDeed
                 BotSchool.Students.Count
             );
 
-            body.Say($"{BotSchool.Students.Count} of you. Take your places and keep them.");
+            BotVoice.Aloud(body, $"{BotSchool.Students.Count} of you. Take your places and keep them.");
 
             return BotDoing.Work($"drilling {BotSchool.Students.Count}");
         }
@@ -161,7 +161,7 @@ public sealed class BotLesson : BotDeed
         {
             BotSchool.Close();
 
-            body.Say("That is enough for today. Go and use it.");
+            BotVoice.Aloud(body, "That is enough for today. Go and use it.");
 
             return BotDoing.Done($"the class is over — {_lessons} lessons given");
         }
@@ -225,7 +225,7 @@ public sealed class BotLesson : BotDeed
 
         if (_turn % 2 == 0)
         {
-            body.Say(Line(_turn, reached));
+            BotVoice.Aloud(body, Line(_turn, reached));
         }
 
         return BotDoing.Walk(_map, post, BotArrival.Within(1), $"drilling {students.Count}");

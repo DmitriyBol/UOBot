@@ -16,6 +16,8 @@ public static class NavCost
 {
     public const int Step = 100;
 
+    public const int Unaffordable = int.MaxValue / 4;
+
     public const int DiagonalTie = 1;
 
     public const int Door = 200;

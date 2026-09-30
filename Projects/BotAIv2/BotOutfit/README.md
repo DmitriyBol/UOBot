@@ -15,6 +15,7 @@ right to take from it.
 | `BotHarness.cs` | what a bot ought to be wearing, worked out from what this shard can actually make and what it costs |
 | `BotStable.cs` | buying a horse, and calling it up; keeps back `BotPurse.KeepBack` (build 64) |
 | `BotSteed.cs` | a horse a bot carries in its pack and calls up when it has somewhere to be |
+| `BotChampionSteed.cs` | A champion's steed: a mount of a kind no stable sells, won in the championship. |
 
 **Eight kinds of reagent are issued, not six.** Six were chosen to match exactly the three starting spells, and
 that was right while a book held three spells and could hold no more. Without bloodmoss and mandrake root half a

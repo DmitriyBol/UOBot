@@ -35,6 +35,17 @@ public sealed class BotMindModule : BotModule
 
         BotMinds.Start();
 
+        BotWebHooks.Minds = () => new BotMindsReport(
+            BotOllama.Model,
+            BotOllama.Endpoint,
+            BotMinds.All.Count,
+            BotOllama.Reachable,
+            BotOllama.Asked,
+            BotOllama.Answered,
+            BotOllama.Refused,
+            BotOllama.LastMs
+        );
+
         if (BotMinds.All.Count == 0)
         {
             return;

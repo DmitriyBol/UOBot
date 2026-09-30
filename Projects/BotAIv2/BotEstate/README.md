@@ -53,6 +53,7 @@ design silently if it had gone the other way.
 | `BotReeve.cs` | the guild's own company for the guild's own dire ground: a leader-class member is offered the Baron's harrow on the nearest square its guild holds at or below dire, and the Baron leaves such ground alone while the guild has a leader (build 92) |
 | `BotChest.cs` | the guild's chest: a tenth of the coin taken by work that braves a square the guild holds, and the first payer of the guild's next claim or hall before any member's pack (build 93) |
 | `BotChestStore.cs` | keeps the chests across restarts, as the claims are kept (build 93) |
+| `BotDues.cs` | the members' dues: a fifth of the coin their work brings in, paid into the guild's chest; what the chest keeps back from everyday draws while the guild saves for its hall or a house in Britain; the `Treasuries:` line (29.09.2026) |
 | `BotFittings.cs` | what goes inside: the chest, the room the flood-fill finds, and what each guild wants |
 | `BotBench.cs` | the undertaking: fetch one workbench the guild has paid for and set it up |
 | `BotFitter.cs` | whether the guild can afford its next bench, and which member is away getting it |

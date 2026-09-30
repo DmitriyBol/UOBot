@@ -138,7 +138,9 @@ public static class BotEstate
 
     public static int Standing => _halls.Count;
 
-    public static int Fund(Guild guild)
+    public static int Fund(Guild guild) => guild == null ? 0 : BotChest.Holds(guild.Name) + Spare(guild);
+
+    public static int Spare(Guild guild)
     {
         if (guild?.Members == null)
         {
@@ -222,7 +224,13 @@ public static class BotEstate
 
         var got = 0;
 
-        got += BotChest.Draw(guild.Name, want);
+        var chest = 0;
+
+        if (paid != null)
+        {
+            chest = BotChest.Draw(guild.Name, want);
+            got += chest;
+        }
 
         for (var i = 0; i < members.Count && got < want; i++)
         {
@@ -276,6 +284,12 @@ public static class BotEstate
             {
                 Payers++;
             }
+        }
+
+        if (chest > 0 && got < want)
+        {
+            BotChest.Return(guild.Name, chest);
+            got -= chest;
         }
 
         return got;

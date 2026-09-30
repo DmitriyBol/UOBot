@@ -1,4 +1,5 @@
-﻿using Server.Items;
+﻿using System;
+using Server.Items;
 using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -52,6 +53,12 @@ public sealed class BotAlchemist : IBotProposer
     public static long NoShop { get; private set; }
 
     public static long NoPrice { get; private set; }
+
+    public static long Unaffordable { get; private set; }
+
+    public static long Richest { get; private set; }
+
+    public static long SentBottles { get; private set; }
 
     public static long ToOrder { get; private set; }
 
@@ -198,9 +205,32 @@ public sealed class BotAlchemist : IBotProposer
             return null;
         }
 
-        Sent++;
+        var fill = BotFlask.GlassFor(bot, body, potion);
+        var take = Math.Clamp(Math.Max(fill, BotFlask.LeastBottles) - BotFlask.Bottles(body), 1, Math.Max(1, BotFlask.Batch));
+        var least = Math.Max(1, Math.Min(fill, BotFlask.LeastBottles) - BotFlask.Bottles(body));
+        var wealth = BotYield.Wealth(body);
 
-        return new BotBrew(map, body.Location, potion, shop, price, BotFlask.Batch);
+        if (wealth < take * price)
+        {
+            take = wealth / price;
+        }
+
+        if (take < least)
+        {
+            Unaffordable++;
+
+            if (wealth > Richest)
+            {
+                Richest = wealth;
+            }
+
+            return null;
+        }
+
+        Sent++;
+        SentBottles += take;
+
+        return new BotBrew(map, body.Location, potion, shop, price, take);
     }
 
     private static BotWant Order(System.Type potion)
@@ -247,7 +277,7 @@ public sealed class BotAlchemist : IBotProposer
             ? $"nobody has been offered the mortar ({NoKit} answers went to bots with no pestle)"
             : $"{Asked} asked to brew: {ToOrder} took an order off the board, {OnSpec} brewed on spec, "
               + $"{NoHerbs} had the glass and not the reagent, {Stocked} had both and every draught already at its cap, {Unskilled} could not carry a single recipe yet, {Bare} had neither, {AtCap} were at the cap of {BotFlask.Cap} on everything they can make ({BotFlask.Capped} draughts passed over for it, {BotFlask.Rests} stood off for {BotFlask.RestMs / 60000} minutes), "
-              + $"{NoGlass} had the herbs but no glass ({Sent} sent to buy some, {NoShop} found no counter with one in stock "
+              + $"{NoGlass} had the herbs but no glass ({Sent} sent to buy some, {SentBottles} bottles between them, {Unaffordable} could not pay for the glass their herbs could fill (the fattest purse among them held {Richest}gp), {NoShop} found no counter with one in stock "
               + $"within reach, {NoPrice} found a counter that named no price)";
 
     public static void Forget()
@@ -267,6 +297,9 @@ public sealed class BotAlchemist : IBotProposer
         Sent = 0;
         NoShop = 0;
         NoPrice = 0;
+        Unaffordable = 0;
+        Richest = 0;
+        SentBottles = 0;
         ToOrder = 0;
         OnSpec = 0;
     }

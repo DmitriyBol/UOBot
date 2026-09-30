@@ -220,7 +220,7 @@ public sealed class BotScout : BotDeed
 
         _began = Core.TickCount;
 
-        body.Say(_wage > 0 ? "Ground nobody has walked. Who is coming? There is coin in it." : "Ground nobody has walked. I am going to look at it.");
+        BotVoice.Aloud(body, _wage > 0 ? "Ground nobody has walked. Who is coming? There is coin in it." : "Ground nobody has walked. I am going to look at it.");
 
         logger.Information(
             "{Name} is taking {Count} of them to look at ({X}, {Y}), which nobody has stood in",

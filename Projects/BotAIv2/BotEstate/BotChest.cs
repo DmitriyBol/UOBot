@@ -45,18 +45,18 @@ public static class BotChest
 
     public static int Holds(string guild) => guild != null && _chests.TryGetValue(guild, out var gold) ? gold : 0;
 
-    public static void Tithe(Mobile body, Map map, Point3D where, int coin)
+    public static int Tithe(Mobile body, Map map, Point3D where, int coin)
     {
         if (!Running || coin <= 0 || map == null || map == Map.Internal || body?.Backpack is not { } pack)
         {
-            return;
+            return 0;
         }
 
         var owner = BotLand.Holder(map, where);
 
         if (owner == null)
         {
-            return;
+            return 0;
         }
 
         var own = body.Guild?.Name == owner;
@@ -69,14 +69,14 @@ public static class BotChest
                 BotToll.Owed(owner, body);
             }
 
-            return;
+            return 0;
         }
 
         var share = (int)(coin * rate);
 
         if (share <= 0 || !pack.ConsumeTotal(typeof(Gold), share))
         {
-            return;
+            return 0;
         }
 
         _chests[owner] = Holds(owner) + share;
@@ -85,12 +85,41 @@ public static class BotChest
         {
             Tithes++;
             TitheGold += share;
+
+            return share;
         }
-        else
-        {
-            BotToll.Paid(owner, body, share);
-        }
+
+        BotToll.Paid(owner, body, share);
+
+        return 0;
     }
+
+    public static void Put(string guild, int gold)
+    {
+        if (string.IsNullOrEmpty(guild) || gold <= 0)
+        {
+            return;
+        }
+
+        _chests[guild] = Holds(guild) + gold;
+    }
+
+    public static void Return(string guild, int gold)
+    {
+        if (string.IsNullOrEmpty(guild) || gold <= 0)
+        {
+            return;
+        }
+
+        _chests[guild] = Holds(guild) + gold;
+        Draws--;
+        DrawnGold -= gold;
+        Returned += gold;
+
+        logger.Information("{Guild}'s chest had its {Gold}gp back: the levy it paid into fell short; {Held}gp in it", guild, gold, Holds(guild));
+    }
+
+    public static long Returned { get; private set; }
 
     public static int Draw(string guild, int want)
     {
@@ -179,7 +208,7 @@ public static class BotChest
 
         using var say = ValueStringBuilder.Create(256);
 
-        say.Append($"{Tithes} tithes of {TitheGold}gp paid to the guilds holding the ground hunted ({Rate:P0} of the coin), {Draws} draws of {DrawnGold}gp on the chests; chests: ");
+        say.Append($"{Tithes} tithes of {TitheGold}gp paid to the guilds holding the ground hunted ({Rate:P0} of the coin), {Draws} draws of {DrawnGold}gp on the chests ({Returned}gp handed back from levies that fell short); chests: ");
 
         if (_chests.Count == 0)
         {
@@ -215,5 +244,6 @@ public static class BotChest
         TitheGold = 0;
         Draws = 0;
         DrawnGold = 0;
+        Returned = 0;
     }
 }

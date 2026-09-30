@@ -111,6 +111,8 @@ public static class BotProving
 
     public static int PartySize { get; set; } = 5;
 
+    public static int PartyMultiple { get; set; } = 2;
+
     public static int PartyLeast { get; set; } = 3;
 
     public static int MostFoes { get; set; } = 6;
@@ -507,17 +509,19 @@ public static class BotProving
 
         fighters.Sort((a, b) => Against(b, pickDeep).CompareTo(Against(a, pickDeep)));
 
-        if (fighters.Count > PartySize)
-        {
-            fighters.RemoveRange(PartySize, fighters.Count - PartySize);
-        }
-
         var room = BotRoomTrial.Worst(map, pickDeep, MostFoes);
+
+        var size = Math.Max(PartySize, room.Count * PartyMultiple);
+
+        if (fighters.Count > size)
+        {
+            fighters.RemoveRange(size, fighters.Count - size);
+        }
 
         return room.Count == 0 ? null : (pick, fighters, pickDeep, room);
     }
 
-    private static List<BotMobile> Fighters(Guilds.Guild guild)
+    internal static List<BotMobile> Fighters(Guilds.Guild guild)
     {
         List<BotMobile> list = [];
 

@@ -63,6 +63,8 @@ public sealed class BotHouseCall : BotDeed
 
     public override string Kind => Trade;
 
+    public override bool Resumes => true;
+
     public override Map Map => _map;
 
     public override Point3D Where => _found;

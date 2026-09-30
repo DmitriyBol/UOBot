@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Items;
@@ -36,6 +36,8 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotSupply : BotDeed
 {
+    public static long FromChest { get; private set; }
+
     public const string Trade = "supply";
 
     public static double Prior { get; set; } = 260.0;
@@ -222,6 +224,20 @@ public sealed class BotSupply : BotDeed
             var wealth = BotYield.Wealth(body);
             var mine = wealth;
 
+            var fromChest = 0;
+
+            if (wealth < bill && BotChest.Holds(_guild.Name) > 0 && body.Backpack is { } purse)
+            {
+                fromChest = BotChest.Draw(_guild.Name, bill - wealth);
+
+                if (fromChest > 0)
+                {
+                    purse.DropItem(new Gold(fromChest));
+                    wealth += fromChest;
+                    FromChest += fromChest;
+                }
+            }
+
             if (wealth < bill && !BotGuilds.Stand(body as BotMobile, bill - wealth))
             {
                 return BotDoing.Failed($"{_guild.Name} could not raise {bill}gp to stock its counter");
@@ -230,6 +246,12 @@ public sealed class BotSupply : BotDeed
             var got = BotShops.Buy(bot, _shop, _kind, _batch, out var refused);
 
             _mine += Math.Max(0, mine - BotYield.Wealth(body));
+
+            if (got <= 0 && fromChest > 0 && body.Backpack is { } returning && returning.ConsumeTotal(typeof(Gold), fromChest))
+            {
+                BotChest.Put(_guild.Name, fromChest);
+                FromChest -= fromChest;
+            }
 
             if (got <= 0)
             {

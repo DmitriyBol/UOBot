@@ -1,4 +1,4 @@
-﻿using Server.Logging;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -87,6 +87,7 @@ public sealed class BotPopulationModule : BotModule
         );
 
         BotRest.Start();
+        BotPeoples.Load();
 
         BotGuilds.Muster();
 

@@ -39,9 +39,9 @@ ROOT = "(root)"
 # subsystems that watch rather than act.
 ORDER = [
     ROOT, "BotModules", "BotPopulation", "BotWill", "BotMovement", "BotClasses", "BotOutfit",
-    "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotAuction", "BotSpells",
-    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotProving", "BotEstate", "BotQuest", "BotQuad", "BotRanger",
-    "BotDashboard", "BotAlarm", "mindedBots", "mindedBots/debugger",
+    "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotAuction", "BotShopkeep", "BotSpells",
+    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotTravel", "BotResidence", "BotGuildHouse", "BotCamp", "BotRunes", "BotSea", "BotProving", "BotEstate", "BotDiplomacy", "BotQuest", "BotQuad", "BotRanger",
+    "BotDashboard", "BotAlarm", "BotVoice", "BotWeb", "mindedBots", "mindedBots/debugger",
 ]
 
 # folder -> (title, what it is, [traps])
@@ -173,6 +173,20 @@ BLOCKS = {
         ["A stall and a want can both be healthy and never meet. When trade is low the question is not "
          "whether either side works but whether there is an edge between them."],
     ),
+    "BotShopkeep": (
+        "bots' shops by the bank",
+        "Trade between bots in a place (Patrick's order of 29.09.2026). A bot holding what the island is short "
+        "of stands beside the bank of the town it lives in for a shift and calls out what it sells; a bot short "
+        "of a supply, or with money down on the board, weighs the shop against the shopkeeper and the stall on "
+        "price and the walk, walks over, and buys out of the keeper's bank box and pack. The goods never leave "
+        "the world. The auction is cut to `BotAuction.LotsPerBot` kinds a bot, set here, and what it turns away "
+        "is sold from here.",
+        ["The cap on the auction is set by this module's start. With the module off the auction is uncapped, "
+         "because a cap with no shop to take the rest only fills bank boxes.",
+         "A shop's stock is a count, not the goods: it is taken every few seconds and at every sale, and the "
+         "till counts again before anything moves. A customer can arrive to find the thing gone; a supplies "
+         "errand then goes on to a shopkeeper."],
+    ),
     "BotQuest": (
         "the board of errands",
         "What the door and the marshal of events ask of the population, for a price: kill so many of a "
@@ -235,16 +249,95 @@ BLOCKS = {
     ),
     "BotDelve": (
         "the dungeons",
-        "Five bots taken underground by the maker of their guild, for twenty minutes or twenty corpses. The "
-        "dungeon block has no walkable road from the island, so a party is put down and lifted back out; "
-        "which dungeon is decided by measuring what lives in each against what the band is worth. What they "
-        "take is swept into one pot as it fills and divided at the end, half to the leader.",
+        "Five bots taken underground by a member of their guild, for twenty minutes or twenty corpses. Since "
+        "29.09.2026 the party marches from the muster to the cave mouth and walks through it — the world's "
+        "teleporters are gates the journey routes through (`BotGates`) — and walks out by it at the end; the "
+        "descent by hand is kept only for a dungeon no gate joins. Which dungeon is decided by measuring what "
+        "lives in each against what the band is worth. What they take is swept into one pot as it fills and "
+        "divided at the end, half to the leader. A fighter alone may venture into a dungeon whose worst it "
+        "outmatches (`BotVenture`); inside, the hunt, the band and the walk home do the rest.",
         ["A refused road underground is ordinary rather than fatal — a wall between a bot and its place in "
-         "the line is what a cavern is made of — so `BotDelve.Bend` shrugs it off and moves the party. The "
-         "first party that ever went down was out again in forty-one seconds without it.",
-         "A bot left in a dungeon has no road home at all. `BotDelveParty.Watch` is the net under that, and "
-         "the count of what it lifts out is printed: a backstop doing the ordinary work has become the "
+         "the line is what a cavern is made of — so `BotDelve.Bend` shrugs it off and moves the party.",
+         "Whoever is still below ten minutes after a delve settled is lifted by `BotDelveParty.Watch`, and the "
+         "count is printed against those who walked out: a backstop doing the ordinary work has become the "
          "design."],
+    ),
+    "BotTravel": (
+        "the towns and the roads",
+        "The towns read from the map's regions, which of them can be walked to from home (the gates' answer), "
+        "one road per pair drawn by the long tier and walked into the book, and the journey a bot with nothing "
+        "pressing takes to a town it has not seen — telling its guild what the road read on the danger map. "
+        "Guilds founded on the shard may be seated by another town (`BotSeat.Choose`). Patrick's order of "
+        "29.09.2026.",
+        ["The roam round home is now the roam round every reachable town, so a proposer that looks further "
+         "than it walks sees further than it should.",
+         "A town reached only through a gate has no road in the book and is not offered to travellers."],
+    ),
+    "BotResidence": (
+        "where each bot lives",
+        "Every bot has a town of its own: born in it, risen in it, walked home to it, hunting and gathering round it. "
+        "`BotPopulation.HomeOf` is the one answer to every per-bot home and asks `BotResidence.Home`: in the population's "
+        "home town that is the guild's hall or seat or the population's home, as before; elsewhere the town's bank, or the "
+        "guild's hall or seat when it stands there. A member of a guild seated abroad lives by its guild; everybody else "
+        "chooses among the towns fit to live in (a road in the book, a bank, shops), weighed towards the emptier and away "
+        "from roads too strong for it, and may move — by walking there — after a poor living or deaths where it lives. "
+        "Patrick's order of 29.09.2026, point 5.",
+        ["A move changes the residence when it is taken, not when it is offered and not when it arrives: a bot that dies on "
+         "the road rises in its new town.",
+         "Population-wide questions — the roads' flood, the gates, the city's errands, the Baron — still ask "
+         "`BotPopulation.Where`; only a per-bot home asks `HomeOf`."],
+    ),
+    "BotGuildHouse": (
+        "guild houses in the towns",
+        "A guild settles in an empty town building: the towns' regions are read for the engine's own door frames "
+        "(`DoorGenerator`), both sides of every doorway flooded with the planner's step model, and the enclosed, roofed "
+        "rooms of 64 to 400 tiles with at most two doorless ways in kept (cached in `Data/bot-guild-houses.bin` by the map "
+        "files' fingerprint). What the world has put in one since — a spawner, a shopkeeper's home, a door, an inn's region, "
+        "a house — is asked live. A guild wishing abroad takes a free building in a fit town with room (two a town), for "
+        "nothing; a guild wishing for Britain raises its hall first, then pays 10,000gp to the city. A door keyed to the "
+        "guild goes into every doorway and a sign naming it on the wall; the building's heart is the guild's seat "
+        "(`BotSeat.Of`), where members are born and rise (`BotSeat.Home`), and its town is where they live "
+        "(`BotRelocate.Forced`). The hall and the claims are still earned the old way. Patrick's idea of 29.09.2026, evening.",
+        ["The door is unlocked in the engine's terms and refuses at the handle (`BotGuildDoor.Use`), because a locked shut "
+         "door is a wall to the planner for members too: a door a member opened lets anybody through for twenty seconds.",
+         "A guild's house outranks every other seat, but the hall is still carried towards the seat the hall itself last "
+         "set (`BotSeat.Moving`), or an exile's move would be undone by the next carry."],
+    ),
+    "BotCamp": (
+        "fires in the woods and a word on the road",
+        "Some bots light a campfire in the wild when tired, bored or idle — the engine's own kindling, struck and fed by "
+        "the engine's roll — and free bots within forty tiles are offered a seat at it, where they face the flame and talk: "
+        "roads walked, the worst ground near, trade, their guild. Sitting at a lit fire is rest at the inn's rate, and a tired "
+        "bot secure at one goes offline there, unpaid, for a sixth of its rest as regeneration. Two free bots passing in the "
+        "open may stop for a word. Patrick's point 6 of 29.09.2026.",
+        ["The engine's campfire burns a hundred seconds; a fire nobody feeds is out, and `BotCamp.Warm` carries it only "
+         "thirty seconds between flames.",
+         "Every deed here is unpaid, so its proposer asks every reason it fails before it is offered."],
+    ),
+    "BotRunes": (
+        "Mark, Recall and the company's gate",
+        "A mage of Magery 40 and up marks a rune where its guild holds none — its seat, a cave mouth, the town it "
+        "stands in — and keeps it in its own book; the guild's knowledge of the place is kept in a store and "
+        "written into the guild's library, a runebook in the hall's chest or with its keeper, which lends copies "
+        "at a blank rune each. A far walk (a journey, the walk home, a far counter) asks for a recall first; a "
+        "delve or a sweep asks for a Gate Travel, and the company steps through, the leader last. Every cast is "
+        "the engine's spell. Patrick's order of 29.09.2026, point 7.",
+        ["Nobody marks inside a Felucca dungeon (`SpellHelper` travel rules): a mouth's rune stands on the island "
+         "side, and the company walks the last tiles through the mouth.",
+         "A bot has no screen for the gate's confirmation gump: members are put through by the engine's own "
+         "`Moongate.EndConfirmation`, not by stepping on the gate."],
+    ),
+    "BotSea": (
+        "ships between the islands",
+        "The water of the map charted once from the client files (cached in `Data/bot-sea-chart.bin`), a dock for "
+        "each town a ship can berth at, and lanes between every pair of docks no road or gate joins. A traveller "
+        "bound for a town it cannot walk to buys a small ship (the guild may help pay), boards it by the engine's "
+        "own plank and key, and the helm moves it with `BaseBoat.Move` and `Turn` at the engine's speeds; ashore, "
+        "the ship is dry-docked into the pack for the next voyage. Patrick's order of 29.09.2026, point 7.",
+        ["A bot's speech carries no keywords, so the tillerman's commands are not used: the helm drives the ship "
+         "itself on its own clock.",
+         "A voyage with no headway for three minutes is wrecked: captain and crew are carried to the nearest dock "
+         "and the ship is dry-docked — the only hand-move, counted and logged."],
     ),
     "BotProving": (
         "Argus's proving ground",
@@ -260,14 +353,35 @@ BLOCKS = {
     ),
     "BotEstate": (
         "the guilds' halls",
-        "The one thing this population builds that outlives it. A guild levies its members, finds ground the "
-        "engine will take a house on, raises a hall, and fits it out with the tools of its own trade. Next "
-        "start the halls are read back out of the world by the name on their signs and handed to whoever "
-        "leads that guild now.",
+        "The one thing this population builds that outlives it. A guild saves in its chest — the members' dues, a "
+        "fifth of what their work brings in (`BotDues`), and the tithes of its ground — levies the rest off its "
+        "members, finds ground the engine will take a house on, raises a hall, and fits it out with the tools of its "
+        "own trade. Next start the halls are read back out of the world by the name on their signs and handed to "
+        "whoever leads that guild now.",
         ["A house is permanent and a population is not, so an unowned hall decays: `BotEstate.Adopt` is the "
          "only thing standing between an evening's building and an empty ruin.",
          "The price is a dial rather than the engine's 35,250gp, which no bot on this shard could ever "
-         "reach. Watch the `short` clause in the summary before moving it."],
+         "reach. Watch the `short` clause in the summary before moving it.",
+         "`BotEstate.Fund` is the chest plus the members' spare above the keep; the members' spare is the same pool "
+         "`BotGuilds.Stand` spends on their armour and supplies every minute, so on a poor shard it reads nought and "
+         "only the chest ever grows. The `Treasuries:` line prints both halves per guild."],
+    ),
+    "BotDiplomacy": (
+        "meetings between guilds, and with their towns",
+        "No war and no alliance without a meeting. A grievance at the war line, or a friendship at the alliance line, calls "
+        "one (`BotRegard` → `BotParley.Grieve`/`Befriend`); a guild thought ill of asks for peace, and two on good terms "
+        "propose trade. Any member walks as envoy (a guild of one sends its founder) to the host guild's town hall — the bank "
+        "unless the file names one (`BotParley.Seat`) — the host sends an answerer, one of Argus's squad is summoned as a "
+        "visible witness (`mindedBots/debugger/BotWitness`), the sides state their grievances from the books "
+        "(`BotGrievances`), and the duke's word is asked of the model with the outcome an enumeration, or given by rule "
+        "(`BotDuke`): war, peace, trade terms, standing orders, an alliance or nothing. Agreements change prices and "
+        "service on the bots' market and forbid war (`BotPact`). Each guild also sends an envoy to its towns, is set a "
+        "checkable task (`BotTownTask`) and pays the town's shops half a percent less or more per task (`BotBurgh`); three "
+        "failures in a row put it out of the town for 48 hours. Patrick's order of 29.09.2026, evening.",
+        ["A restart ends every meeting in flight; the grievance calls it again at its next drift. Agreements, the books, "
+         "the pair clocks and the towns' standing are kept (`BotDiplomacyStore`).",
+         "The duke's model answer is waited for two minutes after the last line and then given by rule; the log line "
+         "`the word, by <who>` says which."],
     ),
     "BotQuad": (
         "the island as squares",
@@ -296,6 +410,30 @@ BLOCKS = {
          "that reason, and every event reports the window it actually measured rather than the one intended.",
          "The error count is read through a buffered redirect and can lag the world by a buffer. Good for "
          "noticing, useless for timing."],
+    ),
+    "BotVoice": (
+        "what the bots say",
+        "Speech as a by-product of doing: a line rides on work taken up or ended, a blow, a death, a war, a "
+        "hall, an order, and now and then a mood. Five channels — local, guild, world, mood, cry — each an "
+        "audience; every line is also an event on the stream and a line in `logs/bot-speech.log`. The phrase "
+        "bank is written whole to `bot-voice.json` so the words can be changed without the code. Rationed per "
+        "bot and channel, never per shard.",
+        ["Nothing here is offered to the auction and nothing costs a beat: the voices must never change what "
+         "the population does.",
+         "The occasions are the will's own hooks (`BotWill.Started`, `BotWill.Ended`), the damage and death "
+         "hooks on `BotMobile`, and three lines in `BotWar` and `BotHall`."],
+    ),
+    "BotWeb": (
+        "the shard as a page",
+        "The whole population as one JSON document on `127.0.0.1:2599`, rebuilt on the game loop every two "
+        "seconds and handed to an `HttpListener` that reads nothing from the world; an event stream "
+        "(`bot-events.ndjson`) with sequence numbers and server-sent events; a picture of the map from the "
+        "client's `radarcol.mul`; the crafting chain as the craft systems define it; a minute of history at a "
+        "time. The page is `Distribution/Data/bot-web/index.html`.",
+        ["Every number on the page is a counter the log already prints, so the two cannot disagree; the one "
+         "addition is the split of searches by purpose in `BotWalk`.",
+         "The map is sampled in slices on the loop because the tile matrix is not safe off it, and encoded off "
+         "the loop because encoding needs no world."],
     ),
     "BotDashboard": (
         "watching it happen",
@@ -337,6 +475,7 @@ LINES = {
     "BotCraft": ["Needs:"],
     "BotShops": ["Needs:"],
     "BotAuction": ["The market:"],
+    "BotShopkeep": ["Bot shops:"],
     "BotSpells": ["Arms:"],
     "BotCombat": ["Arms:", "Bows:"],
     "BotMend": ["Arms:"],
@@ -345,8 +484,12 @@ LINES = {
     "BotDrill": ["The captain:"],
     "BotBaron": ["The Baron:"],
     "BotDelve": ["Delving:"],
+    "BotResidence": ["Residences:"],
+    "BotSea": ["Sea:"],
     "BotProving": ["Proving:"],
-    "BotEstate": ["Estate:"],
+    "BotEstate": ["Estate:", "Treasuries:"],
+    "BotDiplomacy": ["Diplomacy:"],
+    "BotGuildHouse": ["Houses:"],
     "BotQuest": ["Quests:"],
     "BotQuad": ["The captain:"],
     "mindedBots": ["Minds:"],

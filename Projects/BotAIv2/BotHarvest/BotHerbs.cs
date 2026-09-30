@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
@@ -310,7 +310,7 @@ public sealed class BotHerbs : BotDeed
 
         for (var i = 0; i < Kinds.Length; i++)
         {
-            var held = BotAuction.Stocked(Kinds[i]);
+            var held = BotAuction.Stocked(Kinds[i]) + BotShopkeep.Showing(Kinds[i]);
 
             if (held > least)
             {
@@ -362,6 +362,8 @@ public sealed class BotHerbalist : IBotProposer
     public static long Asked { get; private set; }
 
     public static long Refused { get; private set; }
+
+    public static long Perilous { get; private set; }
 
     public static long NotAGatherer { get; private set; }
 
@@ -417,8 +419,8 @@ public sealed class BotHerbalist : IBotProposer
 
     private static Point3D Wood(Mobile body, Map map, BotLedger ledger)
     {
-        var home = BotPopulation.Where;
-        var roam = Math.Min(Range, BotPopulation.Roam);
+        var home = BotPopulation.HomeOf(body);
+        var roam = Math.Min(Range, BotPopulation.Leash(body));
 
         var best = Point3D.Zero;
         var bestAway = double.MaxValue;
@@ -436,6 +438,11 @@ public sealed class BotHerbalist : IBotProposer
             var where = new Point3D(x, y, z);
 
             if (Region.Find(where, map)?.IsPartOf<TownRegion>() == true)
+            {
+                continue;
+            }
+
+            if (!BotPopulation.Reachable(map, body.Location, where))
             {
                 continue;
             }
@@ -460,6 +467,13 @@ public sealed class BotHerbalist : IBotProposer
                 continue;
             }
 
+            if (BotGround.MineOdds > 0.0 && BotQuad.Muscle(map, where) > BotThreat.Power(body) * BotGround.MineOdds)
+            {
+                Perilous++;
+
+                continue;
+            }
+
             var away = body.GetDistanceToSqrt(where) + Math.Max(0, BotRoads.Behind(map, body.Location, where));
 
             if (away < bestAway)
@@ -475,7 +489,7 @@ public sealed class BotHerbalist : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody on this shard may go looking for herbs ({NotAGatherer} answers went to bots that may not)"
-            : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go, {Refused} patches passed over as already refused; "
+            : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go, {Refused} patches passed over as already refused, {Perilous} as asking more than the picker brings; "
               + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker that can cast or brew keeps back; "
               + $"{BotHerbs.ForHealing} of the trips were healers' own, for the four herbs a heal spends, of which each keeps {BotHerbs.HealerKeeps}";
 

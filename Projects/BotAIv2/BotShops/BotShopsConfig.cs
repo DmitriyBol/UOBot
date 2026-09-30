@@ -25,6 +25,14 @@ public sealed class BotShopsSettings
     public double? WorkMinutes { get; set; }
 
     public int? PeddleAfterMs { get; set; }
+
+    public bool? CapitalRunning { get; set; }
+
+    public string Capital { get; set; }
+
+    public double? CapitalPremium { get; set; }
+
+    public int? CapitalReach { get; set; }
 }
 
 /// <summary>Reads the shops file and moves the numbers it names.</summary>
@@ -60,5 +68,10 @@ public static class BotShopsConfig
         BotRestock.Prior = settings.Expects ?? BotRestock.Prior;
         BotPeddler.IgnoredMs = settings.PeddleAfterMs ?? BotPeddler.IgnoredMs;
         BotRestock.WorkMinutes = settings.WorkMinutes ?? BotRestock.WorkMinutes;
+
+        BotCapital.Running = settings.CapitalRunning ?? BotCapital.Running;
+        BotCapital.Name = string.IsNullOrWhiteSpace(settings.Capital) ? BotCapital.Name : settings.Capital;
+        BotCapital.Premium = settings.CapitalPremium ?? BotCapital.Premium;
+        BotCapital.Reach = settings.CapitalReach ?? BotCapital.Reach;
     }
 }

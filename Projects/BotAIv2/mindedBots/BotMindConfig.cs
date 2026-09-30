@@ -18,6 +18,10 @@ public sealed class BotMindSettings
 {
     public string Model { get; set; }
 
+    public string Api { get; set; }
+
+    public string ApiKey { get; set; }
+
     public string Endpoint { get; set; }
 
     public string KeepAlive { get; set; }
@@ -70,6 +74,8 @@ public static class BotMindConfig
         }
 
         BotOllama.Model = settings.Model ?? BotOllama.Model;
+        BotOllama.Api = string.IsNullOrWhiteSpace(settings.Api) ? BotOllama.Api : settings.Api.Trim();
+        BotOllama.ApiKey = settings.ApiKey ?? BotOllama.ApiKey;
         BotOllama.Endpoint = settings.Endpoint ?? BotOllama.Endpoint;
         BotOllama.KeepAlive = settings.KeepAlive ?? BotOllama.KeepAlive;
         BotOllama.TimeoutMs = settings.TimeoutMs ?? BotOllama.TimeoutMs;

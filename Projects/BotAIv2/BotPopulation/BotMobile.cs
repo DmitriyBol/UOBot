@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Server.Guilds;
@@ -70,6 +70,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
     public BotJourney Journey { get; } = new();
 
+    public BotWalkResult LastWalk { get; private set; }
+
     private (int Map, int X, int Y) _quadWas;
 
     private Point3D _quadAt;
@@ -110,6 +112,10 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     public int Refusals { get; set; }
 
     public bool Tired { get; set; }
+
+    public DateTime WellRestedUntil { get; set; }
+
+    public BotResidence.Record Residence { get; set; }
 
     public long FellTick { get; private set; }
 
@@ -184,7 +190,11 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
     public static int GriefAt { get; set; } = 4;
 
-    public void Become(BotClass klass, string name, bool female)
+    public void Become(BotClass klass, string name, bool female) => Become(klass, name, female, null);
+
+    public BotPeoples.People People => BotPeoples.Of(Name);
+
+    public void Become(BotClass klass, string name, bool female, BotPeoples.People people)
     {
         if (klass == null)
         {
@@ -197,10 +207,18 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         Name = name;
         Female = female;
-        Body = female ? 0x191 : 0x190;
+
+        Race = people?.Race ?? Race.Human;
+        Body = female ? Race.FemaleBody : Race.MaleBody;
         Hue = Race.RandomSkinHue();
         HairItemID = Race.RandomHair(female);
         HairHue = Race.RandomHairHue();
+
+        if (people is { Beards: true } && !female)
+        {
+            FacialHairItemID = Race.RandomFacialHair(false);
+            FacialHairHue = HairHue;
+        }
 
         AddItem(new Backpack { Movable = false });
 
@@ -311,6 +329,10 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         BotMeal.Keep(this);
 
+        BotInns.Regen(this);
+
+        BotPets.Keep(this);
+
         BotTidy.Keep(this);
 
         BotStable.Keep(this);
@@ -335,6 +357,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         BotWill.Spent(decided - began);
 
         var result = BotWalk.Advance(this, Journey, Running);
+
+        LastWalk = result;
 
         BotWalk.Spent(System.Diagnostics.Stopwatch.GetTimestamp() - decided);
 
@@ -481,6 +505,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         BotWill.Hurt(this);
         BotSquads.Note(this, from);
+        BotVoice.Struck(this, from);
 
         BotPeril.Struck(Map, Location);
 
@@ -594,9 +619,16 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     {
         base.OnDeath(c);
 
+        var fellAt = Location;
+        var fellMap = Map;
+
+        (Resolve?.Deed as BotBolt)?.Died(this, fellAt);
+
         Fallen = true;
         FellTick = Core.TickCount;
         ReviveComplained = false;
+
+        BotResidence.Fell(this, Location);
 
         Remains = c as Corpse;
 
@@ -614,7 +646,30 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         BotWill.Died(this);
 
-        BotKept.Fell(this);
+        var felledBy = LastKiller;
+
+        BotBarred.Fell(fellMap, fellAt, felledBy, $"{Name} the {Class?.Name}");
+
+        BotEvents.Post(
+            "death",
+            this,
+            $"killed by {felledBy?.Name ?? "something"} at ({fellAt.X}, {fellAt.Y})",
+            null,
+            BotJson.Object(
+                w =>
+                {
+                    w.WriteString("killer", felledBy?.Name);
+                    w.WriteString("killerKind", felledBy?.GetType().Name);
+                    w.WriteString("class", Class?.Name);
+                }
+            )
+        );
+
+        BotVoice.Died(this, felledBy);
+
+        BotKept.Fell(this, fellMap, fellAt);
+
+        BotZones.Fell(fellMap, fellAt);
 
         BotSquads.Leave(this);
 
@@ -989,6 +1044,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
     public static int DressEveryMs { get; set; } = 15000;
 
+    public static long LeftToTheFight { get; private set; }
+
     private bool _dressed;
 
     private long _dressedTick;
@@ -1150,6 +1207,13 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     {
         if (!taken.Contains(Layer.OneHanded) || taken.Contains(Layer.TwoHanded))
         {
+            return;
+        }
+
+        if (Combatant is { Deleted: false, Alive: true })
+        {
+            LeftToTheFight++;
+
             return;
         }
 

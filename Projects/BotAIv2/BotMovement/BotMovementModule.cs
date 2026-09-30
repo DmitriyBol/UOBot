@@ -62,6 +62,8 @@ public sealed class BotMovementModule : BotModule
             BotRefused.MostPlaces
         );
 
+        BotBarred.Load();
+        BotDanger.Hook();
         BotBarred.Announce();
 
         _roads?.Stop();
@@ -90,6 +92,7 @@ public sealed class BotMovementModule : BotModule
         BotRefused.Forget();
         BotRoads.Forget();
         BotChart.Forget();
+        BotGates.Forget();
     }
 
     public static string Summarise() =>

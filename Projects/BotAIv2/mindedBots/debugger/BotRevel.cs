@@ -168,7 +168,7 @@ public static class BotRevel
 
         foreach (var guild in BotGuilds.Standing)
         {
-            var spare = BotEstate.Fund(guild);
+            var spare = BotEstate.Spare(guild);
 
             if (spare <= 0)
             {

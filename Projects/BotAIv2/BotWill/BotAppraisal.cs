@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
@@ -221,13 +221,13 @@ public static class BotAppraisal
             return 0.0;
         }
 
-        if (!deed.Standing && BotDungeon.Under(body.Location) != BotDungeon.Under(deed.Where))
+        if (!deed.Standing && !BotGates.Joined(deed.Map ?? body.Map, body.Location, deed.Where))
         {
             Undergroundish++;
 
             veto = BotDungeon.Under(body.Location)
-                ? $"{deed.Kind} is on the island and this bot is underground"
-                : $"{deed.Kind} is underground and this bot is on the island";
+                ? $"{deed.Kind} is on ground no gate joins to where this bot is, underground"
+                : $"{deed.Kind} is on ground no gate joins to this bot's";
 
             return 0.0;
         }
@@ -248,7 +248,7 @@ public static class BotAppraisal
             return 0.0;
         }
 
-        if (BotBreaker.Resting(body, deed.Kind, out var restedAfter, out var restLeftMs))
+        if (deed is not BotRescue { Own: true } && BotBreaker.Resting(body, deed.Kind, out var restedAfter, out var restLeftMs))
         {
             veto = $"{deed.Kind} failed {Math.Max(2, BotBreaker.Failures)} times running for the same reason and rests {restLeftMs / 1000}s more, after \"{restedAfter}\"";
 

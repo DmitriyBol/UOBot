@@ -212,11 +212,11 @@ public static class BotInquest
 
         if (revealed || seen)
         {
-            finder.Say($"Murder! {scene.Victim} lies dead here, and {killer.Name} did it!");
+            BotVoice.Aloud(finder, $"Murder! {scene.Victim} lies dead here, and {killer.Name} did it!");
         }
         else
         {
-            finder.Say($"Murder! {scene.Victim} lies dead here!");
+            BotVoice.Aloud(finder, $"Murder! {scene.Victim} lies dead here!");
         }
 
         logger.Information(

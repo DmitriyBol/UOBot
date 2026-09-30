@@ -53,6 +53,11 @@ public sealed class BotDebugModule : BotModule
 
         BotHalls.Noted = BotDebugLog.Write;
 
+        BotWitness.Open();
+
+        BotZoneTour.Walkers = BotVigil.Walkers;
+        BotZoneTour.Move = BotVigil.Carry;
+
         _timer?.Stop();
         _timer = new VigilSummaryTimer(TimeSpan.FromMilliseconds(SayEveryMs));
         _timer.Start();
@@ -107,7 +112,7 @@ public sealed class BotDebugModule : BotModule
         protected override void OnTick() => logger.Information("The debugger: {What}", Summarise());
     }
 
-    public static string Summarise() => $"{BotVigil.Describe()}; {BotRevel.Describe()}";
+    public static string Summarise() => $"{BotVigil.Describe()}; {BotRevel.Describe()}; {BotWitness.Describe()}";
 
     public override void Reset()
     {
@@ -116,6 +121,10 @@ public sealed class BotDebugModule : BotModule
         BotCrier.Watchers = null;
         BotWill.Completed = null;
         BotHalls.Noted = null;
+        BotZoneTour.Walkers = null;
+        BotZoneTour.Move = null;
+        BotWitness.Close();
+        BotWitness.Forget();
         BotRevel.Forget();
         BotWaves.Forget();
 

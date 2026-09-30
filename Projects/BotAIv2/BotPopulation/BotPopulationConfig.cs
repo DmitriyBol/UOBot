@@ -40,6 +40,14 @@ public sealed class BotPopulationSettings
     public int? NoticeRange { get; set; }
 
     public double? FitFraction { get; set; }
+
+    public bool? Inns { get; set; }
+
+    public int? InnReach { get; set; }
+
+    public int? InnPricePerHour { get; set; }
+
+    public double? InnBuffShare { get; set; }
 }
 
 /// <summary>Reads the population file, or writes a working one.</summary>
@@ -114,6 +122,10 @@ public static class BotPopulationConfig
         BotOutfit.Purse = settings.Purse ?? BotOutfit.Purse;
         BotProgress.Savings = settings.KeepEarnings ?? BotProgress.Savings;
         BotPopulation.Roam = settings.Roam ?? BotPopulation.Roam;
+        BotInns.Running = settings.Inns ?? BotInns.Running;
+        BotInns.Reach = settings.InnReach ?? BotInns.Reach;
+        BotInns.PricePerHour = settings.InnPricePerHour ?? BotInns.PricePerHour;
+        BotInns.BuffShare = settings.InnBuffShare ?? BotInns.BuffShare;
         BotPopulation.ReviveMs = settings.ReviveMs ?? BotPopulation.ReviveMs;
 
         BotBeat.IntervalMs = settings.BeatMs ?? BotBeat.IntervalMs;

@@ -145,7 +145,7 @@ public sealed class BotEvict : BotDeed
                 return BotDoing.Walk(_them.Map, _them, BotArrival.Within(Reach), $"over to {_them.Name}");
             }
 
-            body.Say($"This is the land of {_ours}. Move along.");
+            BotVoice.Aloud(body, $"This is the land of {_ours}. Move along.");
             _said = true;
             _spoke = Core.TickCount;
 

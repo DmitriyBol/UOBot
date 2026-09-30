@@ -332,7 +332,7 @@ public sealed class BotEnlarger : IBotProposer
             return null;
         }
 
-        if (BotChest.Holds(ours.Name) + BotEstate.Fund(ours) < next.Price)
+        if (BotEstate.Fund(ours) < next.Price)
         {
             Poor++;
 

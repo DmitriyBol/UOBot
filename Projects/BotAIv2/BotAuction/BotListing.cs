@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Items;
 
@@ -324,7 +324,7 @@ public sealed class BotListing
             return false;
         }
 
-        var floor = Math.Max(BotAuction.Floor, (int)(Anchor * leastMultiple));
+        var floor = Math.Max(BotAuction.FloorFor(Kind), (int)(Anchor * leastMultiple));
         var ceiling = Math.Max(1, (int)(Anchor * mostMultiple));
         var want = Math.Clamp(offer, floor, ceiling);
 
@@ -356,10 +356,17 @@ public sealed class BotListing
         return true;
     }
 
-    public bool Raise(double step, double mostMultiple)
+    public bool Raise(double step, double mostMultiple) => Raise(step, mostMultiple, 0);
+
+    public bool Raise(double step, double mostMultiple, int counter)
     {
         var ceiling = Math.Max(1, (int)(Anchor * mostMultiple));
         var asking = Math.Max(Price + 1, (int)(Price * (1.0 + step)));
+
+        if (counter > 0 && counter < ceiling)
+        {
+            ceiling = counter;
+        }
 
         if (asking > ceiling)
         {
@@ -380,7 +387,7 @@ public sealed class BotListing
 
     public bool Cut(double step, double leastMultiple)
     {
-        var floor = Math.Max(BotAuction.Floor, (int)(Anchor * leastMultiple));
+        var floor = Math.Max(BotAuction.FloorFor(Kind), (int)(Anchor * leastMultiple));
         var asking = Math.Min(Price - 1, (int)(Price * (1.0 - step)));
 
         if (asking < floor)
@@ -422,7 +429,7 @@ public sealed class BotListing
         return made;
     }
 
-    private static string Name(Item item)
+    internal static string Name(Item item)
     {
         var name = item.Name;
 

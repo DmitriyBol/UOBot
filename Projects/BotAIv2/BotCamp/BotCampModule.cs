@@ -1,0 +1,182 @@
+using System;
+using System.IO;
+using Server.Json;
+using Server.Logging;
+
+namespace Server.BotAI.V2;
+
+/// <summary>The numbers of <c>Configuration/bot-camp.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
+public sealed class BotCampSettings
+{
+    public bool? Running { get; set; }
+
+    public double? LighterShare { get; set; }
+
+    public double? CampEveryMinutes { get; set; }
+
+    public double? JoinEveryMinutes { get; set; }
+
+    public int? JoinReach { get; set; }
+
+    public int? MostFires { get; set; }
+
+    public int? MostAtFire { get; set; }
+
+    public double? SitMinutes { get; set; }
+
+    public double? GuestMinutes { get; set; }
+
+    public double? CampPrior { get; set; }
+
+    public double? JoinPrior { get; set; }
+
+    public double? RestShare { get; set; }
+
+    public double? FireBuffShare { get; set; }
+
+    public bool? SleepByFire { get; set; }
+
+    public bool? Meetings { get; set; }
+
+    public double? MeetChance { get; set; }
+
+    public int? MeetReach { get; set; }
+
+    public double? MeetEverySeconds { get; set; }
+
+    public double? MeetRestMinutes { get; set; }
+
+    public bool? MeetInTowns { get; set; }
+
+    public double? LineSeconds { get; set; }
+
+    public int? MostLinesEach { get; set; }
+}
+
+/// <summary>
+/// Fires in the woods, company round them, and a word on the road, as a module: reads its numbers, puts its words into the
+/// voice's bank, offers the camp and the seat to the auction, and runs the camp's clock — the fires fed and talked at, and
+/// a slice of the population looked at for meetings — once a second. Patrick's point 6 of 29.09.2026. See <see cref="BotCamp"/>.
+/// </summary>
+public sealed class BotCampModule : BotModule
+{
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCampModule));
+
+    private const string ConfigPath = "Configuration/bot-camp.json";
+
+    public static int TickMs { get; set; } = 1000;
+
+    private static CampTimer _timer;
+
+    public override string Name => "Camp";
+
+    public override BotPhase Phase => BotPhase.World;
+
+    public override string[] Requires => ["Population", "Will", "Movement"];
+
+    public override void Start()
+    {
+        Load();
+
+        var words = BotCampTalk.Phrases();
+
+        if (BotCamp.Running)
+        {
+            BotWill.Offer(new BotCamper());
+            BotWill.Offer(new BotBeckon());
+        }
+
+        _timer?.Stop();
+        _timer = new CampTimer(TimeSpan.FromMilliseconds(Math.Max(100, TickMs)));
+        _timer.Start();
+
+        logger.Information(
+            "Camp is {State}: {Share:P0} of the bots light fires in the wild when tired, bored or idle (once in {Every} min, at {CampPrior}/min and more as they tire), a free bot within {Reach} tiles is asked to a seat (at {JoinPrior}/min, once in {JoinEvery} min), "
+            + "at most {Fires} fires of {Seats} seats, kept {Sit} min; a minute by a fire gives back play at {RestShare:P0} of the inn's rate, a tired bot secure at one sleeps there (buff {Buff:P0} of the rest); "
+            + "meetings {Meet}: {Chance:P0} of two free bots passing within {MeetReach} tiles in the open stop to talk; {Words} occasions added to the voice's bank",
+            BotCamp.Running ? "on" : "off",
+            BotCamp.LighterShare,
+            BotCamper.EveryMs / 60000,
+            BotKindle.Prior,
+            BotCamp.JoinReach,
+            BotFireside.Prior,
+            BotBeckon.EveryMs / 60000,
+            BotCamp.MostFires,
+            BotCamp.MostAtFire,
+            BotCamp.SitMinutes,
+            BotCamp.RestShare,
+            BotCamp.FireBuffShare,
+            BotMeetings.Running ? "on" : "off",
+            BotMeetings.Chance,
+            BotMeetings.Reach,
+            words
+        );
+    }
+
+    private static void Load()
+    {
+        var path = Path.Combine(Core.BaseDirectory, ConfigPath);
+        var settings = JsonConfig.Deserialize<BotCampSettings>(path);
+
+        if (settings == null)
+        {
+            JsonConfig.Serialize(path, new BotCampSettings());
+            logger.Information("Wrote a starter camp file to {Path}; every number stays as the code has it", ConfigPath);
+
+            return;
+        }
+
+        BotCamp.Running = settings.Running ?? BotCamp.Running;
+        BotCamp.LighterShare = settings.LighterShare ?? BotCamp.LighterShare;
+        BotCamper.EveryMs = settings.CampEveryMinutes is { } camp ? (int)(camp * 60000) : BotCamper.EveryMs;
+        BotBeckon.EveryMs = settings.JoinEveryMinutes is { } join ? (int)(join * 60000) : BotBeckon.EveryMs;
+        BotCamp.JoinReach = settings.JoinReach ?? BotCamp.JoinReach;
+        BotCamp.MostFires = settings.MostFires ?? BotCamp.MostFires;
+        BotCamp.MostAtFire = settings.MostAtFire ?? BotCamp.MostAtFire;
+        BotCamp.SitMinutes = settings.SitMinutes ?? BotCamp.SitMinutes;
+        BotFireside.GuestMinutes = settings.GuestMinutes ?? BotFireside.GuestMinutes;
+        BotKindle.Prior = settings.CampPrior ?? BotKindle.Prior;
+        BotFireside.Prior = settings.JoinPrior ?? BotFireside.Prior;
+        BotCamp.RestShare = settings.RestShare ?? BotCamp.RestShare;
+        BotCamp.FireBuffShare = settings.FireBuffShare ?? BotCamp.FireBuffShare;
+        BotCamp.SleepByFire = settings.SleepByFire ?? BotCamp.SleepByFire;
+        BotMeetings.Running = settings.Meetings ?? BotMeetings.Running;
+        BotMeetings.Chance = settings.MeetChance ?? BotMeetings.Chance;
+        BotMeetings.Reach = settings.MeetReach ?? BotMeetings.Reach;
+        BotMeetings.EveryMs = settings.MeetEverySeconds is { } every ? (int)(every * 1000) : BotMeetings.EveryMs;
+        BotMeetings.RestMs = settings.MeetRestMinutes is { } rest ? (int)(rest * 60000) : BotMeetings.RestMs;
+        BotMeetings.InTowns = settings.MeetInTowns ?? BotMeetings.InTowns;
+        BotCampTalk.LineMs = settings.LineSeconds is { } line ? (int)(line * 1000) : BotCampTalk.LineMs;
+        BotCampTalk.MostLinesEach = settings.MostLinesEach ?? BotCampTalk.MostLinesEach;
+    }
+
+    public override void Reset()
+    {
+        logger.Information("Camp, before the reload: {Camp}", BotCamp.Describe());
+
+        _timer?.Stop();
+        _timer = null;
+
+        BotCamp.Forget();
+    }
+
+    private sealed class CampTimer : Timer
+    {
+        private readonly int _ms;
+
+        public CampTimer(TimeSpan interval) : base(interval, interval) => _ms = (int)interval.TotalMilliseconds;
+
+        protected override void OnTick()
+        {
+            if (!BotCamp.Running)
+            {
+                return;
+            }
+
+            var now = Core.TickCount;
+
+            BotCamp.Tick(now);
+            BotMeetings.Tick(now, _ms);
+        }
+    }
+}

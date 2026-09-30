@@ -86,14 +86,14 @@ public sealed class BotTutor : IBotProposer
             return null;
         }
 
-        const SkillName skill = SkillName.Cooking;
+        var wanted = Wanted(body);
 
-        var held = body.Skills[skill];
-
-        if (held == null || held.Base >= Below || held.Lock != SkillLock.Up || BotOven.Larder(body, out _) == null)
+        if (wanted == null)
         {
             return null;
         }
+
+        var skill = wanted.Value;
 
         Asked++;
 
@@ -134,6 +134,25 @@ public sealed class BotTutor : IBotProposer
         return new BotTutoring(teacher, skill, points);
     }
 
+    private static SkillName? Wanted(BotMobile body)
+    {
+        var cooking = body.Skills[SkillName.Cooking];
+
+        if (cooking != null && cooking.Base < Below && cooking.Lock == SkillLock.Up && BotOven.Larder(body, out _) != null)
+        {
+            return SkillName.Cooking;
+        }
+
+        var tinkering = body.Skills[SkillName.Tinkering];
+
+        if (tinkering != null && tinkering.Base < Below && tinkering.Lock == SkillLock.Up && body.Class?.Wants(SkillName.Tinkering) == true)
+        {
+            return SkillName.Tinkering;
+        }
+
+        return null;
+    }
+
     private static BaseVendor Teacher(Mobile body, SkillName skill)
     {
         BaseVendor best = null;
@@ -163,7 +182,7 @@ public sealed class BotTutor : IBotProposer
     }
 
     public static string Describe() =>
-        $"lessons: {Asked} beginners holding meat asked, {Offered} offered a lesson, {BotTutoring.Taught} taught ({BotTutoring.Points / 10.0:0.0} points "
+        $"lessons: {Asked} beginners asked (cooking with meat in hand, tinkering for the class that targets it), {Offered} offered a lesson, {BotTutoring.Taught} taught ({BotTutoring.Points / 10.0:0.0} points "
         + $"for {BotTutoring.Paid}gp), {BotTutoring.Failed} lessons failed, {NoTeacher} with no teacher in reach, {Poor} too poor, "
         + $"{NoRoom} with no room to learn, {Crowded} waiting for the road to a teacher to clear, {Walking} on it now";
 }

@@ -1028,7 +1028,7 @@ public static class BotOutlaw
         Released++;
 
         var map = BotPopulation.Home ?? Map.Felucca;
-        var home = BotSeat.Home(bot);
+        var home = BotPopulation.HomeOf(bot);
 
         if (bot.Alive)
         {

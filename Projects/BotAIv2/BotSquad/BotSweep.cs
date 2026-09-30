@@ -58,6 +58,26 @@ public sealed class BotSweep : BotDeed
 
     public static int HoldMs { get; set; } = 300000;
 
+    public static int MarchSpread { get; set; } = 8;
+
+    public static int MarchLost { get; set; } = 60;
+
+    public static int MarchHoldMs { get; set; } = 90000;
+
+    public static int GatherMs { get; set; } = 90000;
+
+    public static long Gathered { get; private set; }
+
+    public static long Ungathered { get; private set; }
+
+    public static long Held { get; private set; }
+
+    public static long LeftBehind { get; private set; }
+
+    public static long Stood { get; private set; }
+
+    private bool _stoodTo;
+
     private readonly Map _map;
 
     private readonly Point3D _square;
@@ -67,6 +87,14 @@ public sealed class BotSweep : BotDeed
     private long _began;
 
     private long _stoodTick;
+
+    private long _holdTick;
+
+    private bool _gathered;
+
+    private bool _reached;
+
+    private long _gatherTick;
 
     private bool _standing;
 
@@ -88,6 +116,8 @@ public sealed class BotSweep : BotDeed
 
     private bool _fighting;
 
+    private BotPassage _passage;
+
     public BotSweep(Map map, Point3D square, double reading)
     {
         _map = map;
@@ -97,7 +127,7 @@ public sealed class BotSweep : BotDeed
     }
 
     public static string Describe() =>
-        $"{Marches} companies actually marched, {Undermanned} could not raise {Least} bodies once chosen";
+        $"{Marches} companies actually marched ({Gathered} gathered on the captain first, {Ungathered} members let go for not coming in; {Held} holds for stragglers, {LeftBehind} left behind, {Stood} fights stood to on the road with the captain), {Undermanned} could not raise {Least} bodies once chosen";
 
     public override string Kind => Trade;
 
@@ -172,7 +202,10 @@ public sealed class BotSweep : BotDeed
                 continue;
             }
 
-            BotSquads.Join(squad, other);
+            if (BotSquads.Join(squad, other) && other is IBotWilful wilful)
+            {
+                BotWill.Press(wilful, new BotEnlist(squad, _map, body.Location, true), $"called to {body.Name}'s company for ({_square.X}, {_square.Y})");
+            }
         }
 
         _called = squad.Count;
@@ -192,6 +225,8 @@ public sealed class BotSweep : BotDeed
 
         squad.Charged = true;
 
+        squad.OnTheMarch = true;
+
         _began = Core.TickCount;
 
         logger.Information(
@@ -202,6 +237,165 @@ public sealed class BotSweep : BotDeed
             _square.Y,
             _read
         );
+
+        return BotDoing.Work($"gathering {_called} of us to march on ({_square.X}, {_square.Y})");
+    }
+
+    private BotDoing March(BotSquad squad, Mobile body, long now)
+    {
+        if (squad.Stance == BotSquadStance.Fighting && squad.Focus is { Deleted: false, Alive: true } foe)
+        {
+            if (!_stoodTo)
+            {
+                _stoodTo = true;
+                _holdTick = 0;
+                Stood++;
+
+                squad.Leader?.Journey?.Finish();
+
+                logger.Information(
+                    "{Name} halts the march on ({X}, {Y}): the company of {Count} turns on {Foe}, which set upon {Who}",
+                    body.Name,
+                    _square.X,
+                    _square.Y,
+                    squad.Count,
+                    foe.Name,
+                    squad.Contact?.Self?.Name ?? "one of us"
+                );
+            }
+
+            if (!ReferenceEquals(foe, _focus))
+            {
+                _focus = foe;
+
+                if (squad.Leader is IBotWilful wilful && wilful.Resolve != null)
+                {
+                    wilful.Resolve.StirredTick = now;
+                }
+            }
+
+            return BotDoing.Work($"standing with the company against {foe.Name} on the way to ({_square.X}, {_square.Y})");
+        }
+
+        _stoodTo = false;
+
+        if (_reached)
+        {
+            return BotDoing.Walk(_map, _square, BotArrival.Within(BotPeril.Side / 3), $"back to the square at ({_square.X}, {_square.Y})");
+        }
+
+        if (!_gathered)
+        {
+            if (_gatherTick == 0)
+            {
+                _gatherTick = now;
+            }
+
+            var late = squad.Straggler(MarchSpread, out var off);
+
+            if (late != null && now - _gatherTick < GatherMs)
+            {
+                squad.Leader?.Journey?.Finish();
+
+                return BotDoing.Work($"gathering the company before the march on ({_square.X}, {_square.Y}): {late.Self?.Name ?? "a member"} is {off} tiles off");
+            }
+
+            _gathered = true;
+            Gathered++;
+
+            var let = 0;
+            var members = squad.Members;
+
+            for (var i = members.Count - 1; i >= 0; i--)
+            {
+                var other = members[i];
+
+                if (ReferenceEquals(other, squad.Leader) || other?.Self is not { } self)
+                {
+                    continue;
+                }
+
+                if (!self.Alive || self.Map != body.Map || !self.InRange(body.Location, MarchLost))
+                {
+                    BotSquads.Leave(other);
+                    let++;
+                }
+            }
+
+            Ungathered += let;
+
+            logger.Information(
+                "{Name} gathered {Count} of them in {Seconds}s to march on ({X}, {Y}); {Let} did not come in and were let go",
+                body.Name,
+                squad.Count,
+                (now - _gatherTick) / 1000,
+                _square.X,
+                _square.Y,
+                let
+            );
+
+            if (squad.Count < Least)
+            {
+                return Finish(squad, $"only {squad.Count} came in to march on ({_square.X}, {_square.Y})");
+            }
+
+            _holdTick = 0;
+
+            _passage = BotPassage.Open(squad, body, _map, _square, $"the square at ({_square.X}, {_square.Y})", false);
+
+            if (_passage != null && _passage.Lead(body, out var gated))
+            {
+                return gated;
+            }
+        }
+
+        var straggler = squad.Straggler(MarchSpread, out var behind);
+
+        if (straggler != null)
+        {
+            if (_holdTick == 0)
+            {
+                _holdTick = now;
+                Held++;
+            }
+
+            if ((behind <= MarchLost || BotSquad.Coming(straggler, behind)) && now - _holdTick < MarchHoldMs)
+            {
+                squad.Leader?.Journey?.Finish();
+
+                return BotDoing.Work($"holding for {straggler.Self?.Name ?? "a member"}, {behind} tiles behind, on the way to ({_square.X}, {_square.Y})");
+            }
+
+            LeftBehind++;
+            var stragglerDeed = (straggler as IBotWilful)?.Resolve?.Deed;
+            var stragglerJourney = straggler.Journey;
+            logger.Information(
+                "{Name} leaves {Who} behind on the march to ({X}, {Y}): {Behind} tiles back after {Seconds}s — in squad {Squad}, holding {Deed} ({Stage}), journey {Moving} towards {Target} ({Reason})",
+                body.Name,
+                straggler.Self?.Name ?? "a member",
+                _square.X,
+                _square.Y,
+                behind,
+                (now - _holdTick) / 1000,
+                straggler.Squad?.Id.ToString() ?? "none",
+                stragglerDeed?.Kind ?? "nothing",
+                stragglerDeed?.Stage ?? "",
+                stragglerJourney is { Moving: true } ? "moving" : stragglerJourney is { Active: true } ? "active, not moving" : "idle",
+                stragglerJourney?.Target ?? Point3D.Zero,
+                stragglerJourney?.Reason ?? ""
+            );
+            BotSquads.Leave(straggler);
+            _holdTick = 0;
+
+            if (squad.Count < Least)
+            {
+                return Finish(squad, $"the company came apart on the way to ({_square.X}, {_square.Y}): {squad.Count} left");
+            }
+        }
+        else
+        {
+            _holdTick = 0;
+        }
 
         return BotDoing.Walk(_map, _square, BotArrival.Within(BotPeril.Side / 3), $"marching on ({_square.X}, {_square.Y})");
     }
@@ -240,17 +434,29 @@ public sealed class BotSweep : BotDeed
 
         var away = _standing ? BotPeril.Side : BotPeril.Side / 2;
 
+        if (_passage != null)
+        {
+            if (_passage.Lead(body, out var through))
+            {
+                return through;
+            }
+
+            _passage = null;
+        }
+
         if (!body.InRange(_square, away))
         {
             _standing = false;
 
-            return BotDoing.Walk(_map, _square, BotArrival.Within(BotPeril.Side / 3), $"marching on ({_square.X}, {_square.Y})");
+            return March(squad, body, now);
         }
 
         if (!_standing)
         {
             _standing = true;
+            _reached = true;
             _stoodTick = now;
+            squad.OnTheMarch = false;
 
             _steppedTick = now;
             _round = 0;
@@ -325,6 +531,7 @@ public sealed class BotSweep : BotDeed
         if (squad != null)
         {
             squad.Charged = false;
+            squad.OnTheMarch = false;
         }
 
         return BotDoing.Done($"{why} — {_fights} fights, {_called} of us");
@@ -354,9 +561,13 @@ public sealed class BotSweep : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
+        _passage?.Abort("the patrol was let go");
+        _passage = null;
+
         if (_squad != null)
         {
             _squad.Charged = false;
+            _squad.OnTheMarch = false;
         }
 
         if (bot is IBotSquadMember member && member.Squad != null && ReferenceEquals(member.Squad, _squad))

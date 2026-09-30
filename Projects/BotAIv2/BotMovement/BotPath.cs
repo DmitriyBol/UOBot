@@ -111,6 +111,91 @@ public static class BotPath
 
     private static readonly List<Point3D> _scratch = [];
 
+    public static int MemoMs { get; set; } = 2000;
+
+    public static long Recalled { get; private set; }
+
+    public static double RecalledMs { get; private set; }
+
+    private const int MemoSweep = 256;
+
+    private readonly record struct MemoKey(int Map, Point3D From, Point3D To, int Tiles, double Ceiling);
+
+    private sealed class Memo
+    {
+        public readonly List<Point3D> Path = [];
+
+        public long At;
+
+        public BotPathOutcome Outcome;
+
+        public double Ms;
+    }
+
+    private static readonly Dictionary<MemoKey, Memo> _memo = [];
+
+    private static readonly Stack<Memo> _memoFree = new();
+
+    private static readonly List<MemoKey> _memoStale = [];
+
+    private static bool Recall(in MemoKey key, List<Point3D> path, out BotPathOutcome outcome)
+    {
+        outcome = BotPathOutcome.Partial;
+
+        if (!_memo.TryGetValue(key, out var memo) || Core.TickCount - memo.At >= MemoMs)
+        {
+            return false;
+        }
+
+        path.AddRange(memo.Path);
+        outcome = memo.Outcome;
+        Recalled++;
+        RecalledMs += memo.Ms;
+
+        return true;
+    }
+
+    private static void Keep(in MemoKey key, BotPathOutcome outcome, List<Point3D> path, double ms)
+    {
+        if (_memo.Count >= MemoSweep)
+        {
+            _memoStale.Clear();
+
+            foreach (var (k, m) in _memo)
+            {
+                if (Core.TickCount - m.At >= MemoMs)
+                {
+                    _memoStale.Add(k);
+                }
+            }
+
+            for (var i = 0; i < _memoStale.Count; i++)
+            {
+                if (_memo.Remove(_memoStale[i], out var gone) && _memoFree.Count < MemoSweep)
+                {
+                    _memoFree.Push(gone);
+                }
+            }
+
+            if (_memo.Count >= MemoSweep * 4)
+            {
+                _memo.Clear();
+            }
+        }
+
+        if (!_memo.TryGetValue(key, out var memo))
+        {
+            memo = _memoFree.Count > 0 ? _memoFree.Pop() : new Memo();
+            _memo[key] = memo;
+        }
+
+        memo.Path.Clear();
+        memo.Path.AddRange(path);
+        memo.At = Core.TickCount;
+        memo.Outcome = outcome;
+        memo.Ms = ms;
+    }
+
     private static readonly List<int> _frontier = [];
 
     private static long _windowEnds;
@@ -149,6 +234,10 @@ public static class BotPath
 
     public static bool LastStarved { get; private set; }
 
+    public static double LastMs { get; private set; }
+
+    public static long LastExpansions { get; private set; }
+
     public static long Lengthened { get; private set; }
 
     public static long PartialNear { get; private set; }
@@ -183,6 +272,9 @@ public static class BotPath
 
     public static void Reset()
     {
+        _memo.Clear();
+        Recalled = 0;
+        RecalledMs = 0.0;
         Searches = 0;
         TilesExamined = 0;
         Reached = 0;
@@ -217,7 +309,7 @@ public static class BotPath
     public static string Describe() =>
         Searches == 0
             ? "no searches yet"
-            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; {Starved} were handed less clock than they asked for and {Lengthened} asked for the whole ceiling because they were not closing; of the partials {PartialNear} were going somewhere within {Near} tiles and {PartialStill} ended no nearer than they started and {PartialUnfooted} never began because the bot's own tile forbids every direction, the average one {(PartialRuns > PartialUnfooted ? PartialSpan / (PartialRuns - PartialUnfooted) : 0)} tiles out; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand";
+            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; {Starved} were handed less clock than they asked for and {Lengthened} asked for the whole ceiling because they were not closing; of the partials {PartialNear} were going somewhere within {Near} tiles and {PartialStill} ended no nearer than they started and {PartialUnfooted} never began because the bot's own tile forbids every direction, the average one {(PartialRuns > PartialUnfooted ? PartialSpan / (PartialRuns - PartialUnfooted) : 0)} tiles out; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand; {Recalled} asked again within {MemoMs / 1000.0:0.#}s of the same search and answered from it ({RecalledMs:F0}ms of searching not done again)";
 
     public static bool CanReach(Map map, Point3D from, Point3D to, BotArrival arrival, double ceilingMs = 0.0) =>
         Find(map, from, to, arrival, _scratch, ceilingMs: ceilingMs) == BotPathOutcome.Reached;
@@ -237,6 +329,8 @@ public static class BotPath
     )
     {
         path.Clear();
+        LastMs = 0.0;
+        LastExpansions = 0;
 
         if (map == null || map == Map.Internal)
         {
@@ -254,6 +348,16 @@ public static class BotPath
             SealedRuns++;
 
             return BotPathOutcome.Sealed;
+        }
+
+        var memoKey = new MemoKey(map.MapID, from, to, arrival.Tiles, ceilingMs);
+        var memoable = MemoMs > 0 && avoid.Empty && !doorsShut;
+
+        if (memoable && Recall(memoKey, path, out var recalled))
+        {
+            LastStarved = false;
+
+            return recalled;
         }
 
         StepCache.Instance.BeginFindGeneration();
@@ -443,6 +547,8 @@ public static class BotPath
 
         TotalMs += elapsedMs;
         TilesExamined += expansions;
+        LastMs = elapsedMs;
+        LastExpansions = expansions;
 
         if (elapsedMs > WorstMs)
         {
@@ -453,6 +559,11 @@ public static class BotPath
         {
             Rebuild(reached, path);
             Reached++;
+
+            if (memoable && !LastStarved)
+            {
+                Keep(memoKey, BotPathOutcome.Reached, path, elapsedMs);
+            }
 
             return BotPathOutcome.Reached;
         }
@@ -509,6 +620,11 @@ public static class BotPath
         if (nearest < 0 || nearestScore >= Heuristic(from.X, from.Y, to))
         {
             PartialStill++;
+        }
+
+        if (memoable && !LastStarved)
+        {
+            Keep(memoKey, BotPathOutcome.Partial, path, elapsedMs);
         }
 
         return BotPathOutcome.Partial;

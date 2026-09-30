@@ -30,6 +30,8 @@ public sealed class BotRescuer : IBotProposer
 
     private static bool _said;
 
+    public static long Outmatched { get; private set; }
+
     public string Name => "Rescuer";
 
     public BotStanding Rung => BotStanding.Free;
@@ -75,6 +77,14 @@ public sealed class BotRescuer : IBotProposer
 
         if (BotQuarry.Shunned(foe))
         {
+            return null;
+        }
+
+        if (BotThreat.OverrunThere(body, friend, foe, BotMobile.NoticeRange))
+        {
+            BotQuarry.Crowd(foe);
+            Outmatched++;
+
             return null;
         }
 

@@ -164,6 +164,8 @@ public sealed class BotHall : BotDeed
 
         BotSeat.Set(_guild.Name, house.Location, false);
 
+        BotVoice.ToGuild(_guild.Name, "hall", null);
+
         _paid = got;
 
         return BotDoing.Done(

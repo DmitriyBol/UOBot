@@ -104,6 +104,19 @@ public static class BotDungeon
 
     public static IReadOnlyList<Deep> All => _deeps;
 
+    public static Deep Holding(Point3D where)
+    {
+        for (var i = 0; i < _deeps.Length; i++)
+        {
+            if (_deeps[i].Holds(where))
+            {
+                return _deeps[i];
+            }
+        }
+
+        return null;
+    }
+
     public static bool Under(Point3D where)
     {
         for (var i = 0; i < _deeps.Length; i++)
@@ -126,6 +139,30 @@ public static class BotDungeon
     public static int Unknown { get; private set; }
 
     private static readonly Dictionary<string, double> _might = [];
+
+    /// <summary>
+    /// What a kind is besides its strength, read off the same specimen <see cref="Might"/> builds: whether it attacks on sight,
+    /// what mind it has, how far it sees, whether it can leave the water, whether it is the towns' rather than the wild's. For
+    /// the danger zones (<see cref="BotHaunts"/>), which must classify a spawner whose creatures are all dead; one specimen a
+    /// kind, never two.
+    /// </summary>
+    public readonly record struct KindTraits(FightMode Mode, AIType AI, int Perception, bool CantWalk, bool CanSwim, bool Townsfolk);
+
+    private static readonly Dictionary<string, KindTraits> _traits = [];
+
+    public static bool Traits(string named, out KindTraits traits)
+    {
+        traits = default;
+
+        if (string.IsNullOrWhiteSpace(named))
+        {
+            return false;
+        }
+
+        Might(named);
+
+        return _traits.TryGetValue(named, out traits);
+    }
 
     public static void Survey(Map map)
     {
@@ -243,6 +280,15 @@ public static class BotDungeon
             {
                 might = BotThreat.Power(made);
                 Measured++;
+
+                _traits[named] = new KindTraits(
+                    made.FightMode,
+                    made.AI,
+                    made.RangePerception,
+                    made.CantWalk,
+                    made.CanSwim,
+                    BotHaunts.IsTownsfolk(made)
+                );
             }
         }
         catch (Exception)
@@ -365,6 +411,7 @@ public static class BotDungeon
         }
 
         _might.Clear();
+        _traits.Clear();
         _spawners.Clear();
         Surveyed = false;
         Rooms = 0;

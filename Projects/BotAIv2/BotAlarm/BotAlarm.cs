@@ -182,6 +182,8 @@ public static class BotAlarm
             File.AppendAllText(_path, line.ToString() + Environment.NewLine);
 
             Written++;
+
+            BotEvents.Alarm(state, kind, say, n, of, window);
         }
         catch (Exception e)
         {

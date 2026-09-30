@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Logging;
@@ -191,6 +191,8 @@ public static class BotRegard
 
         _regard[(of, about)] = now;
 
+        BotGrievances.Noted(of, about, now - was, why);
+
         Reckon(of, about, was, now, why);
     }
 
@@ -338,6 +340,11 @@ public static class BotRegard
                     continue;
                 }
 
+                if (BotParley.Grieve(mine, theirs, $"a standing grievance (regard {held:F1})"))
+                {
+                    continue;
+                }
+
                 if (mine.IsAlly(theirs))
                 {
                     mine.RemoveAlly(theirs);
@@ -381,6 +388,16 @@ public static class BotRegard
 
     public static bool AtWar(Mobile a, Mobile b) => AtWar(a?.Guild as Guild, b?.Guild as Guild);
 
+    public static bool Hostile(Mobile a, Mobile b)
+    {
+        if (a?.Guild is not Guild ga || b?.Guild is not Guild gb || ga == gb)
+        {
+            return false;
+        }
+
+        return AtWar(ga, gb) || Of(ga, gb) <= Enmity || Of(gb, ga) <= Enmity;
+    }
+
     private static void Reckon(string of, string about, double was, double now, string why)
     {
         if (BaseGuild.FindByName(of) is not Guild mine || BaseGuild.FindByName(about) is not Guild theirs)
@@ -395,6 +412,11 @@ public static class BotRegard
             if (!mine.IsAlly(theirs) && now >= Alliance && Of(about, of) >= Alliance
                 && (mine.Allies?.Count ?? 0) < MostAllies && (theirs.Allies?.Count ?? 0) < MostAllies)
             {
+                if (BotParley.Befriend(mine, theirs, $"{why} (regard {now:F1} and {Of(about, of):F1})"))
+                {
+                    return;
+                }
+
                 mine.AddAlly(theirs);
                 Allied++;
 
@@ -440,6 +462,11 @@ public static class BotRegard
                 return;
             }
 
+            if (BotParley.Grieve(mine, theirs, $"{why} (regard {now:F1})"))
+            {
+                return;
+            }
+
             BotWar.Declare(mine, theirs, $"{why} (regard {now:F1})");
             Declared++;
 
@@ -474,6 +501,8 @@ public static class BotRegard
         _regard.Remove((one, other));
         _regard.Remove((other, one));
         Settled++;
+
+        BotGrievances.Settled(one, other);
     }
 
     private static string Worst()

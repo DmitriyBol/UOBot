@@ -232,6 +232,22 @@ public static class BotCraftwork
     public static int Made(Mobile bot, Type kind) =>
         kind == null ? 0 : bot?.Backpack?.GetAmount(kind, true) ?? 0;
 
+    private static readonly Dictionary<Type, int> _produced = [];
+
+    public static void Produced(Type kind, int count)
+    {
+        if (kind == null || count <= 0)
+        {
+            return;
+        }
+
+        _produced[kind] = _produced.TryGetValue(kind, out var n) ? n + count : count;
+    }
+
+    public static int MadeOf(Type kind) => kind != null && _produced.TryGetValue(kind, out var n) ? n : 0;
+
+    public static IEnumerable<KeyValuePair<Type, int>> Produced() => _produced;
+
     public static List<Item> Gather(Mobile bot, Type kind)
     {
         List<Item> made = [];

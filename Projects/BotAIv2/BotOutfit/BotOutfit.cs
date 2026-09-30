@@ -207,6 +207,11 @@ public static class BotOutfit
             tools.Add(typeof(ScribesPen));
         }
 
+        if (Wants(klass, SkillName.Tinkering))
+        {
+            tools.Add(typeof(TinkerTools));
+        }
+
         return tools;
     }
 

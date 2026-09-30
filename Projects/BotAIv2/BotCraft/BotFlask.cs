@@ -496,6 +496,40 @@ public static class BotFlask
         return bestStock > 0 ? best : null;
     }
 
+    public static int GlassFor(IBotWilful will, Mobile bot, Type potion)
+    {
+        var system = System;
+
+        if (bot == null || system == null || potion == null)
+        {
+            return 0;
+        }
+
+        var able = bot.Skills[SkillName.Alchemy].Value;
+        var recipes = system.CraftItems;
+
+        for (var i = 0; i < recipes.Count; i++)
+        {
+            var recipe = recipes[i];
+
+            if (recipe.ItemType != potion || !Twofold(recipe, out var reagent, out var units, out var glass) || units <= 0 || glass <= 0)
+            {
+                continue;
+            }
+
+            if (Requirement(recipe) > able - Margin)
+            {
+                return 0;
+            }
+
+            var room = Math.Max(0, Cap - Held(will, bot, potion));
+
+            return Math.Min(Amount(bot, reagent) / units, room) * glass;
+        }
+
+        return 0;
+    }
+
     public static bool Swing(Mobile bot, CraftItem recipe, Type reagent, BaseTool tool) =>
         BotCraftwork.Swing(bot, System, recipe, reagent, tool);
 

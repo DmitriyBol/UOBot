@@ -536,6 +536,9 @@ public static class BotWar
         );
 
         BotAlarm.Note("war", $"{mine.Name} declared war on {theirs.Name} over {why}", Fighting(mine.Name), _wars.Count, "-");
+
+        BotVoice.ToGuild(mine.Name, "war:declared", new Dictionary<string, string> { ["enemy"] = theirs.Name });
+        BotVoice.ToGuild(theirs.Name, "war:declared", new Dictionary<string, string> { ["enemy"] = mine.Name });
     }
 
     public static void Reconcile()
@@ -897,6 +900,9 @@ public static class BotWar
 
             BotAlarm.Note("war", $"the war between {war.A} and {war.B} ended by {how} after {war.Minutes} minutes, drawn {war.KillsA}:{war.KillsB}", 0, _wars.Count, $"{war.Minutes}m");
 
+            BotVoice.ToGuild(war.A, "war:drawn", new Dictionary<string, string> { ["enemy"] = war.B });
+            BotVoice.ToGuild(war.B, "war:drawn", new Dictionary<string, string> { ["enemy"] = war.A });
+
             return;
         }
 
@@ -924,6 +930,9 @@ public static class BotWar
         );
 
         BotAlarm.Note("war", $"{winner} won its war with {loser} by {how} after {war.Minutes} minutes, {wonKills}:{lostKills} dead and {wonLoot}:{lostLoot}gp taken", wonKills, lostKills, $"{war.Minutes}m");
+
+        BotVoice.ToGuild(winner, "war:won", new Dictionary<string, string> { ["enemy"] = loser });
+        BotVoice.ToGuild(loser, "war:lost", new Dictionary<string, string> { ["enemy"] = winner });
 
         BotExile.Sentence(winner, loser);
     }

@@ -105,6 +105,84 @@ public static class BotBreaker
 
     private static long _sweptTick;
 
+    public static int DeathsToRest { get; set; } = 2;
+
+    public static int DeathWindowMs { get; set; } = 1800000;
+
+    public static int DeathRestMs { get; set; } = 900000;
+
+    public static long DeathTrips { get; private set; }
+
+    private static readonly Dictionary<(Serial Bot, string Kind), Queue<long>> _falls = [];
+
+    public static void Fell(Mobile bot, string kind)
+    {
+        if (!Running || bot == null || string.IsNullOrEmpty(kind)
+            || kind is "flee" or "mend" or "rescue" or "await" or "enlist" or "band" or "sweep" or "delve")
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+        var key = (bot.Serial, kind);
+
+        if (!_falls.TryGetValue(key, out var falls))
+        {
+            if (_falls.Count >= 2048)
+            {
+                _falls.Clear();
+            }
+
+            falls = new Queue<long>();
+            _falls[key] = falls;
+        }
+
+        falls.Enqueue(now);
+
+        while (falls.Count > 0 && now - falls.Peek() > DeathWindowMs)
+        {
+            falls.Dequeue();
+        }
+
+        if (falls.Count < Math.Max(2, DeathsToRest))
+        {
+            return;
+        }
+
+        var minutes = (now - falls.Peek()) / 60000;
+
+        falls.Clear();
+
+        _records.TryGetValue(key, out var record);
+
+        if (record == null)
+        {
+            record = new Record();
+            _records[key] = record;
+        }
+
+        var rest = (long)Math.Min(DeathRestMs * Math.Pow(2.0, Math.Min(record.Level, 16)), LongestRestMs);
+
+        record.Name = bot.Name;
+        record.Level++;
+        record.Resting = true;
+        record.Until = now + rest;
+        record.Why = "it died at it";
+
+        Trips++;
+        DeathTrips++;
+
+        logger.Information(
+            "{Name} died at {Kind} {Times} times in {Minutes} minutes, and that work is not offered to it for {Rest} minutes; tripped {Level} times since it last finished any",
+            bot.Name,
+            kind,
+            Math.Max(2, DeathsToRest),
+            minutes,
+            rest / 60000,
+            record.Level
+        );
+    }
+
     public static void Failed(Mobile bot, string kind, string why)
     {
         if (!Running || bot == null || string.IsNullOrEmpty(kind))
@@ -404,7 +482,7 @@ public static class BotBreaker
             }
         }
 
-        return $"{Excused} failures kept from the breaker for having made goods or skill first; {Trips} times one bot's work was rested after failing {Math.Max(2, Failures)} times in {WindowMs / 60000} minutes for the same reason, {resting} resting now, {Refused} offers refused while resting and {Forgiven} rests lifted because the work was finished after all, {Spared} flights that tripped it and were not rested";
+        return $"{Excused} failures kept from the breaker for having made goods or skill first; {Trips} times one bot's work was rested after failing {Math.Max(2, Failures)} times in {WindowMs / 60000} minutes for the same reason ({DeathTrips} of them after dying at it {Math.Max(2, DeathsToRest)} times in {DeathWindowMs / 60000}), {resting} resting now, {Refused} offers refused while resting and {Forgiven} rests lifted because the work was finished after all, {Spared} flights that tripped it and were not rested";
     }
 
     public static string List()

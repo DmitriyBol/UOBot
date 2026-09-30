@@ -9,18 +9,19 @@
   "Run": true,
   "Roam": 1000,
   "Classes": {
-    "Crafter": 3,
-    "Captain": 1,
+    "Crafter": 6,
+    "Captain": 2,
     "Baron": 1,
-    "Architect": 1,
-    "Sage": 1,
-    "Brawler": 1,
-    "Gatherer": 7,
-    "Warrior": 9,
-    "Archer": 8,
-    "Mage": 6,
-    "Healer": 3,
-    "WarriorMage": 5,
-    "WarriorArcher": 4
+    "Architect": 2,
+    "Sage": 2,
+    "Brawler": 2,
+    "Gatherer": 10,
+    "Warrior": 12,
+    "Archer": 11,
+    "Mage": 9,
+    "Healer": 6,
+    "WarriorMage": 6,
+    "WarriorArcher": 6,
+    "Tamer": 5
   }
 }

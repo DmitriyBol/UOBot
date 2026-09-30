@@ -73,6 +73,10 @@ public static class BotThreat
         return Power(m) * Math.Clamp(m.Hits / (double)m.HitsMax, 0.1, 1.0);
     }
 
+    public static bool SkillWeighs { get; set; } = true;
+
+    public static double SkillFloor { get; set; } = 0.25;
+
     private static double AverageDamage(Mobile m)
     {
         var melee = 1.0;
@@ -80,10 +84,30 @@ public static class BotThreat
         if (m is BaseCreature creature && creature.DamageMax > 0)
         {
             melee = (creature.DamageMin + creature.DamageMax) / 2.0;
+
+            if (SkillWeighs)
+            {
+                var skill = Math.Max(
+                    Math.Max(creature.Skills[SkillName.Wrestling].Value, creature.Skills[SkillName.Archery].Value),
+                    Math.Max(
+                        Math.Max(creature.Skills[SkillName.Swords].Value, creature.Skills[SkillName.Macing].Value),
+                        creature.Skills[SkillName.Fencing].Value
+                    )
+                );
+
+                melee *= Math.Clamp((skill + 20.0) / 120.0, SkillFloor, 1.0);
+            }
         }
         else if (m.Weapon is BaseWeapon weapon)
         {
             melee = (weapon.MinDamage + weapon.MaxDamage) / 2.0;
+
+            if (SkillWeighs)
+            {
+                var skill = m.Skills[weapon.Skill].Value;
+
+                melee *= Math.Clamp((skill + 20.0) / 120.0, SkillFloor, 1.0);
+            }
         }
 
         var magery = m.Skills[SkillName.Magery].Base;
@@ -121,6 +145,16 @@ public static class BotThreat
         return bot.CanBeHarmful(creature, false);
     }
 
+    public static bool Menacing(Mobile bot, BaseCreature creature)
+    {
+        if (!Hostile(bot, creature))
+        {
+            return false;
+        }
+
+        return creature.FightMode is not (FightMode.None or FightMode.Aggressor) || creature.Combatant != null;
+    }
+
     public static double ThreatPower(Mobile bot, int range)
     {
         var map = bot?.Map;
@@ -135,7 +169,7 @@ public static class BotThreat
 
         foreach (var creature in map.GetMobilesInRange<BaseCreature>(bot.Location, range))
         {
-            if (!Hostile(bot, creature))
+            if (!Menacing(bot, creature))
             {
                 continue;
             }
@@ -172,7 +206,7 @@ public static class BotThreat
 
         foreach (var creature in map.GetMobilesInRange<BaseCreature>(bot.Location, range))
         {
-            if (!Hostile(bot, creature))
+            if (!Menacing(bot, creature))
             {
                 continue;
             }
@@ -282,7 +316,7 @@ public static class BotThreat
 
         foreach (var creature in map.GetMobilesInRange<BaseCreature>(new Point3D(where), range))
         {
-            if (!Hostile(bot, creature))
+            if (!Menacing(bot, creature))
             {
                 continue;
             }
@@ -304,6 +338,46 @@ public static class BotThreat
 
         var threat = worst + (total - worst) * SecondaryWeight;
         var ours = OurPower(bot, range);
+
+        return ours > 0.0 && threat / ours > Tolerance;
+    }
+
+    public static bool OverrunThere(Mobile bot, Mobile beside, IPoint3D where, int range)
+    {
+        var map = bot?.Map;
+
+        if (map == null || map == Map.Internal || where == null || beside == null)
+        {
+            return false;
+        }
+
+        var total = 0.0;
+        var worst = 0.0;
+
+        foreach (var creature in map.GetMobilesInRange<BaseCreature>(new Point3D(where), range))
+        {
+            if (!Menacing(bot, creature))
+            {
+                continue;
+            }
+
+            var power = Power(creature);
+
+            total += power;
+
+            if (power > worst)
+            {
+                worst = power;
+            }
+        }
+
+        if (worst <= 0.0)
+        {
+            return false;
+        }
+
+        var threat = worst + (total - worst) * SecondaryWeight;
+        var ours = Power(bot) + OurPower(beside, range);
 
         return ours > 0.0 && threat / ours > Tolerance;
     }

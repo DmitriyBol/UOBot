@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Logging;
@@ -50,6 +50,14 @@ public static class BotSeat
     public static long Homed { get; private set; }
 
     public static long Spoken { get; private set; }
+
+    public static double AbroadShare { get; set; } = 0.5;
+
+    public static int TownSpread { get; set; } = 40;
+
+    public static long Abroad { get; private set; }
+
+    public static long AtHome { get; private set; }
 
     public static long Carried { get; private set; }
 
@@ -156,10 +164,39 @@ public static class BotSeat
             }
         }
 
+        foreach (var held in BotGuildHouses.All)
+        {
+            if (!names.Contains(held.Guild))
+            {
+                names.Add(held.Guild);
+            }
+        }
+
         return names;
     }
 
     public static Point3D Of(string guild)
+    {
+        if (!Running || guild == null)
+        {
+            return Point3D.Zero;
+        }
+
+        var housed = BotGuildHouses.Seat(guild);
+
+        if (housed != Point3D.Zero)
+        {
+            return housed;
+        }
+
+        return Bare(guild) is var bare && bare != Point3D.Zero
+            ? bare
+            : BotEstate.Held.TryGetValue(guild, out var hall) && hall is { Deleted: false }
+                ? hall.Location
+                : Point3D.Zero;
+    }
+
+    public static Point3D Bare(string guild)
     {
         if (!Running || guild == null)
         {
@@ -171,14 +208,7 @@ public static class BotSeat
             return over;
         }
 
-        if (_configured.TryGetValue(guild, out var set))
-        {
-            return set;
-        }
-
-        return BotEstate.Held.TryGetValue(guild, out var hall) && hall is { Deleted: false }
-            ? hall.Location
-            : Point3D.Zero;
+        return _configured.TryGetValue(guild, out var set) ? set : Point3D.Zero;
     }
 
     public static Point3D Of(Guild guild) => Of(guild?.Name);
@@ -195,6 +225,13 @@ public static class BotSeat
         if (BotUnderworld.Member(bot) && BotUnderworld.Hideout != Point3D.Zero)
         {
             return BotUnderworld.Hideout;
+        }
+
+        var housed = BotGuildHouses.Seat(guild.Name);
+
+        if (housed != Point3D.Zero)
+        {
+            return housed;
         }
 
         if (BotEstate.Hall(guild) is { Deleted: false } hall && hall.Map == BotPopulation.Home)
@@ -236,6 +273,11 @@ public static class BotSeat
 
         hall = BotEstate.Hall(guild);
         seat = Of(guild.Name);
+
+        if (BotGuildHouses.Held(guild) && Bare(guild.Name) is var set && set != Point3D.Zero)
+        {
+            seat = set;
+        }
 
         if (hall is not { Deleted: false } || seat == Point3D.Zero)
         {
@@ -283,12 +325,105 @@ public static class BotSeat
         {
             Spoken++;
 
+            BotGuildHouses.Pin(guild);
+
             logger.Warning("The seat of {Guild} is now {X},{Y}; its hall will be carried there if it stands further than {Settled} tiles off", guild, at.X, at.Y, Settled);
 
             return;
         }
 
         logger.Information("The seat of {Guild} follows its hall to {X},{Y}", guild, at.X, at.Y);
+    }
+
+    public static BotTowns.Town Choose(string guild, Map map)
+    {
+        if (BotGuildHouses.Running && BotGuildHouses.Started)
+        {
+            BotGuildHouses.Founded(guild);
+
+            return null;
+        }
+
+        if (!Running || string.IsNullOrEmpty(guild) || Of(guild) != Point3D.Zero || map == null || !BotTowns.Ensure(map))
+        {
+            return null;
+        }
+
+        if (Utility.RandomDouble() >= AbroadShare)
+        {
+            AtHome++;
+
+            return null;
+        }
+
+        var home = BotPopulation.Where;
+        BotTowns.Town best = null;
+        var fewest = int.MaxValue;
+
+        for (var i = 0; i < BotTowns.All.Count; i++)
+        {
+            var town = BotTowns.All[i];
+
+            if (!town.FromHome || town.Home || town.Bounds.Contains(home))
+            {
+                continue;
+            }
+
+            var seated = 0;
+
+            foreach (var name in Named())
+            {
+                var seat = Of(name);
+
+                if (seat != Point3D.Zero && Utility.InRange(seat, town.Square, BotTowns.Roam))
+                {
+                    seated++;
+                }
+            }
+
+            if (seated < fewest)
+            {
+                fewest = seated;
+                best = town;
+            }
+        }
+
+        if (best == null)
+        {
+            AtHome++;
+
+            return null;
+        }
+
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            var x = best.Square.X + Utility.RandomMinMax(-TownSpread, TownSpread);
+            var y = best.Square.Y + Utility.RandomMinMax(-TownSpread, TownSpread);
+
+            if (!BotStep.Settle(map, x, y, out var z))
+            {
+                continue;
+            }
+
+            var at = new Point3D(x, y, z);
+
+            if (TooNear(guild, at, out _, out _))
+            {
+                continue;
+            }
+
+            Set(guild, at, false);
+            best.Seated++;
+            Abroad++;
+
+            logger.Information("{Guild} settles by {Town}, at {X},{Y}: {Seated} guilds are seated there now", guild, best.Name, x, y, best.Seated);
+
+            return best;
+        }
+
+        AtHome++;
+
+        return null;
     }
 
     public static void Restore(string guild, Point3D at)
@@ -326,7 +461,11 @@ public static class BotSeat
 
             say.Append($"at {seat.X},{seat.Y}");
 
-            if (_overrides.ContainsKey(guild.Name))
+            if (BotGuildHouses.Of(guild.Name) is { } house)
+            {
+                say.Append($" (its house in {house.Town})");
+            }
+            else if (_overrides.ContainsKey(guild.Name))
             {
                 say.Append(" (overriding the file)");
             }
@@ -398,6 +537,8 @@ public static class BotSeat
         Homed = 0;
         Carried = 0;
         Spoken = 0;
+        Abroad = 0;
+        AtHome = 0;
         _moved.Clear();
     }
 

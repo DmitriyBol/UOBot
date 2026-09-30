@@ -10,7 +10,7 @@ put it out, which is still the shape of every one of them.
 |---|---|
 | `BotThread.cs` | sewing: what can be made from a material, and the attempt itself |
 | `BotSew.cs` | an obligation with three legs: shop → work → counter; a kit worn through after the first attempt ends the batch at the counter |
-| `BotTailor.cs` | the proposer: whoever is carrying a sewing kit |
+| `BotTailor.cs` | the proposer: whoever is carrying a sewing kit. Orders are leather; spec work is hide and the pack's own cloth (the weaver's) — cloth is not bought over a counter for it since 29.09.2026 (`BuysCloth` off), after 2080 cloth went into oilcloth nobody bought |
 | `BotCraftConfig.cs` | `Configuration/bot-craft.json` |
 | `BotCraftModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Shops` |
 | `BotAlchemist.cs` | offers the mortar to anybody carrying one, and offers the board's orders first |
@@ -28,6 +28,10 @@ put it out, which is still the shape of every one of them.
 | `BotOven.cs` | cooking: what a meal is made of, and who can make one |
 | `BotSmith.cs` | offers a bot with a hammer and some metal a turn at an anvil, and offers it the board's orders first |
 | `BotCraftEar.cs` | what the craft system last told each bot, and how often it has said each thing, heard through the `CraftItem.Said` engine patch |
+| `BotTinker.cs` | Making a tool out of iron, wherever the bot is standing, and handing it to whoever asked for it or to the market. |
+| `BotTinkerer.cs` | Offers a bot with tinker's tools and some iron a stint at making the tool the island is shortest of, and offers it the board's orders first. |
+| `BotTinkering.cs` | What a tinker needs to know: the craft system, the tool, and which of the things it can make are the tools the rest of the population wears out. |
+| `BotTutor.cs` | The first steps of a trade, bought from a shopkeeper who knows it — the engine's own teaching, paid for in gold. |
 
 ---
 

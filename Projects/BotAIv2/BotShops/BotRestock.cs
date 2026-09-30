@@ -1,4 +1,5 @@
 using System;
+using Server.Items;
 using Server.Mobiles;
 
 namespace Server.BotAI.V2;
@@ -42,6 +43,8 @@ public sealed class BotRestock : BotDeed
 
     public static long FellThrough { get; private set; }
 
+    public static long ToolsBound { get; private set; }
+
     public static long Restalled { get; private set; }
 
     private int _bought;
@@ -76,15 +79,30 @@ public sealed class BotRestock : BotDeed
 
     private PlayerVendor _merchant;
 
+    public BotRestock(BotStorefront front, Type wanted, int amount, int price, bool forWant = false)
+    {
+        _front = front;
+        _wanted = wanted;
+        _amount = Math.Max(1, amount);
+        _price = Math.Max(1, price);
+        _forWant = forWant;
+    }
+
+    private BotStorefront _front;
+
+    private readonly bool _forWant;
+
+    private BotRecall _recall;
+
     private readonly Map _map;
 
     private readonly Point3D _where;
 
     public override string Kind => Trade;
 
-    public override Map Map => _shop?.Map ?? _merchant?.Map ?? _map;
+    public override Map Map => _shop?.Map ?? _merchant?.Map ?? _front?.Map ?? _map;
 
-    public override Point3D Where => _shop?.Location ?? _merchant?.Location ?? _where;
+    public override Point3D Where => _shop?.Location ?? _merchant?.Location ?? _front?.Location ?? _where;
 
     public double? Claim { get; set; }
 
@@ -96,13 +114,15 @@ public sealed class BotRestock : BotDeed
 
     public override SkillName? Trains => null;
 
-    public override int Outlay => _amount * _price;
+    public override int Outlay => _forWant ? 0 : _amount * _price;
 
-    public override bool AtCounter => _shop != null;
+    public override bool AtCounter => _shop != null || _front != null;
 
     public override double Coin => 0.0;
 
     public override bool Unpaid => true;
+
+    public override bool Steadfast => true;
 
     public override int Made => _paid;
 
@@ -117,6 +137,13 @@ public sealed class BotRestock : BotDeed
             return false;
         }
 
+        if (_front != null)
+        {
+            bot?.Resolve?.Ledger?.Beware(BotShopkeep.Kind, _front.Map, _front.Location);
+
+            return false;
+        }
+
         if (_shop == null)
         {
             return false;
@@ -125,6 +152,23 @@ public sealed class BotRestock : BotDeed
         bot?.Resolve?.Ledger?.Beware(BotShops.ShopKind, _shop.Map, _shop.Location);
 
         return false;
+    }
+
+    public bool Cuts { get; set; }
+
+    public static long CutInto { get; private set; }
+
+    private string Cut(IBotWilful bot, string done)
+    {
+        if (!Cuts || _wanted != typeof(Cloth) || _bought <= 0)
+        {
+            return done;
+        }
+
+        var made = BotWeave.Bandages(bot?.Self, _bought);
+        CutInto += made;
+
+        return made > 0 ? $"{done}, cut into {made} bandages" : done;
     }
 
     public override BotDoing Advance(IBotWilful bot)
@@ -162,7 +206,35 @@ public sealed class BotRestock : BotDeed
 
             _paid = _bought * price;
 
-            return BotDoing.Done($"{_bought} {_wanted?.Name} off the market for {_paid}gp");
+            return BotDoing.Done(Cut(bot, $"{_bought} {_wanted?.Name} off the market for {_paid}gp"));
+        }
+
+        if (_front != null)
+        {
+            var visit = BotShopkeep.Visit(bot, _front, _wanted, _amount, _price, _forWant, out var got, out var cost, out var onward);
+
+            if (onward != null)
+            {
+                FellThrough++;
+
+                _front = null;
+                _shop = onward;
+                _price = Math.Max(1, BotShops.Price(onward, _wanted));
+
+                return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"on to {_shop.Name} for {_wanted?.Name}");
+            }
+
+            if (got <= 0)
+            {
+                return visit;
+            }
+
+            _bought = got;
+            _paid = cost;
+
+            (bot as BotMobile)?.Rearm();
+
+            return BotDoing.Done(Cut(bot, visit.Note));
         }
 
         if (_merchant != null)
@@ -218,7 +290,7 @@ public sealed class BotRestock : BotDeed
 
             (bot as BotMobile)?.Rearm();
 
-            return BotDoing.Done($"{_bought} {_wanted?.Name} off the guild's own counter for {_paid}gp");
+            return BotDoing.Done(Cut(bot, $"{_bought} {_wanted?.Name} off the guild's own counter for {_paid}gp"));
         }
 
         if (_shop == null || _shop.Deleted || _shop.Map == null || _shop.Map == Map.Internal)
@@ -228,6 +300,11 @@ public sealed class BotRestock : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
+            if (BotRecall.Instead(bot, _shop.Map, _shop.Location, BotShops.CounterReach, _shop.Name, ref _recall) is { } cast)
+            {
+                return cast;
+            }
+
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name}");
         }
 
@@ -250,8 +327,18 @@ public sealed class BotRestock : BotDeed
 
         _paid = _bought * _price;
 
+        BotShopBook.Counter(body, _wanted, _bought, _paid);
+
+        if (_bought == 1 && _wanted != null && body is BotMobile { Bond: { } bond, Class: { } klass } buyer
+            && BotOutfit.ToolsFor(klass).Contains(_wanted) && buyer.Backpack?.FindItemByType(_wanted) is { } tool
+            && !BotBinding.IsBound(tool, bond))
+        {
+            BotBinding.Bind(tool, bond);
+            ToolsBound++;
+        }
+
         (bot as BotMobile)?.Rearm();
 
-        return BotDoing.Done($"{_bought} {_wanted?.Name} for {_paid}gp");
+        return BotDoing.Done(Cut(bot, $"{_bought} {_wanted?.Name} for {_paid}gp"));
     }
 }

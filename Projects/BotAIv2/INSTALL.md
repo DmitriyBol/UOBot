@@ -168,27 +168,29 @@ ollama pull qwen3.5:9b
 ```
 
 The first is the observers' model. The second is the crafters', chosen for latency, and needed only if crafters
-are to think.
+are to think. One model fits in 12 GB of video memory at a time; both configuration files are tuned around that.
 
 **The observers** — on by default (`"bots.debugger.enabled"`), and optionally configured in
-`Distribution/Configuration/bot-debugger.json`: the helpers' names, their robes and the thresholds. In game,
-`[argus` takes you to the lead observer and `[argus here` brings it to you; from the keyboard, write a line into
-`Distribution/argus-in.txt`.
+`Distribution/Configuration/bot-debugger.json`. In game, `[argus` takes you to the lead observer and `[argus here`
+brings it to you; from the keyboard, write a line into `Distribution/argus-in.txt`.
 
-**The thinking crafters** — off by default: no crafter has thought since 18.09.2026. Which crafters think is a list
-of names in `Distribution/Configuration/bot-mind.json`:
+**The thinking crafters** — off by default: `CrafterNames` in `Distribution/Configuration/bot-mind.json` is empty,
+so no minds run. Naming crafters there switches them on:
 
 ```json
 {
-  "Model": "qwen3.5:9b",
-  "Endpoint": "http://127.0.0.1:11434",
-  "CrafterNames": ["Roderic", "Emeric", "Ulric", "Wulfric"]
+  "CrafterNames": ["Roderic", "Emeric", "Ulric", "Wulfric", "Alaric"]
 }
 ```
 
 Each name is a mind that claims a crafter and renames it, so keep at least as many crafters in
 `bot-population.json` as there are names. Without Ollama nothing breaks: the calls fail and those crafters choose by
 arithmetic. `bot-minds.json` holds the rules each mind has written for itself; the shard writes it.
+
+**Everything else about models and prompts** — which model for how much video memory, every key of `bot-mind.json`
+and `bot-debugger.json` with its default, connecting LM Studio, llama.cpp, vLLM or a hosted API through
+`"Api": "openai"`, what the model is shown, the answer schema, the rules for writing a prompt, and where to look
+when it goes wrong — is in [`mindedBots/LLM.md`](mindedBots/LLM.md).
 
 ---
 

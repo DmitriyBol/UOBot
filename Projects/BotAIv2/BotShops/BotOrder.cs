@@ -69,6 +69,12 @@ public sealed class BotOrder : BotDeed
 
     public override string Stage => $"ordering {_units} {_kind.Name}";
 
+    public System.Type Wanted => _kind;
+
+    public int Units => _units;
+
+    public int Price => _offer;
+
     public override BotDoing Advance(IBotWilful bot)
     {
         var body = bot?.Self;

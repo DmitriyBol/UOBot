@@ -350,9 +350,9 @@ public sealed class BotAbodeBuyer : IBotProposer
         _searched = true;
         _searchedTick = now;
 
-        var from = body.Guild is Guild guild ? BotSeat.Of(guild) : BotPopulation.Where;
+        var from = BotPopulation.HomeOf(body);
 
-        if (!BotPlot.Find(body, from, Point3D.Zero, 0, kind.Multi, null, out var plot))
+        if (!BotPlot.FindHome(body, from, kind.Multi, out var plot))
         {
             Groundless++;
 
@@ -545,7 +545,7 @@ public sealed class BotAbodeBuy : BotDeed
             BotYield.Wealth(body)
         );
 
-        body.Say("A roof of my own, at last.");
+        BotVoice.Aloud(body, "A roof of my own, at last.");
 
         return BotDoing.Done($"bought {_kind} at {_plot.X},{_plot.Y} for {price}gp");
     }

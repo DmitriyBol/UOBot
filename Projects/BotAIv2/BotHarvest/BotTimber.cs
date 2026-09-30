@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Engines.Harvest;
 using Server.Items;
@@ -33,6 +33,39 @@ public static class BotTimber
     public static long Townbound { get; private set; }
 
     public static long Fenced { get; private set; }
+
+    public static int TreeRestMs { get; set; } = 1800000;
+
+    public static long Unwalkable { get; private set; }
+
+    private static readonly Dictionary<(int Map, int X, int Y), long> _unreachable = [];
+
+    public static void Unreachable(Map map, IPoint3D tree)
+    {
+        if (map == null || tree == null)
+        {
+            return;
+        }
+
+        if (_unreachable.Count > 4096)
+        {
+            _unreachable.Clear();
+        }
+
+        _unreachable[(map.MapID, tree.X, tree.Y)] = Core.TickCount;
+    }
+
+    public static void Reached(Map map, IPoint3D tree)
+    {
+        if (map != null && tree != null && _unreachable.Count > 0)
+        {
+            _unreachable.Remove((map.MapID, tree.X, tree.Y));
+        }
+    }
+
+    private static bool Unwalked(Map map, IPoint3D tree) =>
+        _unreachable.Count > 0 && _unreachable.TryGetValue((map.MapID, tree.X, tree.Y), out var at)
+        && Core.TickCount - at < TreeRestMs;
 
     public static int SwingReach { get; set; } = 2;
 
@@ -186,6 +219,13 @@ public static class BotTimber
 
                     if (shun != null && shun.Contains((found.X, found.Y)))
                     {
+                        continue;
+                    }
+
+                    if (Unwalked(map, found))
+                    {
+                        Unwalkable++;
+
                         continue;
                     }
 

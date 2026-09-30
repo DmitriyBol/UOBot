@@ -50,15 +50,13 @@ public static class BotKept
 
     private static string _survey = "the island not yet reckoned";
 
-    public static void Fell(BotMobile bot)
+    public static void Fell(BotMobile bot, Map map, Point3D where)
     {
-        if (!Running || bot?.Map == null || bot.Map == Map.Internal)
+        if (!Running || bot == null || map == null || map == Map.Internal)
         {
             return;
         }
 
-        var map = bot.Map;
-        var where = bot.Location;
         var strength = BotThreat.Power(bot);
         var company = 1;
 

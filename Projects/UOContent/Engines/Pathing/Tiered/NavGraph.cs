@@ -122,6 +122,8 @@ public sealed class NavGraph
 
     public int ComponentCount { get; private set; }
 
+    public int ComponentEpoch { get; private set; }
+
     public long Probes { get; internal set; }
 
     public int ClusterOf(int x, int y) => y / Side * ClustersX + x / Side;
@@ -949,6 +951,7 @@ public sealed class NavGraph
 
         ComponentCount = count;
         ComponentsValid = true;
+        ComponentEpoch++;
     }
 
     private static int Find(int[] parent, int i)

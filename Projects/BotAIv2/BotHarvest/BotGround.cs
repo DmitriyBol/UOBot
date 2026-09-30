@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Server.Engines.Craft;
@@ -110,11 +110,17 @@ public static class BotGround
 
     public static long Refused { get; private set; }
 
+    public static double MineOdds { get; set; } = 1.5;
+
+    public static long Outmuscled { get; private set; }
+
+    public static long SeamsUnfooted { get; private set; }
+
     public static int MaxSeams { get; set; } = 2048;
 
-    public static int MaxPlaces { get; set; } = 48;
+    public static int MaxPlaces { get; set; } = 128;
 
-    public static int MaxSurveys { get; set; } = 64;
+    public static int MaxSurveys { get; set; } = 192;
 
     private static readonly List<BotSeam> _seams = [];
 
@@ -724,8 +730,27 @@ public static class BotGround
                 continue;
             }
 
-            if (!BotPopulation.Within(map, seam.Where))
+            if (!BotPopulation.Within(map, seam.Where, body))
             {
+                continue;
+            }
+
+            if (!BotPopulation.Reachable(map, body.Location, seam.Where))
+            {
+                continue;
+            }
+
+            if (BotFooting.Footless(map, seam.Where.X, seam.Where.Y))
+            {
+                SeamsUnfooted++;
+
+                continue;
+            }
+
+            if (MineOdds > 0.0 && BotQuad.Muscle(map, seam.Where) > BotThreat.Power(body) * MineOdds)
+            {
+                Outmuscled++;
+
                 continue;
             }
 
@@ -1030,7 +1055,12 @@ public static class BotGround
         {
             var (on, where) = places[i];
 
-            if (on != map || !BotPopulation.Within(on, where))
+            if (on != map || !BotPopulation.Within(on, where, who))
+            {
+                continue;
+            }
+
+            if (who != null && !BotPopulation.Reachable(on, who.Location, where))
             {
                 continue;
             }
@@ -1138,5 +1168,5 @@ public static class BotGround
     }
 
     public static string Describe() =>
-        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_hearths.Count} hearths, {_counters.Count} counters; {Walled} seams passed over with no way through, {Unwalked} for standing on ground that had lately refused somebody, {Townbound} for being inside the walls, {Emptied} struck off as barren, {Shied} left on the board because the walk gave up far short of them, and {Dry} rested after being worked out ({Hollow} of them found so as they were about to be chosen, before anybody walked there),{Cooled} hearths rested after a cook stood beside one and found it cold and {Out} struck off for nothing burning on their tile any more, {Underground} asks for a sweep from inside a dungeon refused, {Unfitted} forges rested after a smith stood at one and the engine accepted no anvil, {BotMiner.Sent} sent out past the frontier and {Prospected} seams found there over {Fruitless} empty walks, {BotMiner.Burdened} seams not offered to a pack with no room for ore, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {BotDig.FarSide} rocks found only by looking again from the middle of a seam, {BotDig.Repicked} trips sent on to another seam because another miner already held theirs and {BotDig.Beaten} given up for finding no other free, {BotDig.WorkedOut} rested rather than struck off because every rock in reach was there and worked out,{BotDig.Drained} rocks given up with the engine's bank under them empty against {BotDig.Fumbled} still holding ore the miner kept missing and {BotDig.Allowanced} trips that stopped on their own allowance of eight (the miners that gave up on full rock were being given {(BotDig.Fumbled > 0 ? BotDig.FumbledChance / BotDig.Fumbled : 0.0):P0} a swing by the engine, {BotDig.Locked} swings were taken with the pickaxe still locked by the one before, and {BotDig.Stirred} quiet swings were taken by a bot that had moved since the last one, {BotDig.Adrift} swings the engine cancelled for that and {BotDig.Laden} whose ore was lost to a full pack, {BotDig.NextPickaxe} trips carried on with the next pickaxe, {BotDig.Spurned} melts the forge took none of the ore for, {BotDig.Nearer} of them tried again from beside it and {BotDig.Forsaken} forges rested for it), {Spared} asks answered out of the last scan and {Stale} answers taken back out of it for a seam gone or feared since, {Unfooted} workshops never filed for having no floor at them, {Upstairs} passed over for standing on another floor and {Refused} for ground that has refused the population ({Anyway} choices then had to be made with the resting rule off, or there would have been nowhere at all), patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y}); {BotHeard.Describe()}";
+        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_hearths.Count} hearths, {_counters.Count} counters; {Walled} seams passed over with no way through, {Unwalked} for standing on ground that had lately refused somebody, {Townbound} for being inside the walls, {Outmuscled} for lying where something past the miner's strength (×{MineOdds:F1}) has killed lately, {SeamsUnfooted} for standing where a walk had found no footing, {Emptied} struck off as barren, {Shied} left on the board because the walk gave up far short of them, and {Dry} rested after being worked out ({Hollow} of them found so as they were about to be chosen, before anybody walked there),{Cooled} hearths rested after a cook stood beside one and found it cold and {Out} struck off for nothing burning on their tile any more, {Underground} asks for a sweep from inside a dungeon refused, {Unfitted} forges rested after a smith stood at one and the engine accepted no anvil, {BotMiner.Sent} sent out past the frontier and {Prospected} seams found there over {Fruitless} empty walks, {BotMiner.Burdened} seams not offered to a pack with no room for ore, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {BotDig.FarSide} rocks found only by looking again from the middle of a seam, {BotDig.Standless} rocks with no floor within swinging reach, {BotDig.Repicked} trips sent on to another seam because another miner already held theirs and {BotDig.Beaten} given up for finding no other free, {BotDig.WorkedOut} rested rather than struck off because every rock in reach was there and worked out,{BotDig.Drained} rocks given up with the engine's bank under them empty against {BotDig.Fumbled} still holding ore the miner kept missing and {BotDig.Allowanced} trips that stopped on their own allowance of eight (the miners that gave up on full rock were being given {(BotDig.Fumbled > 0 ? BotDig.FumbledChance / BotDig.Fumbled : 0.0):P0} a swing by the engine, {BotDig.Locked} swings were taken with the pickaxe still locked by the one before, and {BotDig.Stirred} quiet swings were taken by a bot that had moved since the last one, {BotDig.Adrift} swings the engine cancelled for that and {BotDig.Laden} whose ore was lost to a full pack, {BotDig.NextPickaxe} trips carried on with the next pickaxe, {BotDig.Spurned} melts the forge took none of the ore for, {BotDig.Nearer} of them tried again from beside it and {BotDig.Forsaken} forges rested for it), {Spared} asks answered out of the last scan and {Stale} answers taken back out of it for a seam gone or feared since, {Unfooted} workshops never filed for having no floor at them, {Upstairs} passed over for standing on another floor and {Refused} for ground that has refused the population ({Anyway} choices then had to be made with the resting rule off, or there would have been nowhere at all), patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y}); {BotHeard.Describe()}";
 }

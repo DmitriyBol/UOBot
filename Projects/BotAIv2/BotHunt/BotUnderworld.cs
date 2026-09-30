@@ -910,6 +910,7 @@ public static class BotUnderworld
             guild.AddMember(band[i]);
             band[i].DisplayGuildTitle = true;
             _members.Add(band[i].Name);
+            Picks(band[i]);
         }
 
         EnemyOfAll();
@@ -944,6 +945,22 @@ public static class BotUnderworld
         _guild.AddMember(bot);
         bot.DisplayGuildTitle = true;
         _members.Add(bot.Name);
+        Picks(bot);
+    }
+
+    private static void Picks(BotMobile bot)
+    {
+        if (bot?.Backpack == null || BotBurgle.PicksIssued <= 0 || BotBurgle.HasPick(bot))
+        {
+            return;
+        }
+
+        var picks = new Lockpick(BotBurgle.PicksIssued);
+
+        if (!bot.Backpack.TryDropItem(bot, picks, false))
+        {
+            picks.Delete();
+        }
     }
 
     private static void Leave(BotMobile bot)

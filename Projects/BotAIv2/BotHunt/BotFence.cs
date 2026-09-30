@@ -357,7 +357,7 @@ public static class BotFence
             Bribed++;
             BribeGold += asks;
 
-            fence.Say($"Not a word of this, {witness.Name}. Here.");
+            BotVoice.Aloud(fence, $"Not a word of this, {witness.Name}. Here.");
 
             logger.Information(
                 "{Name} the fence bought {Witness}'s silence for {Gold}gp at ({X}, {Y}), seen there with {Thief}",
@@ -389,7 +389,7 @@ public static class BotFence
 
         Hunted++;
 
-        fence.Say($"You saw nothing, {witness.Name}.");
+        BotVoice.Aloud(fence, $"You saw nothing, {witness.Name}.");
 
         if (!BotWill.Press(fence, new BotSilence(witness), $"{witness.Name} saw it with {thief.Name}"))
         {

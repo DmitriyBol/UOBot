@@ -99,17 +99,21 @@ public sealed class BotDelveModule : BotModule
         if (Enabled)
         {
             BotWill.Offer(new BotDelver());
+            BotWill.Offer(new BotVenturer());
         }
 
         logger.Information(
-            "Delving is {State}: any member of a guild may take {Company} down a dungeon — {Fighters} of them able to hold a line, its own band called first — for {Quota} corpses or {Minutes} minutes, after {Muster} minutes of calling at the home ground. It goes to the richest dungeon whose worst inhabitant the band is ×{Odds} the strength of, is carried down and carried back up because no road runs there, and has {Raisings} raisings between them; what it takes is swept into one pot and divided at the end, {Share} to the leader and the rest evenly. A band waits {Between} minutes between delves",
+            "Delving is {State}: any member of a guild may take {Multiple} for each creature of a dungeon's worst room down it, {Company} at the fewest and {Most} at the most — {Fighters} of them able to hold a line, its own band called first, and more than the worst room holds or it does not go — for {Quota} corpses or {Minutes} minutes, after {Muster} minutes of calling at the home ground. It goes to the richest dungeon whose worst inhabitant the band is ×{Odds} the strength of, walks in by the cave mouth where the world's teleporters join it to the island and walks out by it (put down by hand only where none does), and has {Raisings} raisings between them; a fighter alone may venture into a dungeon whose worst it is ×{Alone} the strength of, once an hour; what it takes is swept into one pot and divided at the end, {Share} to the leader and the rest evenly. A band waits {Between} minutes between delves",
             Enabled ? "on" : "off",
+            BotProving.PartyMultiple,
             BotDelve.Company,
+            Math.Max(BotDelve.Company, BotDelver.HeadsPerParty),
             BotDelve.Fighters,
             BotDelve.Quota,
             BotDelve.CapMs / 60000,
             BotDelve.MusterMs / 60000,
             BotDelver.Odds.ToString("F2"),
+            BotVenturer.Odds.ToString("F2"),
             BotDelveParty.Raisings,
             BotDelveParty.LeadersShare.ToString("P0"),
             BotDelver.BetweenMs / 60000
@@ -158,7 +162,7 @@ public sealed class BotDelveModule : BotModule
         BotDelveParty.LeadersShare = settings.LeadersShare ?? BotDelveParty.LeadersShare;
     }
 
-    public static string Summarise() => BotDelver.Describe();
+    public static string Summarise() => $"{BotDelver.Describe()}; alone: {BotVenturer.Describe()}";
 
     private sealed class DelveTimer : Timer
     {

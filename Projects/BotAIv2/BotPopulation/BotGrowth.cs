@@ -38,7 +38,7 @@ public static class BotGrowth
 
     public static int By { get; set; } = 2;
 
-    public static int Most { get; set; } = 120;
+    public static int Most { get; set; } = 210;
 
     private static readonly Dictionary<string, int> _added = new(StringComparer.OrdinalIgnoreCase);
 
@@ -47,6 +47,12 @@ public static class BotGrowth
     private static bool _saidFull;
 
     public static long Raised { get; private set; }
+
+    public static int LeastToWant { get; set; } = 3;
+
+    public static long ByNeed { get; private set; }
+
+    private static readonly BotRole[] _wanted = [BotRole.Producer, BotRole.Medic];
 
     public static IReadOnlyDictionary<string, int> Mix(IReadOnlyDictionary<string, int> configured)
     {
@@ -143,6 +149,32 @@ public static class BotGrowth
     private static BotClass Pick()
     {
         var mix = BotPopulationConfig.Mix;
+
+        if (LeastToWant > 0)
+        {
+            for (var r = 0; r < _wanted.Length; r++)
+            {
+                var guild = BotGuilds.Lacking(_wanted[r], LeastToWant);
+
+                if (guild == null)
+                {
+                    continue;
+                }
+
+                var wanted = OfRole(_wanted[r], mix);
+
+                if (wanted == null)
+                {
+                    continue;
+                }
+
+                ByNeed++;
+                logger.Information("A newcomer is born a {Class}: {Guild} has nobody of that role", wanted.Name, guild);
+
+                return wanted;
+            }
+        }
+
         var total = 0;
 
         foreach (var (name, many) in mix)
@@ -178,8 +210,49 @@ public static class BotGrowth
         return null;
     }
 
+    private static BotClass OfRole(BotRole role, IReadOnlyDictionary<string, int> mix)
+    {
+        var total = 0;
+
+        foreach (var (name, many) in mix)
+        {
+            if (many > 0 && BotClasses.Find(name) is { } k && k.Role == role)
+            {
+                total += many;
+            }
+        }
+
+        if (total > 0)
+        {
+            var roll = Utility.Random(total);
+
+            foreach (var (name, many) in mix)
+            {
+                if (many <= 0 || BotClasses.Find(name) is not { } k || k.Role != role)
+                {
+                    continue;
+                }
+
+                if (roll < many)
+                {
+                    return k;
+                }
+
+                roll -= many;
+            }
+        }
+
+        return role switch
+        {
+            BotRole.Producer => BotClasses.Find("Crafter"),
+            BotRole.Medic => BotClasses.Find("Healer"),
+            _ => null
+        };
+    }
+
     public static void Forget()
     {
+        ByNeed = 0;
         _added.Clear();
         _last = default;
         _saidFull = false;
@@ -196,7 +269,7 @@ public static class BotGrowth
 
         var next = _last == default ? "the clock starts at the first look" : $"the next about {(_last + TimeSpan.FromMinutes(EveryMinutes)).ToLocalTime():HH:mm}";
 
-        return $"newcomers: {By} every {EveryMinutes} minutes up to {Most} bots; {added} added in all, {Raised} this session; {next}";
+        return $"newcomers: {By} every {EveryMinutes} minutes up to {Most} bots; {added} added in all, {Raised} this session, {ByNeed} of them born into a role a guild of {LeastToWant} lacked; {next}";
     }
 
     internal static void Save(IGenericWriter writer)

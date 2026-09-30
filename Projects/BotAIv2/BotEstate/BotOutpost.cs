@@ -295,7 +295,7 @@ public sealed class BotOutposter : IBotProposer
             return null;
         }
 
-        if (BotChest.Holds(ours.Name) + BotEstate.Fund(ours) < BotOutpost.Price)
+        if (BotEstate.Fund(ours) < BotOutpost.Price)
         {
             Poor++;
 

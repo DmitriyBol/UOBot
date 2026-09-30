@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
 using Server.Targeting;
@@ -66,6 +66,12 @@ public sealed class BotChop : BotDeed
 
     private long _grewTick;
 
+    public static int MostBends { get; set; } = 3;
+
+    public static long Bent { get; private set; }
+
+    private int _bends;
+
     public BotChop(Map map, Point3D where, int want)
     {
         _map = map;
@@ -76,6 +82,28 @@ public sealed class BotChop : BotDeed
     public override string Kind => Trade;
 
     public override bool Steadfast => true;
+
+    public override bool Bend(IBotWilful bot)
+    {
+        if (_tree != null)
+        {
+            BotTimber.Unreachable(_map, _tree);
+            _shunned.Add((_tree.X, _tree.Y));
+        }
+
+        _tree = null;
+
+        if (++_bends > MostBends)
+        {
+            return false;
+        }
+
+        Bent++;
+
+        return true;
+    }
+
+    public override bool BendIsTrouble => false;
 
     public override void Resumed(IBotWilful bot)
     {
@@ -264,6 +292,8 @@ public sealed class BotChop : BotDeed
         {
             return BotDoing.Walk(_map, trunk, BotArrival.Within(BotTimber.SwingReach), "to a tree");
         }
+
+        BotTimber.Reached(_map, _tree);
 
         var now = Core.TickCount;
 

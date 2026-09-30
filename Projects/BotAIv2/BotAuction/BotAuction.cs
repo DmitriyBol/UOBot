@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
@@ -96,6 +96,30 @@ public static class BotAuction
 
     public static int SliceMs { get; set; } = 60000;
 
+    public static int LotsPerBot { get; set; } = 0;
+
+    public static long Capped { get; private set; }
+
+    public static bool MadeUncapped { get; set; } = true;
+
+    public static long PastCap { get; private set; }
+
+    public static bool CounterCeiling { get; set; } = true;
+
+    public static long HeldAtCounter { get; private set; }
+
+    private static bool RaiseBrisk(BotListing stall)
+    {
+        var counter = CounterCeiling ? BotShops.Lowest(stall.Kind) : 0;
+
+        if (counter > 0 && Math.Max(stall.Price + 1, (int)(stall.Price * (1.0 + RaiseStep))) > counter)
+        {
+            HeldAtCounter++;
+        }
+
+        return stall.Raise(RaiseStep, MostMultiple, counter);
+    }
+
     private static readonly List<BotListing> _listings = [];
 
     private static readonly List<BotWant> _wants = [];
@@ -107,6 +131,19 @@ public static class BotAuction
     private static readonly HashSet<Type> _worthless = [];
 
     public static bool Worthless(Type kind) => kind != null && _worthless.Contains(kind);
+
+    private static readonly HashSet<Type> _staples = [];
+
+    public static void Staple(Type kind)
+    {
+        if (kind != null)
+        {
+            _staples.Add(kind);
+            _worthless.Remove(kind);
+        }
+    }
+
+    public static int FloorFor(Type kind) => kind != null && _staples.Contains(kind) ? 1 : Floor;
 
     public static long Recalled { get; private set; }
 
@@ -235,11 +272,16 @@ public static class BotAuction
         Levies = 0;
         Cheap = 0;
         Unpriced = 0;
+        Capped = 0;
+        PastCap = 0;
+        HeldAtCounter = 0;
     }
 
     public static BotListing List(IBotWilful seller, Item item, int price) => List(seller, item, price, true);
 
-    public static BotListing List(IBotWilful seller, Item item, int price, bool measured)
+    public static BotListing List(IBotWilful seller, Item item, int price, bool measured) => List(seller, item, price, measured, false);
+
+    public static BotListing List(IBotWilful seller, Item item, int price, bool measured, bool made)
     {
         if (seller?.Self == null || item == null || item.Deleted)
         {
@@ -251,7 +293,7 @@ public static class BotAuction
             return null;
         }
 
-        if (price < Floor)
+        if (price < FloorFor(item.GetType()))
         {
             Cheap++;
 
@@ -267,13 +309,28 @@ public static class BotAuction
             return null;
         }
 
+        if (Lotless(seller, item.GetType()))
+        {
+            if (!made || !MadeUncapped)
+            {
+                Capped += Math.Max(1, item.Amount);
+
+                return null;
+            }
+
+            PastCap += Math.Max(1, item.Amount);
+        }
+
         Withdrawn(seller, item.GetType());
 
         var stall = Find(seller, item.GetType());
 
+        var units = Math.Max(1, item.Amount);
+
         if (stall != null)
         {
             stall.Add(item);
+            BotBurgh.Supplied(seller.Self, item.GetType(), units);
 
             return stall;
         }
@@ -300,6 +357,7 @@ public static class BotAuction
         stall.Add(item);
 
         _listings.Add(stall);
+        BotBurgh.Supplied(seller.Self, stall.Kind, units);
 
         return stall;
     }
@@ -329,6 +387,7 @@ public static class BotAuction
     public static BotListing Cheapest(Type kind, IBotWilful except)
     {
         BotListing best = null;
+        var bestPrice = int.MaxValue;
 
         for (var i = 0; i < _listings.Count; i++)
         {
@@ -339,14 +398,17 @@ public static class BotAuction
                 continue;
             }
 
-            if (stall.Seller?.Self is not { Deleted: false })
+            if (stall.Seller?.Self is not { Deleted: false } seller)
             {
                 continue;
             }
 
-            if (best == null || stall.Price < best.Price)
+            var price = BotPact.Price(except?.Self, seller, stall.Price);
+
+            if (best == null || price < bestPrice)
             {
                 best = stall;
+                bestPrice = price;
             }
         }
 
@@ -394,6 +456,11 @@ public static class BotAuction
     }
 
     public static bool Selling(IBotWilful seller, Type kind) => Find(seller, kind) is { IsEmpty: false };
+
+    public static bool Lotless(IBotWilful seller, Type kind) =>
+        LotsPerBot > 0 && !Selling(seller, kind) && StallsOf(seller) >= LotsPerBot;
+
+    public static bool AtLots(IBotWilful seller) => LotsPerBot > 0 && StallsOf(seller) >= LotsPerBot;
 
     public static BotListing Find(IBotWilful seller, Type kind)
     {
@@ -592,7 +659,7 @@ public static class BotAuction
             units = stock;
         }
 
-        var price = stall.Price;
+        var price = BotPact.Price(buyer, stall.Seller?.Self, stall.Price);
         var bill = price * units;
 
         if (!Charge(buyer, bill))
@@ -622,10 +689,11 @@ public static class BotAuction
 
         Sales++;
         Turnover += bill;
+        BotPact.Bought(stall.Price, price, given);
 
         BotRegard.Traded((buyer?.Guild as Guilds.Guild)?.Name, (seller?.Guild as Guilds.Guild)?.Name);
 
-        if (stall.Note(given, bill, BriskMs) && stall.Raise(RaiseStep, MostMultiple))
+        if (stall.Note(given, bill, BriskMs) && RaiseBrisk(stall))
         {
             Raises++;
 
@@ -743,6 +811,7 @@ public static class BotAuction
     public static BotWant Demand(IBotWilful supplier, Type kind)
     {
         BotWant best = null;
+        var bestServed = false;
 
         if (kind == null || Wanted(supplier, kind) != null)
         {
@@ -758,14 +827,17 @@ public static class BotAuction
                 continue;
             }
 
-            if (want.Buyer?.Self is not { Deleted: false } || !want.Yields(supplier, SliceMs))
+            if (want.Buyer?.Self is not { Deleted: false } buyer || !want.Yields(supplier, SliceMs))
             {
                 continue;
             }
 
-            if (best == null || want.Offer > best.Offer)
+            var served = BotPact.Serves(supplier?.Self, buyer);
+
+            if (best == null || served && !bestServed || served == bestServed && want.Offer > best.Offer)
             {
                 best = want;
+                bestServed = served;
             }
         }
 
@@ -861,6 +933,9 @@ public static class BotAuction
         Fills++;
         Filled += units;
         Turnover += bill;
+
+        BotBurgh.Supplied(body, want.Kind, units);
+        BotPact.Filled(body, want.Buyer?.Self);
 
         if (want.Buyer != null)
         {
@@ -1231,7 +1306,7 @@ public static class BotAuction
             crossed += filled;
             Crossed += filled;
 
-            if (stall.Note(filled, filled * want.Offer, BriskMs) && stall.Raise(RaiseStep, MostMultiple))
+            if (stall.Note(filled, filled * want.Offer, BriskMs) && RaiseBrisk(stall))
             {
                 Raises++;
 
@@ -1716,7 +1791,7 @@ public static class BotAuction
         var (sought, escrow) = Sought();
         var (stuckStalls, stuckThings, stuckWorth, stuckOldest) = Stuck();
 
-        return $"{_listings.Count} of {MaxListings} stalls holding {units} things worth {worth}gp and {_wants.Count} of {MaxWants} wants for {sought} things with {escrow}gp down; {Sales} sales and {Fills} fills for {Turnover}gp, of which {Crossed} things went straight off a stall to a want on the board and {Dear} wants found the thing on a stall dearer than they would pay; {Raises} prices raised, {Cuts} cut, of which {BotHaggle.Describe()}, {Forgotten} forgotten, {Abandoned} given up on; {Sells} orders refused to bots already selling the thing, {Recalled} of them settled by taking it back off the stall and {Unfunded} to bots that could not put the money down; {Cheap} things of {_worthless.Count} kinds were worth less than the {Floor}gp floor and stayed in the pack ({Unpriced} of them because nothing could price them at all, which condemns no kind); the condemned kinds are {Condemned(8)}; {Fetches} deliveries fetched off the board holding {Fetched} things; the levy has taken {Levied}gp over {Levies} sales; {stuckStalls} stalls have stood more than {StuckMs / 60000} minutes holding {stuckThings} things at {stuckWorth}gp, the oldest for {stuckOldest} minutes; {Stood} stalls were taken off the board at their lowest ask and {Returned} things went back to their sellers, {Unreclaimed} could not be handed back";
+        return $"{_listings.Count} of {MaxListings} stalls holding {units} things worth {worth}gp and {_wants.Count} of {MaxWants} wants for {sought} things with {escrow}gp down; {Sales} sales and {Fills} fills for {Turnover}gp, of which {Crossed} things went straight off a stall to a want on the board and {Dear} wants found the thing on a stall dearer than they would pay; {Raises} prices raised, {Cuts} cut, of which {BotHaggle.Describe()}, {Forgotten} forgotten, {Abandoned} given up on; {Sells} orders refused to bots already selling the thing, {Recalled} of them settled by taking it back off the stall and {Unfunded} to bots that could not put the money down; {Cheap} things of {_worthless.Count} kinds were worth less than the {Floor}gp floor and stayed in the pack ({Unpriced} of them because nothing could price them at all, which condemns no kind); the condemned kinds are {Condemned(8)}; {Fetches} deliveries fetched off the board holding {Fetched} things; the levy has taken {Levied}gp over {Levies} sales; {stuckStalls} stalls have stood more than {StuckMs / 60000} minutes holding {stuckThings} things at {stuckWorth}gp, the oldest for {stuckOldest} minutes; {Stood} stalls were taken off the board at their lowest ask and {Returned} things went back to their sellers, {Unreclaimed} could not be handed back; {(LotsPerBot > 0 ? $"{Capped} things stayed in their sellers' hands for want of a lot, at {LotsPerBot} kinds a bot, and {PastCap} their makers put out past it" : "no limit on the kinds a bot may have out")}; {HeldAtCounter} brisk sellers' raises held at the shopkeeper's price";
     }
 
     private sealed class AuctionTimer : Timer

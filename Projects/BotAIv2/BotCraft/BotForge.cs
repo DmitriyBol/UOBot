@@ -246,6 +246,7 @@ public sealed class BotForge : BotDeed
 
         if (_made > had)
         {
+            BotCraftwork.Produced(_kind, _made - had);
             _made += BotCraftwork.Bonus(body, _kind);
         }
 

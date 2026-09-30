@@ -78,6 +78,34 @@ public static class BotCity
         Purse += Math.Min(coin, Math.Max(0, Cap - Purse));
     }
 
+    public static long CapitalPaid { get; private set; }
+
+    public static long CapitalSales { get; private set; }
+
+    public static bool Holds(int reserve) => Running && Purse > Math.Max(0, reserve);
+
+    public static int Draw(int gold, int reserve)
+    {
+        if (!Running || gold <= 0)
+        {
+            return 0;
+        }
+
+        var paid = Math.Min(gold, Math.Max(0, Purse - Math.Max(0, reserve)));
+
+        if (paid <= 0)
+        {
+            return 0;
+        }
+
+        Purse -= paid;
+        Spent += paid;
+        CapitalPaid += paid;
+        CapitalSales++;
+
+        return paid;
+    }
+
     public static long Escrowed { get; private set; }
 
     public static bool Escrow(int gold)
@@ -1107,7 +1135,7 @@ public static class BotCity
     public static string Describe() =>
         !Running
             ? "the city is not buying"
-            : $"the treasury holds {Purse}gp of {Cap} (minted {Minted}, taxed {Taxed} off the guilds' ground, spent {Spent} on {Lots} lots and {Units} things, {Served} of them against standing orders, {Filled} orders filled, {Refused} buys refused for want of coin; {BountiesPaid} bounties on ground and {HeadsPaid} on heads paid, {BountyGold}gp in all, {Lapsed} lapsed, {BloodPaid} murderers paid for at {BloodGold}gp and {BloodShort} prices the treasury could not meet, {HeadsRebound} prices on heads moved onto a new body after a boot); {Escrowed}gp held for the board's errands; {FairTell()}, {Fairs} fairs held and {FairGold}gp spent at them; standing orders: {Wants()}; bounties: {Bounties()}";
+            : $"the treasury holds {Purse}gp of {Cap} (minted {Minted}, taxed {Taxed} off the guilds' ground, spent {Spent} on {Lots} lots and {Units} things, {Served} of them against standing orders, {Filled} orders filled, {Refused} buys refused for want of coin; {BountiesPaid} bounties on ground and {HeadsPaid} on heads paid, {BountyGold}gp in all, {Lapsed} lapsed, {BloodPaid} murderers paid for at {BloodGold}gp and {BloodShort} prices the treasury could not meet, {HeadsRebound} prices on heads moved onto a new body after a boot); {CapitalPaid}gp paid on top of the capital's counters over {CapitalSales} sales; {Escrowed}gp held for the board's errands; {FairTell()}, {Fairs} fairs held and {FairGold}gp spent at them; standing orders: {Wants()}; bounties: {Bounties()}";
 
     public static void Forget()
     {
@@ -1134,6 +1162,8 @@ public static class BotCity
         Served = 0;
         Filled = 0;
         Refused = 0;
+        CapitalPaid = 0;
+        CapitalSales = 0;
     }
 
     private sealed class Clock : Timer

@@ -13,7 +13,7 @@ public sealed class BotRestStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRestStore));
 
-    private const int Shape = 3;
+    private const int Shape = 4;
 
     private static BotRestStore _store;
 

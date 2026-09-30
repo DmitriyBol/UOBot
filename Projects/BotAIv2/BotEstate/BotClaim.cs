@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Logging;
@@ -136,6 +136,17 @@ public static class BotClaim
     }
 
     private static readonly Dictionary<(int Map, int X, int Y), Holding> _held = [];
+
+    public static IEnumerable<(string Guild, int Map, int X, int Y, bool Bought)> Holdings()
+    {
+        foreach (var (key, held) in _held)
+        {
+            if (held?.Guild != null)
+            {
+                yield return (held.Guild, key.Map, key.X, key.Y, held.Bought);
+            }
+        }
+    }
 
     public static long CutOff { get; private set; }
 

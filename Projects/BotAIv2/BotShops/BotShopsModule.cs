@@ -52,6 +52,17 @@ public sealed class BotShopsModule : BotModule
             BotShopper.Short,
             BotPeddler.IgnoredMs / 60000
         );
+
+        logger.Information(
+            BotCapital.Running
+                ? "The capital is {Name}: its shopkeepers pay ×{Premium:F2} of their price, the difference out of the city's treasury above {Reserve}gp; a load on a stall walks to them from within {Reach} tiles and the bot's own leash when that pays for the road at {Tile:F2}gp a tile, and a trader offered a journey takes its goods there"
+                : "The capital's price is off: {Name} pays what every other town pays (×{Premium:F2} unused, {Reserve}gp, {Reach} tiles, {Tile:F2}gp a tile)",
+            BotCapital.Name,
+            BotCapital.Premium,
+            BotCapital.Reserve,
+            BotCapital.Reach,
+            BotPeddler.PettyPerTile
+        );
     }
 
     public override void Reset()
@@ -63,6 +74,7 @@ public sealed class BotShopsModule : BotModule
         BotPeddler.Forget();
         BotUpkeep.Forget();
         BotBullion.Forget();
+        BotCapital.Forget();
     }
 
     public static string Summarise() => BotShops.Describe();

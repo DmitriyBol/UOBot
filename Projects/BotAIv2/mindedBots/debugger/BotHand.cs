@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.IO;
@@ -113,7 +113,7 @@ public static class BotHand
         + "counts near the place named or anywhere, goods are brought to the place or to home. unpost <id> — the errand "
         + "withdrawn and its reward back. quests — the board and what came of it.";
 
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench"];
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench", "go", "gates", "parley", "meet", "zones", "zone"];
 
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
@@ -121,6 +121,10 @@ public static class BotHand
         + "this second instead of waiting a quarter of an hour for the watcher to think of it; naming a spot "
         + "raises a camp there, pulled into the ring around the population if it is too near or too far. "
         + "wars — every war standing, with its score and its clock. "
+        + "parley — the guilds' meetings standing and the last few ended, the agreements between guilds, and each guild's "
+        + "standing in its towns with the task in hand. meet <guild> ; <guild or town> [; grievance|safety|friendship|commerce] — "
+        + "call a meeting now, the pair's clock ignored: the envoy walks, the host answers, a watcher witnesses, the duke gives "
+        + "his word; a town's name sends the guild's envoy to that town's hall for a task. "
         + "guilds — every guild in a paragraph: who leads it, how many it has in the world, at rest and dead, what they fight "
         + "with (strength, armour, the skills a fight turns on, bandages and potions), what it owns, and the war it stands in "
         + "with how many of it are in the fight against how many the score asks for. seats — where each guild lives and how far "
@@ -150,7 +154,11 @@ public static class BotHand
         + "copy of the weapon the bot was born with in its pack, to watch the re-arm wield the better one and put the bound "
         + "one away; the copy is not bound and goes with the bot at the next restart. roads [<x> <y> ...] — how far the road "
         + "map from home has reached and what it cost, or for each tile named the steps of road from home against the "
-        + "straight line: the answer to \"is that ground far, or only far round\". None is offered to the minds.";
+        + "straight line: the answer to \"is that ground far, or only far round\". zones — the danger zones: how many of "
+        + "each level, the ten strongest, and the debuggers' tour. zones tour on|off — the debuggers walk the least-watched zones "
+        + "and wake the ground there, or go back to watching the bots. zone <x> <y> — what the zones say about one tile: its "
+        + "level, the zone it lies in, what lives there, its strength against the median bot, how sure the shape is and who "
+        + "died there. None is offered to the minds.";
 
     private static readonly Dictionary<string, long> _used = [];
 
@@ -313,6 +321,12 @@ public static class BotHand
             case "wars":
                 return BotWar.Describe();
 
+            case "parley":
+                return BotParley.Tell();
+
+            case "meet":
+                return BotParley.ByHand(tail);
+
             case "census":
                 return Census();
 
@@ -384,11 +398,20 @@ public static class BotHand
             case "navcells":
                 return NavCells(tail);
 
+            case "gates":
+                return Gates(tail);
+
             case "navbench":
                 return NavBench(tail);
 
             case "peril":
                 return Peril(tail);
+
+            case "zones":
+                return Zones(tail);
+
+            case "zone":
+                return Zone(tail);
 
             case "resolves":
                 return BotWill.DescribeResolve();
@@ -435,6 +458,7 @@ public static class BotHand
             "props" => Props(bot),
             "sight" => Sight(bot),
             "where" => Whereabouts(bot),
+            "go" => Go(bot, rest),
             "pack" => Packed(bot),
             "home" => Homeward(bot),
             "res" => Raise(bot),
@@ -626,7 +650,7 @@ public static class BotHand
             var hall = BotEstate.Hall(guild);
 
             say.Append(
-                $"{(hall is { Deleted: false } ? $"hall at {hall.X},{hall.Y}" : "no hall")}, {BotChest.Holds(guild.Name)}gp in the chest and {purses}gp in its members' purses and accounts, {BotClaim.Holds(guild.Name)} squares held"
+                $"{(BotGuildHouses.Of(guild.Name) is { } house ? $"a house in {house.Town} at {house.Heart.X},{house.Heart.Y}, " : "")}{(hall is { Deleted: false } ? $"hall at {hall.X},{hall.Y}" : "no hall")}, {BotChest.Holds(guild.Name)}gp in the chest and {purses}gp in its members' purses and accounts, {BotClaim.Holds(guild.Name)} squares held"
             );
 
             foreach (var war in BotWar.Standing)
@@ -746,6 +770,8 @@ public static class BotHand
         BotChest.Wipe();
         var seats = BotSeat.Wipe();
 
+        var houses = BotGuildHouses.Wipe();
+
         BotWar.Forget();
         BotRegard.Forget();
 
@@ -760,11 +786,17 @@ public static class BotHand
         BotGuilds.Forget();
         BotGround.Reset();
 
-        BotQuad.Forget();
         BotCommons.Forget();
 
         BotRest.Forget();
         BotGrowth.Forget();
+
+        BotResidence.Wipe();
+
+        BotParley.Wipe();
+        BotPact.Wipe();
+        BotGrievances.Wipe();
+        BotBurgh.Wipe();
 
         BotCity.Forget();
         BotTourney.Forget();
@@ -777,16 +809,21 @@ public static class BotHand
         BotToll.Forget();
         BotTollman.Forget();
 
+        BotTraveller.Forget();
+        BotVenturer.Forget();
+        BotInns.Forget();
+        BotPeoples.Forget();
+
         if (!World.Saving)
         {
             World.Save();
             Timer.DelayCall(TimeSpan.FromMilliseconds(500), Settled, 0);
         }
 
-        return $"reset: {halls} halls razed, {claims} claims let go, {seats} hand-set seats forgotten, wars, truces and opinions forgotten, "
+        return $"reset: {halls} halls razed, {claims} claims let go, {seats} hand-set seats forgotten, {houses} guild houses emptied, wars, truces and opinions forgotten, "
                + $"{learned} bots' learning wiped and {bodies} bodies deleted with everything they were carrying, "
                + $"the market, the wants and the board of errands emptied, the city's wants and bounties and the championship's record forgotten, every crime and the band forgotten, the guilds disbanded, "
-               + $"the island's danger map and everything known about what pays where wiped; the world is being saved — wait for \"the snapshot is on disk\", then restart the shard and the population rises as novices.";
+               + $"everything known about what pays where wiped (the island's danger map, the zones and the roads walked are kept); the world is being saved — wait for \"the snapshot is on disk\", then restart the shard and the population rises as novices.";
     }
 
     private static void Settled(int tries)
@@ -1400,6 +1437,29 @@ public static class BotHand
 
     public static long Called { get; private set; }
 
+    private static string Go(BotMobile bot, string rest)
+    {
+        var words = (rest ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length < 2 || !int.TryParse(words[0], out var x) || !int.TryParse(words[1], out var y))
+        {
+            return "go wants a bot and a place: go <bot> <x> <y>.";
+        }
+
+        var map = bot.Map;
+
+        if (map == null || map == Map.Internal)
+        {
+            return $"{bot.Name} is not in the world.";
+        }
+
+        var goal = BotStep.Settle(map, x, y, out var z) ? new Point3D(x, y, z) : new Point3D(x, y, map.GetAverageZ(x, y));
+
+        return BotWill.Press(bot, new BotHomeward(map, goal), $"sent by hand to ({x}, {y})")
+            ? $"{bot.Name} is walking from ({bot.X}, {bot.Y}) to ({goal.X}, {goal.Y}, {goal.Z}); its route is drawn by the ordinary walk, gates and moongates included."
+            : $"{bot.Name} would not take the walk.";
+    }
+
     private static string Summon(BotMobile bot)
     {
         var here = BotVigil.Body;
@@ -1711,6 +1771,39 @@ public static class BotHand
         return $"the seat of {found.Name} is {x},{y} now. {BotSeat.Tell()}";
     }
 
+    private static string Zones(string tail)
+    {
+        var words = tail.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length >= 1 && words[0].Equals("tour", StringComparison.OrdinalIgnoreCase))
+        {
+            if (words.Length >= 2 && (words[1].Equals("on", StringComparison.OrdinalIgnoreCase) || words[1].Equals("off", StringComparison.OrdinalIgnoreCase)))
+            {
+                BotZoneTour.Running = words[1].Equals("on", StringComparison.OrdinalIgnoreCase);
+
+                return $"the tour is {(BotZoneTour.Running ? "on: the free debuggers walk the least-watched zones" : "off: the debuggers go back to the bots, and the ground they held sleeps after its grace")}. {BotZoneTour.Describe()}.";
+            }
+
+            return $"the tour: {BotZoneTour.Describe()}. Say zones tour on or zones tour off.";
+        }
+
+        return BotZones.Tell();
+    }
+
+    private static string Zone(string tail)
+    {
+        var words = tail.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length < 2 || !int.TryParse(words[0], out var x) || !int.TryParse(words[1], out var y))
+        {
+            Refused++;
+
+            return "zone wants a tile: zone 1440 1690.";
+        }
+
+        return BotZones.TellAt(x, y);
+    }
+
     private static string Peril(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -1828,6 +1921,38 @@ public static class BotHand
         return $"from {from} to {goal}: {points.Count} points, about {length} steps over the chart for "
             + $"{Math.Max(Math.Abs(goal.X - from.X), Math.Abs(goal.Y - from.Y))} straight, {BotChart.Expanded - expanded} nodes "
             + $"expanded in {took:F2}ms; first points {string.Join(" ", shown)}{(points.Count > 12 ? " …" : "")}; legs: {string.Join("; ", legs)}.";
+    }
+
+    private static string Gates(string tail)
+    {
+        var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var map = BotPopulation.Home;
+
+        if (words.Length == 0)
+        {
+            return BotGates.Describe() + ".";
+        }
+
+        if (words[0] == "route" && words.Length >= 5 && int.TryParse(words[1], out var rx1) && int.TryParse(words[2], out var ry1)
+            && int.TryParse(words[3], out var rx2) && int.TryParse(words[4], out var ry2) && map != null && map != Map.Internal)
+        {
+            var za = BotStep.Settle(map, rx1, ry1, out var fza) ? fza : map.GetAverageZ(rx1, ry1);
+            var zb = BotStep.Settle(map, rx2, ry2, out var fzb) ? fzb : map.GetAverageZ(rx2, ry2);
+
+            return BotGates.Chain(map, new Point3D(rx1, ry1, za), new Point3D(rx2, ry2, zb)) + ".";
+        }
+
+        if (words.Length < 2 || !int.TryParse(words[0], out var x) || !int.TryParse(words[1], out var y) || map == null || map == Map.Internal)
+        {
+            Refused++;
+
+            return "gates wants nothing, or a point and perhaps a radius: gates | gates <x> <y> [radius].";
+        }
+
+        var radius = words.Length >= 3 && int.TryParse(words[2], out var r) ? r : 30;
+        var z = BotStep.Settle(map, x, y, out var fz) ? fz : map.GetAverageZ(x, y);
+
+        return BotGates.Near(map, new Point3D(x, y, z), radius) + ".";
     }
 
     private static string Nav(string tail)
@@ -2376,7 +2501,7 @@ public static class BotHand
     private static string Homeward(BotMobile bot)
     {
         var map = BotPopulation.Home;
-        var where = BotPopulation.Where;
+        var where = BotPopulation.HomeOf(bot);
 
         if (map == null)
         {

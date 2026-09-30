@@ -43,6 +43,8 @@ public sealed class BotMendModule : BotModule
 
         BotWill.Offer(new BotFugitive());
 
+        BotWill.Offer(new BotFugitive(early: true));
+
         logger.Information(
             "Mending ready: a bot looks after itself below {Hurt:P0} health and stops at {Mended:P0}, spell before cloth; a caster watches {Watch} tiles for somebody worse off",
             BotMend.Hurt,

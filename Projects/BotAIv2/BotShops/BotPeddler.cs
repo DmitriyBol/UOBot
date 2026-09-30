@@ -1,4 +1,8 @@
-﻿using Server.Logging;
+using System;
+using System.Collections.Generic;
+using Server.Items;
+using Server.Logging;
+using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
@@ -48,11 +52,17 @@ public sealed class BotPeddler : IBotProposer
             ? "nobody has been offered a trip to a counter with goods"
             : $"{Asked} looks for something to peddle: {Offered} trips to a counter offered, {Stallless} had nothing of their own on the market, {Spoken} were left alone because the board has money down for that kind, "
               + $"{Wanted} held stalls somebody here still wants, {Fresh} held stalls not yet ignored for {IgnoredMs / 60000} minutes, "
-              + $"{NoBuyer} found no shopkeeper in reach who buys the thing";
+              + $"{NoBuyer} found no shopkeeper in reach who buys the thing, {Petty} were worth less than the walk (under {PettyGold}gp or {PettyPerTile:F1}gp a tile); {FromPack} of the trips took goods out of a crowded pack that the bots' market would not take from it";
 
     public string Name => "Peddler";
 
     public BotStanding Rung => BotStanding.Free;
+
+    public static int PettyGold { get; set; } = 15;
+
+    public static double PettyPerTile { get; set; } = 0.1;
+
+    public static long Petty { get; private set; }
 
     public BotDeed Propose(IBotWilful bot)
     {
@@ -110,7 +120,7 @@ public sealed class BotPeddler : IBotProposer
 
             BotShops.Survey(map, body.Location);
 
-            var shop = BotShops.Buyer(bot, sample, out var price);
+            var shop = BotShops.Buyer(bot, sample, stall.Amount, true, out var price, out var factor, out var nearer);
 
             if (shop == null)
             {
@@ -121,14 +131,130 @@ public sealed class BotPeddler : IBotProposer
                 continue;
             }
 
+            var worth = stall.Amount * price * factor;
+            var tiles = Math.Max(Math.Abs(shop.X - body.X), Math.Abs(shop.Y - body.Y));
+
+            if (worth < Math.Max(PettyGold, tiles * PettyPerTile))
+            {
+                Petty++;
+
+                continue;
+            }
+
             Offered++;
 
-            return new BotPeddle(shop, stall.Kind, stall.Label, stall.Amount, price);
+            var passed = factor > 1.0 && nearer >= 0 && tiles > nearer ? tiles - nearer : 0;
+
+            if (passed > 0)
+            {
+                BotCapital.Offer();
+            }
+
+            return new BotPeddle(shop, stall.Kind, stall.Label, stall.Amount, price, false, factor, passed);
         }
 
         if (mine == 0)
         {
             Stallless++;
+        }
+
+        return FromThePack(bot, body, map);
+    }
+
+    public static double CrowdedShare { get; set; } = 0.5;
+
+    public static int PackLookMs { get; set; } = 60000;
+
+    public static long FromPack { get; private set; }
+
+    private static readonly Dictionary<Serial, long> _looked = [];
+
+    private static BotDeed FromThePack(IBotWilful bot, Mobile body, Map map)
+    {
+        var pack = body.Backpack;
+
+        if (pack == null || pack.MaxItems <= 0 || pack.TotalItems < pack.MaxItems * CrowdedShare)
+        {
+            return null;
+        }
+
+        var now = Core.TickCount;
+
+        if (_looked.TryGetValue(body.Serial, out var at) && now - at < PackLookMs)
+        {
+            return null;
+        }
+
+        if (_looked.Count > 1024)
+        {
+            _looked.Clear();
+        }
+
+        _looked[body.Serial] = now;
+
+        var keep = BotUnload.Keeps(bot);
+        var atLots = BotAuction.AtLots(bot);
+        Dictionary<Type, (Item Sample, int Amount)> kinds = [];
+
+        for (var i = 0; i < pack.Items.Count; i++)
+        {
+            var item = pack.Items[i];
+
+            if (item == null || item.Deleted || !item.Movable || item is Gold || !item.IsStandardLoot()
+                || BotBinding.IsBound(item, bot.Bond))
+            {
+                continue;
+            }
+
+            var kind = item.GetType();
+
+            if (keep.ContainsKey(kind) || BotAuction.Selling(bot, kind))
+            {
+                continue;
+            }
+
+            if (!BotAuction.Worthless(kind) && !atLots)
+            {
+                continue;
+            }
+
+            kinds[kind] = kinds.TryGetValue(kind, out var had)
+                ? (had.Sample, had.Amount + Math.Max(1, item.Amount))
+                : (item, Math.Max(1, item.Amount));
+        }
+
+        if (kinds.Count == 0)
+        {
+            return null;
+        }
+
+        BotShops.Survey(map, body.Location);
+
+        foreach (var (kind, (sample, amount)) in kinds)
+        {
+            if (BotAuction.Demand(bot, kind) != null)
+            {
+                continue;
+            }
+
+            var shop = BotShops.Buyer(bot, sample, amount, false, out var price, out _, out _);
+
+            if (shop == null)
+            {
+                continue;
+            }
+
+            var tiles = Math.Max(Math.Abs(shop.X - body.X), Math.Abs(shop.Y - body.Y));
+
+            if (amount * price < Math.Max(PettyGold, tiles * PettyPerTile))
+            {
+                continue;
+            }
+
+            FromPack++;
+            Offered++;
+
+            return new BotPeddle(shop, kind, BotListing.Name(sample), amount, price, true);
         }
 
         return null;
@@ -154,6 +280,8 @@ public sealed class BotPeddler : IBotProposer
     {
         _saidNoBuyer = false;
         Asked = 0;
+        FromPack = 0;
+        _looked.Clear();
         Stallless = 0;
         Wanted = 0;
         Fresh = 0;
