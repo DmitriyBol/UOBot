@@ -11,7 +11,7 @@ optional:
 `BotMindAI` references `BotAIv2` and never the other way round. You can ship the first without the second; you
 cannot ship the second alone.
 
-> **Seven engine patches are required**, all in `engine-patches/`, and one folder of new engine code. From the root
+> **Ten engine patches are required**, all in `engine-patches/`, and one folder of new engine code. From the root
 > of the ModernUO checkout, before building:
 >
 > ```bash
@@ -35,6 +35,16 @@ cannot ship the second alone.
 >   only the map's own tiles.
 > - `BaseHouse-navigation.patch` tells the tiered navigation, from `Projects/UOContent/Multis/Houses/BaseHouse.cs`,
 >   when a house is raised, moved or taken down, so the ground under it is drawn again.
+> - `BaseGuard-killing.patch` adds a static event to `Projects/UOContent/Mobiles/Guards/BaseGuard.cs`, raised just
+>   before a guard kills its focus outright, and names the guard as the killer, so a bot can count a guard's kill as
+>   its rescue.
+> - `GuardedRegion-hostile-creatures.patch` makes a wild creature that attacks on sight and is fighting a player a
+>   guard candidate in `Projects/UOContent/Regions/GuardedRegion.cs`, whoever struck first. It covers only players
+>   with no client (the bots) unless `guards.hostileCreaturesForClients` is set; `guards.hostileCreatures` turns it
+>   off.
+> - `GenericSell-coloured-ingots.patch` lets the blacksmith and the smith-tools shopkeeper buy coloured ingots below
+>   iron's price, consumed rather than put up for sale again, through a new `GenericSellInfo.Add(type, price,
+>   resellable)` and a new file, `Projects/UOContent/Mobiles/Vendors/SBInfo/ColouredIngots.cs`.
 >
 > The new code is the tiered navigation, `Projects/UOContent/Engines/Pathing/Tiered/`, with its tests in
 > `Projects/UOContent.Tests/Tests/Engines/Pathing/Tiered/`: a graph of the whole map that answers a route of any
@@ -42,8 +52,10 @@ cannot ship the second alone.
 > of it on the loop), keeps it in `Distribution/Data/Pathfinding/` between boots, and is switched in
 > `modernuo.json` by `pathfinding.tiered.enable` and `pathfinding.tiered.persist`.
 >
-> Without them `BotAIv2` does not compile. Nothing in the engine subscribes to the two events, every message is
-> still sent exactly as before, and the old `GetSkillTitle` and the old surface probe answer exactly as they did.
+> Without them `BotAIv2` does not compile (the coloured ingots apart: without that patch the smiths simply buy no
+> coloured bar). Nothing in the engine subscribes to the three events, every message is still sent exactly as before,
+> and the old `GetSkillTitle` and the old surface probe answer exactly as they did. The two patches that change what
+> the engine does, the guards and the coloured ingots, are the shard's rules, and say so above their diffs.
 > Each file explains itself above its diff; `git apply` skips that text. The diffs need LF line endings, which this repository's
 > `.gitattributes` keeps on every checkout.
 
@@ -116,7 +128,7 @@ dotnet ModernUO.dll
 
 The first start asks where the client files are, which expansion — `UOR` — and for the owner account, so it has to
 be run from a real console; on Windows that is PowerShell or cmd, not the Git Bash window. After that
-`./start-shard-detached.ps1` starts it detached. The shard raises the population on start. Confirm it in the log:
+`START_SHARD.bat` starts it detached. The shard raises the population on start. Confirm it in the log:
 
 ```
 Population raised: 80 bots at (1440, 1470, 0) on Felucca

@@ -26,12 +26,15 @@ put it out, which is still the shape of every one of them.
 | `BotForge.cs` | beating iron into something, at a forge, and handing it to whoever asked for it; a forge whose anvil the engine refuses rests for every smith (`BotGround.Unfit`) |
 | `BotMeal.cs` | a bot eating a cooked meal: what it does to the bot, and for how long |
 | `BotOven.cs` | cooking: what a meal is made of, and who can make one |
-| `BotSmith.cs` | offers a bot with a hammer and some metal a turn at an anvil, and offers it the board's orders first |
+| `BotSmith.cs` | offers a bot with a hammer and some metal a turn at an anvil, and offers it the board's orders first; remembers the metal the dearest order it passed over for want of iron would take (`Short`, 03.10.2026), which the metal board orders and the porter keeps |
 | `BotCraftEar.cs` | what the craft system last told each bot, and how often it has said each thing, heard through the `CraftItem.Said` engine patch |
 | `BotTinker.cs` | Making a tool out of iron, wherever the bot is standing, and handing it to whoever asked for it or to the market. |
 | `BotTinkerer.cs` | Offers a bot with tinker's tools and some iron a stint at making the tool the island is shortest of, and offers it the board's orders first. |
 | `BotTinkering.cs` | What a tinker needs to know: the craft system, the tool, and which of the things it can make are the tools the rest of the population wears out. |
 | `BotTutor.cs` | The first steps of a trade, bought from a shopkeeper who knows it — the engine's own teaching, paid for in gold. |
+| `BotAdvance.cs` | a brewer's glass and herbs for a draught somebody asked for, lent out of that want's own reservation at the counter and settled at the hand-over; what is not settled the brewer pays back (03.10.2026) |
+| `BotCraftFirst.cs` | a crafter takes the work asked of it before it digs (the auction's rule is in `BotWill`), and is offered its own material out of its bank box for an order it passed over (03.10.2026) |
+| `BotDraw.cs` | the walk to the bank box for that material |
 
 ---
 
@@ -73,6 +76,41 @@ statement said as a number.
 Cloth costs money and the finished piece is worth more — in skill certainly, in coin if the market agrees.
 `GoldPerPiece` (12) is a stand-in of the same kind as the price of an ingot: it **opens a stall**, and from
 there the price is the market's business.
+
+---
+
+## Crafters first, and draughts on a want's advance (03.10.2026)
+
+Patrick, 03.10: flow9's proposals 3 and 4, "do it". Measured on build 396 (04:19–12:47, 210 bots).
+
+**Crafters make what is asked before they dig.** The eighteen crafters spent 44 % of their finished minutes digging and
+7 % making things; mining paid them 8gp an hour in coin and their ingots peddled 6 % of their gold. The auction never put
+digging over an order a crafter could make — a forge or a needle for an order opens at hundreds a minute — but it put it
+over everything around one: a restock of the crafter's own material was the runner-up of 111 of its 1,281 mining takes,
+a delivery of its own pieces 25, and smiths passed orders over for want of iron 6,746 times with their own ingots in their
+bank boxes. So for a Crafter or an Architect (never a gatherer, whose living is the dig) a winning dig or prospect gives
+way to the best *asked* work worth anything (`BotCraftFirst.Asked`): a piece for an order, a delivery to a want or the
+meeting with a carrier bringing its own, a restock of its trade's material (metal, hide, cloth, feathers, wood) — also a
+walk to a bot's shop for its own want of one — and its own material out of the bank box. Prices are not touched; nothing
+else is reordered; work in hand is not taken away. A craft that passes an order over for want of material remembers it for
+ten minutes (`BotCraftFirst.Short`: the smith's metal, the tailor's leather, the fletcher's feathers), and a crafter whose
+bank box holds it is offered the walk to the nearest bank (`BotDraw`, claimed at 120 a minute like a spare tool's trip);
+the memory is let go when the walk reaches the bank, whether or not the pack could take anything (counted apart), so a full
+pack is not walked back to the box.
+Counted in `Roles:` (the crafters' clause: making against digging by trade, what took a dig's place, the walks to the box).
+
+**A potion want's reservation pays the brewer's glass and herbs.** 1,946 looks at the mortar were brewers whose purse would
+not carry the glass for the herbs they held (the fattest 24gp), 53,006 held neither, 23 rounds in eight hours were brewed for
+an order, and potion lines took a median 9.3 minutes (a fifth failed). A brewer with the Alchemy for a draught somebody wants
+— the engine's chance at 80 % or better, under the draught's cap, no loan of its own standing — takes a want older than
+three minutes (a carrier holding the draughts goes first; a brewer looks once every `BotAdvance.LookMs`) when one counter in reach sells what the pack lacks and that costs
+no more than the draughts' offer. At the counter the buyer's account lends the money (`BotAdvance.Lend`, drawn on the want's
+own reservation the way the meeting draws on it), the brewer buys and gives back at once what the counter did not take, and
+the round holds its units on the want while it brews (`BotBrew` is an `IBotWantCarrier` while funded). The want then holds
+that much less (`BotMarket.Holds`), the brewer's kit does not keep the draughts it owes (`BotUnload.Keeps`), and at the
+hand-over the advance comes off the bill (`BotHandover.Exchange`). A loan whose want is gone, shrunk, or not carried for
+twenty minutes is called and paid back out of the brewer's free money as soon as it has any. Not saved across a restart.
+Counted in `Needs:` (after the brew clause) and `The market:` (gold settled out of an advance).
 
 ---
 

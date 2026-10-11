@@ -1,8 +1,11 @@
 # Bots' shops: trade between bots in a place
 
 Patrick's order of 29.09.2026, evening: move away from the internal auction by degrees; bots keep shops by the bank or
-their own storage and call out to the bots that need their goods; for now the auction stays, with fewer lots a bot. A
-merchant caste that buys what moves and carries it between towns is the next step, not this one.
+their own storage and call out to the bots that need their goods. **Since 01.10.2026 (Patrick's order of 30.09) the auction
+is gone and these shops are the market** (`BotMarket/README.md`): only makers and gatherers keep shop
+(`BotShopkeeper.Merchant`), by Britain's bank — a guild's member by its guild's own town's — the opening said in the world's
+chat, a customer buying within two tiles (`ServeReach`), and the city's buys, fairs and standing orders served here
+(`BotShopkeep.CityBuy`). Where this file speaks of stalls, the lot cap or escrow below, it describes the shops of 29.09.
 
 | File | What is in it |
 |---|---|
@@ -15,7 +18,7 @@ merchant caste that buys what moves and carries it between towns is the next ste
 | `BotShopkeepConfig.cs` | `Configuration/bot-botshops.json` |
 | `BotShopkeepModule.cs` | module, phase `World`, requires `Will`, `Shops`, `Auction`, `Population`; sets the auction's lot cap; writes `Bot shops:` every five minutes |
 
-Hooks in shared files, each commented where it stands: `BotCore` registers the module; `BotAuction.List` refuses a new kind
+Hooks in shared files as of 29.09 (the auction's are gone since 01.10.2026), each commented where it stands: `BotCore` registers the module; `BotAuction.List` refused a new kind
 past `LotsPerBot` (with `Capped` and a clause on `The market:` line); `BotShopper.Propose` asks `BotShopkeep.Beats` before
 the stall and the counter; `BotRestock` has a fourth constructor, a branch in `Advance`, `Bend`, `AtCounter` and `Outlay`
 for it, and books each shopkeeper purchase in `BotShopBook`; `BotWebSnapshot` writes `shops`; `BotPhrases` has the four
@@ -57,15 +60,17 @@ goods in front of it; what the shop could not supply is asked for again at the s
 
 ## Prices
 
-Open at the nearest shopkeeper's ask, or `BotAuction.Worth` when that is less; a kind no shopkeeper sells opens at
-`Worth`, falling back on what a shopkeeper pays. Never under `BotAuction.Floor`. Up by `BotAuction.RaiseStep` when a kind
-sells again inside `BotAuction.BriskMs`; down by `BotAuction.CutStep` for each kind nobody bought during a whole shift;
-always inside `BotAuction.LeastMultiple`…`MostMultiple` of the opening. A buyer pays the price it was quoted when it set
+Open at the nearest shopkeeper's ask, or `BotMarket.Worth` when that is less; a kind no shopkeeper sells opens at
+`Worth`, falling back on what a shopkeeper pays — and a coloured ingot, which no shopkeeper in this era buys or sells, on
+`BotAnvil.Reckon`: iron's price raised by the metal's Blacksmithy floor (01.10.2026; before it, no coloured bar was ever shown and
+no smith could see the island had any). Never under `BotMarket.Floor`. Up by `BotMarket.RaiseStep` when a kind
+sells again inside `BotMarket.BriskMs`; down by `BotMarket.CutStep` for each kind nobody bought during a whole shift;
+always inside `BotMarket.LeastMultiple`…`MostMultiple` of the opening. A buyer pays the price it was quoted when it set
 out if the price has risen since. `BotShopkeep.PriceFor` is the one place the price a buyer pays is read.
 
 ## Money
 
-The auction's order: the buyer is charged first (`BotAuction.Charge`, pack then account, all or nothing); the goods move;
+The auction's order: the buyer is charged first (`BotMarket.Charge`, pack then account, all or nothing); the goods move;
 what did not move is refunded to the buyer's account; the keeper is paid for what did, as coin in its pack (the account if
 the pack will not take it, the pack regardless if neither will). No levy.
 
@@ -86,3 +91,22 @@ shop. Its takings are measured as coin. The customer's walk is `restock`, the sh
 4. `Bot shops:` every five minutes: shifts, sales by need, the weighing, the till, the book.
 5. `The market:` — the new clause `N things stayed in their sellers' hands for want of a lot, at 3 kinds a bot`.
 6. The page: the `shops` layer.
+
+## The pitch is in the banker's sight and never a doorway; the walk ends when the shop opens (07.10.2026, work18)
+
+On build 416 (01:16-10:52 on 07.10) shopkeep ended 594 finished, 217 failed, 51 dropped; 195 of the failures were the strip by
+Britain's bank: (1422, 1684-1692) outside the west wall and (1423-1430, 1693-1694) on the south wall line, where the doors are.
+Only 26 pitches were struck and 2 shifts opened where the keeper stood, because most of the failures came with the shop already
+open: the shop opens with the keeper a tile from its pitch, the walk the will sent it on stayed on the road (a work answer does not
+end a walk), and when the walker gave up on the pitch's own tile the open shift failed "could not get nearer" (Lucan, 10:00-10:06,
+in the doorway at (1423, 1693)). Now:
+
+- `BotKeepShop.Opening` ends the shift's own walk when the shop opens (not a company's station nor an interruption).
+- `BotKeepShop.Bend` with the shop open keeps the shift when the keeper is within `StandReach + ServeReach` of its pitch or on
+  fit ground in the bank's ring (its stand moves there). `BendIsTrouble` is false for an open shop.
+- A keeper still walking after `BotShopkeep.OpenStandingMs` (30 s) on fit ground opens where it stands.
+- `Pitches` leaves out a tile within one of a door (`BaseDoor`, open or shut place; `KeepOffDoors`) and a tile the banker has no
+  line of sight to (the wall line). `StandsFit` asks the same.
+- Counters in `Bot shops:`: tiles left out as a doorway / out of the banker's sight, shifts opened where the keeper stood (of them
+  after 30 s of walking), keepers who stood in a doorway and walked on, walks ended when the shop opened, failed walks back that
+  kept the shift.

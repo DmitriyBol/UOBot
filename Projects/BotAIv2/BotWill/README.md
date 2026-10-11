@@ -20,6 +20,7 @@ produced, less what was spent.
 | `BotYield.cs` | the takings: the skill-to-gold rate, the price of death, the measurement ceiling, and the aside ledger — money moved by somebody else's decision, kept out of the work in hand |
 | `BotAppraisal.cs` | the appraisal: estimate × considerations, geometric mean, inertia; the work in hand is not asked the price of starting (build 50); the root is the dial `Root`, 5, named on the take line (build 64) |
 | `BotBreaker.cs` | work one bot keeps failing for the same reason is not offered to that bot for a while; and the loudest loop of an alarm window, for the alarm (`Loudest`, build 64) |
+| `BotTreadmill.cs` | the same deed against the same target failing at once is rested against that target for seconds, defences included; a fight judged lost ("X was winning") rests against that foe at once and the flight is weighed as on the failing rung (07.10.2026, loops18) |
 | `BotResolve.cs` | state on the bot: feelings, ledger, what was taken on and why, what it scored then and how long it reckoned; and `BotPause`, work put down for something that would not wait |
 | `BotWill.cs` | the decision itself: settle → advance → auction. And the census. A refused road the work in hand never sent — a company's station — is not charged to that work (`Foreign`, build 52); a prowl displaced by the fighting it went for is settled finished without crediting its place (`Met`, switch `MetCounts`, build 65) |
 | `BotWillConfig.cs` | `Configuration/bot-will.json` |
@@ -167,6 +168,16 @@ Two more since that evening, both of them the auction reading a record that alre
   this project has met most — a failure offered again unchanged — and it logs every trip with the bot, the work and the
   reason, because the loop it stops still has to be mended where it starts. Replayed over the logs of 14.09.2026 before
   it was written, it stopped every loop of the day and tripped at most once in a session without one.
+- **A rest after a treadmill** (`BotTreadmill`, 07.10.2026, loops18). The breaker counts six in five minutes and never rests a
+  defence; since react14 a fight that ends is decided again at the clock's next look, so a deed that fails on its first beat
+  turns at ten a second (Orlando, build 418: "hitting back at a troll" 39 times in eight seconds, each "a troll was winning").
+  Keyed on the bot, the kind and the target (the foe's serial, else the place): a fight ending on the losing judgement rests
+  against that foe for `LosingRestMs` (15 s) at once, and `BotFugitive`'s early flight is weighed as on the failing rung for
+  those seconds (fight what you beat, leave what you do not); the fight to the end (`BotDefender.Stand`) is let through, so a
+  bot with no flight on offer still fights. Any deed failing within `InstantMs` (2 s) of being taken, having made nothing, twice
+  inside `TwiceMs` (2 s) against one target rests against it for `RestMs` (15 s); a flight never (counted). A veto in the
+  appraisal, so the hurried decision meets it too; never the work in hand. Counted at the end of the Will line; `Running` off
+  undoes it.
 - **Ground where bots have been dying** (`BotPeril.Lethal`). The danger map held every death and was read only by
   captains; the appraisal's caution was the bot's own ledger, keyed by trade. Work whose place lies in or beside squares
   where two bots have died lately is refused, unless it goes where the fighting is on purpose (`BotDeed.Braves`: hunt,

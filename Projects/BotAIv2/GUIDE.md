@@ -305,17 +305,17 @@ be spent.
 
 ## Running a shard
 
-After the first start from a console (see `README.md`), the scripts at the root of this repository do the rest on
-Windows. Copy them to the root of the ModernUO checkout; they expect `Distribution\ModernUO.exe` beside them.
+After the first start from a console (see `README.md`), `START_SHARD.bat` at the root of this repository does the
+rest on Windows. Copy it to the root of the ModernUO checkout; it expects `Distribution\ModernUO.exe` beside it.
 
-```bash
-./start-shard-detached.ps1
+```bat
+START_SHARD.bat
 ```
 
-Starts the shard so that it outlives the shell that started it, and waits until it reports listening on
-`127.0.0.1:2593`. Its whole console goes to `logs/session-<yyyy-MM-dd_HH-mm>.log`, one file per start.
-`./install-shard-autostart.ps1` registers a task that starts the shard a minute after logon and brings it back if it
-stops; with that task in place, `start-shard-detached.ps1` simply runs it.
+Double-click it, or run `START_SHARD.bat --nopause` from a script. It starts the shard through a scheduled task with
+no triggers, so the shard outlives the window or app that started it, and waits until it reports listening on
+`127.0.0.1:2593`. Its whole console goes to `logs/session-<yyyy-MM-dd_HH-mm>.log`, one file per start. Nothing starts
+the shard on its own: after a reboot, run it again.
 
 Stop it by saving first — write `do save` into `Distribution/argus-in.txt` and wait for the answer in
 `Distribution/argus-out.txt`, or type `[Save` in game — and then:

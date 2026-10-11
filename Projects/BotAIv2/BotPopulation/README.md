@@ -19,12 +19,18 @@ project first does anything at all.**
 | `BotTidy.cs` | what a bot carries and wears kept in order on its beat: an unidentified magic weapon or armour identified with Item Identification's check (every bot has it at 100) — off a corpse before it is listed, and in the pack or worn, and the death robe the engine dresses a risen body in cut into bandages with scissors or thrown away (build 98) |
 | `BotReclaim.cs` | going back for what death took |
 | `BotStall.cs` | notices a bot that has stopped getting anywhere, and says so as an error |
-| `BotUnload.cs` | going to the counter when the pack is getting heavy: coin into the account, everything spare onto the market |
+| `BotUnload.cs` | going to the counter when the pack is getting heavy: coin into the account, everything spare into the bank box |
+| `BotSurplus.cs` | a bank box kept in order: stacks of one kind lying apart joined (the engine's `StackWith`), a miner's bars put onto the box's stack of the metal; and where a capped kind's surplus went over the last hour, by kind: box, shopkeeper, a bot, the ground, refused by a full box, no box and no buyer (06.10.2026, box16) |
 | `BotGrowth.cs` | Newcomers: a couple of novices raised every two hours, so the island has old hands and beginners at once. Since 29.09.2026 a guild of `LeastToWant` (3) bots with nobody of a role gets the next newcomer in that role — a producer first, a medic second — instead of a roll of the mix (`BotGuilds.Lacking`). |
 | `BotGrowthStore.cs` | Keeps the newcomers across restarts. |
+| `BotBirth.cs` | A newborn's temperament (01.10.2026, Patrick's point 7): the birth's own points leaned towards one skill of the class's own (`BotClass.Leanings`), seeded by name and class; a smith is born at the first coloured metal's floor (dull copper, 65, read off the engine). The birth line per bot and `births:` in `Rest:`. |
 | `BotGuildWidenStore.cs` | Keeps the guilds' widenings across restarts. |
+| `BotGuildSplitStore.cs` | Keeps across restarts who left which guild and when (the walk-out bar), and the clocks of the splits: five of a full guild founding a new one (`BotGuilds.Hive`, 06.10.2026). |
 | `BotRest.cs` | How long a bot plays before it is tired, and the rest it takes before it plays again. |
 | `BotRestStore.cs` | Keeps every bot's play and rest across restarts. |
+| `BotRestConfig.cs` | what `bot-rest.json` may say (02.10.2026): the rest clock's own dials, which had no file before, the prime time schedule (`PrimeTime`) and the critical floors (`Critical.Floors`) |
+| `BotPrime.cs` | prime time (02.10.2026, Patrick): bands of the day, each a share of the island to be in the world — 00–08 100 %, 08–16 75 %, 16–24 50 %, local time — read by `BotRest.Look` as the floor in both directions: over it the ones past their hours go, under it the resting come back whatever they owed; the target ramps over `RampMinutes` (30) at a band's start and `TirePerLook`/`ReturnPerLook` (5) cap a look; `FloorShare` only when it is off |
+| `BotCritical.cs` | the posts the island is never left without (02.10.2026): a floor per class (Healer, Crafter, Gatherer, Mage, Trader, Captain, Baron) or trade by best skill (Smith, Tailor, Fletcher among crafters; Miner, Woodsman among gatherers); a bot past its hours whose post would fall under its floor plays on, a post under its floor brings its own back from rest up to `EarlyMinutes` (480) early, and a post the whole island lacks gets the next newcomer in its class |
 | `BotInns.cs` | the inns and taverns read from the world; a tired bot walks to one, pays for a bed and leaves from there; a paid night buys a third of the rest as regeneration (29.09.2026) |
 | `BotPeoples.cs` | who a bot is born as: three peoples and two hundred names from `bot-names.json`, the people drawn for the class, the race before the body; see `NAMES.md` |
 
@@ -187,6 +193,15 @@ and the trip is offered unpaid, as it is to a bot too heavy to walk. Loot, spoil
 go into a pack without asking it, which is how a pack gets there. The `Will:` line counts the refusals and the offers
 of the trip; both are counted once a review while the state lasts, so they measure how long it lasted, not how many
 bots were in it.
+
+**Surplus of a capped kind goes to the box (06.10.2026).** Two more reasons for the trip: units of a kind the bot keeps a
+number of (draughts, bandages, reagents, tools) more than `KitSlack` over that number, on the way when a counter is within
+`KitNear` tiles and on its own once it has ridden `KitWaitMs`; and standing within `BankBy` tiles of a banker with anything
+over the allowance. A want near keeps its goods in the pack for no longer than `HoldMs`. Both are made false by the trip,
+and what a full box cannot take is not counted, so a full box cannot send a bot back. A full box (`BotPeddler.FullShare`)
+lets its own capped kinds over one refill, and what the island asks for, go to a shopkeeper. The `Packs:` line names the
+bots over the allowance in capped kinds, by units, the worst pack, and the full bank boxes with what fills them;
+`/api/state` carries `over` and `boxItems` per bot.
 
 **Nobody musters a squad.** `BotSquads.Form` is still called by nothing, so formation, scouting and sharing are
 written and do not run. That is the next proposer, not a defect.

@@ -38,7 +38,7 @@ place: `BotWill`.
 ```
 
 Everything else is a capability those proposers reach for: `BotOutfit` (what a bot owns), `BotCombat` (is this
-fight winnable), `BotShops` (buy and sell over a counter), `BotAuction` (the bots' own market, both sides),
+fight winnable), `BotShops` (buy and sell over a counter), `BotMarket` (the bots' own market, hand to hand, in Britain),
 `BotClasses` (what a kind of bot is).
 
 **No subsystem asks another to make a decision.** They read each other's facts. That is the single rule that
@@ -85,15 +85,15 @@ Fourteen modules. The loader resolves the order itself from what each one declar
 | `Modules` (the frame) | — | — |
 | `Movement` | World | — |
 | `Combat` | — | — (no module; pure arithmetic, called directly) |
-| `Auction` | World | — |
+| `Market` | World | Will |
 | `Will` | World | Classes |
 | `Squads` | World | Classes |
 | `Shops` | World | Classes, Will |
 | `Harvest` | World | Classes, Will |
 | `Mend` | World | Classes, Will |
-| `Hunt` | World | Classes, Will, Auction |
+| `Hunt` | World | Classes, Will, Market |
 | `Craft` | World | Classes, Will, Shops |
-| `Spells` | World | Classes, Will, Shops, Auction |
+| `Spells` | World | Classes, Will, Shops, Market |
 | `Population` | World | Classes, Movement, Will |
 
 The intended layering, from the bottom:
@@ -105,7 +105,7 @@ The intended layering, from the bottom:
    BotMovement     a step, a path, pockets of unreachable ground, a queue of errands
    BotCombat       strength, threat, fight-or-walk — pure arithmetic over Mobile
 3  BotWill         the decision: ladder, obligation, auction, ledger
-4  BotAuction      the bots' market, both sides
+4  BotMarket       the bots' market, hand to hand: wants said aloud, carriers, meetings
    BotShops        buying and selling over an NPC counter
 5  BotHarvest      dig → smelt → bank
    BotCraft        buy cloth → sew → sell
@@ -116,12 +116,11 @@ The intended layering, from the bottom:
    BotDashboard    [bots — five tabs
 ```
 
-**Four real inversions, named rather than hidden.** All four compile (one assembly), and each is a small debt
+**Three real inversions, named rather than hidden.** All three compile (one assembly), and each is a small debt
 worth paying when it next gets in the way:
 
 | Where | What | Why it is wrong |
 |---|---|---|
-| `BotAuctionConfig` → `BotDig.ListGoods` | the market's config file owns a mining dial | the knob belongs to whoever produces, not to the place they sell |
 | `BotSew` → `BotDig.CounterReach` | one trade borrows another trade's number | two trades that share a number will disagree about it eventually |
 | `BotShops`, `BotHarvest`, `BotHunt` → `BotPopulation.Within` | layers 4–5 reach up to layer 6 | the Britain boundary is a fact about the **world**, not about the population; it is in the wrong folder |
 | `BotMend` → `BotSpells.BotGrimoire` | healing reads the spellbook | defensible — a heal is a spell — but it makes mending unavailable without magic |
@@ -184,7 +183,7 @@ Everything else lives in the subsystem READMEs. These are the ones that change w
 
 **No configuration file anywhere sets a price.** Config files set speeds and limits. The one exception is the
 stand-in openers (`GoldPerIngot` 6, `GoldPerPiece` 12) which exist only until the market has traded one, and
-`BotAuction.Worth` asks the market first, always.
+`BotMarket.Worth` asks the market first, always.
 
 ---
 
@@ -263,8 +262,8 @@ The names are unusual and consistent. Knowing them makes the code read like pros
 | **bond** (`BotBond`) | what the world gave a bot at birth and what death may not take |
 | **journey** (`BotJourney`) | the queue of errands; a fight stacks on top and the destination waits under it |
 | **resolve** (`BotResolve`) | a bot's feelings, ledger, what it took on and why |
-| **stall** (`BotListing`) | one bot's standing offer to sell one kind of thing |
-| **want** (`BotWant`) | the same with the sign turned round: an offer to buy, with the money already down |
+| **shop** (`BotStorefront`) | one maker's or gatherer's goods on show by the bank for a shift; the stall (`BotListing`) went with the auction on 01.10.2026 |
+| **want** (`BotWant`) | an offer to buy, said aloud, no gold held; answered by a carrier's walk or at a shop, hand to hand |
 | **kit** (`BotKit`) | what a class is issued at birth |
 | **vector** | how far along its own class's declared skill targets a bot has come |
 
@@ -289,13 +288,13 @@ digging is free.
 
 Two ordering rules carry the whole thing:
 
-**The bots' market is asked before a counter, always.** `BotShops.Buy` is compared against `BotAuction.Cheapest`
-and the cheaper wins — so a shopkeeper is the **ceiling** on what a bot can charge, never the preference. And
-goods only reach a counter through `BotPeddler`, whose one condition is a stall that has stood for a full stale
-period and never sold: half an hour in front of the whole population, refused.
+**The bots' market is asked before a counter, always.** `BotShops.Buy` is compared against a bot's shop by the bank
+(`BotShopkeep.Beats`, its walk counted) and the cheaper wins — so a shopkeeper is the **ceiling** on what a bot can
+charge, never the preference. And goods only reach a counter through `BotPeddler`, whose one condition is that nobody on
+the island is asking for them. Since 01.10.2026 every trade between bots is hand to hand (`BotMarket/README.md`).
 
-**A shortage reaches a worker without anybody sending a message.** `BotAuction.Worth(type, fallback)` asks, in
-order: what somebody is offering for one with the money down; what one has actually changed hands for; then the
+**A shortage reaches a worker without anybody sending a message.** `BotMarket.Worth(type, fallback)` asks, in
+order: what somebody says it will pay for one; what one has actually changed hands for between two bots; then the
 caller's stand-in. A producer counts its output at that price, the takings go into the ledger, and the ledger
 raises its estimate of that work next time. One trip of latency and no new machinery — the same
 arithmetic-from-a-shared-fact that decides everything else here.

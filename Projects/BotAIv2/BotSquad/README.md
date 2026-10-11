@@ -163,6 +163,135 @@ And the same rule applied to a single bot needed no code: a member that cannot r
 errand by itself — the errand queue drops it after a hundred fruitless attempts at a step, and what is underneath
 it is a station.
 
+## Leaving a fight it cannot win (03.10.2026)
+
+The clock above judges a fight the company is in. Nothing judged a fight the company was *put* in: the company chose its
+quarry at `BotThreat.Tolerance` (×1.5) of what it brought (`BotQuarry.Company`), and took on whatever attacked it with no
+weighing at all (`Retarget`, `BotSquads.Note`, the prowl's company in `BotProwl`). On build 395 a company of nine took on a
+wandering plague beast of 20262, broke off "its health has not moved" a minute later — which shuns the beast, so nothing in
+the company looked at it again — and stood there while it killed seven of them.
+
+Now every squad beat weighs the company's enemy and everything in its members' aggression lists, shunned ones included:
+`BotSquad.Reckon` (the creature's strength at its kind's price in our lives — the company price since "A kind priced by
+companies' own fights" below, the island's `BotQuarry.Priced` before — at the share of health it has left) against `BotSquad.Able` (the members' summed `Power`). Past `BotSquad.WithdrawOdds` (1.5) the company **withdraws**: the
+creature is left alone for `BotSquad.WithdrawShunMs` (2 minutes) by companies no stronger and bots joining them (a stronger
+company, a strong hunter and the harrow may still take it), every member is written down as having withdrawn from it, and the
+company ends. Nobody is pressed: each member's enlistment ends "the company broke up" and the work put down beneath it is taken up
+again, and a member the thing is hitting is offered the flight at once by its own rung (`BotFugitive`, via
+`BotSquad.Withdrawing`) — for a guarded town when `BotHaven` judges it realistic, away otherwise — so no enlistment is thrown
+away. The prowl that raised the company ends too, honestly failed. The same test keeps the company's finder, a blow on a
+member and the enlistment from taking such a fight on. **Never from a caster** (Patrick, 30.09.2026: fight a mage to the
+end): a company set upon by one fights it as before, and only does not choose one it cannot beat. Never for a war company, a
+company underground or a delve's.
+
+A sweep (`BotPatrol`, `BotSweep`) is no longer offered closed ground (a bar or a quarantine: that is the harrow's and the
+clearing's) nor a square asking more (`BotPatrol.Asks`: the record or the fight there now, whichever is more) than the captain
+and the strongest it could call bring; the call takes the strongest first and is not made short; a square closed while the
+company is out for it is left.
+
+Read in `Companies:` (`withdrawals: …`), `The captain:` (squares passed over; sweeps not raised or left), the enlistment's
+clause, `The island:` (prowls given up for closed ground; deaths to a wanderer), and every `Squad N of M is dealing with`
+line, which now prints the reckoning against what the company brings.
+
+## Fighting on the strength that is on the field (06.10.2026, `BotSquadField.cs`)
+
+Measured over 429 company deaths on builds 405–409: 89 % fell in fights priced under the company's strength over 1.5, 75 % to a
+killer priced under the dead bot alone; the dead had no other member within 12 tiles in 36 % of cases and stood more than 40 tiles
+from its leader in 43 %; 35 % of deaths followed another in the same company inside a minute, and only 20 companies withdrew against
+233 that lost somebody. `Able` summed every living member on the map. Four rules, each a dial, all counted in `Companies:` ("the
+field: …"):
+
+- **The choice gate is stricter than the withdrawal gate.** `Beyond` refuses a creature past `BotSquad.ChooseOdds` (1.0) times what
+  the company brings at every choice — the finder (`Hunt`, and `BotQuarry.Company` asked at the same odds so the next creature down is
+  offered), a band's call and the muster's offer (`BeyondFor`), a cry's company, a prowl's find. Defence stays at `WithdrawOdds`
+  (1.5): a blow on a member of a company with no enemy, a creature seen coming, the protection of a dire member, the enlistment into
+  a fight already on (each passes `odds` to `Beyond`). Counted: `ChoiceRefused`, `BotQuarry.CompanyChoiceOut`.
+- **A chosen fight musters short of the enemy.** `Engage(focus, contact, chosen: true)` with less than `MusterShare` (75 %) of the
+  company's strength within `FieldReach` (16) of the enemy forms the company up at a rally `MusterOff` (14) tiles short of it: the
+  anchor is the rally, the formation is the march line facing the enemy (`BotFormation`), the leader is stationed with everybody,
+  nobody is pressed (`Tend` runs instead of `Press`), far members walk to the rally (`BotEnlist.Holding`). It ends when the share has
+  come up, at a blow on a member (`Struck`, from `BotSquads.Note`/`Coming`), or on the `MusterMs` (30 s) clock — then with what is
+  on the field if it is enough at `ChooseOdds`, else the creature is let go and shunned (`MusterShort`). The "dealing with" line is
+  printed at the real engagement. A band's own gather judges the field the same way at its clock (`BotBand.GatheredShort`).
+- **A company that bleeds pulls back.** At the `BleedDeaths`th (2) death inside `BleedMs` (60 s) — casters included — the company
+  lets its enemy go, shuns it and the killer for `WithdrawShunMs`, offers the members within the thing's reach the run
+  (`Withdrawing`), and holds on its leader for `BleedRestMs` (45 s): no finder, not scattered, not dissolved, not released. The
+  company does not end; a band whose quarry this was fails "pulled back" (`BotBand.PulledBack`); a delve's party comes up
+  (`BotDelve.BledOut`). `Engage` refuses the creature for the shun (`BledRefused`).
+- **What is killing a member is fought by whoever can reach it.** In `Press`, a member within `PressReach` of an attacker whose
+  combatant is one of ours under `DyingShare` turns on that attacker, whatever its price (`Peel`, `Peeled`). `BotSquads.Protects`
+  also turns the whole company at a blow on a dire member when the company's enemy is attacking nobody of ours
+  (`ProtectedIdle`). Among the things attacking the company, the strongest caster inside the `TieShare` tie is the enemy
+  (`CastersFirst`, `CasterTaken`).
+
+`FieldOvermatched` is an instrument only: creatures stood to at ×1.5 on the map's sum that the strength within `FieldReach` of
+them would have withdrawn from. The withdrawal gate itself is unchanged.
+
+## Clearing a quarantined death square (03.10.2026)
+
+Patrick's order of 02.10.2026, item 4: companies gather, go to the squares where others died, clear them, and protect bots on
+the road. A quarantine (`BotBarred`: three of ours dead within 45 tiles in 30 minutes, or one to the plague or a killer of
+30000) closes a 91-tile box to every chooser for two hours; sweeps and prowls keep out of it. The clearing (`BotClearer`
+offering `BotHarrow` as a clearing) is the company that goes in. On builds 395 and 396 it never marched, for four measured
+reasons, each now changed:
+
+- **The first square or nothing.** The bots within call were weighed only against the first square chosen; now the strongest
+  company the bots within call make (`BotHarrow.SupplyStrength`, at most `BotSquad.MaxSize`) is weighed first and a square
+  asking more is passed over for the next.
+- **What the square asks** (`BotClearer.Asks`): the record, the fight standing there now, the strongest thing alive in the
+  box at its kind's price in our lives (`BotClearer.Strongest`), and for a quarantine the strongest thing recorded killing
+  in it, priced the same (`BotBarred.Closing`; the quarantine now keeps its killers, across restarts). The price is the one a
+  company withdraws by (`BotSquad.Reckon`), so a clearing at `BotHarrow.ClearFit` times this does not withdraw from what it
+  was sized for. Every standing quarantine within reach is a candidate, first in the order, walked from its own middle over
+  its whole box.
+- **What the offer brings.** It told the auction the leader's strength times six; now the company it will not march without.
+- **Heads against strength.** The muster reckoned heads once from the leader's strength while the march waited on strength;
+  every muster taken on 396 came up short with every member standing in it. The heads are re-reckoned every beat from the
+  company as it stands, and the levy calls the strongest first.
+
+Never sent: a standing bar (Patrick's), a quarantine the plague or a killer of 30000 closed, and a square asking past what the
+island's strongest company of 20 brings (`BotClearer.Island`) — said once each in the log, "Quarantine (…) stays closed to the
+clearings: …". A quarantine is lifted (`BotBarred.Lift`) only when its middle lies on the ground the company walked, nothing
+alive in its box is reckoned past ×1.5 a lone bot (`BotBarred.EmptyOdds`), and the plague did not declare it — for the
+Baron's and the guilds' harrows too. The harrow's finder no longer offers the company what it would withdraw from.
+
+Read in `The island:` (the clearings' clause: offers, squares passed over by reason, marches into a quarantine, emptied,
+won, withdrew, lifted, and the census of the quarantines standing by who could clear them), `The Baron:` (the same marches),
+and `Getting about:` (the barred clause: quarantines lifted, left standing after a company's work, and why).
+
+## A kind priced by companies' own fights (03.10.2026)
+
+Patrick, 03.10.2026: "if they kill it, let them gather — what matters is that they level up, and the higher the level, the
+higher the chance to kill later." The island's price of a kind (`BotQuarry.Price`: our deaths to it against its kills, every
+death counted, mostly lone and small companies) made a Reaper ×4.8 to every company, so a company of thirteen at twice a
+Reaper's strength reckoned it at 47,000 and turned away, while companies of ten and more had put Reapers down 20 times in 23
+on build 396. The lone bot keeps the island's price; a company now weighs a kind at its **company price**
+(`BotCompanyRecord.Price`), learned from companies' own fights:
+
+- **What is recorded.** A kill (`BotSquad.Judge`, "it is down") at the odds the company took the creature on at — its strength
+  (`Able`) over the creature's (`BotThreat.Power`, which grows with the weapon skill and the health a bot has: the level is in
+  the scale); a member's death to a kind the company was fighting, or had fought within `BotCompanyRecord.FightMs` (two
+  minutes: the field's next Reaper), at the odds it took that kind on at (`BotSquad.Fell`, from `BotKept.Fell`). Companies of
+  two or more. A death in a company to a kind it was not fighting is the island's alone: on 396, 56 of the 85 enlisted deaths
+  to Reapers fell beside a Reaper the company had not taken on, and that is the walk's business, not the price of taking it on.
+- **The price.** Never above the island's. A company at odds `r` is let in when at least `BotCompanyRecord.Vouch` (3) kills,
+  as the hour weighs them, were made by companies no stronger, and the deaths in the fights of companies up to
+  `BotCompanyRecord.Margin` (×1.5) stronger, put through the island's own formula (`BotQuarry.Formula`) with those kills, come
+  to a price its odds carry at `BotSquad.WithdrawOdds`. The lowest odds let in, times that yardstick, is the kind's company
+  price; a new kind, or one no company has put down three times, keeps the island's.
+- **Who asks it.** `BotSquad.Reckon` (so the withdrawal, the finder, a blow on a member, the enlistment, the band, the harrow's
+  finder and the prowl), `BotQuarry.Company` (whether a company may be called at all; "one bot's work" is still asked at the
+  island's price), a hunter's look for company ground (`BotHunter`, a zone kept for a company), and the clearing's ask
+  (`BotClearer.Asks`, `BotBarred.Closure`). The lift of a quarantine and the harrow's win still ask whether the ground is safe
+  for a lone bot, at the island's price.
+
+Read in `Companies:` after the withdrawals: "the company record …" — company kills and deaths in companies' fights recorded,
+deaths left to the island, the kinds priced below the island for companies (company price against the island's, the odds let
+in, kills and deaths weighed), creatures a company chose, joined or answered and withdrawals not made on the record that the
+island's price would have refused (by kind), and the looks for a company's quarry and for company ground let in on it. The
+dials: `BotCompanyRecord.Prices` (off: every company weighs every kind at the island's price, as build 400), `Vouch`,
+`Margin`, `FightMs`.
+
 ## The size cap lives in one place
 
 `BotSquads.Join` is the only entrance, and the check is there. In v1 the cap was checked only on the recruiting
@@ -227,3 +356,8 @@ With a client:
 - **Prices for items.** `BotSpoils.Worth` is unfilled. It no longer has to be — `BotAuction.Worth` exists.
 - **The leader stands on the anchor while scouting** and does not take a patch of its own. Its patch is computed
   and unused — stable and slightly wasteful; if it matters, the leader can be given the centre.
+
+## A hunter at its fight is left to it (07.10.2026, work18)
+
+`BotSquads.Pressable` is false for a hunt whose quarry is within reach and standing (`BotSlay.Engaged`); `BotDelve` and `BotHarrow`
+pass such a hunter by as they pass a carrier. Dial `BotSquads.SpareFighters`; counter `FightersSpared` in the squads line.

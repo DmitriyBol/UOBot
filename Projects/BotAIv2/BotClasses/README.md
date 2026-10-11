@@ -14,6 +14,7 @@ about the world.
 | `BotPotionKind.cs` | potion families, which is the granularity a carrying limit needs |
 | `BotKit.cs` | what is issued at birth, and on what terms of binding |
 | `BotWeaponOption.cs` | weapon + skill + target + ammunition, as one fact |
+| `BotLeaning.cs` | one way a newborn of the class may lean: the skill, the weight, the band (or the engine's material ladder it is read off), the floors it keeps; applied by `BotBirth` (01.10.2026) |
 | `BotArsenal.cs` | the weapons of the era, the spell ids and the potion types, named once |
 | `BotClasses.cs` | the registry of nine, and applying the configuration overrides |
 | `BotClassConfig.cs` | reading `Configuration/bot-classes.json` |
@@ -32,6 +33,7 @@ about the world.
 | `BotWarrior.cs` | the plain fighter |
 | `BotWarriorArcher.cs` | shoots, and has a knife for when that stops working |
 | `BotWarriorMage.cs` | plate, a blade, and spells anyway |
+| `BotTrader.cs` | the merchant: neutral in wars, buys where a thing is and carries it to whoever asked (01.10.2026; see `BotTraders/README.md`) |
 | the other nine | the classes themselves |
 
 ## The numbers, as the code has them
@@ -50,6 +52,7 @@ Stats total 100 for everybody. The potion limit is one of each family bar two ex
 | Healer | Medic | 25/30/45 | Healing | Healing 80, Anatomy 70, Magery 60, Meditation 60, Alchemy 50 | green staff 4 mana / 4 s, brews every 7 minutes, no plate |
 | Crafter | Producer | 50/30/20 | **Blacksmith** | Mining 75, Blacksmith 70, Tailoring 60, Tinkering 50, Tactics 40, Healing 40, weapon 40 | once an hour, one forging gives two items for one lot of material |
 | Gatherer | Producer | 55/30/15 | Mining | Mining 80, Lumberjacking 75, Tactics 40, Healing 40, weapon 40 | every 15 minutes, 3–6 reagents of one kind |
+| Trader | Producer, `Neutral` | 45/40/15 | **Arms Lore** | Tactics, Arms Lore, Healing, Anatomy (100 each, opening 50/30/20), weapon by the roll | in no guild, no company, no toll; hauls spoken wants and keeps an order book (`BotTraders/`) |
 
 Everybody's weapon is rolled from six families: three swords, a war mace and two fencing weapons. The
 warrior-mage is offered a quarterstaff instead of the dagger — an ordinary fighting staff, not the one that pays

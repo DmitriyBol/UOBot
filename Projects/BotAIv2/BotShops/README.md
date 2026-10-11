@@ -8,14 +8,15 @@ buys cloth to work with — and whatever the population refused goes back over t
 | `BotShops.cs` | where the shopkeepers are, what they sell, what they buy, and both transactions |
 | `BotRestock.cs` | an obligation: go and buy what has run out — off a shelf or off another bot's stall; a guild shelf bought out on arrival sends it on to a shopkeeper |
 | `BotShopper.cs` | the proposer: who is short of what; keeps back `BotPurse.KeepBack` (build 64) |
+| `BotAskFirst.cs` | a restock of cloth or bandages, a reagent, arrows or bolts or a tool asks the island first when a bot within a carrier's reach holds it over its keep: a want at the counter's price, three minutes for a carrier, then the walk (03.10.2026) |
 | `BotPeddle.cs` | an obligation: take what nobody wanted to somebody who will buy it; a load bought off its stall on the way ends finished, and one the market handed back into the pack on the way is sold from the pack |
-| `BotPeddler.cs` | the proposer: whose stall the population has ignored |
+| `BotPeddler.cs` | the proposer: whose stall the population has ignored; a load out of a bank box holds what the pack carries under `BotUnload.Heavy` and at most `BarLoad` (300) bars, a coloured load no more than the counters' hourly purse (`BotOre.CounterRoom`; 06.10.2026, ingots16) |
 | `BotShopsConfig.cs` | `Configuration/bot-shops.json` |
 | `BotShopsModule.cs` | module, phase `World`, requires `Classes` and `Will` |
-| `BotBullion.cs` | a crafter with money buys its metal instead of going and digging it; keeps back `BotPurse.KeepBack` (build 64) |
+| `BotBullion.cs` | a crafter with money buys its metal instead of going and digging it; keeps back `BotPurse.KeepBack` (build 64); stocks to the metal the dearest armour order the smith passed over takes, when that is more than `Enough` (`BotSmith.Short`, 03.10.2026) |
 | `BotNeeds.cs` | how often a bot reconsiders what it is short of |
 | `BotOrder.cs` | putting an order on the board, and going back for it when somebody has filled it; paperwork, taken at the next choice rather than over work in hand (build 50) |
-| `BotStores.cs` | a crafter short of the raw material of its trade, putting the order to the population; keeps back `BotPurse.KeepBack` (build 64) |
+| `BotStores.cs` | a crafter short of the raw material of its trade, putting the order to the population; keeps back `BotPurse.KeepBack` (build 64); raw meat five at a time (`MeatBatch`) and not while the board already asks for more than half an hour of what the island brings it (`SupplyGated`, `StockShare`, `StockFloor`; 03.10.2026), sized to the lesser of the hour and the last quarter-hour's pace, said smaller (`MeatLeast` 3) before it is held or while the pace is thin (`ThinShare`), and taken back when the cook's own hunting brought it (`TakeBackSated`; 06.10.2026, ribs17) |
 | `BotUpkeep.cs` | asking the population, by name, for a replacement for something that is wearing out; keeps back `BotPurse.KeepBack` (build 64) |
 | `BotProvision.cs` | What a bot must carry before it goes into a fight it chose — a dungeon's delve, or a war company sent against somebody else's ground — and the guild's money for what it cannot buy itself. |
 | `BotCapital.cs` | Britain as the centre of trade: the capital's shopkeepers pay better, a stall's load walks to them when that pays for the road, a trader's journey goes there (30.09.2026) |
@@ -97,9 +98,11 @@ derived from the build. The potion list comes from `BotOutfit.PotionsFor` the sa
 Then bandages, then potions, then reagents: one keeps a bot standing, one is the only mending that works while
 something is hitting it, and the last makes it useful.
 
-**The bots' market is asked before a counter, always.** `BotShopper` compares the shelf against
-`BotAuction.Cheapest` and takes whichever is cheaper — so a shopkeeper is the **ceiling** on what a bot can
-charge and never the preference. That ordering is where a crafter's living comes from: a fighter's gold came off
+**The bots' market is asked before a counter, always.** `BotShopper` compares the shelf against a bot's shop by
+the bank (`BotShopkeep.Beats`, the walk to each counted) and takes whichever is cheaper — so a shopkeeper is the
+**ceiling** on what a bot can charge and never the preference. (The auction's cheapest stall, which needed no walk,
+was the comparison until 01.10.2026. A counter four minutes' walk or more away for a thing the island makes is asked of
+the island aloud first — `BotShopper.AskFarMinutes` — and a carrier brings it.) That ordering is where a crafter's living comes from: a fighter's gold came off
 a monster, and it goes to a smith rather than out of the world whenever the smith asks less than the shelf.
 
 **Then the guild's own counter, asked the same two questions as a shopkeeper.** A shopkeeper this bot lately failed to
@@ -154,6 +157,34 @@ number to hear. No "is this junk" test, no table of worthless things.
 are never on a stall, so they are never candidates. That is the same sign rule that kills the ginseng carousel —
 in v1 two bots sold the same shopkeeper the same reagents four thousand times because nothing distinguished
 "goods" from "the things I need to do my job".
+
+---
+
+## Ask the island before the walk (03.10.2026, `BotAskFirst`)
+
+Patrick, 03.10 night: *"the focus is 99 % fulfilment of Needs; we have to bring the economy to life."* On build 395 (03:08–04:19,
+210 bots) the restocks bought over a counter 1,580 cloth (3,703gp), 1,406 arrows (3,438gp), 404 bandages (2,333gp), 70 pickaxes
+(1,588gp) and 856 reagents (3,288gp), while herb pickers came back with herbs "kept to sell", fletchers kept arrows and tinkers kept
+tools; the shopper named 90.9 % of its errands to a counter (`flow9.md`). The far ask needs a four-minute walk and a thing a craft
+makes (no cloth, bandage, reagent or tool); the pile ask needs an island-wide glut and leaves out arrows.
+
+| step | what happens |
+|---|---|
+| **who holds it** | every `HoldersMs` (15 s) the population is read the way a carrier reads a pack: merchandise over `BotUnload.Keeps`, and a bank box's for a bot at a bank; a worn-out tool does not count; a bot in a company is left out. A holder counts for a buyer when it is within `BotCourier.Reach` on the same land, does not want the kind itself, is not already on a delivery or a haul, and holds at least a carrier's least (`LeastGold`) of it; less what other buyers within that reach already ask for |
+| **the ask** | before the walk to a counter (and, where no counter in reach sells it, before the board), for cloth or bandages, a reagent, arrows or bolts, a tool the class carries: a want (`BotMarket.Ask`) at the counter's price to this bot (`BotBurgh.Dear` included; the island's lowest counter price where none is in reach), for no more than the largest single holder holds — one carrier can meet it — and only when that is at least half of what the purse would buy. What the bot would buy is asked for at what it would pay: cloth at cloth's price when it cuts cloth into bandages (cloth handed over is cut), bandages at a bandage's otherwise |
+| **the wait** | the bot goes on with its work and its other supplies: the shopper passes the waiting supply over (`BotAskFirst.Parked`, read in `Wanting`) and looks at the next, so nothing is bought twice and nothing else waits. A carrier that has taken it is always waited for, urgent or not: taking it back would fail the carrier's walk |
+| **the end** | at every look of the bot (`Review`) and swept every `SweepMs` (5 s): met — no walk; nobody has taken it at `WaitMs` (3 min) — taken back by the existing road (`BotWithdraw.Walked`, "nobody brought it, walked to a counter"; "other" for a buyer dead or out of the world) and the bot walks as before; its need turned urgent with nobody bringing it — taken back at once and walked for; not asked again for `AgainMs` (9 min) |
+| **never** | a bot already walking a restock (in hand or put down); a bot below its entry threshold (`BotProvision.Short`, the shopper's `needy`: companies and delves do not wait on it), under `HurtShare` (half) of its health, in a fight (struck lately, or a foe set), out of a supply it fights or mends with (its kit's bandages, a bottle its class carries, its own arrows, a reagent its key spell burns), a medic below the bandages the doors ask; the band's order; the bot's own weapon; a potion; a purse that cannot carry the compulsory part (that bot walks, and its guild pays below the threshold as before) |
+
+**Counting is unchanged.** A line taken back inside its first ten minutes is kept out by build 391's rule; one taken back later (a
+carrier who took the walk and gave up late) fails, and is counted beside the ask too. `Running` false says nothing new and still sees
+the standing asks through. Every gate is in the `Trade:` line, by family: asked, met before the walk by a carrier, by a trader's haul
+(counter goods with carriage) and at a bot's shop, walked after the wait (part met, past ten minutes), had it another way, taken
+back with the buyer dead or away, ended otherwise, units and gold handed; looks that walked as before for urgency (five causes), no
+holder, holders already asked of, no one holder with half; already on the walk, the purse, a want already standing, an ask inside
+`AgainMs`, refused by the market; taken back mid-wait for urgency, and looks urgent with a carrier on the way (waited for); looks that passed a waiting supply
+over, had nothing short but it, had a carrier on the way; read back after a restart (adopted once per bot at its first look);
+bandages cut; holders at the last reading.
 
 ---
 
