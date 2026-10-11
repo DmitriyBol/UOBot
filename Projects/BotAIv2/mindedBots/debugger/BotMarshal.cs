@@ -69,6 +69,8 @@ public static class BotMarshal
 
     public static void Woke(long now) => _thoughtTick = now;
 
+    public static long NextInMinutes(long now) => Math.Max(0, EveryMs - (now - _thoughtTick)) / 60000;
+
     public static string Schema => Build();
 
     private static List<string> _open;
@@ -364,25 +366,20 @@ public static class BotMarshal
     {
         var names = Stalls(most);
 
-        return names.Count == 0 ? "nothing on the stalls" : string.Join(", ", names);
+        return names.Count == 0 ? "nothing at the shops by the bank" : string.Join(", ", names);
     }
 
     private static List<string> Stalls(int most)
     {
-        var listings = BotAuction.Listings;
+        var lots = BotShopkeep.Lots();
         Dictionary<string, int> amounts = [];
 
-        for (var i = 0; i < listings.Count; i++)
+        for (var i = 0; i < lots.Count; i++)
         {
-            var listing = listings[i];
+            var name = lots[i].Kind.Name;
 
-            if (listing?.Kind == null || listing.Amount <= 0)
-            {
-                continue;
-            }
-
-            amounts.TryGetValue(listing.Kind.Name, out var had);
-            amounts[listing.Kind.Name] = had + listing.Amount;
+            amounts.TryGetValue(name, out var had);
+            amounts[name] = had + lots[i].Units;
         }
 
         List<(string Name, int Amount)> sorted = [];
@@ -413,10 +410,13 @@ public static class BotMarshal
                + "which the end of your sight names; the others are these, for when they open again. "
                + "revel: one kind of work worth three times as much for twelve minutes, with a prize of 'pay' gold to whoever "
                + $"does most of it; 'kind' is one of {string.Join(", ", BotRevel.Trades)}. "
-               + $"camp: the same, with an orc camp raised at 'x','y' between {BotRevel.NearestCamp} and "
-               + $"{BotRevel.FurthestCamp} tiles from the population's home at ({home.X}, {home.Y}), for the population to "
-               + "fight over; use 'kind' hunt. "
-               + "tourney: a tournament, one against one, run by the watchers at the drill ground. "
+               + "camp: the same, with an orc camp raised at 'x','y' in the countryside, out of town and near where bots are "
+               + "working, for the population to fight over; use 'kind' hunt. A spot on dangerous ground, on ground no walk "
+               + "reaches, with no bot near it, or close to one of the last few places an event was held is moved to a "
+               + "fitting place, and a revel of a trade is called in a town square chosen the same way: you need not pick "
+               + $"the population's home at ({home.X}, {home.Y}), and should not pick the same spot twice. "
+               + "tourney: a championship, one against one, run by the watchers in a ring chosen among the towns: the ranks "
+               + "fight for the right to challenge the champion, and the last one standing meets the champion for the title. "
                + "errand: an errand on the board, paid from the treasury when it is done: 'kind' is kill, gather or scout; "
                + "'name' is the creature's or the thing's type name (Ogre, Leather, RawRibs); 'number' how many; 'pay' the "
                + "reward in gold. A kill has no place: it is sought at the nearest place a spawner on the island keeps the "
@@ -426,12 +426,12 @@ public static class BotMarshal
                + "for it may take it and sees it through; an errand "
                + "three takers give up with nothing done comes down and its gold goes back. A reward is weighed against what "
                + "the bots earn a minute at their other work, walk and work together. "
-               + "order: a standing order: the city takes 'number' of 'name' off the stalls whenever it is offered at up "
+               + "order: a standing order: the city takes 'number' of 'name' at the bots' shops by the bank whenever it is on show at up "
                + "to 'pay' gold each. "
                + "bounty: 'pay' gold on the square at 'x','y'; the Baron marches there before anywhere else, and the company "
                + "that clears it is paid. "
                + "head: 'pay' gold on the head of the murderer named in 'name', paid to whoever catches it. "
-               + "fair: for 'number' minutes the city takes what is on the stalls at 80 percent of the asking price, "
+               + "fair: for 'number' minutes the city takes what the bots' shops by the bank hold at 80 percent of the asking price, "
                + $"spending evenly over the minutes and keeping {BotCity.FairReserve}gp back; only when the treasury holds "
                + $"{BotCity.FairFloor}gp or more. "
                + $"Everything but a revel is paid from the city's treasury, which holds {BotCity.Purse}gp of "
@@ -465,7 +465,7 @@ public static class BotMarshal
         say.Append(BotVigil.Loitering());
         say.Append(". The island's squares: ");
         say.Append(BotQuad.Describe());
-        say.Append(". An order's thing is named as the city knows it, as these on the stalls now are: ");
+        say.Append(". An order's thing is named as the city knows it, as these on show at the shops by the bank now are: ");
         say.Append(Offered(15));
         say.Append(". The events open to you this time: ");
         say.Append(string.Join(", ", Open()));

@@ -76,6 +76,10 @@ public sealed class BotVoyage : BotDeed
 
     public static long Lost { get; private set; }
 
+    public static long BoughtHome { get; private set; }
+
+    public static long BuyRefused { get; private set; }
+
     private enum Step
     {
         Buy,
@@ -105,6 +109,8 @@ public sealed class BotVoyage : BotDeed
 
     private readonly IReadOnlyList<Mobile> _company;
 
+    private readonly bool _mayBuy;
+
     private Step _step;
 
     private BotSeaVoyage _voyage;
@@ -127,7 +133,10 @@ public sealed class BotVoyage : BotDeed
 
     private long _began;
 
-    public BotVoyage(Map map, BotDock from, BotDock to, BotSeaLane lane, BotTowns.Town town, Point3D goal, string whence, bool home, IReadOnlyList<Mobile> company = null)
+    public BotVoyage(
+        Map map, BotDock from, BotDock to, BotSeaLane lane, BotTowns.Town town, Point3D goal, string whence, bool home,
+        IReadOnlyList<Mobile> company = null, bool mayBuy = false
+    )
     {
         _map = map;
         _from = from;
@@ -138,6 +147,7 @@ public sealed class BotVoyage : BotDeed
         _whence = whence;
         _home = home;
         _company = company;
+        _mayBuy = mayBuy;
         _berth = from?.First;
 
         var sail = lane.Tiles * (double)BotHelm.StrokeMs / Math.Max(1, BotHelm.Speed) / 60000.0;
@@ -395,6 +405,13 @@ public sealed class BotVoyage : BotDeed
             return Grant(body);
         }
 
+        if (!_mayBuy)
+        {
+            BuyRefused++;
+
+            return BotDoing.Failed("no ship of its own, and this voyage pays nothing that would buy one back");
+        }
+
         if (_vendor == null || _vendor.Deleted)
         {
             _vendor = BotShops.Nearest(bot, wanted);
@@ -421,16 +438,16 @@ public sealed class BotVoyage : BotDeed
             return BotDoing.Failed($"{_vendor.Name} has no ship to sell");
         }
 
-        if (BotYield.Wealth(body) < price && BotSea.GuildPays)
+        if (BotYield.Spendable(body) < price && BotSea.GuildPays)
         {
             BotProvision.Fund(body, price);
         }
 
-        if (BotYield.Wealth(body) < price)
+        if (BotYield.Spendable(body) < price)
         {
             Unafforded++;
 
-            return BotDoing.Failed($"{BotYield.Wealth(body)}gp will not buy a ship at {price}gp");
+            return BotDoing.Failed($"{BotYield.Spendable(body)}gp free will not buy a ship at {price}gp");
         }
 
         var bought = BotShops.Buy(bot, _vendor, wanted, 1, out var refused);
@@ -443,6 +460,12 @@ public sealed class BotVoyage : BotDeed
         BotYield.Aside(body, price);
         Bought++;
         BoughtGold += price;
+
+        if (_home)
+        {
+            BoughtHome++;
+        }
+
         BotHelm.Keep(body, BotHelm.ShipOf(body));
 
         logger.Information("{Name} the {Class} bought a ship from {Vendor} for {Price}gp to sail to {To}", body.Name, body.Class?.Name, _vendor.Name, price, _to.Name);
@@ -477,7 +500,7 @@ public sealed class BotVoyage : BotDeed
         Voyages + Homeward == 0
             ? "nobody has set out by sea"
             : $"{Voyages} voyages to another town and {Homeward} home begun, {Landed} landed, {Reached} reached the town, {Lost} lost at sea, {Berthless} could not put to sea, {Shifted} went to another berth, {Waited} waited for a ship to leave one; "
-              + $"{Bought} ships bought for {BoughtGold}gp, {Granted} handed over, {Unafforded} could not afford one, {NoShipwright} found nobody selling one";
+              + $"{Bought} ships bought for {BoughtGold}gp ({BoughtHome} for the way home from an island), {BuyRefused} voyages refused a ship for paying nothing that would buy one back, {Granted} handed over, {Unafforded} could not afford one, {NoShipwright} found nobody selling one";
 
     public static void Forget()
     {
@@ -485,6 +508,8 @@ public sealed class BotVoyage : BotDeed
         Homeward = 0;
         Bought = 0;
         BoughtGold = 0;
+        BoughtHome = 0;
+        BuyRefused = 0;
         Granted = 0;
         Unafforded = 0;
         NoShipwright = 0;

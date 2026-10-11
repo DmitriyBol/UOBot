@@ -305,6 +305,17 @@ public static class BotRegard
                 var (of, about, held) = _mending[i];
                 var step = held < 0.0 ? Math.Min(Mend, -held) : -Math.Min(Mend, held);
 
+                if (held < 0.0 && BotSeizure.Ceiling(about, out var ceiling) && held + step > ceiling)
+                {
+                    step = Math.Max(0.0, ceiling - held);
+                    BotSeizure.Kept();
+
+                    if (step <= 0.0)
+                    {
+                        continue;
+                    }
+                }
+
                 Mended++;
                 Move(of, about, step, "time");
             }

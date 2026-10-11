@@ -78,7 +78,7 @@ public sealed class BotGlean : BotDeed
         return false;
     }
 
-    public override int Made => _gathered * BotAuction.Worth(_kind, 1);
+    public override int Made => _gathered * BotMarket.Worth(_kind, 1);
 
     public override string Stage =>
         _gathered > 0 ? $"gathered {_gathered} {_kind?.Name}" : $"after spent {_kind?.Name}";

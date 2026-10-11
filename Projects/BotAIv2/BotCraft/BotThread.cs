@@ -61,6 +61,9 @@ public static class BotThread
         CraftItem best = null;
         var bestNeeds = -1.0;
 
+        CraftItem pile = null;
+        var pileNeeds = -1.0;
+
         CraftItem asked = null;
         var bestBid = 0;
 
@@ -85,7 +88,7 @@ public static class BotThread
                 continue;
             }
 
-            var bid = BotAuction.Best(recipe.ItemType);
+            var bid = BotMarket.Best(recipe.ItemType);
 
             if (bid > bestBid)
             {
@@ -93,14 +96,37 @@ public static class BotThread
                 asked = recipe;
             }
 
-            if (needs > bestNeeds)
+            if (BotGlut.Glutted(recipe.ItemType))
+            {
+                if (needs > pileNeeds)
+                {
+                    pile = recipe;
+                    pileNeeds = needs;
+                }
+            }
+            else if (needs > bestNeeds)
             {
                 best = recipe;
                 bestNeeds = needs;
             }
         }
 
-        return asked ?? best;
+        if (asked != null)
+        {
+            return asked;
+        }
+
+        if (best == null)
+        {
+            return pile;
+        }
+
+        if (pile != null && pileNeeds > bestNeeds)
+        {
+            BotGlut.Steered();
+        }
+
+        return best;
     }
 
     public static bool Simple(CraftItem recipe, Type material)

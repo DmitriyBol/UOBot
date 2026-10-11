@@ -410,6 +410,14 @@ public sealed class BotOutpostRaise : BotDeed
         }
 
         var kind = BotHallKind.First;
+
+        if (BotBounds.Refuse(BotBounds.Placing.Outpost, _guild.Name, _map, _plot, kind.Multi, out var foreign))
+        {
+            BotPlot.Spend();
+
+            return BotDoing.Failed(foreign);
+        }
+
         var result = HousePlacement.Check(body, kind.Multi, _plot, out var toMove, Direction.South);
 
         if (result != HousePlacementResult.Valid)

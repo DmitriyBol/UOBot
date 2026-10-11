@@ -87,22 +87,19 @@ public static class BotAnvil
     {
         _onBoard.Clear();
 
-        var stalls = BotAuction.Listings;
+        var metals = system.CraftSubRes;
 
-        for (var i = 0; i < stalls.Count; i++)
+        for (var i = 0; i < metals.Count; i++)
         {
-            var stall = stalls[i];
-            var kind = stall?.Kind;
+            var kind = metals.GetAt(i)?.ItemType;
+            var shown = kind == null ? 0 : BotShopkeep.Showing(kind);
 
-            if (kind == null || stall.IsEmpty)
+            if (shown > 0)
             {
-                continue;
+                _onBoard[kind] = shown;
             }
-
-            _onBoard[kind] = _onBoard.TryGetValue(kind, out var held) ? held + stall.Amount : stall.Amount;
         }
 
-        var metals = system.CraftSubRes;
         var say = ValueStringBuilder.Create(128);
 
         try
@@ -126,7 +123,7 @@ public static class BotAnvil
                 say.Append(held);
             }
 
-            Reading = say.Length == 0 ? "no metal on the board at all, so iron stands" : say.ToString();
+            Reading = say.Length == 0 ? "no metal on show at the shops at all, so iron stands" : say.ToString();
         }
         finally
         {
@@ -139,6 +136,134 @@ public static class BotAnvil
     public static int Ingots(Mobile bot, Type metal = null) => bot?.Backpack?.GetAmount(metal ?? Metal) ?? 0;
 
     public static double Able(Mobile bot) => bot?.Skills[Skill].Base ?? 0.0;
+
+    public static double Rung(Type metal)
+    {
+        var metals = System?.CraftSubRes;
+
+        if (metal == null || metals == null)
+        {
+            return -1.0;
+        }
+
+        for (var i = 0; i < metals.Count; i++)
+        {
+            var known = metals.GetAt(i);
+
+            if (known?.ItemType == metal)
+            {
+                return known.RequiredSkill;
+            }
+        }
+
+        return -1.0;
+    }
+
+    public static double ColouredPremium { get; set; } = 1.0;
+
+    public static int Reckon(Type metal)
+    {
+        var rung = Rung(metal);
+
+        if (rung <= 0.0)
+        {
+            return 0;
+        }
+
+        var iron = BotMarket.Worth(Base, BotBullion.Guess);
+
+        return (int)Math.Max(1.0, Math.Round(iron * (1.0 + Math.Max(0.0, ColouredPremium) * rung / 100.0)));
+    }
+
+    public static string Named(Type metal)
+    {
+        var name = metal?.Name ?? Base.Name;
+
+        if (name.EndsWith("Ingot", StringComparison.Ordinal))
+        {
+            name = name[..^5];
+        }
+
+        return BotMarket.Spaced(name);
+    }
+
+    public static string Hands()
+    {
+        var metals = System?.CraftSubRes;
+
+        if (metals == null)
+        {
+            return "no smithing system yet";
+        }
+
+        _hands.Clear();
+
+        Tally(BotPopulation.Bots, metals);
+        Tally(BotPopulation.Away, metals);
+
+        if (_hands.Count == 0)
+        {
+            return "nobody works an anvil";
+        }
+
+        using var said = ValueStringBuilder.Create(128);
+
+        for (var i = 0; i < metals.Count; i++)
+        {
+            var kind = metals.GetAt(i)?.ItemType;
+
+            if (kind == null || !_hands.TryGetValue(kind, out var many))
+            {
+                continue;
+            }
+
+            if (said.Length > 0)
+            {
+                said.Append(", ");
+            }
+
+            said.Append(Named(kind));
+            said.Append(' ');
+            said.Append(many);
+        }
+
+        return said.ToString();
+    }
+
+    private static readonly Dictionary<Type, int> _hands = [];
+
+    private static void Tally(IReadOnlyList<BotMobile> bots, CraftSubResCol metals)
+    {
+        for (var i = 0; i < bots.Count; i++)
+        {
+            var bot = bots[i];
+
+            if (bot == null || bot.Deleted || bot.Class is not { } klass || !klass.Wants(Skill))
+            {
+                continue;
+            }
+
+            var able = Able(bot);
+            Type best = null;
+            var bestNeeds = -1.0;
+
+            for (var j = 0; j < metals.Count; j++)
+            {
+                var metal = metals.GetAt(j);
+
+                if (metal?.ItemType != null && metal.RequiredSkill <= able && metal.RequiredSkill > bestNeeds)
+                {
+                    best = metal.ItemType;
+                    bestNeeds = metal.RequiredSkill;
+                }
+            }
+
+            if (best != null)
+            {
+                _hands[best] = _hands.GetValueOrDefault(best) + 1;
+            }
+        }
+    }
 
     public static Type Best(Mobile bot, int need)
     {
@@ -175,6 +300,84 @@ public static class BotAnvil
         }
 
         return best ?? Plentiful(able) ?? Base;
+    }
+
+    public static int BoxedLeast { get; set; } = 200;
+
+    public static bool OrdersBoxed { get; set; } = true;
+
+    private static readonly Dictionary<Type, int> _boxed = [];
+
+    public static void Boxed(Dictionary<Type, int> metal)
+    {
+        _boxed.Clear();
+
+        if (metal == null)
+        {
+            return;
+        }
+
+        foreach (var (kind, units) in metal)
+        {
+            _boxed[kind] = units;
+        }
+    }
+
+    public static Type Order(Mobile bot, int need, out bool boxed)
+    {
+        boxed = false;
+
+        var system = System;
+        var pack = bot?.Backpack;
+
+        if (system == null || pack == null)
+        {
+            return Best(bot, need);
+        }
+
+        var able = Able(bot);
+        var metals = system.CraftSubRes;
+
+        Type held = null;
+        var heldNeeds = -1.0;
+        Type most = null;
+        var mostUnits = BoxedLeast - 1;
+
+        for (var i = 0; i < metals.Count; i++)
+        {
+            var metal = metals.GetAt(i);
+
+            if (metal?.ItemType == null || metal.RequiredSkill > able)
+            {
+                continue;
+            }
+
+            if (metal.RequiredSkill > heldNeeds && pack.GetAmount(metal.ItemType) >= need)
+            {
+                held = metal.ItemType;
+                heldNeeds = metal.RequiredSkill;
+            }
+
+            if (metal.ItemType != Base && _boxed.TryGetValue(metal.ItemType, out var units) && units > mostUnits)
+            {
+                most = metal.ItemType;
+                mostUnits = units;
+            }
+        }
+
+        if (held != null)
+        {
+            return held;
+        }
+
+        if (OrdersBoxed && most != null)
+        {
+            boxed = true;
+
+            return most;
+        }
+
+        return Plentiful(able) ?? Base;
     }
 
     public static void Keep(Mobile body, Dictionary<Type, int> keep, int amount)
@@ -232,7 +435,7 @@ public static class BotAnvil
                 continue;
             }
 
-            back += BotAuction.Reclaim(bot, metal.ItemType);
+            back += BotMarket.FromBank(bot, metal.ItemType, need);
 
             if (Ingots(body, metal.ItemType) >= need)
             {

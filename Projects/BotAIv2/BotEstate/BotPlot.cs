@@ -182,7 +182,7 @@ public static class BotPlot
 
         if (search.HasKept && (mainland < 0 || BotGates.LandOf(map, search.Kept) == mainland)
             && Sound(map, search.Kept, multi, replacing) && Away(search.Kept, shun, clear)
-            && !BotRefused.Refusing(map, search.Kept) && !Foreign(by, map, search.Kept.X, search.Kept.Y)
+            && !BotRefused.Refusing(map, search.Kept) && !Foreign(by, map, search.Kept, multi, mainlandOnly)
             && !Round(map, from, search.Kept.X, search.Kept.Y))
         {
             centre = search.Kept;
@@ -229,13 +229,6 @@ public static class BotPlot
                 continue;
             }
 
-            if (Foreign(by, map, x, y))
-            {
-                Foreigners++;
-
-                continue;
-            }
-
             if (Round(map, from, x, y))
             {
                 Roundabout++;
@@ -251,6 +244,11 @@ public static class BotPlot
             {
                 Overshadowed++;
 
+                continue;
+            }
+
+            if (Foreign(by, map, at, multi, mainlandOnly))
+            {
                 continue;
             }
 
@@ -383,15 +381,44 @@ public static class BotPlot
 
     public static long Foreigners { get; private set; }
 
+    public static long Straddling { get; private set; }
+
+    public static long AbodesAbroad { get; private set; }
+
     public static long Roundabout { get; private set; }
 
     public static int MostBehind { get; set; } = 60;
 
-    private static bool Foreign(Mobile by, Map map, int x, int y)
+    private static bool Foreign(Mobile by, Map map, Point3D at, int multi, bool guildBuilding)
     {
-        var owner = BotClaim.Owner(map, new Point3D(x, y, 0));
+        var guild = (by?.Guild as Server.Guilds.Guild)?.Name;
 
-        return owner != null && owner != (by?.Guild as Server.Guilds.Guild)?.Name;
+        switch (BotBounds.Covers(guild, map, at, multi, guildBuilding, !guildBuilding, out _))
+        {
+            case BotBounds.Breach.None:
+                {
+                    return false;
+                }
+            case BotBounds.Breach.Straddling:
+                {
+                    Straddling++;
+
+                    return true;
+                }
+            default:
+                {
+                    if (guildBuilding)
+                    {
+                        Foreigners++;
+                    }
+                    else
+                    {
+                        AbodesAbroad++;
+                    }
+
+                    return true;
+                }
+        }
     }
 
     private static bool Round(Map map, Point3D from, int x, int y)
@@ -408,6 +435,10 @@ public static class BotPlot
 
         return BotRoads.Behind(map, from, new Point3D(x, y, 0)) > MostBehind;
     }
+
+    internal static bool Suits(Map map, Point3D at, int multi, BaseHouse replacing) =>
+        Level(map, at, multi) && !Crowded(map, at, replacing) && !Hallowed(map, at)
+        && Region.Find(at, map)?.IsPartOf<GuardedRegion>() != true;
 
     public static void Spend()
     {
@@ -621,7 +652,7 @@ public static class BotPlot
     }
 
     public static string Describe() =>
-        $"plots: {Tested} put to the engine and {Fit} would take a hall; {Uneven} passed over as not level, {Floorless} with no floor at all, {Unreached} for ground somebody lately failed to reach, {Foreigners} for standing on another guild's square, {Roundabout} for lying round the far side of something by road, {InTown} for standing in a town, {Shunned} for pressing against a graveyard, {Occupied} with something standing on them, {Neighboured} taken within {Shy} tiles of another clan for want of anything further off; the engine refused {Forbidden} on its own regions, {Surfaceless} for resting on nothing, {BadLand} for the land, {BadStatic} for a static or an unclear yard, {BadItem} for something lying there; the spiral has been walked out {Exhausted} times; guild buildings kept to the mainland: {Ashore} searches begun from an island seat moved to the home, {OffMainland} candidates off it passed over, {GatesUnread} searches refused before the gates were read";
+        $"plots: {Tested} put to the engine and {Fit} would take a hall; {Uneven} passed over as not level, {Floorless} with no floor at all, {Unreached} for ground somebody lately failed to reach, {Foreigners} for standing on another guild's square under any part of their walls, {Straddling} for walls reaching out of their own square onto open ground, {AbodesAbroad} bots' houses for lying on a guild's ground not their own nor allied, {Roundabout} for lying round the far side of something by road, {InTown} for standing in a town, {Shunned} for pressing against a graveyard, {Occupied} with something standing on them, {Neighboured} taken within {Shy} tiles of another clan for want of anything further off; the engine refused {Forbidden} on its own regions, {Surfaceless} for resting on nothing, {BadLand} for the land, {BadStatic} for a static or an unclear yard, {BadItem} for something lying there; the spiral has been walked out {Exhausted} times; guild buildings kept to the mainland: {Ashore} searches begun from an island seat moved to the home, {OffMainland} candidates off it passed over, {GatesUnread} searches refused before the gates were read";
 
     public static void Forget()
     {
@@ -632,6 +663,8 @@ public static class BotPlot
         Floorless = 0;
         Unreached = 0;
         Foreigners = 0;
+        Straddling = 0;
+        AbodesAbroad = 0;
         Roundabout = 0;
         Occupied = 0;
         InTown = 0;

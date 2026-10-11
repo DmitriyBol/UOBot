@@ -33,6 +33,10 @@ public sealed class BotWebSettings
     public int? MapScale { get; set; }
 
     public string Folder { get; set; }
+
+    public bool? Live { get; set; }
+
+    public bool? LivePicture { get; set; }
 }
 
 public static class BotWebConfig
@@ -69,5 +73,7 @@ public static class BotWebConfig
         BotEvents.KeepPaths = settings.KeepPaths ?? BotEvents.KeepPaths;
         BotWebMap.Enabled = settings.MapImage ?? BotWebMap.Enabled;
         BotWebMap.Scale = settings.MapScale ?? BotWebMap.Scale;
+        BotWebLive.Enabled = settings.Live ?? BotWebLive.Enabled;
+        BotWebLive.Picture = settings.LivePicture ?? BotWebLive.Picture;
     }
 }

@@ -85,6 +85,8 @@ public static class BotSpoils
         Shares++;
 
         var gold = SplitGold(corpse);
+
+        gold += BotCity.Collect((corpse as Corpse)?.Owner?.GetType(), _claimants);
         var handed = SplitGoods(corpse, collector);
 
         squad.Won += gold + _shared;

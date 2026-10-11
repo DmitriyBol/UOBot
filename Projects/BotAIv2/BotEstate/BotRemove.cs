@@ -56,18 +56,27 @@ public sealed class BotRemove : BotDeed
 
     private readonly bool _seating;
 
+    private readonly bool _off;
+
+    public static long Off { get; private set; }
+
     private int _fitted;
 
     public BotRemove(Guild guild, Map map, Point3D plot) : this(guild, map, plot, false)
     {
     }
 
-    public BotRemove(Guild guild, Map map, Point3D plot, bool seating)
+    public BotRemove(Guild guild, Map map, Point3D plot, bool seating) : this(guild, map, plot, seating, false)
+    {
+    }
+
+    public BotRemove(Guild guild, Map map, Point3D plot, bool seating, bool off)
     {
         _guild = guild;
         _map = map;
         _plot = plot;
-        _seating = seating;
+        _seating = seating && !off;
+        _off = off;
     }
 
     public override string Kind => Trade;
@@ -89,9 +98,11 @@ public sealed class BotRemove : BotDeed
     public override bool Unpaid => true;
 
     public override string Stage =>
-        _seating
-            ? $"carrying the hall of {_guild?.Name} to its seat, to {_plot.X},{_plot.Y}"
-            : $"carrying the hall of {_guild?.Name} out to {_plot.X},{_plot.Y}";
+        _off
+            ? $"carrying the hall of {_guild?.Name} off another guild's ground, to {_plot.X},{_plot.Y}"
+            : _seating
+                ? $"carrying the hall of {_guild?.Name} to its seat, to {_plot.X},{_plot.Y}"
+                : $"carrying the hall of {_guild?.Name} out to {_plot.X},{_plot.Y}";
 
     public override bool Bend(IBotWilful bot) => false;
 
@@ -106,7 +117,7 @@ public sealed class BotRemove : BotDeed
             return BotDoing.Failed("no body");
         }
 
-        if (_seating ? !BotSeat.Moving(_guild, out _, out _) : BotExile.Owed(_guild) is not { Deleted: false })
+        if (_off ? !BotBounds.Owes(_guild, out _, out _) : _seating ? !BotSeat.Moving(_guild, out _, out _) : BotExile.Owed(_guild) is not { Deleted: false })
         {
             return BotDoing.Failed($"{_guild.Name} owes nobody a move any more");
         }
@@ -126,6 +137,15 @@ public sealed class BotRemove : BotDeed
         }
 
         var kind = BotHallKind.Of(old);
+
+        if (BotBounds.Refuse(BotBounds.Placing.Carry, _guild.Name, _map, _plot, kind.Multi, out var foreign))
+        {
+            BotPlot.Spend();
+            Refused++;
+
+            return BotDoing.Failed(foreign);
+        }
+
         var result = HousePlacement.Check(body, kind.Multi, _plot, out var toMove, Direction.South);
 
         if (result != HousePlacementResult.Valid)
@@ -208,7 +228,14 @@ public sealed class BotRemove : BotDeed
         BotEstate.Fit(_fitted);
         BotEstate.Register(_guild, house, false);
 
-        if (_seating)
+        if (_off)
+        {
+            Off++;
+            BotBounds.Paid(_guild.Name, _plot);
+
+            BotSeat.Set(_guild.Name, _plot, false);
+        }
+        else if (_seating)
         {
             BotSeat.Moved(_guild.Name, true);
             Seated++;
@@ -223,22 +250,25 @@ public sealed class BotRemove : BotDeed
         Done++;
 
         return BotDoing.Done(
-            _seating
-                ? $"the hall of {_guild.Name} now stands at {_plot.X},{_plot.Y}, by its seat, {_fitted} things inside"
-                : $"the hall of {_guild.Name} now stands at {_plot.X},{_plot.Y}, out of the winner's yard, {_fitted} things inside"
+            _off
+                ? $"the hall of {_guild.Name} now stands at {_plot.X},{_plot.Y}, off another guild's ground, {_fitted} things inside"
+                : _seating
+                    ? $"the hall of {_guild.Name} now stands at {_plot.X},{_plot.Y}, by its seat, {_fitted} things inside"
+                    : $"the hall of {_guild.Name} now stands at {_plot.X},{_plot.Y}, out of the winner's yard, {_fitted} things inside"
         );
     }
 
     public static string Describe() =>
         Done + Refused == 0
             ? "no hall has been moved"
-            : $"{Done} halls moved ({Seated} of them to their seat, {MerchantsCarried} merchants carried along), {Refused} refused by the new ground";
+            : $"{Done} halls moved ({Seated} of them to their seat, {Off} off another guild's ground, {MerchantsCarried} merchants carried along), {Refused} refused by the new ground";
 
     public static void Forget()
     {
         Done = 0;
         Refused = 0;
         Seated = 0;
+        Off = 0;
         MerchantsCarried = 0;
     }
 }
@@ -274,6 +304,10 @@ public sealed class BotRemover : IBotProposer
 
     public static long NoNearer { get; private set; }
 
+    public static long Foreign { get; private set; }
+
+    public static long Shifts { get; private set; }
+
     public static int FartherBy { get; set; } = 30;
 
     public string Name => "remover";
@@ -304,6 +338,48 @@ public sealed class BotRemover : IBotProposer
 
         if (winner == null)
         {
+            if (BotBounds.Owes(ours, out var under, out var whose))
+            {
+                if (BotOffice.Busy(BotExile.Office, ours))
+                {
+                    Claimed++;
+
+                    return null;
+                }
+
+                if (BotBounds.Shifting(ours.Name))
+                {
+                    Offered++;
+                    Shifts++;
+                    BotOffice.Offering(BotExile.Office, ours);
+
+                    return new BotShift(ours, under.Map, under.Location);
+                }
+
+                if (!BotPlot.Find(body, under.Location, Point3D.Zero, 0, BotHallKind.Of(under).Multi, under, out var off))
+                {
+                    Groundless++;
+                    BotBounds.Missed(ours.Name, whose, false);
+
+                    return null;
+                }
+
+                if (BotSeat.Gap(off, under.Location) > BotBounds.OpenReach)
+                {
+                    Groundless++;
+                    BotBounds.Missed(ours.Name, whose, true);
+
+                    return null;
+                }
+
+                Offered++;
+                Foreign++;
+                BotBounds.Offered();
+                BotOffice.Offering(BotExile.Office, ours);
+
+                return new BotRemove(ours, BotPopulation.Home, off, false, true);
+            }
+
             if (!BotSeat.Moving(ours, out var hall, out var seat))
             {
                 Settled++;
@@ -373,7 +449,7 @@ public sealed class BotRemover : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been looked at for a removal"
-            : $"the remover looked {Asked} times and sent {Offered} ({Seating} of them to carry a hall to its seat): {Settled} owed no move, {Claimed} already had somebody on it, "
+            : $"the remover looked {Asked} times and sent {Offered} ({Seating} of them to carry a hall to its seat, {Foreign} off another guild's ground to open ground, {Shifts} to shift one onto its own): {Settled} owed no move, {Claimed} already had somebody on it, "
             + $"{Groundless} found no ground outside the winner's yard or by the seat, {NoNearer} found none nearer the seat than the hall already is; {BotRemove.Describe()}";
 
     public static void Forget()
@@ -385,5 +461,7 @@ public sealed class BotRemover : IBotProposer
         Groundless = 0;
         Seating = 0;
         NoNearer = 0;
+        Foreign = 0;
+        Shifts = 0;
     }
 }

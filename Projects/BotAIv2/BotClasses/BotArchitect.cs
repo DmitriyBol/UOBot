@@ -4,15 +4,13 @@ using Server.Items;
 namespace Server.BotAI.V2;
 
 /// <summary>
-/// The bot that is paid by the health of the market rather than by any errand in it.
+/// The maker of both halves of the armour chain: the seam and the forge.
 ///
 /// <para>
-/// <b>Its office is a hundredth of every sale, and that number is the whole of its motivation.</b> Every
-/// other bot on this shard is paid for a piece of work: a hunt, a seam, a commission. The architect is paid
-/// when <em>anybody</em> trades — see <see cref="BotClass.Levies"/> — so the only way it can earn more is for
-/// the population as a whole to make more, sell more and be better equipped than it was yesterday. That is
-/// not a rule it is told to follow; it is the shape of its income, and it is why this class exists rather
-/// than a flag on a crafter.
+/// <b>Its office was a hundredth of every sale on the auction</b>, paid when <em>anybody</em> traded, so the only
+/// way it could earn more was for the population as a whole to make more and sell more. The levy went with the
+/// auction on 01.10.2026 (Patrick's order of 30.09: every sale hand to hand, nothing settled from nowhere); what is
+/// left is a maker of both halves of the armour chain, paid for its forge and its seam like anybody else.
 /// </para>
 ///
 /// <para>
@@ -34,6 +32,8 @@ public sealed class BotArchitect : BotClass
 {
     public override string Name => "Architect";
 
+    public override bool Office => true;
+
     public override BotRole Role => BotRole.Producer;
 
     public override SkillName? MainSkill => SkillName.Blacksmith;
@@ -41,8 +41,6 @@ public sealed class BotArchitect : BotClass
     public override bool Seasoned => true;
 
     public override double Seasoning => 0.78;
-
-    public override bool Levies => true;
 
     public override bool Rides => true;
 

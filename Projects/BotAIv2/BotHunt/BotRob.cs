@@ -434,6 +434,8 @@ public sealed class BotRob : BotDeed
             Paid++;
             Extorted += amount;
             BotUnderworld.Extorted(body);
+
+            BotBiography.Extorted(_victim, body, amount);
             BotOutlaw.Want(body as BotMobile, _victim.Name, $"taking {amount}gp from {_victim.Name} under threat");
 
             if (BotShadow.Running && BotShadow.CanHide(body))

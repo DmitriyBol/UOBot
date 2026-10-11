@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Server.Mobiles;
 
 namespace Server.BotAI.V2;
@@ -84,6 +85,24 @@ public sealed class BotBrawl : BotDeed
     private long _castTick;
 
     private int _casts;
+
+    private int _begun;
+
+    private int _broken;
+
+    private bool _sequenced;
+
+    private string _why;
+
+    private string _gate;
+
+    private long _whyTick;
+
+    private bool _caster;
+
+    private bool _reached;
+
+    private bool _tallied;
 
     private Point3D _found;
 
@@ -172,7 +191,13 @@ public sealed class BotBrawl : BotDeed
 
     public override int Made => 0;
 
-    public override string Stage => $"{_kind}: fighting {_foe?.Name ?? "somebody"} ({_casts} casts, {Elapsed / 1000}s)";
+    public override string Stage => $"{_kind}: fighting {_foe?.Name ?? "somebody"} ({_casts} casts, {Elapsed / 1000}s{Spellless})";
+
+    private string Spellless =>
+        _casts > 0 ? ""
+        : _begun > 0 ? $", {_begun} begun, none landed"
+        : _why != null ? $", no spell: {_why}{(_kind == Duel && _gate == BotStrike.NoHerbs ? " — the arena fills the pool, not the pack" : "")}"
+        : "";
 
     public override BotDoing Advance(IBotWilful bot)
     {
@@ -184,6 +209,11 @@ public sealed class BotBrawl : BotDeed
         }
 
         Count();
+
+        if (_aiming && body.Spell is Server.Spells.Spell { State: Server.Spells.SpellState.Sequencing })
+        {
+            _sequenced = true;
+        }
 
         if (_foe is not { Deleted: false } || _foe.Map != _map)
         {
@@ -224,6 +254,17 @@ public sealed class BotBrawl : BotDeed
         var armed = casting && BotStrike.Best(body) >= 0;
         var reach = Math.Max(body.Weapon?.MaxRange ?? 1, armed ? BotStrike.Range : 0);
 
+        if (casting || body is BotMobile { Class.Role: BotRole.Caster or BotRole.Medic })
+        {
+            _caster = true;
+
+            if (!armed && Core.TickCount - _whyTick >= 1000)
+            {
+                _whyTick = Core.TickCount;
+                _why = BotStrike.Why(body, out _gate);
+            }
+        }
+
         if (!body.InRange(_foe.Location, reach) || !body.InLOS(_foe))
         {
             var lost = _kind == Manhunt ? HuntMs : _kind == Robbery ? ChaseMs : LostMs;
@@ -236,15 +277,27 @@ public sealed class BotBrawl : BotDeed
                 return BotDoing.Done($"{_foe.Name} could not be reached for {lost / 1000}s");
             }
 
-            if (_aim == Point3D.Zero || !Utility.InRange(_foe.Location, _aim, Restride))
+            var arrival = BotArrival.Within(Math.Max(1, reach - 1));
+
+            if (_aim == Point3D.Zero || !Utility.InRange(_foe.Location, _aim, Restride) || arrival.Reached(body.Location, _aim))
             {
                 _aim = _foe.Location;
             }
 
-            return BotDoing.Walk(_map, _aim, BotArrival.Within(Math.Max(1, reach - 1)), $"after {_foe.Name}");
+            _walking = true;
+
+            return BotDoing.Walk(_map, _aim, arrival, $"after {_foe.Name}");
         }
 
         _seenTick = Core.TickCount;
+        _reached = true;
+
+        if (body.InRange(_foe.Location, Math.Max(1, reach - 1)))
+        {
+            Halt(bot);
+        }
+
+        Leftover(bot);
 
         body.Warmode = true;
         body.Combatant = _foe;
@@ -271,6 +324,19 @@ public sealed class BotBrawl : BotDeed
             return BotDoing.Work("casting");
         }
 
+        if (_aiming)
+        {
+            _aiming = false;
+
+            if (!_sequenced)
+            {
+                Broken++;
+                _broken++;
+            }
+        }
+
+        _sequenced = false;
+
         if (_cast && Core.TickCount - _castTick < BotStrike.CastMs)
         {
             return BotDoing.Work($"between spells at {_foe.Name}");
@@ -283,15 +349,74 @@ public sealed class BotBrawl : BotDeed
             _aiming = true;
             _cast = true;
             _castTick = Core.TickCount;
+            _begun++;
+            _sequenced = false;
 
             return BotDoing.Work($"casting at {_foe.Name}");
+        }
+
+        if (spell >= 0 && Core.TickCount - _whyTick >= 1000)
+        {
+            _whyTick = Core.TickCount;
+            _why = BotStrike.Why(body, out _gate);
         }
 
         return BotDoing.Work($"fighting {_foe.Name}");
     }
 
+    private bool _walking;
+
+    public static long Halted { get; private set; }
+
+    private void Halt(IBotWilful bot)
+    {
+        if (!_walking)
+        {
+            return;
+        }
+
+        _walking = false;
+
+        var journey = bot?.Journey;
+
+        if (journey is { Queued: 1, Bottom: { Interruption: false, Follow: null } errand } && errand.Where == _aim && errand.Map == _map)
+        {
+            journey.Complete();
+            Halted++;
+        }
+
+        _aim = Point3D.Zero;
+    }
+
+    private bool _cleared;
+
+    public static long Leftovers { get; private set; }
+
+    private void Leftover(IBotWilful bot)
+    {
+        if (_cleared)
+        {
+            return;
+        }
+
+        _cleared = true;
+
+        if (bot?.Resolve is not { } resolve || resolve.Sent.Kind != BotDoingKind.None)
+        {
+            return;
+        }
+
+        if (bot.Journey is { Queued: 1, Bottom: { Interruption: false } errand } journey && errand.Reason is not ("station" or "sweep" or "bind" or "raise"))
+        {
+            journey.Complete();
+            Leftovers++;
+        }
+    }
+
     private void Quiet(Mobile body)
     {
+        Tally();
+
         if (body != null && ReferenceEquals(body.Combatant, _foe))
         {
             body.Combatant = null;
@@ -301,10 +426,91 @@ public sealed class BotBrawl : BotDeed
 
     public override void Drop(IBotWilful bot) => Quiet(bot?.Self);
 
+    private static readonly Dictionary<string, long[]> Spells = [];
+
+    public static long Broken { get; private set; }
+
+    private enum SpellSlot
+    {
+        Casters,
+        Cast,
+        Thrown,
+        Begun,
+        NoSpell,
+        NoMana,
+        NoHerbs,
+        Refused,
+        AllBroken,
+        Unreached,
+        Unknown,
+        Count
+    }
+
+    private void Tally()
+    {
+        if (_tallied || !_counted || !_caster)
+        {
+            return;
+        }
+
+        _tallied = true;
+
+        if (!Spells.TryGetValue(_kind, out var row))
+        {
+            Spells[_kind] = row = new long[(int)SpellSlot.Count];
+        }
+
+        row[(int)SpellSlot.Casters]++;
+        row[(int)SpellSlot.Thrown] += _casts;
+        row[(int)SpellSlot.Begun] += _begun;
+
+        if (_casts > 0)
+        {
+            row[(int)SpellSlot.Cast]++;
+
+            return;
+        }
+
+        var slot = _begun > 0 ? _broken > 0 ? SpellSlot.AllBroken : SpellSlot.Unknown
+            : !_reached ? SpellSlot.Unreached
+            : _gate switch
+            {
+                BotStrike.NoMana => SpellSlot.NoMana,
+                BotStrike.NoHerbs => SpellSlot.NoHerbs,
+                BotStrike.Refused => SpellSlot.Refused,
+                BotStrike.NoSpell => SpellSlot.NoSpell,
+                _ => SpellSlot.Unknown
+            };
+
+        row[(int)slot]++;
+    }
+
+    private static string DescribeSpells()
+    {
+        if (Spells.Count == 0)
+        {
+            return "no caster has fought a brawl";
+        }
+
+        var parts = new List<string>(Spells.Count);
+
+        foreach (var (kind, r) in Spells)
+        {
+            parts.Add(
+                $"{kind} {r[(int)SpellSlot.Cast]} of {r[(int)SpellSlot.Casters]} cast ({r[(int)SpellSlot.Thrown]} spells of {r[(int)SpellSlot.Begun]} begun; "
+                + $"none for: {r[(int)SpellSlot.NoHerbs]} no reagents, {r[(int)SpellSlot.NoMana]} no mana, {r[(int)SpellSlot.NoSpell]} no attack spell, "
+                + $"{r[(int)SpellSlot.Refused]} refused by the engine, {r[(int)SpellSlot.AllBroken]} begun and broken off, {r[(int)SpellSlot.Unreached]} never in reach, "
+                + $"{r[(int)SpellSlot.Unknown]} begun or barred with no gate named)"
+            );
+        }
+
+        return $"casters in brawls: {string.Join(", ", parts)}; {Broken} casts broken off in all";
+    }
+
     public static string Describe() =>
         Duels + Robberies + Manhunts + Defences == 0
             ? "no bot has fought another on purpose"
-            : $"{Duels} duels, {Robberies} robberies, {Manhunts} manhunts and {Defences} defences fought bot against bot, {Capped} ran to the cap and {Lost} lost their foe";
+            : $"{Duels} duels, {Robberies} robberies, {Manhunts} manhunts and {Defences} defences fought bot against bot, {Capped} ran to the cap and {Lost} lost their foe, {Halted} walks ended with the foe in reach, {Leftovers} walks of a deed put down taken off the road; {DescribeSpells()}";
 
     public static void Forget()
     {
@@ -314,5 +520,9 @@ public sealed class BotBrawl : BotDeed
         Defences = 0;
         Capped = 0;
         Lost = 0;
+        Halted = 0;
+        Leftovers = 0;
+        Broken = 0;
+        Spells.Clear();
     }
 }

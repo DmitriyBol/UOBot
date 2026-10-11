@@ -216,6 +216,8 @@ public static class BotMend
 
         potion.Drink(bot);
 
+        BotReflex.Drank(bot);
+
         return true;
     }
 
@@ -346,6 +348,8 @@ public static class BotMend
 
         aiming.Invoke(bot, patient);
 
+        BotReflex.Mending(bot, patient);
+
         return true;
     }
 
@@ -365,6 +369,8 @@ public static class BotMend
         }
 
         cloth.Consume();
+
+        BotReflex.Mending(bot, patient);
 
         return true;
     }

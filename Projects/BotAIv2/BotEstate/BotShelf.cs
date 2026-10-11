@@ -12,10 +12,9 @@ namespace Server.BotAI.V2;
 /// carrying its takings back to the guild.
 ///
 /// <para>
-/// <b>Why a shop in the hall is worth anything at all, when the bots already have a market.</b> A stall on
-/// <see cref="BotAuction"/> holds its stock out of the world and can be bought from anywhere, so bot-to-bot
-/// trade has never needed a building. What a stall cannot do is stand still: it belongs to a bot, and this
-/// population is rebuilt at every restart. A merchant in a hall is saved with the house, so what is left on
+/// <b>Why a shop in the hall is worth anything at all, when the bots already have a market.</b> The bots' own
+/// shops by the bank (<see cref="BotShopkeep"/>) are kept by a bot standing there for a shift; what a keeper cannot
+/// do is stand there for ever: it belongs to a bot, and this population is rebuilt at every restart. A merchant in a hall is saved with the house, so what is left on
 /// its shelf outlives the bots that put it there — and Patrick can walk in and buy it.
 /// </para>
 ///
@@ -314,7 +313,7 @@ public static class BotShelf
         }
 
         var price = vi.Price;
-        var purse = BotYield.Wealth(buyer);
+        var purse = BotYield.Spendable(buyer);
 
         if (purse < price)
         {

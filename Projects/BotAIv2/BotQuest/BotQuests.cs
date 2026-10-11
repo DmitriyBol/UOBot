@@ -203,7 +203,7 @@ public static class BotQuests
 
             if (kind == BotQuestKind.Gather && GatherTimesWorth > 0)
             {
-                var piece = Math.Max(GatherLeastPerPiece, BotAuction.Worth(type, 1) * GatherTimesWorth);
+                var piece = Math.Max(GatherLeastPerPiece, BotMarket.Worth(type, 1) * GatherTimesWorth);
                 var most = (int)Math.Min(MostReward, (long)piece * amount);
 
                 if (reward > most)

@@ -52,6 +52,12 @@ public static class BotScatter
 
     private static readonly List<IBotSquadMember> _order = [];
 
+    private static readonly Dictionary<IBotSquadMember, int> _seats = [];
+
+    private static BotSquad _orderedFor;
+
+    private static int _orderedAt;
+
     public static Point3D PatchFor(BotSquad squad, IBotSquadMember member)
     {
         if (squad == null || member?.Self == null)
@@ -66,20 +72,32 @@ public static class BotScatter
             return Point3D.Zero;
         }
 
-        _order.Clear();
-
-        var members = squad.Members;
-
-        for (var i = 0; i < members.Count; i++)
+        if (!ReferenceEquals(_orderedFor, squad) || _orderedAt != squad.Roster)
         {
-            _order.Add(members[i]);
+            _orderedFor = squad;
+            _orderedAt = squad.Roster;
+            _order.Clear();
+            _seats.Clear();
+
+            var members = squad.Members;
+
+            for (var i = 0; i < members.Count; i++)
+            {
+                if (members[i]?.Self != null)
+                {
+                    _order.Add(members[i]);
+                }
+            }
+
+            _order.Sort(static (a, b) => a.Self.Serial.Value.CompareTo(b.Self.Serial.Value));
+
+            for (var i = 0; i < _order.Count; i++)
+            {
+                _seats[_order[i]] = i;
+            }
         }
 
-        _order.Sort(static (a, b) => a.Self.Serial.Value.CompareTo(b.Self.Serial.Value));
-
-        var seat = _order.IndexOf(member);
-
-        if (seat < 0)
+        if (!_seats.TryGetValue(member, out var seat))
         {
             return Point3D.Zero;
         }

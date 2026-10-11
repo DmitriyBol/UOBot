@@ -342,6 +342,38 @@ public static class BotThreat
         return ours > 0.0 && threat / ours > Tolerance;
     }
 
+    public static double ThreatAt(Mobile bot, IPoint3D where, int range)
+    {
+        var map = bot?.Map;
+
+        if (map == null || map == Map.Internal || where == null)
+        {
+            return 0.0;
+        }
+
+        var total = 0.0;
+        var worst = 0.0;
+
+        foreach (var creature in map.GetMobilesInRange<BaseCreature>(new Point3D(where), range))
+        {
+            if (!Menacing(bot, creature))
+            {
+                continue;
+            }
+
+            var power = Power(creature);
+
+            total += power;
+
+            if (power > worst)
+            {
+                worst = power;
+            }
+        }
+
+        return worst <= 0.0 ? 0.0 : worst + (total - worst) * SecondaryWeight;
+    }
+
     public static bool OverrunThere(Mobile bot, Mobile beside, IPoint3D where, int range)
     {
         var map = bot?.Map;

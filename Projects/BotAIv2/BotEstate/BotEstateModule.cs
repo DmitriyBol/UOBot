@@ -25,6 +25,7 @@ public sealed class BotEstateModule : BotModule
     public override void Start()
     {
         BotEstateConfig.Load();
+        BotTownGround.Load();
 
         BotEstate.Adopt();
 
@@ -120,6 +121,7 @@ public sealed class BotEstateModule : BotModule
         BotSupplier.Forget();
         BotOffice.Forget();
         BotLand.Forget();
+        BotBounds.Forget();
         BotRegard.Forget();
         BotBailiff.Forget();
         BotFeuder.Forget();
@@ -129,6 +131,7 @@ public sealed class BotEstateModule : BotModule
         BotWar.Forget();
         BotSeat.Forget();
         BotClaim.Forget();
+        BotTownGround.Forget();
         BotHolder.Forget();
         BotReeve.Forget();
         BotChest.Forget();

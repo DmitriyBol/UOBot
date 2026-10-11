@@ -75,7 +75,8 @@ public static class BotHand
         "city",
         "post",
         "unpost",
-        "quests"
+        "quests",
+        "reach"
     ];
 
     public const string Manual =
@@ -98,22 +99,24 @@ public static class BotHand
         + "that has never been somewhere; kept across restarts. gaps — each trade's claim against what it turned out to "
         + "pay, worst overstatement first: a claim far above the payment is a number in the source that stopped being "
         + "true, with the whole population chasing it. city — the treasury: what it holds, what it has spent, its "
-        + "standing orders. city buy [<lots>] — the city buys that many whole lots off the stalls, the longest-standing "
-        + "first, for what is in the treasury and not a coin more: the outside demand that clears what the population "
-        + "cannot sell to itself. city want <Thing> <amount> <price> — a standing order: the city takes that thing off "
-        + "the stalls whenever it is offered at or under the price, until the amount is bought. city forget <Thing> — "
+        + "standing orders. city buy [<lots>] — the city buys that many whole lots at the bots' shops open by the bank, "
+        + "for what is in the treasury and not a coin more: the outside demand that clears what the population "
+        + "cannot sell to itself. city want <Thing> <amount> <price> — a standing order: the city takes that thing at "
+        + "the bots' shops whenever it is on show at or under the price, until the amount is bought. city forget <Thing> — "
         + "the order withdrawn. city bounty <x> <y> <gp> — a price on a square: the Baron marches there before "
         + "anywhere else, and the company that clears it is paid from the treasury, split evenly. city head <bot> <gp> — "
         + "a price on a murderer's head, paid to whoever catches it. city fair [<minutes>] [<percent>] — a fair: for an "
-        + "hour the city takes what is on the stalls at 80% of the asking price, twenty lots a minute, out of the treasury; "
+        + "hour the city takes what the bots' shops by the bank hold at 80% of the asking price, twenty lots a minute, out of the treasury; "
         + "the clock declares one every six hours when the treasury allows. The treasury fills on a clock and never faster; "
         + "spend it where the market is stuck or the ground is bad. "
         + "post kill <Creature> <n> <gp> [<x> <y>] / post gather <Thing> <n> <gp> [<x> <y>] / post scout <x> <y> <gp> — "
         + "an errand on the board, its reward held by the treasury from now and paid to whichever bot does it; a kill "
         + "counts near the place named or anywhere, goods are brought to the place or to home. unpost <id> — the errand "
-        + "withdrawn and its reward back. quests — the board and what came of it.";
+        + "withdrawn and its reward back. quests — the board and what came of it. reach <x> <y> — what the reach map says of "
+        + "a tile (open to a walker from home, an isle only a ship reaches, a sealed pocket, water a ship sails, nowhere to "
+        + "stand) and what the walker's own search finds there; reach — the map, and how its check of the borders came out.";
 
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench", "go", "gates", "parley", "meet", "zones", "zone"];
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "arena", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench", "go", "gates", "parley", "meet", "zones", "zone", "zonewatch", "charters", "charter", "relics", "relic", "steward", "decree", "officers", "appoint"];
 
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
@@ -125,6 +128,9 @@ public static class BotHand
         + "standing in its towns with the task in hand. meet <guild> ; <guild or town> [; grievance|safety|friendship|commerce] — "
         + "call a meeting now, the pair's clock ignored: the envoy walks, the host answers, a watcher witnesses, the duke gives "
         + "his word; a town's name sends the guild's envoy to that town's hall for a task. "
+        + "relics — every relic and banner, who holds it, where it is and since when, the lair standing and the counters. "
+        + "relic <name> ; <guild> — hand a relic to a guild's hall now (a key such as crown or banner:The Hammer, or a piece of its "
+        + "name; hide instead of a guild puts a town relic back into hiding), to watch its gifts, a theft or a war's end. "
         + "guilds — every guild in a paragraph: who leads it, how many it has in the world, at rest and dead, what they fight "
         + "with (strength, armour, the skills a fight turns on, bandages and potions), what it owns, and the war it stands in "
         + "with how many of it are in the fight against how many the score asks for. seats — where each guild lives and how far "
@@ -133,7 +139,11 @@ public static class BotHand
         + "stopped: a kill without one rolls the island back to the last autosave, five minutes of halls and moves. "
         + "census — one line per bot into logs/bot-census.log: class, band, work in hand, health, purse, place, company. "
         + "tourney [stop|state] — hold the championship now instead of waiting for the week: the strongest thirty, one against "
-        + "one in the ring, the winner's name yellow and a prize in its pack; stop calls it off, state says where it stands. "
+        + "one in the ring, the winner's name yellow and a prize in its pack; stop calls it off, state says where it stands; at the "
+        + "arenas (BotTourney.Arena) it is the same as arena. arena [force|state|stop] — the day's championship at the round arenas "
+        + "east of Papua now, if today's has not been held: at least fifty free bots, ported in batches, one pair to a ring; force "
+        + "holds one anyway for a test without spending the day's and pays no prize; state tells the bracket; stop calls it off and "
+        + "sends everybody home. "
         + "prove <bot> [<Creature>] — put the bot's double on the proving ground in Green Acres next, against the creature named "
         + "or the rung of the dungeons' ladder it is due; proof <bot> — every fight its doubles have had, what each proved, and "
         + "its strength against each dungeon's worst; proofs — every bot measured, strongest first, and the ladder. "
@@ -156,9 +166,24 @@ public static class BotHand
         + "map from home has reached and what it cost, or for each tile named the steps of road from home against the "
         + "straight line: the answer to \"is that ground far, or only far round\". zones — the danger zones: how many of "
         + "each level, the ten strongest, and the debuggers' tour. zones tour on|off — the debuggers walk the least-watched zones "
-        + "and wake the ground there, or go back to watching the bots. zone <x> <y> — what the zones say about one tile: its "
+        + "and wake the ground there, or go back to watching the bots. zonewatch on|off|state — the zone watch: one debugger "
+        + "wholly on the zones and the others carrying its charge, the accuracy counter both ways (deaths and visits), and the "
+        + "end at 99 %; on puts the keeper back, off ends it now, state says where it stands. zone <x> <y> — what the zones say about one tile: its "
         + "level, the zone it lies in, what lives there, its strength against the median bot, how sure the shape is and who "
-        + "died there. None is offered to the minds.";
+        + "died there. reach check <n> — examine n border tiles of the reach map with the walker's own search, a debugger "
+        + "standing on each; reach check — the tally and the misses; reach redraw <x> <y> [<r>] — draw that square of the map "
+        + "again; reach carry on|off — whether a debugger stands on each tile examined. "
+        + "charters — every town's charter standing, its holder, price and levies, the next auction and this period's books. "
+        + "charter <town> <smith|tailor|woodsman|alchemist|scribe|cook> — auction that town's charter for the craft now, until the "
+        + "next general auction: the bids, the winner and what it paid the town. "
+        + "steward [<town>] — the towns' stewards: who governs, the coffer, the tax, the regard, the bars, the last decrees and "
+        + "what is lawful now (* what the rule would take). decree <town> tax +2|captain [<guild>]|bounty <bot>|militia|bar <guild>|"
+        + "holiday|caravan [<town>] — the town's steward gives it now if it is lawful and the coffer can pay; spoken and logged like "
+        + "any decree. "
+        + "officers [<guild>] — each guild's quartermaster, herald and scout, how long they have held the post, the guild's store and "
+        + "the debts owed to it, the herald's invitations and bouts, the scout's watches; with no guild, every guild and the officers' "
+        + "clause. appoint <guild> <quartermaster|herald|scout> <bot> — give the post by hand, whatever the fit; the head's next review "
+        + "may take it back. None is offered to the minds.";
 
     private static readonly Dictionary<string, long> _used = [];
 
@@ -228,7 +253,7 @@ public static class BotHand
             return null;
         }
 
-        if (Array.IndexOf(Verbs, verb) < 0 && !(byHand && Array.IndexOf(HandVerbs, verb) >= 0))
+        if (Array.IndexOf(Verbs, verb) < 0 && !(byHand && (Array.IndexOf(HandVerbs, verb) >= 0 || Array.IndexOf(BotColonies.Verbs, verb) >= 0)))
         {
             Refused++;
             Write($"REFUSED {who}: \"{verb} {tail}\" — no such verb");
@@ -312,6 +337,9 @@ public static class BotHand
             case "quests":
                 return $"{BotQuests.Describe()}.";
 
+            case "reach":
+                return ReachMap(tail);
+
             case "halls":
                 return BotEstate.Describe();
 
@@ -321,11 +349,23 @@ public static class BotHand
             case "wars":
                 return BotWar.Describe();
 
+            case "relics":
+                return BotRelics.Report();
+
+            case "relic":
+                return BotRelics.Give(tail);
+
             case "parley":
                 return BotParley.Tell();
 
             case "meet":
                 return BotParley.ByHand(tail);
+
+            case "charters":
+                return BotCharters.Tell();
+
+            case "charter":
+                return BotCharters.ByHand(tail);
 
             case "census":
                 return Census();
@@ -356,8 +396,21 @@ public static class BotHand
                         ? BotTourney.Describe()
                         : BotTourney.Start("the keyboard");
 
+            case "arena":
+                return tail.StartsWith("stop", StringComparison.OrdinalIgnoreCase)
+                    ? BotTourney.Stop()
+                    : tail.StartsWith("state", StringComparison.OrdinalIgnoreCase)
+                        ? BotTourney.ArenaBracket()
+                        : BotTourney.ArenaByHand(tail.StartsWith("force", StringComparison.OrdinalIgnoreCase));
+
             case "band":
                 return Band();
+
+            case "steward":
+                return BotStewardship.Tell(tail);
+
+            case "decree":
+                return BotStewardship.ByHand(tail);
 
             case "proofs":
                 return BotProving.Board();
@@ -413,11 +466,26 @@ public static class BotHand
             case "zone":
                 return Zone(tail);
 
+            case "zonewatch":
+                return BotZoneWatch.Turn(tail.Trim());
+
+            case "officers":
+                return BotOfficers.Tell(tail);
+
+            case "appoint":
+                return BotOfficers.Appoint(tail);
+
             case "resolves":
                 return BotWill.DescribeResolve();
 
             case "breaks":
                 return BotBreaker.List();
+
+            case "expeditions":
+                return BotColonies.Tell();
+
+            case "colony":
+                return string.IsNullOrWhiteSpace(tail) ? "colony wants a guild: colony The Hammer." : BotColonies.Launch(tail.Trim());
 
             case "save":
                 {
@@ -779,12 +847,16 @@ public static class BotHand
 
         var bodies = BotPopulation.PurgeSaved();
 
-        BotAuction.Reset();
+        BotMarket.Reset();
+
+        BotTrading.Forget();
+
         BotQuests.Wipe();
         BotOutlaw.Forget();
         BotUnderworld.Forget();
         BotGuilds.Forget();
         BotGround.Reset();
+        BotOre.Forget();
 
         BotCommons.Forget();
 
@@ -814,16 +886,64 @@ public static class BotHand
         BotInns.Forget();
         BotPeoples.Forget();
 
-        if (!World.Saving)
-        {
-            World.Save();
-            Timer.DelayCall(TimeSpan.FromMilliseconds(500), Settled, 0);
-        }
+        var coffers = BotPolitics.Wipe();
+        var held = BotSeasons.Wipe();
+        var lives = BotLives.Wipe();
+        var charters = BotCharters.Wipe();
+        var colonies = BotColonies.Wipe();
+        var wanted = BotCrime.Wipe();
+        var loans = BotLoans.Wipe();
+        BotTrades.Forget();
+        var posts = BotOfficers.Wipe();
+        var relics = BotRelics.Wipe();
+
+        var runes = BotRuneShelf.Wipe();
+        var unheld = BotCity.Unhold();
+
+        var saving = SaveWiped(0);
 
         return $"reset: {halls} halls razed, {claims} claims let go, {seats} hand-set seats forgotten, {houses} guild houses emptied, wars, truces and opinions forgotten, "
                + $"{learned} bots' learning wiped and {bodies} bodies deleted with everything they were carrying, "
                + $"the market, the wants and the board of errands emptied, the city's wants and bounties and the championship's record forgotten, every crime and the band forgotten, the guilds disbanded, "
-               + $"everything known about what pays where wiped (the island's danger map, the zones and the roads walked are kept); the world is being saved — wait for \"the snapshot is on disk\", then restart the shard and the population rises as novices.";
+               + $"{lives} bots' characters, ties and tales forgotten, {charters} charters let go, {colonies} colonies given up with their stores, {wanted} names struck off the books on crime, {loans} loans and {posts} officers' posts with the guilds' stores and kit debts, "
+               + $"the politics and the stewardships ({coffers}gp of coffers and watches' wages back into the treasury), the events ({held}gp of their holds back to the purse and the crown), "
+               + $"{relics} relic items taken out of the world (the town relics hidden again), {runes} guilds' runes forgotten, the seizures, the guild splits and widenings, {unheld}gp held for nobody back into the treasury; "
+               + $"everything known about what pays where wiped (the island's danger map, the zones and the roads walked are kept); "
+               + (saving
+                   ? "the world is being saved"
+                   : $"a save was already under way (state {World.WorldState}), so the wiped world is saved as soon as the engine is free")
+               + " — wait for \"the snapshot is on disk\", then restart the shard and the population rises as novices.";
+    }
+
+    private static bool SaveWiped(int tries)
+    {
+        if (World.WorldState == WorldState.Running)
+        {
+            World.Save();
+
+            if (World.WorldState != WorldState.Running)
+            {
+                if (tries > 0)
+                {
+                    BotConsole.Say("the wiped world's save is under way now.");
+                }
+
+                Timer.DelayCall(TimeSpan.FromMilliseconds(500), Settled, 0);
+
+                return true;
+            }
+        }
+
+        if (tries >= 240)
+        {
+            BotConsole.Say($"the wiped world could NOT be saved in two minutes (state {World.WorldState}); do not restart the shard — say \"save\" once the engine is free.");
+
+            return false;
+        }
+
+        Timer.DelayCall(TimeSpan.FromMilliseconds(500), () => { SaveWiped(tries + 1); });
+
+        return false;
     }
 
     private static void Settled(int tries)
@@ -1029,7 +1149,7 @@ public static class BotHand
 
                     return taken <= 0
                         ? $"the city sent for {lots} lots and bought nothing: {(BotCity.Purse <= 0 ? "the treasury is empty" : "nothing on offer it could pay for")}; {BotCity.Describe()}."
-                        : $"the city bought {units} things from {taken} stalls for {paid}gp; {BotCity.Purse}gp left in the treasury.";
+                        : $"the city bought {units} things in {taken} lots at the bots' shops for {paid}gp; {BotCity.Purse}gp left in the treasury.";
                 }
 
             case "want":
@@ -1526,7 +1646,8 @@ public static class BotHand
             $"A {kind} revel! Whoever does most of it before the hour is out takes the purse.",
             "called by hand, from the console",
             spot != Point3D.Zero,
-            spot
+            spot,
+            exact: true
         );
     }
 
@@ -1766,6 +1887,14 @@ public static class BotHand
             return $"{roadless}; a seat has to be ground with a road from home, or everybody put down there is carried home. {BotSeat.Tell()}";
         }
 
+        if (BotBounds.Foreign(found.Name, map, seat, out var holder))
+        {
+            Refused++;
+            BotBounds.SeatRefused();
+
+            return $"{x},{y} lies on {holder}'s held ground, and no guild's seat may stand on another guild's ground; choose ground of its own or open ground. {BotSeat.Tell()}";
+        }
+
         BotSeat.Set(found.Name, seat);
 
         return $"the seat of {found.Name} is {x},{y} now. {BotSeat.Tell()}";
@@ -1788,6 +1917,60 @@ public static class BotHand
         }
 
         return BotZones.Tell();
+    }
+
+    private static string ReachMap(string tail)
+    {
+        var words = tail.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+        if (words.Length == 0)
+        {
+            return BotReachMap.Tell();
+        }
+
+        if (words[0].Equals("check", StringComparison.OrdinalIgnoreCase))
+        {
+            if (words.Length >= 2 && int.TryParse(words[1], out var n))
+            {
+                return BotReachCheck.Start(n, "the door");
+            }
+
+            var misses = BotReachCheck.Report.Misses;
+
+            return misses.Length == 0
+                ? $"{BotReachCheck.Describe()}."
+                : $"{BotReachCheck.Describe()}; the misses: {string.Join("; ", misses.Take(12))}.";
+        }
+
+        if (words[0].Equals("redraw", StringComparison.OrdinalIgnoreCase))
+        {
+            if (words.Length < 3 || !int.TryParse(words[1], out var rx) || !int.TryParse(words[2], out var ry))
+            {
+                Refused++;
+
+                return "reach redraw wants a tile and perhaps a radius: reach redraw 1432 1690 40.";
+            }
+
+            var r = words.Length > 3 && int.TryParse(words[3], out var rr) ? Math.Clamp(rr, 0, 256) : 16;
+
+            return $"{BotReachMap.Redraw(rx, ry, r)} clusters round ({rx}, {ry}) are drawn again, and the map solved after.";
+        }
+
+        if (words[0].Equals("carry", StringComparison.OrdinalIgnoreCase))
+        {
+            BotReachCheck.Carry = words.Length < 2 || !words[1].Equals("off", StringComparison.OrdinalIgnoreCase);
+
+            return $"a debugger {(BotReachCheck.Carry ? "stands" : "no longer stands")} on each tile the check examines.";
+        }
+
+        if (words.Length < 2 || !int.TryParse(words[0], out var x) || !int.TryParse(words[1], out var y))
+        {
+            Refused++;
+
+            return "reach wants nothing, a tile, or check / redraw / carry: reach | reach 1432 1690 | reach check 200 | reach redraw 1432 1690 40.";
+        }
+
+        return $"{BotReachMap.TellAt(x, y)} {BotReachCheck.Probe(x, y)}";
     }
 
     private static string Zone(string tail)

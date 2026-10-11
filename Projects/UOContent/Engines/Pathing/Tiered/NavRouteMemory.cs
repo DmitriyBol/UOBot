@@ -358,8 +358,9 @@ public sealed class NavRouteMemory
                 return false;
             }
 
-            if (proof == NavProof.Valid && Danger(detour, 0, detour.Count - 1, danger) <= detour.DangerThen
-                                     && groundDanger >= detour.GroundDangerThen)
+            var detourDanger = Danger(detour, 0, detour.Count - 1, danger);
+
+            if (proof == NavProof.Valid && detourDanger <= detour.DangerThen && detourDanger < groundDanger)
             {
                 Points(detour, from, to, points);
                 detour.Used = ++_clock;

@@ -38,6 +38,8 @@ public sealed class BotInscribe : BotDeed
 
     public static double WorkMinutes { get; set; } = 6.0;
 
+    public static double OrderLift { get; set; } = 1.6;
+
     public static int Batch { get; set; } = 20;
 
     public static int SwingMs { get; set; } = 3000;
@@ -91,38 +93,69 @@ public sealed class BotInscribe : BotDeed
 
     private long _restingTick;
 
-    public BotInscribe(BaseVendor shop, int price)
+    private readonly BotQuillPlan _plan;
+
+    private readonly Map _map;
+
+    private readonly Point3D _here;
+
+    private bool _started;
+
+    public BotInscribe(BaseVendor shop, int price, BotQuillPlan plan, Mobile scribe)
     {
         _shop = shop;
         _price = Math.Max(1, price);
+        _plan = plan;
+        _recipe = plan?.Recipe;
+        _kind = plan?.Kind;
+        _worth = plan?.Worth ?? 0;
+        _map = scribe?.Map;
+        _here = scribe?.Location ?? Point3D.Zero;
     }
 
     public override string Kind => Trade;
 
-    public override Map Map => _shop?.Map;
+    private bool Buys => _plan?.Buys ?? true;
 
-    public override Point3D Where => _shop?.Location ?? Point3D.Zero;
+    public override Map Map => Buys ? _shop?.Map : _map;
 
-    public override double Expects => Prior;
+    public override Point3D Where => Buys ? _shop?.Location ?? Point3D.Zero : _here;
+
+    public override double Expects => _plan?.For != null ? Prior * OrderLift : Prior;
 
     public override double Minutes => WorkMinutes;
 
     public override SkillName? Trains => SkillName.Inscribe;
 
-    public override int Outlay => Batch * _price;
+    public override int Outlay => _plan?.Outlay ?? Batch * _price;
 
-    public override bool AtCounter => _shop != null;
+    public override bool AtCounter => Buys && _shop != null;
 
-    public override double Coin => 0.0;
+    public override double Coin => _plan?.For != null ? 1.0 : 0.0;
 
-    public override int Made => _made + Math.Max(0, _scrolls - _placed) * _worth;
+    public bool Serves(BotWant want) => want != null && ReferenceEquals(_plan?.For, want) && _leg != Leg.Market;
+
+    public override void Taken(IBotWilful bot)
+    {
+        BotScribes.Took(_plan);
+
+        if (_plan?.For != null)
+        {
+            BotScribes.Claim(_plan.For, bot);
+        }
+    }
+
+    public override int Made => _made + BotGlut.Yield(_kind, Math.Max(0, _scrolls - _placed), _worth);
 
     public override string Stage => _leg switch
     {
-        Leg.Shop => "after paper",
-        Leg.Work => $"writing {_kind?.Name ?? "something"} ({_swings} attempts, {_scrolls} written)",
+        Leg.Shop => _plan?.Herbs is { Count: > 0 } ? "after paper and herbs" : "after paper",
+        Leg.Work => $"writing {_kind?.Name ?? "something"}{For} ({_swings} attempts, {_scrolls} written)",
         _ => $"placing {_scrolls}"
     };
+
+    private string For =>
+        _plan?.For?.Buyer?.Self is { } buyer ? $" for {buyer.Name}'s want" : _plan?.Own == true ? " for itself" : "";
 
     public override bool Bend(IBotWilful bot)
     {
@@ -150,7 +183,7 @@ public sealed class BotInscribe : BotDeed
             var doing = _leg switch
             {
                 Leg.Shop => Shopping(bot, body),
-                Leg.Work => Writing(body),
+                Leg.Work => Writing(bot, body),
                 _ => Placing(bot, body)
             };
 
@@ -165,7 +198,9 @@ public sealed class BotInscribe : BotDeed
 
     private BotDoing Shopping(IBotWilful bot, Mobile body)
     {
-        if (BotQuill.Blanks(body) > 0)
+        var paper = PaperWanted(body);
+
+        if (paper <= 0 && !HerbsLacking(body))
         {
             _leg = Leg.Work;
 
@@ -182,7 +217,7 @@ public sealed class BotInscribe : BotDeed
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for blank scrolls");
         }
 
-        if (BotShops.Buy(bot, _shop, typeof(BlankScroll), Batch, out var refused) <= 0)
+        if (paper > 0 && BotShops.Buy(bot, _shop, typeof(BlankScroll), paper, out var refused) <= 0)
         {
             var next = BotShops.Next(bot, _shop, typeof(BlankScroll), ref _repicks);
 
@@ -196,14 +231,83 @@ public sealed class BotInscribe : BotDeed
             return BotDoing.Failed(refused ?? "no blank scrolls to be had");
         }
 
+        BuyHerbs(bot, body);
+
         _leg = Leg.Work;
 
         return default;
     }
 
+    private int PaperWanted(Mobile body)
+    {
+        var held = BotQuill.Blanks(body);
+
+        if (_plan?.Order != true)
+        {
+            return held > 0 ? 0 : Math.Max(1, Batch);
+        }
+
+        return Math.Max(0, _plan.Attempts - held);
+    }
+
+    private bool HerbsLacking(Mobile body)
+    {
+        var pack = body?.Backpack;
+        var resources = _recipe?.Resources;
+
+        if (_plan?.Order != true || pack == null || resources == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < resources.Count; i++)
+        {
+            var res = resources[i];
+
+            if (res.ItemType != null && res.ItemType != typeof(BlankScroll)
+                && pack.GetAmount(res.ItemType) < _plan.Attempts * Math.Max(1, res.Amount))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void BuyHerbs(IBotWilful bot, Mobile body)
+    {
+        var pack = body?.Backpack;
+        var resources = _recipe?.Resources;
+
+        if (_plan?.Order != true || pack == null || resources == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < resources.Count; i++)
+        {
+            var res = resources[i];
+
+            if (res.ItemType == null || res.ItemType == typeof(BlankScroll))
+            {
+                continue;
+            }
+
+            var lacking = _plan.Attempts * Math.Max(1, res.Amount) - pack.GetAmount(res.ItemType);
+
+            if (lacking > 0)
+            {
+                BotScribes.Bought(BotShops.Buy(bot, _shop, res.ItemType, lacking));
+            }
+        }
+    }
+
+    private int Allowed(IBotWilful bot) =>
+        _kind != null && BotUnload.Keeps(bot).TryGetValue(_kind, out var allowed) ? Math.Max(0, allowed) : 0;
+
     private bool _worn;
 
-    private BotDoing Writing(Mobile body)
+    private BotDoing Writing(IBotWilful bot, Mobile body)
     {
         var pen = BotQuill.Pen(body);
 
@@ -212,15 +316,23 @@ public sealed class BotInscribe : BotDeed
             return BotDoing.Failed("nothing to write with");
         }
 
-        if (_recipe == null)
+        if (!_started)
         {
-            _recipe = BotQuill.Choose(body, _price, out _kind, out _worth);
-
             if (_recipe == null)
             {
-                return BotDoing.Failed("no spell it can write with the herbs it has");
+                var plan = BotQuill.Plan(bot, _shop, _price);
+
+                if (plan == null)
+                {
+                    return BotDoing.Failed("no spell it can write with the herbs it has");
+                }
+
+                _recipe = plan.Recipe;
+                _kind = plan.Kind;
+                _worth = plan.Worth;
             }
 
+            _started = true;
             _had = BotQuill.Held(body, _kind);
         }
 
@@ -231,6 +343,13 @@ public sealed class BotInscribe : BotDeed
             _scrolls += have - _had;
             BotCraftwork.Produced(_kind, have - _had);
             _had = have;
+        }
+
+        if (_plan?.Order == true && _scrolls >= Math.Max(1, _plan.Units))
+        {
+            _leg = Leg.Market;
+
+            return default;
         }
 
         if (pen == null)
@@ -246,7 +365,9 @@ public sealed class BotInscribe : BotDeed
             return default;
         }
 
-        if (BotQuill.Blanks(body) <= 0 || !BotQuill.Stocked(body, _recipe))
+        var reserve = _plan?.Order == true && _swings < _plan.Attempts ? 0 : BotQuill.Reserve;
+
+        if (BotQuill.Blanks(body) <= 0 || !BotQuill.Stocked(body, _recipe, reserve))
         {
             _leg = Leg.Market;
 
@@ -314,17 +435,24 @@ public sealed class BotInscribe : BotDeed
 
         var written = BotQuill.Gather(body, _kind);
 
+        var keeps = Allowed(bot);
+        var order = _plan?.For is { IsOpen: true } open && BotMarket.Stands(open) ? open : null;
+        var spare = order == null
+            ? _scrolls
+            : keeps >= int.MaxValue ? 0 : Math.Max(0, BotHandover.Carried(bot, _kind) - keeps - order.Payable);
+
         for (var i = 0; i < written.Count; i++)
         {
             var scroll = written[i];
 
-            if (BotGrimoire.Write(body, scroll))
+            if (spare > 0 && BotGrimoire.Write(body, scroll))
             {
+                spare--;
                 _kept++;
                 _placed++;
                 _made += _worth;
 
-                BotAuction.Withdrawn(bot, _kind);
+                BotMarket.Withdrawn(bot, _kind, BotWithdraw.Have);
             }
 
             if (scroll.Deleted || scroll.Amount <= 0)
@@ -333,29 +461,18 @@ public sealed class BotInscribe : BotDeed
             }
 
             var left = scroll.Amount;
-            var want = BotAuction.Demand(bot, _kind);
-            var sold = want == null ? 0 : BotAuction.Fill(bot, want, scroll);
 
-            if (sold > 0)
-            {
-                _sold += sold;
-                _placed += sold;
-
-                if (sold >= left)
-                {
-                    continue;
-                }
-
-                left -= sold;
-            }
-
-            if (BotAuction.List(bot, scroll, _worth) != null)
-            {
-                _made += left * _worth;
-                _placed += left;
-            }
+            _made += BotGlut.Yield(_kind, left, _worth);
+            _placed += left;
         }
 
-        return BotDoing.Done($"{_scrolls} {_kind?.Name} in {_swings} attempts, {_kept} into its own book, {_sold} sold to order{(_worn ? ", the pen worn through" : "")}");
+        var surplus = keeps >= int.MaxValue ? 0 : Math.Max(0, BotHandover.Carried(bot, _kind) - keeps);
+        var asked = order ?? BotMarket.Demand(bot, _kind);
+
+        _sold = asked == null ? 0 : Math.Min(surplus, asked.Payable);
+
+        BotScribes.Wrote(_plan, _sold, _scrolls);
+
+        return BotDoing.Done($"{_scrolls} {_kind?.Name} in {_swings} attempts, {_kept} into its own book, {_sold} for somebody's want, to be carried to it{(For.Length > 0 ? "; the session written" + For : "")}{(_worn ? ", the pen worn through" : "")}");
     }
 }

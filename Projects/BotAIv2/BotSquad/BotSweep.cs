@@ -118,6 +118,12 @@ public sealed class BotSweep : BotDeed
 
     private BotPassage _passage;
 
+    private static readonly System.Collections.Generic.List<Mobile> _recruits = [];
+
+    public static long Short { get; private set; }
+
+    public static long ClosedOn { get; private set; }
+
     public BotSweep(Map map, Point3D square, double reading)
     {
         _map = map;
@@ -127,7 +133,7 @@ public sealed class BotSweep : BotDeed
     }
 
     public static string Describe() =>
-        $"{Marches} companies actually marched ({Gathered} gathered on the captain first, {Ungathered} members let go for not coming in; {Held} holds for stragglers, {LeftBehind} left behind, {Stood} fights stood to on the road with the captain), {Undermanned} could not raise {Least} bodies once chosen";
+        $"{Marches} companies actually marched ({Gathered} gathered on the captain first, {Ungathered} members let go for not coming in; {Held} holds for stragglers, {LeftBehind} left behind, {Stood} fights stood to on the road with the captain), {Undermanned} could not raise {Least} bodies once chosen, {Short} were not raised for the bots within call bringing less than the square asks, {ClosedOn} left their square when it was closed while they were out for it";
 
     public override string Kind => Trade;
 
@@ -178,35 +184,76 @@ public sealed class BotSweep : BotDeed
 
     private BotDoing Calling(IBotSquadMember member, Mobile body)
     {
+        var asked = BotPatrol.Asks(_map, _square);
+        var strength = BotQuad.Strength(body);
+
+        _recruits.Clear();
+
+        foreach (var mobile in _map.GetMobilesInRange<Mobile>(body.Location, Reach))
+        {
+            if (BotPatrol.Callable(body, mobile))
+            {
+                _recruits.Add(mobile);
+            }
+        }
+
+        _recruits.Sort((a, b) => BotThreat.Power(b).CompareTo(BotThreat.Power(a)));
+
+        if (member.Squad == null && asked > 0.0)
+        {
+            var could = strength;
+
+            for (var i = 0; i < _recruits.Count && i < BotSquad.MaxSize - 1; i++)
+            {
+                could += BotThreat.Power(_recruits[i]);
+            }
+
+            if (could < asked)
+            {
+                _recruits.Clear();
+                Short++;
+
+                return BotDoing.Failed($"the bots within call bring {could:F0} of the {asked:F0} of strength ({_square.X}, {_square.Y}) asks");
+            }
+        }
+
         var squad = member.Squad ?? BotSquads.Form(member);
 
         if (squad == null)
         {
+            _recruits.Clear();
+
             return BotDoing.Failed("could not call a company together");
         }
 
-        foreach (var mobile in _map.GetMobilesInRange<Mobile>(body.Location, Reach))
+        for (var i = 0; i < _recruits.Count; i++)
         {
-            if (squad.Count >= squad.Ceiling)
+            if (BotSquads.Enough(squad, strength, asked))
             {
                 break;
             }
 
-            if (mobile == body || mobile is not IBotSquadMember { Squad: null } other)
+            var mobile = _recruits[i];
+
+            if (mobile is not IBotSquadMember { Squad: null } other)
             {
                 continue;
             }
 
-            if (mobile is not IBotAlly { AbleToFight: true })
-            {
-                continue;
-            }
+            var past = squad.Count >= BotSquad.Usual;
 
-            if (BotSquads.Join(squad, other) && other is IBotWilful wilful)
+            if (BotSquads.Enrol(squad, other, _map, body.Location, $"called to {body.Name}'s company for ({_square.X}, {_square.Y})", force: true))
             {
-                BotWill.Press(wilful, new BotEnlist(squad, _map, body.Location, true), $"called to {body.Name}'s company for ({_square.X}, {_square.Y})");
+                strength += BotThreat.Power(mobile);
+
+                if (past)
+                {
+                    BotSquads.Past();
+                }
             }
         }
+
+        _recruits.Clear();
 
         _called = squad.Count;
 
@@ -295,9 +342,7 @@ public sealed class BotSweep : BotDeed
 
             if (late != null && now - _gatherTick < GatherMs)
             {
-                squad.Leader?.Journey?.Finish();
-
-                return BotDoing.Work($"gathering the company before the march on ({_square.X}, {_square.Y}): {late.Self?.Name ?? "a member"} is {off} tiles off");
+                return Holding(squad, $"gathering the company before the march on ({_square.X}, {_square.Y}): {late.Self?.Name ?? "a member"} is {off} tiles off");
             }
 
             _gathered = true;
@@ -361,9 +406,7 @@ public sealed class BotSweep : BotDeed
 
             if ((behind <= MarchLost || BotSquad.Coming(straggler, behind)) && now - _holdTick < MarchHoldMs)
             {
-                squad.Leader?.Journey?.Finish();
-
-                return BotDoing.Work($"holding for {straggler.Self?.Name ?? "a member"}, {behind} tiles behind, on the way to ({_square.X}, {_square.Y})");
+                return Holding(squad, $"holding for {straggler.Self?.Name ?? "a member"}, {behind} tiles behind, on the way to ({_square.X}, {_square.Y})");
             }
 
             LeftBehind++;
@@ -400,9 +443,21 @@ public sealed class BotSweep : BotDeed
         return BotDoing.Walk(_map, _square, BotArrival.Within(BotPeril.Side / 3), $"marching on ({_square.X}, {_square.Y})");
     }
 
+    private BotDoing Holding(BotSquad squad, string why)
+    {
+        squad.Leader?.Journey?.Hold(BotDelve.HoldBeatMs);
+
+        return BotDoing.Walk(_map, _square, BotArrival.Within(BotPeril.Side / 3), why);
+    }
+
     private BotDoing Patrolling(IBotSquadMember member, Mobile body)
     {
         var squad = member.Squad;
+
+        if (_squad is { Disbanded: true, WithdrewFrom: { } withdrewFrom })
+        {
+            return BotDoing.Failed($"the company withdrew from {withdrewFrom.Name}, which it could not beat — {_fights} fights, {_called} of us");
+        }
 
         if (squad == null || !ReferenceEquals(squad, _squad))
         {
@@ -430,6 +485,13 @@ public sealed class BotSweep : BotDeed
         if (now - _began >= CapMs)
         {
             return Finish(squad, $"half an hour on ({_square.X}, {_square.Y}) was enough");
+        }
+
+        if (BotBarred.Holds(_map, _square))
+        {
+            ClosedOn++;
+
+            return Abandon(squad, $"({_square.X}, {_square.Y}) was closed to the population while the company was out for it");
         }
 
         var away = _standing ? BotPeril.Side : BotPeril.Side / 2;
@@ -522,6 +584,17 @@ public sealed class BotSweep : BotDeed
         var y = _square.Y + dy;
 
         return BotStep.Settle(_map, x, y, out var z) ? new Point3D(x, y, z) : _square;
+    }
+
+    private BotDoing Abandon(BotSquad squad, string why)
+    {
+        if (squad != null)
+        {
+            squad.Charged = false;
+            squad.OnTheMarch = false;
+        }
+
+        return BotDoing.Failed($"{why} — {_fights} fights, {_called} of us");
     }
 
     private BotDoing Finish(BotSquad squad, string why)

@@ -148,7 +148,7 @@ public sealed class BotAttend : BotDeed
 
             if (!_paid)
             {
-                if (!BotAuction.Charge(body, _bill))
+                if (!BotMarket.Charge(body, _bill))
                 {
                     return BotDoing.Failed($"could not find the {_bill}gp for a lesson");
                 }

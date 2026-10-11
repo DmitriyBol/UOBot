@@ -267,6 +267,8 @@ public sealed class BotHolder : IBotProposer
 
     public static long Rested { get; private set; }
 
+    public static long RestedLooks { get; private set; }
+
     public static long Refused { get; private set; }
 
     public string Name => "staker";
@@ -375,6 +377,7 @@ public sealed class BotHolder : IBotProposer
         var rings = Math.Max(1, Look / BotQuad.Side);
         var poor = false;
         var found = -1;
+        var rested = Rested;
 
         for (var ring = 0; ring <= rings && found < 0; ring++)
         {
@@ -424,6 +427,11 @@ public sealed class BotHolder : IBotProposer
             }
         }
 
+        if (Rested > rested)
+        {
+            RestedLooks++;
+        }
+
         if (found < 0)
         {
             if (poor)
@@ -447,6 +455,8 @@ public sealed class BotHolder : IBotProposer
     }
 
     public static long Outward { get; private set; }
+
+    public static long Weighed { get; private set; }
 
     private static int Touching(string guild, Map map, int qx, int qy)
     {
@@ -487,9 +497,30 @@ public sealed class BotHolder : IBotProposer
             return false;
         }
 
+        if (BotTownGround.Guarded(map, at))
+        {
+            BotTownGround.Passed(owner != null);
+
+            return false;
+        }
+
+        if (owner == null && BotBounds.HallIn(ours.Name, map, BotQuad.Key(map, at)) != null)
+        {
+            BotBounds.Spare();
+
+            return false;
+        }
+
         if (BotClaim.Resting(ours.Name, BotQuad.Key(map, at)))
         {
             Rested++;
+
+            return false;
+        }
+
+        if (owner != null && !BotSeizure.Weigh(ours, owner))
+        {
+            Weighed++;
 
             return false;
         }
@@ -532,7 +563,7 @@ public sealed class BotHolder : IBotProposer
             ? "nobody has been looked at for a claim"
             : $"the staker looked {Asked} times: {Opened} claims opened, {Sent} sent to stand on one, "
             + $"{Enough} not sent because the square already had its muster of {BotClaim.Gather} and {Spare} to spare, {Landless} guilds had no hall to want ground near, {Nothing} found no square worth claiming within "
-            + $"{Look} tiles, {Poor} could not pay for the one they wanted, {Unreachable} passed over a square the hall cannot reach; {Walled} members were not sent because they cannot reach it from where they stand, {Refused} because a walk to it lately gave up and {Shy} because their own walk to it lately ended somewhere else; {Rested} squares passed over where the guild lately failed to muster, {Outward} claims opened beyond the first ring round the hall; {BotHold.Describe()}";
+            + $"{Look} tiles, {Poor} could not pay for the one they wanted, {Unreachable} passed over a square the hall cannot reach; {Walled} members were not sent because they cannot reach it from where they stand, {Refused} because a walk to it lately gave up and {Shy} because their own walk to it lately ended somewhere else; {Rested} squares passed over where the guild lately failed to muster, {Weighed} held squares passed over because it weighed the seizure and would not pay its price, {Outward} claims opened beyond the first ring round the hall; {BotHold.Describe()}";
 
     public static void Forget()
     {
@@ -545,7 +576,9 @@ public sealed class BotHolder : IBotProposer
         Walled = 0;
         Unreachable = 0;
         Rested = 0;
+        RestedLooks = 0;
         Outward = 0;
+        Weighed = 0;
         Refused = 0;
         Shy = 0;
         _missed.Clear();

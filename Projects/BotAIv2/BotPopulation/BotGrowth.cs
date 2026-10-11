@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Server.Logging;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -24,8 +25,11 @@ namespace Server.BotAI.V2;
 /// </para>
 ///
 /// <para>
-/// Classes are drawn in proportion to the configured mix, leaving out the offices a population has exactly one of —
-/// a second Baron is not a newcomer, it is a constitutional crisis.
+/// Classes are drawn in proportion to the configured mix, leaving out the offices — a second Baron is not a newcomer, it
+/// is a constitutional crisis. <b>An office is a fact of the class since 07.10.2026</b> (<see cref="BotClass.Office"/>: the
+/// Captain, the Baron, the Architect, the Sage, one each at any population, Patrick's rule): the draw never takes one,
+/// <see cref="Mix"/> never lays a newcomer over one, and a critical post or a guild's gap never asks for one that is held.
+/// Build 425 had it as "a class the mix counts at 1", which a stale file undid and which no branch ever actually tested.
 /// </para>
 /// </summary>
 public static class BotGrowth
@@ -40,13 +44,21 @@ public static class BotGrowth
 
     public static int Most { get; set; } = 210;
 
+    public static int FillTo { get; set; } = 200;
+
+    public static int BurstBy { get; set; } = 5;
+
     private static readonly Dictionary<string, int> _added = new(StringComparer.OrdinalIgnoreCase);
 
     private static DateTime _last;
 
     private static bool _saidFull;
 
+    private static bool _saidFilled;
+
     public static long Raised { get; private set; }
+
+    public static long Burst { get; private set; }
 
     public static int LeastToWant { get; set; } = 3;
 
@@ -56,15 +68,28 @@ public static class BotGrowth
 
     public static IReadOnlyDictionary<string, int> Mix(IReadOnlyDictionary<string, int> configured)
     {
-        if (_added.Count == 0 || configured == null)
+        if (configured == null)
         {
-            return configured;
+            return null;
         }
 
         var mix = new Dictionary<string, int>(configured);
 
+        foreach (var (name, many) in configured)
+        {
+            if (many > 1 && BotClasses.Find(name) is { Office: true })
+            {
+                mix[name] = 1;
+            }
+        }
+
         foreach (var (name, many) in _added)
         {
+            if (BotClasses.Find(name) is { Office: true })
+            {
+                continue;
+            }
+
             var key = name;
 
             foreach (var (existing, _) in configured)
@@ -92,6 +117,14 @@ public static class BotGrowth
         if (_last == default)
         {
             _last = now;
+        }
+
+        var have = BotPopulation.Count + BotPopulation.Away.Count;
+
+        if (FillTo > 0 && have < Math.Min(FillTo, Most))
+        {
+            Fill(have);
+
             return;
         }
 
@@ -101,8 +134,6 @@ public static class BotGrowth
         }
 
         _last = now;
-
-        var have = BotPopulation.Count + BotPopulation.Away.Count;
 
         if (have >= Most)
         {
@@ -117,7 +148,7 @@ public static class BotGrowth
 
         for (var i = 0; i < By && have < Most; i++)
         {
-            var klass = Pick();
+            var klass = Pick(false);
 
             if (klass == null)
             {
@@ -131,9 +162,10 @@ public static class BotGrowth
                 continue;
             }
 
-            _added[klass.Name] = _added.GetValueOrDefault(klass.Name) + 1;
+            Added(klass);
             Raised++;
             have++;
+            BotCritical.Born(bot);
 
             logger.Information(
                 "A newcomer: {Name} the {Class} arrives at {Where}, a novice; the island now has {Have} bots, {Away} of them resting",
@@ -146,11 +178,109 @@ public static class BotGrowth
         }
     }
 
-    private static BotClass Pick()
+    private static void Fill(int have)
+    {
+        var goal = Math.Min(FillTo, Most);
+        var raised = 0;
+
+        using var who = ValueStringBuilder.Create(160);
+
+        for (var i = 0; i < Math.Max(1, BurstBy) && have < goal; i++)
+        {
+            var klass = Pick(true);
+
+            if (klass == null)
+            {
+                break;
+            }
+
+            var bot = BotPopulation.RaiseNewcomer(klass);
+
+            if (bot == null)
+            {
+                continue;
+            }
+
+            Added(klass);
+            Raised++;
+            Burst++;
+            have++;
+            raised++;
+
+            BotRest.Spread(bot);
+            BotCritical.Born(bot);
+
+            if (raised > 1)
+            {
+                who.Append(", ");
+            }
+
+            who.Append(bot.Name);
+            who.Append(" the ");
+            who.Append(klass.Name);
+        }
+
+        if (raised > 0)
+        {
+            logger.Information(
+                "The burst: {Raised} newcomers ({Who}); the island now has {Have} bots towards {Goal}, {Away} of them resting",
+                raised,
+                who.ToString(),
+                have,
+                goal,
+                BotPopulation.Away.Count
+            );
+        }
+
+        if (have >= goal && !_saidFilled)
+        {
+            _saidFilled = true;
+            logger.Information("The burst is done: {Have} bots on the island; the growth carries on at {By} every {Every} minutes up to {Most}", have, By, EveryMinutes, Most);
+        }
+    }
+
+    private static void Added(BotClass klass)
+    {
+        if (!klass.Office)
+        {
+            _added[klass.Name] = _added.GetValueOrDefault(klass.Name) + 1;
+        }
+    }
+
+    private static readonly HashSet<string> _saidHeld = new(StringComparer.OrdinalIgnoreCase);
+
+    private static bool Held(BotClass klass)
+    {
+        if (klass is not { Office: true } || BotPopulation.Holder(klass) is not { } holder)
+        {
+            return false;
+        }
+
+        OfficesPassedOver++;
+
+        if (_saidHeld.Add(klass.Name))
+        {
+            logger.Information("No second {Class}: {Holder} holds the office, so a newcomer is something else", klass.Name, holder.Name);
+        }
+
+        return true;
+    }
+
+    public static long OfficesPassedOver { get; private set; }
+
+    private static BotClass Pick(bool burst)
     {
         var mix = BotPopulationConfig.Mix;
 
-        if (LeastToWant > 0)
+        if (BotCritical.Running && BotCritical.Wanting(out var post, Held) is { } asked)
+        {
+            BotCritical.ByPost++;
+            logger.Information("A newcomer is born a {Class}: the island has {Have} of its {Floor} {Post}(s)", asked.Name, BotCritical.OnIsland(post), BotCritical.Floor(post), post);
+
+            return asked;
+        }
+
+        if (LeastToWant > 0 && !burst)
         {
             for (var r = 0; r < _wanted.Length; r++)
             {
@@ -163,7 +293,7 @@ public static class BotGrowth
 
                 var wanted = OfRole(_wanted[r], mix);
 
-                if (wanted == null)
+                if (wanted == null || Held(wanted))
                 {
                     continue;
                 }
@@ -179,7 +309,7 @@ public static class BotGrowth
 
         foreach (var (name, many) in mix)
         {
-            if (many > 1 && BotClasses.Find(name) != null)
+            if (many > 0 && BotClasses.Find(name) is { Office: false })
             {
                 total += many;
             }
@@ -194,7 +324,7 @@ public static class BotGrowth
 
         foreach (var (name, many) in mix)
         {
-            if (many <= 1 || BotClasses.Find(name) is not { } klass)
+            if (many <= 0 || BotClasses.Find(name) is not { Office: false } klass)
             {
                 continue;
             }
@@ -216,7 +346,7 @@ public static class BotGrowth
 
         foreach (var (name, many) in mix)
         {
-            if (many > 0 && BotClasses.Find(name) is { } k && k.Role == role)
+            if (many > 0 && BotClasses.Find(name) is { } k && k.Role == role && !BotGuilds.Bars(k.Name) && !k.Neutral)
             {
                 total += many;
             }
@@ -228,7 +358,7 @@ public static class BotGrowth
 
             foreach (var (name, many) in mix)
             {
-                if (many <= 0 || BotClasses.Find(name) is not { } k || k.Role != role)
+                if (many <= 0 || BotClasses.Find(name) is not { } k || k.Role != role || BotGuilds.Bars(k.Name) || k.Neutral)
                 {
                     continue;
                 }
@@ -256,6 +386,7 @@ public static class BotGrowth
         _added.Clear();
         _last = default;
         _saidFull = false;
+        _saidFilled = false;
     }
 
     public static string Describe()
@@ -268,8 +399,14 @@ public static class BotGrowth
         }
 
         var next = _last == default ? "the clock starts at the first look" : $"the next about {(_last + TimeSpan.FromMinutes(EveryMinutes)).ToLocalTime():HH:mm}";
+        var have = BotPopulation.Count + BotPopulation.Away.Count;
+        var burst = FillTo <= 0
+            ? "no burst"
+            : have < Math.Min(FillTo, Most)
+                ? $"the burst filling to {Math.Min(FillTo, Most)} at {BurstBy} a look, {Math.Min(FillTo, Most) - have} to go"
+                : $"filled to {Math.Min(FillTo, Most)}";
 
-        return $"newcomers: {By} every {EveryMinutes} minutes up to {Most} bots; {added} added in all, {Raised} this session, {ByNeed} of them born into a role a guild of {LeastToWant} lacked; {next}";
+        return $"newcomers: {By} every {EveryMinutes} minutes up to {Most} bots ({burst}, {Burst} raised by it this session); {added} added in all, {Raised} this session, {ByNeed} of them born into a role a guild of {LeastToWant} lacked, {OfficesPassedOver} times a held office passed over; {next}";
     }
 
     internal static void Save(IGenericWriter writer)

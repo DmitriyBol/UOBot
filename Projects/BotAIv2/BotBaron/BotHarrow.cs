@@ -82,6 +82,22 @@ public sealed class BotHarrow : BotDeed
 
     public static void Declined() => Doubled++;
 
+    public static int ClearingsStanding()
+    {
+        var now = Core.TickCount;
+        var standing = 0;
+
+        foreach (var held in _taken.Values)
+        {
+            if (held.Deed is { Clearing: true } && now - held.Beat < TakenMs)
+            {
+                standing++;
+            }
+        }
+
+        return standing;
+    }
+
     public static long Rested { get; private set; }
 
     private static readonly Dictionary<Serial, long> _resting = new();
@@ -235,8 +251,87 @@ public sealed class BotHarrow : BotDeed
         _began = Core.TickCount;
     }
 
+    public BotHarrow(Map map, Point3D square, int dead, double asked, bool clearing, int half = 0) : this(map, square, dead)
+    {
+        _clearing = clearing;
+        _asked = Math.Max(0.0, asked);
+        _half = half;
+    }
+
+    private readonly int _half;
+
+    private int Edge => _half > 0 ? _half : Side / 2;
+
+    private readonly bool _clearing;
+
+    private double _asked;
+
+    private bool _reasked;
+
+    public bool Clearing => _clearing;
+
+    public static double ClearFit { get; set; } = 1.25;
+
+    public static double ClearPrior { get; set; } = 150.0;
+
+    public static long ClearMarches { get; private set; }
+
+    public static long ClearEmptied { get; private set; }
+
+    public static long ClearTimedout { get; private set; }
+
+    public static long ClearUndermanned { get; private set; }
+
+    public static long ClearKilled { get; private set; }
+
+    public static long QuarantinesLifted { get; private set; }
+
+    public static long ClearClosed { get; private set; }
+
+    public static long ClearResized { get; private set; }
+
+    public static long ClearWon { get; private set; }
+
+    public static long ClearLifted { get; private set; }
+
+    public static long ClearWithdrew { get; private set; }
+
+    private bool _resized;
+
+    public static long ClearReasked { get; private set; }
+
+    public static long ClearDoomed { get; private set; }
+
+    public static long ClearEnough { get; private set; }
+
+    private static double CompanyStrength(BotSquad squad, out int heads)
+    {
+        var strength = 0.0;
+        heads = 0;
+
+        var members = squad?.Members;
+
+        for (var i = 0; i < members?.Count; i++)
+        {
+            if (members[i] is IBotAlly { AbleToFight: true } && members[i].Self is { Deleted: false, Alive: true } self)
+            {
+                strength += BotThreat.Power(self);
+                heads++;
+            }
+        }
+
+        return strength;
+    }
+
+    private double _levied;
+
+    private bool _enough;
+
+    public static long BoxesLifted { get; private set; }
+
     public static string Describe() =>
-        $"{Musters} musters called and {Called} bots called up ({Pressed} of them pressed to fall in), {Marches} of them marched, {Undermanned} could not raise the company asked for in {MusterMs / 60000} minutes of calling ({Rested} times the idea was then left alone for {RestMs / 60000} minutes), {Held} bells held while the company fought, {Engaged} looks at a bot already answering to a company or a class passed over, {Unsupplied} without their supplies, {Across} round the far side of something by road from the muster, {Doubled} harrows let go or not offered for a square another already stood on, {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them, {FellBack} times the leader put the harrow down and the company fell back with him, {TookUp} of them taken up again";
+        $"{Musters} musters called and {Called} bots called up ({Pressed} of them pressed to fall in), {Marches} of them marched, {Undermanned} could not raise the company asked for in {MusterMs / 60000} minutes of calling ({Rested} times the idea was then left alone for {RestMs / 60000} minutes), {Held} bells held while the company fought, {Engaged} looks at a bot already answering to a company or a class passed over, {Unsupplied} without their supplies, {Across} round the far side of something by road from the muster, {Doubled} harrows let go or not offered for a square another already stood on, {Emptied} grounds emptied and {Timedout} run out of time, {Killed} things killed on them, {FellBack} times the leader put the harrow down and the company fell back with him, {TookUp} of them taken up again; "
+        + $"of these, clearings by any fighter: {ClearMarches} marched ({ClearClosed} into a standing quarantine, {ClearResized} musters called past the leader's first reckoning for the strength asked), {ClearEmptied} emptied their ground, {ClearTimedout} ran out of time on it, {ClearWon} left it with nothing past {BotBarred.EmptyBelow:F0}, {ClearUndermanned} came up short of ×{ClearFit:F2} the strength asked, {ClearWithdrew} withdrew from what they could not beat, {ClearReasked} asked more at the bell than at the offer, {ClearDoomed} given up at the bell for the plague, {ClearEnough} levies stopped with the strength asked in the company, {ClearKilled} things killed; lifted with the ground cleared: {QuarantinesLifted} quarantines ({ClearLifted} by clearings) and {BoxesLifted} boxes closed to bots that had died there";
 
     public override string Kind => Trade;
 
@@ -250,10 +345,12 @@ public sealed class BotHarrow : BotDeed
 
     public override Point3D Where => _square;
 
-    public override double Expects => _guild != null ? DutyPrior : Prior;
+    public override double Expects => _guild != null ? DutyPrior : _clearing ? ClearPrior : Prior;
 
     public override double Brings(Mobile body) =>
-        Math.Max(BotQuad.Strength(body), Expected(_map, _square, BotThreat.Power(body), _guild));
+        _clearing
+            ? Math.Max(BotQuad.Strength(body), _asked * ClearFit)
+            : Math.Max(BotQuad.Strength(body), Expected(_map, _square, BotThreat.Power(body), _guild));
 
     public static double Expected(Map map, Point3D square, double head, Guild guild = null)
     {
@@ -267,7 +364,7 @@ public sealed class BotHarrow : BotDeed
         return head * bodies;
     }
 
-    public override bool Unpaid => _guild != null;
+    public override bool Unpaid => _guild != null || _clearing;
 
     public override double Minutes => WorkMinutes;
 
@@ -281,10 +378,10 @@ public sealed class BotHarrow : BotDeed
 
     public override string Stage =>
         !_marching
-            ? $"calling for volunteers to harrow ({_square.X}, {_square.Y}), where {_dead} have died: {_here} of {Wanted} gathered, {_called} called"
+            ? $"calling for volunteers to {(_clearing ? "clear" : "harrow")} ({_square.X}, {_square.Y}), where {_dead} have died: {_here} of {Wanted} gathered, {_called} called"
             : !_standing
                 ? $"marching {_called} of us on ({_square.X}, {_square.Y}), where {_dead} have died"
-                : $"harrowing ({_square.X}, {_square.Y}) with {_called} of us, {_kills} of {Quota} down";
+                : $"{(_clearing ? "clearing" : "harrowing")} ({_square.X}, {_square.Y}) with {_called} of us, {_kills} of {Quota} down";
 
     public override BotDoing Advance(IBotWilful bot)
     {
@@ -334,6 +431,25 @@ public sealed class BotHarrow : BotDeed
         if (_guild != null)
         {
             _wanted = Math.Max(Least, Math.Min(_wanted, BotReeve.Fighters(_guild)));
+        }
+
+        if (_clearing)
+        {
+            var least = Math.Min(Math.Max(Least, _wanted), BotSquad.MaxSize);
+
+            var need = _asked * ClearFit;
+            var company = CompanyStrength(squad, out var heads);
+            var head = heads > 0 ? company / heads : Math.Max(1.0, BotThreat.Power(body));
+            var more = company >= need ? 0 : (int)Math.Ceiling((need - company) / Math.Max(1.0, head));
+            var first = (int)Math.Ceiling(Math.Min(need / Math.Max(1.0, BotThreat.Power(body)), BotSquad.MaxSize));
+
+            _wanted = Math.Clamp(squad.Count + more, least, BotSquad.MaxSize);
+
+            if (!_resized && _wanted > Math.Max(first, least))
+            {
+                _resized = true;
+                ClearResized++;
+            }
         }
 
         squad.Ceiling = _wanted;
@@ -416,7 +532,84 @@ public sealed class BotHarrow : BotDeed
 
         var fighting = _fought && now - _foughtTick < RegroupMs && now - _musteredTick < MusterMs + HoldMs;
 
-        if (_here < _wanted && (now - _musteredTick < MusterMs || fighting))
+        if (_clearing)
+        {
+            var standing = Strong(squad);
+            var enough = _here >= Least && standing >= _asked * ClearFit;
+
+            if (enough)
+            {
+                var closed = BotBarred.Closing(_map, _square, out var closure);
+
+                if (closed && closure.Dire)
+                {
+                    ClearDoomed++;
+                    Rest(body);
+                    BotClearer.RestSquare(_map, _square);
+                    BotSquads.Leave(member);
+                    _squad = null;
+
+                    return BotDoing.Failed($"({_square.X}, {_square.Y}) was closed for the plague or a killer of {BotBarred.QuarantinePower:F0} while the company was called");
+                }
+
+                var again = BotClearer.Asks(_map, _square, closed ? closure : null);
+
+                if (again > _asked)
+                {
+                    if (!_reasked)
+                    {
+                        _reasked = true;
+                        ClearReasked++;
+                    }
+
+                    _asked = again;
+                    enough = standing >= _asked * ClearFit;
+                }
+            }
+
+            if (!enough && (now - _musteredTick < MusterMs || fighting))
+            {
+                if (!_held && now - _musteredTick >= MusterMs)
+                {
+                    _held = true;
+                    Held++;
+                }
+
+                return BotDoing.Work($"calling at ({_muster.X}, {_muster.Y}): {_here} of {_wanted} gathered, {standing:F0} of the {_asked * ClearFit:F0} the ground asks");
+            }
+
+            if (!enough)
+            {
+                Undermanned++;
+                ClearUndermanned++;
+
+                logger.Information(
+                    "{Name}'s muster at ({MX}, {MY}) to clear ({X}, {Y}) came up {Here} of {Wanted} and {Standing:F0} of the {Asked:F0} of strength the ground asks; not in the square: {Absent}",
+                    body.Name,
+                    _muster.X,
+                    _muster.Y,
+                    _square.X,
+                    _square.Y,
+                    _here,
+                    _wanted,
+                    standing,
+                    _asked * ClearFit,
+                    Absent(squad)
+                );
+
+                Rest(body);
+                BotClearer.RestSquare(_map, _square);
+                BotSquads.Leave(member);
+                _squad = null;
+
+                return BotDoing.Failed(
+                    $"only {_here} of us with {standing:F0} of strength stood at the muster for ({_square.X}, {_square.Y}), which asks {_asked * ClearFit:F0}, after"
+                    + $" {MusterMs / 60000} minutes, of {_called} called"
+                );
+            }
+        }
+
+        if (!_clearing && _here < _wanted && (now - _musteredTick < MusterMs || fighting))
         {
             if (!_held && now - _musteredTick >= MusterMs)
             {
@@ -427,7 +620,7 @@ public sealed class BotHarrow : BotDeed
             return BotDoing.Work($"calling at ({_muster.X}, {_muster.Y}): {_here} of {_wanted} gathered");
         }
 
-        if (_here < _wanted)
+        if (!_clearing && _here < _wanted)
         {
             Undermanned++;
 
@@ -482,6 +675,16 @@ public sealed class BotHarrow : BotDeed
 
         Marches++;
 
+        if (_clearing)
+        {
+            ClearMarches++;
+
+            if (BotBarred.Closing(_map, _square, out _))
+            {
+                ClearClosed++;
+            }
+        }
+
         squad.Quarry = Prey;
 
         _began = now;
@@ -503,6 +706,16 @@ public sealed class BotHarrow : BotDeed
     private BotDoing Harrowing(IBotSquadMember member, Mobile body)
     {
         var squad = member.Squad;
+
+        if (_squad is { Disbanded: true, WithdrewFrom: { } withdrewFrom })
+        {
+            if (_clearing)
+            {
+                ClearWithdrew++;
+            }
+
+            return BotDoing.Failed($"the company withdrew from {withdrewFrom.Name}, which it could not beat");
+        }
 
         if (squad == null || !ReferenceEquals(squad, _squad))
         {
@@ -527,6 +740,11 @@ public sealed class BotHarrow : BotDeed
         {
             Emptied++;
 
+            if (_clearing)
+            {
+                ClearEmptied++;
+            }
+
             return Finish(squad, $"{_kills} of them are dead and ({_square.X}, {_square.Y}) is done", cleared: true);
         }
 
@@ -535,6 +753,11 @@ public sealed class BotHarrow : BotDeed
         if (now - _began >= CapMs)
         {
             Timedout++;
+
+            if (_clearing)
+            {
+                ClearTimedout++;
+            }
 
             return Finish(squad, $"{CapMs / 60000} minutes on ({_square.X}, {_square.Y}) was enough at {_kills} down", cleared: true);
         }
@@ -599,6 +822,12 @@ public sealed class BotHarrow : BotDeed
         {
             _kills++;
             Killed++;
+
+            if (_clearing)
+            {
+                ClearKilled++;
+            }
+
             _quarry = null;
         }
 
@@ -624,9 +853,14 @@ public sealed class BotHarrow : BotDeed
 
         var gate = BotPopulation.Gate(_map, body.Location, _square);
 
-        if (gate != Point3D.Zero)
+        if (gate != Point3D.Zero && !(_clearing && BotBarred.Holds(_map, gate)))
         {
             return gate;
+        }
+
+        if (_clearing && !BotBarred.Holds(_map, body.Location) && BotStep.Settle(_map, body.X, body.Y, out var hz))
+        {
+            return new Point3D(body.X, body.Y, hz);
         }
 
         var named = Square != Point3D.Zero ? Square : BotPopulation.Where;
@@ -674,13 +908,25 @@ public sealed class BotHarrow : BotDeed
             }
         }
 
-        _called0.Sort((a, b) => Apart(a, body).CompareTo(Apart(b, body)));
+        if (_clearing)
+        {
+            _called0.Sort((a, b) => BotThreat.Power(b).CompareTo(BotThreat.Power(a)));
+        }
+        else
+        {
+            _called0.Sort((a, b) => Apart(a, body).CompareTo(Apart(b, body)));
+        }
+
+        _levied = _clearing ? CompanyStrength(squad, out _) : 0.0;
 
         Take(squad, BotRole.Melee, Melee);
         Take(squad, BotRole.Ranged, Ranged);
         Take(squad, BotRole.Medic, Medics);
         Take(squad, null, Wanted);
     }
+
+    private bool Enough(BotSquad squad) =>
+        _clearing && squad.Count >= Least && _levied >= _asked * ClearFit;
 
     public static long Across { get; private set; }
 
@@ -718,7 +964,8 @@ public sealed class BotHarrow : BotDeed
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(muster, Reach))
         {
-            if (mobile != caller && mobile is BotMobile other && Callable(other, count: false) && Reaches(map, other.Location, muster, count: false))
+            if (mobile != caller && mobile is BotMobile other && Callable(other, count: false) && Reaches(map, other.Location, muster, count: false)
+                && (caller == null || !BotRegard.Hostile(caller, other)))
             {
                 supply++;
             }
@@ -749,7 +996,37 @@ public sealed class BotHarrow : BotDeed
             return false;
         }
 
-        if (!BotProvision.Fit(other, out _))
+        if (BotSquads.Carrying(other))
+        {
+            if (count)
+            {
+                BotSquads.Spare();
+            }
+
+            return false;
+        }
+
+        if (BotSquads.Fighting(other))
+        {
+            if (count)
+            {
+                BotSquads.SpareFighter();
+            }
+
+            return false;
+        }
+
+        if (BotSquads.Thieving(other))
+        {
+            if (count)
+            {
+                BotSquads.SpareThief();
+            }
+
+            return false;
+        }
+
+        if (count ? !BotProvision.Fit(other, out _) : BotProvision.Short(other))
         {
             if (count)
             {
@@ -977,6 +1254,17 @@ public sealed class BotHarrow : BotDeed
 
         for (var i = 0; i < _called0.Count && taken < most && squad.Count < Wanted; i++)
         {
+            if (Enough(squad))
+            {
+                if (!_enough)
+                {
+                    _enough = true;
+                    ClearEnough++;
+                }
+
+                break;
+            }
+
             var other = _called0[i];
 
             if (other.Squad != null || role != null && other.Class?.Role != role)
@@ -988,6 +1276,11 @@ public sealed class BotHarrow : BotDeed
             {
                 taken++;
                 Called++;
+
+                if (_clearing && other is IBotAlly { AbleToFight: true })
+                {
+                    _levied += BotThreat.Power(other);
+                }
 
                 if (BotWill.Press(other, new BotEnlist(squad, _map, _muster, true), $"called to {squad.Leader?.Self?.Name ?? "a leader"}'s harrowing"))
                 {
@@ -1017,7 +1310,8 @@ public sealed class BotHarrow : BotDeed
 
         BaseCreature nearest = null;
         var closest = int.MaxValue;
-        var edge = Side / 2;
+        var edge = Edge;
+        var able = _squad?.Able() ?? 0.0;
 
         foreach (var creature in map.GetMobilesInRange<BaseCreature>(leader.Location, Sight))
         {
@@ -1041,6 +1335,18 @@ public sealed class BotHarrow : BotDeed
                 continue;
             }
 
+            var apart = Math.Max(Math.Abs(creature.X - leader.X), Math.Abs(creature.Y - leader.Y));
+
+            if (apart >= closest)
+            {
+                continue;
+            }
+
+            if (BotBarred.BarredOutright(map, creature.Location) || BotBarred.DireAt(map, creature.Location))
+            {
+                continue;
+            }
+
             if (!BotThreat.Hostile(leader, creature))
             {
                 continue;
@@ -1051,9 +1357,7 @@ public sealed class BotHarrow : BotDeed
                 continue;
             }
 
-            var apart = Math.Max(Math.Abs(creature.X - leader.X), Math.Abs(creature.Y - leader.Y));
-
-            if (apart >= closest)
+            if (_squad != null && (_squad.Beyond(creature) || BotSquad.Shuns(creature, able)))
             {
                 continue;
             }
@@ -1105,12 +1409,85 @@ public sealed class BotHarrow : BotDeed
             }
 
             BotCity.Claim(_map, _square, squad.Members);
+
+            var lifted = BotBarred.Lift(_map, _square, Edge, $"cleared by {squad.Leader?.Self?.Name ?? "a company"}'s company");
+
+            QuarantinesLifted += lifted;
+            BoxesLifted += BotBreaker.LiftGround(_map, _square, Side / 2);
+
+            if (_clearing)
+            {
+                ClearLifted += lifted;
+
+                if (BotClearer.Strongest(_map, _square, Edge, out _, fresh: true) <= BotBarred.EmptyBelow)
+                {
+                    ClearWon++;
+                }
+            }
         }
 
         Release(squad);
 
         return BotDoing.Done($"{why} — {_called} of us, {Made}gp between them");
     }
+
+    private double Strong(BotSquad squad)
+    {
+        if (squad == null || _muster == Point3D.Zero)
+        {
+            return 0.0;
+        }
+
+        var strength = 0.0;
+        var members = squad.Members;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            var body = members[i]?.Self;
+
+            if (body is { Deleted: false, Alive: true } && body.Map == _map && body.InRange(_muster, Assembly)
+                && members[i] is IBotAlly { AbleToFight: true })
+            {
+                strength += BotThreat.Power(body);
+            }
+        }
+
+        return strength;
+    }
+
+    public static double SupplyStrength(Map map, Point3D muster, Mobile caller)
+    {
+        if (map == null || map == Map.Internal || muster == Point3D.Zero)
+        {
+            return 0.0;
+        }
+
+        var strength = caller != null ? BotThreat.Power(caller) : 0.0;
+
+        _supplied.Clear();
+
+        foreach (var mobile in map.GetMobilesInRange<Mobile>(muster, Reach))
+        {
+            if (mobile != caller && mobile is BotMobile other && Callable(other, count: false) && Reaches(map, other.Location, muster, count: false)
+                && (caller == null || !BotRegard.Hostile(caller, other)))
+            {
+                _supplied.Add(BotThreat.Power(other));
+            }
+        }
+
+        _supplied.Sort();
+
+        for (int i = _supplied.Count - 1, taken = 0; i >= 0 && taken < BotSquad.MaxSize - 1; i--, taken++)
+        {
+            strength += _supplied[i];
+        }
+
+        _supplied.Clear();
+
+        return strength;
+    }
+
+    private static readonly List<double> _supplied = [];
 
     public override bool Bend(IBotWilful bot)
     {
@@ -1231,5 +1608,20 @@ public sealed class BotHarrow : BotDeed
         Killed = 0;
         FellBack = 0;
         TookUp = 0;
+        ClearMarches = 0;
+        ClearEmptied = 0;
+        ClearTimedout = 0;
+        ClearUndermanned = 0;
+        ClearKilled = 0;
+        QuarantinesLifted = 0;
+        BoxesLifted = 0;
+        ClearClosed = 0;
+        ClearResized = 0;
+        ClearWon = 0;
+        ClearLifted = 0;
+        ClearWithdrew = 0;
+        ClearReasked = 0;
+        ClearDoomed = 0;
+        ClearEnough = 0;
     }
 }

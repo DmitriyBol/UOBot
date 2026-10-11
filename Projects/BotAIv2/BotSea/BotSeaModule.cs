@@ -29,6 +29,16 @@ public sealed class BotSeaSettings
     public int? DockReach { get; set; }
 
     public Dictionary<string, int[]> Docks { get; set; }
+
+    public bool? Colonies { get; set; }
+
+    public int? PartySize { get; set; }
+
+    public int? ColonyCost { get; set; }
+
+    public string Islands { get; set; }
+
+    public bool? Piracy { get; set; }
 }
 
 /// <summary>
@@ -63,6 +73,8 @@ public sealed class BotSeaModule : BotModule
         if (BotSea.Running)
         {
             BotWill.Offer(new BotSeafarer());
+
+            BotColonies.Start();
         }
 
         logger.Information(
@@ -116,6 +128,11 @@ public sealed class BotSeaModule : BotModule
         BotVoyage.HomeWorth = settings.HomeWorth ?? BotVoyage.HomeWorth;
         BotSeaChart.Cache = settings.Cache ?? BotSeaChart.Cache;
         BotDocks.Reach = settings.DockReach ?? BotDocks.Reach;
+        BotColonies.Running = settings.Colonies ?? BotColonies.Running;
+        BotColonies.PartySize = settings.PartySize ?? BotColonies.PartySize;
+        BotColonies.Cost = settings.ColonyCost ?? BotColonies.Cost;
+        BotColonies.Islands = settings.Islands ?? BotColonies.Islands;
+        BotPiracy.Running = settings.Piracy ?? BotPiracy.Running;
 
         if (settings.Docks != null)
         {
@@ -181,6 +198,7 @@ public sealed class BotSeaModule : BotModule
                 }
 
                 BotSea.Obey();
+                BotColonies.Look();
             }
             catch (Exception e)
             {

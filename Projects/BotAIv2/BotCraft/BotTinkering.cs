@@ -120,18 +120,17 @@ public static class BotTinkering
         stocked = 0;
 
         Dictionary<Type, int> stock = [];
-        var listings = BotAuction.Listings;
+        var box = (bot as BotMobile)?.FindBankNoCreate();
 
-        for (var i = 0; i < listings.Count; i++)
+        for (var i = 0; i < Tools.Length; i++)
         {
-            var listing = listings[i];
+            var kind = Tools[i];
+            var held = BotShopkeep.Showing(kind) + (bot?.Backpack?.GetAmount(kind) ?? 0) + (box?.GetAmount(kind) ?? 0);
 
-            if (listing?.Kind == null || listing.Amount <= 0 || !_tools.Contains(listing.Kind))
+            if (held > 0)
             {
-                continue;
+                stock[kind] = held;
             }
-
-            stock[listing.Kind] = stock.TryGetValue(listing.Kind, out var n) ? n + listing.Amount : listing.Amount;
         }
 
         if ((bot?.Backpack?.GetAmount(typeof(TinkerTools)) ?? 0) < Spares && Recipe(bot, typeof(TinkerTools)) != null)

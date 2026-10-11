@@ -69,6 +69,9 @@ public static class BotCraftwork
         CraftItem best = null;
         var bestNeeds = -1.0;
 
+        CraftItem pile = null;
+        var pileNeeds = -1.0;
+
         for (var i = 0; i < recipes.Count; i++)
         {
             var recipe = recipes[i];
@@ -80,7 +83,7 @@ public static class BotCraftwork
 
             var needs = Requirement(recipe, skill);
 
-            if (needs > able - Margin || needs <= bestNeeds)
+            if (needs > able - Margin)
             {
                 continue;
             }
@@ -90,13 +93,38 @@ public static class BotCraftwork
                 continue;
             }
 
+            var glutted = BotGlut.Glutted(recipe.ItemType);
+
+            if (glutted ? needs <= pileNeeds : needs <= bestNeeds)
+            {
+                continue;
+            }
+
             if (!Likely(bot, system, recipe, material))
             {
                 continue;
             }
 
-            best = recipe;
-            bestNeeds = needs;
+            if (glutted)
+            {
+                pile = recipe;
+                pileNeeds = needs;
+            }
+            else
+            {
+                best = recipe;
+                bestNeeds = needs;
+            }
+        }
+
+        if (best == null)
+        {
+            return pile;
+        }
+
+        if (pile != null && pileNeeds > bestNeeds)
+        {
+            BotGlut.Steered();
         }
 
         return best;
@@ -242,6 +270,8 @@ public static class BotCraftwork
         }
 
         _produced[kind] = _produced.TryGetValue(kind, out var n) ? n + count : count;
+
+        BotGlut.Made(kind, count);
     }
 
     public static int MadeOf(Type kind) => kind != null && _produced.TryGetValue(kind, out var n) ? n : 0;

@@ -118,9 +118,9 @@ public sealed class BotArmourer : IBotProposer
             return null;
         }
 
-        var offer = BotAuction.Worth(piece.Kind, piece.Cost * 2);
+        var offer = BotMarket.Worth(piece.Kind, piece.Making());
 
-        var wealth = BotYield.Wealth(body);
+        var wealth = BotYield.Spendable(body);
 
         if (wealth - offer <= Keeps(offer))
         {
@@ -178,7 +178,7 @@ public sealed class BotArmourer : IBotProposer
                 continue;
             }
 
-            if (Carrying(wearer, best.Kind) || BotAuction.Wanted(bot, best.Kind) != null)
+            if (Carrying(wearer, best.Kind) || BotMarket.Wanted(bot, best.Kind) != null)
             {
                 continue;
             }
@@ -191,7 +191,7 @@ public sealed class BotArmourer : IBotProposer
 
     private static int Outstanding(IBotWilful bot)
     {
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
         var mine = 0;
 
         for (var i = 0; i < wants.Count; i++)

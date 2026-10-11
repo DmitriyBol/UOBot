@@ -99,6 +99,14 @@ public sealed class BotHall : BotDeed
             return BotDoing.Walk(_map, _plot, BotArrival.Within(Reach), $"to the plot at {_plot.X},{_plot.Y}");
         }
 
+        if (BotBounds.Refuse(BotBounds.Placing.Hall, _guild.Name, _map, _plot, BotPlot.MultiID, out var foreign))
+        {
+            BotPlot.Spend();
+            BotEstate.Lost();
+
+            return BotDoing.Failed(foreign);
+        }
+
         var result = HousePlacement.Check(body, BotPlot.MultiID, _plot, out var toMove, Direction.South);
 
         if (result != HousePlacementResult.Valid)

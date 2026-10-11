@@ -15,33 +15,28 @@ namespace Server.BotAI.V2;
 /// the bots that are short of those goods walk over and buy them out of its pack. Patrick's order of 29.09.2026, evening.
 ///
 /// <para>
-/// <b>Why a shop and not another stall.</b> The market (<c>BotAuction</c>) is placeless: a stall holds its goods out of the
-/// world and anybody anywhere buys from it without taking a step. That made trade between bots possible at all, and it is
-/// also why nothing about it can be seen — no bot stands anywhere, nobody walks to anybody, and a town is not a place trade
-/// happens. A shop is the other way round. The goods stay in the keeper's own pack and bank box, where the engine keeps them
-/// and the save keeps them; a customer walks to the keeper and the goods move pack to pack at the till, paid for in coin that
-/// moves pack to pack (<see cref="Serve"/>). The auction is not removed: <see cref="BotAuction.LotsPerBot"/> cuts the kinds
-/// one bot may hold out on it, and whatever it turns away stays in the pack, goes to the bank box with the rest of the
-/// surplus (<c>BotUnload.Store</c>), and is sold from there by the bank.
+/// <b>Why a shop and not a stall.</b> The auction was placeless: a stall held its goods out of the world and anybody anywhere
+/// bought from it without taking a step, so nothing about it could be seen and a town was not a place trade happened. A shop
+/// is the other way round. The goods stay in the keeper's own pack and bank box, where the engine keeps them and the save keeps
+/// them; a customer walks to the keeper and the goods move pack to pack at the till, paid for in coin that moves pack to pack
+/// (<see cref="Serve"/>). <b>Since 01.10.2026 it is the market</b> (Patrick's order of 30.09: the auction removed, all trade in
+/// Britain, guild traders at home, every purchase hand to hand): the stalls are gone, and a shop by Britain's bank — or a guild
+/// member's by its guild's own town's — is where one bot sells to another that comes to it.
 /// </para>
 ///
 /// <para>
-/// <b>A shop wins where it is better and nowhere else.</b> A bot short of a supply (<c>BotShopper</c>) already weighs a
-/// stall against a shopkeeper on price, and a shop is entered into that same weighing on price <em>and</em> the walk
-/// (<see cref="Beats"/>): the keeper's ask plus the minutes of walking to it, priced at what the shard reckons a shopping
-/// minute is worth (<see cref="WalkGold"/>, which follows <c>BotRestock.Prior</c>), against the shopkeeper's price plus the
-/// walk to the shopkeeper and against the stall's price with no walk at all. A want on the board is weighed the same way
-/// against its own offer (<see cref="BotPatron"/>). Ties go to the shop, as ties between a stall and a counter go to the
-/// stall: coin paid to a bot stays in the population.
+/// <b>A shop wins where it is better and nowhere else.</b> A bot short of a supply (<c>BotShopper</c>) weighs a shop against a
+/// shopkeeper on price <em>and</em> the walk (<see cref="Beats"/>): the keeper's ask plus the minutes of walking to it, priced
+/// at what the shard reckons a shopping minute is worth (<see cref="WalkGold"/>, which follows <c>BotRestock.Prior</c>),
+/// against the shopkeeper's price plus the walk to the shopkeeper. A want is weighed the same way against its own offer
+/// (<see cref="BotPatron"/>). Ties go to the shop: coin paid to a bot stays in the population.
 /// </para>
 ///
 /// <para>
-/// <b>Prices start where the island already is and move the way the auction's do.</b> A keeper opens a kind at what the
-/// nearest shopkeeper asks for it, or what the market reckons it worth when that is less (<see cref="Opening"/>), so a bot
-/// shop never opens above the shelf — the rule <c>BotShops.Shelf</c> already enforces on the stalls. A kind that sells
-/// again inside <c>BotAuction.BriskMs</c> goes up by <c>BotAuction.RaiseStep</c>; a kind nobody bought during a whole shift
-/// comes down by <c>BotAuction.CutStep</c>, both inside the auction's own ×0.25…×4 of the opening ask. The same numbers, so
-/// a dial that makes the market bolder makes the shops bolder too.
+/// <b>Prices start where the island already is and move by the market's own steps.</b> A keeper opens a kind under what the
+/// nearest shopkeeper asks for it, or at what the market reckons it worth when that is less (<see cref="Opening"/>). A kind
+/// that sells again inside <c>BotMarket.BriskMs</c> goes up by <c>BotMarket.RaiseStep</c>; a kind nobody bought during a whole
+/// shift comes down by <c>BotMarket.CutStep</c>, both inside ×0.25…×4 of the opening ask.
 /// </para>
 /// </summary>
 public static class BotShopkeep
@@ -51,8 +46,6 @@ public static class BotShopkeep
     public const string Kind = "botshop";
 
     public static bool Running { get; set; } = true;
-
-    public static int AuctionLots { get; set; } = 3;
 
     public static double ShiftMinutes { get; set; } = 8.0;
 
@@ -88,7 +81,7 @@ public static class BotShopkeep
 
     public static int StandReach { get; set; } = 1;
 
-    public static int ServeReach { get; set; } = 3;
+    public static int ServeReach { get; set; } = 2;
 
     public static int SeekTiles { get; set; } = 240;
 
@@ -149,8 +142,6 @@ public static class BotShopkeep
     public static long ToFront { get; private set; }
 
     public static long LostToCounter { get; private set; }
-
-    public static long LostToStall { get; private set; }
 
     public static long Sealed { get; private set; }
 
@@ -433,6 +424,20 @@ public static class BotShopkeep
                         continue;
                     }
 
+                    if (Doorway(map, x, y, z))
+                    {
+                        PitchesLeftDoor++;
+
+                        continue;
+                    }
+
+                    if (!map.LineOfSight(new Point3D(bank.X, bank.Y, bank.Z + Eye), new Point3D(x, y, z + Eye)))
+                    {
+                        PitchesLeftWall++;
+
+                        continue;
+                    }
+
                     found.Add(new Point3D(x, y, z));
                 }
             }
@@ -474,6 +479,27 @@ public static class BotShopkeep
                 continue;
             }
 
+            if (Unflagged(map, spot))
+            {
+                PitchesPassedFlag++;
+
+                continue;
+            }
+
+            if (Struck(map, spot))
+            {
+                PitchesPassedStruck++;
+
+                continue;
+            }
+
+            if (Occupied(map, spot, body))
+            {
+                PitchesPassedOccupied++;
+
+                continue;
+            }
+
             if (BotReach.Ask(map, body.Location, spot, BotArrival.Within(StandReach), false) == BotReachVerdict.Sealed)
             {
                 continue;
@@ -483,6 +509,210 @@ public static class BotShopkeep
         }
 
         return Point3D.Zero;
+    }
+
+    public static int StrikeMs { get; set; } = 1800000;
+
+    public static int StrikeSpread { get; set; } = 1;
+
+    public static long PitchesStruck { get; private set; }
+
+    public static long PitchesPassedStruck { get; private set; }
+
+    public static long PitchesPassedOccupied { get; private set; }
+
+    public static int StripTiles { get; set; } = 6;
+
+    public static long StripsStruck { get; private set; }
+
+    public static long PitchesPassedFlag { get; private set; }
+
+    public static long OpenedWhereStood { get; private set; }
+
+    internal static void OpenedStanding() => OpenedWhereStood++;
+
+    private static readonly List<(Map Map, int X1, int Y1, int X2, int Y2, long Until)> _struck = [];
+
+    public static void Strike(Map map, Point3D spot)
+    {
+        if (map == null || spot == Point3D.Zero || StrikeMs <= 0)
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+        var spread = Math.Max(0, StrikeSpread);
+        var x1 = spot.X - spread;
+        var y1 = spot.Y - spread;
+        var x2 = spot.X + spread;
+        var y2 = spot.Y + spread;
+        var strip = false;
+
+        for (var i = _struck.Count - 1; i >= 0; i--)
+        {
+            var (m, a1, b1, a2, b2, until) = _struck[i];
+
+            if (now - until >= 0)
+            {
+                _struck.RemoveAt(i);
+
+                continue;
+            }
+
+            if (m != map)
+            {
+                continue;
+            }
+
+            var dx = Math.Max(0, Math.Max(a1 - spot.X, spot.X - a2));
+            var dy = Math.Max(0, Math.Max(b1 - spot.Y, spot.Y - b2));
+
+            if (Math.Max(dx, dy) <= Math.Max(0, StripTiles))
+            {
+                x1 = Math.Min(x1, a1);
+                y1 = Math.Min(y1, b1);
+                x2 = Math.Max(x2, a2);
+                y2 = Math.Max(y2, b2);
+                strip = true;
+                _struck.RemoveAt(i);
+            }
+        }
+
+        if (_struck.Count >= 256)
+        {
+            _struck.RemoveAt(0);
+        }
+
+        _struck.Add((map, x1, y1, x2, y2, now + StrikeMs));
+        PitchesStruck++;
+
+        if (strip)
+        {
+            StripsStruck++;
+        }
+    }
+
+    private static bool Struck(Map map, Point3D spot)
+    {
+        if (_struck.Count == 0)
+        {
+            return false;
+        }
+
+        var now = Core.TickCount;
+
+        for (var i = 0; i < _struck.Count; i++)
+        {
+            var (m, x1, y1, x2, y2, until) = _struck[i];
+
+            if (m == map && now - until < 0 && spot.X >= x1 && spot.X <= x2 && spot.Y >= y1 && spot.Y <= y2)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool Unflagged(Map map, Point3D spot)
+    {
+        var kind = BotReachMap.Class(map, spot.X, spot.Y, spot.Z);
+
+        return kind != BotReachClass.Unknown && kind != BotReachClass.Open;
+    }
+
+    public static bool StandsFit(BotMobile keeper, Point3D bank)
+    {
+        if (keeper?.Map == null || bank == Point3D.Zero)
+        {
+            return false;
+        }
+
+        var map = keeper.Map;
+        var at = keeper.Location;
+        var away = Math.Max(Math.Abs(at.X - bank.X), Math.Abs(at.Y - bank.Y));
+
+        if (away < Math.Max(1, PitchNear) || away > Math.Max(PitchNear, PitchFar) || Math.Abs(at.Z - bank.Z) > PitchClimb
+            || Unflagged(map, at) || Taken(map, at, keeper) || Occupied(map, at, keeper))
+        {
+            return false;
+        }
+
+        if (Doorway(map, at.X, at.Y, at.Z))
+        {
+            StoodInDoorway++;
+
+            return false;
+        }
+
+        return map.LineOfSight(new Point3D(bank.X, bank.Y, bank.Z + Eye), new Point3D(at.X, at.Y, at.Z + Eye));
+    }
+
+    private const int Eye = 14;
+
+    public static bool Doorway(Map map, int x, int y, int z)
+    {
+        if (map == null || !KeepOffDoors)
+        {
+            return false;
+        }
+
+        foreach (var door in map.GetItemsInRange<BaseDoor>(new Point3D(x, y, z), 2))
+        {
+            if (door.Deleted || Math.Abs(door.Z - z) > 16)
+            {
+                continue;
+            }
+
+            var shut = door.Open ? new Point3D(door.X - door.Offset.X, door.Y - door.Offset.Y, door.Z) : door.Location;
+
+            if (Math.Max(Math.Abs(shut.X - x), Math.Abs(shut.Y - y)) <= 1
+                || Math.Max(Math.Abs(door.X - x), Math.Abs(door.Y - y)) <= 1)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool KeepOffDoors { get; set; } = true;
+
+    public static long PitchesLeftDoor { get; private set; }
+
+    public static long PitchesLeftWall { get; private set; }
+
+    public static long StoodInDoorway { get; private set; }
+
+    public static int OpenStandingMs { get; set; } = 30000;
+
+    public static long OpenedWhereStoodLate { get; private set; }
+
+    internal static void OpenedStandingLate()
+    {
+        OpenedWhereStood++;
+        OpenedWhereStoodLate++;
+    }
+
+    public static long WalksEndedOnOpening { get; private set; }
+
+    internal static void EndedWalkOnOpening() => WalksEndedOnOpening++;
+
+    public static long OpenWalksSpared { get; private set; }
+
+    internal static void SparedOpenWalk() => OpenWalksSpared++;
+
+    private static bool Occupied(Map map, Point3D spot, Mobile except)
+    {
+        foreach (var m in map.GetMobilesAt(spot))
+        {
+            if (!ReferenceEquals(m, except) && m is { Deleted: false, Alive: true } && Math.Abs(m.Z - spot.Z) < 16)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static bool Taken(Map map, Point3D spot, Mobile except)
@@ -577,6 +807,31 @@ public static class BotShopkeep
         }
 
         return held;
+    }
+
+    public static List<(BotStorefront Front, Type Kind, int Units, int Ask)> Lots()
+    {
+        List<(BotStorefront, Type, int, int)> lots = [];
+
+        for (var i = 0; i < _open.Count; i++)
+        {
+            var front = _open[i];
+
+            if (front.Shut)
+            {
+                continue;
+            }
+
+            foreach (var (kind, units, ask) in front.Ranked())
+            {
+                if (kind != null && units > 0 && ask > 0)
+                {
+                    lots.Add((front, kind, units, ask));
+                }
+            }
+        }
+
+        return lots;
     }
 
     public static int Spoken
@@ -768,7 +1023,7 @@ public static class BotShopkeep
     {
         _ownWants.Clear();
 
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
 
         for (var i = 0; i < wants.Count; i++)
         {
@@ -953,19 +1208,20 @@ public static class BotShopkeep
 
         if (shelf > 0)
         {
-            var open = Math.Min(BotAuction.Worth(kind, shelf), (int)Math.Round(shelf * ShelfShare));
+            var open = Math.Min(BotMarket.Worth(kind, shelf), (int)Math.Round(shelf * ShelfShare));
 
-            return open >= BotAuction.FloorFor(kind) ? open : 0;
+            return open >= BotMarket.FloorFor(kind) ? open : 0;
         }
 
-        if (BotAuction.Worthless(kind))
+        if (BotMarket.Worthless(kind))
         {
             return 0;
         }
 
-        var worth = BotAuction.Worth(kind, PaidFor(keeper, kind, sample));
+        var paid = PaidFor(keeper, kind, sample);
+        var worth = BotMarket.Worth(kind, paid > 0 ? paid : BotAnvil.Reckon(kind));
 
-        return worth >= BotAuction.FloorFor(kind) ? worth : 0;
+        return worth >= BotMarket.FloorFor(kind) ? worth : 0;
     }
 
     private static readonly Dictionary<Type, (int Price, long Tick)> _shelf = [];
@@ -1050,7 +1306,7 @@ public static class BotShopkeep
         }
 
         var now = Core.TickCount;
-        var brisk = price.Traded && now - price.SoldTick < BotAuction.BriskMs;
+        var brisk = price.Traded && now - price.SoldTick < BotMarket.BriskMs;
 
         price.Traded = true;
         price.SoldTick = now;
@@ -1060,8 +1316,8 @@ public static class BotShopkeep
             return;
         }
 
-        var ceiling = Math.Max(1, (int)(price.Anchor * BotAuction.MostMultiple));
-        var asking = Math.Min(ceiling, Math.Max(price.Asking + 1, (int)(price.Asking * (1.0 + BotAuction.RaiseStep))));
+        var ceiling = Math.Max(1, (int)(price.Anchor * BotMarket.MostMultiple));
+        var asking = Math.Min(ceiling, Math.Max(price.Asking + 1, (int)(price.Asking * (1.0 + BotMarket.RaiseStep))));
 
         if (asking <= price.Asking)
         {
@@ -1096,8 +1352,8 @@ public static class BotShopkeep
                 continue;
             }
 
-            var floor = Math.Max(BotAuction.FloorFor(kind), (int)(price.Anchor * BotAuction.LeastMultiple));
-            var asking = Math.Max(floor, Math.Min(price.Asking - 1, (int)(price.Asking * (1.0 - BotAuction.CutStep))));
+            var floor = Math.Max(BotMarket.FloorFor(kind), (int)(price.Anchor * BotMarket.LeastMultiple));
+            var asking = Math.Max(floor, Math.Min(price.Asking - 1, (int)(price.Asking * (1.0 - BotMarket.CutStep))));
 
             if (asking < price.Asking)
             {
@@ -1135,7 +1391,7 @@ public static class BotShopkeep
                 _demanded.Add(shortages[i].Kind);
             }
 
-            var wants = BotAuction.Wants;
+            var wants = BotMarket.Wants;
 
             for (var i = 0; i < wants.Count; i++)
             {
@@ -1213,9 +1469,7 @@ public static class BotShopkeep
         return best;
     }
 
-    public static BotStorefront Beats(
-        IBotWilful bot, Type wanted, int amount, BaseVendor shop, int counter, BotListing stall, out int unit, out int units
-    )
+    public static BotStorefront Beats(IBotWilful bot, Type wanted, int amount, BaseVendor shop, int counter, out int unit, out int units)
     {
         unit = 0;
         units = 0;
@@ -1246,13 +1500,6 @@ public static class BotShopkeep
 
                 return null;
             }
-        }
-
-        if (stall is { IsEmpty: false } && landed > stall.Price)
-        {
-            LostToStall++;
-
-            return null;
         }
 
         ToFront++;
@@ -1301,18 +1548,23 @@ public static class BotShopkeep
 
         Arrived++;
 
-        var want = forWant ? BotAuction.Wanted(bot, kind) : null;
+        var want = forWant ? BotMarket.Wanted(bot, kind) : null;
 
         if (forWant && want is not { IsOpen: true })
         {
             FilledMeanwhile++;
 
-            return BotDoing.Done($"its want for {kind.Name} was met on the board while it walked");
+            return BotDoing.Done($"its want for {kind.Name} was met while it walked");
         }
 
         var payable = want?.Payable ?? 0;
         var offer = want?.Offer ?? 0;
         var units = forWant ? Math.Min(amount, payable) : amount;
+
+        if (forWant && offer > 0 && (quoted <= 0 || quoted > offer))
+        {
+            quoted = offer;
+        }
 
         if (Available(keeper, kind) <= 0)
         {
@@ -1329,25 +1581,12 @@ public static class BotShopkeep
             return BotDoing.Failed($"{keeper.Name} had sold the last of its {kind.Name}");
         }
 
-        var released = 0;
-
-        if (forWant)
-        {
-            released = BotAuction.Withdrawn(bot, kind);
-        }
-
         bought = Serve(bot, front, kind, units, quoted, forWant, out paid, out var refused);
 
-        if (forWant)
+        if (forWant && bought > 0)
         {
-            Released += released;
-
-            var rest = payable - bought;
-
-            if (rest > 0)
-            {
-                BotAuction.Ask(bot, kind, rest, offer);
-            }
+            Released += bought;
+            BotMarket.Received(want, bought, paid, keeper, BotRoute.Shop);
         }
 
         if (bought <= 0)
@@ -1387,7 +1626,7 @@ public static class BotShopkeep
             return;
         }
 
-        if (BotAuction.Wanted(keeper, kind) != null)
+        if (BotMarket.Wanted(keeper, kind) != null)
         {
             return;
         }
@@ -1494,7 +1733,9 @@ public static class BotShopkeep
         }
 
         var units = Math.Min(wanted, available);
-        var purse = BotYield.Wealth(body);
+
+        var against = forWant ? kind : null;
+        var purse = (int)Math.Min(BotYield.Wealth(body), (long)BotYield.Spendable(body) + (forWant ? BotMarket.ReservedFor(body, kind) : 0));
 
         if (purse < price)
         {
@@ -1508,7 +1749,7 @@ public static class BotShopkeep
 
         var bill = units * price;
 
-        if (!BotAuction.Charge(body, bill))
+        if (!BotMarket.Charge(body, bill, out _, against))
         {
             Broke++;
             refused = $"could not put {bill}gp down for {units} {kind.Name}";
@@ -1548,7 +1789,7 @@ public static class BotShopkeep
 
         if (given < units)
         {
-            Refund(body, (units - given) * price);
+            BotMarket.Refund(body, (units - given) * price);
         }
 
         if (given <= 0)
@@ -1560,13 +1801,19 @@ public static class BotShopkeep
 
         var takings = given * price;
 
-        Pay(keeper, takings);
+        BotMarket.Pay(keeper, takings - BotCharters.Split(keeper, front.Town, kind, given, takings));
+        BotMarket.Traded(kind, given, takings);
+
+        BotPact.Bought(front.Ask(kind), price, given);
 
         paid = takings;
 
         front.Took(body, kind, given, takings);
         Learn(front, kind);
         BotShopBook.Sold(front.Town, kind, given, takings);
+
+        BotRegard.Traded((body.Guild as Guilds.Guild)?.Name, (keeper.Guild as Guilds.Guild)?.Name);
+        BotBurgh.Supplied(keeper, kind, given);
 
         Sales++;
         Units += given;
@@ -1593,7 +1840,7 @@ public static class BotShopkeep
             front.Town,
             takings,
             price,
-            forWant ? "against its own want on the board" : "short of it for its kit"
+            forWant ? "against its own spoken want" : "short of it for its kit"
         );
 
         BotEvents.Post("market", keeper, $"sold {given} {kind.Name} to {body.Name} for {takings}gp");
@@ -1605,68 +1852,148 @@ public static class BotShopkeep
             new Dictionary<string, string> { ["buyer"] = body.Name, ["amount"] = given.ToString(), ["item"] = Words(kind) }
         );
 
-        BotVoice.Say(keeper, "local", thanks ?? $"There you are, {body.Name}.");
+        BotVoice.Say(keeper, BotVoice.HandOver, thanks ?? $"There you are, {body.Name}.");
 
         return given;
     }
 
-    private static void Pay(Mobile keeper, int amount)
+    public static long CityLots { get; private set; }
+
+    public static long CityUnits { get; private set; }
+
+    public static long CityGold { get; private set; }
+
+    public static (int Lots, int Units, int Paid) CityBuy(Type kind, int wanted, int most, int budget, double share, int lots, string who)
     {
-        if (amount <= 0 || keeper == null)
+        if (!Running || _open.Count == 0 || wanted <= 0 || budget <= 0 || lots <= 0 || share <= 0.0)
         {
-            return;
+            return (0, 0, 0);
         }
 
-        var pack = keeper.Backpack;
+        var took = 0;
+        var things = 0;
+        var paid = 0;
 
-        if (pack != null && amount <= 60000)
+        List<BotStorefront> open = [.. _open];
+
+        for (var i = 0; i < open.Count && took < lots && things < wanted && paid < budget; i++)
         {
-            var coin = new Gold(amount);
+            var front = open[i];
 
-            if (pack.TryDropItem(keeper, coin, false))
+            if (!Live(front))
             {
-                return;
+                continue;
             }
 
-            coin.Delete();
+            var keeper = front.Keeper;
+            var ranked = front.Ranked();
+
+            for (var k = 0; k < ranked.Count && took < lots && things < wanted && paid < budget; k++)
+            {
+                var (lotKind, _, ask) = ranked[k];
+
+                if (kind != null && lotKind != kind || ask <= 0)
+                {
+                    continue;
+                }
+
+                if (most > 0 && ask > most)
+                {
+                    continue;
+                }
+
+                var price = Math.Max(1, (int)Math.Round(ask * share));
+                var afford = (budget - paid) / price;
+                var units = Math.Min(Math.Min(Available(keeper, lotKind), wanted - things), afford);
+
+                if (units <= 0)
+                {
+                    continue;
+                }
+
+                var gone = Remove(keeper, lotKind, units);
+
+                if (gone <= 0)
+                {
+                    continue;
+                }
+
+                var bill = gone * price;
+
+                BotMarket.Pay(keeper, bill - BotCharters.Split(keeper, front.Town, lotKind, gone, bill));
+                BotMarket.Traded(lotKind, gone, bill);
+
+                front.Took(null, lotKind, gone, bill);
+                Learn(front, lotKind);
+                BotShopBook.Sold(front.Town, lotKind, gone, bill);
+
+                Sales++;
+                Units += gone;
+                Takings += bill;
+                _soldKinds[lotKind] = _soldKinds.GetValueOrDefault(lotKind) + gone;
+
+                took++;
+                things += gone;
+                paid += bill;
+
+                logger.Information(
+                    "The city bought {Units} {Item} at {Keeper}'s shop in {Town} for {Paid}gp, {Price} each — {Who}",
+                    gone,
+                    lotKind.Name,
+                    keeper.Name,
+                    front.Town,
+                    bill,
+                    price,
+                    who ?? "the city"
+                );
+
+                BotEvents.Post("market", keeper, $"sold {gone} {lotKind.Name} to the city for {bill}gp");
+            }
         }
 
-        if (Banker.Deposit(keeper, amount))
-        {
-            return;
-        }
+        CityLots += took;
+        CityUnits += things;
+        CityGold += paid;
 
-        Force(keeper, amount);
+        return (took, things, paid);
     }
 
-    private static void Refund(Mobile buyer, int amount)
+    private static int Remove(BotMobile keeper, Type kind, int units)
     {
-        if (amount <= 0 || buyer == null || Banker.Deposit(buyer, amount))
+        Gather(keeper, kind, _lots);
+
+        var gone = 0;
+
+        for (var i = 0; i < _lots.Count && gone < units; i++)
         {
-            return;
+            var (item, take) = _lots[i];
+
+            if (item == null || item.Deleted)
+            {
+                continue;
+            }
+
+            var part = Math.Min(take, units - gone);
+            var many = Math.Max(1, item.Amount);
+
+            if (part >= many)
+            {
+                item.Delete();
+                gone += many;
+
+                continue;
+            }
+
+            if (!item.Stackable)
+            {
+                continue;
+            }
+
+            item.Amount = many - part;
+            gone += part;
         }
 
-        Force(buyer, amount);
-    }
-
-    private static void Force(Mobile who, int amount)
-    {
-        var pack = who?.Backpack;
-
-        if (pack == null)
-        {
-            logger.Error("{Amount}gp owed to {Name} had nowhere to go and was lost", amount, who?.Name ?? "nobody");
-
-            return;
-        }
-
-        while (amount > 0)
-        {
-            var part = Math.Min(amount, 60000);
-
-            pack.DropItem(new Gold(part));
-            amount -= part;
-        }
+        return gone;
     }
 
     internal static void Cry(BotMobile keeper, BotStorefront front, string occasion)
@@ -1700,12 +2027,13 @@ public static class BotShopkeep
             ["goods"] = goods.ToString(),
             ["item"] = Words(ranked[0].Kind),
             ["price"] = ranked[0].Ask.ToString(),
-            ["amount"] = ranked[0].Units.ToString()
+            ["amount"] = ranked[0].Units.ToString(),
+            ["town"] = front.Town
         };
 
         var line = BotVoice.Phrase(occasion, "shop:cry", keeper, fill) ?? $"{fill["goods"]} for sale here, by the bank.";
 
-        if (BotVoice.Say(keeper, "local", line))
+        if (BotVoice.Say(keeper, "trade", line))
         {
             Cries++;
         }
@@ -1828,13 +2156,13 @@ public static class BotShopkeep
 
         return $"{_open.Count} of {MostOpen} open now holding {units} things worth {worth}gp; "
             + $"{BotShopkeeper.Describe()}; "
-            + $"{Opened} shifts opened ({Reopened} more openings after the keeper was called away), {Closed} ended ({SoldOut} sold out, {TimeUp} ran their {ShiftMinutes:F0} minutes, {Empty} of them sold nothing), {Suspended} shut while the keeper was away or taken off, {Refused} could not open at the bank; "
-            + $"{Sales} sales of {Units} things for {Takings}gp, every one to a bot that came for it: {SupplySales} sales ({SupplyUnits} things) to bots short of their kit and {WantSales} ({WantUnits} things) against the buyer's own want on the board, {Released}gp of escrow taken back to buy them; most sold {Commonest(5)}; "
-            + $"supplies: {Weighed} looks found a bot's shop holding the thing, {ToFront} chose it, {LostToCounter} a shopkeeper was cheaper counting the walk, {LostToStall} a stall was cheaper, {Sealed} shops passed over as out of reach and {Far} as too far off; "
+            + $"{Opened} shifts opened ({Reopened} more openings after the keeper was called away), {Closed} ended ({SoldOut} sold out, {TimeUp} ran their {ShiftMinutes:F0} minutes, {Empty} of them sold nothing), {Suspended} shut while the keeper was away or taken off, {Refused} could not open at the bank, {BotKeepShop.Rewalked} sent on to another pitch when the road to theirs could not be walked ({PitchesStruck} pitches struck for every keeper after one could not get to them, {StripsStruck} of them widened to the strip between two within {StripTiles} tiles, {PitchesPassedStruck} looks passed a struck pitch, {PitchesPassedOccupied} a pitch a body stood on, {PitchesPassedFlag} a pitch the reach map does not call open; {PitchesLeftDoor} tiles left out of the pitches as a doorway and {PitchesLeftWall} as out of the banker's sight; {OpenedWhereStood} shifts opened where the keeper stood when the last steps could not be walked, {OpenedWhereStoodLate} of them after {OpenStandingMs / 1000}s of walking, {StoodInDoorway} times a keeper stood in a doorway and walked on; {WalksEndedOnOpening} walks to the pitch ended when the shop opened, {OpenWalksSpared} walks back to it that failed with the shop open and the keeper beside it kept the shift); "
+            + $"{Sales} sales of {Units} things for {Takings}gp, every one to a bot that came for it: {SupplySales} sales ({SupplyUnits} things) to bots short of their kit and {WantSales} ({WantUnits} things) against the buyer's own spoken want ({Released} of them taken off its want); most sold {Commonest(5)}; "
+            + $"supplies: {Weighed} looks found a bot's shop holding the thing, {ToFront} chose it, {LostToCounter} a shopkeeper was cheaper counting the walk, {Sealed} shops passed over as out of reach and {Far} as too far off; "
             + $"{BotPatron.Describe()}; "
             + $"at the till {Arrived} customers arrived: {SoldOutOnArrival} found the thing gone and {Gone} set out for a shop that shut, {FellThrough} of those going on to a shopkeeper; {PackFull} could not carry it all, {Broke} could not pay, {FilledMeanwhile} found their want met on the board meanwhile; "
             + $"{Raised} prices raised after selling again soon, {Cut} cut after a shift nobody bought them in; {SelfSupplied} things keepers took out of their own boxes for their own kits; {Cries} cries; sell-through {Share:P0} of demanded stock over {Shifts} measured shifts ({ShownTotal}gp shown, {TakenTotal}gp taken, {SellShare:P0} assumed until {LeastShifts}); "
-            + $"the auction kept {BotAuction.Capped} things in their sellers' hands at {BotAuction.LotsPerBot} kinds a bot; "
+            + $"the city bought {CityUnits} things in {CityLots} lots at the shops for {CityGold}gp; "
             + BotShopBook.Describe(4);
     }
 
@@ -1866,6 +2194,19 @@ public static class BotShopkeep
         Empty = 0;
         Suspended = 0;
         Refused = 0;
+        _struck.Clear();
+        PitchesStruck = 0;
+        StripsStruck = 0;
+        PitchesPassedStruck = 0;
+        PitchesPassedOccupied = 0;
+        PitchesPassedFlag = 0;
+        OpenedWhereStood = 0;
+        PitchesLeftDoor = 0;
+        PitchesLeftWall = 0;
+        StoodInDoorway = 0;
+        OpenedWhereStoodLate = 0;
+        WalksEndedOnOpening = 0;
+        OpenWalksSpared = 0;
         Sales = 0;
         Units = 0;
         Takings = 0;
@@ -1877,7 +2218,9 @@ public static class BotShopkeep
         Weighed = 0;
         ToFront = 0;
         LostToCounter = 0;
-        LostToStall = 0;
+        CityLots = 0;
+        CityUnits = 0;
+        CityGold = 0;
         Sealed = 0;
         Far = 0;
         Arrived = 0;

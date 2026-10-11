@@ -109,7 +109,7 @@ public sealed class BotDrill : IBotProposer
                 continue;
             }
 
-            if (BotYield.Wealth(other) < BotSchool.Bill(captain, other))
+            if (BotYield.Spendable(other) < BotSchool.Bill(captain, other))
             {
                 continue;
             }
@@ -251,7 +251,7 @@ public sealed class BotStudent : IBotProposer
         }
 
         var bill = BotSchool.Bill(student);
-        var wealth = BotYield.Wealth(student);
+        var wealth = BotYield.Spendable(student);
 
         if (wealth < bill)
         {

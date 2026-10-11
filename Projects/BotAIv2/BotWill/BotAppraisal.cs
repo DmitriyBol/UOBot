@@ -19,7 +19,9 @@ public readonly struct BotWeigh
         double charter = 1.0,
         double ground = 1.0,
         double calling = 1.0,
-        double toll = 1.0
+        double toll = 1.0,
+        double nature = 1.0,
+        BotTrait natureBit = BotTrait.None
     )
     {
         Estimate = estimate;
@@ -35,6 +37,8 @@ public readonly struct BotWeigh
         Ground = ground;
         Calling = calling;
         Toll = toll;
+        Nature = nature;
+        NatureBit = natureBit;
     }
 
     public double Estimate { get; }
@@ -61,11 +65,15 @@ public readonly struct BotWeigh
 
     public double Toll { get; }
 
+    public double Nature { get; }
+
+    public BotTrait NatureBit { get; }
+
     public double Score { get; }
 
     public string Describe()
     {
-        var bend = Estimate > 0.0 && Calling > 0.0 && Toll > 0.0 ? Score / (Estimate * Calling * Toll) : 0.0;
+        var bend = Estimate > 0.0 && Calling > 0.0 && Toll > 0.0 && Nature > 0.0 ? Score / (Estimate * Calling * Toll * Nature) : 0.0;
 
         var extra = "";
 
@@ -79,6 +87,11 @@ public readonly struct BotWeigh
         if (Toll != 1.0)
         {
             called += $"; × {Toll:F2} after the toll on this land";
+        }
+
+        if (Nature != 1.0)
+        {
+            called += $"; × {Nature:F2} for its nature ({BotTraits.Words(NatureBit)})";
         }
 
         return $"{Score:F0}/min = {Estimate:F0} × {bend:F2}, that being the {Nth(BotAppraisal.Root)} root of "
@@ -232,9 +245,9 @@ public static class BotAppraisal
             return 0.0;
         }
 
-        if (!inHand && deed.Outlay > 0 && BotYield.Wealth(body) < deed.Outlay)
+        if (!inHand && deed.Outlay > 0 && BotYield.Spendable(body) < deed.Outlay)
         {
-            veto = $"{deed.Kind} costs {deed.Outlay}gp and it has {BotYield.Wealth(body)}gp";
+            veto = $"{deed.Kind} costs {deed.Outlay}gp and it has {BotYield.Spendable(body)}gp free of {BotYield.Wealth(body)}gp";
 
             return 0.0;
         }
@@ -253,6 +266,35 @@ public static class BotAppraisal
             veto = $"{deed.Kind} failed {Math.Max(2, BotBreaker.Failures)} times running for the same reason and rests {restLeftMs / 1000}s more, after \"{restedAfter}\"";
 
             return 0.0;
+        }
+
+        if (!inHand && BotTreadmill.Resting(body, deed, out var losingRest, out var treadLeftMs))
+        {
+            veto = losingRest
+                ? $"{deed.Kind} against {deed.Foe?.Name ?? "it"} was judged lost a moment ago and rests {treadLeftMs / 1000}s more"
+                : $"{deed.Kind} failed at once twice running against the same target and rests {treadLeftMs / 1000}s more";
+
+            return 0.0;
+        }
+
+        if (!inHand && !deed.Standing && deed.Where != Point3D.Zero && !BotBreaker.Spares(deed.Kind) && deed.Kind != BotHomeward.Trade)
+        {
+            var brings = deed.Brings(body);
+
+            if (brings <= BotThreat.Power(body) * BotBreaker.GroundCompany
+                && BotBreaker.GroundResting(body, map, body.Location, deed.Where, out var groundWhy, out var groundLeftMs))
+            {
+                veto = $"{deed.Kind} lies on or across ground this bot has lately died on twice ({groundWhy}), rested {groundLeftMs / 1000}s more";
+
+                return 0.0;
+            }
+
+            if (BotDanger.Road(body, map, body.Location, deed.Where, brings, out var asked, out var at, out var what, deed.Kind, resolve.Deed != null))
+            {
+                veto = $"{deed.Kind} is over a road that asks {asked:F0} of strength at ({at.X}, {at.Y}) by {what}, against the {brings:F0} it brings ({BotDanger.RoadHow ?? "on the straight line"})";
+
+                return 0.0;
+            }
         }
 
         if (!inHand && resolve.Becalmed
@@ -291,6 +333,13 @@ public static class BotAppraisal
         if (deed is not BotBolt && deed is not BotSentence && BotOutlaw.Keeps(body, map, deed.Where))
         {
             veto = $"{deed.Kind} lies in a guarded town and {body.Name} is red";
+
+            return 0.0;
+        }
+
+        if (deed is not BotBolt && deed is not BotSentence && BotStewardship.Refuses(body, map, deed.Where, out var barred))
+        {
+            veto = $"{deed.Kind} {barred}";
 
             return 0.0;
         }
@@ -380,9 +429,11 @@ public static class BotAppraisal
 
         var toll = BotToll.Factor(body, map, deed);
 
-        var score = estimate * Math.Pow(product, 1.0 / Math.Max(1, Root)) * calling * toll;
+        var nature = BotTraits.Nature(body, deed, out var natureBit);
 
-        weigh = new BotWeigh(estimate, nearness, novelty, room, caution, purse, score, stopped, revel, charter, ground, calling, toll);
+        var score = estimate * Math.Pow(product, 1.0 / Math.Max(1, Root)) * calling * toll * nature;
+
+        weigh = new BotWeigh(estimate, nearness, novelty, room, caution, purse, score, stopped, revel, charter, ground, calling, toll, nature, natureBit);
 
         return score;
     }

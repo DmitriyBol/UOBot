@@ -42,6 +42,12 @@ public sealed class BotArcher : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("marksman", null, 5, 58.0, 74.0, Weapon: true),
+            BotLeaning.Even(1)
+        ];
+
         CritChancePerSkill = 0.001;
         CritMultiplier = 3;
 

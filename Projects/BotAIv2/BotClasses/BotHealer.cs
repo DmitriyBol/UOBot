@@ -58,6 +58,12 @@ public sealed class BotHealer : BotClass
             (SkillName.Alchemy, 100.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("mender", SkillName.Healing, 4, 58.0, 72.0),
+            BotLeaning.Even(1)
+        ];
+
         NeedsMeditation = true;
 
         HerbIntervalMs = 1800000;

@@ -111,6 +111,18 @@ public sealed class BotHirer : IBotProposer
             return null;
         }
 
+        if (_rested.TryGetValue(guild.Name, out var until))
+        {
+            if (now - until < 0)
+            {
+                Resting++;
+
+                return null;
+            }
+
+            _rested.Remove(guild.Name);
+        }
+
         var fund = BotEstate.Fund(guild);
 
         if (fund < price)
@@ -136,14 +148,37 @@ public sealed class BotHirer : IBotProposer
 
     public static void Release(Guild guild) => BotOffice.Release(Office, guild);
 
+    public static int RestMs { get; set; } = 600000;
+
+    private static readonly Dictionary<string, long> _rested = new();
+
+    public static long Rests { get; private set; }
+
+    public static long Resting { get; private set; }
+
+    public static void Rest(Guild guild)
+    {
+        if (guild?.Name == null)
+        {
+            return;
+        }
+
+        _rested[guild.Name] = Core.TickCount + RestMs;
+        Rests++;
+    }
+
     public static string Describe() =>
         $"the hirer offered a merchant {Offered} times, held off {Wanting} times for want of the money"
         + (Wanting > 0 ? $" (the best-off guild that wanted one had {Nearest}gp free and was {Short} short)" : "")
         + $" and {Unsold} times for want of anybody selling a contract; "
-        + $"{Staffed} halls already had their merchant, {Fitting} guilds were still fitting out a workshop first, {Claimed} already had somebody fetching one";
+        + $"{Staffed} halls already had their merchant, {Fitting} guilds were still fitting out a workshop first, {Claimed} already had somebody fetching one; "
+        + $"{Rests} guilds rested after a levy fell short at the counter, {Resting} offers held off while one rested";
 
     public static void Forget()
     {
+        Rests = 0;
+        Resting = 0;
+        _rested.Clear();
         Offered = 0;
         Wanting = 0;
         Unsold = 0;

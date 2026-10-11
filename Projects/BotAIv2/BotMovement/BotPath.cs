@@ -208,6 +208,10 @@ public static class BotPath
 
     public static long TilesExamined { get; private set; }
 
+    public static long Pruned { get; private set; }
+
+    public static long PrunedSearches { get; private set; }
+
     public static long Reached { get; private set; }
 
     public static long PartialRuns { get; private set; }
@@ -309,7 +313,7 @@ public static class BotPath
     public static string Describe() =>
         Searches == 0
             ? "no searches yet"
-            : $"{Searches} searches, {TilesExamined} tiles examined, {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; {Starved} were handed less clock than they asked for and {Lengthened} asked for the whole ceiling because they were not closing; of the partials {PartialNear} were going somewhere within {Near} tiles and {PartialStill} ended no nearer than they started and {PartialUnfooted} never began because the bot's own tile forbids every direction, the average one {(PartialRuns > PartialUnfooted ? PartialSpan / (PartialRuns - PartialUnfooted) : 0)} tiles out; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand; {Recalled} asked again within {MemoMs / 1000.0:0.#}s of the same search and answered from it ({RecalledMs:F0}ms of searching not done again)";
+            : $"{Searches} searches, {TilesExamined} tiles examined ({Pruned} steps left unexamined for landing on ground the reach map says the walker cannot reach, in {PrunedSearches} searches), {TotalMs:F0}ms total ({TotalMs / Searches:F2}ms each, worst {WorstMs:F2}ms), {Reached} reached, {PartialRuns} partial, {SealedRuns} refused outright; {Starved} were handed less clock than they asked for and {Lengthened} asked for the whole ceiling because they were not closing; of the partials {PartialNear} were going somewhere within {Near} tiles and {PartialStill} ended no nearer than they started and {PartialUnfooted} never began because the bot's own tile forbids every direction, the average one {(PartialRuns > PartialUnfooted ? PartialSpan / (PartialRuns - PartialUnfooted) : 0)} tiles out; proofs of a pocket lost: {LostToClock} to the clock, {LostToBox} to the box, {LostToAvoiding} to avoiding danger, {LostToDoors} to shut doors, {LostToSize} too small to be one; {Probes} looks at the far side costing {ProbeMs:F0}ms over {ProbeTiles} expansions across {ProbeCells} cells of ground: {Enclosed} found a pocket, {ProbedTooBig} found the world, {ProbedNoTime} ran out of clock, {ProbedNoFooting} found nowhere at all to stand; {Recalled} asked again within {MemoMs / 1000.0:0.#}s of the same search and answered from it ({RecalledMs:F0}ms of searching not done again)";
 
     public static bool CanReach(Map map, Point3D from, Point3D to, BotArrival arrival, double ceilingMs = 0.0) =>
         Find(map, from, to, arrival, _scratch, ceilingMs: ceilingMs) == BotPathOutcome.Reached;
@@ -406,6 +410,10 @@ public static class BotPath
             return BotPathOutcome.Partial;
         }
 
+        var want = BotReachClass.Unknown;
+        var pruning = BotReachMap.PrunesSearch && BotReachMap.Standing(map, from, out want);
+        var pruned = 0L;
+
         var start = AddNode(from.X, from.Y, startZ, 0, -1);
 
         _nodeTotal[start] = Heuristic(from.X, from.Y, to);
@@ -414,6 +422,10 @@ public static class BotPath
 
         var nearest = -1;
         var nearestScore = int.MaxValue;
+
+        var reaching = avoid.HasReaches;
+        var nearestOut = -1;
+        var nearestOutScore = int.MaxValue;
 
         var reached = -1;
         var expansions = 0;
@@ -458,6 +470,12 @@ public static class BotPath
             {
                 nearestScore = score;
                 nearest = current;
+            }
+
+            if (reaching && score < nearestOutScore && !avoid.InReach(cx, cy))
+            {
+                nearestOutScore = score;
+                nearestOut = current;
             }
 
             var mask = BotStep.Mask(map, cx, cy, cz);
@@ -509,6 +527,18 @@ public static class BotPath
 
                 var nz = mask.GetWalkZ((Direction)d);
 
+                if (pruning)
+                {
+                    var kind = BotReachMap.Class(map, nx, ny, nz);
+
+                    if (kind != BotReachClass.Unknown && kind != want)
+                    {
+                        pruned++;
+
+                        continue;
+                    }
+                }
+
                 if (Blocked(map, nx, ny, nz, doorsShut))
                 {
                     continue;
@@ -516,7 +546,8 @@ public static class BotPath
 
                 var cell = BotStep.Cell(nx, ny, nz);
                 var stepCost = (d & 1) == 1 ? DiagonalCost : StraightCost;
-                var cost = _nodeCost[current] + stepCost;
+
+                var cost = _nodeCost[current] + stepCost + (reaching ? avoid.Penalty(nx, ny) : 0);
 
                 if (_lookup.TryGetValue(cell, out var existing))
                 {
@@ -549,6 +580,12 @@ public static class BotPath
         TilesExamined += expansions;
         LastMs = elapsedMs;
         LastExpansions = expansions;
+
+        if (pruned > 0)
+        {
+            Pruned += pruned;
+            PrunedSearches++;
+        }
 
         if (elapsedMs > WorstMs)
         {
@@ -602,6 +639,12 @@ public static class BotPath
             SealedRuns++;
 
             return BotPathOutcome.Sealed;
+        }
+
+        if (reaching && nearestOut >= 0 && nearestOut != start)
+        {
+            nearest = nearestOut;
+            nearestScore = nearestOutScore;
         }
 
         if (nearest >= 0 && nearest != start)

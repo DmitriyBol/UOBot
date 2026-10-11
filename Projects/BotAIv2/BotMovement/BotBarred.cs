@@ -102,7 +102,7 @@ public static class BotBarred
 
     public static long Fields { get; private set; }
 
-    private static readonly List<(Map Map, int X, int Y, long Tick)> _fallen = [];
+    private static readonly List<(Map Map, int X, int Y, long Tick, Type Kind, double Power)> _fallen = [];
 
     public static long Quarantined { get; private set; }
 
@@ -115,6 +115,180 @@ public static class BotBarred
         public long Until;
 
         public int Deaths;
+
+        public readonly Dictionary<Type, double> Killers = [];
+
+        public bool Dire;
+    }
+
+    /// <summary>
+    /// <b>A standing quarantine as a clearing sees it (03.10.2026, build next).</b> Patrick's order of 02.10.2026, item 4: companies
+    /// go to the squares where others died and clear them. Its box, why and how often it was closed, whether the plague or a killer
+    /// of <see cref="QuarantinePower"/> closed it (<see cref="Dire"/>: never a clearing's), and the strongest thing recorded killing
+    /// in it at its kind's company price now (<c>BotCompanyRecord.Price</c>, since 03.10.2026; the island's price before) — the
+    /// figure a company withdraws by (<c>BotSquad.Reckon</c>).
+    /// </summary>
+    public readonly struct Closure
+    {
+        public Closure(int x1, int y1, int x2, int y2, string why, int deaths, bool dire, double worst, string worstKind, double worstRaw)
+        {
+            X1 = x1;
+            Y1 = y1;
+            X2 = x2;
+            Y2 = y2;
+            Why = why;
+            Deaths = deaths;
+            Dire = dire;
+            Worst = worst;
+            WorstKind = worstKind;
+            WorstRaw = worstRaw;
+        }
+
+        public int X1 { get; }
+
+        public int Y1 { get; }
+
+        public int X2 { get; }
+
+        public int Y2 { get; }
+
+        public string Why { get; }
+
+        public int Deaths { get; }
+
+        public bool Dire { get; }
+
+        public double Worst { get; }
+
+        public string WorstKind { get; }
+
+        public double WorstRaw { get; }
+
+        public Point3D Middle => new((X1 + X2) / 2, (Y1 + Y2) / 2, 0);
+
+        public bool Holds(int x, int y) => x >= X1 && x <= X2 && y >= Y1 && y <= Y2;
+    }
+
+    private static Closure View(Quarantined_ q)
+    {
+        var worst = 0.0;
+        var raw = 0.0;
+        string kind = null;
+
+        foreach (var (type, power) in q.Killers)
+        {
+            var priced = power * BotCompanyRecord.Price(type);
+
+            if (priced > worst)
+            {
+                worst = priced;
+                raw = power;
+                kind = type.Name;
+            }
+        }
+
+        return new Closure(q.Box.X1, q.Box.Y1, q.Box.X2, q.Box.Y2, q.Box.Why, q.Deaths, q.Dire, worst, kind, raw);
+    }
+
+    public static bool Closing(Map map, Point3D where, out Closure closure)
+    {
+        closure = default;
+
+        if (!Running || map == null || map == Map.Internal)
+        {
+            return false;
+        }
+
+        var now = Core.TickCount;
+
+        for (var i = 0; i < _quarantine.Count; i++)
+        {
+            var q = _quarantine[i];
+
+            if (q.Until - now > 0 && q.Box.Holds(where.X, where.Y))
+            {
+                closure = View(q);
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static IEnumerable<Closure> Closures()
+    {
+        var now = Core.TickCount;
+
+        for (var i = 0; i < _quarantine.Count; i++)
+        {
+            if (_quarantine[i].Until - now > 0)
+            {
+                yield return View(_quarantine[i]);
+            }
+        }
+    }
+
+    public static bool DireAt(Map map, Point3D where)
+    {
+        if (!Running || map == null || map == Map.Internal || _quarantine.Count == 0)
+        {
+            return false;
+        }
+
+        var now = Core.TickCount;
+
+        for (var i = 0; i < _quarantine.Count; i++)
+        {
+            var q = _quarantine[i];
+
+            if (q.Dire && q.Until - now > 0 && q.Box.Holds(where.X, where.Y))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static bool BarredOutright(Map map, Point3D where)
+    {
+        if (!Running || map == null || map == Map.Internal)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < _bars.Count; i++)
+        {
+            if (_bars[i].Holds(where.X, where.Y))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static (Type Kind, double Power) Killer(Mobile killer) =>
+        killer is Server.Mobiles.BaseCreature { Controlled: false, Summoned: false } beast
+            ? (beast.GetType(), BotThreat.Power(beast))
+            : (null, 0.0);
+
+    private static bool Record(Quarantined_ q, Type kind, double power)
+    {
+        if (kind == null || power <= 0.0)
+        {
+            return false;
+        }
+
+        if (!q.Killers.TryGetValue(kind, out var had) || power > had)
+        {
+            q.Killers[kind] = power;
+
+            return true;
+        }
+
+        return false;
     }
 
     private static readonly List<Quarantined_> _quarantine = [];
@@ -170,9 +344,13 @@ public static class BotBarred
             return;
         }
 
+        var (kind, power) = Killer(killer);
+
+        Note(where, kind, power);
+
         if (killer != null && Quarantines(killer))
         {
-            Quarantine(map, where, $"{killer.Name} killed {who} here");
+            Quarantine(map, where, $"{killer.Name} killed {who} here", [(kind, power)], dire: true);
 
             return;
         }
@@ -192,9 +370,10 @@ public static class BotBarred
             }
         }
 
-        _fallen.Add((map, where.X, where.Y, now));
+        _fallen.Add((map, where.X, where.Y, now, kind, power));
 
         var near = 0;
+        List<(Type, double)> killers = [];
 
         for (var i = 0; i < _fallen.Count; i++)
         {
@@ -203,6 +382,7 @@ public static class BotBarred
             if (f.Map == map && Math.Max(Math.Abs(f.X - where.X), Math.Abs(f.Y - where.Y)) <= QuarantineHalf)
             {
                 near++;
+                killers.Add((f.Kind, f.Power));
             }
         }
 
@@ -216,7 +396,9 @@ public static class BotBarred
         Quarantine(
             map,
             where,
-            $"a killing field: {near} bots dead within {QuarantineHalf} tiles in {KillingWindowMs / 60000} minutes, the last {who} by {killer?.Name ?? "something"}"
+            $"a killing field: {near} bots dead within {QuarantineHalf} tiles in {KillingWindowMs / 60000} minutes, the last {who} by {killer?.Name ?? "something"}",
+            killers,
+            dire: false
         );
 
         if (Quarantined > before)
@@ -225,7 +407,35 @@ public static class BotBarred
         }
     }
 
-    public static void Quarantine(Map map, Point3D where, string why)
+    private static void Note(Point3D where, Type kind, double power)
+    {
+        if (kind == null || _quarantine.Count == 0)
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+        var written = false;
+
+        for (var i = 0; i < _quarantine.Count; i++)
+        {
+            var q = _quarantine[i];
+
+            if (q.Until - now > 0 && q.Box.Holds(where.X, where.Y))
+            {
+                written |= Record(q, kind, power);
+            }
+        }
+
+        if (written)
+        {
+            Save();
+        }
+    }
+
+    public static void Quarantine(Map map, Point3D where, string why) => Quarantine(map, where, why, null, dire: false);
+
+    private static void Quarantine(Map map, Point3D where, string why, List<(Type Kind, double Power)> killers, bool dire)
     {
         if (!Running || map == null || map == Map.Internal || QuarantineMs <= 0)
         {
@@ -242,6 +452,13 @@ public static class BotBarred
             {
                 q.Until = now + QuarantineMs;
                 q.Deaths++;
+                q.Dire |= dire;
+
+                for (var k = 0; k < killers?.Count; k++)
+                {
+                    Record(q, killers[k].Kind, killers[k].Power);
+                }
+
                 Save();
 
                 return;
@@ -256,8 +473,14 @@ public static class BotBarred
         }
 
         var box = new Bar(where.X - QuarantineHalf, where.Y - QuarantineHalf, where.X + QuarantineHalf, where.Y + QuarantineHalf, why);
+        var made = new Quarantined_ { Box = box, Until = now + QuarantineMs, Deaths = 1, Dire = dire };
 
-        _quarantine.Add(new Quarantined_ { Box = box, Until = now + QuarantineMs, Deaths = 1 });
+        for (var k = 0; k < killers?.Count; k++)
+        {
+            Record(made, killers[k].Kind, killers[k].Power);
+        }
+
+        _quarantine.Add(made);
         Quarantined++;
         Save();
 
@@ -271,6 +494,106 @@ public static class BotBarred
             why
         );
     }
+
+    public static int Lift(Map map, Point3D where, int spread, string why)
+    {
+        if (!Running || map == null || map == Map.Internal)
+        {
+            return 0;
+        }
+
+        var lifted = 0;
+        var now = Core.TickCount;
+
+        for (var i = _quarantine.Count - 1; i >= 0; i--)
+        {
+            var q = _quarantine[i];
+            var box = q.Box;
+            var middle = new Point3D((box.X1 + box.X2) / 2, (box.Y1 + box.Y2) / 2, where.Z);
+
+            var near = box.Holds(where.X, where.Y)
+                       || Math.Max(Math.Abs(middle.X - where.X), Math.Abs(middle.Y - where.Y)) <= spread;
+
+            if (!near || q.Until - now <= 0)
+            {
+                continue;
+            }
+
+            if (q.Dire)
+            {
+                DireKept++;
+
+                logger.Information(
+                    "Quarantine kept: ({X1},{Y1})-({X2},{Y2}) was declared for the plague or a killer of {Power:F0} and stands its clock, whatever a company cleared — {Why}",
+                    box.X1,
+                    box.Y1,
+                    box.X2,
+                    box.Y2,
+                    QuarantinePower,
+                    why
+                );
+
+                continue;
+            }
+
+            var left = BotClearer.Strongest(map, middle, QuarantineHalf, out var worst, fresh: true);
+            var empty = EmptyBelow;
+
+            if (left > empty)
+            {
+                Unemptied++;
+
+                logger.Information(
+                    "Quarantine kept: ({X1},{Y1})-({X2},{Y2}) still holds {Worst} at ({WX}, {WY}), reckoned {Left:F0} at its kind's price, past the {Empty:F0} a lone bot takes on — {Why}",
+                    box.X1,
+                    box.Y1,
+                    box.X2,
+                    box.Y2,
+                    worst?.Name ?? "something",
+                    worst?.X ?? 0,
+                    worst?.Y ?? 0,
+                    left,
+                    empty,
+                    why
+                );
+
+                continue;
+            }
+
+            logger.Information(
+                "Quarantine lifted: ({X1},{Y1})-({X2},{Y2}) after {Deaths} deaths and {Turned} choices turned away, nothing in it past {Empty:F0} — {Why}",
+                box.X1,
+                box.Y1,
+                box.X2,
+                box.Y2,
+                q.Deaths,
+                box.Turned,
+                empty,
+                why
+            );
+
+            _quarantine.RemoveAt(i);
+            lifted++;
+        }
+
+        if (lifted > 0)
+        {
+            Lifted += lifted;
+            Save();
+        }
+
+        return lifted;
+    }
+
+    public static double EmptyOdds { get; set; } = 1.5;
+
+    public static double EmptyBelow => BotKept.LoneBot * Math.Max(0.0, EmptyOdds);
+
+    public static long Unemptied { get; private set; }
+
+    public static long DireKept { get; private set; }
+
+    public static long Lifted { get; private set; }
 
     private static bool InQuarantine(Point3D where)
     {
@@ -328,6 +651,43 @@ public static class BotBarred
         public string Why { get; set; }
         public int Deaths { get; set; }
         public DateTime UntilUtc { get; set; }
+
+        public bool Dire { get; set; }
+
+        public Dictionary<string, double> Killers { get; set; }
+    }
+
+    private static Dictionary<string, double> Written(Quarantined_ q)
+    {
+        if (q.Killers.Count == 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, double> written = [];
+
+        foreach (var (kind, power) in q.Killers)
+        {
+            written[kind.Name] = Math.Round(power);
+        }
+
+        return written;
+    }
+
+    private static void Read(Quarantined_ q, Dictionary<string, double> written)
+    {
+        if (written == null)
+        {
+            return;
+        }
+
+        foreach (var (name, power) in written)
+        {
+            if (!string.IsNullOrEmpty(name) && AssemblyHandler.FindTypeByName(name) is { } kind)
+            {
+                Record(q, kind, power);
+            }
+        }
     }
 
     public static void Save()
@@ -346,7 +706,13 @@ public static class BotBarred
 
                 if (left > 0)
                 {
-                    kept.Add(new Kept { X1 = q.Box.X1, Y1 = q.Box.Y1, X2 = q.Box.X2, Y2 = q.Box.Y2, Why = q.Box.Why, Deaths = q.Deaths, UntilUtc = DateTime.UtcNow.AddMilliseconds(left) });
+                    kept.Add(
+                        new Kept
+                        {
+                            X1 = q.Box.X1, Y1 = q.Box.Y1, X2 = q.Box.X2, Y2 = q.Box.Y2, Why = q.Box.Why, Deaths = q.Deaths,
+                            UntilUtc = DateTime.UtcNow.AddMilliseconds(left), Dire = q.Dire, Killers = Written(q)
+                        }
+                    );
                 }
             }
 
@@ -383,7 +749,11 @@ public static class BotBarred
                     continue;
                 }
 
-                _quarantine.Add(new Quarantined_ { Box = new Bar(k.X1, k.Y1, k.X2, k.Y2, k.Why ?? "kept from the last session"), Until = now + left, Deaths = k.Deaths });
+                var dire = k.Dire || k.Why != null && !k.Why.StartsWith("a killing field", StringComparison.Ordinal);
+                var back = new Quarantined_ { Box = new Bar(k.X1, k.Y1, k.X2, k.Y2, k.Why ?? "kept from the last session"), Until = now + left, Deaths = k.Deaths, Dire = dire };
+
+                Read(back, k.Killers);
+                _quarantine.Add(back);
                 read++;
             }
 
@@ -537,13 +907,15 @@ public static class BotBarred
 
         return $"{_bars.Count} pieces of ground are barred outright, turning {Turned} choices away: {string.Join("; ", said)}; "
             + $"{Quarantined} quarantines declared ({Fields} of them killing fields of {KillingDeaths} dead in {KillingWindowMs / 60000} minutes), "
-            + $"{inForce} in force, {QuarantineTurned} choices turned by them, {Spared} spared for being home";
+            + $"{inForce} in force, {QuarantineTurned} choices turned by them, {Spared} spared for being home, {Lifted} lifted by a company that cleared the ground, {Unemptied} left standing after a company's work for something still in them past {EmptyBelow:F0} at its kind's price, {DireKept} left to their clock for the plague or a killer of {QuarantinePower:F0}";
     }
 
     public static void Forget()
     {
         Turned = 0;
         Fields = 0;
+        Unemptied = 0;
+        DireKept = 0;
         _fallen.Clear();
 
         for (var i = 0; i < _bars.Count; i++)

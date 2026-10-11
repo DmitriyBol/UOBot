@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Server.Engines.Spawners;
+using Server.Items;
 using Server.Logging;
 using Server.Mobiles;
 using Server.Regions;
@@ -21,10 +22,10 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotZoneKind
 {
-    public BotZoneKind(Type type)
+    public BotZoneKind(Type type, string name = null)
     {
         Type = type;
-        Name = type.Name;
+        Name = name ?? type.Name;
     }
 
     public Type Type { get; }
@@ -45,7 +46,11 @@ public sealed class BotZoneKind
 
     public int Perception { get; set; } = 16;
 
+    public int Strike { get; set; }
+
     public bool Water { get; set; }
+
+    public bool Swims { get; set; }
 
     public bool Rooted { get; set; }
 
@@ -75,7 +80,9 @@ public sealed class BotZoneKind
         Aggressive = BotHaunts.AttacksFirst(c.FightMode);
         Caster = c.AI == AIType.AI_Mage;
         Perception = c.RangePerception;
+        Strike = BotHaunts.StrikeOf(c);
         Water = c.CantWalk && c.CanSwim;
+        Swims = c.CanSwim;
         Rooted = c.CantWalk && !c.CanSwim;
         Townsfolk = BotHaunts.IsTownsfolk(c);
         Known = true;
@@ -123,11 +130,21 @@ public sealed class BotHaunt
 
     public int Index { get; set; } = -1;
 
+    public bool Wet { get; set; }
+
+    public Point3D WetAt { get; set; } = new(-1, -1, 0);
+
     public double AwakeSeconds { get; set; }
 
     public long Samples { get; set; }
 
     public int ObservedRange { get; set; }
+
+    private float[] _reach;
+
+    private long _reachTick;
+
+    public double ReachWeight { get; private set; }
 
     public DateTime LastAwake { get; set; } = DateTime.MinValue;
 
@@ -143,7 +160,7 @@ public sealed class BotHaunt
         0.5 * Math.Min(1.0, AwakeSeconds / Math.Max(1, BotZones.ConfidentSeconds))
         + 0.5 * Math.Min(1.0, Samples / (double)Math.Max(1, BotZones.ConfidentSamples));
 
-    public void Sample(long now, bool awake, int away)
+    public void Sample(long now, bool awake, int away, bool calm)
     {
         if (awake)
         {
@@ -159,7 +176,12 @@ public sealed class BotHaunt
 
             if (away > ObservedRange)
             {
-                ObservedRange = away;
+                ObservedRange = Math.Min(away, Radius);
+            }
+
+            if (calm)
+            {
+                AddReach(now, away, 1f);
             }
         }
 
@@ -168,6 +190,112 @@ public sealed class BotHaunt
     }
 
     public string Key => $"{At.X},{At.Y},{At.Z}";
+
+    public int ReachAt(long now)
+    {
+        Fade(now);
+
+        var bins = _reach;
+
+        if (bins == null || ReachWeight < Math.Max(1, BotZones.ReachLeast))
+        {
+            return -1;
+        }
+
+        var want = ReachWeight * Math.Clamp(BotZones.ReachPercentile, 0.0, 1.0);
+        var sum = 0.0;
+
+        for (var d = 0; d < bins.Length; d++)
+        {
+            sum += bins[d];
+
+            if (sum >= want)
+            {
+                return d;
+            }
+        }
+
+        return bins.Length - 1;
+    }
+
+    public void Restore(float[] bins, double fade, long now)
+    {
+        if (bins == null || fade <= 0.0)
+        {
+            return;
+        }
+
+        for (var d = 0; d < bins.Length; d++)
+        {
+            if (bins[d] > 0f)
+            {
+                AddReach(now, d, (float)(bins[d] * fade));
+            }
+        }
+    }
+
+    public void Seed(int reach, double weight, long now)
+    {
+        if (reach >= 0 && weight > 0.0)
+        {
+            AddReach(now, reach, (float)Math.Min(weight, Math.Max(1, BotZones.ReachLeast)));
+        }
+    }
+
+    public float[] ReachBins(long now)
+    {
+        Fade(now);
+
+        return _reach == null || ReachWeight <= 0.0 ? null : (float[])_reach.Clone();
+    }
+
+    public const int CountedBeyond = 32;
+
+    private void AddReach(long now, int away, float weight)
+    {
+        var length = Radius + Math.Max(CountedBeyond, BotZones.ReachBeyond) + 1;
+
+        if (Radius > BotZones.DeclaredMost)
+        {
+            return;
+        }
+
+        if (_reach == null || _reach.Length != length)
+        {
+            _reach = new float[length];
+            _reachTick = now;
+            ReachWeight = 0.0;
+        }
+
+        Fade(now);
+
+        _reach[Math.Clamp(away, 0, length - 1)] += weight;
+        ReachWeight += weight;
+    }
+
+    private void Fade(long now)
+    {
+        var bins = _reach;
+        var elapsed = now - _reachTick;
+
+        if (bins == null || elapsed < 60000)
+        {
+            return;
+        }
+
+        _reachTick = now;
+
+        var factor = (float)Math.Pow(0.5, elapsed / 60000.0 / Math.Max(1, BotZones.ReachHalfLifeMinutes));
+        var weight = 0.0;
+
+        for (var d = 0; d < bins.Length; d++)
+        {
+            bins[d] *= factor;
+            weight += bins[d];
+        }
+
+        ReachWeight = weight;
+    }
 }
 
 /// <summary>What the scan last knew about one living creature.</summary>
@@ -184,6 +312,42 @@ public sealed class BotZoneSeen
     public float Power;
 
     public int Sightings;
+
+    public short[] TrailX;
+
+    public short[] TrailY;
+
+    public long[] TrailTick;
+
+    public int TrailCount;
+
+    public int TrailHead;
+
+    public void Walked(int x, int y, long now)
+    {
+        if (TrailX == null)
+        {
+            var most = Math.Max(1, BotHaunts.TrailMost);
+
+            TrailX = new short[most];
+            TrailY = new short[most];
+            TrailTick = new long[most];
+            TrailHead = -1;
+        }
+
+        if (TrailCount > 0 && Math.Max(Math.Abs(TrailX[TrailHead] - x), Math.Abs(TrailY[TrailHead] - y)) < BotZoneState.Cell)
+        {
+            TrailTick[TrailHead] = now;
+
+            return;
+        }
+
+        TrailHead = (TrailHead + 1) % TrailX.Length;
+        TrailX[TrailHead] = (short)x;
+        TrailY[TrailHead] = (short)y;
+        TrailTick[TrailHead] = now;
+        TrailCount = Math.Min(TrailCount + 1, TrailX.Length);
+    }
 }
 
 /// <summary>
@@ -208,6 +372,8 @@ public static class BotHaunts
     public static int MeasurePerBeat { get; set; } = 2;
 
     public static int RepowerEvery { get; set; } = 16;
+
+    public static int TrailMost { get; set; } = 32;
 
     public static int StaleMs { get; set; } = 180000;
 
@@ -274,6 +440,21 @@ public static class BotHaunts
     }
 
     public static bool AttacksFirst(FightMode mode) => mode is FightMode.Closest or FightMode.Strongest or FightMode.Weakest;
+
+    public static int StrikeOf(BaseCreature c)
+    {
+        if (BotZones.SpellReach <= 0)
+        {
+            return 0;
+        }
+
+        if (c.AI == AIType.AI_Mage)
+        {
+            return BotZones.SpellReach;
+        }
+
+        return c.Weapon is BaseRanged ranged ? Math.Max(0, ranged.MaxRange) : 0;
+    }
 
     public static bool IsTownsfolk(BaseCreature c) => c is BaseVendor or BaseEscortable || c.IsInvulnerable;
 
@@ -504,7 +685,10 @@ public static class BotHaunts
             kind.Aggressive = AttacksFirst(traits.Mode);
             kind.Caster = traits.AI == AIType.AI_Mage;
             kind.Perception = traits.Perception;
+
+            kind.Strike = traits.AI == AIType.AI_Mage ? Math.Max(0, BotZones.SpellReach) : 0;
             kind.Water = traits.CantWalk && traits.CanSwim;
+            kind.Swims = traits.CanSwim;
             kind.Rooted = traits.CantWalk && !traits.CanSwim;
             kind.Townsfolk = traits.Townsfolk;
             kind.Known = true;
@@ -551,6 +735,7 @@ public static class BotHaunts
         seen.Tick = now;
 
         var haunt = c.Spawner is BaseSpawner spawner ? Of(spawner) : null;
+        var away = 0;
 
         seen.Haunt = haunt;
 
@@ -558,7 +743,13 @@ public static class BotHaunts
         {
             var home = c.Home == Point3D.Zero ? haunt.At : c.Home;
 
-            haunt.Sample(now, awake, Math.Max(Math.Abs(c.X - home.X), Math.Abs(c.Y - home.Y)));
+            away = Math.Max(Math.Abs(c.X - home.X), Math.Abs(c.Y - home.Y));
+            haunt.Sample(now, awake, away, c.Combatant == null && !c.Warmode);
+        }
+
+        if ((haunt == null || away > haunt.Radius) && AttacksFirst(c.FightMode) && !(c.CantWalk && c.CanSwim))
+        {
+            seen.Walked(c.X, c.Y, now);
         }
 
         return kind;

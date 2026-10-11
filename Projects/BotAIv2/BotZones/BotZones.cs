@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Server.Logging;
 using Server.Mobiles;
+using Server.Regions;
 
 namespace Server.BotAI.V2;
 
@@ -100,6 +101,38 @@ public static class BotZones
     public static int RootedReach { get; set; } = 3;
 
     public static int ConvergeTiles { get; set; } = 20;
+
+    public static int JoinGap { get; set; } = 8;
+
+    public static int ZoneMostTiles { get; set; } = 192;
+
+    public static int StrayBeyond { get; set; } = 16;
+
+    public static int ObservedSlack { get; set; } = 8;
+
+    public static bool TownsClear { get; set; } = true;
+
+    public static int ReachBeyond { get; set; }
+
+    public static double ReachPercentile { get; set; } = 0.95;
+
+    public static int ReachLeast { get; set; } = 20;
+
+    public static int ReachHalfLifeMinutes { get; set; } = 180;
+
+    public static int SpellReach
+    {
+        get => _spellReach >= 0 ? _spellReach : Core.T2A ? 10 : 12;
+        set => _spellReach = value;
+    }
+
+    private static int _spellReach = -1;
+
+    public static int WanderMinutes { get; set; } = 10;
+
+    public static int WanderMostCells { get; set; } = 64;
+
+    public static bool Events { get; set; } = true;
 
     public static double DeadlyVsBot { get; set; } = 6.0;
 
@@ -197,6 +230,8 @@ public static class BotZones
 
     private static long _touredTick;
 
+    private static long _watchVersion = -1;
+
     private static long _startedTick;
 
     private static bool _jsonDirty = true;
@@ -258,7 +293,8 @@ public static class BotZones
             return BotZoneLevel.Clear;
         }
 
-        var v = state.Cells[cy * state.Width + cx];
+        var i = cy * state.Width + cx;
+        var v = state.Cells[i];
 
         if (v == 0)
         {
@@ -270,11 +306,29 @@ public static class BotZones
 
         if (level != BotZoneLevel.Clear)
         {
-            vsBot = (float)zone.VsBot;
-            threat = (float)zone.Threat;
+            var fight = state.Fight;
+            var here = fight != null ? fight[i] * (float)BotZoneState.FightUnit : 0f;
+
+            threat = here > 0f ? here : (float)zone.Threat;
+            vsBot = (float)(threat / Math.Max(1.0, state.RefBotPower));
         }
 
         return level;
+    }
+
+    public static float FightAt(Map map, int x, int y)
+    {
+        var state = _state;
+
+        if (state?.Fight == null || map != state.Map)
+        {
+            return 0f;
+        }
+
+        var cx = x >> BotZoneState.Shift;
+        var cy = y >> BotZoneState.Shift;
+
+        return (uint)cx >= (uint)state.Width || (uint)cy >= (uint)state.Height ? 0f : state.Fight[cy * state.Width + cx] * (float)BotZoneState.FightUnit;
     }
 
     public static BotZone ZoneAt(Map map, int x, int y)
@@ -358,6 +412,8 @@ public static class BotZones
         BotZoneScan.Open(map, now);
         BotZoneTour.Open(now);
         BotZoneMemory.Load(map);
+
+        BotZoneWatch.Load();
 
         _timer = new ZoneTimer(TimeSpan.FromMilliseconds(Math.Max(50, TickMs)));
         _timer.Start();
@@ -457,6 +513,14 @@ public static class BotZones
         }
 
         BotZoneMemory.Beat(now);
+
+        BotZoneWatch.Beat(now);
+
+        if (BotZoneWatch.Version != _watchVersion)
+        {
+            _watchVersion = BotZoneWatch.Version;
+            _jsonDirty = true;
+        }
 
         var ms = Stopwatch.GetElapsedTime(began).TotalMilliseconds;
 
@@ -576,7 +640,9 @@ public static class BotZones
             {
                 index = kinds.Count;
                 kindIndex[kind] = index;
-                kinds.Add(new BotZoneKindIn(kind.Name, kind.Power, kind.Aggressive, kind.Caster, kind.Perception, kind.Water, kind.Rooted));
+                kinds.Add(
+                    new BotZoneKindIn(kind.Name, kind.Power, kind.Aggressive, kind.Caster, kind.Perception, kind.Water, kind.Rooted, kind.Swims, kind.Strike)
+                );
             }
 
             return index;
@@ -620,6 +686,12 @@ public static class BotZones
 
             haunt.Index = haunts.Count;
 
+            if (haunt.WetAt != haunt.At)
+            {
+                haunt.WetAt = haunt.At;
+                haunt.Wet = Wet(map, haunt.At.X, haunt.At.Y);
+            }
+
             haunts.Add(
                 new BotZoneHauntIn
                 {
@@ -630,39 +702,135 @@ public static class BotZones
                     Count = haunt.Count,
                     Running = haunt.Running,
                     InTown = haunt.InTown,
+                    Wet = haunt.Wet,
                     Kinds = kindsOf,
                     Expected = expected,
                     Confidence = haunt.Confidence,
                     AwakeSeconds = haunt.AwakeSeconds,
                     Samples = haunt.Samples,
                     ObservedRange = haunt.ObservedRange,
+                    Reach = haunt.ReachAt(now),
                     LastAwake = haunt.LastAwake
                 }
             );
         }
 
         List<BotZoneLiveIn> living = [];
+        List<int> trail = [];
+        List<BotZoneEventIn> events = [];
+
+        _eventOf.Clear();
+
+        if (Events)
+        {
+            StandingEvents(map, events);
+        }
+
+        var wander = (long)Math.Max(0, WanderMinutes) * 60000L;
 
         BotHaunts.Living(
             map,
             now,
-            (c, seen) => living.Add(
-                new BotZoneLiveIn(
-                    c.X,
-                    c.Y,
-                    IndexOf(seen.Kind),
-                    seen.Haunt?.Index ?? -1,
-                    seen.Awake,
-                    seen.Power,
-                    BotHaunts.AttacksFirst(c.FightMode),
-                    c.AI == AIType.AI_Mage,
-                    c.RangePerception,
+            (c, seen) =>
+            {
+                var ev = _eventOf.Count > 0 && _eventOf.Remove(c, out var index) ? index : -1;
+                var from = trail.Count / 2;
+                var count = 0;
 
-                    c.CanSwim && (c.CantWalk || Wet(map, c.X, c.Y)),
-                    c.CantWalk && !c.CanSwim
-                )
-            )
+                if (seen.TrailCount > 0 && wander > 0)
+                {
+                    var length = seen.TrailX.Length;
+
+                    for (var k = 0; k < seen.TrailCount; k++)
+                    {
+                        var slot = ((seen.TrailHead - k) % length + length) % length;
+
+                        if (now - seen.TrailTick[slot] > wander)
+                        {
+                            break;
+                        }
+
+                        trail.Add(seen.TrailX[slot]);
+                        trail.Add(seen.TrailY[slot]);
+                        count++;
+                    }
+                }
+
+                living.Add(
+                    new BotZoneLiveIn(
+                        c.X,
+                        c.Y,
+                        IndexOf(seen.Kind),
+                        seen.Haunt?.Index ?? -1,
+                        seen.Awake,
+                        seen.Power,
+                        BotHaunts.AttacksFirst(c.FightMode),
+                        c.AI == AIType.AI_Mage,
+                        c.RangePerception,
+
+                        c.CanSwim && (c.CantWalk || Wet(map, c.X, c.Y)),
+                        c.CantWalk && !c.CanSwim,
+                        BotHaunts.StrikeOf(c),
+                        ev,
+                        from,
+                        count
+                    )
+                );
+            }
         );
+
+        foreach (var (m, ev) in _eventOf)
+        {
+            if (m is BaseCreature c)
+            {
+                var kind = BotHaunts.KindOf(c.GetType());
+
+                if (!kind.FromLife)
+                {
+                    kind.ReadFrom(c);
+                }
+
+                living.Add(
+                    new BotZoneLiveIn(
+                        c.X,
+                        c.Y,
+                        IndexOf(kind),
+                        -1,
+                        c.AIObject?.AITimer.Running == true,
+                        (float)BotThreat.Power(c),
+                        BotHaunts.AttacksFirst(c.FightMode),
+                        c.AI == AIType.AI_Mage,
+                        c.RangePerception,
+                        c.CanSwim && (c.CantWalk || Wet(map, c.X, c.Y)),
+                        c.CantWalk && !c.CanSwim,
+                        BotHaunts.StrikeOf(c),
+                        ev
+                    )
+                );
+            }
+            else
+            {
+                living.Add(
+                    new BotZoneLiveIn(
+                        m.X,
+                        m.Y,
+                        IndexOf(_bandit),
+                        -1,
+                        true,
+                        (float)BotThreat.Power(m),
+                        true,
+                        false,
+                        BaseCreature.DefaultRangePerception,
+                        false,
+                        false,
+                        0,
+                        ev
+                    )
+                );
+            }
+        }
+
+        _eventOf.Clear();
 
         List<int> cells = [];
         List<float> weightsOf = [];
@@ -718,6 +886,8 @@ public static class BotZones
             Kinds = kinds.ToArray(),
             Haunts = haunts.ToArray(),
             Live = living.ToArray(),
+            Trail = trail.ToArray(),
+            Events = events.ToArray(),
             Observed = cells.ToArray(),
             ObservedWeight = weightsOf.ToArray(),
             Deaths = deaths,
@@ -726,10 +896,63 @@ public static class BotZones
             RefBotPower = Math.Max(ReferenceFloor, Reference),
             Previous = _state,
             Buffer = BackBuffer(width * height),
+            FightBuffer = FightBackBuffer(width * height),
+            Guarded = GuardedCells(map, width, height),
             At = DateTime.Now,
             OffLoop = OffLoopNow,
             Generation = _generation
         };
+    }
+
+    private static readonly Dictionary<Mobile, int> _eventOf = [];
+
+    private static readonly BotZoneKind _bandit = new(typeof(BotMobile), "ShadowBandit") { Aggressive = true, Known = true, FromLife = true };
+
+    private static void StandingEvents(Map map, List<BotZoneEventIn> events)
+    {
+        if (BotInvasion.Now is { Over: false } raid && raid.Map == map)
+        {
+            var index = -1;
+
+            for (var i = 0; i < raid.Alive.Count; i++)
+            {
+                if (raid.Alive[i] is { Deleted: false, Alive: true } c && c.Map == map)
+                {
+                    if (index < 0)
+                    {
+                        index = events.Count;
+                        events.Add(new BotZoneEventIn($"the invasion out of {raid.From}", raid.Lair.X, raid.Lair.Y, BotInvasion.Spread));
+                    }
+
+                    _eventOf[c] = index;
+                }
+            }
+        }
+
+        if (BotRelicLair.Now is { } lair && lair.Warden is { Deleted: false, Alive: true } warden && warden.Map == map)
+        {
+            _eventOf[warden] = events.Count;
+            events.Add(new BotZoneEventIn("the relic's lair", lair.At.X, lair.At.Y, Math.Max(0, warden.RangeHome)));
+        }
+
+        if (BotHighway.Now is { Quay: true } party && party.Map == map && party.Spot != Point3D.Zero)
+        {
+            var index = -1;
+
+            for (var i = 0; i < party.Members.Count; i++)
+            {
+                if (party.Members[i] is { Deleted: false, Alive: true } bandit && bandit.Map == map)
+                {
+                    if (index < 0)
+                    {
+                        index = events.Count;
+                        events.Add(new BotZoneEventIn("The Shadow's band on the quay", party.Spot.X, party.Spot.Y, 0));
+                    }
+
+                    _eventOf[bandit] = index;
+                }
+            }
+        }
     }
 
     private static bool Wet(Map map, int x, int y)
@@ -767,6 +990,99 @@ public static class BotZones
         return new ushort[length];
     }
 
+    private static ushort[] FightBackBuffer(int length)
+    {
+        var current = _state?.Fight;
+
+        for (var b = 0; b < _fightBuffers.Length; b++)
+        {
+            if (_fightBuffers[b] == null || _fightBuffers[b].Length != length)
+            {
+                _fightBuffers[b] = new ushort[length];
+            }
+
+            if (!ReferenceEquals(_fightBuffers[b], current))
+            {
+                return _fightBuffers[b];
+            }
+        }
+
+        return new ushort[length];
+    }
+
+    private static byte[] GuardedCells(Map map, int width, int height)
+    {
+        if (!TownsClear || map == null)
+        {
+            return null;
+        }
+
+        var regions = Region.Regions;
+
+        if (_guarded != null && _guardedMap == map && _guardedRegions == regions.Count && _guarded.Length == width * height)
+        {
+            return _guarded;
+        }
+
+        var cells = new byte[width * height];
+        var marked = 0;
+
+        for (var r = 0; r < regions.Count; r++)
+        {
+            var region = regions[r];
+
+            if (region?.Map != map || region.Area == null)
+            {
+                continue;
+            }
+
+            var guarded = region.GetRegion<GuardedRegion>();
+
+            if (guarded == null || guarded.IsDisabled())
+            {
+                continue;
+            }
+
+            for (var a = 0; a < region.Area.Length; a++)
+            {
+                var box = region.Area[a];
+                var x0 = Math.Max(0, box.Start.X >> BotZoneState.Shift);
+                var y0 = Math.Max(0, box.Start.Y >> BotZoneState.Shift);
+                var x1 = Math.Min(width - 1, (box.End.X - 1) >> BotZoneState.Shift);
+                var y1 = Math.Min(height - 1, (box.End.Y - 1) >> BotZoneState.Shift);
+
+                for (var cy = y0; cy <= y1; cy++)
+                {
+                    for (var cx = x0; cx <= x1; cx++)
+                    {
+                        if (cells[cy * width + cx] == 0)
+                        {
+                            cells[cy * width + cx] = 1;
+                            marked++;
+                        }
+                    }
+                }
+            }
+        }
+
+        _guarded = cells;
+        _guardedMap = map;
+        _guardedRegions = regions.Count;
+        GuardedCellCount = marked;
+
+        return cells;
+    }
+
+    private static byte[] _guarded;
+
+    private static Map _guardedMap;
+
+    private static int _guardedRegions;
+
+    public static int GuardedCellCount { get; private set; }
+
+    private static readonly ushort[][] _fightBuffers = new ushort[2][];
+
     private static BotZoneSettings Settings() =>
         new()
         {
@@ -783,6 +1099,12 @@ public static class BotZones
             WaterCasterReach = WaterCasterReach,
             RootedReach = RootedReach,
             ConvergeTiles = ConvergeTiles,
+            JoinGap = JoinGap,
+            ZoneMostTiles = ZoneMostTiles,
+            StrayBeyond = StrayBeyond,
+            ObservedSlack = ObservedSlack,
+            ReachBeyond = Math.Max(0, ReachBeyond),
+            WanderMostCells = WanderMinutes > 0 ? Math.Max(0, WanderMostCells) : 0,
             Secondary = BotThreat.Secondary,
             DeadlyVsBot = DeadlyVsBot,
             EmptyWeight = EmptyWeight,
@@ -862,8 +1184,37 @@ public static class BotZones
             w.WriteNumber("observedCells", BotZoneRaster.Touched);
             w.WriteEndObject();
 
+            w.WriteStartObject("accuracy");
+            w.WriteNumber("landZones", state?.LandZones ?? 0);
+            w.WriteNumber("strayZones", state?.StrayZones ?? 0);
+            w.WriteNumber("paintedTiles", (long)(state?.PaintedCells ?? 0) * BotZoneState.Cell * BotZoneState.Cell);
+            w.WriteNumber("patrolTiles", (long)(state?.LandCoreCells ?? 0) * BotZoneState.Cell * BotZoneState.Cell);
+            w.WriteNumber("attackers", state?.LandAggressive ?? 0);
+            w.WriteNumber("townsInside", state?.TownsInside ?? 0);
+            w.WriteNumber("guardedKept", state?.GuardedKept ?? 0);
+
+            if (state?.Largest is { } largest)
+            {
+                w.WriteStartObject("largest");
+                w.WriteNumber("id", largest.Id);
+                w.WriteString("label", largest.Label);
+                w.WriteNumber("width", largest.X2 - largest.X1 + 1);
+                w.WriteNumber("height", largest.Y2 - largest.Y1 + 1);
+                w.WriteNumber("tiles", (long)largest.CoreCells * BotZoneState.Cell * BotZoneState.Cell);
+                w.WriteEndObject();
+            }
+            else
+            {
+                w.WriteNull("largest");
+            }
+
+            w.WriteEndObject();
+
             w.WritePropertyName("tour");
             BotZoneTour.Write(w);
+
+            w.WritePropertyName("watch");
+            BotZoneWatch.Write(w);
 
             w.WritePropertyName("zones");
 
@@ -899,15 +1250,33 @@ public static class BotZones
 
         var deaths = state == null
             ? ""
-            : $"; deaths in {DeathsWindowHours}h by where they fell: {state.DeathsDeadly} deadly, {state.DeathsHostile} hostile, {state.DeathsEdge} in a fringe, {state.DeathsClear} on clear ground ({DeathsHeard} heard since the start)";
+            : $"; deaths in {DeathsWindowHours}h by where they fell: {state.DeathsDeadly} deadly, {state.DeathsHostile} hostile, {state.DeathsEdge} in a fringe, {state.DeathsClear} on clear ground ({DeathsHeard} heard since the start); {BotZoneWatch.Summary()}";
 
         var build = Builds == 0
             ? "no build yet"
             : $"gather {GatherMs:F1}ms on the loop (last), build {BuildMsTotal / Builds:F1}ms average and {BuildMsWorst:F1}ms worst ({state?.Phases}, the last); {InlineMsTotal:F0}ms of builds ran inline on the loop";
 
-        return $"{zones}{deaths}. {BotHaunts.Describe()}. The sweep: {BotZoneScan.Describe()}. Observed: {BotZoneRaster.Touched} cells hold awake sightings ({BotZoneRaster.Recorded} recorded), {state?.ObservedCells ?? 0} of them patrol. "
+        return $"{zones}{deaths}. {Accuracy(state)}. {BotHaunts.Describe()}. The sweep: {BotZoneScan.Describe()}. Observed: {BotZoneRaster.Touched} cells hold awake sightings ({BotZoneRaster.Recorded} recorded), {state?.ObservedCells ?? 0} of them patrol. "
             + $"The tour: {BotZoneTour.Describe()}. The loop: {Ticks} beats, {(Ticks == 0 ? 0 : SpentMs / Ticks):F3}ms a beat, {WorstTickMs:F1}ms worst, {SpentMs:F0}ms in all (the tour {TourSpentMs:F0}ms); {build}. "
-            + $"JSON {JsonBytes / 1024}KB, written {JsonWrites} times in {(JsonWrites == 0 ? 0 : JsonMsTotal / JsonWrites):F2}ms each. {BotZoneMemory.Describe()}";
+            + $"JSON {JsonBytes / 1024}KB, written {JsonWrites} times in {(JsonWrites == 0 ? 0 : JsonMsTotal / JsonWrites):F2}ms each. {BotZoneMemory.Describe()} {BotZoneWatch.Describe()}";
+    }
+
+    public static string Accuracy(BotZoneState state)
+    {
+        if (state == null)
+        {
+            return "Accuracy: no map yet";
+        }
+
+        var tiles = BotZoneState.Cell * BotZoneState.Cell;
+        var painted = (long)state.PaintedCells * tiles;
+        var patrol = (long)state.LandCoreCells * tiles;
+        var perThousand = patrol > 0 ? state.LandAggressive * 1000.0 / patrol : 0.0;
+        var largest = state.Largest == null
+            ? "none"
+            : $"#{state.Largest.Id} {state.Largest.Label} at {state.Largest.X2 - state.Largest.X1 + 1}×{state.Largest.Y2 - state.Largest.Y1 + 1} tiles ({(long)state.Largest.CoreCells * tiles / 1000}k of patrol, {state.Largest.Haunts} spawners, fight {state.Largest.Threat:F0})";
+
+        return $"Accuracy: {state.LandZones} zones of the land's attackers ({state.StrayZones} of wanderers) paint {painted / 1000}k tiles as patrol or fringe ({patrol / 1000}k of patrol); the largest {largest}; {state.LandAggressive} attackers alive, {perThousand:F2} a thousand tiles of patrol; {state.TownsInside} town squares under a patrol or fringe; {state.GuardedKept} guarded cells kept clear of {GuardedCellCount}; {state.GrownHaunts} spawners' patrols grown past their declaration on what was seen (at most {ReachBeyond} tiles), {state.TrailCells} cells painted along wanderers' trails, {state.EventZones} event zones";
     }
 
     private static int Emptied(BotZoneState state)
@@ -955,7 +1324,7 @@ public static class BotZones
             lines.Add($"#{z.Id} {Word(z.Level)} ×{z.VsBot:F1} at ({z.CenterX}, {z.CenterY}) — {z.Label}: {z.Aggressive} of {z.Live} alive attack, confidence {z.Confidence:F2}, {z.Deaths} deaths");
         }
 
-        return $"{state.Zones.Length} zones: {state.Clear} clear, {state.Hostile} hostile, {state.Deadly} deadly ({state.WaterZones} at sea); the median bot {state.RefBotPower:F0}. The strongest: {string.Join("; ", lines)}. The tour: {BotZoneTour.Describe()}.";
+        return $"{state.Zones.Length} zones: {state.Clear} clear, {state.Hostile} hostile, {state.Deadly} deadly ({state.WaterZones} at sea); the median bot {state.RefBotPower:F0}. The strongest: {string.Join("; ", lines)}. The tour: {BotZoneTour.Describe()}. {BotZoneWatch.Describe()}";
     }
 
     public static string TellAt(int x, int y)
@@ -987,10 +1356,12 @@ public static class BotZones
         }
 
         var last = zone.LastSeen == DateTime.MinValue ? "never" : zone.LastSeen.ToLocalTime().ToString("HH:mm:ss");
+        var here = FightAt(map, x, y);
 
         return $"({x}, {y}) is {Word(level)}: {(level == BotZoneLevel.Edge ? "in the aggro fringe of" : "inside")} zone #{zone.Id}, {Word(zone.Level)} — {zone.Label}. {zone.Why}. "
             + $"{zone.Live} alive of {zone.Max} kept: {string.Join(", ", kinds)}{(zone.OtherKinds > 0 ? $" and {zone.OtherKinds} more kinds" : "")}. "
-            + $"Threat {zone.Threat:F0} (worst {zone.Worst:F0}, all {zone.PowerTotal:F0}) = ×{zone.VsBot:F2} the median bot's {state.RefBotPower:F0}. "
+            + $"The fight at this tile {here:F0} (what can close on a walker here; the spawners promise {zone.Declared:F0} at one place). "
+            + $"Threat {zone.Threat:F0} at the zone's worst place (worst creature {zone.Worst:F0}, all {zone.PowerTotal:F0}) = ×{zone.VsBot:F2} the median bot's {state.RefBotPower:F0}. "
             + $"Patrol declared {zone.DeclaredRange} tiles, observed {zone.ObservedRange}, aggro reach {zone.AggroRange}; {zone.CoreCells} cells of patrol and {zone.AggroCells} of reach. "
             + $"Confidence {zone.Confidence:F2}: {zone.Samples} awake sightings over {zone.AwakeSeconds:F0}s, last {last}; this cell's sightings weigh {seen:F2}. {zone.Deaths} bots killed here in {DeathsWindowHours}h; {zone.Haunts} spawners feed it; the tour stands at ({zone.Stand.X}, {zone.Stand.Y}).";
     }
@@ -1000,6 +1371,8 @@ public static class BotZones
         Stop();
         BotZoneTour.Forget(Core.TickCount);
         BotZoneMemory.Save();
+
+        BotZoneWatch.Save();
         BotHaunts.Forget();
         BotZoneRaster.Forget();
         BotZoneScan.Forget();
@@ -1008,6 +1381,10 @@ public static class BotZones
         _page = new BotZonePage(Empty(), "\"z0\"");
         _buffers[0] = null;
         _buffers[1] = null;
+        _fightBuffers[0] = null;
+        _fightBuffers[1] = null;
+        _guarded = null;
+        _guardedMap = null;
         _deaths.Clear();
         Map = null;
         Builds = BuildsOffLoop = BuildFailures = 0;

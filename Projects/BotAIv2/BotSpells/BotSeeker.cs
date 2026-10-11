@@ -65,10 +65,15 @@ public sealed class BotSeeker : IBotProposer
             return null;
         }
 
-        var kind = BotGrimoire.ScrollFor(spell);
-        var want = BotAuction.Wanted(bot, kind);
+        if (spell == BotRaise.Spell && BotRaise.KeepsScroll(body))
+        {
+            return null;
+        }
 
-        if (want is { Waiting: > 0 } || BotQuill.Held(body, kind) > 0)
+        var kind = BotGrimoire.ScrollFor(spell);
+        var want = BotMarket.Wanted(bot, kind);
+
+        if (BotQuill.Held(body, kind) > 0)
         {
             return BotAcquire.Delivery(kind, spell, map, body.Location);
         }
@@ -77,11 +82,11 @@ public sealed class BotSeeker : IBotProposer
 
         var shop = BotShops.Nearest(bot, kind);
         var counter = shop == null ? 0 : BotShops.Price(shop, kind);
-        var stall = BotAuction.Cheapest(kind, bot);
+        var front = BotShopkeep.Best(bot, kind, 1, out var ask, out _, out var landed);
 
-        if (stall != null && (counter <= 0 || stall.Price <= counter))
+        if (front != null && (counter <= 0 || landed <= counter))
         {
-            return BotAcquire.Stalled(kind, spell, stall, map, body.Location);
+            return BotAcquire.AtShop(kind, spell, front, ask);
         }
 
         if (counter > 0)
@@ -94,7 +99,14 @@ public sealed class BotSeeker : IBotProposer
             return null;
         }
 
-        var offer = BotAuction.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
+        if (BotQuill.OwnPen(bot, kind))
+        {
+            BotScribes.LeftToPen(body, kind);
+
+            return null;
+        }
+
+        var offer = BotMarket.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
 
         return BotAcquire.Board(kind, spell, map, body.Location, offer);
     }

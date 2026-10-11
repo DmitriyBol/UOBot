@@ -111,7 +111,7 @@ public sealed class BotBake : BotDeed
 
     public override Point3D Where => _where;
 
-    public override double Expects => Prior;
+    public override double Expects => BotGlut.Claim(_meal, Prior);
 
     public override double Minutes => WorkMinutes;
 
@@ -121,7 +121,7 @@ public sealed class BotBake : BotDeed
 
     public override double Coin => 0.0;
 
-    public override int Made => _cooked * BotOven.Worth;
+    public override int Made => BotGlut.Yield(_meal, _cooked, BotOven.Worth);
 
     public override string Stage =>
         _served
@@ -324,26 +324,18 @@ public sealed class BotBake : BotDeed
                     keep = 0;
                 }
 
-                var want = BotAuction.Demand(bot, _meal);
-                var sold = want == null ? 0 : BotAuction.Fill(bot, want, stack);
+                var held2 = Math.Max(1, stack.Amount);
+                var want = BotMarket.Demand(bot, _meal);
+                var answer = want == null ? 0 : Math.Min(held2, Math.Max(0, want.Payable - ordered));
 
-                if (sold > 0)
-                {
-                    ordered += sold;
-
-                    continue;
-                }
-
-                if (BotAuction.List(bot, stack, BotAuction.Worth(_meal, BotOven.Worth)) != null)
-                {
-                    listed++;
-                }
+                ordered += answer;
+                listed += held2 - answer;
             }
         }
 
         Once(body, _meal);
 
-        return BotDoing.Done($"{_cooked} cooked in {_swings} swings, {ordered} to order and {listed} put out to sell");
+        return BotDoing.Done($"{_cooked} cooked in {_swings} swings, {ordered} for somebody's want and {listed} kept to sell");
     }
 
     private static bool _said;

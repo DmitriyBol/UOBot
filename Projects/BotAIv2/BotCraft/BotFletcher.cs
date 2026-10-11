@@ -58,8 +58,6 @@ public sealed class BotFletcher : IBotProposer
 
     public static int LeastFeathers { get; set; } = 5;
 
-    public static long OffStall { get; private set; }
-
     public static long Poor { get; private set; }
 
     public static int CallMs { get; set; } = 600000;
@@ -111,93 +109,57 @@ public sealed class BotFletcher : IBotProposer
             return null;
         }
 
-        if (BotFletching.Feathers(body) <= 0)
+        if (BotFletching.Feathers(body) < LeastFeathers)
         {
-            BotAuction.Reclaim(bot, typeof(Feather));
+            BotMarket.FromBank(bot, typeof(Feather), BotFletching.LeastArrows);
         }
 
         var feathers = BotFletching.Feathers(body);
-        var plumes = 0;
-        var plumePrice = 0;
 
         if (feathers <= 0)
         {
-            var stock = BotAuction.Cheapest(typeof(Feather), bot);
+            NoFeathers++;
+            _starved = true;
+            _starvedAt = Core.TickCount;
 
-            if (stock is not { IsEmpty: false } || stock.Amount < LeastFeathers)
+            if (Order(bot) != null)
             {
-                NoFeathers++;
-                _starved = true;
-                _starvedAt = Core.TickCount;
+                Unfilled++;
 
-                if (Order() != null)
-                {
-                    Unfilled++;
-                }
-
-                return null;
+                BotCraftFirst.Short(body, typeof(Feather), Math.Max(LeastFeathers, BotFletching.LeastArrows));
             }
 
-            plumes = Math.Min(stock.Amount, BotFletching.LeastArrows);
-            plumePrice = Math.Max(1, stock.Price);
+            return null;
         }
 
-        var order = Order();
+        var order = Order(bot);
 
-        if (plumes == 0 && BotFletching.Possible(body) >= BotFletching.LeastArrows)
+        if (BotFletching.Possible(body) >= BotFletching.LeastArrows)
         {
             Once(body, feathers);
 
             if (order != null)
             {
                 ToOrder++;
+                order.Offered();
 
                 return new BotFletch(map, body.Location, null, 0, 0, order);
             }
 
             OnSpec++;
+            BotGlut.Spec(typeof(Arrow));
 
             return new BotFletch(map, body.Location, null, 0, 0);
         }
 
         BotShops.Survey(map, body.Location);
 
-        var held = feathers + plumes;
-        var wooded = BotFletching.Shafts(body) + BotFletching.Logs(body) >= Math.Min(held, BotFletching.LeastArrows);
-
-        if (plumes > 0 && wooded)
-        {
-            var bill = plumes * plumePrice;
-
-            if (BotYield.Wealth(body) < bill)
-            {
-                Poor++;
-
-                return null;
-            }
-
-            OffStall++;
-            Once(body, held);
-
-            if (order != null)
-            {
-                ToOrder++;
-
-                return new BotFletch(map, body.Location, null, 0, 0, order, plumes, plumePrice);
-            }
-
-            OnSpec++;
-
-            return new BotFletch(map, body.Location, null, 0, 0, null, plumes, plumePrice);
-        }
+        var held = feathers;
 
         var shop = BotShops.Nearest(bot, typeof(Log));
         var price = shop == null ? 0 : BotShops.Price(shop, typeof(Log));
 
-        var lot = BotAuction.Cheapest(typeof(Log), bot);
-        var lotted = lot is { IsEmpty: false };
-
-        if (!lotted && price <= 0)
+        if (price <= 0)
         {
             NoWood++;
             _woodless = true;
@@ -208,17 +170,12 @@ public sealed class BotFletcher : IBotProposer
                 _saidNoWood = true;
 
                 logger.Error(
-                    "No shopkeeper within reach of the bots on {Map} sells wood and no bot has any on a stall, so no arrows can be made",
+                    "No shopkeeper within reach of the bots on {Map} sells wood, so arrows wait for a woodcutter's logs brought by hand",
                     map
                 );
             }
 
             return null;
-        }
-
-        if (lotted && (price <= 0 || lot.Price < price))
-        {
-            price = lot.Price;
         }
 
         var take = Math.Max(BotFletching.LeastArrows, held) - BotFletching.Shafts(body) - BotFletching.Logs(body);
@@ -228,16 +185,11 @@ public sealed class BotFletcher : IBotProposer
             take = BotFletching.LeastArrows;
         }
 
-        if (plumes > 0)
+        if (BotYield.Spendable(body) < take * price)
         {
-            if (BotYield.Wealth(body) < take * price + plumes * plumePrice)
-            {
-                Poor++;
+            Poor++;
 
-                return null;
-            }
-
-            OffStall++;
+            return null;
         }
 
         Once(body, held);
@@ -245,18 +197,20 @@ public sealed class BotFletcher : IBotProposer
         if (order != null)
         {
             ToOrder++;
+            order.Offered();
 
-            return new BotFletch(map, body.Location, shop, price, take, order, plumes, plumePrice);
+            return new BotFletch(map, body.Location, shop, price, take, order);
         }
 
         OnSpec++;
+        BotGlut.Spec(typeof(Arrow));
 
-        return new BotFletch(map, body.Location, shop, price, take, null, plumes, plumePrice);
+        return new BotFletch(map, body.Location, shop, price, take, null);
     }
 
-    private static BotWant Order()
+    private static BotWant Order(IBotWilful bot)
     {
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
 
         BotWant best = null;
         var bestWorth = 0;
@@ -266,6 +220,11 @@ public sealed class BotFletcher : IBotProposer
             var want = wants[i];
 
             if (!want.IsOpen || want.Kind != typeof(Arrow) || want.Worth <= bestWorth)
+            {
+                continue;
+            }
+
+            if (!BotCourier.Answerable(bot, want) || BotCourier.Holding(bot, want))
             {
                 continue;
             }
@@ -296,7 +255,7 @@ public sealed class BotFletcher : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody has been offered fletching ({NoKit} answers went to bots with no tool)"
-            : $"{Asked} asked to fletch: {ToOrder} took an order off the board, {OnSpec} made some on spec ({OffStall} of them buying their feathers off a stall, {BotFletch.PlumesBought} feathers bought so), {NoFeathers} had no feathers and found fewer than {LeastFeathers} on any stall, {Poor} could not pay for the feathers and wood, {NoWood} could not find wood; {Unfilled} times a fletcher with no feathers looked at an arrow order it could not fill; "
+            : $"{Asked} asked to fletch: {ToOrder} took an order off the board, {OnSpec} made some on spec, {NoFeathers} had no feathers and waited for a carrier to bring some, {Poor} could not pay for the wood, {NoWood} could not find wood; {Unfilled} times a fletcher with no feathers looked at an arrow order it could not fill; "
               + $"{BotFletching.Spared} stacks of feathers kept back off a corpse against {BotFletching.Sold} sold on past the cap of {BotFletching.Keeps}";
 
     public static void Forget()
@@ -309,7 +268,6 @@ public sealed class BotFletcher : IBotProposer
         ToOrder = 0;
         OnSpec = 0;
         Unfilled = 0;
-        OffStall = 0;
         Poor = 0;
         _starved = false;
         _woodless = false;

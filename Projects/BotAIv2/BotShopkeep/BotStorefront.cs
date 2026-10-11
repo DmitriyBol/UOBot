@@ -7,7 +7,7 @@ namespace Server.BotAI.V2;
 /// One bot's shop while it is open: who keeps it, where it stands, what it holds and at what price, and what it has taken.
 ///
 /// <para>
-/// <b>A snapshot, not the goods.</b> Unlike a stall on <c>BotAuction</c>, nothing here is lifted out of the world: the
+/// <b>A snapshot, not the goods.</b> Unlike a stall on the auction that was, nothing here is lifted out of the world: the
 /// goods stay in the keeper's own pack and bank box, where the engine keeps them and a save keeps them, and they move to a
 /// customer only at the till (<see cref="BotShopkeep.Serve"/>). What this holds is the keeper's last count of them, taken
 /// every <see cref="BotShopkeep.StockMs"/> and cut down at every sale, so that a customer deciding whether the walk is

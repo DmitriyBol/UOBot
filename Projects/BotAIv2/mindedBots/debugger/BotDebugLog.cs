@@ -69,6 +69,14 @@ public static class BotDebugLog
 
     public static void Write(string line)
     {
+        try
+        {
+            BotDebugWeb.Heard(line);
+        }
+        catch
+        {
+        }
+
         if (_broken || _path == null || line == null)
         {
             return;

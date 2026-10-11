@@ -792,7 +792,8 @@ public static class BotQuad
                 continue;
             }
 
-            if (mobile is IBotAlly { AbleToFight: true } && mobile is { Deleted: false, Alive: true })
+            if (mobile is IBotAlly { AbleToFight: true } && mobile is { Deleted: false, Alive: true }
+                && (mobile is not IBotWilful wilful || BotSquads.Pressable(wilful)))
             {
                 _powers.Add(BotThreat.Power(mobile));
             }
@@ -800,7 +801,7 @@ public static class BotQuad
 
         _powers.Sort();
 
-        for (int i = _powers.Count - 1, taken = 0; i >= 0 && taken < BotSquad.MaxSize - 1; i--, taken++)
+        for (int i = _powers.Count - 1, taken = 0; i >= 0 && taken < BotSquad.Usual - 1; i--, taken++)
         {
             strength += _powers[i];
         }
@@ -1046,6 +1047,11 @@ public static class BotQuad
         quad.Tick = Core.TickCount;
         quad.DiedTick = Core.TickCount;
 
+        if (quad.HarrowedTick != 0 && Core.TickCount - quad.HarrowedTick < AfterMs)
+        {
+            DiedAfterClearing++;
+        }
+
         quad.Towards = 0;
         quad.Reaping = 0;
 
@@ -1062,6 +1068,10 @@ public static class BotQuad
     }
 
     public static void Fell(Map map, Point3D where) => Fell(map, where, DeathWorth);
+
+    public static int AfterMs { get; set; } = 3600000;
+
+    public static long DiedAfterClearing { get; private set; }
 
     public static void Cleared(Quad quad)
     {
@@ -1374,7 +1384,7 @@ public static class BotQuad
             + $"({Hushed} shut and {Roused} reopened since the shard came up, which is the direction rather than the level) "
                + $"(above {TooQuiet:F2}), {wanted} worth going to (at or below {Wanted:F2}), {dire} dire (at or below {Dire:F2}) of which {damned} damned by a company being lost in them; "
                + $"worst is {worst}; {Discovered} first set foot in, {Credited} raised for crossings, "
-               + $"{Marked} marked for blows, {Mourned} for a death ({ToBots} deaths at the hand of a bot left off the ground), {Cleansed} harrowed, {Sweeps} swept by rangers, {Wiped} took a whole company, {Rebuffs} drove one off with its leader, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough, {Walled} born safe inside the walls, {Yielded} times a hunter was pointed at a square for what walks there, {Resurveys} scouts sent back to ground uncounted for {StaleMs / 3600000} hours, {Dreaded} crossings and harvests that earned nothing within {DreadMs / 3600000} hours of a death";
+               + $"{Marked} marked for blows, {Mourned} for a death ({ToBots} deaths at the hand of a bot left off the ground), {Cleansed} harrowed ({DiedAfterClearing} deaths on a square within {AfterMs / 60000} minutes of its clearing), {Sweeps} swept by rangers, {Wiped} took a whole company, {Rebuffs} drove one off with its leader, {Baulked} rested because nobody could get near them, {Reaped} credited for undisturbed harvests, {Counted} counts of what lives in a square over {Looks} sweeps, {Feared} refused to somebody not strong enough, {Walled} born safe inside the walls, {Yielded} times a hunter was pointed at a square for what walks there, {Resurveys} scouts sent back to ground uncounted for {StaleMs / 3600000} hours, {Dreaded} crossings and harvests that earned nothing within {DreadMs / 3600000} hours of a death";
     }
 
     public static void Restore(

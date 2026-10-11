@@ -55,6 +55,31 @@ public static class BotRevel
 
     public static long Collected { get; private set; }
 
+    public static long Lent { get; private set; }
+
+    public static long Repaid { get; private set; }
+
+    public static int Lend(int gold)
+    {
+        var given = Math.Clamp(gold, 0, Math.Max(0, Purse));
+
+        Purse -= given;
+        Lent += given;
+
+        return given;
+    }
+
+    public static void Repay(int gold)
+    {
+        if (gold <= 0)
+        {
+            return;
+        }
+
+        Purse += gold;
+        Repaid += gold;
+    }
+
     public static long Bands { get; private set; }
 
     public static int MostPrize { get; set; } = 1200;
@@ -82,6 +107,11 @@ public static class BotRevel
     public static string Said { get; private set; }
 
     public static Point3D Where { get; private set; }
+
+    public static BotVenues.Venue Venue { get; private set; }
+
+    private static string Capital(string text) =>
+        string.IsNullOrEmpty(text) ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
     public static int NearestCamp { get; set; } = 30;
 
@@ -114,6 +144,11 @@ public static class BotRevel
     private static readonly Dictionary<string, (int Declared, int Entrants, int Paid)> _ledger = [];
 
     public static bool Running => Kind != null && Core.TickCount - _startedTick < HoldsMs;
+
+    public static string Current() =>
+        !Running
+            ? null
+            : $"a revel for {Kind}: ×{Bonus} for {Math.Max(0, HoldsMs - (Core.TickCount - _startedTick)) / 60000} more minutes, prize {Prize}gp, {Venue?.Phrase ?? "at"} ({Where.X}, {Where.Y}){(Pitched ? ", the camp pitched" : "")}";
 
     public static double Worth(string kind) =>
         Running && string.Equals(kind, Kind, StringComparison.OrdinalIgnoreCase) ? Bonus : 1.0;
@@ -193,7 +228,7 @@ public static class BotRevel
         );
     }
 
-    public static string Declare(string kind, int prize, string say, string why, bool camp, Point3D where)
+    public static string Declare(string kind, int prize, string say, string why, bool camp, Point3D where, bool exact = false)
     {
         if (string.IsNullOrWhiteSpace(kind))
         {
@@ -233,58 +268,79 @@ public static class BotRevel
         _ledger[Kind] = (seen.Declared + 1, seen.Entrants, seen.Paid);
 
         Ground = BotPopulation.Home ?? map;
-        Where = BotPopulation.Where;
         Pitched = false;
 
-        var raised = "";
+        var field = camp || BotWaves.IsHunt(Kind);
+        BotVenues.Venue venue = null;
 
-        if (camp)
+        if (camp && !exact && !BotVenues.Running)
         {
-            var at = Ring(Where, where == Point3D.Zero ? Where : where);
-
             if (where != Point3D.Zero)
             {
                 Placed++;
             }
 
-            if (Footing(map, at, out var pitchAt, out var z))
+            venue = BotVenues.Exact(BotVenues.Use.Field, Ground, Ring(BotPopulation.Where, where == Point3D.Zero ? BotPopulation.Where : where));
+        }
+        else if (camp && where != Point3D.Zero)
+        {
+            Placed++;
+            venue = exact ? BotVenues.Exact(BotVenues.Use.Field, Ground, where) : BotVenues.Accept(Ground, where);
+
+            if (venue == null)
             {
-                at = pitchAt;
-
-                var pitch = new OrcCamp();
-
-                pitch.MoveToWorld(new Point3D(at.X, at.Y, z), map);
-                pitch.DecayDelay = TimeSpan.FromMilliseconds(HoldsMs);
-                Camps++;
-
-                Where = new Point3D(at.X, at.Y, z);
-                Pitched = true;
-
-                raised = $" A camp stands at ({at.X}, {at.Y}).";
+                Hauled++;
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(say))
+        venue ??= BotVenues.Choose(field ? BotVenues.Use.Field : BotVenues.Use.Feast, Ground);
+        Venue = venue;
+        Where = venue.At;
+
+        var raised = "";
+
+        if (camp)
         {
-            body.Say(say.Length > 180 ? say[..180] : say);
+            if (Footing(Ground, Where, out var pitchAt, out var z))
+            {
+                var pitch = new OrcCamp();
+
+                pitch.MoveToWorld(new Point3D(pitchAt.X, pitchAt.Y, z), Ground);
+                pitch.DecayDelay = TimeSpan.FromMilliseconds(HoldsMs);
+                Camps++;
+
+                Where = new Point3D(pitchAt.X, pitchAt.Y, z);
+                BotVenues.Moved(venue, Where);
+                Pitched = true;
+
+                raised = $" A camp stands at ({pitchAt.X}, {pitchAt.Y}), {venue.Phrase}.";
+            }
         }
 
+        BotVenues.Herald(venue, BotVenues.HeraldHoldMs);
+        BotVenues.Announce(
+            $"{Capital(venue.Phrase)}: {(string.IsNullOrWhiteSpace(say) ? $"a {Kind} revel, worth ×{Bonus} for {HoldsMs / 60000} minutes, {Prize}gp to whoever does most." : say.Trim())}"
+        );
+
         logger.Information(
-            "A revel is declared: {Kind} is worth ×{Bonus} for {Minutes} minutes, prize {Prize}gp — {Why}{Raised}",
+            "A revel is declared: {Kind} is worth ×{Bonus} for {Minutes} minutes, prize {Prize}gp, held {Venue} ({X},{Y}) — {Why}{Raised}",
             Kind,
             Bonus,
             HoldsMs / 60000,
             Prize,
+            venue.Phrase,
+            Where.X,
+            Where.Y,
             Why,
             raised
         );
 
         BotDebugLog.Rule();
-        BotDebugLog.Write($"REVEL: {Kind} ×{Bonus} for {HoldsMs / 60000} minutes, prize {Prize}gp");
+        BotDebugLog.Write($"REVEL: {Kind} ×{Bonus} for {HoldsMs / 60000} minutes, prize {Prize}gp, {venue.Phrase} ({Where.X}, {Where.Y})");
         BotDebugLog.Block("  because:", Why ?? "no reason given");
         BotDebugLog.Rule();
 
-        return $"declared: {Kind} is worth ×{Bonus} for {HoldsMs / 60000} minutes, prize {Prize}gp.{raised}";
+        return $"declared: {Kind} is worth ×{Bonus} for {HoldsMs / 60000} minutes, prize {Prize}gp, held {venue.Phrase} ({Where.X}, {Where.Y}).{raised}";
     }
 
     public static void Settle()
@@ -619,9 +675,9 @@ public static class BotRevel
             ? $"no revels have been declared; the crown holds {Purse}gp"
             : $"{Declared} revels declared, {Won} won and {Ignored} ignored, {Bands} of them by a whole band; "
             + $"{Paid}gp paid out and {Collected}gp taken in tax, the crown holding {Purse}gp; "
-            + $"{Camps} camps raised for them ({Placed} on a spot the watcher chose, {Hauled} of those pulled back into the ring, "
+            + $"{Camps} camps raised for them ({Placed} on a spot the watcher chose, {Hauled} of those moved to a fitting place, "
             + $"{Inland} moved off the water, {Awash} refused for standing in it, {Walled} refused for standing in a town, {Unpitched} that found no ground to stand on)"
-            + (Running ? $"; running now: {Kind} at ×{Bonus} for {Prize}gp" : "");
+            + (Running ? $"; running now: {Kind} at ×{Bonus} for {Prize}gp, {Venue?.Phrase ?? "at home"}" : "");
 
     public static void Forget()
     {
@@ -630,6 +686,7 @@ public static class BotRevel
         Why = null;
         Said = null;
         Where = Point3D.Zero;
+        Venue = null;
         Ground = null;
         Pitched = false;
         _past.Clear();
@@ -828,12 +885,11 @@ public static class BotRevel
         + "of gold to whoever does most of it. You are looking at the population's own numbers. Choose work "
         + "that is being neglected, or that the island is short of, or that would put the bots somewhere "
         + "interesting — and set 'camp' true when you want an orc camp raised for them to fight over. "
-        + $"When you raise a camp you also choose where it stands. The population lives at "
-        + $"({BotPopulation.Where.X}, {BotPopulation.Where.Y}); give 'x' and 'y' for the camp as map "
-        + $"coordinates between {NearestCamp} and {FurthestCamp} tiles from that point — closer than that "
-        + "and it is not somewhere to go, further and nobody will walk to it. Your direction is always "
-        + "kept; only a distance outside those bounds is corrected, and being corrected is a sign you have "
-        + "misjudged the scale. Leave x and y out to have it pitched beside the population. "
+        + "When you raise a camp you may also choose where it stands: give 'x' and 'y' as map coordinates in the "
+        + "countryside, out of town, near where bots are working. A spot on dangerous or deadly ground, on ground no "
+        + "walk reaches, with no bot near it, or close to one of the last few places an event was held is moved to a "
+        + "fitting place, and being moved is a sign you have misjudged the map. Leave x and y out to have a fitting "
+        + "place chosen for you; a revel of a trade is called in a town square chosen the same way. "
         + "Answer 'nothing' when the shard is busy and healthy and needs no prodding; that is a good answer "
         + "and you should give it often. 'say' is what you shout to the island, in the voice of a herald. "
         + "'why' is your reasoning, for the log. 'kind' must be exactly one of: "

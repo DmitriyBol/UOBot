@@ -44,6 +44,18 @@ public sealed class BotMendSettings
     public double? FleeBearable { get; set; }
 
     public double? FleeExpects { get; set; }
+
+    public bool? FleeToTown { get; set; }
+
+    public int? FleeTownReach { get; set; }
+
+    public int? FleeTownSeconds { get; set; }
+
+    public int? FleeTownNear { get; set; }
+
+    public int? FleeTownMs { get; set; }
+
+    public bool? FleeHoldsSwing { get; set; }
 }
 
 /// <summary>Reads the mending file and moves the numbers it names.</summary>
@@ -90,5 +102,12 @@ public static class BotMendConfig
         BotBolt.Prior = settings.FleeExpects ?? BotBolt.Prior;
 
         BotFugitive.Bearable = settings.FleeBearable ?? BotFugitive.Bearable;
+
+        BotHaven.Running = settings.FleeToTown ?? BotHaven.Running;
+        BotHaven.Reach = settings.FleeTownReach ?? BotHaven.Reach;
+        BotHaven.MostSeconds = settings.FleeTownSeconds ?? BotHaven.MostSeconds;
+        BotHaven.NearTiles = settings.FleeTownNear ?? BotHaven.NearTiles;
+        BotBolt.HavenMs = settings.FleeTownMs ?? BotBolt.HavenMs;
+        BotBolt.HoldsSwing = settings.FleeHoldsSwing ?? BotBolt.HoldsSwing;
     }
 }

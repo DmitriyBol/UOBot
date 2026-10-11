@@ -87,17 +87,16 @@ public static class BotGround
             return 0;
         }
 
-        var found = Survey(map, Lode);
+        Survey(map, Lode);
 
         logger.Information(
-            "Prospected the lode at ({X}, {Y}): {Found} seams, and now {Total} on the board",
+            "The lode at ({X}, {Y}) is queued to be swept; {Total} seams on the board before it",
             Lode.X,
             Lode.Y,
-            found,
             _seams.Count
         );
 
-        return found;
+        return 0;
     }
 
     public static int PlaceSpacing { get; set; } = 12;
@@ -113,6 +112,8 @@ public static class BotGround
     public static double MineOdds { get; set; } = 1.5;
 
     public static long Outmuscled { get; private set; }
+
+    public static long RoadOutmuscled { get; private set; }
 
     public static long SeamsUnfooted { get; private set; }
 
@@ -216,18 +217,18 @@ public static class BotGround
         return false;
     }
 
-    public static int Survey(Map map, Point3D around)
+    public static void Survey(Map map, Point3D around)
     {
         if (map == null || map == Map.Internal || Surveyed(map, around))
         {
-            return 0;
+            return;
         }
 
         if (BotDungeon.Under(around))
         {
             Underground++;
 
-            return 0;
+            return;
         }
 
         if (_surveyed.Count >= MaxSurveys)
@@ -242,70 +243,172 @@ public static class BotGround
                 );
             }
 
-            return 0;
+            return;
         }
 
         _surveyed.Add((map, around));
+        _pending.Add((map, around));
+    }
 
-        var clock = Stopwatch.StartNew();
-        var system = Mining.System;
+    public static double SliceMs { get; set; } = 6.0;
 
-        var seams = 0;
-        var fires = 0;
-        var hearths = 0;
+    public static long Slices { get; private set; }
 
-        for (var x = around.X - Reach; x <= around.X + Reach; x++)
+    public static double SweptMs { get; private set; }
+
+    public static double SliceWorstMs { get; private set; }
+
+    private static readonly List<(Map Map, Point3D Around)> _pending = [];
+
+    private static bool _sweeping;
+
+    private static Map _sweepMap;
+
+    private static Point3D _sweepAround;
+
+    private static int _sweepX;
+
+    private static int _sweepSeams;
+
+    private static int _sweepFires;
+
+    private static int _sweepHearths;
+
+    private static int _sweepSlices;
+
+    private static double _sweepMs;
+
+    public static bool Sweeping(Map map, Point3D around)
+    {
+        if (map == null)
         {
-            if (x < 0 || x >= map.Width)
+            return false;
+        }
+
+        if (_sweeping && _sweepMap == map && Utility.InRange(_sweepAround, around, Reach / 2))
+        {
+            return true;
+        }
+
+        for (var i = 0; i < _pending.Count; i++)
+        {
+            if (_pending[i].Map == map && Utility.InRange(_pending[i].Around, around, Reach / 2))
             {
-                continue;
-            }
-
-            for (var y = around.Y - Reach; y <= around.Y + Reach; y++)
-            {
-                if (y < 0 || y >= map.Height)
-                {
-                    continue;
-                }
-
-                if (NoteFire(map, x, y))
-                {
-                    fires++;
-                }
-
-                if (NoteHearth(map, x, y))
-                {
-                    hearths++;
-                }
-
-                if (system == null || x % Stride != 0 || y % Stride != 0)
-                {
-                    continue;
-                }
-
-                if (NoteSeam(map, x, y, system))
-                {
-                    seams++;
-                }
+                return true;
             }
         }
 
-        fires += NoteItemFires(map, around);
-        hearths += NoteItemHearths(map, around);
+        return false;
+    }
+
+    public static void Sweep()
+    {
+        if (!_sweeping)
+        {
+            if (_pending.Count == 0)
+            {
+                return;
+            }
+
+            (_sweepMap, _sweepAround) = _pending[0];
+            _pending.RemoveAt(0);
+
+            if (_sweepMap == null || _sweepMap == Map.Internal)
+            {
+                return;
+            }
+
+            _sweeping = true;
+            _sweepX = _sweepAround.X - Reach;
+            _sweepSeams = 0;
+            _sweepFires = 0;
+            _sweepHearths = 0;
+            _sweepSlices = 0;
+            _sweepMs = 0.0;
+        }
+
+        var started = Stopwatch.GetTimestamp();
+        var deadline = started + (long)(SliceMs * Stopwatch.Frequency / 1000.0);
+        var map = _sweepMap;
+        var around = _sweepAround;
+        var system = Mining.System;
+        var last = around.X + Reach;
+        var done = false;
+
+        while (true)
+        {
+            if (_sweepX > last)
+            {
+                done = true;
+
+                break;
+            }
+
+            var x = _sweepX++;
+
+            if (x >= 0 && x < map.Width)
+            {
+                for (var y = around.Y - Reach; y <= around.Y + Reach; y++)
+                {
+                    if (y < 0 || y >= map.Height)
+                    {
+                        continue;
+                    }
+
+                    NoteTile(map, x, y, ref _sweepFires, ref _sweepHearths);
+
+                    if (system == null || x % Stride != 0 || y % Stride != 0)
+                    {
+                        continue;
+                    }
+
+                    if (NoteSeam(map, x, y, system))
+                    {
+                        _sweepSeams++;
+                    }
+                }
+            }
+
+            if (Stopwatch.GetTimestamp() >= deadline)
+            {
+                break;
+            }
+        }
+
+        var ms = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+
+        _sweepMs += ms;
+        _sweepSlices++;
+        Slices++;
+        SweptMs += ms;
+
+        if (ms > SliceWorstMs)
+        {
+            SliceWorstMs = ms;
+        }
+
+        if (!done)
+        {
+            return;
+        }
+
+        _sweepFires += NoteItemFires(map, around);
+        _sweepHearths += NoteItemHearths(map, around);
 
         var counters = NoteCounters(map, around);
 
-        clock.Stop();
+        _sweeping = false;
 
         logger.Information(
-            "Swept {Reach} tiles around {Where} on {Map} in {Elapsed}ms: {Seams} seams, {Fires} fires, {Hearths} hearths, {Counters} counters (now {AllSeams}, {AllFires}, {AllHearths}, {AllCounters})",
+            "Swept {Reach} tiles around {Where} on {Map} in {Elapsed:F0}ms over {Slices} slices: {Seams} seams, {Fires} fires, {Hearths} hearths, {Counters} counters (now {AllSeams}, {AllFires}, {AllHearths}, {AllCounters})",
             Reach,
             around,
             map,
-            clock.ElapsedMilliseconds,
-            seams,
-            fires,
-            hearths,
+            _sweepMs,
+            _sweepSlices,
+            _sweepSeams,
+            _sweepFires,
+            _sweepHearths,
             counters,
             _seams.Count,
             _fires.Count,
@@ -313,7 +416,7 @@ public static class BotGround
             _counters.Count
         );
 
-        if (fires > 0)
+        if (_sweepFires > 0)
         {
             var where = ValueStringBuilder.Create(256);
 
@@ -346,8 +449,6 @@ public static class BotGround
                 where.Dispose();
             }
         }
-
-        return seams;
     }
 
     private static bool NoteSeam(Map map, int x, int y, HarvestSystem system)
@@ -396,33 +497,52 @@ public static class BotGround
         return true;
     }
 
-    private static bool NoteFire(Map map, int x, int y)
+    private static void NoteTile(Map map, int x, int y, ref int fires, ref int hearths)
     {
-        if (_fires.Count >= MaxPlaces)
+        var wantFire = _fires.Count < MaxPlaces;
+        var wantHearth = _hearths.Count < MaxPlaces;
+
+        if (!wantFire && !wantHearth)
         {
-            return false;
+            return;
         }
+
+        var fireSeen = false;
+        var hearthSeen = false;
 
         foreach (var tile in map.Tiles.GetStaticAndMultiTiles(x, y))
         {
-            if (!IsForgeId(tile.ID))
+            if (wantFire && !fireSeen && IsForgeId(tile.ID))
             {
-                continue;
+                fireSeen = true;
+
+                var where = new Point3D(x, y, tile.Z);
+
+                if (HasAnvil(map, x, y) && !Known(_fires, map, where) && Footed(map, where))
+                {
+                    _fires.Add((map, where));
+                    fires++;
+                }
             }
 
-            var where = new Point3D(x, y, tile.Z);
-
-            if (!HasAnvil(map, x, y) || Known(_fires, map, where) || !Footed(map, where))
+            if (wantHearth && !hearthSeen && IsHearthId(tile.ID))
             {
-                return false;
+                hearthSeen = true;
+
+                var where = new Point3D(x, y, tile.Z);
+
+                if (!Known(_hearths, map, where) && Footed(map, where))
+                {
+                    _hearths.Add((map, where));
+                    hearths++;
+                }
             }
 
-            _fires.Add((map, where));
-
-            return true;
+            if ((fireSeen || !wantFire) && (hearthSeen || !wantHearth))
+            {
+                break;
+            }
         }
-
-        return false;
     }
 
     private static int NoteItemFires(Map map, Point3D around)
@@ -448,35 +568,6 @@ public static class BotGround
         }
 
         return found;
-    }
-
-    private static bool NoteHearth(Map map, int x, int y)
-    {
-        if (_hearths.Count >= MaxPlaces)
-        {
-            return false;
-        }
-
-        foreach (var tile in map.Tiles.GetStaticAndMultiTiles(x, y))
-        {
-            if (!IsHearthId(tile.ID))
-            {
-                continue;
-            }
-
-            var where = new Point3D(x, y, tile.Z);
-
-            if (Known(_hearths, map, where) || !Footed(map, where))
-            {
-                return false;
-            }
-
-            _hearths.Add((map, where));
-
-            return true;
-        }
-
-        return false;
     }
 
     private static int NoteItemHearths(Map map, Point3D around)
@@ -720,6 +811,11 @@ public static class BotGround
         var ledger = bot.Resolve?.Ledger;
         var best = default(BotSeam);
         var bestScore = 0.0;
+        var bestPremium = 0.0;
+
+        var oldScore = 0.0;
+        var oldPremium = 0.0;
+        var oldWhere = Point3D.Zero;
 
         for (var i = 0; i < _seams.Count; i++)
         {
@@ -754,6 +850,13 @@ public static class BotGround
                 continue;
             }
 
+            if (BotDanger.Road(body, map, body.Location, seam.Where, BotThreat.Power(body), out _, out _, out _))
+            {
+                RoadOutmuscled++;
+
+                continue;
+            }
+
             if (ledger != null && ledger.Cautious(BotDig.Trade, map, seam.Where))
             {
                 continue;
@@ -783,11 +886,20 @@ public static class BotGround
                 continue;
             }
 
-            var worth = BotOre.CanWork(body, seam.Required) ? seam.Required / 10.0 : 0.0;
+            var seen = BotCommons.Richest(map, seam.Where);
+            var worth = BotOre.Premium(body, map, seam.Where, seen);
+            var was = (BotOre.CanWork(body, seam.Required) ? seam.Required / 10.0 : 0.0) + seen;
 
-            worth += BotCommons.Richest(map, seam.Where);
             var away = body.GetDistanceToSqrt(seam.Where) + System.Math.Max(0, BotRoads.Behind(map, body.Location, seam.Where));
             var score = (1.0 + worth) / (1.0 + away / Patience);
+            var old = (1.0 + was) / (1.0 + away / Patience);
+
+            if (old > oldScore)
+            {
+                oldScore = old;
+                oldPremium = worth;
+                oldWhere = seam.Where;
+            }
 
             if (score <= bestScore)
             {
@@ -796,6 +908,12 @@ public static class BotGround
 
             best = seam;
             bestScore = score;
+            bestPremium = worth;
+        }
+
+        if (best.Exists)
+        {
+            BotOre.Chose(bestPremium, oldWhere != Point3D.Zero && oldWhere != best.Where && oldPremium < 0.0);
         }
 
         return best;
@@ -1144,6 +1262,11 @@ public static class BotGround
         _hearths.Clear();
         _counters.Clear();
         _surveyed.Clear();
+        _pending.Clear();
+        _sweeping = false;
+        Slices = 0;
+        SweptMs = 0.0;
+        SliceWorstMs = 0.0;
         _digging.Clear();
         _told.Clear();
         _drained.Clear();
@@ -1168,5 +1291,5 @@ public static class BotGround
     }
 
     public static string Describe() =>
-        $"{_surveyed.Count} sweeps: {_seams.Count} seams, {_fires.Count} fires, {_hearths.Count} hearths, {_counters.Count} counters; {Walled} seams passed over with no way through, {Unwalked} for standing on ground that had lately refused somebody, {Townbound} for being inside the walls, {Outmuscled} for lying where something past the miner's strength (×{MineOdds:F1}) has killed lately, {SeamsUnfooted} for standing where a walk had found no footing, {Emptied} struck off as barren, {Shied} left on the board because the walk gave up far short of them, and {Dry} rested after being worked out ({Hollow} of them found so as they were about to be chosen, before anybody walked there),{Cooled} hearths rested after a cook stood beside one and found it cold and {Out} struck off for nothing burning on their tile any more, {Underground} asks for a sweep from inside a dungeon refused, {Unfitted} forges rested after a smith stood at one and the engine accepted no anvil, {BotMiner.Sent} sent out past the frontier and {Prospected} seams found there over {Fruitless} empty walks, {BotMiner.Burdened} seams not offered to a pack with no room for ore, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {BotDig.FarSide} rocks found only by looking again from the middle of a seam, {BotDig.Standless} rocks with no floor within swinging reach, {BotDig.Repicked} trips sent on to another seam because another miner already held theirs and {BotDig.Beaten} given up for finding no other free, {BotDig.WorkedOut} rested rather than struck off because every rock in reach was there and worked out,{BotDig.Drained} rocks given up with the engine's bank under them empty against {BotDig.Fumbled} still holding ore the miner kept missing and {BotDig.Allowanced} trips that stopped on their own allowance of eight (the miners that gave up on full rock were being given {(BotDig.Fumbled > 0 ? BotDig.FumbledChance / BotDig.Fumbled : 0.0):P0} a swing by the engine, {BotDig.Locked} swings were taken with the pickaxe still locked by the one before, and {BotDig.Stirred} quiet swings were taken by a bot that had moved since the last one, {BotDig.Adrift} swings the engine cancelled for that and {BotDig.Laden} whose ore was lost to a full pack, {BotDig.NextPickaxe} trips carried on with the next pickaxe, {BotDig.Spurned} melts the forge took none of the ore for, {BotDig.Nearer} of them tried again from beside it and {BotDig.Forsaken} forges rested for it), {Spared} asks answered out of the last scan and {Stale} answers taken back out of it for a seam gone or feared since, {Unfooted} workshops never filed for having no floor at them, {Upstairs} passed over for standing on another floor and {Refused} for ground that has refused the population ({Anyway} choices then had to be made with the resting rule off, or there would have been nowhere at all), patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y}); {BotHeard.Describe()}";
+        $"{_surveyed.Count} sweeps ({_pending.Count} waiting{(_sweeping ? ", one under way" : "")}) in {Slices} slices costing {SweptMs:F0}ms of the loop, the worst slice {SliceWorstMs:F1}ms against {SliceMs:F0} allowed, {BotMiner.Awaiting} asks for rock answered with nothing for ground still being swept: {_seams.Count} seams, {_fires.Count} fires, {_hearths.Count} hearths, {_counters.Count} counters; {Walled} seams passed over with no way through, {Unwalked} for standing on ground that had lately refused somebody, {Townbound} for being inside the walls, {Outmuscled} for lying where something past the miner's strength (×{MineOdds:F1}) has killed lately and {RoadOutmuscled} for a road there that asks more, {SeamsUnfooted} for standing where a walk had found no footing, {Emptied} struck off as barren, {Shied} left on the board because the walk gave up far short of them, and {Dry} rested after being worked out ({Hollow} of them found so as they were about to be chosen, before anybody walked there),{Cooled} hearths rested after a cook stood beside one and found it cold and {Out} struck off for nothing burning on their tile any more, {Underground} asks for a sweep from inside a dungeon refused, {Unfitted} forges rested after a smith stood at one and the engine accepted no anvil, {BotMiner.Sent} sent out past the frontier and {Prospected} seams found there over {Fruitless} empty walks, {BotMiner.Burdened} seams not offered to a pack with no room for ore, {BotDig.Unwalkable} struck off for nobody getting nearer to them, {BotDig.FarSide} rocks found only by looking again from the middle of a seam, {BotDig.Standless} rocks with no floor within swinging reach, {BotDig.Repicked} trips sent on to another seam because another miner already held theirs and {BotDig.Beaten} given up for finding no other free, {BotDig.WorkedOut} rested rather than struck off because every rock in reach was there and worked out,{BotDig.Drained} rocks given up with the engine's bank under them empty against {BotDig.Fumbled} still holding ore the miner kept missing and {BotDig.Allowanced} trips that stopped on their own allowance of eight (the miners that gave up on full rock were being given {(BotDig.Fumbled > 0 ? BotDig.FumbledChance / BotDig.Fumbled : 0.0):P0} a swing by the engine, {BotDig.Locked} swings were taken with the pickaxe still locked by the one before, and {BotDig.Stirred} quiet swings were taken by a bot that had moved since the last one, {BotDig.Adrift} swings the engine cancelled for that and {BotDig.Laden} whose ore was lost to a full pack, {BotDig.NextPickaxe} trips carried on with the next pickaxe, {BotDig.Spurned} melts the forge took none of the ore for, {BotDig.Nearer} of them tried again from beside it and {BotDig.Forsaken} forges rested for it), {Spared} asks answered out of the last scan and {Stale} answers taken back out of it for a seam gone or feared since, {Unfooted} workshops never filed for having no floor at them, {Upstairs} passed over for standing on another floor and {Refused} for ground that has refused the population ({Anyway} choices then had to be made with the resting rule off, or there would have been nowhere at all), patience {Patience} tiles; the lode is at ({Lode.X}, {Lode.Y}); {BotHeard.Describe()}";
 }

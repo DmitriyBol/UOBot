@@ -20,9 +20,9 @@ namespace Server.BotAI.V2;
 /// <para>
 /// <b>At the corpse, because the pack is only where loot passes through.</b> Build 98 used the skill the way a player
 /// does — use it, then point the target it raises at the thing — on whatever lay in the pack every five seconds, and
-/// counted nothing in its first quarter of an hour: <c>BotSlay.Rifle</c> lists everything it lifts on the market in the
-/// same breath, and a listing takes the thing out of the world (<c>BotListing.Add</c>). So a thing is appraised as it comes
-/// off the corpse, before it is listed, and the look on the beat covers what is worn as well as what is carried — a magic
+/// counted nothing in its first quarter of an hour: <c>BotSlay.Rifle</c> listed everything it lifted on the auction in the
+/// same breath, and a listing took the thing out of the world (until 01.10.2026). So a thing is appraised as it comes
+/// off the corpse, and the look on the beat covers what is worn as well as what is carried — a magic
 /// blade bought off a stall goes straight into the hand (<c>BotMobile.Rearm</c>). The check without the skill's own
 /// target: no bandage's or spell's cursor is taken, and a corpse with three magic things has all three appraised rather
 /// than one a second.

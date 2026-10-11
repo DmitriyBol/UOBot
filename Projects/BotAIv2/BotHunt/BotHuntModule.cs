@@ -27,7 +27,7 @@ public sealed class BotHuntModule : BotModule
 
     public override BotPhase Phase => BotPhase.World;
 
-    public override string[] Requires => ["Classes", "Will", "Auction", "Spells"];
+    public override string[] Requires => ["Classes", "Will", "Market", "Spells"];
 
     public override void Start()
     {
@@ -49,6 +49,8 @@ public sealed class BotHuntModule : BotModule
 
         BotWill.Offer(new BotRescuer());
         BotWill.Offer(new BotDefender());
+
+        BotWill.Offer(new BotDefender(last: true));
 
         BotOutlaw.Start();
 
@@ -113,6 +115,7 @@ public sealed class BotHuntModule : BotModule
     {
         BotHunter.Forget();
         BotMuster.Forget();
+        BotBand.Forget();
         BotRescuer.Forget();
         BotOutlaw.Stop();
         BotOutlaw.Forget();

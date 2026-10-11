@@ -50,19 +50,25 @@ public static class BotKept
 
     private static string _survey = "the island not yet reckoned";
 
-    public static void Fell(BotMobile bot, Map map, Point3D where)
+    public static long Wandered { get; private set; }
+
+    public static long WanderedInCompany { get; private set; }
+
+    public static long WanderedBeyond { get; private set; }
+
+    public static void Fell(BotMobile bot, Map map, Point3D where, BotSquad fellIn = null)
     {
         if (!Running || bot == null || map == null || map == Map.Internal)
         {
             return;
         }
 
-        var strength = BotThreat.Power(bot);
+        var strength = bot.PowerAtDeath > 0.0 ? bot.PowerAtDeath : BotThreat.Power(bot);
         var company = 1;
 
-        if (bot is IBotSquadMember { Squad: not null } member)
+        if ((fellIn ?? (bot as IBotSquadMember)?.Squad) is { } squad)
         {
-            var members = member.Squad.Members;
+            var members = squad.Members;
 
             for (var i = 0; i < members.Count; i++)
             {
@@ -78,6 +84,8 @@ public static class BotKept
                 }
             }
         }
+
+        BotDanger.Fell(bot);
 
         var asked = BotQuad.Muscle(map, where);
         var fight = BotLairs.MetFight(map, where, Sight, out var kept, out var wide);
@@ -95,6 +103,27 @@ public static class BotKept
         }
 
         var killer = bot.LastKiller;
+
+        if (kept == 0 && killer is BaseCreature { Controlled: false })
+        {
+            Wandered++;
+
+            if (company > 1)
+            {
+                WanderedInCompany++;
+            }
+
+            if (BotSquad.Reckon(killer) > strength * BotSquad.WithdrawOdds)
+            {
+                WanderedBeyond++;
+            }
+        }
+
+        BotCity.Fell(killer);
+
+        BotQuarry.Fell(killer);
+
+        (fellIn ?? (bot as IBotSquadMember)?.Squad)?.Fell(killer);
 
         logger.Information(
             "Kept: {Name} fell at ({X}, {Y}) with {Strength:F0} of strength in a company of {Company}, killed by {Killer}; the square asked {Asked:F0}, and the spawners near keep {Kept} alive, {Fight:F0} to meet within sight and {Wide:F0} over all their ground",
@@ -130,7 +159,7 @@ public static class BotKept
             _survey = Survey();
         }
 
-        return $"what the spawners keep, in shadow: {Deaths} deaths reckoned, {Outmatched} where it came to more than the dead bot's company brought and {Unwarned} of those where the square asked no more than it brought; {_survey}";
+        return $"what the spawners keep, in shadow: {Deaths} deaths reckoned, {Outmatched} where it came to more than the dead bot's company brought and {Unwarned} of those where the square asked no more than it brought; {Wandered} to a wanderer (nothing kept within sight), {WanderedInCompany} of them in a company and {WanderedBeyond} to one reckoned past ×{BotSquad.WithdrawOdds:F1} what the dead bot's company brought; {_survey}";
     }
 
     private static string Survey()
@@ -151,7 +180,7 @@ public static class BotKept
         var unasked = 0;
         var worst = 0.0;
         var worstAt = Point2D.Zero;
-        var full = LoneBot * BotSquad.MaxSize;
+        var full = LoneBot * BotSquad.Usual;
 
         foreach (var quad in BotQuad.All)
         {
@@ -208,6 +237,9 @@ public static class BotKept
         Deaths = 0;
         Outmatched = 0;
         Unwarned = 0;
+        Wandered = 0;
+        WanderedInCompany = 0;
+        WanderedBeyond = 0;
         _surveyed = false;
     }
 }

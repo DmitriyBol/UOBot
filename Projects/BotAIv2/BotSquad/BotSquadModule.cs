@@ -35,6 +35,21 @@ public sealed class BotSquadModule : BotModule
 
         BotWill.Offer(new BotEnlister());
 
+        BotWill.Offer(new BotClearer());
+
+        BotWill.Offer(new BotLifeline());
+
+        logger.Information(
+            "Clearings ready: any fighter of a main skill at {Skill:F0} or more may call a company for a square within {Reach} tiles where {Deaths} or more died in the last {Recent} minutes, the ones on a road between towns first, when the bots within {Call} tiles of the muster bring ×{Fit:F2} the strength the square asks (what has killed there, or what stands there); a company cleared of its ground lifts the quarantines and the closed boxes on it ({Running})",
+            BotClearer.LeastSkill,
+            BotClearer.Reach,
+            BotClearer.LeastDeaths,
+            BotClearer.RecentMs / 60000,
+            BotHarrow.Reach,
+            BotHarrow.ClearFit,
+            BotClearer.Running ? "on" : "off"
+        );
+
         logger.Information(
             "Squads ready: up to {Max} to a squad beating every {Beat}ms; knots of {Knot} at {Spread} tiles while sweeping; a fight is broken off after {Stall}ms without the target's health falling, after {Blind}ms of everybody who has arrived being unable to land one at all, after {Close}ms of nobody arriving at all, and capped at {Cap}ms; a company with nothing to fight looks for one every {Look}ms and disbands after {Idle}ms of finding nothing, and lets go of anybody idle in it after {Rest}ms",
             BotSquad.MaxSize,

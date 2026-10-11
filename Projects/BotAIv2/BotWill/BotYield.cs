@@ -43,7 +43,7 @@ public readonly struct BotStake
 /// <summary>What a finished piece of work came to.</summary>
 public readonly struct BotTakings
 {
-    public BotTakings(double minutes, double worth, double perMinute, double skill, int coin, int made)
+    public BotTakings(double minutes, double worth, double perMinute, double skill, int coin, int made, int toll = 0)
     {
         Minutes = minutes;
         Worth = worth;
@@ -51,7 +51,10 @@ public readonly struct BotTakings
         Skill = skill;
         Coin = coin;
         Made = made;
+        Toll = toll;
     }
+
+    public int Toll { get; }
 
     public double Minutes { get; }
 
@@ -66,7 +69,7 @@ public readonly struct BotTakings
     public int Made { get; }
 
     public override string ToString() =>
-        $"{Worth:F0} in {Minutes:F1} min ({PerMinute:F0}/min): {Coin} coin, {Made} made, {Skill:F1} skill";
+        $"{Worth:F0} in {Minutes:F1} min ({PerMinute:F0}/min): {Coin} coin, {Made} made, {Skill:F1} skill{(Toll > 0 ? $", {Toll} toll" : "")}";
 }
 
 /// <summary>
@@ -97,6 +100,15 @@ public static class BotYield
 
     public static double DeathMinutes { get; set; } = 3.0;
 
+    public static double DeathTollShare { get; set; } = 1.0;
+
+    public static long DeathTolls { get; private set; }
+
+    public static long DeathTollGold { get; private set; }
+
+    public static string DescribeDeaths() =>
+        $"{DeathTolls} deaths charged the work that died {DeathTollGold}gp of supplies left on the corpse ({DeathTollShare:P0} of the bill)";
+
     public static double StrayFactor { get; set; } = 0.3;
 
     public static double LeastMinutes { get; set; } = 0.25;
@@ -113,6 +125,19 @@ public static class BotYield
         var purse = bot.Backpack?.GetAmount(typeof(Gold)) ?? 0;
 
         return purse + Banker.GetBalance(bot);
+    }
+
+    public static int Spendable(Mobile bot)
+    {
+        if (bot == null)
+        {
+            return 0;
+        }
+
+        var wealth = Wealth(bot);
+        var held = BotMarket.Reserved(bot);
+
+        return held <= 0 ? wealth : Math.Max(0, wealth - held);
     }
 
     public static bool Pocket(Mobile bot)
@@ -144,7 +169,7 @@ public static class BotYield
         return false;
     }
 
-    public static int Standing(Mobile bot) => bot == null ? 0 : Wealth(bot) + BotAuction.Escrowed(bot);
+    public static int Standing(Mobile bot) => bot == null ? 0 : Wealth(bot);
 
     private static readonly Dictionary<Serial, long> _aside = [];
 
@@ -189,6 +214,8 @@ public static class BotYield
         _aside.Clear();
         AsideTaken = 0;
         AsideGiven = 0;
+        DeathTolls = 0;
+        DeathTollGold = 0;
     }
 
     public static double SkillOf(Mobile bot, SkillName? which) =>
@@ -243,9 +270,22 @@ public static class BotYield
             }
         }
 
-        var worth = coin + made + skill * GoldPerSkillPoint;
+        var toll = 0;
+
+        if (ending == BotEnding.Died && body != null && DeathTollShare > 0.0)
+        {
+            toll = (int)(BotProvision.Bill(body) * DeathTollShare);
+
+            if (toll > 0)
+            {
+                DeathTolls++;
+                DeathTollGold += toll;
+            }
+        }
+
+        var worth = coin + made + skill * GoldPerSkillPoint - toll;
         var perMinute = Math.Clamp(worth / minutes, -MostPerMinute, MostPerMinute);
 
-        return new BotTakings(minutes, worth, perMinute, skill, coin, made);
+        return new BotTakings(minutes, worth, perMinute, skill, coin, made, toll);
     }
 }

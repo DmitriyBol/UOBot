@@ -34,6 +34,7 @@ public static class BotCore
 
     public static bool Enabled { get; private set; }
 
+    [CallPriority(40)]
     public static void Configure()
     {
         Enabled = ServerConfiguration.GetOrUpdateSetting("bots.enabled", true);
@@ -53,6 +54,8 @@ public static class BotCore
 
         BotCityStore.Configure();
 
+        BotMarketStore.Configure();
+
         BotChestStore.Configure();
 
         BotQuestStore.Configure();
@@ -63,7 +66,11 @@ public static class BotCore
 
         BotWarStore.Configure();
 
+        BotSeizureStore.Configure();
+
         BotUnderworldStore.Configure();
+
+        BotCrimeStore.Configure();
 
         BotMeal.Configure();
 
@@ -74,7 +81,7 @@ public static class BotCore
         BotModules.Register(new BotHarvestModule());
         BotModules.Register(new BotShopsModule());
         BotModules.Register(new BotCraftModule());
-        BotModules.Register(new BotAuctionModule());
+        BotModules.Register(new BotMarketModule());
         BotModules.Register(new BotSpellsModule());
         BotModules.Register(new BotHuntModule());
         BotModules.Register(new BotMendModule());
@@ -98,9 +105,15 @@ public static class BotCore
 
         BotModules.Register(new BotShopkeepModule());
 
+        BotModules.Register(new BotTradersModule());
+
         BotModules.Register(new BotCampModule());
 
+        BotModules.Register(new BotTradesModule());
+
         BotModules.Register(new BotDiplomacyModule());
+
+        BotModules.Register(new BotPoliticsModule());
 
         BotModules.Register(new BotRunesModule());
 
@@ -109,11 +122,17 @@ public static class BotCore
         BotModules.Register(new BotProvingModule());
 
         BotModules.Register(new BotZonesModule());
+
+        BotModules.Register(new BotReachModule());
         BotModules.Register(new BotDashboardModule());
 
         BotModules.Register(new BotAlarmModule());
 
         BotModules.Register(new BotVoiceModule());
+
+        BotModules.Register(new BotSocialModule());
+
+        BotModules.Register(new BotCrimeModule());
 
         BotModules.Register(new BotWebModule());
 

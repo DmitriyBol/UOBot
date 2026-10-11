@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Server.Items;
 using Server.Mobiles;
 using Server.Multis;
@@ -177,16 +178,38 @@ public sealed class BotHire : BotDeed
                 return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(Reach), $"to {_shop.Name} for a contract");
             }
 
-            var wealth = BotYield.Wealth(body);
-            var mine = wealth;
+            var mine = BotYield.Wealth(body);
+            var paid = new List<BotEstate.Contribution>();
+            var got = BotEstate.Levy(_guild, _price, paid, body);
 
-            if (wealth < _price && !BotGuilds.Stand(body as BotMobile, _price - wealth))
+            if (got < _price)
             {
-                return BotDoing.Failed($"{_guild.Name} could not raise {_price}gp for a contract");
+                BotEstate.Refund(paid, body);
+
+                BotHirer.Rest(_guild);
+
+                return BotDoing.Failed($"{_guild.Name} could only raise {got} of {_price}gp for a contract");
             }
+
+            var chest = got;
+
+            for (var i = 0; i < paid.Count; i++)
+            {
+                chest -= paid[i].Paid;
+            }
+
+            Banker.Deposit(body, got);
 
             if (BotShops.Buy(bot, _shop, typeof(ContractOfEmployment), 1, out var refused) <= 0)
             {
+                if (Banker.Withdraw(body, got))
+                {
+                    BotEstate.Refund(paid, body);
+                    BotChest.Return(_guild.Name, chest);
+                }
+
+                BotHirer.Rest(_guild);
+
                 return BotDoing.Failed(refused ?? "the shopkeeper would not sell a contract");
             }
 

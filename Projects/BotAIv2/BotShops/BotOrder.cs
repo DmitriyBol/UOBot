@@ -3,17 +3,15 @@ using Server.Logging;
 namespace Server.BotAI.V2;
 
 /// <summary>
-/// Putting an order on the board, and going back for it when somebody has filled it.
+/// Saying aloud what the bot wants and what it will pay: a want on the market, spoken in the trade chat.
 ///
 /// <para>
-/// <b>Ordering only, and the collecting half used to live here.</b> It was a second shape of this same
-/// undertaking — built with no kind, offered by <see cref="BotUpkeep"/> ahead of any fresh order, and it
-/// picked up whatever the board was holding. The reasoning was that from the bot's side the two are one
-/// thing, and the reasoning was right about that and wrong about where to put it: collecting costs nothing,
-/// takes no time and moves the bot nowhere, so weighed against a rescue at a hundred and forty gold a minute
-/// it lost every auction it was ever in. One bot on the shard collected anything in twenty-six minutes on
-/// 26.08.2026, and it won only because it had nothing else on the board at all. Collecting is now a reflex
-/// on the population's beat — see <c>BotAuction.Fetch</c> — where nothing has to be bid against.
+/// <b>Ordering only, and it holds no gold any more (01.10.2026).</b> An order used to put its money down in escrow on the
+/// auction's board and wait for a supplier to fill it from anywhere, the goods then fetched by a reflex. Since Patrick's order of
+/// 30.09 every order is hand to hand: this says the want (<see cref="BotMarket.Ask"/>), the buyer keeps its gold, and the thing
+/// arrives with a carrier who walks it over and is paid at the meeting (<see cref="BotDeliver"/>), or the buyer walks to a shop
+/// that holds it (<see cref="BotPatron"/>). The buyer must be able to pay what it asks for when it asks — the market refuses
+/// a want the purse could not honour.
 /// </para>
 /// </summary>
 public sealed class BotOrder : BotDeed
@@ -36,10 +34,8 @@ public sealed class BotOrder : BotDeed
 
     private bool _posted;
 
-    private int _paid;
-
     public static BotOrder For(Map map, Point3D where, IBotWilful buyer, System.Type kind, int offer, int units = 1) =>
-        BotAuction.Full ? null : new BotOrder(map, where, buyer, kind, offer, units);
+        BotMarket.Full || !BotMarket.Running ? null : new BotOrder(map, where, buyer, kind, offer, units);
 
     public BotOrder(Map map, Point3D where, IBotWilful buyer, System.Type kind, int offer, int units = 1)
     {
@@ -65,7 +61,7 @@ public sealed class BotOrder : BotDeed
 
     public override int Outlay => _offer * System.Math.Max(1, _units);
 
-    public override int Made => _paid;
+    public override int Made => 0;
 
     public override string Stage => $"ordering {_units} {_kind.Name}";
 
@@ -74,6 +70,13 @@ public sealed class BotOrder : BotDeed
     public int Units => _units;
 
     public int Price => _offer;
+
+    private static string Held(Mobile body)
+    {
+        var held = BotMarket.Reserved(body);
+
+        return held > 0 ? $", with {held}gp of its {BotYield.Wealth(body)}gp held for its other wants" : "";
+    }
 
     public override BotDoing Advance(IBotWilful bot)
     {
@@ -86,28 +89,30 @@ public sealed class BotOrder : BotDeed
 
         if (_posted)
         {
-            return BotDoing.Done($"{_kind.Name} is on the board");
+            return BotDoing.Done($"{_kind.Name} is asked for");
         }
 
         _posted = true;
 
-        var want = BotAuction.Ask(_buyer ?? bot, _kind, System.Math.Max(1, _units), _offer);
+        var want = BotMarket.Ask(_buyer ?? bot, _kind, System.Math.Max(1, _units), _offer);
 
         if (want == null)
         {
-            return BotDoing.Failed($"the board would not take an order for {_kind.Name}");
+            return BotDoing.Failed(
+                BotMarket.Full
+                    ? $"the market already holds {BotMarket.MaxWants} wants"
+                    : $"could not pay for {System.Math.Max(1, _units)} {_kind.Name} at {_offer}gp if they came{Held(body)}"
+            );
         }
 
-        _paid = System.Math.Max(1, _units) * want.Offer;
-
         logger.Information(
-            "{Name} has asked the population for {Units} {Item} at {Offer}gp each",
+            "{Name} has asked the island for {Units} {Item} at {Offer}gp each",
             body.Name,
             System.Math.Max(1, _units),
             _kind.Name,
             want.Offer
         );
 
-        return BotDoing.Done($"{System.Math.Max(1, _units)} {_kind.Name} ordered at {want.Offer}gp each");
+        return BotDoing.Done($"{System.Math.Max(1, _units)} {_kind.Name} asked for at {want.Offer}gp each");
     }
 }

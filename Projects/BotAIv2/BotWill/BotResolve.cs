@@ -64,6 +64,10 @@ public sealed class BotResolve
 
     public long HurtTick { get; internal set; }
 
+    public bool Menaced { get; internal set; }
+
+    public long MenaceTick { get; internal set; }
+
     public BotStanding Standing { get; internal set; }
 
     public List<string> Offered { get; } = [];
@@ -108,6 +112,8 @@ public sealed class BotResolve
     public bool Bent { get; internal set; }
 
     public BotPause Paused { get; internal set; }
+
+    public BotPause Under { get; internal set; }
 
     internal string DroppedKind { get; set; }
 
@@ -179,4 +185,6 @@ public sealed class BotPause
     public double Skill { get; init; }
 
     public string For { get; init; }
+
+    public bool Sheltered { get; init; }
 }

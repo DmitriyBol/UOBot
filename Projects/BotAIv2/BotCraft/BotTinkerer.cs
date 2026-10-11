@@ -48,12 +48,6 @@ public sealed class BotTinkerer : IBotProposer
 
     public static long Stocked { get; private set; }
 
-    public static long Buying { get; private set; }
-
-    public static long Poor { get; private set; }
-
-    public static long Richest { get; private set; }
-
     public string Name => "Tinkerer";
 
     public BotStanding Rung => BotStanding.Free;
@@ -96,22 +90,14 @@ public sealed class BotTinkerer : IBotProposer
 
         if (BotTinkering.Ingots(body) < LeastMetal)
         {
-            BotAuction.Reclaim(bot, BotTinkering.Metal);
+            BotMarket.FromBank(bot, BotTinkering.Metal, LeastMetal * 2);
         }
 
-        var ingots = BotTinkering.Ingots(body);
-        BotListing lot = null;
-
-        if (ingots < LeastMetal)
+        if (BotTinkering.Ingots(body) < LeastMetal)
         {
-            lot = BotAuction.Cheapest(BotTinkering.Metal, bot);
+            NoMetal++;
 
-            if (lot is not { IsEmpty: false })
-            {
-                NoMetal++;
-
-                return null;
-            }
+            return null;
         }
 
         var order = Order(bot, body);
@@ -124,58 +110,30 @@ public sealed class BotTinkerer : IBotProposer
             return null;
         }
 
-        var buy = 0;
-        var price = 0;
-
-        if (lot != null)
-        {
-            var cost = Math.Max(1, BotCraftwork.Cost(BotTinkering.Recipe(body, tool)));
-            var need = Math.Max(LeastMetal, cost * (Math.Max(1, BotTinker.Batch) + 1));
-
-            buy = Math.Min(need - ingots, lot.Amount);
-            price = Math.Max(1, lot.Price);
-
-            if (ingots + buy < cost * 2)
-            {
-                NoMetal++;
-
-                return null;
-            }
-
-            var wealth = BotYield.Wealth(body);
-
-            if (wealth < buy * price)
-            {
-                Poor++;
-
-                if (wealth > Richest)
-                {
-                    Richest = wealth;
-                }
-
-                return null;
-            }
-
-            Buying++;
-        }
-
         if (order != null)
         {
             ToOrder++;
+            order.Offered();
             Once(body, order.Kind.Name, "to order");
 
-            return new BotTinker(map, body.Location, order.Kind, order, buy, price);
+            return new BotTinker(map, body.Location, order.Kind, order);
+        }
+
+        if (BotRoom.SpecShut(body))
+        {
+            return null;
         }
 
         OnSpec++;
-        Once(body, tool.Name, "because the stalls are short of it");
+        BotGlut.Spec(tool);
+        Once(body, tool.Name, "because the island is short of it");
 
-        return new BotTinker(map, body.Location, tool, null, buy, price);
+        return new BotTinker(map, body.Location, tool, null);
     }
 
     private static BotWant Order(IBotWilful bot, Mobile body)
     {
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
         BotWant best = null;
         var bestWorth = 0;
 
@@ -189,6 +147,11 @@ public sealed class BotTinkerer : IBotProposer
             }
 
             if (BotTinkering.Recipe(body, want.Kind) == null)
+            {
+                continue;
+            }
+
+            if (!BotCourier.Answerable(bot, want) || BotCourier.Holding(bot, want))
             {
                 continue;
             }
@@ -215,7 +178,7 @@ public sealed class BotTinkerer : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody with tinker's tools has been asked"
-            : $"{Asked} asked to tinker: {ToOrder} to order, {OnSpec} for the stalls ({Buying} of them to buy their iron off a stall first), {Stocked} found every tool stocked, {NoMetal} had no iron and found none on any stall, {Poor} could not pay for a batch's iron off a stall (the fattest purse among them held {Richest}gp); {NoKit} asked without tinker's tools; {BotTinker.Describe()}";
+            : $"{Asked} asked to tinker: {ToOrder} to order, {OnSpec} for the island's stock, {Stocked} found every tool stocked, {NoMetal} had fewer than {LeastMetal} iron in the pack (or in the box at a bank); {NoKit} asked without tinker's tools; {BotTinker.Describe()}";
 
     public static void Forget()
     {
@@ -225,9 +188,6 @@ public sealed class BotTinkerer : IBotProposer
         ToOrder = 0;
         OnSpec = 0;
         Stocked = 0;
-        Buying = 0;
-        Poor = 0;
-        Richest = 0;
         _said = false;
     }
 }

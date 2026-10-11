@@ -38,14 +38,8 @@ public sealed class BotFletch : BotDeed
 
     public static int StallMs { get; set; } = SwingMs * 8;
 
-    public static long PlumesBought { get; private set; }
-
-    public static long PlumesGone { get; private set; }
-
     public static void Forget()
     {
-        PlumesBought = 0;
-        PlumesGone = 0;
     }
 
     private enum Leg
@@ -69,6 +63,8 @@ public sealed class BotFletch : BotDeed
 
     private readonly BotWant _order;
 
+    public BotWant Order => _order;
+
     private Leg _leg;
 
     private int _arrows;
@@ -89,13 +85,7 @@ public sealed class BotFletch : BotDeed
 
     private long _stirTick;
 
-    private readonly int _plumes;
-
-    private readonly int _plumePrice;
-
-    private bool _plumed;
-
-    public BotFletch(Map map, Point3D where, BaseVendor shop, int price, int take, BotWant order = null, int plumes = 0, int plumePrice = 0)
+    public BotFletch(Map map, Point3D where, BaseVendor shop, int price, int take, BotWant order = null)
     {
         _map = map;
         _where = where;
@@ -103,10 +93,7 @@ public sealed class BotFletch : BotDeed
         _price = price;
         _take = take;
         _order = order;
-        _plumes = Math.Max(0, plumes);
-        _plumePrice = Math.Max(0, plumePrice);
-        _plumed = _plumes <= 0;
-        _leg = take > 0 || _plumes > 0 ? Leg.Wood : Leg.Work;
+        _leg = take > 0 ? Leg.Wood : Leg.Work;
     }
 
     public override string Kind => Trade;
@@ -115,13 +102,13 @@ public sealed class BotFletch : BotDeed
 
     public override Point3D Where => _where;
 
-    public override double Expects => _order == null ? Prior : Prior * 1.6;
+    public override double Expects => _order != null ? Prior * 1.6 : BotGlut.Claim(typeof(Arrow), Prior);
 
     public override double Minutes => WorkMinutes;
 
     public override SkillName? Trains => SkillName.Fletching;
 
-    public override int Outlay => _take * _price + _plumes * _plumePrice;
+    public override int Outlay => _take * _price;
 
     public override bool AtCounter => _shop != null;
 
@@ -132,7 +119,7 @@ public sealed class BotFletch : BotDeed
     public override string Stage =>
         _leg switch
         {
-            Leg.Wood => _plumed ? $"after {_take} Log for arrows" : $"after {_plumes} Feather for arrows",
+            Leg.Wood => $"after {_take} Log for arrows",
             Leg.Work => $"fletching ({_arrows} arrows in {_swings} attempts)",
             _ => $"putting {_arrows} arrows out"
         };
@@ -176,23 +163,6 @@ public sealed class BotFletch : BotDeed
 
     private BotDoing Wood(IBotWilful bot, Mobile body)
     {
-        if (!_plumed)
-        {
-            _plumed = true;
-
-            var plumes = BotAuction.Cheapest(typeof(Feather), bot);
-            var got = plumes is { IsEmpty: false } ? BotAuction.Buy(body, plumes, Math.Min(_plumes, plumes.Amount)) : 0;
-
-            PlumesBought += got;
-
-            if (got <= 0 && BotFletching.Feathers(body) <= 0)
-            {
-                PlumesGone++;
-
-                return BotDoing.Failed("the feathers on the stalls were bought before it could buy them");
-            }
-        }
-
         if (BotFletching.Possible(body) >= BotFletching.LeastArrows)
         {
             _leg = Leg.Work;
@@ -207,16 +177,7 @@ public sealed class BotFletch : BotDeed
             return default;
         }
 
-        if (BotAuction.Reclaim(bot, typeof(Log)) > 0 && BotFletching.Possible(body) >= BotFletching.LeastArrows)
-        {
-            _leg = Leg.Work;
-
-            return default;
-        }
-
-        var lot = BotAuction.Cheapest(typeof(Log), bot);
-
-        if (lot is { IsEmpty: false } && BotAuction.Buy(body, lot, Math.Min(_take, lot.Amount)) > 0)
+        if (BotMarket.FromBank(bot, typeof(Log), _take) > 0 && BotFletching.Possible(body) >= BotFletching.LeastArrows)
         {
             _leg = Leg.Work;
 
@@ -225,7 +186,7 @@ public sealed class BotFletch : BotDeed
 
         if (_shop == null || _shop.Deleted || _shop.Map == null || _shop.Map == Map.Internal)
         {
-            return BotDoing.Failed("no wood on any stall and no merchant selling it");
+            return BotDoing.Failed("no merchant selling wood");
         }
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
@@ -274,7 +235,8 @@ public sealed class BotFletch : BotDeed
             _arrows += have - _had;
             BotCraftwork.Produced(typeof(Arrow), have - _had);
             _had = have;
-            _made = _arrows * BotFletching.Worth;
+
+            _made = BotGlut.Yield(typeof(Arrow), _arrows, BotFletching.Worth);
         }
 
         var feathers = BotFletching.Feathers(body);
@@ -361,36 +323,23 @@ public sealed class BotFletch : BotDeed
         {
             var stack = made[i];
             var held = Math.Max(1, stack.Amount);
-            var want = _order ?? BotAuction.Demand(bot, typeof(Arrow));
-            var sold = want == null ? 0 : BotAuction.Fill(bot, want, stack);
+            var want = _order ?? BotMarket.Demand(bot, typeof(Arrow));
+            var answer = want == null ? 0 : Math.Min(held, Math.Max(0, want.Payable - ordered));
 
-            if (sold > 0)
-            {
-                ordered += sold;
-                _made -= sold * BotFletching.Worth;
-
-                if (sold >= held)
-                {
-                    continue;
-                }
-            }
-
-            if (BotAuction.List(bot, stack, BotAuction.Worth(typeof(Arrow), BotFletching.Worth), true, true) != null)
-            {
-                listed++;
-            }
+            ordered += answer;
+            listed += held - answer;
         }
 
         if (ordered > 0)
         {
             logger.Information(
-                "{Name} fletched {Arrows} arrows and {Ordered} of them went straight to an order",
+                "{Name} fletched {Arrows} arrows and {Ordered} of them are for an order, to be carried to it",
                 body.Name,
                 _arrows,
                 ordered
             );
         }
 
-        return BotDoing.Done($"{_arrows} arrows in {_swings} attempts, {ordered} to order and {listed} put out to sell");
+        return BotDoing.Done($"{_arrows} arrows in {_swings} attempts, {ordered} for an order and {listed} kept to sell");
     }
 }

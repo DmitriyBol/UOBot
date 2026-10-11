@@ -21,8 +21,8 @@ namespace Server.BotAI.V2;
 /// ask for something it could not use, and it may not ask for something it could not pay for. The first is
 /// answered without a table of what each class may wear: a bot asks for <em>another one of what it is already
 /// wearing</em>, so the question "could this bot use it" has already been answered by the fact that it is
-/// holding one. The second is the market's own rule — <see cref="BotAuction.Ask"/> takes the money down when
-/// the want is raised — with a reserve on top, because a bot that spends its last coin ordering a sword has
+/// holding one. The second is the market's own rule — <see cref="BotMarket.Ask"/> refuses a want its buyer could
+/// not pay for — with a reserve on top, because a bot that spends its last coin ordering a sword has
 /// no coin left to be resurrected with.
 /// </para>
 /// </summary>
@@ -89,7 +89,7 @@ public sealed class BotUpkeep : IBotProposer
             return null;
         }
 
-        if (BotAuction.Owed(bot) > 0)
+        if (Coming(bot))
         {
             Waiting++;
 
@@ -107,14 +107,14 @@ public sealed class BotUpkeep : IBotProposer
 
         var kind = tired.GetType();
 
-        if (BotAuction.Wanted(bot, kind) != null)
+        if (BotMarket.Wanted(bot, kind) != null)
         {
             Standing++;
 
             return null;
         }
 
-        var offer = BotAuction.Worth(kind, Guess);
+        var offer = BotMarket.Worth(kind, Guess);
 
         if ((body.Backpack?.TotalGold ?? 0) - offer <= Reserve)
         {
@@ -127,6 +127,21 @@ public sealed class BotUpkeep : IBotProposer
         Once(body, tired);
 
         return BotOrder.For(map, body.Location, bot, kind, offer);
+    }
+
+    private static bool Coming(IBotWilful bot)
+    {
+        var wants = BotMarket.Wants;
+
+        for (var i = 0; i < wants.Count; i++)
+        {
+            if (ReferenceEquals(wants[i].Buyer, bot) && wants[i].Coming > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static Item Failing(Mobile body)

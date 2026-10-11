@@ -219,7 +219,7 @@ public sealed class BotHerbs : BotDeed
 
             picked += amount;
 
-            _worth += amount * BotAuction.Worth(kind, Shelf(bot, kind));
+            _worth += amount * BotMarket.Worth(kind, Shelf(bot, kind));
 
             BotQuad.Harvested(body.Map, body.Location);
         }
@@ -234,7 +234,7 @@ public sealed class BotHerbs : BotDeed
         var (ordered, listed) = Store(bot);
 
         logger.Information(
-            "{Name} came back from the woods with {Count} herbs worth about {Worth}gp, {Ordered} of them straight into somebody's order and {Listed} onto a stall",
+            "{Name} came back from the woods with {Count} herbs worth about {Worth}gp, {Ordered} of them for somebody's want, to be carried to it, and {Listed} kept to sell",
             body.Name,
             picked,
             _worth,
@@ -243,7 +243,7 @@ public sealed class BotHerbs : BotDeed
         );
 
         return BotDoing.Done(
-            $"{picked} herbs out of the woods worth about {_worth}gp, {ordered} to order and {listed} put out to sell"
+            $"{picked} herbs out of the woods worth about {_worth}gp, {ordered} for a want and {listed} kept to sell"
         );
     }
 
@@ -281,17 +281,10 @@ public sealed class BotHerbs : BotDeed
                 continue;
             }
 
-            var goods = spare >= held ? stack : Mobile.LiftItemDupe(stack, held - spare);
-
-            if (goods == null)
-            {
-                continue;
-            }
-
-            var (went, out_) = BotAuction.Offer(bot, goods, Shelf(bot, stack.GetType()));
+            var went = BotMarket.Answering(bot, stack.GetType(), spare);
 
             ordered += went;
-            listed += out_;
+            listed += spare - went;
         }
 
         Ordered += ordered;
@@ -310,7 +303,7 @@ public sealed class BotHerbs : BotDeed
 
         for (var i = 0; i < Kinds.Length; i++)
         {
-            var held = BotAuction.Stocked(Kinds[i]) + BotShopkeep.Showing(Kinds[i]);
+            var held = BotShopkeep.Showing(Kinds[i]);
 
             if (held > least)
             {
@@ -364,6 +357,8 @@ public sealed class BotHerbalist : IBotProposer
     public static long Refused { get; private set; }
 
     public static long Perilous { get; private set; }
+
+    public static long FromHere { get; private set; }
 
     public static long NotAGatherer { get; private set; }
 
@@ -422,13 +417,20 @@ public sealed class BotHerbalist : IBotProposer
         var home = BotPopulation.HomeOf(body);
         var roam = Math.Min(Range, BotPopulation.Leash(body));
 
+        var centre = BotPopulation.Within(map, body.Location, body) ? body.Location : home;
+
+        if (centre != home)
+        {
+            FromHere++;
+        }
+
         var best = Point3D.Zero;
         var bestAway = double.MaxValue;
 
         for (var tries = 0; tries < Samples; tries++)
         {
-            var x = home.X + Utility.RandomMinMax(-roam, roam);
-            var y = home.Y + Utility.RandomMinMax(-roam, roam);
+            var x = centre.X + Utility.RandomMinMax(-roam, roam);
+            var y = centre.Y + Utility.RandomMinMax(-roam, roam);
 
             if (!BotStep.Settle(map, x, y, out var z))
             {
@@ -442,7 +444,7 @@ public sealed class BotHerbalist : IBotProposer
                 continue;
             }
 
-            if (!BotPopulation.Reachable(map, body.Location, where))
+            if (!BotPopulation.Within(map, where, body) || !BotPopulation.Reachable(map, body.Location, where))
             {
                 continue;
             }
@@ -450,6 +452,13 @@ public sealed class BotHerbalist : IBotProposer
             if (BotReach.Ask(map, body.Location, where, BotArrival.Within(BotHerbs.ArriveWithin))
                 == BotReachVerdict.Sealed)
             {
+                continue;
+            }
+
+            if (BotZones.LevelAt(map, where.X, where.Y) == BotZoneLevel.Deadly)
+            {
+                Perilous++;
+
                 continue;
             }
 
@@ -489,8 +498,8 @@ public sealed class BotHerbalist : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody on this shard may go looking for herbs ({NotAGatherer} answers went to bots that may not)"
-            : $"{Asked} looks at the woods: {Offered} trips offered, {TooSoon} came round too soon, {NoWood} found nowhere out of town to go, {Refused} patches passed over as already refused, {Perilous} as asking more than the picker brings; "
-              + $"{BotHerbs.Ordered} reagents went straight into somebody's order and {BotHerbs.Listed} onto a stall, above the {BotHerbs.Keeps} of each kind a picker that can cast or brew keeps back; "
+            : $"{Asked} looks at the woods: {Offered} trips offered ({FromHere} of them drawn round where the picker stood rather than its home), {TooSoon} came round too soon, {NoWood} found nowhere out of town to go, {Refused} patches passed over as already refused, {Perilous} as asking more than the picker brings or lying in a deadly zone; "
+              + $"{BotHerbs.Ordered} reagents kept for somebody's want, to be carried to it, and {BotHerbs.Listed} kept to sell, above the {BotHerbs.Keeps} of each kind a picker that can cast or brew keeps back; "
               + $"{BotHerbs.ForHealing} of the trips were healers' own, for the four herbs a heal spends, of which each keeps {BotHerbs.HealerKeeps}";
 
     public static void Forget()
@@ -501,6 +510,7 @@ public sealed class BotHerbalist : IBotProposer
         NoWood = 0;
         Refused = 0;
         Offered = 0;
+        FromHere = 0;
         BotHerbs.ForgetTrade();
     }
 }

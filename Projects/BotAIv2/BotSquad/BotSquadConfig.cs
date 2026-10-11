@@ -35,6 +35,22 @@ public sealed class BotSquadSettings
     public int? Earshot { get; set; }
 
     public int? Reach { get; set; }
+
+    public bool? Clearings { get; set; }
+
+    public int? ClearReach { get; set; }
+
+    public int? ClearDeaths { get; set; }
+
+    public int? ClearRecentMs { get; set; }
+
+    public double? ClearLeastSkill { get; set; }
+
+    public double? ClearFit { get; set; }
+
+    public double? ClearExpects { get; set; }
+
+    public int? ClearRoadWidth { get; set; }
 }
 
 /// <summary>Reads the squad file and moves the numbers it names.</summary>
@@ -72,5 +88,14 @@ public static class BotSquadConfig
         BotScatter.Spread = settings.Spread ?? BotScatter.Spread;
         BotSpoils.Earshot = settings.Earshot ?? BotSpoils.Earshot;
         BotSquads.Reach = settings.Reach ?? BotSquads.Reach;
+
+        BotClearer.Running = settings.Clearings ?? BotClearer.Running;
+        BotClearer.Reach = settings.ClearReach ?? BotClearer.Reach;
+        BotClearer.LeastDeaths = settings.ClearDeaths ?? BotClearer.LeastDeaths;
+        BotClearer.RecentMs = settings.ClearRecentMs ?? BotClearer.RecentMs;
+        BotClearer.LeastSkill = settings.ClearLeastSkill ?? BotClearer.LeastSkill;
+        BotClearer.RoadWidth = settings.ClearRoadWidth ?? BotClearer.RoadWidth;
+        BotHarrow.ClearFit = settings.ClearFit ?? BotHarrow.ClearFit;
+        BotHarrow.ClearPrior = settings.ClearExpects ?? BotHarrow.ClearPrior;
     }
 }

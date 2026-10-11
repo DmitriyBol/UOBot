@@ -22,8 +22,9 @@ namespace Server.BotAI.V2;
 /// <item><b>guard</b> — the guild's members are to spend <see cref="GuardMinutes"/> minutes between them inside the town's
 /// walls. Counted once a look, member by member.</item>
 /// <item><b>supply</b> — the guild's members are to put <see cref="SupplyUnits"/> of a material the market wants onto the bots'
-/// own market, on stalls or into standing orders. Counted where the goods go out (<c>BotAuction.List</c> and
-/// <c>BotAuction.Fill</c>), never where they are made.</item>
+/// own market: sold over a shop's till by the bank or handed over at a carrier's meeting. Counted where the goods go out
+/// (<c>BotShopkeep.Serve</c> and <c>BotHandover.Exchange</c>; the auction's stalls and fills until 01.10.2026), never where they are
+/// made.</item>
 /// </list>
 ///
 /// <para>
@@ -159,8 +160,8 @@ public sealed class BotTownTask
 
             for (var k = 0; k < kinds.Length; k++)
             {
-                stocked += BotAuction.Stocked(kinds[k]);
-                wanted += BotAuction.Best(kinds[k]) > 0 ? 1 : 0;
+                stocked += BotShopkeep.Showing(kinds[k]);
+                wanted += BotMarket.Best(kinds[k]) > 0 ? 1 : 0;
             }
 
             scarce.Add((material, 2 * wanted + (stocked == 0 ? 1 : 0)));

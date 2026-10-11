@@ -21,17 +21,52 @@ namespace Server.BotAI.V2;
 /// <para>
 /// <b>Three layers, never merged across.</b> Land patrol of creatures that attack on sight (declared discs until observation
 /// wins, the living where they stand, the cells seen patrolled awake); the sea's (creatures that cannot leave the water, only
-/// where they are); and the passive animals' (hunting grounds), painted only where no attacker's patrol is. A zone is a
-/// connected patch of one layer, eight ways. A sea serpent's water never joins an orc camp on the beach into one zone, and a
-/// sea spawner that declares a walking range of 175 tiles paints nothing: only its living creatures do.
+/// where they are); and the passive animals' (hunting grounds), painted only where no attacker's patrol is. A sea serpent's
+/// water never joins an orc camp on the beach into one zone, and a sea spawner that declares a walking range of 175 tiles
+/// paints nothing: only its living creatures do.
 /// </para>
 ///
 /// <para>
-/// <b>Strength is what can come at once, not the worst alone.</b> The analysts' reading of 3474 deaths on 29–30.09 found 78
-/// companies of three to six strong bots killed by a single weak kind — snakes, zombies, skeletons — in ground reckoned clear:
-/// the worst creature nearby was weak, and there were many of it. So a zone's threat is taken round every living attacker in
-/// it: that one and all others within <see cref="BotZoneSettings.ConvergeTiles"/> of it, the strongest in full and the rest at
-/// <see cref="BotThreat.Secondary"/>, and the zone's threat is the worst such place in it.
+/// <b>A zone is a camp of spawners, not a connected patch of paint (02.10.2026, build 389).</b> Until 388 a zone was every
+/// cell of one layer joined eight ways, and the paint joined: 1,651 spawners' discs of up to 64 tiles, the cells where their
+/// creatures were seen awake (with a cell's margin each way, a twelve-tile stripe along every chase a bot led across the
+/// island) and the discs round the living fused into zone 25, "W of Trinsic", 1,224 × 1,920 tiles with 80 spawners, 1,198
+/// creatures and Trinsic's own bank inside its outline, charged everywhere at the fight of its worst corner (22,935, ×20 a
+/// bot); the roads went round the peninsula. Patrick, 02.10 00:20: "one of your zones has grown over half of Britain ... the
+/// zone is information both for caution and for fighting and hunting." Now the land's attackers are grouped by their
+/// spawners (<see cref="Group"/>): two spawners are one zone when their discs touch within
+/// <see cref="BotZoneSettings.JoinGap"/> tiles and the zone they make stays within <see cref="BotZoneSettings.ZoneMostTiles"/>
+/// across, nearest pairs first, so a fort of six spawners is one zone and a chain of camps along a road is a chain of zones.
+/// Each zone paints only its own: its spawners' discs, the living of those spawners that are within range of home, and the
+/// observed cells its spawners' ranges (plus <see cref="BotZoneSettings.ObservedSlack"/>) cover. A creature farther from home
+/// than that (a chase, a lure) or with no spawner is a <em>wanderer</em>: a zone of its own where it stands
+/// (<see cref="BotZone.Stray"/>), real danger and no patrol. An observed cell no spawner's range covers is a chase, and paints
+/// nothing. Guarded ground is never painted: the guards kill what attacks there.
+/// </para>
+///
+/// <para>
+/// <b>Where the deaths said the map was wrong (08.10.2026, deaths30).</b> Of 21 deaths on clear ground, 14 began inside a camp's
+/// painted aggro and ended 15–250 tiles out, the pursuer still on the bot; three were by wanderers whose paint lagged behind
+/// them, one by an invasion wave, three by casters past a fringe of their sight. So a camp's patrol may grow past its declared
+/// range to how far its creatures are really seen from home calm (<see cref="BotZoneHauntIn.Reach"/>, a high percentile, at most
+/// <see cref="BotZoneSettings.ReachBeyond"/> past the declaration) — in the direction they were seen, not as a wider disc: past
+/// the declaration a camp claims the observed cells out to its reach, and the cells are where its creatures walked. The grouping
+/// into camps still goes by the declaration, so the zones and their numbers stand. A caster's or an archer's fringe is the larger
+/// of its sight and its blow's reach (it picks a target only within its sight); a wanderer is painted
+/// along where it walked in the last minutes (<see cref="BotZoneInput.Trail"/>, at most
+/// <see cref="BotZoneSettings.WanderMostCells"/> cells); and an event's creatures are a zone of their own while they live
+/// (<see cref="BotZoneInput.Events"/>). Guarded ground stays unpainted: town guards are the answer there, not the map.
+/// </para>
+///
+/// <para>
+/// <b>Strength is what can come at once, not the worst alone — and at a place, not over a peninsula.</b> The analysts' reading of
+/// 3474 deaths on 29–30.09 found 78 companies of three to six strong bots killed by a single weak kind — snakes, zombies,
+/// skeletons — in ground reckoned clear: the worst creature nearby was weak, and there were many of it. So a zone's threat is
+/// taken round every living attacker in it: that one and all others within <see cref="BotZoneSettings.ConvergeTiles"/> of it,
+/// the strongest in full and the rest at <see cref="BotThreat.Secondary"/>, and the zone's threat is the worst such place in
+/// it — the hunter's question of the whole zone. The walker's question of one node is answered by the fight raster
+/// (<see cref="BotZoneState.Fight"/>): the same convergence taken round every <em>cell</em>, over all the living wherever
+/// their zone is, floored by what the cell's own spawners promise at one place when they are full.
 /// </para>
 /// </summary>
 public static class BotZoneBuild
@@ -47,6 +82,24 @@ public static class BotZoneBuild
     private static byte[] _mark;
 
     private static int[] _label;
+
+    private static int[] _owner;
+
+    private static Comp _painting;
+
+    private static byte[] _guarded;
+
+    private static int _guardedKept;
+
+    private static int _marked;
+
+    private static float[] _fightSum;
+
+    private static float[] _fightMax;
+
+    private static int[] _fightStamp;
+
+    private static int _fightGen;
 
     private static readonly List<int> _touched = [];
 
@@ -168,7 +221,17 @@ public static class BotZoneBuild
 
         public double VsBot;
 
+        public double Declared;
+
         public bool Empty;
+
+        public bool Stray;
+
+        public string Event;
+
+        public int Grown;
+
+        public bool Rooted = true;
 
         public int Reach;
 
@@ -234,9 +297,20 @@ public static class BotZoneBuild
         {
             _mark = new byte[w * h];
             _label = new int[w * h];
+            _owner = new int[w * h];
+            _fightSum = new float[w * h];
+            _fightMax = new float[w * h];
+            _fightStamp = new int[w * h];
+            _fightGen = 0;
         }
 
         List<Comp> comps = [];
+
+        _width = w;
+        _guarded = input.Guarded is { } guarded && guarded.Length == w * h ? guarded : null;
+        _guardedKept = 0;
+        _marked = 0;
+        _painting = null;
 
         try
         {
@@ -248,13 +322,36 @@ public static class BotZoneBuild
             {
                 _mark[_touched[k]] = 0;
                 _label[_touched[k]] = 0;
+                _owner[_touched[k]] = 0;
             }
 
             _touched.Clear();
             _cells.Clear();
             _queue.Clear();
             _seaLabel.Clear();
+            _painting = null;
+            _guarded = null;
         }
+    }
+
+    private static bool SeaCamp(BotZoneHauntIn haunt, BotZoneKindIn[] kinds)
+    {
+        if (!haunt.Wet)
+        {
+            return false;
+        }
+
+        for (var e = 0; e < haunt.Kinds.Length; e++)
+        {
+            var kind = kinds[haunt.Kinds[e]];
+
+            if (kind.Water && kind.Aggressive)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static BotZoneState Run(BotZoneInput input, BotZoneSettings s, int w, int h, List<Comp> comps, long began)
@@ -278,7 +375,9 @@ public static class BotZoneBuild
             {
                 var kind = kinds[haunt.Kinds[e]];
 
-                if (!kind.Water)
+                var wet = kind.WaterAt(SeaCamp(haunt, kinds));
+
+                if (!wet)
                 {
                     anyLand = true;
                 }
@@ -290,7 +389,7 @@ public static class BotZoneBuild
 
                 anyAggressive = true;
 
-                if (kind.Water)
+                if (wet)
                 {
                     hostileSea[i] = true;
                 }
@@ -305,52 +404,213 @@ public static class BotZoneBuild
             rooted[i] = hostileLand[i] && allRooted;
         }
 
+        var range = new int[haunts.Length];
+        var grownHaunts = 0;
+
         for (var i = 0; i < haunts.Length; i++)
         {
-            var haunt = haunts[i];
+            range[i] = Math.Max(haunts[i].Radius, Grown(haunts[i], rooted[i], s));
 
-            if (!hostileLand[i] || !haunt.Running || haunt.Radius > s.DeclaredMost)
+            if (range[i] > haunts[i].Radius && hostileLand[i] && haunts[i].Running && haunts[i].Radius <= s.DeclaredMost)
             {
-                continue;
+                grownHaunts++;
             }
+        }
 
-            var radius = rooted[i] ? 0 : haunt.Radius;
+        var hauntComp = new int[haunts.Length];
+        var liveComp = new int[live.Length];
+        var landGroups = Group(haunts, hostileLand, rooted, s);
+        var liveOf = new List<int>[landGroups.Count];
+        var observedOf = new List<int>[landGroups.Count];
+        var groupOf = new int[haunts.Length];
 
-            if (haunt.Confidence >= s.ObservedWins)
+        Array.Fill(groupOf, -1);
+
+        for (var g = 0; g < landGroups.Count; g++)
+        {
+            liveOf[g] = [];
+            observedOf[g] = [];
+
+            for (var k = 0; k < landGroups[g].Count; k++)
             {
-                radius = Math.Min(radius, haunt.ObservedRange + s.ObservedMargin * BotZoneState.Cell);
+                groupOf[landGroups[g][k]] = g;
             }
-
-            Paint(haunt.X, haunt.Y, radius, Land, 0, w, h);
         }
 
         for (var i = 0; i < live.Length; i++)
         {
             var c = live[i];
 
-            if (!c.Aggressive || c.Water)
+            if (!c.Aggressive || c.Water || c.Haunt < 0 || groupOf[c.Haunt] < 0)
             {
                 continue;
             }
 
-            var radius = c.Rooted ? 0
-                : c.Haunt >= 0 && haunts[c.Haunt].Radius > s.DeclaredMost ? s.LooseRadius
-                : s.LiveRadius;
+            var haunt = haunts[c.Haunt];
 
-            Paint(c.X, c.Y, radius, Land, 0, w, h);
+            if (Math.Max(Math.Abs(c.X - haunt.X), Math.Abs(c.Y - haunt.Y)) <= range[c.Haunt] + s.StrayBeyond)
+            {
+                liveOf[groupOf[c.Haunt]].Add(i);
+            }
         }
 
-        for (var i = 0; i < input.Observed.Length; i++)
-        {
-            var cell = input.Observed[i];
+        Attribute(input, haunts, range, hostileLand, groupOf, observedOf, s, w, h);
 
-            if ((uint)cell < (uint)(w * h))
+        for (var g = 0; g < landGroups.Count; g++)
+        {
+            var group = landGroups[g];
+            var comp = new Comp { Number = comps.Count + 1, Layer = Land, Start = _cells.Count };
+
+            comps.Add(comp);
+            _painting = comp;
+
+            for (var k = 0; k < group.Count; k++)
             {
+                var i = group[k];
+                var haunt = haunts[i];
+
+                comp.Haunts.Add(i);
+                comp.Rooted &= rooted[i];
+                hauntComp[i] = comp.Number;
+
+                if (!haunt.Running || haunt.Radius > s.DeclaredMost)
+                {
+                    continue;
+                }
+
+                var radius = rooted[i] ? 0 : haunt.Radius;
+
+                if (haunt.Confidence >= s.ObservedWins)
+                {
+                    radius = Math.Min(radius, haunt.ObservedRange + s.ObservedMargin * BotZoneState.Cell);
+                }
+
+                if (range[i] > haunt.Radius)
+                {
+                    comp.Grown = Math.Max(comp.Grown, range[i]);
+                }
+
+                Paint(haunt.X, haunt.Y, radius, Land, 0, w, h, rooted[i]);
+            }
+
+            var lives = liveOf[g];
+
+            for (var k = 0; k < lives.Count; k++)
+            {
+                var c = live[lives[k]];
+                var radius = c.Rooted ? 0 : haunts[c.Haunt].Radius > s.DeclaredMost ? s.LooseRadius : s.LiveRadius;
+
+                Paint(c.X, c.Y, radius, Land, 0, w, h, c.Rooted);
+                comp.Rooted &= c.Rooted;
+                comp.Live.Add(lives[k]);
+                liveComp[lives[k]] = comp.Number;
+            }
+
+            var observed = observedOf[g];
+
+            for (var k = 0; k < observed.Count; k++)
+            {
+                var cell = input.Observed[observed[k]];
+
                 Block(cell % w, cell / w, s.ObservedMargin, Land, w, h);
+            }
+
+            _painting = null;
+        }
+
+        var events = input.Events;
+        var eventZones = 0;
+        var trailCells = 0;
+
+        for (var e = 0; e < events.Length; e++)
+        {
+            var ev = events[e];
+            var comp = new Comp { Number = comps.Count + 1, Layer = Land, Start = _cells.Count, Stray = true, Event = ev.Label };
+
+            comps.Add(comp);
+            _painting = comp;
+            Paint(ev.X, ev.Y, Math.Max(0, ev.Radius), Land, 0, w, h);
+
+            for (var i = 0; i < live.Length; i++)
+            {
+                var c = live[i];
+
+                if (c.Event != e || liveComp[i] != 0)
+                {
+                    continue;
+                }
+
+                comp.Live.Add(i);
+                comp.Rooted &= c.Rooted;
+                liveComp[i] = comp.Number;
+
+                if (c.Aggressive && !c.Water)
+                {
+                    Paint(c.X, c.Y, c.Rooted ? 0 : s.LiveRadius, Land, 0, w, h, c.Rooted);
+
+                    if (!c.Rooted)
+                    {
+                        trailCells += Trail(input, c, s.LiveRadius, s.WanderMostCells, w, h);
+                    }
+                }
+            }
+
+            _painting = null;
+        }
+
+        var strayFrom = comps.Count;
+
+        for (var i = 0; i < live.Length; i++)
+        {
+            var c = live[i];
+
+            if (!c.Aggressive || c.Water || liveComp[i] != 0)
+            {
+                continue;
+            }
+
+            var number = At(c.X, c.Y, Land, comps, w, h);
+
+            if (number > 0)
+            {
+                comps[number - 1].Live.Add(i);
+                comps[number - 1].Rooted &= c.Rooted;
+                liveComp[i] = number;
+
+                continue;
+            }
+
+            Paint(c.X, c.Y, c.Rooted ? 0 : s.LiveRadius, Land, 0, w, h, c.Rooted);
+
+            if (!c.Rooted)
+            {
+                trailCells += Trail(input, c, s.LiveRadius, s.WanderMostCells, w, h);
             }
         }
 
         Label(Land, Land, comps, w, h);
+
+        for (var k = strayFrom; k < comps.Count; k++)
+        {
+            comps[k].Stray = true;
+        }
+
+        for (var i = 0; i < live.Length; i++)
+        {
+            var c = live[i];
+
+            if (c.Aggressive && !c.Water && liveComp[i] == 0)
+            {
+                var number = At(c.X, c.Y, Land, comps, w, h);
+
+                if (number > 0)
+                {
+                    comps[number - 1].Live.Add(i);
+                    comps[number - 1].Rooted &= c.Rooted;
+                    liveComp[i] = number;
+                }
+            }
+        }
 
         for (var i = 0; i < live.Length; i++)
         {
@@ -365,14 +625,31 @@ public static class BotZoneBuild
 
         Label(SeaGroup, Sea, comps, w, h);
 
-        for (var i = 0; i < haunts.Length; i++)
-        {
-            var haunt = haunts[i];
+        var passiveGroups = Group(haunts, passive, null, s);
 
-            if (passive[i] && haunt.Running && haunt.Radius <= s.DeclaredMost)
+        for (var g = 0; g < passiveGroups.Count; g++)
+        {
+            var group = passiveGroups[g];
+            var comp = new Comp { Number = comps.Count + 1, Layer = Passive, Start = _cells.Count };
+
+            comps.Add(comp);
+            _painting = comp;
+
+            for (var k = 0; k < group.Count; k++)
             {
-                Paint(haunt.X, haunt.Y, haunt.Radius, Passive, Land, w, h);
+                var i = group[k];
+                var haunt = haunts[i];
+
+                comp.Haunts.Add(i);
+                hauntComp[i] = comp.Number;
+
+                if (haunt.Running && haunt.Radius <= s.DeclaredMost)
+                {
+                    Paint(haunt.X, haunt.Y, haunt.Radius, Passive, Land, w, h);
+                }
             }
+
+            _painting = null;
         }
 
         for (var i = 0; i < live.Length; i++)
@@ -396,42 +673,33 @@ public static class BotZoneBuild
 
         var painted = Stopwatch.GetTimestamp();
 
-        var hauntComp = new int[haunts.Length];
-
-        for (var i = 0; i < haunts.Length; i++)
-        {
-            var haunt = haunts[i];
-
-            if (hostileLand[i])
-            {
-                hauntComp[i] = Near(haunt.X, haunt.Y, Land, comps, w, h);
-            }
-            else if (passive[i])
-            {
-                hauntComp[i] = Near(haunt.X, haunt.Y, Passive, comps, w, h);
-            }
-        }
-
         for (var i = 0; i < live.Length; i++)
         {
             var c = live[i];
+
+            if (liveComp[i] != 0)
+            {
+                continue;
+            }
+
             var number = 0;
 
             if (c.Aggressive && c.Water)
             {
                 number = At(c.X, c.Y, Sea, comps, w, h);
             }
-            else if (c.Aggressive)
-            {
-                number = At(c.X, c.Y, Land, comps, w, h);
-            }
-            else if (!c.Water)
+            else if (!c.Aggressive && !c.Water)
             {
                 number = At(c.X, c.Y, Land, comps, w, h);
 
                 if (number == 0)
                 {
                     number = At(c.X, c.Y, Passive, comps, w, h);
+                }
+
+                if (number == 0 && c.Haunt >= 0 && passive[c.Haunt] && hauntComp[c.Haunt] > 0 && comps[hauntComp[c.Haunt] - 1].Count > 0)
+                {
+                    number = hauntComp[c.Haunt];
                 }
             }
 
@@ -441,33 +709,23 @@ public static class BotZoneBuild
             }
 
             comps[number - 1].Live.Add(i);
+            liveComp[i] = number;
 
-            if (c.Haunt >= 0 && hauntComp[c.Haunt] == 0 && (c.Aggressive || passive[c.Haunt]))
+            if (c.Haunt >= 0 && hauntComp[c.Haunt] == 0 && c.Aggressive)
             {
                 hauntComp[c.Haunt] = number;
+                comps[number - 1].Haunts.Add(c.Haunt);
             }
         }
 
-        for (var i = 0; i < haunts.Length; i++)
+        for (var g = 0; g < landGroups.Count; g++)
         {
-            if (hauntComp[i] > 0)
-            {
-                comps[hauntComp[i] - 1].Haunts.Add(i);
-            }
-        }
+            var observed = observedOf[g];
+            var comp = comps[g];
 
-        for (var i = 0; i < input.Observed.Length; i++)
-        {
-            if ((uint)input.Observed[i] >= (uint)(w * h))
+            for (var k = 0; k < observed.Count; k++)
             {
-                continue;
-            }
-
-            var number = _label[input.Observed[i]];
-
-            if (number > 0 && comps[number - 1].Layer == Land)
-            {
-                comps[number - 1].ObservedWeight += input.ObservedWeight[i];
+                comp.ObservedWeight += input.ObservedWeight[observed[k]];
             }
         }
 
@@ -549,6 +807,66 @@ public static class BotZoneBuild
         for (var k = 0; k < ranked.Count; k++)
         {
             WriteCore(ranked[k], cells, (ushort)(ranked[k].Index + 1));
+        }
+
+        var fightBuffer = input.FightBuffer is { } given && given.Length == w * h ? given : new ushort[w * h];
+
+        Array.Clear(fightBuffer);
+        FightRaster(cells, fightBuffer, kept, live, kinds, s, w, h);
+
+        var paintedCells = 0;
+        Comp largest = null;
+        int landZones = 0, landCore = 0, landAggressive = 0, strayZones = 0;
+
+        for (var i = 0; i < cells.Length; i++)
+        {
+            var v = cells[i];
+
+            if (v != 0 && kept[(v & BotZoneState.IndexMask) - 1].Layer == Land)
+            {
+                paintedCells++;
+            }
+        }
+
+        for (var k = 0; k < kept.Count; k++)
+        {
+            var comp = kept[k];
+
+            if (comp.Layer != Land)
+            {
+                continue;
+            }
+
+            landZones++;
+            landCore += comp.Count;
+            landAggressive += comp.Aggressive;
+
+            if (comp.Stray)
+            {
+                strayZones++;
+            }
+
+            if (comp.Event != null)
+            {
+                eventZones++;
+            }
+
+            if (largest == null || comp.Count > largest.Count)
+            {
+                largest = comp;
+            }
+        }
+
+        var townsInside = 0;
+
+        for (var i = 0; i < input.Towns.Length; i++)
+        {
+            var v = CellValue(cells, input.Towns[i].X1, input.Towns[i].Y1, w, h);
+
+            if (v != 0 && kept[(v & BotZoneState.IndexMask) - 1].Layer == Land)
+            {
+                townsInside++;
+            }
         }
 
         var deaths = input.Deaths;
@@ -676,7 +994,19 @@ public static class BotZoneBuild
             Width = w,
             Height = h,
             Cells = cells,
+            Fight = fightBuffer,
             Zones = zones,
+            PaintedCells = paintedCells,
+            LandZones = landZones,
+            LandCoreCells = landCore,
+            LandAggressive = landAggressive,
+            StrayZones = strayZones,
+            GrownHaunts = grownHaunts,
+            EventZones = eventZones,
+            TrailCells = trailCells,
+            Largest = largest == null ? null : zones[largest.Index],
+            TownsInside = townsInside,
+            GuardedKept = _guardedKept,
             NextId = nextId,
             At = input.At,
             RefBotPower = input.RefBotPower,
@@ -703,7 +1033,7 @@ public static class BotZoneBuild
         };
     }
 
-    private static void Paint(int x, int y, int radius, byte bit, byte skip, int w, int h)
+    private static void Paint(int x, int y, int radius, byte bit, byte skip, int w, int h, bool force = false)
     {
         var reach = Math.Max(0, radius) + BotZoneState.Cell / 2;
         var reach2 = reach * reach;
@@ -724,7 +1054,7 @@ public static class BotZoneBuild
 
                 if (dx * dx + dy * dy <= reach2 || cx == ux && cy == uy)
                 {
-                    Set(cy * w + cx, bit, skip);
+                    Set(cy * w + cx, bit, skip, force);
                 }
             }
         }
@@ -736,16 +1066,32 @@ public static class BotZoneBuild
         {
             for (var x = Math.Max(0, cx - margin); x <= Math.Min(w - 1, cx + margin); x++)
             {
-                Set(y * w + x, bit, 0);
+                Set(y * w + x, bit, 0, false);
             }
         }
     }
 
-    private static void Set(int i, byte bit, byte skip)
+    private static void Set(int i, byte bit, byte skip, bool force)
     {
+        if (!force && _guarded != null && bit != Sea && bit != SeaGroup && _guarded[i] != 0)
+        {
+            if (_owner[i] != -1)
+            {
+                if (_mark[i] == 0 && _owner[i] == 0)
+                {
+                    _touched.Add(i);
+                }
+
+                _owner[i] = -1;
+                _guardedKept++;
+            }
+
+            return;
+        }
+
         var m = _mark[i];
 
-        if ((m & skip) != 0 || (m & bit) != 0)
+        if ((m & skip) != 0)
         {
             return;
         }
@@ -755,7 +1101,377 @@ public static class BotZoneBuild
             _touched.Add(i);
         }
 
+        if ((m & bit) == 0)
+        {
+            _marked++;
+        }
+
         _mark[i] = (byte)(m | bit);
+
+        var comp = _painting;
+
+        if (comp == null || _owner[i] == comp.Number)
+        {
+            return;
+        }
+
+        _owner[i] = comp.Number;
+        _cells.Add(i);
+        comp.Count++;
+
+        if (_label[i] == 0)
+        {
+            _label[i] = comp.Number;
+        }
+
+        var x = i % _width;
+        var y = i / _width;
+
+        comp.MinX = Math.Min(comp.MinX, x);
+        comp.MaxX = Math.Max(comp.MaxX, x);
+        comp.MinY = Math.Min(comp.MinY, y);
+        comp.MaxY = Math.Max(comp.MaxY, y);
+    }
+
+    private static int _width;
+
+    private static int Grown(BotZoneHauntIn haunt, bool rooted, BotZoneSettings s) =>
+        rooted || s.ReachBeyond <= 0 || haunt.Reach <= haunt.Radius ? 0 : Math.Min(haunt.Reach, haunt.Radius + s.ReachBeyond);
+
+    private static int Trail(BotZoneInput input, BotZoneLiveIn c, int radius, int most, int w, int h)
+    {
+        var trail = input.Trail;
+
+        if (c.TrailCount <= 0 || most <= 0 || trail == null)
+        {
+            return 0;
+        }
+
+        var start = _marked;
+        var px = c.X;
+        var py = c.Y;
+
+        for (var k = 0; k < c.TrailCount && _marked - start < most; k++)
+        {
+            var t = (c.TrailFrom + k) * 2;
+
+            if (t < 0 || t + 1 >= trail.Length)
+            {
+                break;
+            }
+
+            var x = trail[t];
+            var y = trail[t + 1];
+            var steps = Math.Max(1, Math.Max(Math.Abs(x - px), Math.Abs(y - py)) / BotZoneState.Cell);
+
+            for (var j = 1; j <= steps && _marked - start < most; j++)
+            {
+                Paint(px + (x - px) * j / steps, py + (y - py) * j / steps, radius, Land, 0, w, h);
+            }
+
+            px = x;
+            py = y;
+        }
+
+        return _marked - start;
+    }
+
+    private static List<List<int>> Group(BotZoneHauntIn[] haunts, bool[] member, bool[] rooted, BotZoneSettings s)
+    {
+        var n = haunts.Length;
+        var parent = new int[n];
+        var reach = new int[n];
+        var x1 = new int[n];
+        var y1 = new int[n];
+        var x2 = new int[n];
+        var y2 = new int[n];
+        var most = Math.Max(BotZoneState.Cell, s.ZoneMostTiles);
+        var gap = Math.Max(0, s.JoinGap);
+        var bucket = Math.Max(64, 2 * Math.Max(1, s.DeclaredMost) + gap);
+        Dictionary<(int X, int Y), List<int>> buckets = [];
+
+        for (var i = 0; i < n; i++)
+        {
+            parent[i] = i;
+
+            if (!member[i])
+            {
+                continue;
+            }
+
+            var haunt = haunts[i];
+
+            reach[i] = rooted != null && rooted[i] ? 0 : Math.Min(haunt.Radius, s.DeclaredMost);
+            x1[i] = haunt.X - reach[i];
+            y1[i] = haunt.Y - reach[i];
+            x2[i] = haunt.X + reach[i];
+            y2[i] = haunt.Y + reach[i];
+
+            var key = (haunt.X / bucket, haunt.Y / bucket);
+
+            if (!buckets.TryGetValue(key, out var list))
+            {
+                buckets[key] = list = [];
+            }
+
+            list.Add(i);
+        }
+
+        int Find(int i)
+        {
+            while (parent[i] != i)
+            {
+                parent[i] = parent[parent[i]];
+                i = parent[i];
+            }
+
+            return i;
+        }
+
+        List<(int A, int B, int D)> pairs = [];
+
+        foreach (var ((bx, by), list) in buckets)
+        {
+            for (var k = 0; k < list.Count; k++)
+            {
+                var a = list[k];
+
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    for (var dx = -1; dx <= 1; dx++)
+                    {
+                        if (!buckets.TryGetValue((bx + dx, by + dy), out var near))
+                        {
+                            continue;
+                        }
+
+                        for (var m = 0; m < near.Count; m++)
+                        {
+                            var b = near[m];
+
+                            if (b <= a)
+                            {
+                                continue;
+                            }
+
+                            var d = Math.Max(Math.Abs(haunts[a].X - haunts[b].X), Math.Abs(haunts[a].Y - haunts[b].Y));
+
+                            if (d <= reach[a] + reach[b] + gap)
+                            {
+                                pairs.Add((a, b, d));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        pairs.Sort((p, q) => p.D.CompareTo(q.D));
+
+        for (var p = 0; p < pairs.Count; p++)
+        {
+            var ra = Find(pairs[p].A);
+            var rb = Find(pairs[p].B);
+
+            if (ra == rb)
+            {
+                continue;
+            }
+
+            var nx1 = Math.Min(x1[ra], x1[rb]);
+            var ny1 = Math.Min(y1[ra], y1[rb]);
+            var nx2 = Math.Max(x2[ra], x2[rb]);
+            var ny2 = Math.Max(y2[ra], y2[rb]);
+
+            if (nx2 - nx1 + 1 > most || ny2 - ny1 + 1 > most)
+            {
+                continue;
+            }
+
+            parent[rb] = ra;
+            x1[ra] = nx1;
+            y1[ra] = ny1;
+            x2[ra] = nx2;
+            y2[ra] = ny2;
+        }
+
+        Dictionary<int, List<int>> byRoot = [];
+        List<List<int>> groups = [];
+
+        for (var i = 0; i < n; i++)
+        {
+            if (!member[i])
+            {
+                continue;
+            }
+
+            var root = Find(i);
+
+            if (!byRoot.TryGetValue(root, out var group))
+            {
+                byRoot[root] = group = [];
+                groups.Add(group);
+            }
+
+            group.Add(i);
+        }
+
+        return groups;
+    }
+
+    private static void Attribute(
+        BotZoneInput input, BotZoneHauntIn[] haunts, int[] range, bool[] member, int[] groupOf, List<int>[] observedOf, BotZoneSettings s,
+        int w, int h
+    )
+    {
+        var observed = input.Observed;
+
+        if (observed.Length == 0)
+        {
+            return;
+        }
+
+        const int bucket = 256;
+        var slack = Math.Max(0, s.ObservedSlack);
+        Dictionary<(int X, int Y), List<int>> buckets = [];
+
+        for (var i = 0; i < haunts.Length; i++)
+        {
+            if (!member[i] || groupOf[i] < 0)
+            {
+                continue;
+            }
+
+            var key = (haunts[i].X / bucket, haunts[i].Y / bucket);
+
+            if (!buckets.TryGetValue(key, out var list))
+            {
+                buckets[key] = list = [];
+            }
+
+            list.Add(i);
+        }
+
+        for (var k = 0; k < observed.Length; k++)
+        {
+            var cell = observed[k];
+
+            if ((uint)cell >= (uint)(w * h))
+            {
+                continue;
+            }
+
+            var x = (cell % w << BotZoneState.Shift) + BotZoneState.Cell / 2;
+            var y = (cell / w << BotZoneState.Shift) + BotZoneState.Cell / 2;
+            var bx = x / bucket;
+            var by = y / bucket;
+            var best = -1;
+            var bestD = int.MaxValue;
+
+            for (var dy = -1; dy <= 1; dy++)
+            {
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    if (!buckets.TryGetValue((bx + dx, by + dy), out var list))
+                    {
+                        continue;
+                    }
+
+                    for (var m = 0; m < list.Count; m++)
+                    {
+                        var i = list[m];
+                        var haunt = haunts[i];
+                        var d = Math.Max(Math.Abs(x - haunt.X), Math.Abs(y - haunt.Y));
+
+                        if (d <= Math.Min(bucket, range[i]) + slack && d < bestD)
+                        {
+                            bestD = d;
+                            best = i;
+                        }
+                    }
+                }
+            }
+
+            if (best >= 0)
+            {
+                observedOf[groupOf[best]].Add(k);
+            }
+        }
+    }
+
+    private static void FightRaster(ushort[] cells, ushort[] fight, List<Comp> kept, BotZoneLiveIn[] live, BotZoneKindIn[] kinds, BotZoneSettings s, int w, int h)
+    {
+        var gen = ++_fightGen;
+        var reach = Math.Max(1, s.ConvergeTiles);
+
+        for (var i = 0; i < live.Length; i++)
+        {
+            var c = live[i];
+
+            if (!c.Aggressive || c.Water)
+            {
+                continue;
+            }
+
+            var power = c.Power > 0f ? c.Power : (float)kinds[c.Kind].Power;
+
+            if (power <= 0f)
+            {
+                continue;
+            }
+
+            var cx0 = Math.Max(0, (c.X - reach) >> BotZoneState.Shift);
+            var cy0 = Math.Max(0, (c.Y - reach) >> BotZoneState.Shift);
+            var cx1 = Math.Min(w - 1, (c.X + reach) >> BotZoneState.Shift);
+            var cy1 = Math.Min(h - 1, (c.Y + reach) >> BotZoneState.Shift);
+
+            for (var cy = cy0; cy <= cy1; cy++)
+            {
+                for (var cx = cx0; cx <= cx1; cx++)
+                {
+                    var i2 = cy * w + cx;
+
+                    if (_fightStamp[i2] != gen)
+                    {
+                        _fightStamp[i2] = gen;
+                        _fightSum[i2] = power;
+                        _fightMax[i2] = power;
+                    }
+                    else
+                    {
+                        _fightSum[i2] += power;
+
+                        if (power > _fightMax[i2])
+                        {
+                            _fightMax[i2] = power;
+                        }
+                    }
+                }
+            }
+        }
+
+        for (var i = 0; i < cells.Length; i++)
+        {
+            var v = cells[i];
+
+            if (v == 0)
+            {
+                continue;
+            }
+
+            var comp = kept[(v & BotZoneState.IndexMask) - 1];
+
+            if (comp.Layer == Passive)
+            {
+                continue;
+            }
+
+            var local = _fightStamp[i] == gen ? _fightMax[i] + s.Secondary * Math.Max(0.0, _fightSum[i] - _fightMax[i]) : 0.0;
+            var floor = comp.Stray ? 0.0 : comp.Declared * s.EmptyWeight;
+            var units = Math.Round(Math.Max(local, floor) / BotZoneState.FightUnit);
+
+            fight[i] = (ushort)Math.Min(ushort.MaxValue, Math.Max(0, units));
+        }
     }
 
     private static int LabelOf(int i, byte layer) =>
@@ -891,31 +1607,6 @@ public static class BotZoneBuild
         return number > 0 && comps[number - 1].Layer == layer ? number : 0;
     }
 
-    private static int Near(int x, int y, byte layer, List<Comp> comps, int w, int h)
-    {
-        var number = At(x, y, layer, comps, w, h);
-
-        if (number > 0)
-        {
-            return number;
-        }
-
-        for (var dy = -1; dy <= 1; dy++)
-        {
-            for (var dx = -1; dx <= 1; dx++)
-            {
-                number = At(x + dx * BotZoneState.Cell, y + dy * BotZoneState.Cell, layer, comps, w, h);
-
-                if (number > 0)
-                {
-                    return number;
-                }
-            }
-        }
-
-        return 0;
-    }
-
     private static int CellValue(ushort[] cells, int x, int y, int w, int h)
     {
         var cx = x >> BotZoneState.Shift;
@@ -932,7 +1623,7 @@ public static class BotZoneBuild
         }
     }
 
-    private static int ReachOf(bool water, bool rooted, bool caster, int perception, BotZoneSettings s)
+    private static int ReachOf(bool water, bool rooted, bool caster, int perception, int strike, BotZoneSettings s)
     {
         var sight = Math.Clamp(perception, 1, Math.Max(1, s.PerceptionMost));
 
@@ -941,7 +1632,12 @@ public static class BotZoneBuild
             return caster ? Math.Min(sight, s.WaterCasterReach) : s.WaterMeleeReach;
         }
 
-        return rooted && !caster ? s.RootedReach : sight;
+        if (rooted)
+        {
+            return caster ? sight : Math.Max(s.RootedReach, strike);
+        }
+
+        return Math.Max(sight, strike);
     }
 
     private static void Reckon(Comp comp, BotZoneInput input, BotZoneSettings s, double reference)
@@ -976,7 +1672,7 @@ public static class BotZoneBuild
             attackers.Add((c.X, c.Y, power));
             comp.Total += power;
             comp.Worst = Math.Max(comp.Worst, power);
-            comp.Reach = Math.Max(comp.Reach, ReachOf(c.Water, c.Rooted, c.Caster, c.Perception, s));
+            comp.Reach = Math.Max(comp.Reach, ReachOf(c.Water, c.Rooted, c.Caster, c.Perception, c.Strike, s));
         }
 
         var declared = 0.0;
@@ -1021,14 +1717,21 @@ public static class BotZoneBuild
 
                 worst = Math.Max(worst, kind.Power);
                 sum += expected * kind.Power;
-                comp.Reach = Math.Max(comp.Reach, ReachOf(kind.Water, kind.Rooted, kind.Caster, kind.Perception, s));
+                comp.Reach = Math.Max(
+                    comp.Reach,
+                    ReachOf(kind.WaterAt(SeaCamp(haunt, kinds)), kind.Rooted, kind.Caster, kind.Perception, kind.Strike, s)
+                );
             }
 
             declaredTotal += sum;
             declaredWorst = Math.Max(declaredWorst, worst);
-            declared = Math.Max(declared, worst + s.Secondary * Math.Max(0.0, sum - worst));
+
+            var share = Math.Min(1.0, Math.Pow(s.ConvergeTiles / (double)Math.Max(1, haunt.Radius), 2.0));
+
+            declared = Math.Max(declared, worst + s.Secondary * Math.Max(0.0, sum - worst) * share);
         }
 
+        comp.Declared = declared;
         comp.Confidence = weight > 0 ? confidence / weight : Math.Min(1.0, comp.ObservedWeight / Math.Max(1, s.ConfidentSamples));
         comp.AwakeSeconds = weight > 0 ? awake / weight : 0.0;
 
@@ -1037,7 +1740,7 @@ public static class BotZoneBuild
             comp.Samples = (long)Math.Round(comp.ObservedWeight);
         }
 
-        comp.Kept = comp.Layer switch
+        comp.Kept = comp.Count > 0 && comp.Layer switch
         {
             Land => comp.Haunts.Count > 0 || comp.Aggressive > 0,
             Sea => comp.Aggressive > 0,
@@ -1279,11 +1982,20 @@ public static class BotZoneBuild
 
         for (var i = 0; i < d.Length; i++)
         {
-            if (d[i] <= limit)
+            if (d[i] > limit)
             {
-                mask[i] = 1;
-                count++;
+                continue;
             }
+
+            if (!comp.Rooted && _guarded != null && _guarded[(y0 + i / aw) * w + x0 + i % aw] != 0)
+            {
+                _guardedKept++;
+
+                continue;
+            }
+
+            mask[i] = 1;
+            count++;
         }
 
         comp.Aggro = mask;
@@ -1346,7 +2058,7 @@ public static class BotZoneBuild
                     {
                         var owner = _label[_cells[c]];
 
-                        if (owner > 0)
+                        if (owner > 0 && old[owner - 1].Event == (comp.Event != null))
                         {
                             var id = old[owner - 1].Id;
 
@@ -1377,7 +2089,21 @@ public static class BotZoneBuild
             }
         }
 
-        pairs.Sort((a, b) => b.Overlap.CompareTo(a.Overlap));
+        pairs.Sort(
+            (a, b) =>
+            {
+                var byOverlap = b.Overlap.CompareTo(a.Overlap);
+
+                if (byOverlap != 0)
+                {
+                    return byOverlap;
+                }
+
+                var byEvent = (kept[a.Comp].Event != null).CompareTo(kept[b.Comp].Event != null);
+
+                return byEvent != 0 ? byEvent : a.Comp != b.Comp ? a.Comp.CompareTo(b.Comp) : a.Id.CompareTo(b.Id);
+            }
+        );
 
         HashSet<int> taken = [];
 
@@ -1409,7 +2135,7 @@ public static class BotZoneBuild
 
     private static void Describe(Comp comp, BotZoneInput input, BotZoneSettings s)
     {
-        var who = Who(comp);
+        var who = comp.Event != null ? $"{Who(comp)} of {comp.Event}" : comp.Stray ? $"wandering {Who(comp)}" : Who(comp);
         var where = Place(comp.CenterX, comp.CenterY, comp.Layer == Sea, input);
 
         comp.Label = where.Length == 0 ? who : $"{who}, {where}";
@@ -1417,6 +2143,14 @@ public static class BotZoneBuild
         if (comp.Layer == Passive)
         {
             comp.Why = Invariant($"{comp.Alive} that do not attack first; the strongest is ×{comp.VsBot:F1} a bot if set upon");
+        }
+        else if (comp.Event != null)
+        {
+            comp.Why = Invariant($"{comp.Aggressive} attack on sight, of {comp.Event}: painted while they live, where they stand and where they walked; up to {comp.Converge} can close at once: ×{comp.VsBot:F1} a bot");
+        }
+        else if (comp.Stray)
+        {
+            comp.Why = Invariant($"{comp.Aggressive} attack on sight, away from any spawner's range (a chase, a lure), painted where they stand and where they walked; up to {comp.Converge} can close at once: ×{comp.VsBot:F1} a bot where they stand");
         }
         else if (comp.Empty)
         {
@@ -1609,6 +2343,9 @@ public static class BotZoneBuild
             Label = comp.Label,
             Why = comp.Why,
             Water = comp.Layer == Sea,
+            Stray = comp.Stray,
+            Event = comp.Event != null,
+            Declared = comp.Declared,
             CenterX = comp.CenterX,
             CenterY = comp.CenterY,
             X1 = comp.MinX * BotZoneState.Cell,
@@ -1654,6 +2391,16 @@ public static class BotZoneBuild
         if (zone.Water)
         {
             json.WriteBoolean("water", true);
+        }
+
+        if (zone.Stray)
+        {
+            json.WriteBoolean("stray", true);
+        }
+
+        if (comp.Event != null)
+        {
+            json.WriteString("event", comp.Event);
         }
 
         json.WritePropertyName("center");
@@ -1734,6 +2481,7 @@ public static class BotZoneBuild
         json.WriteNumber("worst", Math.Round(zone.Worst));
         json.WriteNumber("threat", Math.Round(zone.Threat));
         json.WriteNumber("vsBot", Math.Round(zone.VsBot, 2));
+        json.WriteNumber("declared", Math.Round(zone.Declared));
         json.WriteEndObject();
 
         json.WriteStartObject("patrol");
@@ -1749,6 +2497,8 @@ public static class BotZoneBuild
         }
 
         json.WriteNumber("aggroRange", zone.AggroRange);
+
+        json.WriteNumber("grown", comp.Grown);
         json.WriteEndObject();
 
         json.WriteNumber("confidence", Math.Round(zone.Confidence, 2));

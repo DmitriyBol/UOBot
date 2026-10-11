@@ -55,8 +55,21 @@ public sealed class BotDebugModule : BotModule
 
         BotWitness.Open();
 
-        BotZoneTour.Walkers = BotVigil.Walkers;
+        BotZoneTour.Walkers = BotVigil.TourWalkers;
         BotZoneTour.Move = BotVigil.Carry;
+
+        BotZoneTour.KeeperHook = BotVigil.KeeperName;
+        BotZoneWatch.Noted = line => BotDebugLog.Write($"{BotVigil.Name}: {line}");
+
+        BotReachCheck.Walkers = BotVigil.Walkers;
+        BotReachCheck.Move = BotVigil.Carry;
+
+        BotWebHooks.Debuggers = BotDebugWeb.Report;
+
+        BotEventsArgus.Open();
+
+        BotStewardArgus.Open();
+        BotOfficersArgus.Open();
 
         _timer?.Stop();
         _timer = new VigilSummaryTimer(TimeSpan.FromMilliseconds(SayEveryMs));
@@ -112,7 +125,7 @@ public sealed class BotDebugModule : BotModule
         protected override void OnTick() => logger.Information("The debugger: {What}", Summarise());
     }
 
-    public static string Summarise() => $"{BotVigil.Describe()}; {BotRevel.Describe()}; {BotWitness.Describe()}";
+    public static string Summarise() => $"{BotVigil.Describe()}; {BotRevel.Describe()}; {BotVenues.Describe()}; {BotWitness.Describe()}";
 
     public override void Reset()
     {
@@ -123,6 +136,14 @@ public sealed class BotDebugModule : BotModule
         BotHalls.Noted = null;
         BotZoneTour.Walkers = null;
         BotZoneTour.Move = null;
+        BotZoneTour.KeeperHook = null;
+        BotZoneWatch.Noted = null;
+        BotReachCheck.Walkers = null;
+        BotReachCheck.Move = null;
+        BotWebHooks.Debuggers = null;
+        BotEventsArgus.Close();
+        BotStewardArgus.Close();
+        BotOfficersArgus.Close();
         BotWitness.Close();
         BotWitness.Forget();
         BotRevel.Forget();

@@ -62,6 +62,19 @@ public sealed class BotMovementModule : BotModule
             BotRefused.MostPlaces
         );
 
+        logger.Information(
+            "Sight {State}: each bot looks every {Every}ms within {Tiles} tiles; a creature that attacks on sight and comes, at its kind's price, past ×{Odds} what the bot brings is gone round at its reach plus {Margin} tiles (+{Step} a step in a plan, +{Route} tiles a node of a route), waited out {Wait}ms and then turned back from; work left standing {Standing}",
+            BotSight.Running ? "on" : "off",
+            BotSight.EveryMs,
+            BotSight.SightTiles,
+            BotSight.Odds,
+            BotSight.Margin,
+            BotSight.StepCost,
+            BotDanger.SightCost,
+            BotSight.WaitMs,
+            BotSight.Standing ? "on" : "off"
+        );
+
         BotBarred.Load();
         BotDanger.Hook();
         BotBarred.Announce();
@@ -93,6 +106,7 @@ public sealed class BotMovementModule : BotModule
         BotRoads.Forget();
         BotChart.Forget();
         BotGates.Forget();
+        BotSight.Reset();
     }
 
     public static string Summarise() =>

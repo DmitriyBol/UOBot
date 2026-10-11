@@ -47,6 +47,13 @@ public sealed class BotGatherer : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("digger", SkillName.Mining, 4, 65.0, 80.0, Tier: BotTier.Ore),
+            new BotLeaning("woodsman", SkillName.Lumberjacking, 1, 45.0, 60.0),
+            BotLeaning.Even(1)
+        ];
+
         ForageIntervalMs = 900000;
         HerbIntervalMs = 900000;
         ForageYieldMin = 3;

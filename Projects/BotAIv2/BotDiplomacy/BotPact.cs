@@ -17,12 +17,12 @@ namespace Server.BotAI.V2;
 /// <list type="bullet">
 /// <item><b>Peace</b> (safety): neither may declare war on the other while it stands. Enforced by the war ledger's own truce
 /// (<c>BotWar.RestoreTruce</c>), which <c>BotWar.MayDeclare</c> already refuses on and counts — one rule, one place.</item>
-/// <item><b>Trade</b>: a member of one buys off the other's stalls at <see cref="TradeDiscount"/> below the asking price, and
-/// sees that price when it looks for the cheapest stall (<c>BotAuction.Cheapest</c>, <c>BotAuction.Buy</c>). The seller is
-/// paid less by exactly what the buyer saves, so no coin is created: the terms move trade between the two, they do not mint
-/// it.</item>
-/// <item><b>Orders</b>: each side's makers fill the other's standing orders before anybody else's of the same kind
-/// (<c>BotAuction.Demand</c>) — the escrow and the price are the buyer's as ever; only who is served first changes.</item>
+/// <item><b>Trade</b>: a member of one buys at the other's shops by the bank at <see cref="TradeDiscount"/> below the asking
+/// price, and sees that price when it weighs the shop (<c>BotShopkeep.PriceFor</c>, the one place a shop's price is read). The
+/// keeper is paid less by exactly what the buyer saves, so no coin is created: the terms move trade between the two, they do not
+/// mint it.</item>
+/// <item><b>Orders</b>: each side's carriers answer the other's wants before anybody else's of the same kind
+/// (<c>BotMarket.Demand</c>, <c>BotCourier</c>) — the price is the buyer's as ever; only who is served first changes.</item>
 /// </list>
 ///
 /// <para>
@@ -138,6 +138,43 @@ public static class BotPact
         }
 
         return _pacts.TryGetValue(Pair(one, other), out var terms) && terms.Stands((int)kind, Core.TickCount);
+    }
+
+    public static long Broken { get; private set; }
+
+    public static string Break(string one, string other)
+    {
+        if (_pacts.Count == 0 || one == null || other == null || one == other)
+        {
+            return null;
+        }
+
+        var pair = Pair(one, other);
+
+        if (!_pacts.TryGetValue(pair, out var terms))
+        {
+            return null;
+        }
+
+        var now = Core.TickCount;
+        string said = null;
+
+        for (var k = 0; k < terms.Ends.Length; k++)
+        {
+            if (terms.Stands(k, now))
+            {
+                said = said == null ? Word((Kind)k) : $"{said} and {Word((Kind)k)}";
+            }
+        }
+
+        _pacts.Remove(pair);
+
+        if (said != null)
+        {
+            Broken++;
+        }
+
+        return said;
     }
 
     public static int MinutesLeft(string one, string other, Kind kind)
@@ -313,10 +350,11 @@ public static class BotPact
     }
 
     public static string Describe() =>
-        $"{Tell()}; {Peaces} peaces, {Trades} trade terms and {Orders} standing orders sworn for {Hours:0.#}h each; {Discounted} purchases off a partner's stall at {TradeDiscount:P0} off, {Saved}gp kept by the buyers; {Favoured} orders filled for a partner under standing orders";
+        $"{Tell()}; {Peaces} peaces, {Trades} trade terms and {Orders} standing orders sworn for {Hours:0.#}h each; {Discounted} purchases off a partner's stall at {TradeDiscount:P0} off, {Saved}gp kept by the buyers; {Favoured} orders filled for a partner under standing orders; {Broken} pairs' agreements broken by a seizure";
 
     public static void Forget()
     {
+        Broken = 0;
         Peaces = 0;
         Trades = 0;
         Orders = 0;

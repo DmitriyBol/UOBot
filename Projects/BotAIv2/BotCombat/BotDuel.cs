@@ -56,12 +56,16 @@ public static class BotDuel
         a != null && b != null && _bouts.TryGetValue(a.Serial, out var bout)
         && (ReferenceEquals(bout.A, b) || ReferenceEquals(bout.B, b));
 
-    public static bool Duelling(Mobile m) => m != null && _bouts.ContainsKey(m.Serial);
+    public static bool Duelling(Mobile m) => m != null && (_bouts.ContainsKey(m.Serial) || Held?.Invoke(m) == true);
 
-    public static bool Begin(BotMobile a, BotMobile b, SkillName trainsA, SkillName trainsB)
+    public static bool InBout(Mobile m) => m != null && _bouts.ContainsKey(m.Serial);
+
+    public static Func<Mobile, bool> Held { get; set; }
+
+    public static bool Begin(BotMobile a, BotMobile b, SkillName trainsA, SkillName trainsB, bool stack = false)
     {
         if (a is not { Deleted: false, Alive: true } || b is not { Deleted: false, Alive: true } || a == b
-            || Duelling(a) || Duelling(b))
+            || InBout(a) || InBout(b))
         {
             return false;
         }
@@ -71,8 +75,8 @@ public static class BotDuel
         _bouts[a.Serial] = bout;
         _bouts[b.Serial] = bout;
 
-        var pressedA = BotWill.Press(a, new BotBrawl(b, BotBrawl.Duel, trainsA, Over), $"a duel against {b.Name}");
-        var pressedB = BotWill.Press(b, new BotBrawl(a, BotBrawl.Duel, trainsB, Over), $"a duel against {a.Name}");
+        var pressedA = BotWill.Press(a, new BotBrawl(b, BotBrawl.Duel, trainsA, Over), $"a duel against {b.Name}", stack);
+        var pressedB = BotWill.Press(b, new BotBrawl(a, BotBrawl.Duel, trainsB, Over), $"a duel against {a.Name}", stack);
 
         if (!pressedA || !pressedB)
         {
@@ -98,6 +102,39 @@ public static class BotDuel
 
         return true;
     }
+
+    public static bool Again(BotMobile a, BotMobile b, SkillName trainsA, SkillName trainsB, bool stack = false)
+    {
+        if (a is not { Deleted: false, Alive: true } || b is not { Deleted: false, Alive: true } || !Between(a, b)
+            || _bouts[a.Serial].Winner != null)
+        {
+            return false;
+        }
+
+        var pressedA = BotWill.Press(a, new BotBrawl(b, BotBrawl.Duel, trainsA, Over), $"the duel against {b.Name} again", stack);
+        var pressedB = BotWill.Press(b, new BotBrawl(a, BotBrawl.Duel, trainsB, Over), $"the duel against {a.Name} again", stack);
+
+        if (pressedA && pressedB)
+        {
+            Pressed++;
+
+            return true;
+        }
+
+        if (pressedA)
+        {
+            BotWill.Abandon(a, "the duel could not be pressed again", unreached: false);
+        }
+
+        if (pressedB)
+        {
+            BotWill.Abandon(b, "the duel could not be pressed again", unreached: false);
+        }
+
+        return false;
+    }
+
+    public static long Pressed { get; private set; }
 
     private static double Share(Mobile m) =>
         m is { Deleted: false, Alive: true, HitsMax: > 0 } ? Math.Clamp(m.Hits / (double)m.HitsMax, 0.0, 1.0) : 0.0;
@@ -182,6 +219,38 @@ public static class BotDuel
         return true;
     }
 
+    public static bool NoFight(Mobile m, string why)
+    {
+        if (m == null || !_bouts.TryGetValue(m.Serial, out var bout) || bout.Winner != null)
+        {
+            return false;
+        }
+
+        var goes = Share(bout.A) >= Share(bout.B) ? bout.A : bout.B;
+        var other = ReferenceEquals(goes, bout.A) ? bout.B : bout.A;
+
+        NoFights++;
+
+        bout.Winner = goes;
+        bout.Why = $"no fight with {other?.Name}: {why ?? "the two could not reach each other"}";
+
+        Disarm(bout.A);
+        Disarm(bout.B);
+
+        logger.Information(
+            "No fight between {A} and {B} after {Seconds}s ({Why}); {Goes} goes on by the rule of the clock, not on hits",
+            bout.A?.Name,
+            bout.B?.Name,
+            (Core.TickCount - bout.Began) / 1000,
+            why ?? "the two could not reach each other",
+            goes?.Name
+        );
+
+        return true;
+    }
+
+    public static long NoFights { get; private set; }
+
     public static BotMobile Winner(Mobile m) =>
         m != null && _bouts.TryGetValue(m.Serial, out var bout) ? bout.Winner : null;
 
@@ -207,10 +276,12 @@ public static class BotDuel
         Yielded = 0;
         Called = 0;
         Deaths = 0;
+        Pressed = 0;
+        NoFights = 0;
     }
 
     public static string Describe() =>
         Begun == 0
             ? "no duel has been fought"
-            : $"{Begun} duels fought, {Yielded} decided by a yield at {YieldAt:P0}, {Called} by the clock at {CapMs / 1000}s, {Deaths} with a death in them; {_bouts.Count / 2} standing";
+            : $"{Begun} duels fought, {Yielded} decided by a yield at {YieldAt:P0}, {Called} by the clock at {CapMs / 1000}s, {Deaths} with a death in them, {Pressed} pressed again by a referee, {NoFights} decided as no fight; {_bouts.Count / 2} standing";
 }

@@ -57,6 +57,16 @@ public static class BotSea
 
     public static long Ordered { get; private set; }
 
+    public static long Shipless { get; private set; }
+
+    public static long ColonyKept { get; private set; }
+
+    public static long LanesShut { get; private set; }
+
+    public static bool Owns(Mobile body) => body != null && (Grant || BotHelm.ShipOf(body) != null);
+
+    public static bool Shut(BotSeaLane lane) => lane != null && lane.Lost > lane.Sailed;
+
     public static bool Travel(IBotWilful bot, BotTowns.Town here, string from, out BotDeed voyage)
     {
         voyage = null;
@@ -74,6 +84,13 @@ public static class BotSea
             return true;
         }
 
+        if (BotColonies.OnShift(body))
+        {
+            ColonyKept++;
+
+            return true;
+        }
+
         var ashore = BotGates.Joined(map, body.Location, BotPopulation.Where);
 
         if (ashore && Utility.RandomDouble() >= Share)
@@ -86,6 +103,13 @@ public static class BotSea
         if (!ashore)
         {
             Islanders++;
+        }
+
+        if (!Owns(body))
+        {
+            Shipless++;
+
+            return !ashore;
         }
 
         var towns = BotTowns.All;
@@ -105,7 +129,7 @@ public static class BotSea
                 continue;
             }
 
-            if (!Plan(map, body.Location, dock, out var start, out var lane, out var tiles) || tiles > Furthest)
+            if (!Plan(map, body.Location, dock, out var start, out var lane, out var tiles, true) || tiles > Furthest)
             {
                 continue;
             }
@@ -118,13 +142,6 @@ public static class BotSea
         if (total <= 0.0)
         {
             Nowhere++;
-
-            return !ashore;
-        }
-
-        if (!CanSail(body))
-        {
-            Unafforded++;
 
             return !ashore;
         }
@@ -161,7 +178,7 @@ public static class BotSea
         return true;
     }
 
-    public static bool Plan(Map map, Point3D at, BotDock to, out BotDock from, out BotSeaLane lane, out int tiles)
+    public static bool Plan(Map map, Point3D at, BotDock to, out BotDock from, out BotSeaLane lane, out int tiles, bool wary = false)
     {
         from = null;
         lane = null;
@@ -182,6 +199,13 @@ public static class BotSea
 
             if (way == null)
             {
+                continue;
+            }
+
+            if (wary && Shut(way))
+            {
+                LanesShut++;
+
                 continue;
             }
 
@@ -218,7 +242,7 @@ public static class BotSea
             price = ListPrice;
         }
 
-        var have = BotYield.Wealth(body);
+        var have = BotYield.Spendable(body);
 
         if (have >= price)
         {
@@ -236,7 +260,7 @@ public static class BotSea
         {
             if (guild.Members[i] is BotMobile { Deleted: false } mate && mate != body)
             {
-                could += Math.Max(0, BotYield.Wealth(mate) - BotGuilds.Keep);
+                could += Math.Max(0, BotYield.Spendable(mate) - BotGuilds.Keep);
             }
         }
 
@@ -287,7 +311,7 @@ public static class BotSea
         }
 
         var here = BotTowns.Nearest(bot.Location);
-        var voyage = new BotVoyage(bot.Map, from, dock, lane, town, town.Square, here?.Name ?? "the wild", false);
+        var voyage = new BotVoyage(bot.Map, from, dock, lane, town, town.Square, here?.Name ?? "the wild", false, null, true);
 
         if (BotWill.Press(bot, voyage, "ordered to sea by hand (BotSea.Order)"))
         {
@@ -301,8 +325,33 @@ public static class BotSea
         !Running
             ? "the sea is off"
             : $"{BotHelm.Embarked} voyages begun, {BotHelm.Arrived} arrived, {BotHelm.Lost} lost; {BotVoyage.Bought} ships bought for {BotVoyage.BoughtGold}gp, {BotVoyage.Granted} handed over; "
-              + $"{BotSeaChart.Describe()}; {BotDocks.Describe()}; {BotSeaLanes.Describe()}; asked {Asked} travellers ({Islanders} on an island): {Offered} offered a voyage, {Nowhere} with nowhere to sail, {Unafforded} without the means of a ship; "
-              + $"{BotSeafarer.Describe()}; {Ordered} ordered by hand; {BotVoyage.Describe()}; {BotHelm.Describe()}; {BotSeaCourse.Describe()}";
+              + $"{BotSeaChart.Describe()}; {BotDocks.Describe()}; {BotSeaLanes.Describe()}; asked {Asked} travellers ({Islanders} on an island): {Shipless} holding no ship, which a journey does not buy (it pays 0gp: no voyage here pays a ship back), {Offered} offered a voyage, {Nowhere} with nowhere to sail, {ColonyKept} colonists kept to their colony; {LanesShut} lanes passed over for losing more voyages than they delivered ({ShutLanes()}); "
+              + $"{BotSeafarer.Describe()}; {Ordered} ordered by hand; {BotVoyage.Describe()}; {BotHelm.Describe()}; {BotSeaCourse.Describe()}; {BotColonies.Describe()}";
+
+    private static string ShutLanes()
+    {
+        var lanes = BotSeaLanes.All;
+        var named = new System.Text.StringBuilder();
+
+        for (var i = 0; i < lanes.Count; i++)
+        {
+            var lane = lanes[i];
+
+            if (!Shut(lane))
+            {
+                continue;
+            }
+
+            if (named.Length > 0)
+            {
+                named.Append(", ");
+            }
+
+            named.Append($"{lane.A?.Name}–{lane.B?.Name} {lane.Lost} lost to {lane.Sailed} arrived");
+        }
+
+        return named.Length == 0 ? "none shut" : named.ToString();
+    }
 
     public static void Forget()
     {
@@ -310,10 +359,14 @@ public static class BotSea
         Offered = 0;
         Nowhere = 0;
         Unafforded = 0;
+        Shipless = 0;
+        LanesShut = 0;
+        ColonyKept = 0;
         Islanders = 0;
         Ordered = 0;
         Order = "";
         BotSeafarer.Forget();
+        BotColonies.Forget();
         BotVoyage.Forget();
         BotHelm.Forget();
         BotSeaLanes.Forget();
@@ -342,6 +395,8 @@ public sealed class BotSeafarer : IBotProposer
 
     public static long Sent { get; private set; }
 
+    public static long Colonists { get; private set; }
+
     public string Name => "Seafarer";
 
     public BotStanding Rung => BotStanding.Free;
@@ -358,6 +413,13 @@ public sealed class BotSeafarer : IBotProposer
 
         if (bot is IBotSquadMember { Squad: not null } || BotDelveParty.Delving(body) || BotDungeon.Under(body.Location) || BotHelm.Of(body) != null)
         {
+            return null;
+        }
+
+        if (BotColonies.OnShift(body))
+        {
+            Colonists++;
+
             return null;
         }
 
@@ -421,13 +483,13 @@ public sealed class BotSeafarer : IBotProposer
 
         Sent++;
 
-        return new BotVoyage(map, start, end, lane, null, hearth, BotTowns.Nearest(body.Location)?.Name ?? "the wild", true);
+        return new BotVoyage(map, start, end, lane, null, hearth, BotTowns.Nearest(body.Location)?.Name ?? "the wild", true, null, true);
     }
 
     public static string Describe() =>
         Asked == 0
             ? "nobody has been asked to sail home"
-            : $"{Asked} asked to sail home: {OnHome} on home's land, {Busy} not yet out of work, {NoWay} with no dock and lane home, {Unafforded} without the means of a ship, {Sent} sent";
+            : $"{Asked} asked to sail home: {OnHome} on home's land, {Busy} not yet out of work, {NoWay} with no dock and lane home, {Unafforded} without the means of a ship, {Sent} sent; {Colonists} colonists left to their colony's ship";
 
     public static void Forget()
     {
@@ -437,5 +499,6 @@ public sealed class BotSeafarer : IBotProposer
         NoWay = 0;
         Unafforded = 0;
         Sent = 0;
+        Colonists = 0;
     }
 }

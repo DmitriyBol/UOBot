@@ -33,9 +33,9 @@ public sealed class BotRestock : BotDeed
 
     private int _repicks;
 
-    private BotListing _stall;
-
     private readonly Type _wanted;
+
+    public Type Wanted => _wanted;
 
     private readonly int _amount;
 
@@ -44,8 +44,6 @@ public sealed class BotRestock : BotDeed
     public static long FellThrough { get; private set; }
 
     public static long ToolsBound { get; private set; }
-
-    public static long Restalled { get; private set; }
 
     private int _bought;
 
@@ -57,16 +55,6 @@ public sealed class BotRestock : BotDeed
         _wanted = wanted;
         _amount = Math.Max(1, amount);
         _price = Math.Max(1, price);
-    }
-
-    public BotRestock(BotListing stall, Type wanted, int amount, Map map, Point3D where)
-    {
-        _stall = stall;
-        _wanted = wanted;
-        _amount = Math.Max(1, amount);
-        _price = Math.Max(1, stall?.Price ?? 1);
-        _map = map;
-        _where = where;
     }
 
     public BotRestock(PlayerVendor merchant, Type wanted, int amount, int price)
@@ -94,15 +82,11 @@ public sealed class BotRestock : BotDeed
 
     private BotRecall _recall;
 
-    private readonly Map _map;
-
-    private readonly Point3D _where;
-
     public override string Kind => Trade;
 
-    public override Map Map => _shop?.Map ?? _merchant?.Map ?? _front?.Map ?? _map;
+    public override Map Map => _shop?.Map ?? _merchant?.Map ?? _front?.Map;
 
-    public override Point3D Where => _shop?.Location ?? _merchant?.Location ?? _front?.Location ?? _where;
+    public override Point3D Where => _shop?.Location ?? _merchant?.Location ?? _front?.Location ?? Point3D.Zero;
 
     public double? Claim { get; set; }
 
@@ -114,7 +98,7 @@ public sealed class BotRestock : BotDeed
 
     public override SkillName? Trains => null;
 
-    public override int Outlay => _forWant ? 0 : _amount * _price;
+    public override int Outlay => _amount * _price;
 
     public override bool AtCounter => _shop != null || _front != null;
 
@@ -178,35 +162,6 @@ public sealed class BotRestock : BotDeed
         if (body == null)
         {
             return BotDoing.Failed("no body");
-        }
-
-        if (_stall != null)
-        {
-            if (_stall.IsEmpty)
-            {
-                var next = BotAuction.Cheapest(_wanted, bot);
-
-                if (next == null || next.IsEmpty || ReferenceEquals(next, _stall))
-                {
-                    return BotDoing.Failed("that stall is empty now");
-                }
-
-                _stall = next;
-                Restalled++;
-            }
-
-            var price = _stall.Price;
-
-            _bought = BotAuction.Buy(body, _stall, _amount);
-
-            if (_bought <= 0)
-            {
-                return BotDoing.Failed("could not pay another bot for it");
-            }
-
-            _paid = _bought * price;
-
-            return BotDoing.Done(Cut(bot, $"{_bought} {_wanted?.Name} off the market for {_paid}gp"));
         }
 
         if (_front != null)

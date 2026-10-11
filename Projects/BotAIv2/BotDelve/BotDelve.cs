@@ -61,8 +61,10 @@ public sealed class BotDelve : BotDeed
     {
         var want = Math.Max(Company, RoomOf(map, deep) * Math.Max(1, BotProving.PartyMultiple));
 
-        return Math.Min(want, Math.Max(Company, BotDelver.HeadsPerParty));
+        return Math.Min(want, Math.Max(Company, MostParty));
     }
+
+    public static int MostParty { get; set; } = 20;
 
     public static int Least(Map map, BotDungeon.Deep deep) =>
         Math.Min(PartyFor(map, deep), Math.Max(Fewest, RoomOf(map, deep) + 1));
@@ -149,6 +151,22 @@ public sealed class BotDelve : BotDeed
 
     public static int MarchMs { get; set; } = 900000;
 
+    public static int MarchStallMs { get; set; } = 300000;
+
+    public static int ProgressTiles { get; set; } = 8;
+
+    public static int ProgressEveryMs { get; set; } = 5000;
+
+    public static int MarchCapTimes { get; set; } = 3;
+
+    public static int GateApart { get; set; } = 300;
+
+    public static long KeptMarching { get; private set; }
+
+    public static long Deserted { get; private set; }
+
+    public static long MoonLed { get; private set; }
+
     public static int ArriveMs { get; set; } = 120000;
 
     public static int LeaveMs { get; set; } = 300000;
@@ -163,6 +181,12 @@ public sealed class BotDelve : BotDeed
 
     public static long LeftBelow { get; private set; }
 
+    public static long LiftedAtRefusal { get; private set; }
+
+    public static long LiftedBodies { get; private set; }
+
+    private bool _lifted;
+
     public static int Station { get; set; } = 2;
 
     public static int MusterBack { get; set; } = 48;
@@ -172,6 +196,17 @@ public sealed class BotDelve : BotDeed
     public static int MarchLost { get; set; } = 60;
 
     public static int HoldMs { get; set; } = 90000;
+
+    public static int HoldBeatMs { get; set; } = 1500;
+
+    private BotDoing Holding(IBotSquadMember member, string why)
+    {
+        member.Journey?.Hold(HoldBeatMs);
+
+        return _returning
+            ? BotDoing.Walk(_map, _muster, BotArrival.Within(Station), why)
+            : BotDoing.Walk(_map, _room, BotArrival.Within(3), why);
+    }
 
     public static int MouthHoldMs { get; set; } = 180000;
 
@@ -227,6 +262,10 @@ public sealed class BotDelve : BotDeed
 
     public static long Undermanned { get; private set; }
 
+    public static long LeviedEarly { get; private set; }
+
+    public static int LevyWalkingMs { get; set; } = 10000;
+
     public static long Lineless { get; private set; }
 
     public static long Called { get; private set; }
@@ -238,6 +277,8 @@ public sealed class BotDelve : BotDeed
     public static long Timedout { get; private set; }
 
     public static long Broken { get; private set; }
+
+    public static long BledOut { get; private set; }
 
     public static long Bends { get; private set; }
 
@@ -378,8 +419,66 @@ public sealed class BotDelve : BotDeed
         var la = BotGates.LandOf(_map, a);
         var lb = BotGates.LandOf(_map, b);
 
-        return la >= 0 && lb >= 0 ? la != lb : apart > 1000;
+        return la >= 0 && lb >= 0 && la != lb || apart > GateApart;
     }
+
+    private static bool Serving(IBotSquadMember member)
+    {
+        if (member is not IBotWilful { Resolve: { } resolve })
+        {
+            return true;
+        }
+
+        return resolve.Deed is BotEnlist || resolve.Paused?.Deed is BotEnlist || resolve.Deed is BotDelve;
+    }
+
+    private void Progress(Mobile body, long now)
+    {
+        if (_progressTick == 0)
+        {
+            _progressTick = now;
+            _foughtAtProgress = _fought;
+        }
+
+        if (now - _progressReadTick < ProgressEveryMs)
+        {
+            return;
+        }
+
+        _progressReadTick = now;
+
+        var target = _returning ? _muster : _room;
+        var next = BotGates.Next(_map, body.Location, target, out var gate) && gate != null ? gate.From : target;
+        var away = Math.Max(Math.Abs(body.X - next.X), Math.Abs(body.Y - next.Y));
+
+        var journey = (body as BotMobile)?.Journey;
+
+        if (journey != null && journey.HoldsRoadTo(target))
+        {
+            away = Math.Max(0, journey.RoadLeft(body.Location, target) - Math.Max(Math.Abs(next.X - target.X), Math.Abs(next.Y - target.Y)));
+            next = new Point3D(next.X, next.Y, next.Z + 1);
+        }
+
+        if (next != _progressGate || away + ProgressTiles <= _progressLeast)
+        {
+            _progressGate = next;
+            _progressLeast = away;
+            _progressTick = now;
+            _foughtAtProgress = _fought;
+        }
+    }
+
+    private long _progressTick;
+
+    private long _progressReadTick;
+
+    private long _foughtAtProgress;
+
+    private int _progressLeast = int.MaxValue;
+
+    private Point3D _progressGate;
+
+    private bool _keptMarching;
 
     private BotPassage _passage;
 
@@ -406,6 +505,8 @@ public sealed class BotDelve : BotDeed
     private int _which;
 
     private int _kills;
+
+    private int _bledAt;
 
     private int _here;
 
@@ -539,7 +640,35 @@ public sealed class BotDelve : BotDeed
             _foe = null;
         }
 
-        if (now - _marchTick - (MarchFightMs > 0 ? Math.Min(_fought, MarchFightMs) : _fought) >= MarchMs)
+        var marched = now - _marchTick - (MarchFightMs > 0 ? Math.Min(_fought, MarchFightMs) : _fought);
+
+        Progress(body, now);
+
+        if (marched >= MarchMs && MarchStallMs > 0 && marched < (long)MarchMs * Math.Max(1, MarchCapTimes)
+            && now - _progressTick - (_fought - _foughtAtProgress) < MarchStallMs)
+        {
+            if (!_keptMarching)
+            {
+                _keptMarching = true;
+                KeptMarching++;
+
+                logger.Information(
+                    "{Name}'s march {Way} {Deep} goes on past {Minutes} minutes: {Away} tiles from ({X}, {Y}) and still closing, {Count} in the company",
+                    body.Name,
+                    _returning ? "back from" : "to",
+                    _deep.Name,
+                    MarchMs / 60000,
+                    _progressLeast,
+                    _progressGate.X,
+                    _progressGate.Y,
+                    squad.Count
+                );
+            }
+
+            marched = 0;
+        }
+
+        if (marched >= MarchMs)
         {
             Unreached++;
             Release(squad);
@@ -550,7 +679,7 @@ public sealed class BotDelve : BotDeed
             return BotDoing.Failed(
                 _returning
                     ? $"could not bring the party back to the muster at ({_muster.X}, {_muster.Y}) in {MarchMs / 60000} minutes, having turned back from {_deep.Name}: {_why}"
-                    : $"could not reach the mouth of {_deep.Name} in {MarchMs / 60000} minutes, from the muster at ({_muster.X}, {_muster.Y})"
+                    : $"could not reach the mouth of {_deep.Name} in {MarchMs / 60000} minutes, from the muster at ({_muster.X}, {_muster.Y}); {(_progressLeast == int.MaxValue ? "never placed on its road" : $"last {_progressLeast} tiles from ({_progressGate.X}, {_progressGate.Y})")}"
             );
         }
 
@@ -599,7 +728,25 @@ public sealed class BotDelve : BotDeed
             }
         }
 
-        var straggler = squad.Straggler(MarchSpread, out var behind);
+        var spread = MarchSpread + Math.Max(0, squad.Count - BotSquad.Usual) / 2;
+        var straggler = squad.Straggler(spread, out var behind);
+
+        if (straggler != null && !Serving(straggler))
+        {
+            Deserted++;
+
+            logger.Information(
+                "{Name} strikes {Who} off the march to {Deep}: {Behind} tiles back and holding {Deed}, not its place in the company",
+                body.Name,
+                straggler.Self?.Name ?? "a member",
+                _deep.Name,
+                behind,
+                (straggler as IBotWilful)?.Resolve?.Deed?.Kind ?? "nothing"
+            );
+
+            BotSquads.Leave(straggler);
+            straggler = squad.Straggler(spread, out behind);
+        }
 
         if (straggler?.Self is { } crossing && OtherLand(body.Location, crossing.Location, behind))
         {
@@ -618,9 +765,7 @@ public sealed class BotDelve : BotDeed
 
             if (now - _crossTick < MouthHoldMs)
             {
-                member.Journey?.Finish();
-
-                return BotDoing.Work($"holding at the mouth of {_deep.Name} for {crossing.Name} to come through");
+                return Holding(member, $"holding at the mouth of {_deep.Name} for {crossing.Name} to come through");
             }
 
             LeftBehind++;
@@ -643,9 +788,7 @@ public sealed class BotDelve : BotDeed
 
             if ((behind <= MarchLost || BotSquad.Coming(straggler, behind)) && now - _holdTick < HoldMs)
             {
-                member.Journey?.Finish();
-
-                return BotDoing.Work($"holding for {straggler.Self?.Name ?? "a member"}, {behind} tiles behind, on the way {(_returning ? "back from" : "to")} {_deep.Name}");
+                return Holding(member, $"holding for {straggler.Self?.Name ?? "a member"}, {behind} tiles behind, on the way {(_returning ? "back from" : "to")} {_deep.Name}");
             }
 
             LeftBehind++;
@@ -685,6 +828,17 @@ public sealed class BotDelve : BotDeed
         else
         {
             _holdTick = 0;
+        }
+
+        if (_progressGate != Point3D.Zero && body.X == _progressGate.X && body.Y == _progressGate.Y
+            && BotGates.Next(_map, body.Location, _returning ? _muster : _room, out var moon) && moon is { Moongate: true }
+            && moon.From.X == body.X && moon.From.Y == body.Y && BotGates.Travel(body, moon))
+        {
+            MoonLed++;
+            member.Journey?.Finish();
+            _progressReadTick = 0;
+
+            return BotDoing.Work($"through the moongate to ({moon.To.X}, {moon.To.Y}) on the way {(_returning ? "back from" : "to")} {_deep.Name}");
         }
 
         return _returning
@@ -806,6 +960,10 @@ public sealed class BotDelve : BotDeed
         _returning = true;
         _why = why;
         _marchTick = Core.TickCount;
+        _progressTick = 0;
+        _progressLeast = int.MaxValue;
+        _progressGate = Point3D.Zero;
+        _keptMarching = false;
         _fought = 0;
         _fightTick = 0;
         _holdTick = 0;
@@ -859,6 +1017,7 @@ public sealed class BotDelve : BotDeed
         _party = new BotDelveParty(_deep, body as BotMobile);
         _marching = false;
         _down = true;
+        _bledAt = squad.Bled;
         squad.OnTheMarch = false;
         _began = now;
         _roomTick = now;
@@ -869,8 +1028,9 @@ public sealed class BotDelve : BotDeed
         Adopt(squad);
 
         logger.Information(
-            "{Name} has led {Count} into {Deep} by its mouth after {Minutes:F1} minutes' march: {Quota} of them to kill or {Cap} minutes, {Raisings} raisings between them",
+            "{Name} has led its company of {Living} into {Deep} by its mouth ({Count} down so far) after {Minutes:F1} minutes' march: {Quota} of them to kill or {Cap} minutes, {Raisings} raisings between them",
             body.Name,
+            Living(squad),
             _count,
             _deep.Name,
             (now - _marchTick) / 60000.0,
@@ -906,6 +1066,13 @@ public sealed class BotDelve : BotDeed
     {
         var now = Core.TickCount;
         var pot = _party?.Pot ?? 0;
+
+        if (_lifted)
+        {
+            Release(_squad);
+
+            return BotDoing.Done($"{_why} — {_count} of us, {pot}gp between them; the way out by the mouth was refused and the party was lifted out");
+        }
 
         if (!_deep.Holds(body.Location))
         {
@@ -945,7 +1112,20 @@ public sealed class BotDelve : BotDeed
         {
             _calling = true;
 
-            _muster = Muster(body);
+            if (_planned != Point3D.Zero)
+            {
+                _muster = _planned;
+
+                if (_plannedForward)
+                {
+                    MusteredForward++;
+                    logger.Information("{Name}'s muster for {Deep} is set forward to ({X}, {Y})", body.Name, _deep.Name, _muster.X, _muster.Y);
+                }
+            }
+            else
+            {
+                _muster = Muster(body);
+            }
 
             Calls++;
 
@@ -966,8 +1146,24 @@ public sealed class BotDelve : BotDeed
             );
         }
 
-        if (!body.InRange(_muster, Station))
+        var walking = !body.InRange(_muster, Station);
+
+        if (now - _leviedTick >= (walking ? Math.Max(LevyMs, LevyWalkingMs) : LevyMs))
         {
+            _leviedTick = now;
+
+            if (walking)
+            {
+                LeviedEarly++;
+            }
+
+            Levy(squad, body);
+        }
+
+        if (walking)
+        {
+            squad.OnTheMarch = true;
+
             return BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"to the muster at ({_muster.X}, {_muster.Y})");
         }
 
@@ -975,13 +1171,7 @@ public sealed class BotDelve : BotDeed
         {
             _atMuster = true;
             _musteredTick = now;
-        }
-
-        if (now - _leviedTick >= LevyMs)
-        {
-            _leviedTick = now;
-
-            Levy(squad, body);
+            squad.OnTheMarch = false;
         }
 
         _count = squad.Count;
@@ -1133,6 +1323,10 @@ public sealed class BotDelve : BotDeed
             _mouth = BotGates.Mouth(_map, body.Location, _room)?.From ?? Point3D.Zero;
             _atMouth = false;
             _returning = false;
+            _progressTick = 0;
+            _progressLeast = int.MaxValue;
+            _progressGate = Point3D.Zero;
+            _keptMarching = false;
             _fought = 0;
             _fightTick = 0;
             _marchBends = 0;
@@ -1188,6 +1382,7 @@ public sealed class BotDelve : BotDeed
         squad.Quarry = Prey;
 
         _down = true;
+        _bledAt = squad.Bled;
         _count = went;
         _began = Core.TickCount;
         _roomTick = _began;
@@ -1271,6 +1466,13 @@ public sealed class BotDelve : BotDeed
         }
 
         var down = _party?.Down ?? 0;
+
+        if (member.Squad is { } bleeding && bleeding.Bled > _bledAt)
+        {
+            BledOut++;
+
+            return Finish($"the party lost {BotSquad.BleedDeaths} inside a minute in {_deep.Name} at {_kills} down; it comes up", body);
+        }
 
         if (down < 2 && now - _began >= ArriveMs)
         {
@@ -1400,7 +1602,7 @@ public sealed class BotDelve : BotDeed
 
     public static long Undersized { get; private set; }
 
-    private Point3D Muster(Mobile body)
+    private Point3D Muster(Mobile body, bool quiet = false)
     {
         var seat = Rally(body);
 
@@ -1461,6 +1663,13 @@ public sealed class BotDelve : BotDeed
             return seat;
         }
 
+        if (quiet)
+        {
+            _plannedForward = true;
+
+            return new Point3D(at.X, at.Y, z);
+        }
+
         MusteredForward++;
         logger.Information(
             "{Name}'s muster for {Deep} is set forward to ({X}, {Y}), {Back} tiles before {What} at ({AX}, {AY})",
@@ -1477,6 +1686,20 @@ public sealed class BotDelve : BotDeed
         return new Point3D(at.X, at.Y, z);
     }
 
+    internal Point3D Plan(Mobile body)
+    {
+        if (_planned == Point3D.Zero)
+        {
+            _planned = Muster(body, quiet: true);
+        }
+
+        return _planned;
+    }
+
+    private Point3D _planned;
+
+    private bool _plannedForward;
+
     private Point3D Rally(Mobile body)
     {
         var where = BotPopulation.HomeOf(body);
@@ -1486,13 +1709,59 @@ public sealed class BotDelve : BotDeed
             where = BotPopulation.Where;
         }
 
-        if (where != Point3D.Zero && BotStep.Settle(_map, where.X, where.Y, out var z))
+        if (Standing(where, out var home) && SafeMuster(home))
         {
-            return new Point3D(where.X, where.Y, z);
+            return home;
+        }
+
+        MusterMoved++;
+
+        if (Standing(BotPopulation.Where, out var town))
+        {
+            return town;
         }
 
         return body?.Location ?? where;
     }
+
+    public static long MusterMoved { get; private set; }
+
+    private bool Standing(Point3D near, out Point3D at)
+    {
+        at = Point3D.Zero;
+
+        if (near == Point3D.Zero || _map == null)
+        {
+            return false;
+        }
+
+        for (var r = 0; r <= 4; r++)
+        {
+            for (var dx = -r; dx <= r; dx++)
+            {
+                for (var dy = -r; dy <= r; dy++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r)
+                    {
+                        continue;
+                    }
+
+                    if (BotStep.Settle(_map, near.X + dx, near.Y + dy, out var z))
+                    {
+                        at = new Point3D(near.X + dx, near.Y + dy, z);
+
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool SafeMuster(Point3D at) =>
+        BotQuad.Muscle(_map, at) <= 0.0
+        && BotZones.LevelAt(_map, at.X, at.Y) is not (BotZoneLevel.Hostile or BotZoneLevel.Deadly);
 
     public static long Hostiles { get; private set; }
 
@@ -1630,6 +1899,27 @@ public sealed class BotDelve : BotDeed
 
             if (other.Squad != null || role != null && other.Class?.Role != role)
             {
+                continue;
+            }
+
+            if (BotSquads.Carrying(other))
+            {
+                BotSquads.Spare();
+
+                continue;
+            }
+
+            if (BotSquads.Fighting(other))
+            {
+                BotSquads.SpareFighter();
+
+                continue;
+            }
+
+            if (BotSquads.Thieving(other))
+            {
+                BotSquads.SpareThief();
+
                 continue;
             }
 
@@ -1779,6 +2069,27 @@ public sealed class BotDelve : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+        if (_leaving && !_lifted && _party != null)
+        {
+            _lifted = true;
+            LiftedAtRefusal++;
+            LiftedBodies += _party.Lift();
+
+            var walker = bot?.Self;
+
+            logger.Information(
+                "{Name}'s walk out of {Deep} by its mouth was refused at ({X}, {Y}, {Z}); the party is lifted out now. The gates from there: {Chain}",
+                walker?.Name ?? "a leader",
+                _deep?.Name ?? "a dungeon",
+                walker?.X ?? 0,
+                walker?.Y ?? 0,
+                walker?.Z ?? 0,
+                walker == null ? "none" : BotGates.Chain(_map, walker.Location, _muster)
+            );
+
+            return true;
+        }
+
         if (++_bends > MaxBends)
         {
             Walled++;
@@ -1877,10 +2188,10 @@ public sealed class BotDelve : BotDeed
     public static string Describe() =>
         Calls == 0
             ? "no delve has been called"
-            : $"{Calls} delves called and {Called} bots called up ({LinesFar} of them line-holders called from beyond {Reach} tiles for a company that had none; {Hostiles} passed over for a guild hostile to the leader's), {Marches} parties went down with {Heads} bots between them ({Undersized} of them short of what they called, with enough to outnumber the worst room; {Walked} marched to a cave mouth ({MusteredForward} musters set forward on the road, {Pressed} levied bots put their errand down for it, {Ungathered} let go at the descent for not standing at the muster, {Held} holds for stragglers, {LeftBehind} left behind, {Stood} fights stood to on the road with the leader, {MarchRefused} roads refused on the march; {WentOn} counted at the mouth and went in, {TurnedBack} turned back together and {BroughtBack} of those reached the muster), {Carried} were put down by hand, {Unreached} never reached the mouth in {MarchMs / 60000} minutes; {WalkedOut} walked out by the mouth, {LeftBelow} leaders gave up the walk out); {Undermanned} could not raise "
+            : $"{Calls} delves called and {Called} bots called up ({LeviedEarly} levies made while the leader walked to its muster; {LinesFar} of them line-holders called from beyond {Reach} tiles for a company that had none; {Hostiles} passed over for a guild hostile to the leader's; {MusterMoved} musters moved off a home with no floor or on dangerous ground), {Marches} parties went down with {Heads} bots between them ({Undersized} of them short of what they called, with enough to outnumber the worst room; {Walked} marched to a cave mouth ({MusteredForward} musters set forward on the road, {Pressed} levied bots put their errand down for it, {Ungathered} let go at the descent for not standing at the muster, {Held} holds for stragglers, {LeftBehind} left behind, {Stood} fights stood to on the road with the leader, {MarchRefused} roads refused on the march; {WentOn} counted at the mouth and went in, {TurnedBack} turned back together and {BroughtBack} of those reached the muster), {Carried} were put down by hand, {Unreached} never reached the mouth in {MarchMs / 60000} minutes ({KeptMarching} marches kept going past it for still closing on their next gate, up to {MarchMs * MarchCapTimes / 60000} minutes; {Deserted} members struck off a march for holding something other than their place in it; members across a gate read as {GateApart} tiles behind or more; {MoonLed} leaders and {BotEnlist.MoonFollowed} members put through a moongate on the road); {WalkedOut} walked out by the mouth, {LeftBelow} leaders gave up the walk out, {LiftedAtRefusal} parties lifted out at once when the walk out was refused ({LiftedBodies} bodies)); {Undermanned} could not raise "
             + $"enough to outnumber their dungeon's worst room in {MusterMs / 60000} minutes and {Lineless} could raise nobody to hold a line ({LineAway} of them with one called who never reached the muster); "
-            + $"a party calls {BotProving.PartyMultiple} for each creature of its dungeon's worst room, {Company} at the fewest and {Math.Max(Company, BotDelver.HeadsPerParty)} at the most: {Sizes()}; "
-            + $"{Emptied} came out on {Quota} corpses, {Timedout} on the {CapMs / 60000} minutes, {Broken} because too few were left, {Leaderless} because whoever led them was no longer down there "
+            + $"a party calls {BotProving.PartyMultiple} for each creature of its dungeon's worst room, {Company} at the fewest and {Math.Max(Company, MostParty)} at the most: {Sizes()}; "
+            + $"{Emptied} came out on {Quota} corpses, {Timedout} on the {CapMs / 60000} minutes, {Broken} because too few were left, {BledOut} because the company lost {BotSquad.BleedDeaths} inside a minute, {Leaderless} because whoever led them was no longer down there "
             + $"and {Walled} because the walls would not let them past ({Bends} refused roads shrugged off, {Shifted} musters moved to the caller's own tile, {Strayed} leaders fetched back out of the world); "
             + $"{Killed} things killed down there; {BotHalls.Describe()}; {BotDelveParty.Describe()}";
 
@@ -1891,16 +2202,23 @@ public sealed class BotDelve : BotDeed
         Walked = 0;
         Carried = 0;
         Unreached = 0;
+        KeptMarching = 0;
+        Deserted = 0;
+        MoonLed = 0;
         WalkedOut = 0;
         LeftBelow = 0;
+        LiftedAtRefusal = 0;
+        LiftedBodies = 0;
         Marches = 0;
         Undermanned = 0;
+        LeviedEarly = 0;
         Lineless = 0;
         Called = 0;
         Killed = 0;
         Emptied = 0;
         Timedout = 0;
         Broken = 0;
+        BledOut = 0;
         Bends = 0;
         Shifted = 0;
         Walled = 0;

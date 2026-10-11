@@ -53,6 +53,13 @@ public static class BotLand
             return null;
         }
 
+        var claimed = BotClaim.Owner(map, where);
+
+        if (claimed != null)
+        {
+            return claimed;
+        }
+
         string held = null;
 
         var here = BotQuad.Key(map, where);
@@ -80,7 +87,7 @@ public static class BotLand
             }
         }
 
-        return held ?? BotClaim.Owner(map, where);
+        return held;
     }
 
     public static Guild Holding(Map map, Point3D where) => BaseGuild.FindByName(Holder(map, where)) as Guild;
@@ -130,7 +137,7 @@ public static class BotLand
             ? "halls make no land"
             : $"land reaches {Reach} tiles from a hall, worth ×{Home:F2} to its own and ×{Abroad:F2} to anybody else; "
               + $"{AtHome} pieces of work weighed at home, {Away} on somebody else's ground, {Open} on ground nobody claims; "
-              + BotClaim.Describe();
+              + BotClaim.Describe() + "; " + BotBounds.Describe();
 
     public static void Forget()
     {

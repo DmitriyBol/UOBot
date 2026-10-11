@@ -269,6 +269,8 @@ public static class BotInns
 
         var inn = Nearest(bot.Location, Reach);
 
+        inn = BotTaverns.InnFor(bot, inn, Reach) ?? inn;
+
         if (inn == null)
         {
             NoInnNear++;
@@ -348,7 +350,7 @@ public static class BotInns
         var price = Math.Max(1, (int)Math.Ceiling(hours * PricePerHour));
         var pack = bot?.Backpack;
 
-        if (pack == null)
+        if (pack == null || BotYield.Spendable(bot) < price)
         {
             return 0;
         }
@@ -472,6 +474,12 @@ public sealed class BotLodge : BotDeed
 
     private readonly double _hours;
 
+    private bool _supper;
+
+    private bool _supperWalk;
+
+    private long _supperTick;
+
     public BotLodge(BotInns.Inn inn, double hours)
     {
         _inn = inn;
@@ -507,6 +515,30 @@ public sealed class BotLodge : BotDeed
         if (body == null || _inn == null || body.Map == null || body.Map == Map.Internal)
         {
             return BotDoing.Failed("no inn to go to");
+        }
+
+        if (!_supper && BotTaverns.KeeperAt(_inn) is { } cook && body is BotMobile lodger && body.InRange(_inn.Spot, 12))
+        {
+            if (!_supperWalk)
+            {
+                _supperWalk = true;
+                _supperTick = Core.TickCount;
+            }
+
+            if (body.InRange(cook, BotHandover.MeetTiles))
+            {
+                _supper = true;
+                BotTaverns.Supper(lodger, _inn);
+            }
+            else if (Core.TickCount - _supperTick >= BotTaverns.SupperWalkMs)
+            {
+                _supper = true;
+                BotTaverns.NoSupper();
+            }
+            else
+            {
+                return BotDoing.Walk(body.Map, cook, BotArrival.Within(BotHandover.MeetTiles), $"to {cook.Name}'s table for supper");
+            }
         }
 
         if (!body.InRange(_inn.Spot, 2))

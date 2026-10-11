@@ -468,6 +468,38 @@ public static class BotPeril
         );
     }
 
+    public static long ScoutedQuiet { get; private set; }
+
+    public static bool Scouted(Map map, Point3D where)
+    {
+        if (map == null || !_squares.TryGetValue(Key(map, where), out var square))
+        {
+            return false;
+        }
+
+        var was = Faded(square, Core.TickCount);
+
+        if (was <= 0.0)
+        {
+            return false;
+        }
+
+        square.Reading = was * SweptTo;
+        square.Tick = Core.TickCount;
+        ScoutedQuiet++;
+
+        logger.Information(
+            "A scout found the square around {Where} quiet: it read {Was:F0} and now reads {Now:F0}, on {Blows} blows and {Deaths} deaths",
+            where,
+            was,
+            square.Reading,
+            square.Blows,
+            square.Deaths
+        );
+
+        return true;
+    }
+
     public static void Baulked(Map map, Point3D where)
     {
         if (map == null || !_squares.TryGetValue(Key(map, where), out var square))

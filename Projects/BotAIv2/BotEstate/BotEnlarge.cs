@@ -110,6 +110,14 @@ public sealed class BotEnlarge : BotDeed
             return BotDoing.Walk(_map, _plot, BotArrival.Within(Reach), $"to the ground for {_kind} at {_plot.X},{_plot.Y}");
         }
 
+        if (BotBounds.Refuse(BotBounds.Placing.Bigger, _guild.Name, _map, _plot, _kind.Multi, out var foreign))
+        {
+            BotPlot.Spend();
+            Refused++;
+
+            return BotDoing.Failed(foreign);
+        }
+
         var result = HousePlacement.Check(body, _kind.Multi, _plot, out var toMove, Direction.South);
 
         if (result != HousePlacementResult.Valid)

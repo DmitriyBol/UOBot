@@ -97,6 +97,8 @@ public static class BotWebSnapshot
             BotWebMap.Slice();
         }
 
+        BotWebLive.Tick(now);
+
         if (now - _snapTick >= SnapshotMs)
         {
             _snapTick = now;
@@ -284,6 +286,18 @@ public static class BotWebSnapshot
             WriteTowns(w);
 
             BotShopkeep.Web(w);
+
+            BotColonies.Web(w);
+
+            BotLines.Web(w);
+
+            BotReflex.Web(w);
+
+            BotRelics.Web(w);
+
+            WriteAbodes(w);
+
+            BotZoneWatch.Web(w);
 
             WriteBarred(w);
             WriteAlarms(w);
@@ -494,10 +508,15 @@ public static class BotWebSnapshot
             w.WriteNumber("mood", Math.Round(bot.Mood, 3));
             w.WriteNumber("purse", bot.Backpack?.GetAmount(typeof(Gold)) ?? 0);
             w.WriteNumber("bank", Banker.GetBalance(bot));
+            w.WriteNumber("over", BotUnload.OverUnits(bot));
+            w.WriteNumber("boxItems", bot.FindBankNoCreate()?.TotalItems ?? 0);
+            w.WriteBoolean("boxFull", BotSurplus.BoxFull(bot));
             w.WriteString("rank", bot.BotRank ?? "");
             w.WriteString("level", Level(bot.BotRank));
             w.WriteNumber("progress", Math.Round(bot.Progress, 3));
             w.WriteNumber("kills", bot.Kills);
+
+            BotCharacterWeb.Write(w, bot);
 
             WriteSkills(w, bot);
 
@@ -676,6 +695,8 @@ public static class BotWebSnapshot
         w.WriteNumber("dropped", BotWill.Dropped);
         w.WriteNumber("died", BotWill.Deaths);
         w.WriteNumber("share", ended <= 0 ? 0.0 : Math.Round((double)BotWill.Finished / ended, 4));
+        var endedAll = ended + BotWill.Deaths;
+        w.WriteNumber("shareWithDeaths", endedAll <= 0 ? 0.0 : Math.Round((double)BotWill.Finished / endedAll, 4));
         w.WriteNumber("target", 0.95);
         w.WritePropertyName("byKind");
         w.WriteStartArray();
@@ -707,7 +728,11 @@ public static class BotWebSnapshot
         w.WriteNumber("reached", BotPath.Reached);
         w.WriteNumber("partial", BotPath.PartialRuns);
         w.WriteNumber("refused", BotPath.SealedRuns);
-        w.WriteNumber("share", BotPath.Searches <= 0 ? 0.0 : Math.Round((double)BotPath.Reached / BotPath.Searches, 4));
+        w.WriteNumber("share", BotWalk.WalkerSearches <= 0 ? 0.0 : Math.Round((double)BotWalk.WalkerReached / BotWalk.WalkerSearches, 4));
+        w.WriteNumber("walkerSearches", BotWalk.WalkerSearches);
+        w.WriteNumber("walkerReached", BotWalk.WalkerReached);
+        w.WriteNumber("searchShare", BotPath.Searches <= 0 ? 0.0 : Math.Round((double)BotPath.Reached / BotPath.Searches, 4));
+        w.WriteNumber("besides", BotWalk.Besides);
         w.WriteNumber("target", 0.99);
         w.WriteNumber("partialNear", BotPath.PartialNear);
         w.WriteNumber("partialStill", BotPath.PartialStill);
@@ -899,6 +924,13 @@ public static class BotWebSnapshot
             w.WriteNumber("goal", goal);
             BotJson.StringOrNull(w, "saving", saving);
             w.WriteNumber("chest", BotChest.Holds(guild.Name));
+
+            w.WriteNumber("appeal", Math.Round(BotGuilds.Appeal(guild), 1));
+            w.WriteNumber("unwantedMin", BotGuilds.LowMinutes(guild));
+
+            BotPolitics.Write(w, guild);
+
+            BotOfficers.Write(w, guild);
             w.WritePropertyName("wars");
             w.WriteStartArray();
 
@@ -928,6 +960,8 @@ public static class BotWebSnapshot
                 w.WriteNumberValue(qx * BotQuad.Side);
                 w.WriteNumberValue(qy * BotQuad.Side);
                 w.WriteNumberValue(bought ? 1 : 0);
+
+                w.WriteNumberValue(BotTownGround.Guarded(Map.Maps[mapId], (mapId, qx, qy), out _, out _) ? 1 : 0);
                 w.WriteEndArray();
             }
 
@@ -986,6 +1020,45 @@ public static class BotWebSnapshot
                 w.WriteNumber("used", gate.Used);
                 w.WriteEndObject();
             }
+        }
+
+        w.WriteEndArray();
+    }
+
+    private static void WriteAbodes(Utf8JsonWriter w)
+    {
+        w.WritePropertyName("abodes");
+        w.WriteStartArray();
+
+        foreach (var house in BotAbode.Houses)
+        {
+            if (house == null || house.Deleted || house.Map == null)
+            {
+                continue;
+            }
+
+            var owner = house.Owner;
+            var sign = house.Sign?.Name;
+            var name = owner?.Name ?? (sign != null && sign.EndsWith("'s house", StringComparison.Ordinal) ? sign[..^8] : "?");
+
+            w.WriteStartObject();
+            w.WriteString("owner", name);
+            w.WriteString("kind", BotHallKind.Of(house).ToString());
+            w.WriteString("sign", sign ?? BotAbode.SignFor(name));
+            w.WriteNumber("x", house.X);
+            w.WriteNumber("y", house.Y);
+            w.WriteString("map", house.Map.Name);
+
+            if (owner is BotMobile bot)
+            {
+                w.WriteString("class", bot.Class?.Name ?? "?");
+                BotJson.StringOrNull(w, "guild", bot.Guild?.Name);
+                BotJson.StringOrNull(w, "guildAbbr", bot.Guild?.Abbreviation);
+                w.WriteBoolean("alive", bot.Alive);
+                w.WriteBoolean("home", house.IsInside(bot));
+            }
+
+            w.WriteEndObject();
         }
 
         w.WriteEndArray();
@@ -1058,6 +1131,9 @@ public static class BotWebSnapshot
                 w.WriteNumber("free", BotGuildHouses.Free(town.Name));
                 w.WriteNumber("arrivals", town.Arrivals);
                 w.WriteNumber("residents", BotResidence.Residents(town));
+
+                BotCharters.Write(w, town.Name);
+                BotStewardship.Write(w, town);
                 w.WriteEndObject();
             }
         }
@@ -1378,6 +1454,7 @@ public static class BotWebSnapshot
                 w.WriteNumber("requests", BotWebServer.Requests);
                 w.WriteBoolean("mapReady", BotWebMap.Ready);
                 w.WriteBoolean("mapFailed", BotWebMap.Failed);
+                BotWebLive.Health(w);
             }
         );
 

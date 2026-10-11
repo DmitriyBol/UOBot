@@ -27,7 +27,7 @@ public sealed class BotSpellsModule : BotModule
 
     public override BotPhase Phase => BotPhase.World;
 
-    public override string[] Requires => ["Classes", "Will", "Shops", "Auction"];
+    public override string[] Requires => ["Classes", "Will", "Shops", "Market"];
 
     public override void Start()
     {
@@ -55,6 +55,7 @@ public sealed class BotSpellsModule : BotModule
     {
         Server.Engines.Craft.DefInscription.Knows = null;
         BotScribe.Forget();
+        BotScribes.Forget();
         BotSeeker.Forget();
         BotArmoury.Forget();
     }

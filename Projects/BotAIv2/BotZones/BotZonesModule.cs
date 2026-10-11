@@ -59,6 +59,32 @@ public sealed class BotZonesSettings
 
     public int? ConvergeTiles { get; set; }
 
+    public int? JoinGap { get; set; }
+
+    public int? ZoneMostTiles { get; set; }
+
+    public int? StrayBeyond { get; set; }
+
+    public int? ObservedSlack { get; set; }
+
+    public bool? TownsClear { get; set; }
+
+    public int? ReachBeyond { get; set; }
+
+    public double? ReachPercentile { get; set; }
+
+    public int? ReachLeast { get; set; }
+
+    public int? ReachHalfLifeMinutes { get; set; }
+
+    public int? SpellReach { get; set; }
+
+    public int? WanderMinutes { get; set; }
+
+    public int? WanderMostCells { get; set; }
+
+    public bool? Events { get; set; }
+
     public double? DeadlyVsBot { get; set; }
 
     public double? EmptyWeight { get; set; }
@@ -105,6 +131,26 @@ public sealed class BotZonesSettings
 
     public bool? TourWater { get; set; }
 
+    public string TourKeeper { get; set; }
+
+    public int? AccuracyWindowHours { get; set; }
+
+    public int? AccuracyMinDeaths { get; set; }
+
+    public int? AccuracyMinZones { get; set; }
+
+    public int? AlarmWindowHours { get; set; }
+
+    public int? AlarmMinDeaths { get; set; }
+
+    public double? AccuracyTarget { get; set; }
+
+    public int? AccuracyHoldMinutes { get; set; }
+
+    public double? ResumeBelow { get; set; }
+
+    public int? ResumeAfterMinutes { get; set; }
+
     public bool? Memory { get; set; }
 
     public int? MemorySaveMs { get; set; }
@@ -149,13 +195,25 @@ public sealed class BotZonesModule : BotModule
         BotZones.Start(BotPopulation.Home ?? Map.Felucca);
 
         logger.Information(
-            "Zones: kept on {Map} in cells of {Cell} tiles. Declared discs up to {Declared} tiles until a haunt's confidence reaches {Wins:F2} ({Seconds}s awake, {Samples} sightings); deadly at ×{Deadly:F1} the median bot; {Promote} deaths in {Hours}h make a hostile zone deadly. The sweep spends {Budget:F1}ms a beat every {Tick}ms; a build every {Refresh}s, {Where}. The tour is {Tour}: {Walkers} walkers, {Hold}s a zone",
+            "Zones: kept on {Map} in cells of {Cell} tiles. Declared discs up to {Declared} tiles until a haunt's confidence reaches {Wins:F2} ({Seconds}s awake, {Samples} sightings); a zone is a camp of spawners whose discs touch within {Gap} tiles, at most {Most} tiles across, its wanderers beyond range+{Stray} drawn where they stand and along their last {Wander} minutes (at most {WanderCells} cells), a patrol grown to where {Percentile:P0} of its sightings fall (at most {Beyond} tiles past the declaration, from {Least} sightings, halved every {ReachHalf} minutes), casters reaching {Spell} tiles past their sight, events {Events}, guarded ground {Towns}; deadly at ×{Deadly:F1} the median bot; {Promote} deaths in {Hours}h make a hostile zone deadly. The sweep spends {Budget:F1}ms a beat every {Tick}ms; a build every {Refresh}s, {Where}. The tour is {Tour}: {Walkers} walkers, {Hold}s a zone; zone keeper {Keeper}, accuracy over {Window}h judged from {MinDeaths} deaths and {MinZones} zones apart, the watch ends when both are at {Target:P0} for {HoldMin} min, an alarm when the deaths over {AlarmHours}h (at least {AlarmMin}) stay under {Resume:P0} for {ResumeMin} min",
             BotZones.Map,
             BotZoneState.Cell,
             BotZones.DeclaredMost,
             BotZones.ObservedWins,
             BotZones.ConfidentSeconds,
             BotZones.ConfidentSamples,
+            BotZones.JoinGap,
+            BotZones.ZoneMostTiles,
+            BotZones.StrayBeyond,
+            BotZones.WanderMinutes,
+            BotZones.WanderMostCells,
+            BotZones.ReachPercentile,
+            BotZones.ReachBeyond,
+            BotZones.ReachLeast,
+            BotZones.ReachHalfLifeMinutes,
+            BotZones.SpellReach,
+            BotZones.Events ? "painted while they live" : "off",
+            BotZones.TownsClear ? "kept clear" : "painted like any",
             BotZones.DeadlyVsBot,
             BotZones.DeathsPromote,
             BotZones.DeathsWindowHours,
@@ -167,7 +225,17 @@ public sealed class BotZonesModule : BotModule
                 : $"on the loop every {BotZones.InlineRefreshMs / 1000}s at most ({Environment.ProcessorCount} cores, {BotZones.OffLoopCores} wanted to go off it)",
             BotZoneTour.Running ? "on" : "off",
             BotZoneTour.MostWalkers,
-            BotZoneTour.HoldMs / 1000
+            BotZoneTour.HoldMs / 1000,
+            BotZoneTour.Keeper,
+            BotZoneWatch.AccuracyWindowHours,
+            BotZoneWatch.AccuracyMinDeaths,
+            BotZoneWatch.AccuracyMinZones,
+            BotZoneWatch.AccuracyTarget,
+            BotZoneWatch.AccuracyHoldMinutes,
+            BotZoneWatch.AlarmWindowHours,
+            BotZoneWatch.AlarmMinDeaths,
+            BotZoneWatch.ResumeBelow,
+            BotZoneWatch.ResumeAfterMinutes
         );
 
         _say?.Stop();
@@ -214,6 +282,24 @@ public sealed class BotZonesModule : BotModule
         BotZones.WaterCasterReach = settings.WaterCasterReach ?? BotZones.WaterCasterReach;
         BotZones.RootedReach = settings.RootedReach ?? BotZones.RootedReach;
         BotZones.ConvergeTiles = settings.ConvergeTiles ?? BotZones.ConvergeTiles;
+        BotZones.JoinGap = settings.JoinGap ?? BotZones.JoinGap;
+        BotZones.ZoneMostTiles = settings.ZoneMostTiles ?? BotZones.ZoneMostTiles;
+        BotZones.StrayBeyond = settings.StrayBeyond ?? BotZones.StrayBeyond;
+        BotZones.ObservedSlack = settings.ObservedSlack ?? BotZones.ObservedSlack;
+        BotZones.TownsClear = settings.TownsClear ?? BotZones.TownsClear;
+        BotZones.ReachBeyond = settings.ReachBeyond ?? BotZones.ReachBeyond;
+        BotZones.ReachPercentile = settings.ReachPercentile ?? BotZones.ReachPercentile;
+        BotZones.ReachLeast = settings.ReachLeast ?? BotZones.ReachLeast;
+        BotZones.ReachHalfLifeMinutes = settings.ReachHalfLifeMinutes ?? BotZones.ReachHalfLifeMinutes;
+
+        if (settings.SpellReach is { } spellReach)
+        {
+            BotZones.SpellReach = spellReach;
+        }
+
+        BotZones.WanderMinutes = settings.WanderMinutes ?? BotZones.WanderMinutes;
+        BotZones.WanderMostCells = settings.WanderMostCells ?? BotZones.WanderMostCells;
+        BotZones.Events = settings.Events ?? BotZones.Events;
         BotZones.DeadlyVsBot = settings.DeadlyVsBot ?? BotZones.DeadlyVsBot;
         BotZones.EmptyWeight = settings.EmptyWeight ?? BotZones.EmptyWeight;
         BotZones.DeathsPromote = settings.DeathsPromote ?? BotZones.DeathsPromote;
@@ -236,6 +322,16 @@ public sealed class BotZonesModule : BotModule
         BotZoneTour.MostWalkers = settings.TourMostWalkers ?? BotZoneTour.MostWalkers;
         BotZoneTour.FocusMs = settings.TourFocusMs ?? BotZoneTour.FocusMs;
         BotZoneTour.Water = settings.TourWater ?? BotZoneTour.Water;
+        BotZoneTour.Keeper = settings.TourKeeper ?? BotZoneTour.Keeper;
+        BotZoneWatch.AccuracyWindowHours = settings.AccuracyWindowHours ?? BotZoneWatch.AccuracyWindowHours;
+        BotZoneWatch.AccuracyMinDeaths = settings.AccuracyMinDeaths ?? BotZoneWatch.AccuracyMinDeaths;
+        BotZoneWatch.AccuracyMinZones = settings.AccuracyMinZones ?? BotZoneWatch.AccuracyMinZones;
+        BotZoneWatch.AlarmWindowHours = settings.AlarmWindowHours ?? BotZoneWatch.AlarmWindowHours;
+        BotZoneWatch.AlarmMinDeaths = settings.AlarmMinDeaths ?? BotZoneWatch.AlarmMinDeaths;
+        BotZoneWatch.AccuracyTarget = settings.AccuracyTarget ?? BotZoneWatch.AccuracyTarget;
+        BotZoneWatch.AccuracyHoldMinutes = settings.AccuracyHoldMinutes ?? BotZoneWatch.AccuracyHoldMinutes;
+        BotZoneWatch.ResumeBelow = settings.ResumeBelow ?? BotZoneWatch.ResumeBelow;
+        BotZoneWatch.ResumeAfterMinutes = settings.ResumeAfterMinutes ?? BotZoneWatch.ResumeAfterMinutes;
         BotZoneMemory.Running = settings.Memory ?? BotZoneMemory.Running;
         BotZoneMemory.SaveEveryMs = settings.MemorySaveMs ?? BotZoneMemory.SaveEveryMs;
 

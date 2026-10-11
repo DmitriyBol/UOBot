@@ -48,6 +48,10 @@ public static class BotCamp
 
     public static int JoinReach { get; set; } = 40;
 
+    public static int JoinLeastMs { get; set; } = 120000;
+
+    public static long Ending { get; private set; }
+
     public static int MostFires { get; set; } = 6;
 
     public static int MostAtFire { get; set; } = 6;
@@ -482,6 +486,13 @@ public static class BotCamp
 
             if (!fire.Open(now) || fire.Map != bot.Map || fire.Has(bot))
             {
+                continue;
+            }
+
+            if (fire.SitMs - (now - fire.LitTick) < JoinLeastMs)
+            {
+                Ending++;
+
                 continue;
             }
 
@@ -1289,6 +1300,7 @@ public static class BotCamp
         _sentToFire.Clear();
         Lit = 0;
         Relit = 0;
+        Ending = 0;
         Fumbles = 0;
         Joined = 0;
         Slept = 0;

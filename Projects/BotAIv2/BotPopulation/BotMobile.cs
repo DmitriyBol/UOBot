@@ -101,6 +101,24 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
     public bool Scheduled { get; internal set; }
 
+    public bool Urgent { get; internal set; }
+
+    public void Hurry() => Urgent = true;
+
+    public void React()
+    {
+        if (Deleted || !Alive || Fallen || Map == null || Map == Map.Internal)
+        {
+            return;
+        }
+
+        var began = System.Diagnostics.Stopwatch.GetTimestamp();
+
+        BotWill.Decide(this);
+
+        BotWill.Spent(System.Diagnostics.Stopwatch.GetTimestamp() - began);
+    }
+
     public bool Fallen { get; private set; }
 
     public static long BackAsGhost { get; private set; }
@@ -233,6 +251,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         Clothe();
         LearnWeapon();
 
+        BotBirth.Lean(this, klass);
+
         Hits = HitsMax;
         Stam = StamMax;
         Mana = ManaMax;
@@ -321,11 +341,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         BotStipend.Keep(this);
 
-        BotAuction.Fetch(this);
-
         BotStores.Keep(this);
-
-        BotHaggle.Keep(this);
 
         BotMeal.Keep(this);
 
@@ -355,6 +371,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         var decided = System.Diagnostics.Stopwatch.GetTimestamp();
 
         BotWill.Spent(decided - began);
+
+        BotSight.Look(this);
 
         var result = BotWalk.Advance(this, Journey, Running);
 
@@ -494,18 +512,206 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     public override bool IsHarmfulCriminal(Mobile target) =>
         !BotDuel.Between(this, target) && base.IsHarmfulCriminal(target);
 
+    public override void OnMovement(Mobile m, Point3D oldLocation)
+    {
+        base.OnMovement(m, oldLocation);
+
+        if (m is BaseCreature creature && ReferenceEquals(creature.Combatant, this) && Alive)
+        {
+            BotReflex.Seen(this, creature);
+            Menace(creature);
+        }
+    }
+
+    public static bool SeesComing { get; set; } = true;
+
+    public static int MenaceRange { get; set; } = 8;
+
+    public static bool MenaceByReach { get; set; } = true;
+
+    public static int MenaceRangeOf(BaseCreature creature) =>
+        MenaceByReach && creature is { AI: AIType.AI_Mage or AIType.AI_Archer }
+            ? Math.Clamp(creature.RangePerception, MenaceRange, Math.Max(MenaceRange, BotDefender.Reach))
+            : MenaceRange;
+
+    public static int MenaceAskMs { get; set; } = 500;
+
+    public static long Menaces { get; private set; }
+
+    public static long MenacesPassed { get; private set; }
+
+    private bool _menaceAsked;
+
+    private long _menaceAskedTick;
+
+    private void Menace(BaseCreature creature)
+    {
+        if (!SeesComing || Class is { Bidding: false } || creature.Controlled || creature.Summoned
+            || !InRange(creature.Location, MenaceRangeOf(creature)))
+        {
+            return;
+        }
+
+        var resolve = Resolve;
+
+        if (resolve == null)
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+
+        if (Squad != null)
+        {
+            if (!_menaceAsked || now - _menaceAskedTick >= MenaceAskMs)
+            {
+                _menaceAsked = true;
+                _menaceAskedTick = now;
+
+                if (BotThreat.Hostile(this, creature))
+                {
+                    BotReflex.Warned(this);
+                    BotSquads.Coming(this, creature);
+
+                    var span = Math.Max(NoticeRange, Math.Max(Math.Abs(creature.X - X), Math.Abs(creature.Y - Y)));
+
+                    if (MembersMeet && Resolve.Deed is not BotBolt && !BotLadder.Failing(this) && !BotQuarry.Shunned(creature)
+                        && !ReferenceEquals(Squad.Focus, creature) && BotThreat.Decide(this, span) == BotStand.Fight)
+                    {
+                        MembersMet++;
+
+                        Engage(creature);
+                        BotReflex.Met(this);
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if (resolve.Menaced && now - resolve.MenaceTick < BotLadder.MenacedMs)
+        {
+            BotWill.Menaced(this);
+            BotReflex.Warned(this);
+
+            return;
+        }
+
+        if (BotLadder.Hunted(resolve))
+        {
+            return;
+        }
+
+        if (_menaceAsked && now - _menaceAskedTick < MenaceAskMs)
+        {
+            return;
+        }
+
+        _menaceAsked = true;
+        _menaceAskedTick = now;
+
+        var deed = resolve.Deed;
+
+        if (deed is BotBolt || ReferenceEquals(deed?.Foe, creature) || !BotThreat.Hostile(this, creature))
+        {
+            MenacesPassed++;
+
+            return;
+        }
+
+        Menaces++;
+
+        BotWill.Menaced(this);
+        BotReflex.Warned(this);
+        Hurry();
+
+        var look = Math.Max(NoticeRange, Math.Max(Math.Abs(creature.X - X), Math.Abs(creature.Y - Y)));
+
+        if (resolve.Deed is not BotBolt && !BotLadder.Failing(this) && !BotQuarry.Shunned(creature)
+            && BotThreat.Decide(this, look) == BotStand.Fight)
+        {
+            MenacesMet++;
+
+            Engage(BotThreat.Strongest(this, NoticeRange) ?? creature);
+            BotReflex.Met(this);
+        }
+    }
+
+    public static long MenacesMet { get; private set; }
+
+    public static bool MembersMeet { get; set; } = true;
+
+    public static long MembersMet { get; private set; }
+
+    private void Alarm(int amount, bool opens)
+    {
+        if (HitsMax <= 0 || amount <= 0)
+        {
+            if (opens)
+            {
+                Hurry();
+            }
+
+            return;
+        }
+
+        var after = Hits - amount;
+        var failAt = HitsMax * BotLadder.Fraction(this);
+        var fails = Hits > failAt && after <= failAt;
+
+        if (opens || fails)
+        {
+            Hurry();
+        }
+
+        if (fails && Squad != null)
+        {
+            BotSquads.Hurry(Squad);
+        }
+
+        var hurtAt = HitsMax * BotMend.Hurt;
+
+        if (fails || Hits >= hurtAt && after < hurtAt)
+        {
+            BotSurgeon.Call(this);
+        }
+    }
+
+    public static string DescribeAlarms() =>
+        $"{BotBeat.Hurried} decisions taken between turns for an event that would not wait; "
+        + $"{Menaces} bots put on the hunted rung by a creature seen coming within {MenaceRange} tiles before any blow, {MenacesMet} of them squaring up to it at once as beatable, and {MembersMet} members of a company squaring up themselves ({MenacesPassed} looks left alone: its own quarry, a flight already begun, or nothing it may strike); "
+        + $"{BotWill.Alerts} bots told to look up at once for somebody near; {BotSurgeon.Describe2()}; {BotCry.DescribeCalls()}; {BotDefender.DescribeStands()}; {BotSquads.DescribeAnswers()}";
+
     public override void OnDamage(int amount, Mobile from, bool willKill)
     {
         base.OnDamage(amount, from, willKill);
 
         if (from == null || from == this || Deleted || !Alive || willKill)
         {
+            BotReflex.Damaged(this, amount, null, willKill);
+
+            if (!Deleted && Alive && !willKill)
+            {
+                Alarm(amount, false);
+            }
+
             return;
         }
+
+        var opens = !BotLadder.Hunted(Resolve);
 
         BotWill.Hurt(this);
         BotSquads.Note(this, from);
         BotVoice.Struck(this, from);
+
+        if (from is BaseCreature { Controlled: false } && BotHaven.Guarded(Map, Location))
+        {
+            BotHaven.CallGuards(this, from, "struck in town");
+        }
+
+        BotReflex.Damaged(this, amount, from, false);
+
+        Alarm(amount, opens);
 
         BotPeril.Struck(Map, Location);
 
@@ -517,20 +723,39 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         Resolve.Bruise(Core.TickCount);
 
+        var failing = BotLadder.Failing(this);
+        var fleeing = Resolve.Deed is BotBolt;
+        var stand = failing || fleeing ? BotStand.Nothing : BotThreat.Decide(this, NoticeRange);
+
+        BotReflex.Stood(this, stand);
+
+        if (BotBolt.HoldsSwing && from is BaseCreature)
+        {
+            if (Resolve.Deed is BotBolt { ForTown: true })
+            {
+                return;
+            }
+
+            if (stand == BotStand.Outmatched && !BotHaven.Aggressed(this, from))
+            {
+                BotBolt.SwingsHeld++;
+
+                return;
+            }
+        }
+
         Warmode = true;
         Combatant = from;
 
-        if (BotLadder.Failing(this))
+        if (failing)
         {
             return;
         }
 
-        if (Resolve.Deed is BotBolt)
+        if (fleeing)
         {
             return;
         }
-
-        var stand = BotThreat.Decide(this, NoticeRange);
 
         if (stand == BotStand.Nothing)
         {
@@ -561,6 +786,8 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         {
             Journey.Interrupt(Map, quarry, BotArrival.Beside, "fight");
         }
+
+        BotReflex.Engaged(this);
     }
 
     private bool Stow()
@@ -613,7 +840,21 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         }
     }
 
+    public override string ApplyNameSuffix(string suffix) => base.ApplyNameSuffix(BotTraits.Suffix(this, suffix));
+
     public override bool Move(Direction d) => BotOutlaw.Steps(this, d) && base.Move(d);
+
+    public double PowerAtDeath { get; private set; }
+
+    public Poison PoisonAtDeath { get; private set; }
+
+    public override bool OnBeforeDeath()
+    {
+        PowerAtDeath = BotThreat.Power(this);
+        PoisonAtDeath = Poison;
+
+        return base.OnBeforeDeath();
+    }
 
     public override void OnDeath(Container c)
     {
@@ -624,15 +865,21 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         (Resolve?.Deed as BotBolt)?.Died(this, fellAt);
 
+        BotHaven.Died(this, fellAt, fellMap);
+
         Fallen = true;
         FellTick = Core.TickCount;
         ReviveComplained = false;
+
+        BotReflex.Died(this);
 
         BotResidence.Fell(this, Location);
 
         Remains = c as Corpse;
 
         BotOutlaw.Fell(this, LastKiller);
+
+        BotCrime.Fell(this, LastKiller);
 
         logger.Information(
             "{Name} the {Class} was killed at {Where}; it should rise again in {Wait}s",
@@ -644,11 +891,17 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         BotBinding.TrimAmmunition(this, Bond, c);
 
+        var company = Squad;
+
         BotWill.Died(this);
 
         var felledBy = LastKiller;
 
+        BotBiography.Died(this, felledBy, (c as Corpse)?.Killer, fellMap, fellAt);
+
         BotBarred.Fell(fellMap, fellAt, felledBy, $"{Name} the {Class?.Name}");
+
+        BotBreaker.FellAt(this, fellMap, fellAt, felledBy);
 
         BotEvents.Post(
             "death",
@@ -667,15 +920,21 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         BotVoice.Died(this, felledBy);
 
-        BotKept.Fell(this, fellMap, fellAt);
+        BotKept.Fell(this, fellMap, fellAt, company);
+
+        BotSight.Died(this, felledBy);
 
         BotZones.Fell(fellMap, fellAt);
+
+        BotZoneWatch.Died(fellMap, fellAt, felledBy ?? (c as Corpse)?.Killer);
 
         BotSquads.Leave(this);
 
         if ((c as Corpse)?.Killer is BotMobile { Deleted: false } slayer && slayer != this)
         {
             BotRegard.Killed((slayer.Guild as Guilds.Guild)?.Name, (Guild as Guilds.Guild)?.Name);
+
+            BotElection.Slew(slayer, this);
 
             BotClaim.Bled(
                 Map,
@@ -918,6 +1177,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         BotWill.Forget(this);
         BotSquads.Leave(this);
         BotPopulation.Forget(this);
+        BotSight.Forget(this);
 
         Journey.Finish();
 
@@ -1286,6 +1546,11 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
                 continue;
             }
 
+            if (BotHandover.Promised(this, weapon.GetType()))
+            {
+                continue;
+            }
+
             if (weapon.Layer == Layer.TwoHanded && held.Layer == Layer.OneHanded && taken.Contains(Layer.TwoHanded))
             {
                 continue;
@@ -1431,6 +1696,11 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
             }
 
             if (item.Layer != layer || item.Layer == Layer.TwoHanded != (pass == 0))
+            {
+                continue;
+            }
+
+            if (BotHandover.Promised(this, item.GetType()))
             {
                 continue;
             }

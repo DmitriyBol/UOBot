@@ -67,6 +67,45 @@ public static class BotOven
 
     public static int Worth { get; set; } = 6;
 
+    private static readonly Dictionary<Type, Type> _meals = [];
+
+    public static int MealWorth(Type raw)
+    {
+        if (raw == null)
+        {
+            return 0;
+        }
+
+        if (!_meals.TryGetValue(raw, out var meal))
+        {
+            var cooked = false;
+
+            for (var i = 0; i < Raw.Count; i++)
+            {
+                cooked |= Raw[i] == raw;
+            }
+
+            var recipes = cooked ? System?.CraftItems : null;
+
+            for (var i = 0; recipes != null && i < recipes.Count && meal == null; i++)
+            {
+                var recipe = recipes[i];
+
+                if (recipe?.ItemType != null && recipe.Resources is { Count: > 0 } needs && needs[0].ItemType == raw && IsMeal(recipe.ItemType))
+                {
+                    meal = recipe.ItemType;
+                }
+            }
+
+            if (meal != null || !cooked || System != null)
+            {
+                _meals[raw] = meal;
+            }
+        }
+
+        return meal == null ? 0 : Math.Max(1, BotMarket.Worth(meal, Worth));
+    }
+
     public static int Keeps { get; set; } = 20;
 
     public static long Spared { get; private set; }
@@ -95,7 +134,7 @@ public static class BotOven
                 continue;
             }
 
-            if (Amount(bot, kind) <= Keeps && BotAuction.Demand(bot as IBotWilful, kind) == null)
+            if (Amount(bot, kind) <= Keeps && BotMarket.Demand(bot as IBotWilful, kind) == null)
             {
                 Spared++;
 

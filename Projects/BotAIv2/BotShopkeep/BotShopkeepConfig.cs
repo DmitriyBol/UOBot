@@ -17,8 +17,6 @@ public sealed class BotShopkeepSettings
 {
     public bool? Running { get; set; }
 
-    public int? AuctionLots { get; set; }
-
     public double? ShiftMinutes { get; set; }
 
     public int? RestMs { get; set; }
@@ -78,7 +76,6 @@ public static class BotShopkeepConfig
         }
 
         BotShopkeep.Running = settings.Running ?? BotShopkeep.Running;
-        BotShopkeep.AuctionLots = settings.AuctionLots ?? BotShopkeep.AuctionLots;
         BotShopkeep.ShiftMinutes = settings.ShiftMinutes ?? BotShopkeep.ShiftMinutes;
         BotShopkeep.RestMs = settings.RestMs ?? BotShopkeep.RestMs;
         BotShopkeep.OpenWorth = settings.OpenWorth ?? BotShopkeep.OpenWorth;

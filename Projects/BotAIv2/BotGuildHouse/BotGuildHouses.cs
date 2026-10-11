@@ -216,6 +216,19 @@ public static class BotGuildHouses
         }
     }
 
+    public static bool Leave(string guild, string why)
+    {
+        if (!Running || string.IsNullOrEmpty(guild) || !_held.TryGetValue(guild, out var held))
+        {
+            return false;
+        }
+
+        held.Building ??= BotHouseSurvey.ByDoor(held.Key);
+        Vacate(held, BotPopulation.Home, why, true);
+
+        return true;
+    }
+
     public static bool MayOpen(BotGuildDoor door, Mobile from)
     {
         if (from.AccessLevel >= AccessLevel.GameMaster)
@@ -660,6 +673,13 @@ public static class BotGuildHouses
 
         for (var i = 0; i < found.Count; i++)
         {
+            if (BotBounds.Foreign(guild.Name, BotPopulation.Home, found[i].Heart, out _))
+            {
+                BotBounds.HouseRefused();
+
+                continue;
+            }
+
             if (BotHouseSurvey.Occupied(found[i], guild.Name) == null)
             {
                 return found[i];

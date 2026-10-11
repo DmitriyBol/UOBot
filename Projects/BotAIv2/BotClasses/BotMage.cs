@@ -76,6 +76,13 @@ public sealed class BotMage : BotClass
             (SkillName.Wrestling, 100.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("archmage", SkillName.Magery, 4, 58.0, 72.0),
+            new BotLeaning("scribe", SkillName.Inscribe, 1, 36.0, 40.0),
+            BotLeaning.Even(1)
+        ];
+
         NeedsMeditation = true;
 
         StaffManaTrickle = 2;

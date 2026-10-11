@@ -57,6 +57,17 @@ public static class BotBreaker
 
     public static long Trips { get; private set; }
 
+    public static int HardFailures { get; set; } = 2;
+
+    public static int HardWindowMs { get; set; } = 60000;
+
+    public static long HardTrips { get; private set; }
+
+    public static bool Hard(string why) =>
+        !string.IsNullOrEmpty(why)
+        && (why.Contains("no way", StringComparison.Ordinal) || why.Contains("no room", StringComparison.Ordinal)
+            || why.Contains("pack would not", StringComparison.Ordinal) || why.Contains("would come", StringComparison.Ordinal));
+
     public static long Spared { get; private set; }
 
     public static long Refused { get; private set; }
@@ -115,10 +126,12 @@ public static class BotBreaker
 
     private static readonly Dictionary<(Serial Bot, string Kind), Queue<long>> _falls = [];
 
+    public static bool Spares(string kind) =>
+        kind is "flee" or "mend" or "rescue" or "await" or "enlist" or "band" or "sweep" or "delve";
+
     public static void Fell(Mobile bot, string kind)
     {
-        if (!Running || bot == null || string.IsNullOrEmpty(kind)
-            || kind is "flee" or "mend" or "rescue" or "await" or "enlist" or "band" or "sweep" or "delve")
+        if (!Running || bot == null || string.IsNullOrEmpty(kind) || Spares(kind))
         {
             return;
         }
@@ -183,6 +196,331 @@ public static class BotBreaker
         );
     }
 
+    public static int GroundDeaths { get; set; } = 2;
+
+    public static int GroundWindowMs { get; set; } = 1800000;
+
+    public static int GroundHalf { get; set; } = 64;
+
+    public static int GroundRestMs { get; set; } = 1800000;
+
+    public static int GroundStep { get; set; } = 16;
+
+    public static int GroundHome { get; set; } = 24;
+
+    public static double GroundCompany { get; set; } = 1.5;
+
+    public static long GroundTrips { get; private set; }
+
+    public static long GroundRefused { get; private set; }
+
+    public static long GroundExtended { get; private set; }
+
+    private sealed class Fall
+    {
+        public Map Map;
+
+        public int X;
+
+        public int Y;
+
+        public long Tick;
+    }
+
+    private sealed class Ground
+    {
+        public Map Map;
+
+        public int X1;
+
+        public int Y1;
+
+        public int X2;
+
+        public int Y2;
+
+        public long Until;
+
+        public int Deaths;
+
+        public string Why;
+
+        public bool Holds(int x, int y) => x >= X1 && x <= X2 && y >= Y1 && y <= Y2;
+    }
+
+    private static readonly Dictionary<Serial, List<Fall>> _fallsAt = [];
+
+    private static readonly Dictionary<Serial, List<Ground>> _grounds = [];
+
+    public static void FellAt(Mobile bot, Map map, Point3D where, Mobile killer)
+    {
+        if (!Running || bot == null || map == null || map == Map.Internal || GroundDeaths <= 0 || GroundHalf <= 0 || GroundRestMs <= 0)
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+
+        if (_grounds.TryGetValue(bot.Serial, out var grounds))
+        {
+            for (var i = 0; i < grounds.Count; i++)
+            {
+                var g = grounds[i];
+
+                if (g.Map == map && g.Until - now > 0 && g.Holds(where.X, where.Y))
+                {
+                    g.Until = now + GroundRestMs;
+                    g.Deaths++;
+                    GroundExtended++;
+
+                    return;
+                }
+            }
+        }
+
+        if (!_fallsAt.TryGetValue(bot.Serial, out var falls))
+        {
+            if (_fallsAt.Count >= 2048)
+            {
+                _fallsAt.Clear();
+            }
+
+            falls = [];
+            _fallsAt[bot.Serial] = falls;
+        }
+
+        for (var i = falls.Count - 1; i >= 0; i--)
+        {
+            if (now - falls[i].Tick > GroundWindowMs)
+            {
+                falls.RemoveAt(i);
+            }
+        }
+
+        falls.Add(new Fall { Map = map, X = where.X, Y = where.Y, Tick = now });
+
+        var near = 0;
+        var x1 = where.X;
+        var y1 = where.Y;
+        var x2 = where.X;
+        var y2 = where.Y;
+        var oldest = now;
+
+        for (var i = 0; i < falls.Count; i++)
+        {
+            var f = falls[i];
+
+            if (f.Map != map || Math.Max(Math.Abs(f.X - where.X), Math.Abs(f.Y - where.Y)) > GroundHalf * 2)
+            {
+                continue;
+            }
+
+            near++;
+            x1 = Math.Min(x1, f.X);
+            y1 = Math.Min(y1, f.Y);
+            x2 = Math.Max(x2, f.X);
+            y2 = Math.Max(y2, f.Y);
+            oldest = Math.Min(oldest, f.Tick);
+        }
+
+        if (near < Math.Max(2, GroundDeaths))
+        {
+            return;
+        }
+
+        for (var i = falls.Count - 1; i >= 0; i--)
+        {
+            var f = falls[i];
+
+            if (f.Map == map && Math.Max(Math.Abs(f.X - where.X), Math.Abs(f.Y - where.Y)) <= GroundHalf * 2)
+            {
+                falls.RemoveAt(i);
+            }
+        }
+
+        if (grounds == null)
+        {
+            if (_grounds.Count >= 2048)
+            {
+                _grounds.Clear();
+            }
+
+            grounds = [];
+            _grounds[bot.Serial] = grounds;
+        }
+
+        var minutes = (now - oldest) / 60000;
+        var ground = new Ground
+        {
+            Map = map,
+            X1 = x1 - GroundHalf,
+            Y1 = y1 - GroundHalf,
+            X2 = x2 + GroundHalf,
+            Y2 = y2 + GroundHalf,
+            Until = now + GroundRestMs,
+            Deaths = near,
+            Why = $"{near} deaths in {minutes} minutes round ({(x1 + x2) / 2}, {(y1 + y2) / 2}), the last by {killer?.Name ?? "something"}"
+        };
+
+        grounds.Add(ground);
+        GroundTrips++;
+
+        logger.Information(
+            "{Name} died {Times} times in {Minutes} minutes within ({X1}, {Y1})-({X2}, {Y2}), the last by {Killer}, and nothing that goes into or across that ground is offered to it alone for {Rest} minutes, whatever the work",
+            bot.Name,
+            near,
+            minutes,
+            ground.X1,
+            ground.Y1,
+            ground.X2,
+            ground.Y2,
+            killer?.Name ?? "something",
+            GroundRestMs / 60000
+        );
+    }
+
+    public static bool GroundResting(Mobile bot, Map map, Point3D from, Point3D to, out string why, out long leftMs)
+    {
+        why = null;
+        leftMs = 0;
+
+        if (!Running || bot == null || map == null || !_grounds.TryGetValue(bot.Serial, out var grounds) || grounds.Count == 0)
+        {
+            return false;
+        }
+
+        var now = Core.TickCount;
+
+        for (var i = grounds.Count - 1; i >= 0; i--)
+        {
+            if (grounds[i].Until - now <= 0)
+            {
+                grounds.RemoveAt(i);
+            }
+        }
+
+        if (grounds.Count == 0)
+        {
+            return false;
+        }
+
+        var home = BotPopulation.HomeOf(bot);
+
+        for (var i = 0; i < grounds.Count; i++)
+        {
+            var g = grounds[i];
+
+            if (g.Map != map)
+            {
+                continue;
+            }
+
+            if (g.Holds(to.X, to.Y) && Closed(map, to, home))
+            {
+                GroundRefused++;
+                why = g.Why;
+                leftMs = g.Until - now;
+
+                return true;
+            }
+
+            var dx = to.X - from.X;
+            var dy = to.Y - from.Y;
+            var length = Math.Max(Math.Abs(dx), Math.Abs(dy));
+            var step = Math.Max(4, GroundStep);
+
+            if (length <= step)
+            {
+                continue;
+            }
+
+            var samples = length / step;
+
+            for (var s = 1; s < samples; s++)
+            {
+                var at = new Point3D(from.X + dx * s / samples, from.Y + dy * s / samples, 0);
+
+                if (g.Holds(at.X, at.Y) && Closed(map, at, home))
+                {
+                    GroundRefused++;
+                    why = g.Why;
+                    leftMs = g.Until - now;
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public static int LiftGround(Map map, Point3D where, int spread)
+    {
+        if (!Running || map == null || map == Map.Internal)
+        {
+            return 0;
+        }
+
+        var lifted = 0;
+
+        foreach (var grounds in _grounds.Values)
+        {
+            for (var i = grounds.Count - 1; i >= 0; i--)
+            {
+                var g = grounds[i];
+
+                if (g.Map != map)
+                {
+                    continue;
+                }
+
+                var near = g.Holds(where.X, where.Y)
+                           || Math.Max(Math.Abs((g.X1 + g.X2) / 2 - where.X), Math.Abs((g.Y1 + g.Y2) / 2 - where.Y)) <= spread + GroundHalf;
+
+                if (near)
+                {
+                    grounds.RemoveAt(i);
+                    lifted++;
+                }
+            }
+        }
+
+        GroundLifted += lifted;
+
+        return lifted;
+    }
+
+    public static long GroundLifted { get; private set; }
+
+    private static bool Closed(Map map, Point3D at, Point3D home)
+    {
+        if (home != Point3D.Zero && Math.Max(Math.Abs(home.X - at.X), Math.Abs(home.Y - at.Y)) <= GroundHome)
+        {
+            return false;
+        }
+
+        return Region.Find(at, map)?.IsPartOf<Server.Regions.GuardedRegion>() != true;
+    }
+
+    private static int GroundsStanding()
+    {
+        var now = Core.TickCount;
+        var standing = 0;
+
+        foreach (var grounds in _grounds.Values)
+        {
+            for (var i = 0; i < grounds.Count; i++)
+            {
+                if (grounds[i].Until - now > 0)
+                {
+                    standing++;
+                }
+            }
+        }
+
+        return standing;
+    }
+
     public static void Failed(Mobile bot, string kind, string why)
     {
         if (!Running || bot == null || string.IsNullOrEmpty(kind))
@@ -218,12 +556,14 @@ public static class BotBreaker
         trail.Last = now;
         trail.Ticks.Enqueue(now);
 
-        var most = Math.Max(2, Failures);
+        var hard = HardFailures >= 2 && HardFailures < Failures && Hard(why);
+        var most = hard ? HardFailures : Math.Max(2, Failures);
+        var window = hard ? Math.Min(WindowMs, HardWindowMs) : WindowMs;
 
         while (trail.Ticks.Count > 0)
         {
             var oldest = trail.Ticks.Peek();
-            var expired = now - oldest > WindowMs;
+            var expired = now - oldest > window;
             var beforeFinish = record is { Finished: true } && oldest - record.FinishedTick < 0;
 
             if (!expired && !beforeFinish && trail.Ticks.Count <= most)
@@ -265,6 +605,11 @@ public static class BotBreaker
         record.Why = why ?? "no reason given";
 
         Trips++;
+
+        if (hard)
+        {
+            HardTrips++;
+        }
 
         logger.Information(
             "{Name} failed at {Kind} {Times} times in {Seconds}s for the same reason ({Why}), and that work is not offered to it for {Minutes} minutes; tripped {Level} times since it last finished any",
@@ -405,6 +750,8 @@ public static class BotBreaker
 
         _staleTrails.Clear();
         _staleRecords.Clear();
+        _fallsAt.Remove(serial);
+        _grounds.Remove(serial);
     }
 
     private static void Sweep(long now)
@@ -482,7 +829,8 @@ public static class BotBreaker
             }
         }
 
-        return $"{Excused} failures kept from the breaker for having made goods or skill first; {Trips} times one bot's work was rested after failing {Math.Max(2, Failures)} times in {WindowMs / 60000} minutes for the same reason ({DeathTrips} of them after dying at it {Math.Max(2, DeathsToRest)} times in {DeathWindowMs / 60000}), {resting} resting now, {Refused} offers refused while resting and {Forgiven} rests lifted because the work was finished after all, {Spared} flights that tripped it and were not rested";
+        return $"{Excused} failures kept from the breaker for having made goods or skill first; {Trips} times one bot's work was rested after failing {Math.Max(2, Failures)} times in {WindowMs / 60000} minutes for the same reason ({HardTrips} of them after {HardFailures} in {HardWindowMs / 1000}s for a reason of the no-way / no-room family; {DeathTrips} of them after dying at it {Math.Max(2, DeathsToRest)} times in {DeathWindowMs / 60000}), {resting} resting now, {Refused} offers refused while resting and {Forgiven} rests lifted because the work was finished after all, {Spared} flights that tripped it and were not rested; "
+            + $"{GroundTrips} stretches of ground closed to one bot for {GroundRestMs / 60000} minutes after it died on them {Math.Max(2, GroundDeaths)} times in {GroundWindowMs / 60000} ({GroundExtended} closures extended by another death inside, {GroundsStanding()} standing now, {GroundLifted} lifted by a company that cleared the ground), {GroundRefused} offers refused for a goal or a road inside one";
     }
 
     public static string List()
@@ -498,6 +846,19 @@ public static class BotBreaker
             }
 
             parts.Add($"{record.Name}: {key.Kind} for {(record.Until - now) / 1000}s more, trip {record.Level}, after \"{record.Why}\"");
+        }
+
+        foreach (var (serial, grounds) in _grounds)
+        {
+            for (var i = 0; i < grounds.Count; i++)
+            {
+                var g = grounds[i];
+
+                if (g.Until - now > 0)
+                {
+                    parts.Add($"{World.FindMobile(serial)?.Name ?? serial.ToString()}: ground ({g.X1}, {g.Y1})-({g.X2}, {g.Y2}) for {(g.Until - now) / 1000}s more, after \"{g.Why}\"");
+                }
+            }
         }
 
         return parts.Count == 0

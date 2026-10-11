@@ -54,15 +54,13 @@ public sealed class BotTinker : BotDeed
 
     public static long Listed { get; private set; }
 
-    public static long IronBought { get; private set; }
-
-    public static long IronGone { get; private set; }
-
     private readonly Map _map;
 
     private readonly Point3D _where;
 
     private readonly BotWant _order;
+
+    public BotWant Order => _order;
 
     private readonly Type _kind;
 
@@ -78,23 +76,12 @@ public sealed class BotTinker : BotDeed
 
     private long _swungTick;
 
-    private readonly int _buy;
-
-    private readonly int _price;
-
-    private bool _stocked;
-
-    private int _bought;
-
-    public BotTinker(Map map, Point3D where, Type kind, BotWant order = null, int buy = 0, int price = 0)
+    public BotTinker(Map map, Point3D where, Type kind, BotWant order = null)
     {
         _map = map;
         _where = where;
         _kind = kind;
         _order = order;
-        _buy = Math.Max(0, buy);
-        _price = Math.Max(0, price);
-        _stocked = _buy <= 0;
     }
 
     public override string Kind => Trade;
@@ -103,7 +90,7 @@ public sealed class BotTinker : BotDeed
 
     public override Point3D Where => _where;
 
-    public override double Expects => _order == null ? Prior : Prior * 1.6;
+    public override double Expects => _order != null ? Prior * 1.6 : BotGlut.Claim(_kind, Prior);
 
     public override double Minutes => WorkMinutes;
 
@@ -111,11 +98,7 @@ public sealed class BotTinker : BotDeed
 
     public override double Coin => _order == null ? 0.4 : 1.0;
 
-    public override int Outlay => _buy * _price;
-
-    public override bool Steadfast => _bought > 0;
-
-    public override int Made => _made * BotAuction.Worth(_kind, Guess);
+    public override int Made => BotGlut.Yield(_kind, _made, Guess);
 
     public override string Stage => $"tinkering {_kind?.Name ?? "a tool"} ({_swings} attempts, {_made} made)";
 
@@ -140,24 +123,6 @@ public sealed class BotTinker : BotDeed
         if (_recipe == null)
         {
             return BotDoing.Failed($"cannot make {_kind.Name} at {BotTinkering.Able(body):F0} tinkering");
-        }
-
-        if (!_stocked)
-        {
-            _stocked = true;
-
-            var lot = BotAuction.Cheapest(BotTinkering.Metal, bot);
-            var got = lot is { IsEmpty: false } ? BotAuction.Buy(body, lot, Math.Min(_buy, lot.Amount)) : 0;
-
-            _bought += got;
-            IronBought += got;
-
-            if (got <= 0 && BotTinkering.Ingots(body) < BotCraftwork.Cost(_recipe))
-            {
-                IronGone++;
-
-                return BotDoing.Failed("the iron on the stalls was bought before it could be");
-            }
         }
 
         if (_had < 0)
@@ -189,9 +154,9 @@ public sealed class BotTinker : BotDeed
 
         var cost = BotCraftwork.Cost(_recipe);
 
-        if (BotTinkering.Ingots(body) < cost && BotAuction.Reclaim(bot, BotTinkering.Metal) > 0)
+        if (BotTinkering.Ingots(body) < cost && BotMarket.FromBank(bot, BotTinkering.Metal, cost * (Math.Max(1, Batch) + 1)) > 0)
         {
-            logger.Information("{Name} took its own iron back off the market to make {Item}", body.Name, _kind.Name);
+            logger.Information("{Name} took its own iron out of its bank box to make {Item}", body.Name, _kind.Name);
         }
 
         if (BotTinkering.Ingots(body) < cost)
@@ -240,45 +205,19 @@ public sealed class BotTinker : BotDeed
             return BotDoing.Done($"{_swings} attempts at {_kind.Name} and nothing to show");
         }
 
-        var filled = 0;
-        var want = _order ?? BotAuction.Demand(bot, _kind);
+        var want = _order ?? BotMarket.Demand(bot, _kind);
+        var made = 0;
 
-        for (var i = 0; i < goods.Count && want != null; i++)
+        for (var i = 0; i < goods.Count; i++)
         {
-            filled += BotAuction.Fill(bot, want, goods[i]);
+            made += Math.Max(1, goods[i].Amount);
         }
 
-        var listed = 0;
-
-        if (BotDig.ListGoods)
-        {
-            var left = BotCraftwork.Gather(body, _kind);
-            var held = left.Count;
-
-            left.RemoveAll(item => BotBinding.IsBound(item, bot?.Bond));
-
-            var keep = _kind == typeof(Server.Items.TinkerTools)
-                ? Math.Max(0, BotTinkering.Spares - (held - left.Count))
-                : BotOutfit.ToolsFor((body as BotMobile)?.Class).Contains(_kind) ? 1 : 0;
-
-            if (keep > 0 && left.Count > 0)
-            {
-                left.RemoveRange(0, Math.Min(keep, left.Count));
-            }
-
-            var ask = Ask(bot, _kind);
-
-            for (var i = 0; i < left.Count; i++)
-            {
-                if (BotAuction.List(bot, left[i], ask, true, true) != null)
-                {
-                    listed++;
-                }
-            }
-        }
+        var filled = want == null ? 0 : Math.Min(made, want.Payable);
+        var listed = made - filled;
 
         logger.Information(
-            "{Name} tinkered {Made} {Item} in {Swings} attempts: {Filled} to order, {Listed} to the market at {Ask}gp{Bought}{Because}",
+            "{Name} tinkered {Made} {Item} in {Swings} attempts: {Filled} for somebody's order, to be carried to them, and {Listed} kept, worth {Ask}gp each{Because}",
             body.Name,
             _made,
             _kind.Name,
@@ -286,7 +225,6 @@ public sealed class BotTinker : BotDeed
             filled,
             listed,
             Ask(bot, _kind),
-            _bought > 0 ? $", out of {_bought} iron bought off the stalls" : "",
             because == null ? "" : $"; stopped because {because}"
         );
 
@@ -296,21 +234,21 @@ public sealed class BotTinker : BotDeed
         ToOrder += filled;
         Listed += listed;
 
-        return BotDoing.Done($"{_made} {_kind.Name} made, {filled} to order and {listed} on the stall");
+        return BotDoing.Done($"{_made} {_kind.Name} made, {filled} for an order and {listed} kept");
     }
 
     public static int Ask(IBotWilful bot, Type kind)
     {
-        var worth = BotAuction.Worth(kind, Guess);
+        var worth = BotMarket.Worth(kind, Guess);
         var shelf = BotShops.Shelf(bot, kind, worth);
 
-        return Math.Max(BotAuction.Floor, Math.Min(worth, shelf));
+        return Math.Max(BotMarket.Floor, Math.Min(worth, shelf));
     }
 
     public static string Describe() =>
         Stints == 0
-            ? $"no tinkering has ended yet ({IronBought} iron bought off the stalls for it, {IronGone} stints found it bought out first)"
-            : $"{Stints} tinkering stints ended: {Wrought} with {Pieces} tools made, {ToOrder} to order and {Listed} on the stalls, {RanOut} out of iron, {Fruitless} that made nothing; {IronBought} iron bought off the stalls for them, {IronGone} stints found it bought out first";
+            ? "no tinkering has ended yet"
+            : $"{Stints} tinkering stints ended: {Wrought} with {Pieces} tools made, {ToOrder} for an order and {Listed} kept for the shop by the bank, {RanOut} out of iron, {Fruitless} that made nothing";
 
     public static void Forget()
     {
@@ -321,7 +259,5 @@ public sealed class BotTinker : BotDeed
         Fruitless = 0;
         ToOrder = 0;
         Listed = 0;
-        IronBought = 0;
-        IronGone = 0;
     }
 }

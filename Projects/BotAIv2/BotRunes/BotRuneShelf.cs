@@ -266,6 +266,18 @@ public static class BotRuneShelf
     {
         Evicted = 0;
     }
+
+    public static int Wipe()
+    {
+        var shelves = _shelves.Count;
+
+        _shelves.Clear();
+        _versions.Clear();
+        Forget();
+        BotRuneLibrary.Forget();
+
+        return shelves;
+    }
 }
 
 /// <summary>What each guild holds runes for, kept between boots. Shape 1. See <see cref="BotRuneShelf"/>.</summary>

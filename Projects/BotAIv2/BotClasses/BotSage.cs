@@ -42,6 +42,8 @@ public sealed class BotSage : BotClass
 
     public override string Name => "Sage";
 
+    public override bool Office => true;
+
     public override BotRole Role => BotRole.Caster;
 
     public override SkillName? MainSkill => SkillName.Magery;

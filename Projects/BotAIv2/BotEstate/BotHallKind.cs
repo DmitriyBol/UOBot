@@ -57,11 +57,11 @@ public sealed class BotHallKind
 
     public static int MarblePrice { get; set; } = 60000;
 
-    public static int PatioHolds { get; set; } = 25;
+    public static int PatioHolds { get; set; } = 45;
 
-    public static int LargePatioHolds { get; set; } = 35;
+    public static int LargePatioHolds { get; set; } = 55;
 
-    public static int MarbleHolds { get; set; } = 45;
+    public static int MarbleHolds { get; set; } = 65;
 
     private static readonly BotHallKind[] _kinds =
     [

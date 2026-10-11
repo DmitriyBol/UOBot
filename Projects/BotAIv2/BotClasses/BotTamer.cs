@@ -41,6 +41,13 @@ public sealed class BotTamer : BotClass
             (SkillName.Healing, 60.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("beastmaster", SkillName.AnimalTaming, 3, 58.0, 70.0),
+            new BotLeaning("marksman", null, 1, 56.0, 66.0, Weapon: true),
+            BotLeaning.Even(1)
+        ];
+
         CritChancePerSkill = 0.001;
         CritMultiplier = 3;
 

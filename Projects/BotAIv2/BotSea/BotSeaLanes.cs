@@ -17,6 +17,8 @@ public sealed class BotSeaLane
 
     public long Sailed;
 
+    public long Lost;
+
     public BotDock Other(BotDock one) => one == A ? B : A;
 
     public List<Point3D> Course(BotDock from, out int sea, out int harbour) => Course(from, null, out sea, out harbour);

@@ -50,6 +50,13 @@ public sealed class BotWarriorMage : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("blade", null, 2, 56.0, 66.0, Weapon: true),
+            new BotLeaning("spellsword", SkillName.Magery, 2, 56.0, 68.0),
+            BotLeaning.Even(1)
+        ];
+
         NeedsMeditation = false;
 
         IntrinsicManaTrickle = 2;

@@ -49,6 +49,22 @@ public sealed class BotCrafter : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("smith", SkillName.Blacksmith, 6, 65.0, 75.0, Tier: BotTier.Metal, Keeps: [(SkillName.Mining, 40.0)]),
+            new BotLeaning(
+                "tailor",
+                SkillName.Tailoring,
+                1,
+                65.0,
+                75.0,
+                Tier: BotTier.Leather,
+                Keeps: [(SkillName.Mining, 40.0), (SkillName.Blacksmith, 10.0)]
+            ),
+            new BotLeaning("bowyer", SkillName.Fletching, 2, 55.0, 65.0, Keeps: [(SkillName.Mining, 40.0), (SkillName.Blacksmith, 10.0)]),
+            new BotLeaning("tinker", SkillName.Tinkering, 1, 45.0, 55.0, Keeps: [(SkillName.Mining, 40.0), (SkillName.Blacksmith, 10.0)])
+        ];
+
         FreeCraftIntervalMs = 3600000;
 
         Kit = new BotKit

@@ -48,6 +48,26 @@ public sealed class BotPopulationSettings
     public int? InnPricePerHour { get; set; }
 
     public double? InnBuffShare { get; set; }
+
+    public BotGrowthSettings Growth { get; set; }
+}
+
+/// <summary>What <c>bot-population.json</c> may say under <c>Growth</c>. See <see cref="BotGrowth"/>.</summary>
+public sealed class BotGrowthSettings
+{
+    public bool? Running { get; set; }
+
+    public int? EveryMinutes { get; set; }
+
+    public int? By { get; set; }
+
+    public int? Most { get; set; }
+
+    public int? FillTo { get; set; }
+
+    public int? BurstBy { get; set; }
+
+    public int? LeastToWant { get; set; }
 }
 
 /// <summary>Reads the population file, or writes a working one.</summary>
@@ -134,6 +154,46 @@ public static class BotPopulationConfig
         BotMobile.NoticeRange = settings.NoticeRange ?? BotMobile.NoticeRange;
         BotMobile.FitFraction = settings.FitFraction ?? BotMobile.FitFraction;
 
-        Mix = settings.Classes is { Count: > 0 } ? settings.Classes : StarterMix();
+        {
+            var c = settings.Growth;
+
+            if (c != null)
+            {
+                BotGrowth.Running = c.Running ?? BotGrowth.Running;
+                BotGrowth.EveryMinutes = c.EveryMinutes ?? BotGrowth.EveryMinutes;
+                BotGrowth.By = c.By ?? BotGrowth.By;
+                BotGrowth.Most = c.Most ?? BotGrowth.Most;
+                BotGrowth.FillTo = c.FillTo ?? BotGrowth.FillTo;
+                BotGrowth.BurstBy = c.BurstBy ?? BotGrowth.BurstBy;
+                BotGrowth.LeastToWant = c.LeastToWant ?? BotGrowth.LeastToWant;
+            }
+        }
+
+        Mix = Offices(settings.Classes is { Count: > 0 } ? settings.Classes : StarterMix());
+    }
+
+    private static Dictionary<string, int> Offices(Dictionary<string, int> classes)
+    {
+        Dictionary<string, int> held = null;
+
+        foreach (var (name, many) in classes)
+        {
+            if (many <= 1 || BotClasses.Find(name) is not { Office: true } klass)
+            {
+                continue;
+            }
+
+            logger.Warning(
+                "{Class} is an office, held by one bot at any population; the {Many} in {Path} is read as 1",
+                klass.Name,
+                many,
+                ConfigPath
+            );
+
+            held ??= new Dictionary<string, int>(classes, classes.Comparer);
+            held[name] = 1;
+        }
+
+        return held ?? classes;
     }
 }

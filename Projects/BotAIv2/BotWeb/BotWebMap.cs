@@ -54,6 +54,73 @@ public static class BotWebMap
 
     private static bool _encoding;
 
+    private static ushort[] _radar;
+
+    private static volatile bool _radarTried;
+
+    private static readonly object _radarLock = new();
+
+    public static ushort[] Radar()
+    {
+        if (_radarTried)
+        {
+            return _radar;
+        }
+
+        lock (_radarLock)
+        {
+            if (_radarTried)
+            {
+                return _radar;
+            }
+
+            try
+            {
+                var file = Core.FindDataFile("radarcol.mul", false);
+
+                if (file != null && File.Exists(file))
+                {
+                    var bytes = File.ReadAllBytes(file);
+                    var colours = new ushort[bytes.Length / 2];
+
+                    for (var i = 0; i < colours.Length; i++)
+                    {
+                        colours[i] = (ushort)(bytes[i * 2] | (bytes[i * 2 + 1] << 8));
+                    }
+
+                    _radar = colours;
+                }
+            }
+            catch (Exception e)
+            {
+                logger.Warning("The radar colours could not be read for the live window: {Message}", e.Message);
+            }
+
+            _radarTried = true;
+
+            return _radar;
+        }
+    }
+
+    public static ushort Colour(TileMatrix tiles, ushort[] colours, int x, int y)
+    {
+        var index = tiles.GetLandTile(x, y).ID & 0x3FFF;
+        var top = int.MinValue;
+
+        foreach (var tile in tiles.GetStaticTiles(x, y))
+        {
+            var height = tile.Z + tile.Height;
+
+            if (height >= top)
+            {
+                top = height;
+                index = 0x4000 + (tile.ID & 0x3FFF);
+            }
+        }
+
+        return index >= 0 && index < colours.Length ? colours[index] : (ushort)0;
+    }
+
     public static void Prepare(Map map, string folder)
     {
         if (!Enabled || map == null || map == Map.Internal)

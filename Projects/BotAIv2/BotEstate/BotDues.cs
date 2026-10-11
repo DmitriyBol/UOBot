@@ -66,6 +66,10 @@ public static class BotDues
 
     public static long Kept { get; private set; }
 
+    public static long UnderKeep { get; private set; }
+
+    public static long UnderKeepGold { get; private set; }
+
     private static readonly Dictionary<string, long> _paidBy = new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly Dictionary<string, long> _keptBy = new(StringComparer.OrdinalIgnoreCase);
@@ -92,6 +96,15 @@ public static class BotDues
         }
 
         var want = Math.Min((int)(coin * Share) - Math.Max(0, tithed), Ceiling - held);
+
+        var room = BotYield.Spendable(bot) - BotEstate.Keep;
+
+        if (want > 0 && room < want)
+        {
+            UnderKeep++;
+            UnderKeepGold += want - Math.Max(0, room);
+            want = Math.Max(0, room);
+        }
 
         if (want <= 0)
         {
@@ -124,6 +137,8 @@ public static class BotDues
 
         BotChest.Put(guild.Name, paid);
 
+        BotElection.Gave(bot, paid);
+
         BotYield.Aside(bot, paid);
 
         Paid += paid;
@@ -140,6 +155,13 @@ public static class BotDues
         if (!Saving || guild == null)
         {
             return 0;
+        }
+
+        if (BotPurpose.Goal(guild, out var voted, out var price))
+        {
+            what = voted;
+
+            return price;
         }
 
         if (BotEstate.Running && BotEstate.Hall(guild) == null && !BotUnderworld.Band(guild))
@@ -195,11 +217,17 @@ public static class BotDues
 
         say.Append(
             Running
-                ? $"dues of {Share:P0} on the coin members' work brings in: {Paid}gp paid in {Payments} times, {Unpaid} owed and already spent, {Full} not taken for a chest at {Ceiling}gp; "
+                ? $"dues of {Share:P0} on the coin members' work brings in, only above the {BotEstate.Keep}gp keep: {Paid}gp paid in {Payments} times, {UnderKeep} held back ({UnderKeepGold}gp) for a member at or under the keep, {Unpaid} owed and already spent, {Full} not taken for a chest at {Ceiling}gp; "
                 : "no dues are taken; "
         );
 
         say.Append($"chests kept {Kept}gp back from everyday draws for what their guilds save for; members stood {BotGuilds.Stood}gp for each other out of the same spare the hall asks for ({BotGuilds.Cannot} times they could not)");
+
+        say.Append("; ");
+        say.Append(BotPurpose.Describe());
+
+        say.Append("; ");
+        say.Append(BotClaim.DescribeMoney());
 
         foreach (var guild in BotGuilds.Standing)
         {
@@ -221,7 +249,7 @@ public static class BotDues
 
                 members++;
 
-                var wealth = BotYield.Wealth(member);
+                var wealth = BotYield.Spendable(member);
 
                 if (wealth > BotEstate.Keep)
                 {
@@ -269,6 +297,8 @@ public static class BotDues
         Full = 0;
         Unpaid = 0;
         Kept = 0;
+        UnderKeep = 0;
+        UnderKeepGold = 0;
         _paidBy.Clear();
         _keptBy.Clear();
     }

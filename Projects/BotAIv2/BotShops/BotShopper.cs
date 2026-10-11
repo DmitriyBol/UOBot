@@ -43,6 +43,8 @@ public sealed class BotShopper : IBotProposer
 
     public static int Guess { get; set; } = 5;
 
+    private static int Stand(Type wanted) => Math.Max(Guess, BotShops.Lowest(wanted));
+
     public static int Reserve
     {
         get => _reserve ?? BotPurse.KeepBack;
@@ -66,8 +68,6 @@ public sealed class BotShopper : IBotProposer
     public static long ToCounter { get; private set; }
 
     public static long Spares { get; private set; }
-
-    public static long ToStall { get; private set; }
 
     public static long ToHall { get; private set; }
 
@@ -152,6 +152,8 @@ public sealed class BotShopper : IBotProposer
 
     public static long Provisioned { get; private set; }
 
+    public static long FromOwnBox { get; private set; }
+
     public BotDeed Propose(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -168,9 +170,33 @@ public sealed class BotShopper : IBotProposer
 
         Looks++;
 
+        BotAskFirst.Review(bot, body, klass, pack);
+
         if (!Wanting(bot, klass, pack, out var wanted, out var amount, out var band, out var spare))
         {
-            Stocked++;
+            if (BotAskFirst.ParkedThisLook)
+            {
+                BotAskFirst.OnlyWaited();
+            }
+            else
+            {
+                Stocked++;
+            }
+
+            return null;
+        }
+
+        var own = 0;
+
+        if (!band && body.FindBankNoCreate() is { Items.Count: > 0 }
+            && BotUnload.Keeps(bot).TryGetValue(wanted, out var kept) && kept > 0)
+        {
+            own = BotMarket.FromBank(bot, wanted, Math.Min(amount, kept - pack.GetAmount(wanted)));
+        }
+
+        if (own > 0)
+        {
+            FromOwnBox += own;
 
             return null;
         }
@@ -183,9 +209,11 @@ public sealed class BotShopper : IBotProposer
             Provisioned++;
         }
 
+        var askedKind = wanted;
+
         _cutting = false;
 
-        if (wanted == typeof(Bandage) && CutsBandages && ClothCheaper(bot))
+        if (wanted == typeof(Bandage) && CutsBandages && ClothCheaper(bot, amount))
         {
             if (BotOutfit.Oldest<Scissors>(pack) != null)
             {
@@ -202,6 +230,14 @@ public sealed class BotShopper : IBotProposer
             }
         }
 
+        if (!BotRoom.Receives(body, wanted, true))
+        {
+            BotRoom.Note(body);
+            BotRoom.RestockNotOffered();
+
+            return null;
+        }
+
         Fade();
 
         _short.TryGetValue(wanted, out var seen);
@@ -209,30 +245,31 @@ public sealed class BotShopper : IBotProposer
 
         var shop = BotShops.Nearest(bot, wanted);
         var counter = shop == null ? 0 : BotBurgh.Dear(body, shop, BotShops.Price(shop, wanted));
-        var stall = BotAuction.Cheapest(wanted, bot);
 
-        var front = BotShopkeep.Beats(bot, wanted, amount, shop, counter, stall, out var frontUnit, out var frontUnits);
+        var need = _cutting ? askedKind : wanted;
+
+        if (BotAskFirst.Parked(body.Serial, need))
+        {
+            return null;
+        }
+
+        var front = BotShopkeep.Beats(bot, wanted, amount, shop, counter, out var frontUnit, out var frontUnits);
 
         if (front != null)
         {
+            frontUnits = ByPurse(body, askedKind, wanted, frontUnits, frontUnit, needy, band, pack);
+
+            if (frontUnits <= 0)
+            {
+                return null;
+            }
+
             if (needy)
             {
                 BotProvision.Fund(body, frontUnit * frontUnits);
             }
 
             return Ordered(new BotRestock(front, wanted, frontUnits, frontUnit), band, spare);
-        }
-
-        if (stall != null && (counter <= 0 || stall.Price <= counter))
-        {
-            ToStall++;
-
-            if (needy)
-            {
-                BotProvision.Fund(body, stall.Price * Math.Min(amount, stall.Amount));
-            }
-
-            return Ordered(new BotRestock(stall, wanted, Math.Min(amount, stall.Amount), map, body.Location), band, spare);
         }
 
         var merchant = BotShelf.Of(body);
@@ -252,7 +289,7 @@ public sealed class BotShopper : IBotProposer
         {
             var unit = (int)Math.Ceiling(lotPrice / (double)Math.Max(1, ours.Amount));
 
-            if ((counter <= 0 || unit <= counter) && BotYield.Wealth(body) >= lotPrice)
+            if ((counter <= 0 || unit <= counter) && BotYield.Spendable(body) >= lotPrice)
             {
                 ToHall++;
 
@@ -260,8 +297,73 @@ public sealed class BotShopper : IBotProposer
             }
         }
 
+        if (PileMs > 0 && !band && Patient(wanted) && BotProvision.Consumable(wanted) && BotGlut.Glutted(wanted)
+            && pack.GetAmount(wanted) > 0 && !BotAskFirst.Lately(body.Serial, need))
+        {
+            var key = (body.Serial, wanted);
+            var now = Core.TickCount;
+            var offer = counter > 0 ? counter : BotMarket.Worth(wanted, Stand(wanted));
+
+            if (_askedPile.TryGetValue(key, out var at) && now - at < PileMs * 3L)
+            {
+                if (now - at < PileMs && BotMarket.Wanted(bot, wanted) != null)
+                {
+                    PileWaited++;
+
+                    return null;
+                }
+
+                if (now - at >= PileMs && BotMarket.Wanted(bot, wanted) is { } standing && !OwnAsk(standing, at))
+                {
+                    _askedPile[key] = standing.PostedTick;
+                    ForeignKept++;
+
+                    return null;
+                }
+
+                if (now - at >= PileMs && BotMarket.Withdrawn(bot, wanted, BotWithdraw.Walked) > 0)
+                {
+                    PileWalked++;
+                }
+            }
+            else if (BotMarket.Wanted(bot, wanted) != null)
+            {
+                if (_askedPile.Count > 4096)
+                {
+                    _askedPile.Clear();
+                }
+
+                _askedPile[key] = now;
+                PileWaited++;
+
+                return null;
+            }
+            else if (BotYield.Spendable(body) - offer * amount > 0)
+            {
+                var order = BotOrder.For(map, body.Location, bot, wanted, offer, amount);
+
+                if (order != null)
+                {
+                    if (_askedPile.Count > 4096)
+                    {
+                        _askedPile.Clear();
+                    }
+
+                    _askedPile[key] = now;
+                    Piled++;
+
+                    return order;
+                }
+            }
+        }
+
         if (counter <= 0)
         {
+            if (BotAskFirst.Asks(bot, body, klass, pack, need, wanted, amount, BotAskFirst.Price(wanted), band, _cutting, needy, Owned(body.Serial, wanted, need), true))
+            {
+                return null;
+            }
+
             Missing(wanted, map, body);
 
             var order = Board(bot, body, map, wanted, amount);
@@ -272,9 +374,9 @@ public sealed class BotShopper : IBotProposer
             }
             else
             {
-                var wealth = BotYield.Wealth(body);
+                var wealth = BotYield.Spendable(body);
 
-                if (wealth - BotAuction.Worth(wanted, Guess) * amount <= Reserve)
+                if (wealth - BotMarket.Worth(wanted, Stand(wanted)) * amount <= Reserve)
                 {
                     Broke++;
 
@@ -292,6 +394,81 @@ public sealed class BotShopper : IBotProposer
             return order;
         }
 
+        if (AskFarMinutes > 0.0 && !needy && !band && Patient(wanted) && Makeable(wanted)
+            && BotAppraisal.Travel(body.Location, shop.Location) >= AskFarMinutes)
+        {
+            var key = (body.Serial, wanted);
+            var now = Core.TickCount;
+            var asked = _askedFar.TryGetValue(key, out var at);
+
+            if (asked && BotMarket.Wanted(bot, wanted) is { Coming: > 0 })
+            {
+                WaitedFar++;
+
+                return null;
+            }
+
+            if (!asked && BotMarket.Wanted(bot, wanted) != null)
+            {
+                if (_askedFar.Count > 4096)
+                {
+                    _askedFar.Clear();
+                }
+
+                _askedFar[key] = now;
+                WaitedFar++;
+
+                return null;
+            }
+
+            if (!asked || now - at >= AskFarMs * 3L)
+            {
+                var order = BotOrder.For(map, body.Location, bot, wanted, counter, amount);
+
+                if (order != null && BotYield.Spendable(body) - counter * amount > Reserve)
+                {
+                    if (_askedFar.Count > 4096)
+                    {
+                        _askedFar.Clear();
+                    }
+
+                    _askedFar[key] = now;
+                    AskedFar++;
+
+                    return order;
+                }
+            }
+            else if (now - at < AskFarMs && BotMarket.Wanted(bot, wanted) != null)
+            {
+                WaitedFar++;
+
+                return null;
+            }
+            else if (BotMarket.Wanted(bot, wanted) is { } standing && !OwnAsk(standing, at))
+            {
+                _askedFar[key] = standing.PostedTick;
+                ForeignKept++;
+
+                return null;
+            }
+            else if (BotMarket.Withdrawn(bot, wanted, BotWithdraw.Walked) > 0)
+            {
+                WalkedFar++;
+            }
+        }
+
+        if (BotAskFirst.Asks(bot, body, klass, pack, need, wanted, amount, counter, band, _cutting, needy, Owned(body.Serial, wanted, need), false))
+        {
+            return null;
+        }
+
+        amount = ByPurse(body, askedKind, wanted, amount, counter, needy, band, pack);
+
+        if (amount <= 0)
+        {
+            return null;
+        }
+
         ToCounter++;
 
         if (needy)
@@ -302,11 +479,104 @@ public sealed class BotShopper : IBotProposer
         return Ordered(new BotRestock(shop, wanted, amount, counter), band, spare);
     }
 
-    private static bool ClothCheaper(IBotWilful bot)
+    public static bool PurseSized { get; set; } = true;
+
+    public static long Trimmed { get; private set; }
+
+    public static long TrimmedUnits { get; private set; }
+
+    public static long KeptBack { get; private set; }
+
+    private static int ByPurse(Mobile body, Type asked, Type buying, int amount, int unit, bool needy, bool band, Container pack)
     {
+        if (!PurseSized || band || amount <= 0 || unit <= 0 || body == null || !BotProvision.Consumable(asked)
+            || buying != asked && buying != typeof(Cloth))
+        {
+            return amount;
+        }
+
+        var held = pack?.GetAmount(asked) ?? 0;
+        var must = Math.Clamp(BotProvision.Floor(body, asked) - held, 0, amount);
+        var free = Math.Max(0, BotYield.Spendable(body));
+
+        var door = Math.Clamp(BotProvision.DoorFloor(body, asked) - held, 0, must);
+        var mustUnits = Math.Min(must, free / unit);
+
+        if (mustUnits < door && needy && BotProvision.Fund(body, door * unit))
+        {
+            free = Math.Max(0, BotYield.Spendable(body));
+            mustUnits = Math.Min(must, Math.Max(door, free / unit));
+        }
+
+        var left = Math.Max(0, free - mustUnits * unit);
+        var extraUnits = Math.Min(amount - must, Math.Max(0, left - Reserve) / unit);
+        var units = mustUnits + extraUnits;
+
+        if (units >= amount)
+        {
+            return amount;
+        }
+
+        if (units <= 0)
+        {
+            KeptBack++;
+
+            return 0;
+        }
+
+        Trimmed++;
+        TrimmedUnits += amount - units;
+
+        return units;
+    }
+
+    public static double AskFarMinutes { get; set; } = 4.0;
+
+    public static int AskFarMs { get; set; } = 600000;
+
+    public static long AskedFar { get; private set; }
+
+    public static long WaitedFar { get; private set; }
+
+    public static long WalkedFar { get; private set; }
+
+    private static readonly Dictionary<(Serial, Type), long> _askedFar = [];
+
+    public static int PileMs { get; set; } = 180000;
+
+    public static long Piled { get; private set; }
+
+    public static long PileWaited { get; private set; }
+
+    public static long PileWalked { get; private set; }
+
+    public static long ForeignKept { get; private set; }
+
+    private static bool OwnAsk(BotWant want, long at) => want.PostedTick - at <= 1000;
+
+    private static readonly Dictionary<(Serial, Type), long> _askedPile = [];
+
+    private static bool Owned(Serial who, Type wanted, Type need)
+    {
+        var now = Core.TickCount;
+
+        return Clocked(_askedPile, (who, wanted), now, PileMs * 3L) || Clocked(_askedFar, (who, wanted), now, AskFarMs * 3L)
+               || need != wanted && (Clocked(_askedPile, (who, need), now, PileMs * 3L) || Clocked(_askedFar, (who, need), now, AskFarMs * 3L));
+    }
+
+    private static bool Clocked(Dictionary<(Serial, Type), long> clock, (Serial, Type) key, long now, long span) =>
+        clock.TryGetValue(key, out var at) && now - at < span;
+
+    private static bool Patient(Type wanted) =>
+        wanted != null && !typeof(BaseWeapon).IsAssignableFrom(wanted) && !typeof(BaseShield).IsAssignableFrom(wanted)
+        && wanted != typeof(Arrow) && wanted != typeof(Bolt);
+
+    private static bool ClothCheaper(IBotWilful bot, int amount)
+    {
+        var body = bot?.Self;
         var cloth = BotShops.Nearest(bot, typeof(Cloth));
 
-        if (cloth == null)
+        if (body == null || cloth == null)
         {
             return false;
         }
@@ -321,8 +591,30 @@ public sealed class BotShopper : IBotProposer
         var bandages = BotShops.Nearest(bot, typeof(Bandage));
         var bandagePrice = bandages == null ? 0 : BotShops.Price(bandages, typeof(Bandage));
 
-        return bandagePrice <= 0 || clothPrice < bandagePrice;
+        if (bandagePrice <= 0)
+        {
+            return true;
+        }
+
+        var n = Math.Max(1, amount);
+        var walk = BotShopkeep.WalkGold;
+        var clothLanded = clothPrice + 2.0 * BotAppraisal.Travel(body.Location, cloth.Location) * walk / n;
+        var bandageLanded = bandagePrice + 2.0 * BotAppraisal.Travel(body.Location, bandages.Location) * walk / n;
+
+        if (clothLanded < bandageLanded)
+        {
+            return true;
+        }
+
+        if (clothPrice < bandagePrice)
+        {
+            ClothFarther++;
+        }
+
+        return false;
     }
+
+    public static long ClothFarther { get; private set; }
 
     private static BotDeed Ordered(BotRestock errand, bool band, bool spare)
     {
@@ -387,19 +679,33 @@ public sealed class BotShopper : IBotProposer
     public static string Describe() =>
         Looks == 0
             ? "nobody has been looked at for supplies"
-            : $"{Looks} looks for supplies: {Stocked} were short of nothing, {ToCounter} sent to a shopkeeper, "
-              + $"{ToStall} to a cheaper stall, {BotShopkeep.ToFront} to a bot's shop by the bank, {ToHall} to their own guild's counter ({HallWalled} times it was passed over as out of reach), {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
-              + $"{Spares} offers were for a tool bought again before the last gave out, {BotRestock.ToolsBound} working tools bound as they were bought, {AsCloth} bandage trips sent for cloth to cut ({BotRestock.CutInto} bandages cut at the counter) and {ScissorsFirst} for scissors first, "
+            : $"{Looks} looks for supplies: {Stocked} were short of nothing, {FromOwnBox} things taken out of the bot's own bank box at a bank instead of bought, {ToCounter} sent to a shopkeeper, "
+              + $"{AskedFar} asked the island aloud instead of walking to a counter {AskFarMinutes:F0} minutes or more away ({WaitedFar} looks waited for the carrier, {WalkedFar} walked after all), {Piled} asked the island for a piled consumable before any counter ({PileWaited} looks waited for the carrier, {PileWalked} walked after nobody came; {ForeignKept} times either clock found a want another path had said since its ask and waited for it rather than taking it back), {BotShopkeep.ToFront} to a bot's shop by the bank, {ToHall} to their own guild's counter ({HallWalled} times it was passed over as out of reach), {ToBoard} put an order on the board, {Unmakeable} were left off it because nothing on this shard makes the thing, "
+              + $"{Spares} offers were for a tool bought again before the last gave out, {BotRestock.ToolsBound} working tools bound as they were bought, {AsCloth} bandage trips sent for cloth to cut ({BotRestock.CutInto} bandages cut at the counter), {ClothFarther} kept to bandages for the cloth counter being the dearer by the road, and {ScissorsFirst} for scissors first, "
               + $"{Broke} wanted something nobody sells and could not afford one made (the fattest purse among them held {Richest}gp); "
+              + $"by the purse{(PurseSized ? "" : " (off)")}: {Trimmed} restocks bought smaller than asked ({TrimmedUnits} units left unbought: the threshold whatever the purse, the rest only above the {Reserve}gp keep), {KeptBack} not offered for the keep; "
               + $"most often short of {Commonest()} lately";
 
     public static void ForgetCounts()
     {
+        Trimmed = 0;
+        TrimmedUnits = 0;
+        KeptBack = 0;
         Looks = 0;
         Stocked = 0;
+        FromOwnBox = 0;
         ToCounter = 0;
+        AskedFar = 0;
+        WaitedFar = 0;
+        ClothFarther = 0;
+        WalkedFar = 0;
+        _askedFar.Clear();
+        Piled = 0;
+        PileWaited = 0;
+        PileWalked = 0;
+        ForeignKept = 0;
+        _askedPile.Clear();
         Spares = 0;
-        ToStall = 0;
         ToHall = 0;
         ToBoard = 0;
         Unmakeable = 0;
@@ -435,7 +741,7 @@ public sealed class BotShopper : IBotProposer
             var quiver = rolled.Value.Ammunition;
             var granted = BotBinding.BoundCount(quiver, bond);
 
-            if (granted > 0 && Lacking(pack, quiver, granted, out amount))
+            if (granted > 0 && Lacking(pack, quiver, granted, out amount) && !BotAskFirst.Parked(body.Serial, quiver))
             {
                 wanted = quiver;
 
@@ -443,7 +749,7 @@ public sealed class BotShopper : IBotProposer
             }
         }
 
-        if (Lacking(pack, typeof(Bandage), kit.Bandages, out amount))
+        if (Lacking(pack, typeof(Bandage), kit.Bandages, out amount) && !BotAskFirst.Parked(body.Serial, typeof(Bandage)))
         {
             wanted = typeof(Bandage);
 
@@ -470,7 +776,7 @@ public sealed class BotShopper : IBotProposer
 
         for (var i = 0; i < tools.Count; i++)
         {
-            if (Kept(body, pack, tools[i], out var spent))
+            if (Kept(body, pack, tools[i], out var spent) || BotAskFirst.Parked(body.Serial, tools[i]))
             {
                 continue;
             }
@@ -487,7 +793,21 @@ public sealed class BotShopper : IBotProposer
         {
             for (var i = 0; i < Reagents.Length; i++)
             {
-                if (!Lacking(pack, Reagents[i], kit.Reagents, out amount))
+                if (BotProvision.Floor(body, Reagents[i]) <= pack.GetAmount(Reagents[i])
+                    || !Lacking(pack, Reagents[i], kit.Reagents, out amount) || BotAskFirst.Parked(body.Serial, Reagents[i]))
+                {
+                    continue;
+                }
+
+                wanted = Reagents[i];
+
+                return true;
+            }
+
+            for (var i = 0; BotYield.Spendable(body) > Reserve && i < Reagents.Length; i++)
+            {
+                if (BotYield.Spendable(body) <= Reserve + Stand(Reagents[i])
+                    || !Lacking(pack, Reagents[i], kit.Reagents, out amount) || BotAskFirst.Parked(body.Serial, Reagents[i]))
                 {
                     continue;
                 }
@@ -518,7 +838,7 @@ public sealed class BotShopper : IBotProposer
 
         for (var i = 0; i < brewing.Count; i++)
         {
-            if (!Lacking(pack, brewing[i], BotFlask.Herbs, out amount))
+            if (!Lacking(pack, brewing[i], BotFlask.Herbs, out amount) || BotAskFirst.Parked(body.Serial, brewing[i]))
             {
                 continue;
             }
@@ -790,7 +1110,7 @@ public sealed class BotShopper : IBotProposer
 
     private static BotDeed Board(IBotWilful bot, Mobile body, Map map, Type wanted, int amount)
     {
-        if (BotAuction.Wanted(bot, wanted) != null)
+        if (BotMarket.Wanted(bot, wanted) != null)
         {
             return null;
         }
@@ -802,9 +1122,9 @@ public sealed class BotShopper : IBotProposer
             return null;
         }
 
-        var offer = BotAuction.Worth(wanted, Guess);
+        var offer = BotMarket.Worth(wanted, Stand(wanted));
 
-        if (BotYield.Wealth(body) - offer * amount <= Reserve)
+        if (BotYield.Spendable(body) - offer * amount <= Reserve)
         {
             return null;
         }

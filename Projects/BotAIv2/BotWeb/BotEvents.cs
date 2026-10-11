@@ -107,6 +107,8 @@ public static class BotEvents
 
     public static string Path { get; private set; }
 
+    public static Action<BotEvent> Live { get; set; }
+
     public static long Seq
     {
         get
@@ -250,6 +252,17 @@ public static class BotEvents
             try
             {
                 sinks[i](e);
+            }
+            catch
+            {
+            }
+        }
+
+        if (Live is { } live)
+        {
+            try
+            {
+                live(e);
             }
             catch
             {

@@ -82,6 +82,8 @@ public abstract class BotDeed
 
     public virtual bool Summons => false;
 
+    public virtual bool Shelters => false;
+
     public virtual bool Braves => false;
 
     public virtual double Brings(Mobile body) => BotQuad.Strength(body);
@@ -101,6 +103,10 @@ public abstract class BotDeed
     public virtual void Resumed(IBotWilful bot)
     {
     }
+
+    public virtual string Stale(IBotWilful bot) => null;
+
+    public virtual bool KeptOut => false;
 
     public virtual void Drop(IBotWilful bot)
     {

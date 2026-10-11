@@ -35,6 +35,8 @@ public sealed class BotCaptain : BotClass
 {
     public override string Name => "Captain";
 
+    public override bool Office => true;
+
     public override BotRole Role => BotRole.Ranged;
 
     public override SkillName? MainSkill => SkillName.Archery;

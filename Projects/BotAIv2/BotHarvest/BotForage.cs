@@ -48,8 +48,6 @@ public sealed class BotForage : BotDeed
 
     public static int Guess { get; set; } = 5;
 
-    public static bool ListGoods { get; set; } = true;
-
     public static long Unreachable { get; private set; }
 
     public static void ForgetGround() => Unreachable = 0;
@@ -219,7 +217,7 @@ public sealed class BotForage : BotDeed
         _gathered += amount;
 
         BotQuad.Harvested(body.Map, body.Location);
-        _worth += amount * BotAuction.Worth(kind, Guess);
+        _worth += amount * BotMarket.Worth(kind, Guess);
 
         _taken.Add(lying);
 
@@ -238,57 +236,16 @@ public sealed class BotForage : BotDeed
             return BotDoing.Done(why);
         }
 
-        var put = 0;
-
-        if (ListGoods)
-        {
-            put = Put(bot, body);
-        }
-
         _taken.Clear();
 
         logger.Information(
-            "{Name} gathered {Count} reagents worth about {Worth}gp and put {Put} of them on the board",
+            "{Name} gathered {Count} reagents worth about {Worth}gp",
             body.Name,
             _gathered,
-            _worth,
-            put
+            _worth
         );
 
-        return BotDoing.Done($"{_gathered} reagents gathered, {put} put out — {why}");
-    }
-
-    private int Put(IBotWilful bot, Mobile body)
-    {
-        var pack = body.Backpack;
-
-        if (pack == null)
-        {
-            return 0;
-        }
-
-        var put = 0;
-
-        List<Item> carried = [.. pack.Items];
-
-        for (var i = 0; i < carried.Count; i++)
-        {
-            var item = carried[i];
-
-            if (item is not BaseReagent { Deleted: false })
-            {
-                continue;
-            }
-
-            var amount = Math.Max(1, item.Amount);
-
-            if (BotAuction.List(bot, item, BotAuction.Worth(item.GetType(), BotShops.Shelf(bot, item.GetType(), Guess))) != null)
-            {
-                put += amount;
-            }
-        }
-
-        return put;
+        return BotDoing.Done($"{_gathered} reagents gathered — {why}");
     }
 
     public override void Drop(IBotWilful bot) => _taken.Clear();
