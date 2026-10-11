@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Server.Logging;
+using Server.Mobiles;
 using Server.Regions;
 
 namespace Server.BotAI.V2;
@@ -66,12 +67,32 @@ public sealed class BotHunter : IBotProposer
 
         if (BotThreat.Decide(body, BotMobile.NoticeRange) == BotStand.Outmatched)
         {
-            var elsewhere = Hunting(bot, body, map, out var outmatched);
+            var elsewhere = Hunting(bot, body, map, out var outmatched, out var reach, out _);
 
-            return elsewhere == Point3D.Zero ? null : new BotProwl(map, elsewhere, outmatched);
+            return Offer(bot, body, map, elsewhere, outmatched, reach);
         }
 
-        var quarry = BotQuarry.Best(body, BotQuarry.Reach);
+        var quarry = BotQuarry.Paying(bot, body);
+
+        if (quarry != null && GrazersLast && BotQuarry.HostileFirst
+            && !ReferenceEquals(quarry.Combatant, body) && !BotQuarry.Fights(quarry))
+        {
+            var ground = Hunting(bot, body, map, out var needsCompany, out var zoneSeek, out var fighter);
+
+            if (ground != Point3D.Zero && fighter is { Deleted: false, Alive: true }
+                && BotQuarry.Ours(body, fighter) && !BotQuarry.Shunned(fighter) && !BotQuarry.Crowded(fighter))
+            {
+                if (needsCompany)
+                {
+                    GrazerCompanied++;
+
+                    return Offer(bot, body, map, ground, true, zoneSeek);
+                }
+
+                GrazerPassed++;
+                quarry = fighter;
+            }
+        }
 
         if (quarry != null
             && BotThreat.Overrun(body, quarry, BotMobile.NoticeRange))
@@ -86,21 +107,31 @@ public sealed class BotHunter : IBotProposer
         {
             Missing(map);
 
-            var ground = Hunting(bot, body, map, out var company);
+            var again = Again(body, map);
 
-            return ground == Point3D.Zero ? null : new BotProwl(map, ground, company);
+            if (again != null)
+            {
+                return again;
+            }
+
+            var ground = Hunting(bot, body, map, out var company, out var seek, out _);
+
+            return Offer(bot, body, map, ground, company, seek);
         }
 
         BotQuarry.Claim(body, quarry);
+        BotQuarry.Chosen(quarry, body);
 
         var trains = bot.Bond?.Weapon?.Skill ?? SkillName.Wrestling;
 
         return new BotSlay(quarry, trains);
     }
 
-    private static Point3D Hunting(IBotWilful bot, Mobile body, Map map, out bool company)
+    private static Point3D Hunting(IBotWilful bot, Mobile body, Map map, out bool company, out int seek, out BaseCreature sighted)
     {
         company = false;
+        seek = 0;
+        sighted = null;
 
         var ledger = bot?.Resolve?.Ledger;
         var home = BotPopulation.HomeOf(body);
@@ -110,6 +141,7 @@ public sealed class BotHunter : IBotProposer
         var bestPaid = -1.0;
         var bestKnown = -1.0;
         var bestWanted = false;
+        var bestLive = false;
 
         var refused = 0;
 
@@ -132,7 +164,7 @@ public sealed class BotHunter : IBotProposer
         var overWater = mainland >= 0 ? BotGates.NearestMoongate(map, body.Location, mainland, Walkable) : null;
         var landing = overWater?.To ?? Point3D.Zero;
 
-        var zoned = Zoned(body, map, home, roam);
+        var zoned = Zoned(body, map, home, roam, out var zoneSeek, out var zoneCreature);
 
         for (var tries = 0; tries <= Samples + 4; tries++)
         {
@@ -199,7 +231,11 @@ public sealed class BotHunter : IBotProposer
                 where = new Point3D(x, y, z);
             }
 
-            if (Utility.InRange(body.Location, where, BotQuarry.Reach))
+            var live = tries == 4;
+
+            var near = live && body.Region?.IsPartOf<TownRegion>() == true ? BotProwl.ArriveWithin : BotQuarry.Reach;
+
+            if (Utility.InRange(body.Location, where, near))
             {
                 continue;
             }
@@ -247,9 +283,16 @@ public sealed class BotHunter : IBotProposer
 
             if (TroddenOnly && !Walked(map, where))
             {
-                Untrodden++;
+                if (live)
+                {
+                    ZoneSpared++;
+                }
+                else
+                {
+                    Untrodden++;
 
-                continue;
+                    continue;
+                }
             }
 
             if (Region.Find(where, map)?.IsPartOf<TownRegion>() == true)
@@ -257,7 +300,7 @@ public sealed class BotHunter : IBotProposer
                 continue;
             }
 
-            if (BotRefused.Refusing(map, where) || BotQuad.Baulking(map, where))
+            if (BotRefused.Refusing(map, where) || BotQuad.Baulking(map, where) || NoWay(map, where))
             {
                 Darted++;
 
@@ -274,7 +317,7 @@ public sealed class BotHunter : IBotProposer
                 continue;
             }
 
-            if (LatelyEmpty(body, where))
+            if (!live && LatelyEmpty(body, where))
             {
                 Revisits++;
 
@@ -303,6 +346,12 @@ public sealed class BotHunter : IBotProposer
             if (lethal && dares)
             {
                 Deadly++;
+            }
+
+            if (dares && !lethal && BotDanger.Road(body, map, body.Location, where, BotQuad.Strength(body), out _, out _, out _))
+            {
+                dares = false;
+                RoadTooStrong++;
             }
 
             if (lethal || !dares)
@@ -340,7 +389,11 @@ public sealed class BotHunter : IBotProposer
 
             var safety = BotQuad.Safety(map, where);
 
-            if (safety > BotQuad.TooQuiet)
+            if (safety > BotQuad.TooQuiet && live)
+            {
+                ZoneSpared++;
+            }
+            else if (safety > BotQuad.TooQuiet)
             {
                 Quiet++;
                 refused++;
@@ -369,8 +422,10 @@ public sealed class BotHunter : IBotProposer
             var better = best == Point3D.Zero
                 || (boarded && !bestBoarded)
                 || (boarded == bestBoarded
-                    && ((wanted && !bestWanted)
-                        || (wanted == bestWanted && (paid > bestPaid || (paid >= bestPaid && known > bestKnown)))));
+                    && ((ZoneFirst && live && !bestLive)
+                        || ((!ZoneFirst || live == bestLive)
+                            && ((wanted && !bestWanted)
+                                || (wanted == bestWanted && (paid > bestPaid || (paid >= bestPaid && known > bestKnown)))))));
 
             if (better)
             {
@@ -379,6 +434,7 @@ public sealed class BotHunter : IBotProposer
                 bestKnown = known;
                 bestWanted = wanted;
                 bestBoarded = boarded;
+                bestLive = live;
                 bestNeedsCompany = needsCompany;
                 company = needsCompany;
 
@@ -404,9 +460,295 @@ public sealed class BotHunter : IBotProposer
         if (zoned != Point3D.Zero && best == zoned)
         {
             ZoneChosen++;
+            seek = zoneSeek;
+
+            if (zoneCreature != null && BotQuarry.Fights(zoneCreature))
+            {
+                sighted = zoneCreature;
+            }
         }
 
         return best;
+    }
+
+    private static BotProwl Offer(IBotWilful bot, Mobile body, Map map, Point3D ground, bool company, int seek)
+    {
+        if (ground == Point3D.Zero)
+        {
+            return null;
+        }
+
+        if (NoWay(map, ground))
+        {
+            BotProwl.FirstNoWay++;
+
+            return null;
+        }
+
+        List<Point3D> legs = null;
+
+        if (BotProwl.Sweeps)
+        {
+            legs = Sweep(bot, body, map, ground, company);
+
+            BotProwl.SweepsOffered++;
+            BotProwl.SquaresOffered += legs.Count;
+
+            if (!company && legs.Count < BotProwl.SweepLeast)
+            {
+                BotProwl.ShortSweeps++;
+            }
+        }
+
+        return new BotProwl(map, ground, company, legs) { Seek = seek };
+    }
+
+    private static readonly List<(Point3D At, double Score)> _ring = [];
+
+    public static int SweepTries { get; set; } = 3;
+
+    private static List<Point3D> Sweep(IBotWilful bot, Mobile body, Map map, Point3D first, bool company)
+    {
+        var legs = new List<Point3D>(Math.Max(1, BotProwl.SweepMost)) { first };
+
+        if (company || BotProwl.SweepMost <= 1)
+        {
+            return legs;
+        }
+
+        var ledger = bot?.Resolve?.Ledger;
+        var strength = BotQuad.Strength(body);
+        var own = BotQuad.Key(map, body.Location);
+        var last = BotQuad.Key(map, first);
+        var now = Core.TickCount;
+        var novice = BotLadder.Novice(body);
+
+        while (legs.Count < BotProwl.SweepMost)
+        {
+            _ring.Clear();
+
+            for (var dx = -1; dx <= 1; dx++)
+            {
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    if (dx == 0 && dy == 0)
+                    {
+                        continue;
+                    }
+
+                    var qx = last.X + dx;
+                    var qy = last.Y + dy;
+
+                    if (own.Map == last.Map && own.X == qx && own.Y == qy)
+                    {
+                        BotProwl.Underfoot++;
+
+                        continue;
+                    }
+
+                    if (Listed(map, legs, qx, qy))
+                    {
+                        continue;
+                    }
+
+                    var mx = qx * BotQuad.Side + BotQuad.Side / 2;
+                    var my = qy * BotQuad.Side + BotQuad.Side / 2;
+                    var probe = new Point3D(mx, my, 0);
+                    var quad = BotQuad.Known(map, probe);
+
+                    if (quad == null || !quad.Trodden || quad.Townbound || quad.Deep)
+                    {
+                        continue;
+                    }
+
+                    if (BotQuad.Baulking(map, probe) || BotRefused.Refusing(map, probe) || BotBarred.Holds(map, probe)
+                        || !BotPopulation.Within(map, probe, body) || NoWay(map, probe))
+                    {
+                        continue;
+                    }
+
+                    if (LatelyEmpty(body, probe))
+                    {
+                        BotProwl.Underfoot++;
+
+                        continue;
+                    }
+
+                    var level = BotZoneLevel.Clear;
+                    var threat = 0f;
+
+                    if (ReadsZones)
+                    {
+                        level = BotZones.LevelAt(map, mx, my, out _, out threat);
+                    }
+
+                    if (level == BotZoneLevel.Deadly || level is BotZoneLevel.Hostile or BotZoneLevel.Edge && threat > strength * ZoneDare)
+                    {
+                        continue;
+                    }
+
+                    var safety = BotQuad.Safety(map, probe);
+
+                    if (novice && safety <= BotQuad.Wanted)
+                    {
+                        continue;
+                    }
+
+                    var mobs = quad.Mobs > 0 && now - quad.Sighted < BotQuad.SightMs ? Math.Min(quad.Mobs, 5) : 0;
+
+                    var score = (level == BotZoneLevel.Hostile ? 20.0 : level == BotZoneLevel.Edge ? 10.0 : 0.0)
+                                + mobs * 3.0
+                                + BotSweepRecord.Worth(map, probe)
+                                + (ledger?.Expect(BotSlay.Trade, map, probe, 0.0) ?? 0.0) / 10.0
+                                - (safety > BotQuad.TooQuiet ? 5.0 : 0.0);
+
+                    _ring.Add((probe, score));
+                }
+            }
+
+            if (_ring.Count == 0)
+            {
+                break;
+            }
+
+            _ring.Sort(static (a, b) => b.Score.CompareTo(a.Score));
+
+            var next = Point3D.Zero;
+
+            for (var i = 0; i < _ring.Count && i < SweepTries; i++)
+            {
+                if (!StandIn(map, _ring[i].At, out var stand))
+                {
+                    continue;
+                }
+
+                if (Region.Find(stand, map)?.IsPartOf<TownRegion>() == true
+                    || !BotQuad.Dares(body, map, stand)
+                    || BotPeril.Overwhelms(map, stand, body.Location, strength, out _, count: false)
+                    || BotReach.Ask(map, body.Location, stand, BotArrival.Within(BotProwl.ArriveWithin)) == BotReachVerdict.Sealed
+                    || NoWay(map, stand))
+                {
+                    continue;
+                }
+
+                next = stand;
+
+                break;
+            }
+
+            if (next == Point3D.Zero)
+            {
+                break;
+            }
+
+            legs.Add(next);
+            last = BotQuad.Key(map, next);
+        }
+
+        _ring.Clear();
+
+        return legs;
+    }
+
+    public static bool NoWay(Map map, Point3D where)
+    {
+        if (map == null || where == Point3D.Zero)
+        {
+            return false;
+        }
+
+        if (BotSweepRecord.NoWay(map, where))
+        {
+            BotProwl.SquaresNoWay++;
+
+            return true;
+        }
+
+        if (BotReachMap.Class(map, where.X, where.Y, where.Z) is BotReachClass.Isle or BotReachClass.Pocket)
+        {
+            BotProwl.SquaresNoGround++;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool Listed(Map map, List<Point3D> legs, int qx, int qy)
+    {
+        for (var i = 0; i < legs.Count; i++)
+        {
+            var key = BotQuad.Key(map, legs[i]);
+
+            if (key.X == qx && key.Y == qy)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool StandIn(Map map, Point3D middle, out Point3D stand)
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            var x = middle.X + (i == 1 ? 8 : i == 2 ? -8 : 0);
+            var y = middle.Y + (i == 3 ? 8 : i == 4 ? -8 : 0);
+
+            if (BotStep.Settle(map, x, y, out var z))
+            {
+                stand = new Point3D(x, y, z);
+
+                return true;
+            }
+        }
+
+        stand = Point3D.Zero;
+
+        return false;
+    }
+
+    private static BotProwl Again(Mobile body, Map map)
+    {
+        if (!BotProwl.Sweeps)
+        {
+            return null;
+        }
+
+        var left = BotSweepRecord.Left(body, map);
+
+        if (left == null)
+        {
+            return null;
+        }
+
+        var strength = BotQuad.Strength(body);
+        var legs = new List<Point3D>(left.Length);
+
+        for (var i = 0; i < left.Length; i++)
+        {
+            var at = left[i];
+
+            if (BotBarred.Holds(map, at) || BotQuad.Baulking(map, at) || BotRefused.Refusing(map, at) || !BotQuad.Dares(body, map, at)
+                || BotPeril.Overwhelms(map, at, body.Location, strength, out _, count: false))
+            {
+                continue;
+            }
+
+            legs.Add(at);
+        }
+
+        if (legs.Count == 0)
+        {
+            BotSweepRecord.Taken(body);
+
+            return null;
+        }
+
+        BotProwl.ResumeOffered++;
+
+        return new BotProwl(map, legs[0], false, legs, resumed: true);
     }
 
     private static Point3D Paying(Mobile body, Map map, int roam)
@@ -425,7 +767,7 @@ public sealed class BotHunter : IBotProposer
             return Point3D.Zero;
         }
 
-        if (BotQuad.Baulking(map, where) || BotRefused.Refusing(map, where))
+        if (BotQuad.Baulking(map, where) || BotRefused.Refusing(map, where) || NoWay(map, where))
         {
             Rested++;
 
@@ -476,7 +818,7 @@ public sealed class BotHunter : IBotProposer
             return Point3D.Zero;
         }
 
-        if (BotQuad.Baulking(map, where) || BotRefused.Refusing(map, where))
+        if (BotQuad.Baulking(map, where) || BotRefused.Refusing(map, where) || NoWay(map, where))
         {
             Rested++;
 
@@ -532,7 +874,7 @@ public sealed class BotHunter : IBotProposer
 
     private static readonly Dictionary<Serial, List<(Point3D At, long Tick)>> _empty = [];
 
-    private const int EmptyKept = 4;
+    private const int EmptyKept = 8;
 
     public static void FoundEmpty(Mobile body, Point3D at)
     {
@@ -597,22 +939,29 @@ public sealed class BotHunter : IBotProposer
 
     public static long ZoneTooStrong { get; private set; }
 
-    private static Point3D Zoned(Mobile body, Map map, Point3D home, int roam)
+    public static long RoadTooStrong { get; private set; }
+
+    private static Point3D Zoned(Mobile body, Map map, Point3D home, int roam, out int seek, out BaseCreature creature)
     {
+        seek = 0;
+        creature = null;
+
         if (!ReadsZones || BotZones.State is not { } state || state.Zones.Length == 0)
         {
             return Point3D.Zero;
         }
 
         var strength = BotQuad.Strength(body);
-        var best = Point3D.Zero;
-        var bestScore = 0.0;
+
+        var together = ZoneCompanies ? Math.Max(strength, BotThreat.OurPower(body, BotMuster.Reach)) : strength;
+
+        _looks.Clear();
 
         for (var i = 0; i < state.Zones.Length; i++)
         {
             var zone = state.Zones[i];
 
-            if (zone.Water || zone.Live <= 0 || zone.Level == BotZoneLevel.Deadly || zone.Stand == Point3D.Zero)
+            if (zone.Water || zone.Live <= 0 || zone.Stand == Point3D.Zero)
             {
                 continue;
             }
@@ -625,11 +974,30 @@ public sealed class BotHunter : IBotProposer
             double quarry;
             double worth;
 
-            if (zone.Level == BotZoneLevel.Hostile)
+            if (zone.Level >= BotZoneLevel.Hostile)
             {
-                if (zone.Threat > strength * ZoneDare)
+                if (zone.Threat > together * ZoneDare)
                 {
                     continue;
+                }
+
+                var forCompany = zone.Threat > strength * ZoneDare;
+
+                if (zone.Threat * BotQuarry.ZonePrice(zone.Kinds, forCompany) > together * ZoneDare)
+                {
+                    BotQuarry.ZoneRefused();
+
+                    continue;
+                }
+
+                if (forCompany && zone.Threat * BotQuarry.ZonePrice(zone.Kinds) > together * ZoneDare)
+                {
+                    BotCompanyRecord.Zoned();
+                }
+
+                if (zone.Threat > strength * ZoneDare)
+                {
+                    ZoneForCompany++;
                 }
 
                 quarry = Math.Min(zone.Aggressive, 20);
@@ -642,22 +1010,130 @@ public sealed class BotHunter : IBotProposer
             }
 
             var away = Math.Max(Math.Abs(zone.Stand.X - body.X), Math.Abs(zone.Stand.Y - body.Y));
-            var score = quarry * worth / (1.0 + away / 150.0);
+            var score = quarry * worth * BotQuarry.ZonePays(zone.Kinds, body) / (1.0 + away / 150.0);
 
-            if (score > bestScore)
+            if (score <= 0.0)
             {
-                bestScore = score;
-                best = zone.Stand;
+                continue;
+            }
+
+            var at = _looks.Count;
+
+            while (at > 0 && _looks[at - 1].Score < score)
+            {
+                at--;
+            }
+
+            if (at < ZoneLooks)
+            {
+                _looks.Insert(at, (zone, score));
+
+                if (_looks.Count > ZoneLooks)
+                {
+                    _looks.RemoveAt(_looks.Count - 1);
+                }
             }
         }
 
-        if (best != Point3D.Zero)
+        for (var i = 0; i < _looks.Count; i++)
         {
-            ZoneOffered++;
+            var zone = _looks[i].Zone;
+            var reach = Math.Clamp(Math.Max(zone.DeclaredRange, zone.ObservedRange), ZoneReachLeast, ZoneReach);
+
+            var company = zone.Level >= BotZoneLevel.Hostile && zone.Threat > strength * ZoneDare;
+            var live = Living(body, map, zone, reach, company ? together : strength, company);
+
+            if (live != null)
+            {
+                ZoneOffered++;
+                ZoneLive++;
+                seek = reach;
+                creature = live;
+                _looks.Clear();
+
+                return live.Location;
+            }
+
+            ZoneUnpeopled++;
+        }
+
+        _looks.Clear();
+
+        return Point3D.Zero;
+    }
+
+    private static BaseCreature Living(Mobile body, Map map, BotZone zone, int reach, double strength, bool company = false)
+    {
+        BaseCreature best = null;
+        var bestAway = int.MaxValue;
+        var fights = zone.Level >= BotZoneLevel.Hostile;
+
+        foreach (var creature in map.GetMobilesInRange<BaseCreature>(zone.Stand, reach))
+        {
+            if (creature is not { Deleted: false, Alive: true } || creature.Controlled || creature.Summoned || creature.IsDeadBondedPet
+                || creature.Blessed || creature is BaseVendor || creature.CanSwim && !BotStep.Settle(map, creature.X, creature.Y, out _))
+            {
+                continue;
+            }
+
+            if (fights && creature.FightMode is FightMode.None or FightMode.Aggressor)
+            {
+                continue;
+            }
+
+            var away = Math.Max(Math.Abs(creature.X - body.X), Math.Abs(creature.Y - body.Y));
+
+            if (away >= bestAway || BotThreat.Power(creature) > strength * BotQuarry.Daring)
+            {
+                continue;
+            }
+
+            if (Notoriety.Compute(body, creature) == Notoriety.Innocent || !BotQuarry.Ours(body, creature) || BotQuarry.Shunned(creature))
+            {
+                continue;
+            }
+
+            if ((company ? BotCompanyRecord.Priced(creature) : BotQuarry.Priced(creature)) > strength * BotQuarry.Daring)
+            {
+                BotQuarry.ZoneRefused();
+
+                continue;
+            }
+
+            best = creature;
+            bestAway = away;
         }
 
         return best;
     }
+
+    public static int PoorBelow { get; set; } = 100;
+
+    public static bool ZoneFirst { get; set; } = true;
+
+    public static bool GrazersLast { get; set; } = true;
+
+    public static long GrazerPassed { get; private set; }
+
+    public static bool ZoneCompanies { get; set; } = true;
+
+    public static long ZoneForCompany { get; private set; }
+
+    public static long GrazerCompanied { get; private set; }
+
+    public static long ZoneSpared { get; private set; }
+
+    public static int ZoneLooks { get; set; } = 3;
+
+    public static int ZoneReach { get; set; } = 40;
+
+    public static int ZoneReachLeast { get; set; } = 8;
+
+    public static long ZoneLive { get; private set; }
+
+    public static long ZoneUnpeopled { get; private set; }
+
+    private static readonly List<(BotZone Zone, double Score)> _looks = [];
 
     public static long OverWater { get; private set; }
 
@@ -708,7 +1184,7 @@ public sealed class BotHunter : IBotProposer
     public static long Boarded { get; private set; }
 
     public static string Describe() =>
-        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Boarded} picked for a creature the guild's board asks for, {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overmatched} grounds passed over for asking more strength than whoever looked had, {Deadly} grounds where bots had lately died kept to companies, {Green} grounds that had hurt somebody passed over for a novice (main skill under {BotLadder.NoviceSkill:F0}), {Claimed} for somebody already raising a company for them, {Overrun} quarry passed over for the crowd already round it, {Rested} named grounds passed over as resting after refusing somebody and {Darted} sampled ones, {Revisits} for lying where the asker had lately found nothing, {Distant} further from the asker than {Walkable} tiles, which is as far as a road is ever searched for, {Unjoined} on ground no gate joins to the hunter, {OverWater} weighed over the water beyond a moongate for a hunter living on another land ({AbroadTooHard} of them passed over for asking more than it alone brings), {Roundabout} whose road from home runs more than {Detour} tiles past the straight line from the asker ({(ReadsRoads ? "passed over" : "only counted")}),{Untrodden} on squares nobody has ever stood in or beside, {BotProwl.Baulked} prowls that stopped getting nearer ({BotProwl.RoadKept} beats kept going along a road that was not closing as the crow flies), {BotProwl.Redarted} of them sent on to ground they could walk to on their own side and {BotProwl.Unredarted} given up for finding none ({BotBarrier.Stops} of their stopping places remembered and {BotBarrier.Behind} grounds passed over for lying beyond them), {BotProwl.Turned} refused a road on the way and sent on to ground on their own side and {BotProwl.Unturned} given up for finding none,{BotProwl.Raised} companies raised for ground one bot could not take, {BotProwl.Regathered} that came up short and went to ground they could take instead, {BotProwl.Unraised} given up for raising none they could use anywhere; {BotSlay.Undaring} of {BotSlay.Begun} hunts begun at a quarry on ground asking more strength than the hunter brought (counted, not refused); the zones: {ZoneOffered} zones named as ground the hunter could take and {ZoneChosen} of them chosen, {ZoneDeadly} grounds made lethal for lying in a deadly zone and {ZoneTooStrong} too strong for a zone's fight outweighing the hunter";
+        $"{Sworn} answers went to classes that only defend; {Quiet} hunting grounds passed over as too quiet (above {BotQuad.TooQuiet:F2}), {Sought} picked for having hurt somebody (at or below {BotQuad.Wanted:F2}), {Boarded} picked for a creature the guild's board asks for, {Stranded} hunters left with nowhere to walk at all because every ground they looked at was too quiet, {Overmatched} grounds passed over for asking more strength than whoever looked had, {Deadly} grounds where bots had lately died kept to companies, {Green} grounds that had hurt somebody passed over for a novice (main skill under {BotLadder.NoviceSkill:F0}), {Claimed} for somebody already raising a company for them, {Overrun} quarry passed over for the crowd already round it, {Rested} named grounds passed over as resting after refusing somebody and {Darted} sampled ones, {Revisits} for lying where the asker had lately found nothing, {Distant} further from the asker than {Walkable} tiles, which is as far as a road is ever searched for, {Unjoined} on ground no gate joins to the hunter, {OverWater} weighed over the water beyond a moongate for a hunter living on another land ({AbroadTooHard} of them passed over for asking more than it alone brings), {Roundabout} whose road from home runs more than {Detour} tiles past the straight line from the asker ({(ReadsRoads ? "passed over" : "only counted")}),{Untrodden} on squares nobody has ever stood in or beside, {BotProwl.Baulked} prowls that stopped getting nearer ({BotProwl.RoadKept} beats kept going along a road that was not closing as the crow flies), {BotProwl.Redarted} of them sent on to ground they could walk to on their own side and {BotProwl.Unredarted} given up for finding none ({BotBarrier.Stops} of their stopping places remembered and {BotBarrier.Behind} grounds passed over for lying beyond them), {BotProwl.Turned} refused a road on the way and sent on to ground on their own side and {BotProwl.Unturned} given up for finding none,{BotProwl.Raised} companies raised for ground one bot could not take, {BotProwl.Regathered} that came up short and went to ground they could take instead, {BotProwl.Unraised} given up for raising none they could use anywhere ({BotProwl.ShortRested} of their grounds rested {BotProwl.ShortRestMs / 60000} minutes for it); {BotSlay.Undaring} of {BotSlay.Begun} hunts begun at a quarry on ground asking more strength than the hunter brought (counted, not refused); the zones: {ZoneOffered} zones named as ground the hunter could take ({ZoneLive} at a living creature's place, {ZoneUnpeopled} of the best {ZoneLooks} passed over for holding none the hunter could take within their reach) and {ZoneChosen} of them chosen, {ZoneDeadly} grounds made lethal for lying in a deadly zone and {ZoneTooStrong} too strong for a zone's fight outweighing the hunter ({ZoneForCompany} hostile zones kept as ground for a company, too strong for the hunter alone{(ZoneCompanies ? "" : ", off")}); {RoadTooStrong} grounds kept for a company because the road there asked more than the hunter alone brought; {BotProwl.ZoneFollowed} zone prowls walked on after quarry in the zone's patrol and {BotProwl.ZoneEmpty} found it empty after all; {ZoneSpared} times a zone's living creature was let past a dart's filter ({(ZoneFirst ? "and ranked next after the board's" : "ranked as any dart")}); {GrazerPassed} quarry of the grazing kind at hand passed over for a zone's fighter within the walk and {GrazerCompanied} for a company raised against one whose ground asked it ({(GrazersLast ? "grazers last" : "off")});{BotProwl.Widened} prowls walked on after quarry seen within {BotProwl.LookWider} tiles of their ground on arrival; {BotProwl.CameApart} prowls for company ground given up when the company came apart on the way; {BotProwl.ClosedOn} prowls given up when their ground was closed while they walked there; {BotProwl.CompanyTookOn} fights a prowl's raised company took on for what its leader found (up to {BotProwl.CompanyFights} a prowl); the hunt itself: {BotSlay.Slipped} quarry let go for running {BotSlay.Leash} tiles from where it was found, {BotSlay.Dragged} for drawing the hunter {BotSlay.Leash * BotSlay.FarLeash} past its walk out, {BotSlay.Unleashed} hunts kept past the old leash for fighting the bot or having been fought, {BotSlay.Rebased} leashes measured again after a jump of more than {BotSlay.JumpTiles} tiles, {BotSlay.StaleResumes} hunts not taken up again for a quarry far away by then; {BotQuarry.InTown} quarry passed over for standing in a town, {BotQuarry.OnGuarded} hostile quarry for standing on guarded ground (and {BotHaven.QuarryTaken} taken by the guards all the same); {BotSlay.PoorBegun} of {BotSlay.Begun} hunts begun and {BotProwl.PoorTaken} prowls taken by bots holding under {PoorBelow}gp free of what their wants on the board hold; {BotSlay.Thrifted} hunts left when the casts had spent what the quarry pays (a caster casts at least {BotSlay.CastFloor} times{(BotSlay.CastsByGold ? "" : ", off")}); {BotProwl.DescribeSweeps()}";
 
     public static void Forget()
     {
@@ -729,6 +1205,11 @@ public sealed class BotHunter : IBotProposer
         Sought = 0;
         Boarded = 0;
         Revisits = 0;
+        GrazerPassed = 0;
+        GrazerCompanied = 0;
+        ZoneForCompany = 0;
+        RoadTooStrong = 0;
         _empty.Clear();
+        BotSweepRecord.Forget();
     }
 }

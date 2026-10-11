@@ -44,6 +44,8 @@ public static class BotBeat
 
     public static long Faults { get; private set; }
 
+    public static long Hurried { get; private set; }
+
     public static bool Running => _timer != null;
 
     public static void Start()
@@ -78,6 +80,7 @@ public static class BotBeat
         Ticks = 0;
         Turns = 0;
         Faults = 0;
+        Hurried = 0;
     }
 
     public static int SummaryMs { get; set; } = 300000;
@@ -103,10 +106,14 @@ public static class BotBeat
 
         _summaryTick = now;
 
-        logger.Information("Getting about: {Paths}; {Walk}; {Reach}; {Refused}; {Footing}; gates: {Gates}; {Danger}", BotPath.Describe(), BotWalk.Describe(), BotReach.Describe(), BotRefused.Describe(), BotFooting.Describe(), BotGates.Describe(), BotDanger.Describe());
+        logger.Information("Getting about: {Paths}; {Walk}; {Reach}; {Refused}; {Footing}; gates: {Gates}; {Danger}; {Sight}", BotPath.Describe(), BotWalk.Describe(), BotReach.Describe(), BotRefused.Describe(), BotFooting.Describe(), BotGates.Describe(), BotDanger.Describe(), BotSight.Describe());
         logger.Information("Navigation: {Tiers}; {Chart}", Server.Engines.Pathing.Tiered.NavigationService.Describe(), BotChart.Describe());
 
-        logger.Information("The market: {What}", BotAuction.Describe());
+        logger.Information("The market: {What}", BotMarket.Describe());
+
+        logger.Information("Lines: {What}", BotLines.Describe());
+
+        logger.Information("Balance: {What}", BotGlut.Describe());
 
         logger.Information("What we know: {What}", BotCommons.Describe());
 
@@ -118,21 +125,24 @@ public static class BotBeat
 
         logger.Information("Kit: {What}", BotTidy.Describe());
 
-        logger.Information("The island: {What}; {Hunting}; {Kept}", BotQuad.Describe(), BotHunter.Describe(), BotKept.Describe());
+        logger.Information("The island: {What}; {Hunting}; {Kept}; clearings: {Clearings}", BotQuad.Describe(), BotHunter.Describe(), BotKept.Describe(), BotClearer.Describe());
 
         logger.Information("At death's door: {What}; {Supplies}", BotMobile.DescribeGasps(), BotShopper.Describe());
+
+        logger.Information("Reflexes: {What}; the answers: {Cure}", BotReflex.Describe(), BotMobile.DescribeAlarms());
 
         logger.Information("Standing still: {What}; {Home}", BotStall.Describe(), BotHomer.Describe());
 
         logger.Information(
-            "Gathering: {Forage}; {Herbs}; {Pickings}; {Outfit}",
+            "Gathering: {Forage}; {Herbs}; {Pickings}; {Outfit}; {Ore}",
             BotForager.Describe(),
             BotHerbalist.Describe(),
             BotPicker.Describe(),
-            BotOutfit.Describe()
+            BotOutfit.Describe(),
+            BotOre.Describe()
         );
 
-        logger.Information("The board: {What}", BotAuction.Board());
+        logger.Information("The board: {What}", BotMarket.Board());
 
         logger.Information(
             "Spoils: {Chests}; {Prisoners}; {Plunderer}; {Liberator}",
@@ -143,14 +153,21 @@ public static class BotBeat
         );
 
         logger.Information(
-            "Trade: {Shops}; {Peddling}; {Quarry}; {Standing}",
+            "Trade: {Shops}; {Peddling}; {Quarry}; {Standing}; {AskFirst}",
             BotShops.Describe(),
             BotPeddler.Describe(),
             BotQuarry.Describe(),
-            BotPopulation.Describe()
+            BotPopulation.Describe(),
+            BotAskFirst.Describe()
         );
 
-        logger.Information("Rest: {Rest}; {Growth}; inns: {Inns}", BotRest.Describe(), BotGrowth.Describe(), BotInns.Describe());
+        logger.Information(
+            "Rest: {Rest}; {Growth}; births: {Births}; inns: {Inns}",
+            BotRest.Describe(),
+            BotGrowth.Describe(),
+            BotBirth.Describe(),
+            BotInns.Describe()
+        );
 
         logger.Information("Travel: {Towns}; {Roads}; {Travel}; peoples: {Peoples}", BotTowns.Describe(), BotRoadbook.Describe(), BotTraveller.Describe(), BotPeoples.Describe());
 
@@ -164,7 +181,11 @@ public static class BotBeat
 
         logger.Information("Camp: {Camp}", BotCamp.Describe());
 
-        logger.Information("Guilds: {What}", BotGuilds.Describe());
+        logger.Information("Society: {What}", BotSocial.Describe());
+
+        logger.Information("Voice: {What}", BotVoice.Describe());
+
+        logger.Information("Guilds: {What}", BotGuilds.Describe() + BotOfficers.Clause());
 
         logger.Information("Estate: {What}", BotEstate.Describe());
 
@@ -264,8 +285,23 @@ public static class BotBeat
         BotShops.Keep();
         Segment("the shops");
 
+        BotGround.Sweep();
+        Segment("the ground sweep");
+
+        BotCry.Dispatch();
+        Segment("the cries");
+
+        BotSquads.Answer();
+        Segment("the companies' answers");
+
         var turnWorstMs = 0.0;
         BotMobile turnWorst = null;
+
+        var turnWorstDecideMs = 0.0;
+        var turnWorstAuctionMs = 0.0;
+        var turnWorstWalkMs = 0.0;
+        string turnWorstProposer = null;
+        var turnWorstProposerMs = 0.0;
 
         for (var i = 0; i < bots.Count; i++)
         {
@@ -278,10 +314,31 @@ public static class BotBeat
 
             if (bot.Scheduled && now - bot.DueTick < 0)
             {
+                if (bot.Urgent)
+                {
+                    bot.Urgent = false;
+                    Hurried++;
+
+                    BotWill.BeginTurn();
+
+                    try
+                    {
+                        bot.React();
+                    }
+                    catch (Exception e)
+                    {
+                        Faults++;
+
+                        logger.Error(e, "{Name} threw deciding in a hurry; the rest of the population carries on", bot.Name);
+                    }
+                }
+
                 continue;
             }
 
             bot.Scheduled = true;
+
+            bot.Urgent = false;
 
             BotStall.Look(bot);
 
@@ -295,6 +352,9 @@ public static class BotBeat
             Turns++;
 
             var turnMark = Stopwatch.GetTimestamp();
+
+            BotWill.BeginTurn();
+            BotWalk.BeginTurn();
 
             try
             {
@@ -321,6 +381,11 @@ public static class BotBeat
                 {
                     turnWorstMs = turnMs;
                     turnWorst = bot;
+                    turnWorstDecideMs = BotWill.TurnMs;
+                    turnWorstAuctionMs = BotWill.TurnAuctionMs;
+                    turnWorstWalkMs = BotWalk.TurnMs;
+                    turnWorstProposer = BotWill.TurnProposer;
+                    turnWorstProposerMs = BotWill.TurnProposerMs;
                 }
             }
         }
@@ -344,20 +409,25 @@ public static class BotBeat
         _slowSaidTick = now;
 
         logger.Information(
-            "A slow tick: {Total:F0}ms, {WorstMs:F0}ms of it in {Worst}; the costliest turn was {Bot}'s at {TurnMs:F0}ms on {Deed}; {Slow} such ticks so far",
+            "A slow tick: {Total:F0}ms, {WorstMs:F0}ms of it in {Worst}; the costliest turn was {Bot}'s at {TurnMs:F0}ms on {Deed} (deciding {Decide:F0}ms, of which the auction {Auction:F0}ms and its costliest proposer {Proposer} {ProposerMs:F0}ms; walking {Walk:F0}ms); {Slow} such ticks so far",
             total,
             worstMs,
             worst ?? "nothing in particular",
             turnWorst?.Name ?? "nobody",
             turnWorstMs,
             turnWorst?.Resolve?.Deed?.Kind ?? "nothing",
+            turnWorstDecideMs,
+            turnWorstAuctionMs,
+            turnWorstProposer ?? "none",
+            turnWorstProposerMs,
+            turnWorstWalkMs,
             Slow
         );
     }
 
     public static string Describe() =>
         $"{Ticks} looks, {Turns} turns handed out, {Faults} faults; every {IntervalMs}ms, a turn each every {BotWalk.StepDelayMs(BotMobile.Runs)}ms; "
-        + $"{SpentMs:F0}ms of the loop in all ({(Ticks > 0 ? SpentMs / Ticks : 0.0):F2}ms a look, worst {WorstMs:F1}ms), of which deciding {BotWill.SpentMs:F0}ms over {BotWill.Decisions} turns and walking {BotWalk.SpentMs:F0}ms";
+        + $"{SpentMs:F0}ms of the loop in all ({(Ticks > 0 ? SpentMs / Ticks : 0.0):F2}ms a look, worst {WorstMs:F1}ms), of which deciding {BotWill.SpentMs:F0}ms over {BotWill.Decisions} turns and walking {BotWalk.SpentMs:F0}ms; {Hurried} of those decisions were taken between turns, for an event that would not wait";
 
     private sealed class BeatTimer : Timer
     {

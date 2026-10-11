@@ -47,6 +47,18 @@ public sealed class BotHuntSettings
     public int? SlayNoProgressMs { get; set; }
 
     public int? SlayCapMs { get; set; }
+
+    public bool? BandGathers { get; set; }
+
+    public int? BandGatherMs { get; set; }
+
+    public int? BandEngageTiles { get; set; }
+
+    public int? BandGatherTiles { get; set; }
+
+    public int? BandMedicReach { get; set; }
+
+    public bool? MusterJudged { get; set; }
 }
 
 /// <summary>Reads the hunt file and moves the numbers it names.</summary>
@@ -80,6 +92,12 @@ public static class BotHuntConfig
         BotMuster.Reach = settings.MusterReach ?? BotMuster.Reach;
         BotMuster.Least = settings.MusterLeast ?? BotMuster.Least;
         BotBand.Prior = settings.BandExpects ?? BotBand.Prior;
+        BotBand.Gathers = settings.BandGathers ?? BotBand.Gathers;
+        BotBand.GatherMs = settings.BandGatherMs ?? BotBand.GatherMs;
+        BotBand.EngageTiles = settings.BandEngageTiles ?? BotBand.EngageTiles;
+        BotBand.GatherTiles = settings.BandGatherTiles ?? BotBand.GatherTiles;
+        BotBand.MedicReach = settings.BandMedicReach ?? BotBand.MedicReach;
+        BotMuster.Judged = settings.MusterJudged ?? BotMuster.Judged;
         BotSquad.IdleCapMs = settings.SquadIdleCapMs ?? BotSquad.IdleCapMs;
 
         BotSlay.FleeAt = settings.FleeAt ?? BotSlay.FleeAt;

@@ -819,7 +819,7 @@ public sealed class BotCamper : IBotProposer
         var price = BotShops.Price(shop, typeof(Kindling));
         var amount = Math.Max(1, KindlingBuy);
 
-        if (price <= 0 || BotYield.Wealth(who) < price * amount * 4)
+        if (price <= 0 || BotYield.Spendable(who) < price * amount * 4)
         {
             Poor++;
 

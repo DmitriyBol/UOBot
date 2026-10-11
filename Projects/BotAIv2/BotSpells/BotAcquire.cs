@@ -4,15 +4,15 @@ using Server.Mobiles;
 namespace Server.BotAI.V2;
 
 /// <summary>
-/// Getting hold of one spell the book is short of: off a shelf, off somebody's stall, or by asking the
-/// population for it and putting the money down.
+/// Getting hold of one spell the book is short of: off a shelf, at a bot's shop by the bank, or by asking the
+/// population for it aloud and waiting for a scribe to bring one.
 ///
 /// <para>
 /// <b>Three routes, and which one exists is a fact about the spell rather than a choice.</b> The first three
 /// circles are on a shopkeeper's shelf for twelve, twenty-two and thirty-two gold. Above that no shop in the
-/// era sells them, so either a scribe has already written one and it is on a stall, or nobody has and the only
-/// thing left to do is ask — a standing, funded want that says what this bot will pay and waits for somebody
-/// to find it worth writing.
+/// era sells them, so either a scribe has already written one and keeps shop with it by the bank, or nobody has and
+/// the only thing left to do is ask — a spoken want that says what this bot will pay and waits for somebody to find
+/// it worth writing and carrying over (01.10.2026: the stall and the escrow went with the auction).
 /// </para>
 ///
 /// <para>
@@ -45,7 +45,7 @@ public sealed class BotAcquire : BotDeed
 
         Counter,
 
-        Stall,
+        Shop,
 
         Board
     }
@@ -60,7 +60,7 @@ public sealed class BotAcquire : BotDeed
 
     private int _repicks;
 
-    private readonly BotListing _stall;
+    private readonly BotStorefront _front;
 
     private readonly Map _map;
 
@@ -100,7 +100,7 @@ public sealed class BotAcquire : BotDeed
     private readonly Purpose _purpose;
 
     private BotAcquire(
-        Route route, Type kind, int spell, Map map, Point3D where, int price, BaseVendor shop, BotListing stall,
+        Route route, Type kind, int spell, Map map, Point3D where, int price, BaseVendor shop, BotStorefront front,
         Purpose purpose = Purpose.Learn
     )
     {
@@ -112,7 +112,7 @@ public sealed class BotAcquire : BotDeed
         _where = where;
         _price = Math.Max(1, price);
         _shop = shop;
-        _stall = stall;
+        _front = front;
     }
 
     public static BotAcquire Delivery(Type kind, int spell, Map map, Point3D where, bool toCast = false) =>
@@ -123,11 +123,11 @@ public sealed class BotAcquire : BotDeed
     public static BotAcquire Counter(Type kind, int spell, BaseVendor shop, int price, bool toCast = false) =>
         new(Route.Counter, kind, spell, shop?.Map, shop?.Location ?? Point3D.Zero, price, shop, null, Bought(toCast));
 
-    public static BotAcquire Stalled(Type kind, int spell, BotListing stall, Map map, Point3D where, bool toCast = false) =>
-        new(Route.Stall, kind, spell, map, where, stall?.Price ?? 1, null, stall, Bought(toCast));
+    public static BotAcquire AtShop(Type kind, int spell, BotStorefront front, int price, bool toCast = false) =>
+        new(Route.Shop, kind, spell, front?.Map, front?.Location ?? Point3D.Zero, price, null, front, Bought(toCast));
 
     public static BotAcquire Board(Type kind, int spell, Map map, Point3D where, int offer, bool toCast = false) =>
-        BotAuction.Full ? null : new BotAcquire(Route.Board, kind, spell, map, where, offer, null, null, Bought(toCast));
+        BotMarket.Full || !BotMarket.Running ? null : new BotAcquire(Route.Board, kind, spell, map, where, offer, null, null, Bought(toCast));
 
     public override string Kind => Trade;
 
@@ -145,7 +145,7 @@ public sealed class BotAcquire : BotDeed
 
     public override int Outlay => _route == Route.Delivered ? 0 : Ask * _price;
 
-    public override bool AtCounter => _route == Route.Counter;
+    public override bool AtCounter => _route is Route.Counter or Route.Shop;
 
     public override double Coin => 0.0;
 
@@ -166,7 +166,7 @@ public sealed class BotAcquire : BotDeed
             {
                 Route.Delivered => $"collecting {name}",
                 Route.Counter => $"buying {name}",
-                Route.Stall => $"buying {name} off the market",
+                Route.Shop => $"buying {name} at {_front?.Keeper?.Name ?? "a bot"}'s shop",
                 _ => $"asking for {name} at {_price}gp"
             };
         }
@@ -207,17 +207,12 @@ public sealed class BotAcquire : BotDeed
         {
             Route.Delivered => Collecting(bot, body),
             Route.Counter => Buying(bot, body),
-            Route.Stall => Taking(bot, body),
+            Route.Shop => Visiting(bot, body),
             _ => Asking(bot, body)
         };
     }
 
-    private BotDoing Collecting(IBotWilful bot, Mobile body)
-    {
-        BotAuction.Collect(bot);
-
-        return Learn(bot, body);
-    }
+    private BotDoing Collecting(IBotWilful bot, Mobile body) => Learn(bot, body);
 
     private BotDoing Buying(IBotWilful bot, Mobile body)
     {
@@ -251,51 +246,51 @@ public sealed class BotAcquire : BotDeed
         return Learn(bot, body);
     }
 
-    private BotDoing Taking(IBotWilful bot, Mobile body)
+    private BotDoing Visiting(IBotWilful bot, Mobile body)
     {
-        if (_stall == null || _stall.IsEmpty)
+        var visit = BotShopkeep.Visit(bot, _front, _kind, Ask, _price, false, out var got, out var cost, out var onward);
+
+        if (onward != null)
         {
-            return BotDoing.Failed("that stall is empty now");
+            _shop = onward;
+            _price = Math.Max(1, BotShops.Price(onward, _kind));
+
+            return Buying(bot, body);
         }
 
-        var price = _stall.Price;
-
-        if (BotAuction.Buy(body, _stall, Ask) <= 0)
+        if (got <= 0)
         {
-            return BotDoing.Failed("could not pay for it");
+            return visit;
         }
 
-        _paid = Ask * price;
+        _paid = cost;
 
         return Learn(bot, body);
     }
 
     private BotDoing Asking(IBotWilful bot, Mobile body)
     {
-        if (BotAuction.Selling(bot, _kind))
+        if (BotMarket.FromBank(bot, _kind, Ask) > 0)
         {
-            var took = BotAuction.Reclaim(bot, _kind);
             (body as BotMobile)?.Rearm();
 
-            return took > 0
-                ? BotDoing.Done($"took {took} {_kind.Name} back off its own stall")
-                : BotDoing.Failed($"selling {_kind.Name} itself with nothing on the stall to take back");
+            return Learn(bot, body);
         }
 
-        var want = BotAuction.Ask(bot, _kind, Ask, _price);
+        var want = BotMarket.Ask(bot, _kind, Ask, _price);
 
         if (want == null)
         {
             return BotDoing.Failed(
-                BotAuction.Full
-                    ? $"the board is full at {BotAuction.MaxWants} wants"
-                    : "could not put the money down for it"
+                BotMarket.Full
+                    ? $"the market already holds {BotMarket.MaxWants} wants"
+                    : BotMarket.Reserved(body) > 0
+                        ? $"could not pay for it if it came, with {BotMarket.Reserved(body)}gp of its {BotYield.Wealth(body)}gp held for its other wants"
+                        : "could not pay for it if it came"
             );
         }
 
-        _paid = Ask * want.Offer;
-
-        return BotDoing.Done($"asked for {_kind.Name} at {want.Offer}gp, {want.Escrow}gp down");
+        return BotDoing.Done($"asked aloud for {_kind.Name} at {want.Offer}gp");
     }
 
     private BotDoing Learn(IBotWilful bot, Mobile body)
@@ -310,7 +305,7 @@ public sealed class BotAcquire : BotDeed
             }
 
             _learned = true;
-            BotAuction.Withdrawn(bot, _kind);
+            BotMarket.Withdrawn(bot, _kind, BotWithdraw.Have);
 
             return BotDoing.Done($"stocked {_kind.Name} for {_paid}gp");
         }
@@ -328,7 +323,7 @@ public sealed class BotAcquire : BotDeed
 
             _learned = true;
 
-            BotAuction.Withdrawn(bot, _kind);
+            BotMarket.Withdrawn(bot, _kind, BotWithdraw.Have);
 
             return BotDoing.Done($"learned {_kind.Name} for {_paid}gp");
         }

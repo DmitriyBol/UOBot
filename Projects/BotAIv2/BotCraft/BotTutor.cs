@@ -122,7 +122,7 @@ public sealed class BotTutor : IBotProposer
             return null;
         }
 
-        if (BotYield.Wealth(body) < points + Reserve)
+        if (BotYield.Spendable(body) < points + Reserve)
         {
             Poor++;
 
@@ -280,7 +280,7 @@ public sealed class BotTutoring : BotDeed
             return BotDoing.Failed($"{_teacher.Name} had nothing to teach it any more");
         }
 
-        if (!BotAuction.Charge(body, points))
+        if (!BotMarket.Charge(body, points))
         {
             Failed++;
 

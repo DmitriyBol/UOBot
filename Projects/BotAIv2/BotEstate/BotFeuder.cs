@@ -1,4 +1,5 @@
-﻿using Server.Logging;
+﻿using System.Collections.Generic;
+using Server.Logging;
 using Server.Guilds;
 using Server.Mobiles;
 
@@ -85,13 +86,21 @@ public sealed class BotFeuder : IBotProposer
 
         if (BotUnderworld.Near(body, Watch) is { } bandit)
         {
-            if (body.Hits >= body.HitsMax * Fit && BotThreat.Now(body) >= BotThreat.Power(bandit) * BanditOdds
-                && BotFeud.Quarrel(body, bandit))
+            var why = BanditLeft(bot, body, bandit);
+
+            if (why == null)
             {
                 Bandits++;
                 Offered++;
 
-                return Alone(bot, new BotQuarrel(bandit, ours.Name));
+                return new BotQuarrel(bandit, ours.Name);
+            }
+
+            _banditsLeft[why] = _banditsLeft.GetValueOrDefault(why) + 1;
+
+            if (bot is IBotSquadMember { Squad: not null })
+            {
+                return null;
             }
         }
 
@@ -297,6 +306,79 @@ public sealed class BotFeuder : IBotProposer
         return false;
     }
 
+    private static string BanditLeft(IBotWilful bot, BotMobile body, BotMobile bandit)
+    {
+        if (bot is IBotSquadMember { Squad: not null })
+        {
+            return "the fighter is in a company";
+        }
+
+        if (body.Hits < body.HitsMax * Fit)
+        {
+            return "the fighter too hurt";
+        }
+
+        if (BotThreat.Now(body) < BotThreat.Power(bandit) * BanditOdds)
+        {
+            return "the bandit the stronger";
+        }
+
+        if (!BotFeud.Quarrel(body, bandit))
+        {
+            return "a guarded town or no lawful blow";
+        }
+
+        if (!BanditStands)
+        {
+            return null;
+        }
+
+        if (bandit.Squad != null)
+        {
+            return "the bandit in a company";
+        }
+
+        if (bandit.Journey.Moving && !body.InRange(bandit.Location, BanditBeside))
+        {
+            return "the bandit walking";
+        }
+
+        if (bandit.Resolve?.Deed is { Steadfast: true })
+        {
+            return "the bandit at steadfast work";
+        }
+
+        if (body.Map is { } map && BotReach.Ask(map, body.Location, bandit.Location, BotArrival.Within(BotQuarrel.Reach)) == BotReachVerdict.Sealed)
+        {
+            return "no way to the bandit";
+        }
+
+        return null;
+    }
+
+    public static bool BanditStands { get; set; } = true;
+
+    public static int BanditBeside { get; set; } = 2;
+
+    private static readonly Dictionary<string, long> _banditsLeft = new(System.StringComparer.Ordinal);
+
+    private static string DescribeBanditsLeft()
+    {
+        if (_banditsLeft.Count == 0)
+        {
+            return "none";
+        }
+
+        var said = "";
+
+        foreach (var (why, n) in _banditsLeft)
+        {
+            said += (said.Length == 0 ? "" : ", ") + $"{why} {n}";
+        }
+
+        return said;
+    }
+
     public static double BanditOdds { get; set; } = 0.8;
 
     public static long Bandits { get; private set; }
@@ -310,12 +392,13 @@ public sealed class BotFeuder : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been looked at for a quarrel"
-            : $"the feuder looked {Asked} times and sent {Offered} ({Defended} of them to defend their own ground): {Peaceful} guilds were at war with nobody, "
+            : $"the feuder looked {Asked} times and sent {Offered} ({Defended} of them to defend their own ground, {Bandits} against a bandit of The Shadow in sight; bandits in sight not set on: {DescribeBanditsLeft()}): {Peaceful} guilds were at war with nobody, "
             + $"{Unseen} saw no enemy within {Watch} tiles or the call, {Sallied} went out after one nobody had seen, {Summoned} looks at members called back from rest, {Mustered} at members drawn in from beyond their reach because their guild was behind in its war, {Sheltered} were kept apart by a town, "
             + $"{Unfit} were too hurt to start one, {Unarmed} carry no weapon, {Unsupplied} kept off somebody else's ground for want of supplies, {Disagreeing} found the ledger and the engine disagreeing about the war; {BotQuarrel.Describe()}; {BotFeud.Describe()}";
 
     public static void Forget()
     {
+        _banditsLeft.Clear();
         Asked = 0;
         Offered = 0;
         Defended = 0;

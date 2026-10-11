@@ -40,6 +40,7 @@ public abstract class BotClass
         Int = 0;
         Skills = [];
         Kit = new BotKit();
+        Leanings = [];
         NeedsMeditation = false;
         PotionLimits.Clear();
         BrewIntervalMs = DefaultBrewIntervalMs;
@@ -74,8 +75,6 @@ public abstract class BotClass
 
     public virtual bool Closes => false;
 
-    public virtual bool Levies => false;
-
     public virtual bool Tutors => false;
 
     public virtual string[] Sworn => [];
@@ -96,6 +95,10 @@ public abstract class BotClass
 
     public virtual bool Bidding => true;
 
+    public virtual bool Neutral => false;
+
+    public virtual bool Office => false;
+
     public int Stipend { get; set; }
 
     public int Str { get; set; }
@@ -107,6 +110,8 @@ public abstract class BotClass
     public IReadOnlyList<(SkillName Skill, double Target)> Skills { get; set; } = [];
 
     public BotKit Kit { get; set; } = new();
+
+    public IReadOnlyList<BotLeaning> Leanings { get; set; } = [];
 
     public bool Wants(SkillName skill)
     {

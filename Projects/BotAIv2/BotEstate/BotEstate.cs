@@ -44,7 +44,7 @@ public static class BotEstate
 
     public static int Price { get; set; } = 5000;
 
-    public static int Keep { get; set; } = 300;
+    public static int Keep { get; set; } = 800;
 
     public static int MaxHalls { get; set; } = 4;
 
@@ -156,7 +156,7 @@ public static class BotEstate
                 continue;
             }
 
-            var spare = BotYield.Wealth(member) - Keep;
+            var spare = BotYield.Spendable(member) - Keep;
 
             if (spare > 0)
             {
@@ -242,7 +242,7 @@ public static class BotEstate
                 continue;
             }
 
-            var spare = Math.Min(BotYield.Wealth(member) - Keep, want - got);
+            var spare = Math.Min(BotYield.Spendable(member) - Keep, want - got);
 
             if (spare <= 0)
             {

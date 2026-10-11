@@ -182,7 +182,7 @@ public sealed class BotScout : BotDeed
 
             foreach (var mobile in _map.GetMobilesInRange<Mobile>(body.Location, Reach))
             {
-                if (squad.Count >= squad.Ceiling)
+                if (squad.Count >= Math.Min(squad.Ceiling, BotSquad.Usual))
                 {
                     break;
                 }
@@ -197,7 +197,7 @@ public sealed class BotScout : BotDeed
                     continue;
                 }
 
-                BotSquads.Join(squad, other);
+                BotSquads.Enrol(squad, other, _map, body.Location, $"called to {body.Name}'s party to look at ({_where.X}, {_where.Y})");
             }
         }
 
@@ -327,7 +327,7 @@ public sealed class BotScout : BotDeed
         var each = Math.Max(1, wage / owed.Count);
         var total = each * owed.Count;
 
-        if (BotYield.Wealth(captain) - total < Solvent)
+        if (BotYield.Spendable(captain) - total < Solvent)
         {
             return 0;
         }

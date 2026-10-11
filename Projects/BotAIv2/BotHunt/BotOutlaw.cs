@@ -473,7 +473,8 @@ public static class BotOutlaw
 
         Blood(fallen, by);
 
-        var hunter = by.Class is BotBaron || by.Resolve?.Deed is BotBrawl { Kind: BotBrawl.Manhunt } || by.Resolve?.Deed is BotManhunt;
+        var hunter = by.Class is BotBaron || by.Resolve?.Deed is BotBrawl { Kind: BotBrawl.Manhunt } || by.Resolve?.Deed is BotManhunt
+                     || BotCrime.Hunts(by, fallen);
 
         if (!hunter && patrol != null)
         {
@@ -660,6 +661,18 @@ public static class BotOutlaw
         return posse;
     }
 
+    public static bool Free(Mobile m)
+    {
+        if (m == null || !_records.TryGetValue(m.Serial, out var r) || r.Cell < 0)
+        {
+            return false;
+        }
+
+        r.JailedUntil = Core.TickCount;
+
+        return true;
+    }
+
     public static bool Jail(BotMobile bot, Mobile by)
     {
         if (!Running || bot is not { Deleted: false })
@@ -685,7 +698,7 @@ public static class BotOutlaw
 
         r.Cell = cell;
         r.Wanted = false;
-        r.JailedUntil = Core.TickCount + JailMs;
+        r.JailedUntil = Core.TickCount + BotCrime.Term(bot, JailMs);
         r.CaughtBy = by?.Name;
         Caught++;
         BotUnderworld.Jailed(bot);
@@ -693,6 +706,8 @@ public static class BotOutlaw
         Seize(bot);
 
         BotCity.Collect(bot, by);
+
+        BotCrime.Caught(bot, by);
 
         logger.Information(
             "{Name} was caught by {By} and is sentenced to cell {Cell} at ({X}, {Y}) for {Minutes} minutes",
@@ -1037,6 +1052,8 @@ public static class BotOutlaw
         }
 
         logger.Information("{Name} is let out of cell {Cell} after {Minutes} minutes and put down at ({X}, {Y})", bot.Name, r.Cell, JailMs / 60000, home.X, home.Y);
+
+        BotCrime.Freed(bot);
     }
 
     public static string Describe() =>
@@ -1087,6 +1104,8 @@ public static class BotOutlaw
             BotUnderworld.Beat(Core.TickCount);
             BotLair.Watch(Core.TickCount);
             BotFence.Beat(Core.TickCount);
+
+            BotCrime.Beat(Core.TickCount);
             Tick();
         }
     }
@@ -1198,6 +1217,11 @@ public sealed class BotManhunt : BotDeed
         if (BotOutlaw.Jailed(red))
         {
             return $"{red.Name} is in a cell";
+        }
+
+        if (BotCrime.Yield(bot, red))
+        {
+            return $"{red.Name} yielded";
         }
 
         return BotOutlaw.Outlaw(red) ? null : $"{red.Name} is no longer red or wanted";

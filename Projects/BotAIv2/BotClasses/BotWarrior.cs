@@ -34,6 +34,12 @@ public sealed class BotWarrior : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("blade", null, 5, 56.0, 72.0, Weapon: true),
+            BotLeaning.Even(1)
+        ];
+
         Kit = new BotKit
         {
             Melee = BotArsenal.Melee(100.0)

@@ -415,6 +415,14 @@ public static class BotDuke
                         return;
                     }
 
+                    if (BotTribute.Demand(guest, host, m.Why, out var terms))
+                    {
+                        m.Ending = terms;
+                        m.Applied = BotTribute.Word;
+
+                        return;
+                    }
+
                     if (guest.IsAlly(host))
                     {
                         guest.RemoveAlly(host);

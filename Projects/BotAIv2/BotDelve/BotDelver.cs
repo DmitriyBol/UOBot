@@ -186,9 +186,22 @@ public sealed class BotDelver : IBotProposer
 
         var least = BotDelve.Least(map, deep);
 
-        if (_band.Count + 1 < least && Raisable(map, body, BotDelve.Reach) + 1 < least)
+        var delve = new BotDelve(map, deep);
+        var muster = delve.Plan(body);
+
+        var round = muster == Point3D.Zero ? body.Location : muster;
+
+        if (Raisable(map, body, round, BotDelve.Reach, out var lines) + 1 < least)
         {
             Unraisable++;
+
+            return null;
+        }
+
+        if ((body as BotMobile)?.Class?.Role != BotRole.Melee && lines < BotDelve.Fighters
+            && Lines(map, body, round, Math.Max(BotDelve.Reach, BotDelve.LineReach)) < BotDelve.Fighters)
+        {
+            Lineless++;
 
             return null;
         }
@@ -209,27 +222,51 @@ public sealed class BotDelver : IBotProposer
         Compare(body, deep, strength);
         Once(body, deep, strength);
 
-        return new BotDelve(map, deep);
+        return delve;
     }
 
     public static long Unraisable { get; private set; }
 
     public static long Answering { get; private set; }
 
-    private static int Raisable(Map map, Mobile leader, int reach)
+    private static int Raisable(Map map, Mobile leader, Point3D round, int reach, out int lines)
     {
         var count = 0;
+        lines = 0;
 
-        foreach (var mobile in map.GetMobilesInRange<Mobile>(leader.Location, reach))
+        foreach (var mobile in map.GetMobilesInRange<Mobile>(round, reach))
         {
             if (mobile != leader && mobile is BotMobile other && Eligible(other) && !BotRegard.Hostile(leader, other))
             {
                 count++;
+
+                if (other.Class?.Role == BotRole.Melee)
+                {
+                    lines++;
+                }
             }
         }
 
         return count;
     }
+
+    private static int Lines(Map map, Mobile leader, Point3D round, int reach)
+    {
+        var lines = 0;
+
+        foreach (var mobile in map.GetMobilesInRange<Mobile>(round, reach))
+        {
+            if (mobile != leader && mobile is BotMobile { Class.Role: BotRole.Melee } other && Eligible(other)
+                && !BotRegard.Hostile(leader, other))
+            {
+                lines++;
+            }
+        }
+
+        return lines;
+    }
+
+    public static long Lineless { get; private set; }
 
     private static bool Eligible(BotMobile other) =>
         other is IBotAlly { AbleToFight: true } && other.Class is { } klass && klass.Role != BotRole.Producer && other.Squad == null
@@ -804,7 +841,7 @@ public sealed class BotDelver : IBotProposer
             ? $"no guild member has ever been offered a delve ({NotALeader} answers went to bots in no guild)"
             : $"{Asked} times a guild member was asked: {Offered} were offered a dungeon and {Taken} took one, {Held} were already leading a company, "
             + $"{Unfit} were too hurt, {Unsupplied} lacked their supplies, {Resting} came too soon after a call that failed, {TooSoon} too soon after their band's last delve, "
-            + $"{Unsurveyed} found nothing surveyed, {Crowded} found every dungeon they could survive already full, {Unraisable} could not raise the party's floor within the call's reach, {Answering} left to a call already gathering near them, "
+            + $"{Unsurveyed} found nothing surveyed, {Crowded} found every dungeon they could survive already full, {Unraisable} could not raise the party's floor within the call's reach of its muster, {Lineless} could raise nobody there to hold a line, {Answering} left to a call already gathering near them, "
             + $"{Outmatched} found nothing their band could come back out of at ×{Odds:F2} the worst of it (the nearest came to {_nearest:P0} of it: {_nearestSaid}); "
             + $"judged by the proving ground: {Lifted} offers went deeper than the old formula would have sent them, {Lowered} less deep, "
             + $"{HeldBack} bands kept on the island that the formula would have sent down, {Rechosen} parties sent elsewhere once raised, "

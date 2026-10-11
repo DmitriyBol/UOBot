@@ -45,7 +45,34 @@ public sealed class BotSupplier : IBotProposer
     public static int Tools { get; set; } = 10;
 
     public static int Enough(Type kind) =>
-        kind != null && typeof(IUsesRemaining).IsAssignableFrom(kind) ? Tools : Shelf;
+        kind != null && typeof(IUsesRemaining).IsAssignableFrom(kind) ? Tools
+        : kind != null && !Stacks(kind) ? Math.Min(Shelf, Loose)
+        : Shelf;
+
+    public static int Loose { get; set; } = 10;
+
+    public static bool Stacks(Type kind)
+    {
+        if (kind == null)
+        {
+            return true;
+        }
+
+        if (!_stacks.TryGetValue(kind, out var stacks))
+        {
+            var sample = kind.CreateInstance<Item>();
+
+            stacks = sample?.Stackable ?? true;
+            sample?.Delete();
+            _stacks[kind] = stacks;
+        }
+
+        return stacks;
+    }
+
+    private static readonly Dictionary<Type, bool> _stacks = [];
+
+    public static long Slotted { get; private set; }
 
     private static readonly Dictionary<Type, double> _stones = [];
 
@@ -110,6 +137,8 @@ public sealed class BotSupplier : IBotProposer
     public static long Cramped { get; private set; }
 
     public static long Closed { get; private set; }
+
+    public static long HomeShops { get; private set; }
 
     public static void Shut() => Closed++;
 
@@ -190,6 +219,7 @@ public sealed class BotSupplier : IBotProposer
         }
 
         BotShops.Survey(body.Map, body.Location);
+        BotShops.Survey(hall.Map, hall.Location);
 
         var looked = Math.Min(Considered, wants.Count);
         var full = 0;
@@ -217,7 +247,7 @@ public sealed class BotSupplier : IBotProposer
                 continue;
             }
 
-            var shop = BotShops.Nearest(bot, kind);
+            var shop = BotShops.Nearest(bot, kind, hall.Location);
 
             if (shop == null)
             {
@@ -225,6 +255,8 @@ public sealed class BotSupplier : IBotProposer
 
                 continue;
             }
+
+            var home = BotTowns.Of(shop.Location) is { } town && town == BotTowns.Of(hall.Location);
 
             var price = BotShops.Price(shop, kind);
 
@@ -238,6 +270,18 @@ public sealed class BotSupplier : IBotProposer
             var wanted = Math.Max(1, Enough(kind) - held);
             var carriable = Math.Max(1, Fits(body, kind));
             var asked = Math.Min(Math.Min(Spend / price, Batch), Math.Min(wanted, carriable));
+
+            if (!Stacks(kind) && merchant.Backpack is { MaxItems: > 0 } shelf)
+            {
+                var free = Math.Max(1, shelf.MaxItems - shelf.TotalItems);
+
+                if (asked > free)
+                {
+                    asked = free;
+                    Slotted++;
+                }
+            }
+
             var batch = Math.Max(1, asked);
 
             if (batch < Batch)
@@ -263,6 +307,11 @@ public sealed class BotSupplier : IBotProposer
 
             Offered++;
             BotOffice.Offering(Office, guild);
+
+            if (home)
+            {
+                HomeShops++;
+            }
 
             return new BotSupply(guild, hall, shop, kind, batch, price);
         }
@@ -294,16 +343,19 @@ public sealed class BotSupplier : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been looked at for a supply run"
-            : $"the supplier looked {Asked} times and sent {Offered} ({BotSupply.FromChest}gp of it paid from the guilds' chests): {Shopless} guilds had no counter, {Claimed} already had somebody on it, "
+            : $"the supplier looked {Asked} times and sent {Offered} ({BotSupply.FromChest}gp of it paid from the guilds' chests; {HomeShops} runs to a counter in the hall's own town): {Shopless} guilds had no counter, {Claimed} already had somebody on it, "
               + $"{Stocked} shelves held enough, {Unsold} wanted what nobody within reach sells, {Wanting} could not raise a batch"
               + (Wanting > 0 ? $" (the best-off had {Nearest}gp free and was {Short} short)" : "")
               + $", {Unmeasured} asked before the population had run short of anything, {Laden} could not have carried it, {Below} were underground, "
               + $"{Cramped} found the shelf with no room left for it ({Closed} more found it full on arrival at the shop)"
-              + $"; {Trimmed} lots came back smaller than a packet, {Spared} units the shelf or the courier had no room for";
+              + $"; {Trimmed} lots came back smaller than a packet, {Spared} units the shelf or the courier had no room for"
+              + $"; {Slotted} lots of a kind that does not stack cut to the merchant's free places, {BotSupply.Loose} such things shelved one by one "
+              + $"and {BotSupply.Unshelved} left in a courier's pack when the merchant would take no more";
 
     public static void Forget()
     {
         Trimmed = 0;
+        HomeShops = 0;
         Spared = 0;
         Cramped = 0;
         Closed = 0;
@@ -319,5 +371,6 @@ public sealed class BotSupplier : IBotProposer
         Short = 0;
         Laden = 0;
         Below = 0;
+        Slotted = 0;
     }
 }

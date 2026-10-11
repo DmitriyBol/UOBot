@@ -404,6 +404,20 @@ public static class BotParley
         return null;
     }
 
+    public static bool Overtake(string one, string other, string why)
+    {
+        var m = Between(one, other);
+
+        if (m == null || m.Stage == BotHearingStage.Over)
+        {
+            return false;
+        }
+
+        End(m, $"overtaken by war: {why}", false);
+
+        return true;
+    }
+
     public static bool Busy(string guild)
     {
         for (var i = 0; i < _meetings.Count; i++)
@@ -1297,6 +1311,9 @@ public static class BotParley
         );
         say.Append($"{BotDuke.Describe()}, {Late} of the model's answers late and {Unread} unreadable; {Wars} wars declared at a meeting, {Forbidden} refused by the war's rules at the word, {Alliances} alliances; ");
         say.Append($"{BotEnvoy.Describe()}; {BotHerald.Describe()}; {Doorsteps} halls met at their doorstep for standing where no road reaches, {Doorless} with none found; {BotPact.Describe()}; {BotGrievances.Describe()}");
+
+        say.Append("; ");
+        say.Append(BotTribute.Describe());
 
         return say.ToString();
     }

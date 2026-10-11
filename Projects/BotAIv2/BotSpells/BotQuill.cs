@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Server.Engines.Craft;
 using Server.Items;
+using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
@@ -120,7 +121,9 @@ public static class BotQuill
         return 0.0;
     }
 
-    public static bool Stocked(Mobile bot, CraftItem recipe)
+    public static bool Stocked(Mobile bot, CraftItem recipe) => Stocked(bot, recipe, Reserve);
+
+    public static bool Stocked(Mobile bot, CraftItem recipe, int reserve)
     {
         var pack = bot?.Backpack;
         var resources = recipe?.Resources;
@@ -139,7 +142,7 @@ public static class BotQuill
                 continue;
             }
 
-            if (pack.GetAmount(res.ItemType) < Math.Max(1, res.Amount) + Math.Max(0, Reserve))
+            if (pack.GetAmount(res.ItemType) < Math.Max(1, res.Amount) + Math.Max(0, reserve))
             {
                 return false;
             }
@@ -148,14 +151,107 @@ public static class BotQuill
         return true;
     }
 
-    public static CraftItem Choose(Mobile bot, out Type scroll, out int worth) =>
-        Choose(bot, 0, out scroll, out worth);
-
-    public static CraftItem Choose(Mobile bot, int paper, out Type scroll, out int worth)
+    public static double Chance(Mobile bot, CraftItem recipe)
     {
-        scroll = null;
-        worth = 0;
+        if (bot == null || recipe == null || System == null)
+        {
+            return 0.0;
+        }
 
+        var chance = recipe.GetSuccessChance(bot, null, System, false, out var able);
+
+        return able ? Math.Clamp(chance, 0.0, 1.0) : 0.0;
+    }
+
+    private static bool Supply(
+        Mobile bot, BaseVendor shop, CraftItem recipe, int units, double chance, int paper, out int attempts, out int blanks,
+        out List<(Type Herb, int Amount)> herbs, out int outlay
+    )
+    {
+        attempts = Math.Clamp((int)Math.Ceiling(Math.Max(1, units) / Math.Max(0.05, chance)), 1, Math.Max(1, BotInscribe.Batch));
+        blanks = Math.Max(0, attempts - Blanks(bot));
+        outlay = blanks * Math.Max(0, paper);
+        herbs = null;
+
+        var pack = bot?.Backpack;
+        var resources = recipe?.Resources;
+
+        if (pack == null || resources == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < resources.Count; i++)
+        {
+            var res = resources[i];
+
+            if (res.ItemType == null || res.ItemType == typeof(BlankScroll))
+            {
+                continue;
+            }
+
+            var lacking = attempts * Math.Max(1, res.Amount) - pack.GetAmount(res.ItemType);
+
+            if (lacking <= 0)
+            {
+                continue;
+            }
+
+            var price = shop == null ? 0 : BotShops.Price(shop, res.ItemType);
+
+            if (price <= 0)
+            {
+                return false;
+            }
+
+            herbs ??= [];
+            herbs.Add((res.ItemType, lacking));
+            outlay += lacking * price;
+        }
+
+        return true;
+    }
+
+    public static bool OwnPen(IBotWilful wilful, Type kind)
+    {
+        var bot = wilful?.Self;
+
+        if (bot == null || System == null || Pen(bot) == null || BotGrimoire.Book(bot) == null)
+        {
+            return false;
+        }
+
+        var recipe = BotScribes.Recipe(kind);
+        var spell = BotGrimoire.SpellOf(kind);
+
+        if (recipe == null || spell < 0 || Requirement(recipe) > bot.Skills[SkillName.Inscribe].Value - Margin || recipe.Mana > bot.ManaMax)
+        {
+            return false;
+        }
+
+        var chance = Chance(bot, recipe);
+
+        if (chance <= 0.0)
+        {
+            return false;
+        }
+
+        var shop = BotShops.Nearest(wilful, typeof(BlankScroll));
+        var paper = shop == null ? 0 : BotShops.Price(shop, typeof(BlankScroll));
+
+        if (paper <= 0 || !Supply(bot, shop, recipe, 1, chance, paper, out _, out _, out _, out var outlay) || BotYield.Spendable(bot) < outlay)
+        {
+            return false;
+        }
+
+        var offer = BotMarket.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
+
+        return Cost(bot, recipe, paper) / chance <= offer;
+    }
+
+    public static BotQuillPlan Plan(IBotWilful wilful, BaseVendor shop, int paper)
+    {
+        var bot = wilful?.Self;
         var system = System;
         var pack = bot?.Backpack;
 
@@ -170,14 +266,21 @@ public static class BotQuill
 
         var book = BotGrimoire.Book(bot);
 
+        var gap = OwnGap(bot);
+        var kept = BotArmoury.Kept(bot, out _);
+        var keptShort = kept == null ? 0 : Math.Max(0, BotArmoury.Stock - pack.GetAmount(kept));
+
+        var keep = BotUnload.Keeps(wilful);
+
+        BotQuillPlan line = null;
+        BotQuillPlan own = null;
+
+        var free = BotYield.Spendable(bot);
+
         CraftItem best = null;
         var bestNeeds = -1.0;
         var bestWorth = 0;
-
-        CraftItem asked = null;
-        var bestBid = 0;
-        Type askedKind = null;
-        var askedWorth = 0;
+        Type bestKind = null;
 
         for (var i = 0; i < recipes.Count; i++)
         {
@@ -197,19 +300,10 @@ public static class BotQuill
                 continue;
             }
 
-            var bid = BotAuction.Best(kind);
+            var funded = BotMarket.Best(kind) > 0;
+            var mine = kind == gap || kind == kept && keptShort > 0;
 
-            if (bid <= 0 && best != null && needs < bestNeeds)
-            {
-                continue;
-            }
-
-            if (bid > 0 && bid <= bestBid)
-            {
-                continue;
-            }
-
-            if (!Stocked(bot, recipe))
+            if (!funded && !mine && best != null && needs < bestNeeds)
             {
                 continue;
             }
@@ -219,25 +313,67 @@ public static class BotQuill
                 continue;
             }
 
-            var asking = BotAuction.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
+            var chance = Chance(bot, recipe);
 
-            var cost = Cost(bot, recipe, paper);
-            var revenue = Math.Max(asking, bid);
-
-            if (cost > 0 && revenue < cost)
+            if (chance <= 0.0)
             {
                 continue;
             }
 
-            asking = Math.Max(asking, Asking(cost));
+            var cost = Cost(bot, recipe, paper);
+            var asking = Math.Max(BotMarket.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell))), Asking(cost));
 
-            if (bid > 0)
+            if (funded && BotScribes.Order(wilful, kind) is { } want && want.Offer > (line?.For?.Offer ?? 0)
+                && !BotCourier.Holding(wilful, want))
             {
-                asked = recipe;
-                bestBid = bid;
-                askedKind = kind;
-                askedWorth = asking;
+                keep.TryGetValue(kind, out var allowed);
+                var units = allowed >= int.MaxValue
+                    ? 0
+                    : want.Payable + Math.Max(0, allowed - BotHandover.Carried(wilful, kind));
 
+                if (units <= 0)
+                {
+                    BotScribes.Keeping();
+                }
+                else if (cost > 0 && want.Offer < cost / chance)
+                {
+                    BotScribes.Under();
+                }
+                else if (!Supply(bot, shop, recipe, units, chance, paper, out var attempts, out var blanks, out var herbs, out var outlay))
+                {
+                    BotScribes.Herbless();
+                }
+                else if (outlay > free)
+                {
+                    BotScribes.Poor();
+                }
+                else
+                {
+                    line = new BotQuillPlan
+                    {
+                        Recipe = recipe, Kind = kind, Worth = Math.Max(asking, want.Offer), For = want, Units = units,
+                        Chance = chance, Attempts = attempts, Paper = blanks, Herbs = herbs, Outlay = outlay
+                    };
+                }
+            }
+
+            if (mine && own == null && (cost <= 0 || cost / chance <= BotMarket.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell))))
+                && Supply(bot, shop, recipe, 1, chance, paper, out var tries, out var sheets, out var stock, out var bill) && bill <= free)
+            {
+                own = new BotQuillPlan
+                {
+                    Recipe = recipe, Kind = kind, Worth = asking, Own = true, Units = 1, Chance = chance, Attempts = tries,
+                    Paper = sheets, Herbs = stock, Outlay = bill
+                };
+            }
+
+            if (best != null && needs < bestNeeds || !Stocked(bot, recipe))
+            {
+                continue;
+            }
+
+            if (cost > 0 && BotMarket.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell))) < cost)
+            {
                 continue;
             }
 
@@ -249,20 +385,40 @@ public static class BotQuill
             best = recipe;
             bestNeeds = needs;
             bestWorth = asking;
-
-            scroll = kind;
-            worth = asking;
+            bestKind = kind;
         }
 
-        if (asked == null)
+        if (line != null || own != null)
         {
-            return best;
+            return line ?? own;
         }
 
-        scroll = askedKind;
-        worth = askedWorth;
+        if (best == null)
+        {
+            return null;
+        }
 
-        return asked;
+        var practicePaper = Blanks(bot) > 0 ? 0 : Math.Max(1, BotInscribe.Batch);
+
+        return new BotQuillPlan
+        {
+            Recipe = best, Kind = bestKind, Worth = bestWorth, Chance = Chance(bot, best), Attempts = Math.Max(1, BotInscribe.Batch),
+            Paper = practicePaper, Outlay = practicePaper * Math.Max(0, paper)
+        };
+    }
+
+    private static Type OwnGap(Mobile bot)
+    {
+        var spell = BotGrimoire.Missing(bot);
+
+        if (spell < 0 || spell == BotRaise.Spell && BotRaise.KeepsScroll(bot))
+        {
+            return null;
+        }
+
+        var kind = BotGrimoire.ScrollFor(spell);
+
+        return kind == null || Held(bot, kind) > 0 ? null : kind;
     }
 
     private static bool Better(double needs, int worth, double bestNeeds, int bestWorth)
@@ -318,4 +474,37 @@ public static class BotQuill
 
         return made;
     }
+}
+
+/// <summary>
+/// What one session at the pen is for, and what it has to buy before it starts. Made by <see cref="BotQuill.Plan"/>, carried by
+/// <see cref="BotInscribe"/> from the proposal to the last scroll, so the work writes what it was chosen for.
+/// </summary>
+public sealed class BotQuillPlan
+{
+    public CraftItem Recipe { get; init; }
+
+    public Type Kind { get; init; }
+
+    public int Worth { get; init; }
+
+    public BotWant For { get; init; }
+
+    public bool Own { get; init; }
+
+    public int Units { get; init; }
+
+    public double Chance { get; init; }
+
+    public int Attempts { get; init; }
+
+    public int Paper { get; init; }
+
+    public List<(Type Herb, int Amount)> Herbs { get; init; }
+
+    public int Outlay { get; init; }
+
+    public bool Order => For != null || Own;
+
+    public bool Buys => Paper > 0 || Herbs is { Count: > 0 };
 }

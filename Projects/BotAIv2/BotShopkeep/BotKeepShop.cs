@@ -61,6 +61,8 @@ public sealed class BotKeepShop : BotDeed
 
     private int _firstShown = -1;
 
+    private long _walkSince;
+
     public static int MostRepitches { get; set; } = 2;
 
     public BotKeepShop(Map map, Point3D stand, Point3D bank, double claim, int shown)
@@ -95,6 +97,8 @@ public sealed class BotKeepShop : BotDeed
     public override bool Committed => _front != null;
 
     public override bool Steadfast => true;
+
+    public override bool BendIsTrouble => _front == null;
 
     public override double HoldsFor => _front != null ? Math.Max(1.0, BotShopkeep.ShiftMinutes - OpenMinutes(Core.TickCount)) + 1.0 : 0.0;
 
@@ -183,7 +187,24 @@ public sealed class BotKeepShop : BotDeed
     {
         if (body.Map != _map || !body.InRange(_stand, BotShopkeep.StandReach))
         {
-            return BotDoing.Walk(_map, _stand, BotArrival.Within(BotShopkeep.StandReach), $"to the bank at ({_bank.X}, {_bank.Y}) to keep shop");
+            if (_walkSince == 0)
+            {
+                _walkSince = now;
+            }
+            else if (BotShopkeep.OpenStandingMs > 0 && now - _walkSince >= BotShopkeep.OpenStandingMs && body.Map == _map
+                     && BotShopkeep.StandsFit(body, _bank))
+            {
+                BotShopkeep.Strike(_map, _stand);
+                BotShopkeep.OpenedStandingLate();
+
+                _stand = body.Location;
+                BotShopkeep.Reserve(body, _map, _stand, _bank);
+            }
+
+            if (!body.InRange(_stand, BotShopkeep.StandReach) || body.Map != _map)
+            {
+                return BotDoing.Walk(_map, _stand, BotArrival.Within(BotShopkeep.StandReach), $"to the bank at ({_bank.X}, {_bank.Y}) to keep shop");
+            }
         }
 
         if (BotShopkeep.Taken(_map, _stand, body) && _repitched < MostRepitches)
@@ -194,6 +215,7 @@ public sealed class BotKeepShop : BotDeed
             {
                 _repitched++;
                 _stand = next;
+                _walkSince = now;
 
                 BotShopkeep.Reserve(body, _map, _stand, _bank);
 
@@ -217,6 +239,13 @@ public sealed class BotKeepShop : BotDeed
 
         _openedTick = now;
         _cryTick = now;
+        _walkSince = 0;
+
+        if (body.Squad == null && body.Journey is { Active: true } road && road.Current is { Interruption: false })
+        {
+            road.Finish();
+            BotShopkeep.EndedWalkOnOpening();
+        }
 
         if (_firstShown < 0)
         {
@@ -273,10 +302,62 @@ public sealed class BotKeepShop : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+        if (_front != null && bot?.Self is BotMobile open && open.Map == _map)
+        {
+            var fits = BotShopkeep.StandsFit(open, _bank);
+
+            if (fits || open.InRange(_stand, BotShopkeep.StandReach + BotShopkeep.ServeReach))
+            {
+                if (fits)
+                {
+                    _stand = open.Location;
+                }
+
+                BotShopkeep.SparedOpenWalk();
+
+                return true;
+            }
+        }
+
+        if (_front == null && bot?.Self is BotMobile keeper && keeper.Map == _map && BotShopkeep.StandsFit(keeper, _bank))
+        {
+            BotShopkeep.Strike(_map, _stand);
+            BotShopkeep.OpenedStanding();
+
+            _stand = keeper.Location;
+            BotShopkeep.Reserve(keeper, _map, _stand, _bank);
+
+            return true;
+        }
+
         bot?.Resolve?.Ledger?.Beware(Trade, _map, _stand);
+
+        if (_front == null)
+        {
+            BotShopkeep.Strike(_map, _stand);
+        }
+
+        if (_front == null && _repitched < MostRepitches && bot?.Self is { } body && body.Map == _map)
+        {
+            var next = BotShopkeep.Pitch(_map, _bank, bot);
+
+            if (next != Point3D.Zero && next != _stand)
+            {
+                _repitched++;
+                _stand = next;
+                Rewalked++;
+                _walkSince = Core.TickCount;
+
+                BotShopkeep.Reserve(body, _map, _stand, _bank);
+
+                return true;
+            }
+        }
 
         return false;
     }
+
+    public static long Rewalked { get; private set; }
 
     public override void Taken(IBotWilful bot) => BotShopkeep.Reserve(bot?.Self, _map, _stand, _bank);
 
@@ -286,7 +367,11 @@ public sealed class BotKeepShop : BotDeed
         BotShopkeep.Release(bot?.Self);
     }
 
-    public override void Resumed(IBotWilful bot) => BotShopkeep.Reserve(bot?.Self, _map, _stand, _bank);
+    public override void Resumed(IBotWilful bot)
+    {
+        _walkSince = 0;
+        BotShopkeep.Reserve(bot?.Self, _map, _stand, _bank);
+    }
 
     public override void Drop(IBotWilful bot)
     {

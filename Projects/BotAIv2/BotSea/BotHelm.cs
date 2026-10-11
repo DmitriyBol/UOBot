@@ -383,6 +383,14 @@ public static class BotHelm
 
         voyage.Course = lane.Course(from, berth, out voyage.Sea, out voyage.Harbour);
         voyage.Measure();
+
+        for (var i = 0; i < voyage.Course.Count; i++)
+        {
+            if (BotReachMap.Ready && BotReachMap.Unreachable(map, voyage.Course[i].X, voyage.Course[i].Y, aboard: true))
+            {
+                CourseAground++;
+            }
+        }
         voyage.LimitMs = (long)(lane.Tiles * 2.0 * StrokeMs / Math.Max(1, Speed)) + SlackMs;
 
         _afloat.Add(voyage);
@@ -541,6 +549,12 @@ public static class BotHelm
 
         return cleared;
     }
+
+    public static long CourseAground { get; private set; }
+
+    public static long LandedOpen { get; private set; }
+
+    public static long LandedElsewhere { get; private set; }
 
     private static void Unload(Map map, BaseBoat ship, Point3D shore)
     {
@@ -1047,6 +1061,11 @@ public static class BotHelm
 
         if (home)
         {
+            if (voyage.Lane != null)
+            {
+                voyage.Lane.Lost++;
+            }
+
             logger.Information("{Name} the {Class} put back into {From}: {Why}", captain.Name, captain.Class?.Name, voyage.From.Name, voyage.Why);
 
             return;
@@ -1141,6 +1160,37 @@ public static class BotHelm
 
     private static Point3D? Beside(Map map, Point3D spot)
     {
+        for (var r = 1; r <= 3 && BotReachMap.Ready; r++)
+        {
+            for (var dx = -r; dx <= r; dx++)
+            {
+                for (var dy = -r; dy <= r; dy++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r)
+                    {
+                        continue;
+                    }
+
+                    var x = spot.X + dx;
+                    var y = spot.Y + dy;
+
+                    if (BotReachMap.Class(map, x, y) is not (BotReachClass.Open or BotReachClass.Isle))
+                    {
+                        continue;
+                    }
+
+                    if (BotStep.Settle(map, x, y, out var z) && map.CanSpawnMobile(x, y, z) && BaseBoat.FindBoatAt(new Point3D(x, y, z), map) == null)
+                    {
+                        LandedOpen++;
+
+                        return new Point3D(x, y, z);
+                    }
+                }
+            }
+        }
+
+        LandedElsewhere++;
+
         for (var r = 1; r <= 3; r++)
         {
             for (var dx = -r; dx <= r; dx++)
@@ -1275,6 +1325,11 @@ public static class BotHelm
 
     private static void Lose(BotSeaVoyage voyage, string why)
     {
+        if (voyage.State != BotSeaVoyage.Tide.Lost && voyage.Lane != null)
+        {
+            voyage.Lane.Lost++;
+        }
+
         voyage.State = BotSeaVoyage.Tide.Lost;
         voyage.Why ??= why;
     }
@@ -1398,11 +1453,14 @@ public static class BotHelm
             ? "no ship has put to sea"
             : $"{Embarked} ships put to sea, {Arrived} arrived, {_afloat.Count} at sea now; {TurnedBack} put back, {Died} captains died aboard, {LeftShip} left their ship, {Sunk} ships gone, {Wrecked} wrecked and {Carried} carried ashore; "
               + $"{DryDocked} dry-docked again, {Moored} left at anchor, {Harried} fought on the way, {CrewCarried} carried as crew; {Strokes} strokes, {Moves} moves, {Turns} turns, {Blocks} blocked, {SideSteps} side-steps, {Reroutes} new courses; "
-              + $"{Refused} embarkations refused; berths found taken by a ship {TakenByShip} times, by ground {TakenByGround}, a static {TakenByStatic}, a building {TakenByMulti}, an item {TakenByItem}; {Cleared} idle ships cleared out of a berth; {Recovered} ships recovered and {Scuttled} scuttled";
+              + $"{Refused} embarkations refused; berths found taken by a ship {TakenByShip} times, by ground {TakenByGround}, a static {TakenByStatic}, a building {TakenByMulti}, an item {TakenByItem}; {Cleared} idle ships cleared out of a berth; {Recovered} ships recovered and {Scuttled} scuttled; the reach map: {CourseAground} course waypoints it calls land, {LandedOpen} walkers put ashore on ground a walk reaches and {LandedElsewhere} asked for a shore with none such near";
 
     public static void Forget()
     {
         _afloat.Clear();
+        CourseAground = 0;
+        LandedOpen = 0;
+        LandedElsewhere = 0;
         Embarked = 0;
         Arrived = 0;
         TurnedBack = 0;

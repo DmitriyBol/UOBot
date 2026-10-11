@@ -34,6 +34,13 @@ namespace Server.BotAI.V2;
 /// itself (<c>Guild.IsWar</c>) and still does the enforcing — nothing about notoriety or looting changed.
 /// What changed is that a war is a thing with a beginning, a score and an end, all of them printed.
 /// </para>
+///
+/// <para>
+/// <b>One war begins without an opinion and without a meeting: a claim on a square another guild holds</b> (Patrick,
+/// 06.10.2026). <c>BotSeizure.Seize</c> declares it at once, the claimant the declarer of record, past the truce, the clock
+/// and the count of wars; the claimant has weighed it before (<c>BotSeizure.Weigh</c>). Everything after the declaration —
+/// score, ends, capitulation, the losing side's call — is the same as for any other war here.
+/// </para>
 /// </summary>
 public static class BotWar
 {
@@ -94,6 +101,14 @@ public static class BotWar
     public static double YieldMight { get; set; } = 1.5;
 
     public static long Capitulated { get; private set; }
+
+    public static long YieldedOnScore { get; private set; }
+
+    public static long YieldedOutmatched { get; private set; }
+
+    public static double YieldOdds { get; set; } = 5.0;
+
+    public static long HeldByBlood { get; private set; }
 
     public static double Might(string guild)
     {
@@ -208,6 +223,16 @@ public static class BotWar
         {
             _truces[Pair(a, b)] = Core.TickCount + leftMs;
         }
+    }
+
+    public static bool Untruce(string a, string b)
+    {
+        if (a == null || b == null || !_truces.Remove(Pair(a, b), out var until))
+        {
+            return false;
+        }
+
+        return until - Core.TickCount > 0;
     }
 
     public static void RestoreDeclared(string guild, long agoMs)
@@ -438,28 +463,49 @@ public static class BotWar
             return true;
         }
 
+        if (BotTribute.Forbids(mine, theirs, out var paying))
+        {
+            why = paying;
+
+            return false;
+        }
+
         var now = Core.TickCount;
         var pair = Pair(mine, theirs);
+
+        var avenging = BotRelics.Avenges(mine, theirs);
 
         if (_truces.TryGetValue(pair, out var until))
         {
             if (now - until < 0)
             {
-                Truced++;
-                why = $"a truce with {(until - now) / 60000} minutes left";
+                if (!avenging)
+                {
+                    Truced++;
+                    why = $"a truce with {(until - now) / 60000} minutes left";
 
-                return false;
+                    return false;
+                }
+
+                BotRelics.Waive(mine, theirs, "a truce");
             }
-
-            _truces.Remove(pair);
+            else
+            {
+                _truces.Remove(pair);
+            }
         }
 
         if (_declared.TryGetValue(mine, out var last) && now - (last + DeclareEveryMs) < 0)
         {
-            Cooling++;
-            why = $"{mine} declared or lost a war {(now - last) / 60000} minutes ago";
+            if (!avenging)
+            {
+                Cooling++;
+                why = $"{mine} declared or lost a war {(now - last) / 60000} minutes ago";
 
-            return false;
+                return false;
+            }
+
+            BotRelics.Waive(mine, theirs, "its own clock");
         }
 
         if (Fighting(mine) >= MostWars || Fighting(theirs) >= MostWars)
@@ -784,6 +830,107 @@ public static class BotWar
             TimedOut++;
             End(_over[i], Ahead(_over[i]), "the clock");
         }
+
+        Outmatched(now);
+    }
+
+    private static readonly List<(War War, string Loser, double Ours, double Theirs)> _yielding = [];
+
+    private static void Outmatched(long now)
+    {
+        if (YieldOdds <= 0.0 || _wars.Count == 0)
+        {
+            return;
+        }
+
+        _yielding.Clear();
+
+        foreach (var war in _wars.Values)
+        {
+            if (war.Joined != null || now - (war.Began + LeastMs) < 0)
+            {
+                continue;
+            }
+
+            var a = SideMight(war, war.A);
+            var b = SideMight(war, war.B);
+
+            string loser = null;
+            var ours = 0.0;
+            var theirs = 0.0;
+
+            if (a * YieldOdds <= b)
+            {
+                (loser, ours, theirs) = (war.A, a, b);
+            }
+            else if (b * YieldOdds <= a)
+            {
+                (loser, ours, theirs) = (war.B, b, a);
+            }
+
+            if (loser == null)
+            {
+                continue;
+            }
+
+            var (lostKills, _) = war.Score(loser);
+            var (wonKills, _) = war.Score(war.Against(loser));
+
+            if (lostKills > wonKills)
+            {
+                HeldByBlood++;
+
+                continue;
+            }
+
+            _yielding.Add((war, loser, ours, theirs));
+        }
+
+        for (var i = 0; i < _yielding.Count; i++)
+        {
+            var (war, loser, ours, theirs) = _yielding[i];
+            var winner = war.Against(loser);
+
+            logger.Warning(
+                "{Loser} capitulates to {Winner} after {Minutes} minutes: its side's might {Ours:F0} against {Theirs:F0} ({Ratio:F1} times), under 1/{Odds:0.#} of its enemy's, {Involved} of it in the field against {Others}, {LostKills} to {WonKills} dead",
+                loser,
+                winner,
+                war.Minutes,
+                ours,
+                theirs,
+                ours > 0.0 ? theirs / ours : 0.0,
+                YieldOdds,
+                Involved(loser),
+                Involved(winner),
+                war.Score(loser).Kills,
+                war.Score(winner).Kills
+            );
+
+            Capitulated++;
+            YieldedOutmatched++;
+            End(war, winner, "the other side's capitulation, outmatched");
+        }
+    }
+
+    private static double SideMight(War war, string side)
+    {
+        var enemy = war.Against(side);
+        var total = Might(side);
+
+        foreach (var other in _wars.Values)
+        {
+            if (other.Joined is { } cause && cause.A == war.A && cause.B == war.B && (other.A == enemy || other.B == enemy))
+            {
+                var ally = other.Against(enemy);
+
+                if (ally != null && ally != side)
+                {
+                    total += Might(ally);
+                }
+            }
+        }
+
+        return total;
     }
 
     private static void Reckon(War war)
@@ -814,6 +961,7 @@ public static class BotWar
         if (aYields || Beaten(war.KillsB, war.KillsA) && Outmatched(war.B, war.A))
         {
             Capitulated++;
+            YieldedOnScore++;
             End(war, aYields ? war.B : war.A, "the other side's capitulation");
         }
     }
@@ -903,11 +1051,15 @@ public static class BotWar
             BotVoice.ToGuild(war.A, "war:drawn", new Dictionary<string, string> { ["enemy"] = war.B });
             BotVoice.ToGuild(war.B, "war:drawn", new Dictionary<string, string> { ["enemy"] = war.A });
 
+            BotElection.WarEnded(war.A, war.B, null);
+
             return;
         }
 
         var loser = war.Against(winner);
         var (wonKills, wonLoot) = war.Score(winner);
+
+        var conceded = how.StartsWith("the other side's capitulation", StringComparison.Ordinal) ? BotClaim.Concede(winner, loser) : 0;
 
         if (LoserCools && loser != null)
         {
@@ -917,7 +1069,7 @@ public static class BotWar
         var (lostKills, lostLoot) = war.Score(loser);
 
         logger.Warning(
-            "{Winner} won its war with {Loser} by {How} after {Minutes} minutes: {WonKills} to {LostKills} dead, {WonLoot}gp to {LostLoot}gp taken; a truce of {Truce} minutes",
+            "{Winner} won its war with {Loser} by {How} after {Minutes} minutes: {WonKills} to {LostKills} dead, {WonLoot}gp to {LostLoot}gp taken; a truce of {Truce} minutes{Conceded}",
             winner,
             loser,
             how,
@@ -926,7 +1078,8 @@ public static class BotWar
             lostKills,
             wonLoot,
             lostLoot,
-            TruceMs / 60000
+            TruceMs / 60000,
+            conceded > 0 ? $"; {conceded} of the winner's claims on the loser's ground decided for it" : ""
         );
 
         BotAlarm.Note("war", $"{winner} won its war with {loser} by {how} after {war.Minutes} minutes, {wonKills}:{lostKills} dead and {wonLoot}:{lostLoot}gp taken", wonKills, lostKills, $"{war.Minutes}m");
@@ -934,7 +1087,11 @@ public static class BotWar
         BotVoice.ToGuild(winner, "war:won", new Dictionary<string, string> { ["enemy"] = loser });
         BotVoice.ToGuild(loser, "war:lost", new Dictionary<string, string> { ["enemy"] = winner });
 
+        BotElection.WarEnded(winner, loser, winner);
+
         BotExile.Sentence(winner, loser);
+
+        BotRelics.WarEnded(winner, loser);
     }
 
     public static string Tell()
@@ -971,11 +1128,12 @@ public static class BotWar
             + $"each side fought with {Engage} and one more for every {1.0 / Math.Max(0.01, PerKillBehind):0.#} kills it is behind, a big war past {BigAt} on each side ({Bigs} so far), "
             + $"judged at {LongestMs / 60000}, a truce of {TruceMs / 60000} after, one declaration a guild per {DeclareEveryMs / 60000} minutes and {MostWars} at a time; "
             + $"{Declared} declared, {Truced} refused for a truce, {Cooling} for declaring too soon ({LosersCooled} clocks started by a defeat), {Busy} for a guild already at war, {Daunted} against a guild {DauntedAt:0.#} times the declarer's might or more; "
-            + $"{WonByBlood} won by blood, {WonByPlunder} by plunder, {Capitulated} by the other side's capitulation (at {YieldBehind} kills and {YieldRatio:0.#} times its own, against {YieldMight:0.#} times its might), {TimedOut} judged by the clock, {Peaced} ended in peace, {Drawn} of those drawn; "
-            + $"{Counted} kills and {Plundered}gp of plunder counted";
+            + $"{WonByBlood} won by blood, {WonByPlunder} by plunder, {Capitulated} by the other side's capitulation ({YieldedOnScore} on the score, at {YieldBehind} kills and {YieldRatio:0.#} times its own, against {YieldMight:0.#} times its might; {YieldedOutmatched} outmatched, fielding under 1/{YieldOdds:0.#} of the enemy's might once {LeastMs / 60000} minutes had passed, {HeldByBlood} looks where the smaller side fought on for being ahead on blood; {BotClaim.Conceded} claims on the loser's ground decided for the winner by a capitulation), {TimedOut} judged by the clock, {Peaced} ended in peace, {Drawn} of those drawn; "
+            + $"{Counted} kills and {Plundered}gp of plunder counted; {BotSeizure.Describe()}";
 
     public static void Forget()
     {
+        BotSeizure.Wipe();
         _wars.Clear();
         _truces.Clear();
         _declared.Clear();
@@ -990,6 +1148,10 @@ public static class BotWar
         TimedOut = 0;
         Peaced = 0;
         Drawn = 0;
+        Capitulated = 0;
+        YieldedOnScore = 0;
+        YieldedOutmatched = 0;
+        HeldByBlood = 0;
         Counted = 0;
         Plundered = 0;
         Bigs = 0;

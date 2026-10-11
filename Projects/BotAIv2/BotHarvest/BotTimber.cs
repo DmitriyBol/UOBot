@@ -162,17 +162,10 @@ public static class BotTimber
                 continue;
             }
 
-            var goods = spare >= held ? wood : Mobile.LiftItemDupe(wood, held - spare);
-
-            if (goods == null)
-            {
-                continue;
-            }
-
-            var (went, out_) = BotAuction.Offer(bot, goods, Worth);
+            var went = BotMarket.Answering(bot, typeof(Log), spare);
 
             ordered += went;
-            listed += out_;
+            listed += spare - went;
         }
 
         Ordered += ordered;

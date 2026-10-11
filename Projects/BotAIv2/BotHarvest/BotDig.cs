@@ -45,8 +45,6 @@ public sealed class BotDig : BotDeed
 
     public static int MaxBends { get; set; } = 3;
 
-    public static bool ListGoods { get; set; } = true;
-
     public static int MaxSpent { get; set; } = 8;
 
     public static int SwingMs { get; set; } = 2000;
@@ -234,6 +232,30 @@ public sealed class BotDig : BotDeed
 
     private static readonly Dictionary<Point3D, long> _nearing = [];
 
+    private static readonly Dictionary<System.Type, int> _barsBefore = [];
+
+    private static readonly Dictionary<System.Type, int> _barsAfter = [];
+
+    private static void Bars(Mobile body, Dictionary<System.Type, int> into)
+    {
+        into.Clear();
+
+        var items = body?.Backpack?.Items;
+
+        if (items == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i] is BaseIngot { Deleted: false } bar)
+            {
+                into[bar.GetType()] = into.GetValueOrDefault(bar.GetType()) + System.Math.Max(1, bar.Amount);
+            }
+        }
+    }
+
     private bool _closer;
 
     private int _refusals;
@@ -275,6 +297,10 @@ public sealed class BotDig : BotDeed
     public override string Kind => Trade;
 
     public override bool Steadfast => true;
+
+    public override double HoldsFor => HoldMinutes;
+
+    public static double HoldMinutes { get; set; } = 12.0;
 
     public override void Resumed(IBotWilful bot)
     {
@@ -657,7 +683,7 @@ public sealed class BotDig : BotDeed
             {
                 _rawWorth = System.Math.Max(
                     1,
-                    BotAuction.Worth(typeof(IronOre), System.Math.Max(1, GoldPerIngot / 2))
+                    BotMarket.Worth(typeof(IronOre), System.Math.Max(1, GoldPerIngot / 2))
                 );
             }
 
@@ -733,6 +759,14 @@ public sealed class BotDig : BotDeed
         {
             _fire = BotGround.Fire(_bot, body.Location);
 
+            if ((_fire == Point3D.Zero || !BotGates.Joined(_map, body.Location, _fire)) && BotColonies.StoreOf(body) != null)
+            {
+                _fire = Point3D.Zero;
+                _leg = Leg.Counter;
+
+                return default;
+            }
+
             if (_fire == Point3D.Zero)
             {
                 return BotDoing.Failed("nowhere known to melt it");
@@ -747,6 +781,9 @@ public sealed class BotDig : BotDeed
         }
 
         var before = BotOre.Carried(body);
+
+        Bars(body, _barsBefore);
+
         var made = BotOre.Melt(body);
 
         if (made <= 0 && BotOre.Carried(body) >= before)
@@ -793,8 +830,40 @@ public sealed class BotDig : BotDeed
             return BotDoing.Done($"the ore burned away, {_swings} swings");
         }
 
-        _worth = BotAuction.Worth(typeof(IronIngot), GoldPerIngot);
-        _made += made * _worth;
+        _worth = BotMarket.Worth(typeof(IronIngot), GoldPerIngot);
+
+        Bars(body, _barsAfter);
+
+        var booked = 0;
+
+        foreach (var (metal, held) in _barsAfter)
+        {
+            var gained = held - _barsBefore.GetValueOrDefault(metal);
+
+            if (gained <= 0)
+            {
+                continue;
+            }
+
+            gained = System.Math.Min(gained, made - booked);
+
+            if (gained <= 0)
+            {
+                break;
+            }
+
+            BotGlut.Made(metal, gained);
+            BotOre.Smelted(metal, gained);
+            _made += BotGlut.Yield(metal, gained, GoldPerIngot);
+            booked += gained;
+        }
+
+        if (booked < made)
+        {
+            BotGlut.Made(typeof(IronIngot), made - booked);
+            BotOre.Smelted(typeof(IronIngot), made - booked);
+            _made += BotGlut.Yield(typeof(IronIngot), made - booked, GoldPerIngot);
+        }
 
         _raw = 0;
 
@@ -806,6 +875,22 @@ public sealed class BotDig : BotDeed
     private BotDoing Banking(IBotWilful bot)
     {
         var body = bot.Self;
+
+        if (BotColonies.StoreOf(body) is { } store)
+        {
+            var at = store.GetWorldLocation();
+
+            if (!body.InRange(at, 2))
+            {
+                return BotDoing.Walk(_map, at, BotArrival.Within(1), "to the colony's store");
+            }
+
+            var (bars, ore, _) = BotColonies.Deposit(body, store);
+
+            _stored = bars;
+
+            return BotDoing.Done($"{bars} ingots and {ore} ore into the colony's store, {_swings} swings");
+        }
 
         if (_counter == Point3D.Zero)
         {
@@ -826,9 +911,7 @@ public sealed class BotDig : BotDeed
 
         _stored = stored;
 
-        _made -= ordered * _worth;
-
-        return BotDoing.Done($"{_stored} ingots away, {ordered} of them to order, {_swings} swings");
+        return BotDoing.Done($"{_stored} ingots away and {ordered} kept for somebody's want, {_swings} swings");
     }
 
     private void Note(Mobile body, Point3D where)
@@ -944,6 +1027,7 @@ public sealed class BotDig : BotDeed
         var box = body.BankBox;
         var stored = 0;
         var ordered = 0;
+        Dictionary<System.Type, int> held = [];
 
         List<Item> carried = [.. pack.Items];
 
@@ -956,29 +1040,17 @@ public sealed class BotDig : BotDeed
 
             var amount = ingot.Amount;
             var kind = ingot.GetType();
-            var worth = BotAuction.Worth(kind, GoldPerIngot);
 
-            var want = BotAuction.Demand(bot, kind);
-            var sold = want == null ? 0 : BotAuction.Fill(bot, want, ingot);
+            var hold = BotMarket.Holding(bot, kind, amount, held);
 
-            if (sold > 0)
+            if (hold > 0)
             {
-                stored += sold;
-                ordered += sold;
+                ordered += hold;
 
-                if (sold >= amount)
+                if (hold >= amount)
                 {
                     continue;
                 }
-
-                amount -= sold;
-            }
-
-            if (ListGoods && BotAuction.List(bot, ingot, worth) != null)
-            {
-                stored += amount;
-
-                continue;
             }
 
             if (box == null)
@@ -986,9 +1058,17 @@ public sealed class BotDig : BotDeed
                 continue;
             }
 
-            stored += amount;
-            box.DropItem(ingot);
+            if (hold > 0 && Mobile.LiftItemDupe(ingot, amount - hold) == null)
+            {
+                continue;
+            }
+
+            stored += ingot.Amount;
+
+            BotSurplus.Put(body, box, ingot);
         }
+
+        BotSurplus.TidyIfFull(body);
 
         var purse = pack.GetAmount(typeof(Gold));
 

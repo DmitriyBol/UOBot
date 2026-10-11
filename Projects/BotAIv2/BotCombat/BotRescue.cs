@@ -46,6 +46,10 @@ public sealed class BotRescue : BotDeed
 
     public bool Own => _own;
 
+    public Mobile Friend => _friend;
+
+    public bool ToTheEnd => _fight.ToTheEnd;
+
     public override Mobile Foe => _foe;
 
     public override bool Resumes => true;
@@ -96,7 +100,18 @@ public sealed class BotRescue : BotDeed
             return BotDoing.Done($"{_friend?.Name ?? "they"} are past helping");
         }
 
+        if (!_own && _friend.Hits < _lowest)
+        {
+            _lowest = _friend.Hits;
+        }
+
         var doing = _fight.Advance(bot);
+
+        if (!_told && !_own && doing.Kind == BotDoingKind.Done && _friend is { Deleted: false, Alive: true })
+        {
+            _told = true;
+            BotBiography.Rescued(_rescuer, _friend, _foe, _lowest == int.MaxValue ? _friend.Hits : _lowest, _friend.HitsMax);
+        }
 
         if (!_thanked && !_own && doing.Kind == BotDoingKind.Done
             && _rescuer?.Guild is Guilds.Guild ours && _friend?.Guild is Guilds.Guild theirs && ours != theirs)
@@ -109,6 +124,10 @@ public sealed class BotRescue : BotDeed
     }
 
     private bool _thanked;
+
+    private bool _told;
+
+    private int _lowest = int.MaxValue;
 
     public override void Drop(IBotWilful bot)
     {

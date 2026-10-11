@@ -91,8 +91,10 @@ public sealed class BotPatrol : IBotProposer
             return null;
         }
 
+        var free = Free(body, BotSweep.Reach, out var supply);
+
         if (body is BotMobile { Guild: Server.Guilds.Guild guild } && Clearing(guild.Name, map, body.Location) is var clearing
-            && clearing != Point3D.Zero && Free(body, BotSweep.Reach) >= BotSweep.Least - 1)
+            && clearing != Point3D.Zero && free >= BotSweep.Least - 1 && Takes(map, clearing, supply))
         {
             Offered++;
             ForTown++;
@@ -100,22 +102,31 @@ public sealed class BotPatrol : IBotProposer
             return new BotSweep(map, clearing, BotPeril.Reading(map, clearing));
         }
 
+        var refusedBefore = Closed + Outmatched;
+
         var square = BotPeril.Worst(
             map,
             body.Location,
             Range,
             out var reading,
-            at => Reachable(map, body.Location, at)
+            at => Reachable(map, body.Location, at) && (free < BotSweep.Least - 1 || Takes(map, at, supply))
         );
 
         if (square == Point3D.Zero)
         {
-            Peaceful++;
+            if (Closed + Outmatched > refusedBefore)
+            {
+                Unwinnable++;
+            }
+            else
+            {
+                Peaceful++;
+            }
 
             return null;
         }
 
-        if (Free(body, BotSweep.Reach) < BotSweep.Least - 1)
+        if (free < BotSweep.Least - 1)
         {
             TooFewNear++;
 
@@ -162,31 +173,74 @@ public sealed class BotPatrol : IBotProposer
         return false;
     }
 
-    private static int Free(Mobile body, int range)
+    private static int Free(Mobile body, int range, out double supply)
     {
         var map = body.Map;
         var free = 0;
 
+        _powers.Clear();
+
         foreach (var mobile in map.GetMobilesInRange<Mobile>(body.Location, range))
         {
-            if (mobile == body || mobile is not IBotSquadMember { Squad: null })
-            {
-                continue;
-            }
-
-            if (mobile is IBotAlly { AbleToFight: true })
+            if (Callable(body, mobile))
             {
                 free++;
+                _powers.Add(BotThreat.Power(mobile));
             }
         }
+
+        _powers.Sort();
+
+        supply = BotThreat.Power(body);
+
+        for (int i = _powers.Count - 1, taken = 0; i >= 0 && taken < BotSquad.MaxSize - 1; i--, taken++)
+        {
+            supply += _powers[i];
+        }
+
+        _powers.Clear();
 
         return free;
     }
 
+    private static readonly System.Collections.Generic.List<double> _powers = [];
+
+    internal static bool Callable(Mobile captain, Mobile mobile) =>
+        mobile != captain && mobile is IBotSquadMember { Squad: null }
+
+        && mobile is IBotAlly { AbleToFight: true } && !BotTrading.Neutral(mobile) && !BotRegard.Hostile(captain, mobile);
+
+    public static double Asks(Map map, Point3D at) => System.Math.Max(BotQuad.Muscle(map, at), BotPeril.Hostility(map, at));
+
+    private static bool Takes(Map map, Point3D at, double supply)
+    {
+        if (BotBarred.Holds(map, at))
+        {
+            Closed++;
+
+            return false;
+        }
+
+        if (Asks(map, at) > supply)
+        {
+            Outmatched++;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static long Closed { get; private set; }
+
+    public static long Unwinnable { get; private set; }
+
+    public static long Outmatched { get; private set; }
+
     public static string Describe() =>
         Asked == 0
             ? $"no captain has ever been offered a patrol ({NotACaptain} answers went to bots that are not captains)"
-            : $"{Asked} times a captain was asked: {Offered} were offered a square ({ForTown} of them their town's clearing), {Held} were already in a company, {Unfit} were too hurt, {Peaceful} found nowhere dangerous enough, {Sealed} found the worst of it behind something, {TooFewNear} had too few free bots near; {BotSweep.Describe()}; {BotPeril.Describe()}";
+            : $"{Asked} times a captain was asked: {Offered} were offered a square ({ForTown} of them their town's clearing), {Held} were already in a company, {Unfit} were too hurt, {Peaceful} found nowhere dangerous enough, {Sealed} found the worst of it behind something, {TooFewNear} had too few free bots near; {Unwinnable} found every dangerous square within reach closed or beyond what they could call ({Closed} candidate squares passed over for lying in closed ground and {Outmatched} for asking more than the captain and the strongest it could call bring); {BotSweep.Describe()}; {BotPeril.Describe()}";
 
     public static void Forget()
     {
@@ -198,5 +252,8 @@ public sealed class BotPatrol : IBotProposer
         Sealed = 0;
         TooFewNear = 0;
         Offered = 0;
+        Closed = 0;
+        Outmatched = 0;
+        Unwinnable = 0;
     }
 }

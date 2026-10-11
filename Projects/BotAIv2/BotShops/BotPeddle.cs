@@ -16,11 +16,11 @@ namespace Server.BotAI.V2;
 /// </para>
 ///
 /// <para>
-/// <b>The condition for coming here is the whole design, and it is the market's own price that states it.</b>
-/// A shopkeeper is not where goods go; it is where goods go <em>after the population has been offered them
-/// and refused</em>. A stall that has never sold one and has already had its price cut once has stood in front
-/// of every bot on the shard for half an hour with nobody interested. That is the shard saying "nobody here
-/// wants this", in the only language it has, and it costs no new number to hear.
+/// <b>The condition for coming here is the whole design.</b> A shopkeeper is not where goods go; it is where goods go
+/// <em>when the population is not asking for them</em>: nobody has said a want for the kind, and nobody has been short of it
+/// lately (<see cref="BotShopkeep.Demanded"/>). Under the auction that was a stall that had stood unsold for ten minutes; since
+/// the stalls went (01.10.2026) it is read straight off the wants and the shortages, and the goods come out of the pack or, at a
+/// bank, out of the bot's own bank box (<see cref="BotMarket.FromBank"/>), where the porter put what it did not keep.
 /// </para>
 ///
 /// <para>
@@ -56,17 +56,13 @@ public sealed class BotPeddle : BotDeed
 
     private int _sold;
 
-    private BotListing _listing;
-
-    private int _soldBefore;
-
     private bool _begun;
 
-    public static long SoldOnTheWay { get; private set; }
+    public static long FromBox { get; private set; }
 
-    public static long HandedBack { get; private set; }
+    public static long FromBoxUnits { get; private set; }
 
-    private readonly bool _fromPack;
+    private readonly bool _fromBox;
 
     private readonly double _factor;
 
@@ -74,9 +70,9 @@ public sealed class BotPeddle : BotDeed
 
     private int _premium;
 
-    public BotPeddle(BaseVendor shop, Type kind, string label, int units, int price, bool fromPack = false, double factor = 1.0, int passed = 0)
+    public BotPeddle(BaseVendor shop, Type kind, string label, int units, int price, bool fromBox = false, double factor = 1.0, int passed = 0)
     {
-        _fromPack = fromPack;
+        _fromBox = fromBox;
         _shop = shop;
         _kind = kind;
         _label = label;
@@ -94,7 +90,13 @@ public sealed class BotPeddle : BotDeed
 
     public override Point3D Where => _shop?.Location ?? Point3D.Zero;
 
-    public override double Expects => Math.Max(1.0, _units * (double)_price * _factor / Math.Max(0.5, WorkMinutes));
+    public override double Expects => Math.Max(1.0, (_units * (double)_price * _factor + Extra) / Math.Max(0.5, WorkMinutes));
+
+    public int Extra { get; init; }
+
+    public bool BoxedOut { get; init; }
+
+    public int Most { get; init; }
 
     public override double Minutes => WorkMinutes;
 
@@ -140,8 +142,22 @@ public sealed class BotPeddle : BotDeed
         if (!_begun)
         {
             _begun = true;
-            _listing = BotAuction.Find(bot, _kind);
-            _soldBefore = _listing?.Sold ?? 0;
+
+            if (_fromBox)
+            {
+                var drawn = BotMarket.FromBank(bot, _kind, _units);
+
+                if (drawn <= 0 && Gather(body, _kind).Count == 0)
+                {
+                    return BotDoing.Failed($"could not take the {_label} out of its bank box");
+                }
+
+                if (drawn > 0)
+                {
+                    FromBox++;
+                    FromBoxUnits += drawn;
+                }
+            }
         }
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
@@ -149,52 +165,220 @@ public sealed class BotPeddle : BotDeed
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} with {_label}");
         }
 
-        var taken = BotAuction.Reclaim(bot, _kind);
+        var goods = Upto(Beyond(bot, Gather(body, _kind), _kind), Most);
 
-        if (taken <= 0 && Gather(body, _kind).Count > 0)
+        if (goods.Count == 0)
         {
-            if (!_fromPack)
-            {
-                HandedBack++;
-            }
+            return BotDoing.Failed($"no {_label} left in the pack by the time it got here");
         }
-        else if (taken <= 0 && _listing != null && _listing.Sold > _soldBefore)
-        {
-            SoldOnTheWay++;
-
-            return BotDoing.Done($"the stall sold {_listing.Sold - _soldBefore} of them while it walked");
-        }
-        else if (taken <= 0)
-        {
-            return BotDoing.Failed(
-                BotYield.Pocket(body) ? "the stall was empty by the time it got here" : "the pack had no room to take the goods back off the stall"
-            );
-        }
-
-        var goods = Gather(body, _kind);
 
         _earned = BotShops.Sell(bot, _shop, goods, out var units, out _premium);
 
+        BotOre.Release(body);
+
         if (_earned <= 0)
         {
-            for (var i = 0; i < goods.Count; i++)
-            {
-                BotAuction.List(bot, goods[i], Math.Max(1, _price));
-            }
-
             return BotDoing.Failed("the shopkeeper would not buy it after all");
         }
 
         _sold = units;
+
+        BotSurplus.CountIfCapped(bot, BotSurplus.Shop, _kind, units);
 
         if (_passed > 0 && BotCapital.In(_shop.Location))
         {
             BotCapital.Delivered(units, _earned + _premium, _passed);
         }
 
+        var extra = BotPeddler.Hunter(body) ? Rest(bot, body, _kind) : null;
+        var also = "";
+
+        if (extra is { Count: > 0 })
+        {
+            var more = BotShops.Sell(bot, _shop, extra, out var moreUnits, out var morePremium);
+
+            if (more > 0)
+            {
+                AlsoSold++;
+                AlsoUnits += moreUnits;
+                AlsoGold += more;
+
+                _earned += more;
+                _premium += morePremium;
+                _sold += moreUnits;
+
+                also = $" and {moreUnits} other things of its loot";
+            }
+        }
+
         return _premium > 0
-            ? BotDoing.Done($"{units} {_label} for {_earned}gp and {_premium}gp more from the city at the capital's counter")
-            : BotDoing.Done($"{units} {_label} for {_earned}gp");
+            ? BotDoing.Done($"{units} {_label}{also} for {_earned}gp and {_premium}gp more from the city at the capital's counter")
+            : BotDoing.Done($"{units} {_label}{also} for {_earned}gp");
+    }
+
+    public static long AlsoSold { get; private set; }
+
+    public static long AlsoUnits { get; private set; }
+
+    public static long AlsoGold { get; private set; }
+
+    public static void ForgetCounts()
+    {
+        AlsoSold = 0;
+        AlsoUnits = 0;
+        AlsoGold = 0;
+    }
+
+    private static List<Item> Rest(IBotWilful bot, Mobile body, Type but)
+    {
+        List<Item> found = [];
+
+        var pack = body.Backpack;
+
+        if (pack == null)
+        {
+            return found;
+        }
+
+        var bond = (body as BotMobile)?.Bond;
+        var keep = BotUnload.Keeps(bot);
+        List<Item> carried = [.. pack.Items];
+
+        for (var i = 0; i < carried.Count; i++)
+        {
+            var item = carried[i];
+
+            if (item == null || item.Deleted || !item.Movable || item is Gold || !item.IsStandardLoot() || BotBinding.IsBound(item, bond)
+                || !BotShopkeep.Merchandise(item, bond))
+            {
+                continue;
+            }
+
+            var kind = item.GetType();
+
+            if (kind == but || keep != null && keep.ContainsKey(kind) || BotCourier.Deliverable(bot, kind) || Supper(kind)
+                || BotOre.Coloured(kind))
+            {
+                continue;
+            }
+
+            found.Add(item);
+        }
+
+        return found;
+    }
+
+    internal static int RestWorth(IBotWilful bot, Mobile body, BaseVendor shop, Type but)
+    {
+        if (shop == null || body == null)
+        {
+            return 0;
+        }
+
+        var rest = Rest(bot, body, but);
+        var worth = 0;
+
+        for (var i = 0; i < rest.Count; i++)
+        {
+            if (BotShops.Buys(shop, rest[i], out var paying))
+            {
+                worth += paying * Math.Max(1, rest[i].Amount);
+            }
+        }
+
+        return worth;
+    }
+
+    private static bool Supper(Type kind)
+    {
+        for (var i = 0; i < BotOven.Raw.Count; i++)
+        {
+            if (BotOven.Raw[i] == kind)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static List<Item> Beyond(IBotWilful bot, List<Item> goods, Type kind)
+    {
+        if (goods.Count == 0 || !BotUnload.Keeps(bot).TryGetValue(kind, out var cap) || cap <= 0)
+        {
+            return goods;
+        }
+
+        if (cap >= int.MaxValue)
+        {
+            return [];
+        }
+
+        var left = cap;
+        List<Item> sell = [];
+
+        for (var i = 0; i < goods.Count; i++)
+        {
+            var item = goods[i];
+            var many = Math.Max(1, item.Amount);
+
+            if (left <= 0)
+            {
+                sell.Add(item);
+
+                continue;
+            }
+
+            if (many <= left)
+            {
+                left -= many;
+
+                continue;
+            }
+
+            if (item.Stackable && Mobile.LiftItemDupe(item, many - left) != null)
+            {
+                sell.Add(item);
+            }
+
+            left = 0;
+        }
+
+        return sell;
+    }
+
+    private static List<Item> Upto(List<Item> goods, int most)
+    {
+        if (most <= 0 || goods.Count == 0)
+        {
+            return goods;
+        }
+
+        var left = most;
+        List<Item> sell = [];
+
+        for (var i = 0; i < goods.Count && left > 0; i++)
+        {
+            var item = goods[i];
+            var many = Math.Max(1, item.Amount);
+
+            if (many <= left)
+            {
+                sell.Add(item);
+                left -= many;
+
+                continue;
+            }
+
+            if (item.Stackable && Mobile.LiftItemDupe(item, left) != null)
+            {
+                sell.Add(item);
+            }
+
+            left = 0;
+        }
+
+        return sell;
     }
 
     private static List<Item> Gather(Mobile body, Type kind)

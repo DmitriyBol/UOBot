@@ -98,6 +98,17 @@ public sealed class BotSalve : BotDeed
         Turned = 0;
     }
 
+    private bool Cast(Mobile body)
+    {
+        BotReflex.Casting(body, _patient);
+
+        return true;
+    }
+
+    public Mobile Patient => _patient;
+
+    public bool OnSelf => _onSelf;
+
     public BotSalve(Mobile patient, Map map, bool onSelf, SkillName trains)
     {
         _patient = patient;
@@ -110,6 +121,23 @@ public sealed class BotSalve : BotDeed
     public override string Kind => Trade;
 
     public override bool Summons => true;
+
+    public override bool Pressing(IBotWilful bot)
+    {
+        if (_onSelf || !BotSurgeon.Calls || _patient is not { Deleted: false, Alive: true } patient)
+        {
+            return false;
+        }
+
+        var held = bot?.Resolve?.Deed;
+
+        if (held != null && (!held.Resumes || bot.Resolve.Paused != null))
+        {
+            return false;
+        }
+
+        return BotLadder.Failing(patient) || BotMend.Share(patient) < BotMend.Hurt && BotMend.Embattled(patient);
+    }
 
     public override bool Repeats(BotDeed other) => other is BotSalve salve && salve._patient == _patient;
 
@@ -204,6 +232,11 @@ public sealed class BotSalve : BotDeed
 
         if (BotMend.Whole(_patient))
         {
+            if (!_onSelf && _casts + _cloths + _draughts > 0)
+            {
+                BotBiography.Healed(body, _patient);
+            }
+
             return _casts + _cloths + _draughts > 0
                 ? Ending("mended")
                 : BotDoing.Done("there was nothing left to mend");
@@ -304,7 +337,7 @@ public sealed class BotSalve : BotDeed
 
             var last = BotMend.Spell(body, _patient);
 
-            if (last >= 0 && BotMend.Begin(body, last))
+            if (last >= 0 && BotMend.Begin(body, last) && Cast(body))
             {
                 _awaiting = true;
 
@@ -313,7 +346,7 @@ public sealed class BotSalve : BotDeed
         }
         else
         {
-            if (spell >= 0 && BotMend.Begin(body, spell))
+            if (spell >= 0 && BotMend.Begin(body, spell) && Cast(body))
             {
                 _awaiting = true;
 

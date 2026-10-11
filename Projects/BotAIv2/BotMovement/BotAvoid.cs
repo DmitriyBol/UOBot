@@ -20,6 +20,13 @@ namespace Server.BotAI.V2;
 /// </para>
 ///
 /// <para>
+/// <b>And a few squares of ground priced rather than shut, because something the bot cannot beat stands in them (03.10.2026,
+/// sight13).</b> The reach of a creature the walker has seen (<see cref="BotSight"/>): a step into it costs more, so the
+/// search goes round when a way round is not dear, and through when it is the only way — the walk itself then waits or turns
+/// back. Never a wall: the goal may stand inside one.
+/// </para>
+///
+/// <para>
 /// Neither may ever be recorded as knowledge about the ground. A search that failed because of an avoid
 /// has proved nothing — which is why <see cref="BotPath"/> refuses to write a pocket into
 /// <see cref="BotReach"/> from any search that carried one.
@@ -34,8 +41,9 @@ public readonly struct BotAvoid
     private readonly int _x2;
     private readonly int _y2;
     private readonly Map _towns;
+    private readonly BotReaches _reaches;
 
-    private BotAvoid(int tileX, int tileY, int x1, int y1, int x2, int y2, Map towns = null)
+    private BotAvoid(int tileX, int tileY, int x1, int y1, int x2, int y2, Map towns = null, BotReaches reaches = null)
     {
         _tileX = tileX;
         _tileY = tileY;
@@ -44,6 +52,7 @@ public readonly struct BotAvoid
         _x2 = x2;
         _y2 = y2;
         _towns = towns;
+        _reaches = reaches is { Count: > 0 } ? reaches : null;
 
         HasTile = tileX >= 0;
         HasSquare = x2 >= x1 && x1 >= 0;
@@ -55,7 +64,9 @@ public readonly struct BotAvoid
 
     public bool HasSquare { get; }
 
-    public bool Empty => !HasTile && !HasSquare && _towns == null;
+    public bool Empty => !HasTile && !HasSquare && _towns == null && _reaches == null;
+
+    public bool HasReaches => _reaches != null;
 
     public bool HasTowns => _towns != null;
 
@@ -63,11 +74,17 @@ public readonly struct BotAvoid
 
     public static BotAvoid Square(int x1, int y1, int x2, int y2) => new(-1, -1, x1, y1, x2, y2);
 
-    public BotAvoid And(Point3D tile) => new(tile.X, tile.Y, _x1, _y1, _x2, _y2, _towns);
+    public BotAvoid And(Point3D tile) => new(tile.X, tile.Y, _x1, _y1, _x2, _y2, _towns, _reaches);
 
-    public BotAvoid And(int x1, int y1, int x2, int y2) => new(_tileX, _tileY, x1, y1, x2, y2, _towns);
+    public BotAvoid And(int x1, int y1, int x2, int y2) => new(_tileX, _tileY, x1, y1, x2, y2, _towns, _reaches);
 
-    public BotAvoid Towns(Map map) => new(_tileX, _tileY, _x1, _y1, _x2, _y2, map);
+    public BotAvoid Reaches(BotReaches reaches) => new(_tileX, _tileY, _x1, _y1, _x2, _y2, _towns, reaches);
+
+    public int Penalty(int x, int y) => _reaches?.Penalty(x, y) ?? 0;
+
+    public bool InReach(int x, int y) => _reaches?.Within(x, y, 0) == true;
+
+    public BotAvoid Towns(Map map) => new(_tileX, _tileY, _x1, _y1, _x2, _y2, map, _reaches);
 
     public bool Blocks(int x, int y)
     {

@@ -58,6 +58,10 @@ public sealed class BotDelveParty
 
     public static int Raisings { get; set; } = 3;
 
+    public static bool FreeRaisings { get; set; } = false;
+
+    public static long Unraised { get; private set; }
+
     public static double LeadersShare { get; set; } = 0.5;
 
     public static int GraceMs { get; set; } = 60000;
@@ -91,6 +95,8 @@ public sealed class BotDelveParty
         public int Credit;
 
         public bool Down = true;
+
+        public long Unraised;
     }
 
     private readonly List<Share> _shares = [];
@@ -166,7 +172,7 @@ public sealed class BotDelveParty
         {
             var share = _shares[i];
 
-            if (share.Who is not { Deleted: false } body)
+            if (share.Who is not { Deleted: false } body || !share.Down)
             {
                 continue;
             }
@@ -263,9 +269,44 @@ public sealed class BotDelveParty
             return false;
         }
 
+        if (!FreeRaisings)
+        {
+            if (BotRaise.Holding(bot))
+            {
+                return true;
+            }
+
+            if (share.Unraised != bot.FellTick)
+            {
+                share.Unraised = bot.FellTick;
+                share.Down = false;
+                Unraised++;
+
+                logger.Information(
+                    "{Bot} has fallen in {Deep} and nobody down there can raise it — no resurrection scroll read, no book with the spell, no healer of 80 — so it goes back to the world with {Credit}gp of the pot and {Left} raisings unspent",
+                    bot.Name,
+                    _deep?.Name ?? "the deep",
+                    share.Credit,
+                    Left
+                );
+            }
+
+            return false;
+        }
+
         if (Core.TickCount - (bot.FellTick + RaiseMs) < 0)
         {
             return true;
+        }
+
+        if (bot.Remains is { Deleted: false } corpse)
+        {
+            BotReclaim.Strip(bot, corpse, out _, out _);
+
+            if (corpse.Items.Count == 0)
+            {
+                bot.Remains = null;
+            }
         }
 
         bot.Resurrect();
@@ -276,6 +317,8 @@ public sealed class BotDelveParty
 
             return false;
         }
+
+        share.Floor = Purse(bot);
 
         Left--;
         Raised++;
@@ -416,6 +459,59 @@ public sealed class BotDelveParty
         return false;
     }
 
+    public static void Spent(BotMobile bot)
+    {
+        for (var i = 0; i < _parties.Count; i++)
+        {
+            var party = _parties[i];
+
+            if (party.Ended || party.Of(bot) is not { } share || !BotUndertaker.Below(bot.Location))
+            {
+                continue;
+            }
+
+            share.Down = true;
+            share.Floor = Purse(bot);
+            party.Left = Math.Max(0, party.Left - 1);
+            Raised++;
+
+            logger.Information(
+                "{Bot} is back on its feet in {Deep} where it fell, raised by one of its party; the party has {Left} raisings left",
+                bot.Name,
+                party._deep?.Name ?? "the deep",
+                party.Left
+            );
+
+            return;
+        }
+    }
+
+    public static bool MayRaise(BotMobile bot)
+    {
+        for (var i = 0; i < _parties.Count; i++)
+        {
+            if (!_parties[i].Ended && _parties[i].Holds(bot) && BotUndertaker.Below(bot.Location))
+            {
+                return _parties[i].Left > 0;
+            }
+        }
+
+        return true;
+    }
+
+    public static bool Below(Mobile bot)
+    {
+        for (var i = 0; i < _parties.Count; i++)
+        {
+            if (!_parties[i].Ended && _parties[i].Of(bot) is { Down: true })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static bool Delving(Mobile bot)
     {
         for (var i = 0; i < _parties.Count; i++)
@@ -507,7 +603,7 @@ public sealed class BotDelveParty
         Delves == 0
             ? "nobody has been down a dungeon"
             : $"{Delves} parties went down, {_parties.Count} are down now: {Taken}gp swept into their pots and {Paid}gp handed out, "
-            + $"{Raised} raised where they fell out of {Raisings} to a party, {Lost} went home for want of one, "
+            + $"{Raised} raised where they fell out of {Raisings} to a party ({(FreeRaisings ? "for nothing" : "by a member's scroll, spell or bandage")}), {Lost} went home for want of one, {Unraised} with raisings left and nobody down there able to raise them, "
             + $"{WalkedOut} walked out by the mouth and {Stranded} had to be lifted out";
 
     public static void Forget()
@@ -518,6 +614,7 @@ public sealed class BotDelveParty
         Paid = 0;
         Raised = 0;
         Lost = 0;
+        Unraised = 0;
         Stranded = 0;
         WalkedOut = 0;
     }

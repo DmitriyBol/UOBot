@@ -45,6 +45,8 @@ public static class BotDebugCore
         }
 
         BotModules.Register(new BotDebugModule());
+
+        BotTourneyStore.Configure();
     }
 
     public static void Initialize()

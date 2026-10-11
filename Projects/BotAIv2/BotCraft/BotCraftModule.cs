@@ -45,13 +45,15 @@ public sealed class BotCraftModule : BotModule
 
         BotWill.Offer(new BotFletcher());
 
-        BotAuction.Staple(typeof(Server.Items.Feather));
+        BotMarket.Staple(typeof(Server.Items.Feather));
 
         BotWill.Offer(new BotAlchemist());
 
         BotWill.Offer(new BotCook());
 
         BotWill.Offer(new BotTutor());
+
+        BotWill.Offer(new BotCraftFirst());
 
         logger.Information(
             "Craft ready: a tailor buys {Bolt} cloth at a time, works {Margin} points below its own skill, attempts every {Swing}ms, and asks {Price}gp a piece; a fletcher makes at least {Least} arrows at a time and opens them at {Arrow}gp, buying wood to match the feathers it holds because nobody anywhere sells a feather",
@@ -73,11 +75,23 @@ public sealed class BotCraftModule : BotModule
         );
 
         logger.Information(
-            "Supplies from our own benches: a weaver walks to the flock with the least road per sheep within {Pasture} tiles and its leash, gathers up to {Wool} wool, and puts cloth over {Keep} out at no more than the tailor asks; a tinker short of iron buys a batch's worth off the cheapest stall; a fletcher short of feathers buys them off a stall; what a maker makes goes out past the auction's lot cap: {Uncapped}",
+            "Crafters first (econ13): a crafter's winning dig gives way to work asked of it ({Running}); one short of material for an order walks to its own bank box within {Reach} tiles at {Claim}/min; a want's reservation lends a brewer its glass and herbs ({Lends}) for up to {Units} draughts it has {Chance:P0} of brewing, settled at the hand-over and called after {Call} minutes",
+            BotCraftFirst.Running ? "on" : "off",
+            BotCraftFirst.DrawReach,
+            BotCraftFirst.DrawClaim,
+            BotAdvance.Running ? "on" : "off",
+            BotAdvance.MostUnits,
+            BotAdvance.LeastChance,
+            BotAdvance.CallMs / 60000
+        );
+
+        logger.Information(
+            "Supplies from our own benches, sold hand to hand: a weaver walks to the flock with the least road per sheep within {Pasture} tiles and its leash, gathers up to {Wool} wool, spins and weaves at {Looms}, and keeps cloth over {Keep} to sell; a smith works at {Forges}; a tinker short of iron and a fletcher short of feathers say so aloud and wait for a carrier; what a maker makes for an order rides in its pack to whoever ordered it",
             BotWeaver.PastureReach,
             BotWeave.WoolAfield,
+            BotLooms.WorkshopsInBritain ? "Britain's wheels and looms" : "the nearest wheel and loom",
             BotSew.Bolt * 2,
-            BotAuction.MadeUncapped
+            BotSmith.WorkshopsInBritain ? "Britain's forges" : "the nearest forge"
         );
 
     }
@@ -93,6 +107,8 @@ public sealed class BotCraftModule : BotModule
         BotSmith.Forget();
         BotFletcher.Forget();
         BotAlchemist.Forget();
+        BotAdvance.Forget();
+        BotCraftFirst.Forget();
         BotCook.Forget();
         BotBake.Forget();
         BotMeal.Forget();

@@ -421,6 +421,100 @@ public static class BotGates
         return BotStep.Ground(map, at.X, at.Y, at.Z, BotStep.GroundReach, out floor) && floor < at.Z;
     }
 
+    public static bool Unwedge(Mobile body)
+    {
+        var map = body?.Map;
+
+        if (map == null || map == Map.Internal || !body.Alive)
+        {
+            return false;
+        }
+
+        var now = Core.TickCount;
+
+        if (_wedged.TryGetValue(body.Serial, out var last) && now - last < UnwedgeMs)
+        {
+            return false;
+        }
+
+        var at = body.Location;
+        var z = (sbyte)Math.Clamp(at.Z, sbyte.MinValue, sbyte.MaxValue);
+
+        if (BotStep.Ground(map, at.X, at.Y, z, 1, out _) && Standable(map, at.X, at.Y, z))
+        {
+            return false;
+        }
+
+        _wedged[body.Serial] = now;
+
+        if (Aloft(map, at, out var under) && Standable(map, at.X, at.Y, under) && Alight(body))
+        {
+            Unwedged++;
+
+            return true;
+        }
+
+        for (var r = 1; r <= UnwedgeReach; r++)
+        {
+            for (var dx = -r; dx <= r; dx++)
+            {
+                for (var dy = -r; dy <= r; dy++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r)
+                    {
+                        continue;
+                    }
+
+                    var x = at.X + dx;
+                    var y = at.Y + dy;
+
+                    if (!BotStep.Ground(map, x, y, z, BotStep.GroundReach, out var floor) || !Standable(map, x, y, floor))
+                    {
+                        continue;
+                    }
+
+                    body.MoveToWorld(new Point3D(x, y, floor), map);
+                    Unwedged++;
+
+                    if (Unwedged <= SayAlighted)
+                    {
+                        logger.Information(
+                            "Gates: {Name} stood at {From}, where nothing stands, and has been set on the floor at ({X}, {Y}, {Z})",
+                            body.Name,
+                            at,
+                            x,
+                            y,
+                            floor
+                        );
+                    }
+
+                    return true;
+                }
+            }
+        }
+
+        Unwedgeable++;
+
+        return false;
+    }
+
+    private static bool Standable(Map map, int x, int y, int z)
+    {
+        var k = BotReachMap.Class(map, x, y, z);
+
+        return k is not (BotReachClass.Blocked or BotReachClass.Water);
+    }
+
+    public static int UnwedgeReach { get; set; } = 2;
+
+    public static int UnwedgeMs { get; set; } = 10000;
+
+    public static long Unwedged { get; private set; }
+
+    public static long Unwedgeable { get; private set; }
+
+    private static readonly Dictionary<Serial, long> _wedged = [];
+
     public static bool Alight(Mobile body)
     {
         var map = body?.Map;
@@ -666,6 +760,58 @@ public static class BotGates
         return null;
     }
 
+    public static Gate MoongateNear(Point3D at, Point3D toward, int reach)
+    {
+        Gate best = null;
+        var bestWay = Away(at, toward);
+
+        for (var i = 0; i < _gates.Count; i++)
+        {
+            var gate = _gates[i];
+
+            if (!gate.Moongate || Away(at, gate.From) > reach)
+            {
+                continue;
+            }
+
+            var way = Away(at, gate.From) + Away(gate.To, toward);
+
+            if (way < bestWay)
+            {
+                best = gate;
+                bestWay = way;
+            }
+        }
+
+        return best;
+    }
+
+    public static Gate MoongateAt(Point3D at, Point3D toward)
+    {
+        Gate best = null;
+        var bestAway = Away(at, toward);
+
+        for (var i = 0; i < _gates.Count; i++)
+        {
+            var gate = _gates[i];
+
+            if (!gate.Moongate || gate.From.X != at.X || gate.From.Y != at.Y)
+            {
+                continue;
+            }
+
+            var away = Away(gate.To, toward);
+
+            if (away < bestAway)
+            {
+                best = gate;
+                bestAway = away;
+            }
+        }
+
+        return best;
+    }
+
     public static bool Travel(Mobile body, Gate gate)
     {
         var map = body?.Map;
@@ -879,7 +1025,142 @@ public static class BotGates
             return BotDungeon.Under(a) == BotDungeon.Under(b);
         }
 
-        return la == lb || First(la, a, lb, b) != null;
+        if (la == lb)
+        {
+            return true;
+        }
+
+        if (_refusedWays.Count > 0 && Shut(la, lb))
+        {
+            JoinsDenied++;
+
+            return false;
+        }
+
+        return First(la, a, lb, b) != null;
+    }
+
+    public static int RefuseTimes { get; set; } = 2;
+
+    public static int RefuseWindowMs { get; set; } = 300000;
+
+    public static int RefuseShutMs { get; set; } = 600000;
+
+    public static long WaysRefused { get; private set; }
+
+    public static long WaysShut { get; private set; }
+
+    public static long JoinsDenied { get; private set; }
+
+    private static readonly Dictionary<(int From, int To), (int Count, long First, long Until)> _refusedWays = [];
+
+    public static void WalkRefused(Map map, Point3D from, Point3D to)
+    {
+        if (!Running || RefuseTimes <= 0 || from.X < Edge || !Ensure(map) || map != _map)
+        {
+            return;
+        }
+
+        var la = LandOf(map, from);
+        var lb = LandOf(map, to);
+
+        if (la < 0 || lb < 0 || la == lb || Shut(la, lb) || First(la, from, lb, to) == null)
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+
+        if (_refusedWays.Count >= 1024)
+        {
+            _refusedWays.Clear();
+        }
+
+        WaysRefused++;
+
+        var key = (la, lb);
+        var (count, first, _) = _refusedWays.TryGetValue(key, out var kept) && now - kept.First < RefuseWindowMs ? kept : (0, now, 0L);
+
+        count++;
+
+        if (count >= Math.Max(1, RefuseTimes))
+        {
+            WaysShut++;
+            _refusedWays[key] = (count, first, now + RefuseShutMs);
+
+            logger.Information(
+                "The way from land {From} to land {To} was refused {Count} times in {Seconds}s (last from ({X}, {Y}, {Z}) to ({TX}, {TY}, {TZ})); the gates read it shut for {Minutes} minutes",
+                la,
+                lb,
+                count,
+                (now - first) / 1000,
+                from.X,
+                from.Y,
+                from.Z,
+                to.X,
+                to.Y,
+                to.Z,
+                RefuseShutMs / 60000
+            );
+
+            return;
+        }
+
+        _refusedWays[key] = (count, first, 0L);
+    }
+
+    public static void WalkedThrough(Map map, Point3D gate)
+    {
+        if (_refusedWays.Count == 0 || map != _map)
+        {
+            return;
+        }
+
+        var la = LandOf(map, gate);
+
+        if (la < 0)
+        {
+            return;
+        }
+
+        _openedWays.Clear();
+
+        foreach (var key in _refusedWays.Keys)
+        {
+            if (key.From == la)
+            {
+                _openedWays.Add(key);
+            }
+        }
+
+        for (var i = 0; i < _openedWays.Count; i++)
+        {
+            _refusedWays.Remove(_openedWays[i]);
+            WaysOpened++;
+        }
+    }
+
+    private static readonly List<(int From, int To)> _openedWays = [];
+
+    public static long WaysOpened { get; private set; }
+
+    private static bool Shut(int la, int lb) =>
+        _refusedWays.TryGetValue((la, lb), out var kept) && kept.Until != 0 && Core.TickCount - kept.Until < 0;
+
+    private static int WaysShutNow()
+    {
+        var now = Core.TickCount;
+        var shut = 0;
+
+        foreach (var kept in _refusedWays.Values)
+        {
+            if (kept.Until != 0 && now - kept.Until < 0)
+            {
+                shut++;
+            }
+        }
+
+        return shut;
     }
 
     public static bool Next(Map map, Point3D from, Point3D to, out Gate gate)
@@ -895,6 +1176,11 @@ public static class BotGates
         var lb = LandOf(map, to);
 
         if (la < 0 || lb < 0 || la == lb)
+        {
+            return false;
+        }
+
+        if (_refusedWays.Count > 0 && Shut(la, lb))
         {
             return false;
         }
@@ -1107,7 +1393,7 @@ public static class BotGates
                 ? "the gates have not been read"
                 : !Landed
                     ? $"{_gates.Count} gates read from {Tiles} teleporters, waiting for the graph's components"
-                    : $"{_gates.Count} gates from {Tiles} teleporters and {MoongatesRead} moongates ({MoongatesRaised} raised; {MoonTrips} walkers put through a moongate, {MoonRefused} refused by one; {Nudged} stepped through a teleporter that had not fired for them, {NudgeRefused} refused by it; {Floating} put a walker down above the floor, {Alighted} walkers set on it) ({Landless} with an end the graph cannot place; lands asked again {Relanded} times, {Moved} gates renamed); {Asked} land-to-land routes asked, {Routed} found; {Passed} walkers put through a gate, {Refused} stood on one and stayed";
+                    : $"{_gates.Count} gates from {Tiles} teleporters and {MoongatesRead} moongates ({MoongatesRaised} raised; {MoonTrips} walkers put through a moongate, {MoonRefused} refused by one; {Nudged} stepped through a teleporter that had not fired for them, {NudgeRefused} refused by it; {Floating} put a walker down above the floor, {Alighted} walkers set on it) ({Landless} with an end the graph cannot place; lands asked again {Relanded} times, {Moved} gates renamed); {Asked} land-to-land routes asked, {Routed} found; {Passed} walkers put through a gate, {Refused} stood on one and stayed; {WaysRefused} walks out of the dungeon block refused across a gate the lands joined, {WaysShut} ways shut by {Math.Max(1, RefuseTimes)} of them in {RefuseWindowMs / 60000} minutes for {RefuseShutMs / 60000} ({WaysShutNow()} shut now, {WaysOpened} opened again by a walker put through), {JoinsDenied} answers of joined turned to no while shut";
 
     public static string Near(Map map, Point3D at, int radius)
     {
@@ -1154,5 +1440,13 @@ public static class BotGates
         Passed = 0;
         Floating = 0;
         Alighted = 0;
+        Unwedged = 0;
+        Unwedgeable = 0;
+        _wedged.Clear();
+        _refusedWays.Clear();
+        WaysRefused = 0;
+        WaysShut = 0;
+        WaysOpened = 0;
+        JoinsDenied = 0;
     }
 }

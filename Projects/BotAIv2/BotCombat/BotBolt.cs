@@ -69,8 +69,26 @@ public sealed class BotBolt : BotDeed
             FellWalking++;
         }
 
+        if (ForTown)
+        {
+            FellOnWay++;
+        }
+
+        var poison = (body as BotMobile)?.PoisonAtDeath ?? body.Poison;
+        var cures = BotMend.Bottles(body, BotPotionKind.Cure);
+
+        if (poison != null)
+        {
+            FellPoisoned++;
+
+            if (cures > 0)
+            {
+                FellWithCure++;
+            }
+        }
+
         logger.Information(
-            "{Name} died running from ({FromX}, {FromY}) at ({X}, {Y}), {Tiles} tiles in {Seconds}s: {Walked} of {Beats} beats at a walk, stamina at least {Least} of {StamMax}{Mounted}",
+            "{Name} died running from ({FromX}, {FromY}) at ({X}, {Y}), {Tiles} tiles in {Seconds}s: {Walked} of {Beats} beats at a walk, stamina at least {Least} of {StamMax}{Mounted}; poison {Poison}, {Cures} cure bottles in the pack",
             body.Name,
             _from.X,
             _from.Y,
@@ -82,7 +100,9 @@ public sealed class BotBolt : BotDeed
             _beats,
             _leastStam == int.MaxValue ? body.Stam : _leastStam,
             body.StamMax,
-            body.Mounted ? ", mounted" : ""
+            body.Mounted ? ", mounted" : "",
+            poison == null ? "none" : $"level {poison.Level}",
+            cures
         );
     }
 
@@ -198,6 +218,53 @@ public sealed class BotBolt : BotDeed
         _least = Math.Max(0, leastMs);
     }
 
+    public BotBolt(Map map, Point3D from, Point3D haven, string town, int tiles) : this(map, from)
+    {
+        _haven = haven;
+        _town = town ?? "a town";
+        _havenTiles = tiles;
+    }
+
+    private Point3D _haven;
+
+    private string _town;
+
+    private int _havenTiles;
+
+    private bool _reached;
+
+    private long _calledTick;
+
+    private Mobile _watched;
+
+    private bool _guardKilled;
+
+    public bool ForTown => _haven != Point3D.Zero;
+
+    public string Town => _town;
+
+    public static int HavenMs { get; set; } = 150000;
+
+    public static int GuardsEveryMs { get; set; } = 3000;
+
+    public static bool HoldsSwing { get; set; } = true;
+
+    public static long Runs { get; private set; }
+
+    public static long Reached { get; private set; }
+
+    public static long GuardsCalled { get; private set; }
+
+    public static long RunnerCallsBlind { get; private set; }
+
+    public static long RunnerGuardKills { get; private set; }
+
+    public static long FellOnWay { get; private set; }
+
+    public static long UnshakenInTown { get; private set; }
+
+    public static long SwingsHeld { get; set; }
+
     public override string Kind => Trade;
 
     public override bool Braves => true;
@@ -205,6 +272,20 @@ public sealed class BotBolt : BotDeed
     public override bool Resumes => true;
 
     public override bool Repeats(BotDeed other) => other is BotBolt;
+
+    internal Action Began { get; init; }
+
+    public override void Taken(IBotWilful bot)
+    {
+        base.Taken(bot);
+
+        if (ForTown)
+        {
+            Runs++;
+        }
+
+        Began?.Invoke();
+    }
 
     public override Map Map => _map;
 
@@ -222,7 +303,10 @@ public sealed class BotBolt : BotDeed
 
     public override int Made => 0;
 
-    public override string Stage => _to == Point3D.Zero ? "getting away" : $"getting away to {_to}";
+    public override string Stage =>
+        ForTown
+            ? _reached ? $"in {_town}, calling the guards" : $"running for {_town}"
+            : _to == Point3D.Zero ? "getting away" : $"getting away to {_to}";
 
     public static int ClearCalmMs { get; set; } = 4000;
 
@@ -337,6 +421,11 @@ public sealed class BotBolt : BotDeed
             worst = _pursuer;
         }
 
+        if (ForTown)
+        {
+            return RunForTown(bot, body, worst, now);
+        }
+
         if (worst == null && now - _begun >= _least)
         {
             BotFugitive.Cleared(body);
@@ -346,7 +435,14 @@ public sealed class BotBolt : BotDeed
 
         if (now - _begun >= GiveUpMs)
         {
-            return BotDoing.Done(worst == null ? $"ran for {(now - _begun) / 1000}s" : $"could not shake {worst.Name}");
+            if (worst == null)
+            {
+                return BotDoing.Done($"ran for {(now - _begun) / 1000}s");
+            }
+
+            Unshaken++;
+
+            return BotDoing.Failed($"could not shake {worst.Name}");
         }
 
         if (_to == Point3D.Zero || body.InRange(_to, 1))
@@ -357,7 +453,10 @@ public sealed class BotBolt : BotDeed
 
         if (_to == Point3D.Zero)
         {
-            return BotDoing.Failed($"cornered by {worst.Name}");
+            EndedCornered++;
+            BotFugitive.CorneredRun(body);
+
+            return BotDoing.Failed($"cornered by {worst?.Name ?? "nothing it could name"}");
         }
 
         if (!_saidStuck && now - _movedTick >= StuckMs)
@@ -390,6 +489,132 @@ public sealed class BotBolt : BotDeed
         return BotDoing.Walk(_map, _to, BotArrival.Within(1), $"away from {worst.Name}");
     }
 
+    private BotDoing RunForTown(IBotWilful bot, Mobile body, Mobile worst, long now)
+    {
+        var inTown = BotHaven.Guarded(_map, body.Location);
+
+        if (inTown && !_reached)
+        {
+            _reached = true;
+            Reached++;
+
+            logger.Information(
+                "{Name} reached {Town} at ({X}, {Y}) after {Seconds}s of running from ({FromX}, {FromY}), {Tiles} tiles; {Followed}",
+                body.Name,
+                _town,
+                body.X,
+                body.Y,
+                (now - _begun) / 1000,
+                _from.X,
+                _from.Y,
+                _havenTiles,
+                worst == null ? "nothing follows" : $"{worst.Name} still on it"
+            );
+
+            if (worst != null)
+            {
+                BotHaven.Reached(body, _town);
+            }
+        }
+
+        if (worst != null && !ReferenceEquals(worst, _watched))
+        {
+            _watched = worst;
+        }
+
+        if (!_guardKilled && _watched is { } watched && (watched.Deleted || !watched.Alive) && watched.LastKiller is Server.Mobiles.BaseGuard)
+        {
+            _guardKilled = true;
+            RunnerGuardKills++;
+
+            logger.Information("{Name}'s pursuer {Foe} was cut down by the guards of {Town}", body.Name, watched.Name, _town);
+        }
+
+        if (worst == null && now - _begun >= _least)
+        {
+            BotFugitive.Cleared(body);
+
+            return BotDoing.Done(
+                _reached
+                    ? $"reached {_town}: {(_guardKilled ? "the guards cut it down" : "nothing follows")}"
+                    : $"clear of it on the way to {_town}"
+            );
+        }
+
+        if (now - _begun >= HavenMs)
+        {
+            if (worst == null)
+            {
+                return BotDoing.Done($"ran for {(now - _begun) / 1000}s towards {_town}");
+            }
+
+            Unshaken++;
+
+            if (inTown)
+            {
+                UnshakenInTown++;
+            }
+
+            return BotDoing.Failed($"could not shake {worst.Name} {(inTown ? "in" : "on the way to")} {_town}");
+        }
+
+        if (inTown && worst != null && now - _calledTick >= GuardsEveryMs)
+        {
+            _calledTick = now;
+
+            var aggressed = BotHaven.Aggressed(body, worst);
+
+            if (BotHaven.CallGuards(body, worst, $"on a run for {_town}"))
+            {
+                GuardsCalled++;
+
+                if (aggressed)
+                {
+                    RunnerCallsBlind++;
+                }
+            }
+        }
+
+        var to = _haven;
+
+        if (inTown && worst != null && body.InRange(_haven, 2))
+        {
+            var deeper = BotTowns.Of(body.Location)?.Square ?? _haven;
+
+            if (deeper != Point3D.Zero && !body.InRange(deeper, 2))
+            {
+                to = deeper;
+            }
+            else
+            {
+                return BotDoing.Work($"calling the guards of {_town} on {worst.Name}");
+            }
+        }
+
+        _to = to;
+
+        if (!_saidStuck && now - _movedTick >= StuckMs)
+        {
+            _saidStuck = true;
+            Stuck++;
+
+            logger.Information(
+                "{Name} has not taken a step in {Seconds}s of running for {Town} from {Foe} towards {To}: stamina {Stam} of {StamMax}{Paralyzed}{Frozen}",
+                body.Name,
+                (now - _movedTick) / 1000,
+                _town,
+                worst?.Name ?? "nothing it can see",
+                to,
+                body.Stam,
+                body.StamMax,
+                body.Paralyzed ? ", paralyzed" : "",
+                body.Frozen ? ", frozen" : ""
+            );
+        }
+
+        return BotDoing.Walk(_map, to, BotArrival.Within(2), $"for {_town} away from {worst?.Name ?? "it"}");
+    }
+
     private readonly List<Point3D> _refused = [];
 
     public override bool Bend(IBotWilful bot)
@@ -399,6 +624,16 @@ public sealed class BotBolt : BotDeed
         if (body == null)
         {
             return false;
+        }
+
+        if (ForTown)
+        {
+            BotHaven.Refused();
+            _haven = Point3D.Zero;
+            _to = Point3D.Zero;
+            Bent++;
+
+            return true;
         }
 
         if (_to != Point3D.Zero)
@@ -431,6 +666,51 @@ public sealed class BotBolt : BotDeed
 
     public static long Skirted { get; private set; }
 
+    public static long Unreached { get; private set; }
+
+    public static long DeadlierLandings { get; private set; }
+
+    public static long Unshaken { get; private set; }
+
+    public static long EndedCornered { get; private set; }
+
+    public static long FellPoisoned { get; private set; }
+
+    public static long FellWithCure { get; private set; }
+
+    private static bool Deadlier(Map map, Point3D landing, int standing)
+    {
+        if (BotZones.LevelAt(map, landing.X, landing.Y) != BotZoneLevel.Deadly)
+        {
+            return false;
+        }
+
+        var zone = BotZones.ZoneAt(map, landing.X, landing.Y)?.Id ?? 0;
+
+        if (zone == 0 || zone == standing)
+        {
+            return false;
+        }
+
+        DeadlierLandings++;
+
+        return true;
+    }
+
+    private static bool Sighted(Mobile body, Point3D landing)
+    {
+        if (!BotSight.Covers(body, landing))
+        {
+            return false;
+        }
+
+        SightedLandings++;
+
+        return true;
+    }
+
+    public static long SightedLandings { get; private set; }
+
     private static bool Occupied(Map map, Mobile body, Point3D landing, Mobile from)
     {
         foreach (var creature in map.GetMobilesInRange<Server.Mobiles.BaseCreature>(landing, Clearance))
@@ -445,8 +725,9 @@ public sealed class BotBolt : BotDeed
     }
 
     public static string Describe() =>
-        $"{Fell} flights ended in death ({FellWalking} of them mostly at a walk), {Shed} fleeing bots' detours dropped from the road away, {Stuck} flights {StuckMs / 1000}s without a step, {Pursuits} beats a flight went on past Watch for a blow still landing or a pursuer still coming, {Bent} flights turned another way after a refused road, {Skirted} legs taken a lesser way for something else hostile at the better one's end (within {Clearance}), {Vetoed} retreats refused by the look ahead ({VetMs:F0} ms) before anybody walked, {Tended} bandages and bottles taken on the run, "
-        + $"{TowardAllies} retreats bent towards allies and {TowardHome} towards home (×{HelpWeight:F2})";
+        $"{Fell} flights ended in death ({FellWalking} of them mostly at a walk; {FellPoisoned} poisoned when they fell, {FellWithCure} of those with a cure bottle unopened), {Unshaken} flights failed for not shaking what followed, {EndedCornered} failed cornered after they began ({BotFugitive.CorneredRested} flights not offered within {BotFugitive.CorneredRestMs / 1000}s of a bot's last cornered one), {Unreached} retreats passed over for landing on ground the reach map says the runner cannot reach and {DeadlierLandings} on the first pass for landing in a deadly patrol it did not stand in ({SightedLandings} in the reach of a creature it had seen and could not beat), {Shed} fleeing bots' detours dropped from the road away, {Stuck} flights {StuckMs / 1000}s without a step, {Pursuits} beats a flight went on past Watch for a blow still landing or a pursuer still coming, {Bent} flights turned another way after a refused road, {Skirted} legs taken a lesser way for something else hostile at the better one's end (within {Clearance}), {Vetoed} retreats refused by the look ahead ({VetMs:F0} ms) before anybody walked, {Tended} bandages and bottles taken on the run, "
+        + $"{TowardAllies} retreats bent towards allies and {TowardHome} towards home (×{HelpWeight:F2}); "
+        + $"runs for a town: {Runs} begun, {Reached} reached guarded ground, {GuardsCalled} calls for the guards ({RunnerCallsBlind} of them while the runner stood in its pursuer's aggressors, which the guards answer only for a hostile creature), {RunnerGuardKills} runners' pursuers cut down by the guards, {FellOnWay} died on the way, {UnshakenInTown} could not shake it in the town inside {HavenMs / 1000}s, {SwingsHeld} swings held by a bot outmatched that had not struck its attacker ({(HoldsSwing ? "on" : "off")}); {BotHaven.Describe()}";
 
     public static long Tended { get; private set; }
 
@@ -506,6 +787,13 @@ public sealed class BotBolt : BotDeed
                     continue;
                 }
 
+                if (BotReachMap.RefusesTile(map, body.Location, back))
+                {
+                    Unreached++;
+
+                    continue;
+                }
+
                 var rank = (int)(1000.0 * (score / (double)step + (helped ? HelpWeight * (wx * hx + wy * hy) : 0.0)));
                 var at = found;
 
@@ -521,13 +809,15 @@ public sealed class BotBolt : BotDeed
 
             var skirting = false;
 
+            var standing = BotZones.ZoneAt(map, body.X, body.Y)?.Id ?? 0;
+
             for (var pass = 0; pass < 2; pass++)
             {
                 for (var i = 0; i < found; i++)
                 {
                     var back = ways[i].Back;
 
-                    if (pass == 0 && Occupied(map, body, back, from))
+                    if (pass == 0 && (Occupied(map, body, back, from) || Deadlier(map, back, standing) || Sighted(body, back)))
                     {
                         skirting = true;
 

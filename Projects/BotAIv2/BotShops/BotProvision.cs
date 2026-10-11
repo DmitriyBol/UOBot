@@ -39,7 +39,7 @@ public static class BotProvision
 {
     public static bool Running { get; set; } = true;
 
-    public static double BandageShare { get; set; } = 0.5;
+    public static double BandageShare { get; set; } = 0.25;
 
     public static int Bottles { get; set; } = 1;
 
@@ -74,6 +74,95 @@ public static class BotProvision
     public static bool Fit(Mobile body, out string why) => Check(body, true, out why);
 
     public static bool Short(Mobile body) => !Check(body, false, out _);
+
+    public static int BandageGuess { get; set; } = 5;
+
+    public static int BottleGuess { get; set; } = 15;
+
+    public static int HerbGuess { get; set; } = 3;
+
+    public static int ScrollGuess { get; set; } = 10;
+
+    public static int Bill(Mobile body)
+    {
+        if (!Running || body is not BotMobile bot || bot.Class is not { } klass || bot.Backpack is not { } pack)
+        {
+            return 0;
+        }
+
+        var bill = 0;
+        var kit = klass.Kit;
+
+        if (kit.Bandages > 0)
+        {
+            var need = (int)Math.Ceiling(kit.Bandages * BandageShare) - pack.GetAmount(typeof(Bandage));
+
+            if (need > 0)
+            {
+                bill += need * BotMarket.Worth(typeof(Bandage), BandageGuess);
+            }
+        }
+
+        var bottles = BotOutfit.PotionsFor(klass);
+
+        for (var i = 0; i < bottles.Count; i++)
+        {
+            var (kind, many) = bottles[i];
+            var need = Math.Min(many, Bottles) - pack.GetAmount(kind);
+
+            if (need > 0)
+            {
+                bill += need * BotMarket.Worth(kind, BottleGuess);
+            }
+        }
+
+        if (kit.Reagents > 0)
+        {
+            Key(bot, klass, _spells);
+
+            for (var s = 0; s < _spells.Count; s++)
+            {
+                var herbs = Herbs(bot, _spells[s]);
+
+                for (var i = 0; i < herbs.Length; i++)
+                {
+                    var need = Casts - pack.GetAmount(herbs[i]);
+
+                    if (need > 0)
+                    {
+                        bill += need * BotMarket.Worth(herbs[i], HerbGuess);
+                    }
+                }
+            }
+        }
+
+        return bill;
+    }
+
+    public static int CastCost(Mobile bot, int spell)
+    {
+        if (bot == null || spell < 0)
+        {
+            return 1;
+        }
+
+        if (BotStrike.Scroll(bot, spell) != null)
+        {
+            var scroll = BotGrimoire.ScrollFor(spell);
+
+            return Math.Max(1, scroll == null ? ScrollGuess : BotMarket.Worth(scroll, ScrollGuess));
+        }
+
+        var herbs = Herbs(bot, spell);
+        var cost = 0;
+
+        for (var i = 0; i < herbs.Length; i++)
+        {
+            cost += BotMarket.Worth(herbs[i], HerbGuess);
+        }
+
+        return Math.Max(1, cost);
+    }
 
     private static bool Check(Mobile body, bool count, out string why)
     {
@@ -256,13 +345,91 @@ public static class BotProvision
         return herbs;
     }
 
+    private static void Armed(Mobile bot, BotClass klass, List<int> spells)
+    {
+        Key(bot, klass, spells);
+
+        if (klass.Role == BotRole.Caster)
+        {
+            return;
+        }
+
+        var attack = BotStrike.Stocked(bot);
+
+        if (attack >= 0 && !spells.Contains(attack))
+        {
+            spells.Add(attack);
+        }
+    }
+
+    public static int DoorFloor(Mobile body, Type kind) => Floor(body, kind, false);
+
+    public static int Floor(Mobile body, Type kind) => Floor(body, kind, true);
+
+    private static int Floor(Mobile body, Type kind, bool armed)
+    {
+        if (!Running || kind == null || body is not BotMobile bot || bot.Class is not { } klass)
+        {
+            return 0;
+        }
+
+        var kit = klass.Kit;
+
+        if (kind == typeof(Bandage))
+        {
+            return kit.Bandages > 0 ? (int)Math.Ceiling(kit.Bandages * BandageShare) : 0;
+        }
+
+        var bottles = BotOutfit.PotionsFor(klass);
+
+        for (var i = 0; i < bottles.Count; i++)
+        {
+            if (bottles[i].Item1 == kind)
+            {
+                return Math.Min(bottles[i].Item2, Bottles);
+            }
+        }
+
+        if (bot.Bond is { } bond && bond.Weapon is { Ammunition: { } quiver } && quiver == kind)
+        {
+            return (int)Math.Ceiling(BotBinding.BoundCount(quiver, bond) * AmmoShare);
+        }
+
+        if (kit.Reagents > 0 && typeof(BaseReagent).IsAssignableFrom(kind))
+        {
+            if (armed)
+            {
+                Armed(bot, klass, _spells);
+            }
+            else
+            {
+                Key(bot, klass, _spells);
+            }
+
+            for (var s = 0; s < _spells.Count; s++)
+            {
+                var herbs = Herbs(bot, _spells[s]);
+
+                for (var i = 0; i < herbs.Length; i++)
+                {
+                    if (herbs[i] == kind)
+                    {
+                        return Casts;
+                    }
+                }
+            }
+        }
+
+        return 0;
+    }
+
     public static bool Consumable(Type kind) =>
         kind != null && (kind == typeof(Bandage) || typeof(BasePotion).IsAssignableFrom(kind)
             || typeof(BaseReagent).IsAssignableFrom(kind) || kind == typeof(Arrow) || kind == typeof(Bolt));
 
     public static bool Fund(Mobile body, int cost)
     {
-        var short0 = cost - BotYield.Wealth(body);
+        var short0 = cost - BotYield.Spendable(body);
 
         if (short0 <= 0)
         {

@@ -97,7 +97,7 @@ public sealed class BotDashboardGump : DynamicGump
 
     private readonly List<BotMobile> _bots = [];
 
-    private readonly List<BotListing> _stalls = [];
+    private readonly List<(BotStorefront Front, Type Kind, int Units, int Ask)> _stalls = [];
 
     private readonly List<BotWant> _wants = [];
 
@@ -329,8 +329,8 @@ public sealed class BotDashboardGump : DynamicGump
         builder.AddLabelCropped(848, 44, 60, 20, Head, "purse");
         builder.AddLabelCropped(914, 44, 68, 20, Head, "bank");
         builder.AddLabelCropped(988, 44, 40, 20, Head, "box");
-        builder.AddLabelCropped(1034, 44, 50, 20, Head, "stalls");
-        builder.AddLabelCropped(1090, 44, 76, 20, Head, "onsale");
+        builder.AddLabelCropped(1034, 44, 50, 20, Head, "goods");
+        builder.AddLabelCropped(1090, 44, 76, 20, Head, "worth");
 
         for (var i = 0; i < _bots.Count; i++)
         {
@@ -351,8 +351,8 @@ public sealed class BotDashboardGump : DynamicGump
                 builder.AddLabelCropped(848, y, 60, 20, Offline, $"{Purse(bot)}");
                 builder.AddLabelCropped(914, y, 68, 20, Offline, $"{Banker.GetBalance(bot)}");
                 builder.AddLabelCropped(988, y, 40, 20, Offline, $"{bot.BankBox?.TotalItems ?? 0}");
-                builder.AddLabelCropped(1034, y, 50, 20, Offline, $"{BotAuction.StallsOf(bot)}");
-                builder.AddLabelCropped(1090, y, 50, 20, Offline, $"{BotAuction.WorthOf(bot)}");
+                builder.AddLabelCropped(1034, y, 50, 20, Offline, $"{BotShopkeep.Look(bot).Units}");
+                builder.AddLabelCropped(1090, y, 50, 20, Offline, $"{BotShopkeep.Look(bot).Worth}");
 
                 continue;
             }
@@ -368,8 +368,8 @@ public sealed class BotDashboardGump : DynamicGump
             builder.AddLabelCropped(848, y, 60, 20, Ink, $"{Purse(bot)}");
             builder.AddLabelCropped(914, y, 68, 20, Ink, $"{Banker.GetBalance(bot)}");
             builder.AddLabelCropped(988, y, 40, 20, Ink, $"{bot.BankBox?.TotalItems ?? 0}");
-            builder.AddLabelCropped(1034, y, 50, 20, Ink, $"{BotAuction.StallsOf(bot)}");
-            builder.AddLabelCropped(1090, y, 50, 20, Ink, $"{BotAuction.WorthOf(bot)}");
+            builder.AddLabelCropped(1034, y, 50, 20, Ink, $"{BotShopkeep.Look(bot).Units}");
+            builder.AddLabelCropped(1090, y, 50, 20, Ink, $"{BotShopkeep.Look(bot).Worth}");
 
             builder.AddButton(1146, y, 4005, 4007, 100 + i);
         }
@@ -386,7 +386,7 @@ public sealed class BotDashboardGump : DynamicGump
             );
         }
 
-        var (units, worth) = BotAuction.Offered();
+        var (units, worth) = Shown();
 
         builder.AddLabelCropped(14, Height - 52, 130, 20, Ink, $"{BotPopulation.Count} bots, {BotPopulation.Living} alive");
         builder.AddLabelCropped(150, Height - 52, 150, 20, Offline, $"{BotPopulation.Away.Count} offline, resting");
@@ -398,7 +398,7 @@ public sealed class BotDashboardGump : DynamicGump
             1010,
             20,
             Ink,
-            $"market: {BotAuction.Stalls} stalls, {units} things worth {worth}gp, {BotAuction.Asks} wants"
+            $"market: {BotShopkeep.OpenCount} shops open by the bank showing {units} things worth {worth}gp, {BotMarket.Asks} wants said"
         );
     }
 
@@ -406,38 +406,28 @@ public sealed class BotDashboardGump : DynamicGump
     {
         builder.AddLabelCropped(14, 44, 230, 20, Head, "item");
         builder.AddLabelCropped(250, 44, 64, 20, Head, "amount");
-        builder.AddLabelCropped(320, 44, 64, 20, Head, "price");
+        builder.AddLabelCropped(320, 44, 64, 20, Head, "ask");
         builder.AddLabelCropped(390, 44, 64, 20, Head, "worth");
-        builder.AddLabelCropped(460, 44, 54, 20, Head, "sold");
-        builder.AddLabelCropped(520, 44, 70, 20, Head, "earned");
-        builder.AddLabelCropped(596, 44, 68, 20, Head, "moves");
-        builder.AddLabelCropped(670, 44, 496, 20, Head, "seller");
+        builder.AddLabelCropped(460, 44, 200, 20, Head, "keeper");
+        builder.AddLabelCropped(670, 44, 160, 20, Head, "town");
 
         for (var i = 0; i < _stalls.Count; i++)
         {
-            var stall = _stalls[i];
+            var (front, kind, units, ask) = _stalls[i];
             var y = 66 + i * (RowHeight + 8);
+            var look = BotWant.Look(kind);
 
-            builder.AddItem(20, y - 4, stall.ItemId, stall.Hue);
+            builder.AddItem(20, y - 4, look.ItemId, look.Hue);
 
-            builder.AddLabelCropped(64, y, 180, 20, Ink, stall.Label);
-            builder.AddLabelCropped(250, y, 64, 20, Ink, $"{stall.Amount}");
-            builder.AddLabelCropped(320, y, 64, 20, Ink, $"{stall.Price}");
-            builder.AddLabelCropped(390, y, 64, 20, Ink, $"{stall.Worth}");
-            builder.AddLabelCropped(460, y, 54, 20, Ink, $"{stall.Sold}");
-            builder.AddLabelCropped(520, y, 70, 20, Ink, $"{stall.Earned}");
-            builder.AddLabelCropped(
-                596,
-                y,
-                68,
-                20,
-                stall.Raises >= stall.Cuts ? Good : Bad,
-                $"+{stall.Raises}/-{stall.Cuts}"
-            );
-            builder.AddLabelCropped(670, y, 150, 20, Ink, stall.Seller?.Self?.Name ?? "gone");
+            builder.AddLabelCropped(64, y, 180, 20, Ink, look.Label);
+            builder.AddLabelCropped(250, y, 64, 20, Ink, $"{units}");
+            builder.AddLabelCropped(320, y, 64, 20, Ink, $"{ask}");
+            builder.AddLabelCropped(390, y, 64, 20, Ink, $"{units * ask}");
+            builder.AddLabelCropped(460, y, 200, 20, Ink, front.Keeper?.Name ?? "gone");
+            builder.AddLabelCropped(670, y, 160, 20, Ink, front.Town);
 
             builder.AddButton(838, y, 4005, 4007, 200 + i);
-            builder.AddLabelCropped(858, y, 308, 20, Ink, "buy");
+            builder.AddLabelCropped(858, y, 308, 20, Ink, "go to the keeper");
         }
 
         if (_stalls.Count == 0)
@@ -448,11 +438,11 @@ public sealed class BotDashboardGump : DynamicGump
                 1152,
                 20,
                 Bad,
-                "Nothing on offer yet. Bots list what they produce when they bank it"
+                "No shop is open by the bank. Makers and gatherers keep shop when they hold what the island asks for"
             );
         }
 
-        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotAuction.Describe());
+        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotMarket.Describe());
     }
 
     private void NeedsPage(ref DynamicGumpBuilder builder)
@@ -460,11 +450,10 @@ public sealed class BotDashboardGump : DynamicGump
         builder.AddLabelCropped(14, 44, 230, 20, Head, "wanted");
         builder.AddLabelCropped(250, 44, 54, 20, Head, "count");
         builder.AddLabelCropped(310, 44, 54, 20, Head, "offer");
-        builder.AddLabelCropped(370, 44, 60, 20, Head, "down");
+        builder.AddLabelCropped(370, 44, 60, 20, Head, "coming");
         builder.AddLabelCropped(436, 44, 54, 20, Head, "filled");
         builder.AddLabelCropped(496, 44, 58, 20, Head, "paid");
         builder.AddLabelCropped(560, 44, 66, 20, Head, "moves");
-        builder.AddLabelCropped(632, 44, 48, 20, Head, "held");
         builder.AddLabelCropped(686, 44, 480, 20, Head, "buyer");
 
         for (var i = 0; i < _wants.Count; i++)
@@ -477,12 +466,11 @@ public sealed class BotDashboardGump : DynamicGump
             builder.AddLabelCropped(64, y, 180, 20, Ink, want.Label);
             builder.AddLabelCropped(250, y, 54, 20, want.IsOpen ? Ink : Bad, $"{want.Amount}");
             builder.AddLabelCropped(310, y, 54, 20, Ink, $"{want.Offer}");
-            builder.AddLabelCropped(370, y, 60, 20, want.Escrow >= want.Offer ? Ink : Bad, $"{want.Escrow}");
+            builder.AddLabelCropped(370, y, 60, 20, want.Coming > 0 ? Good : Ink, $"{want.Coming}");
             builder.AddLabelCropped(436, y, 54, 20, Ink, $"{want.Filled}");
             builder.AddLabelCropped(496, y, 58, 20, Ink, $"{want.Paid}");
 
             builder.AddLabelCropped(560, y, 66, 20, want.Raises > want.Cuts ? Bad : Good, $"+{want.Raises}/-{want.Cuts}");
-            builder.AddLabelCropped(632, y, 48, 20, want.Waiting > 0 ? Good : Ink, $"{want.Waiting}");
             builder.AddLabelCropped(686, y, 150, 20, Ink, want.Buyer?.Self?.Name ?? "gone");
         }
 
@@ -491,7 +479,7 @@ public sealed class BotDashboardGump : DynamicGump
             builder.AddLabelCropped(14, 68, 1152, 20, Bad, "Nobody is short of anything they cannot buy off a shelf");
         }
 
-        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotAuction.Describe());
+        builder.AddLabelCropped(14, Height - 34, 1010, 20, Ink, BotMarket.Describe());
     }
 
     private void QuadPage(ref DynamicGumpBuilder builder)
@@ -649,9 +637,9 @@ public sealed class BotDashboardGump : DynamicGump
 
     private void CrownPage(ref DynamicGumpBuilder builder)
     {
-        var (units, worth) = BotAuction.Offered();
+        var (units, worth) = Shown();
 
-        builder.AddLabelCropped(14, 44, 1152, 20, Head, "the city sends for goods");
+        builder.AddLabelCropped(14, 44, 1152, 20, Head, "the city buys at the market");
 
         builder.AddLabelCropped(
             14,
@@ -659,7 +647,7 @@ public sealed class BotDashboardGump : DynamicGump
             1152,
             20,
             Ink,
-            $"The market holds {BotAuction.Stalls} stalls: {units} things the population is asking {worth}gp for."
+            $"The market has {BotShopkeep.OpenCount} shops open by the bank: {units} things their keepers are asking {worth}gp for."
         );
 
         builder.AddLabelCropped(
@@ -668,7 +656,7 @@ public sealed class BotDashboardGump : DynamicGump
             1152,
             20,
             Ink,
-            $"Buying takes {CrownLots} stalls, the longest-standing first, and pays the sellers what they asked."
+            $"Buying takes {CrownLots} lots at the open shops and pays the keepers what they ask, in coin into their packs."
         );
 
         builder.AddLabelCropped(
@@ -681,7 +669,7 @@ public sealed class BotDashboardGump : DynamicGump
         );
 
         builder.AddButton(14, 160, 4005, 4007, 8);
-        builder.AddLabelCropped(52, 160, 1114, 20, Head, $"buy {CrownLots} lots from afar");
+        builder.AddLabelCropped(52, 160, 1114, 20, Head, $"buy {CrownLots} lots at the shops by the bank");
 
         builder.AddLabelCropped(14, 200, Width - 28, 20, Ink, $"standing orders: {BotCity.Wants()}");
         builder.AddLabelCropped(
@@ -690,7 +678,7 @@ public sealed class BotDashboardGump : DynamicGump
             1152,
             20,
             Ink,
-            $"so far: {BotAuction.Sales} sales on this market, {BotAuction.Turnover}gp turned over; the city spent {BotCity.Spent}gp"
+            $"so far: {BotShopkeep.Sales} sales at the shops for {BotShopkeep.Takings}gp and {BotHandover.Exchanges} carriers' meetings for {BotHandover.Gold}gp; the city spent {BotCity.Spent}gp"
         );
     }
 
@@ -705,10 +693,10 @@ public sealed class BotDashboardGump : DynamicGump
             return;
         }
 
-        from.SendMessage($"The city bought {units} things from {lots} stalls for {paid}gp.");
+        from.SendMessage($"The city bought {units} things in {lots} lots at the shops for {paid}gp.");
 
         logger.Information(
-            "{Who} had the city buy {Units} things from {Lots} stalls for {Paid}gp",
+            "{Who} had the city buy {Units} things in {Lots} lots at the bots' shops for {Paid}gp",
             from.Name,
             units,
             lots,
@@ -1634,19 +1622,38 @@ public sealed class BotDashboardGump : DynamicGump
             return;
         }
 
-        var stall = _stalls[row];
-        var bought = BotAuction.Buy(from, stall, 1);
+        var (front, kind, units, ask) = _stalls[row];
+        var keeper = front.Keeper;
 
-        if (bought > 0)
+        if (keeper is not { Deleted: false } || !BotShopkeep.Live(front))
         {
-            from.SendMessage($"Bought {bought} {stall.Label} for {stall.Price}gp.");
+            from.SendMessage("That shop has shut.");
         }
         else
         {
-            from.SendMessage("That purchase did not go through — check your gold.");
+            from.MoveToWorld(keeper.Location, keeper.Map);
+            from.SendMessage($"{keeper.Name}'s shop in {front.Town}: {units} {kind.Name} at {ask}gp.");
         }
 
         DisplayTo(from, _tab, _page);
+    }
+
+    private static (int Units, int Worth) Shown()
+    {
+        var units = 0;
+        var worth = 0;
+        var open = BotShopkeep.Open;
+
+        for (var i = 0; i < open.Count; i++)
+        {
+            if (!open[i].Shut)
+            {
+                units += open[i].Units;
+                worth += open[i].Worth;
+            }
+        }
+
+        return (units, worth);
     }
 
     public static void DisplayTo(Mobile from, int tab = BotsTab, int page = 0)
@@ -1705,7 +1712,7 @@ public sealed class BotDashboardGump : DynamicGump
 
     private static List<BotWant> Needs()
     {
-        var all = BotAuction.Wants;
+        var all = BotMarket.Wants;
         List<BotWant> wants = [];
 
         for (var i = 0; i < all.Count; i++)
@@ -1716,21 +1723,7 @@ public sealed class BotDashboardGump : DynamicGump
         return wants;
     }
 
-    private static List<BotListing> Market()
-    {
-        var all = BotAuction.Listings;
-        List<BotListing> stalls = [];
-
-        for (var i = 0; i < all.Count; i++)
-        {
-            if (!all[i].IsEmpty)
-            {
-                stalls.Add(all[i]);
-            }
-        }
-
-        return stalls;
-    }
+    private static List<(BotStorefront Front, Type Kind, int Units, int Ask)> Market() => BotShopkeep.Lots();
 
     private static int Purse(Mobile bot) => bot.Backpack?.GetAmount(typeof(Gold)) ?? 0;
 

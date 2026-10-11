@@ -64,8 +64,8 @@ public static class BotWebHistory
             _first = true;
             _lastTick = now;
             _lastSpent = BotWill.SpentMs + BotWalk.SpentMs;
-            _lastSearches = BotPath.Searches;
-            _lastReached = BotPath.Reached;
+            _lastSearches = BotWalk.WalkerSearches;
+            _lastReached = BotWalk.WalkerReached;
 
             return;
         }
@@ -78,20 +78,20 @@ public static class BotWebHistory
         var seconds = Math.Max(1.0, (now - _lastTick) / 1000.0);
         var spent = BotWill.SpentMs + BotWalk.SpentMs;
         var loopMs = (spent - _lastSpent) / seconds;
-        var searches = BotPath.Searches - _lastSearches;
-        var reached = BotPath.Reached - _lastReached;
+        var searches = BotWalk.WalkerSearches - _lastSearches;
+        var reached = BotWalk.WalkerReached - _lastReached;
 
         _lastTick = now;
         _lastSpent = spent;
-        _lastSearches = BotPath.Searches;
-        _lastReached = BotPath.Reached;
+        _lastSearches = BotWalk.WalkerSearches;
+        _lastReached = BotWalk.WalkerReached;
 
         var ended = BotWill.Finished + BotWill.Failed + BotWill.Dropped;
         var sample = new BotWebSample(
             DateTime.Now,
             alive,
             ended <= 0 ? 0.0 : (double)BotWill.Finished / ended,
-            BotPath.Searches <= 0 ? 0.0 : (double)BotPath.Reached / BotPath.Searches,
+            BotWalk.WalkerSearches <= 0 ? 0.0 : (double)BotWalk.WalkerReached / BotWalk.WalkerSearches,
             BotWill.Taken,
             BotWill.Finished,
             BotWill.Failed,

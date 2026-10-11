@@ -36,6 +36,8 @@ public enum BotWalkResult
 
     Casting,
 
+    Held,
+
     Blocked,
 
     Refused,
@@ -100,7 +102,15 @@ public static class BotWalk
 
     public static double SpentMs { get; private set; }
 
-    public static void Spent(long ticks) => SpentMs += ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+    public static void Spent(long ticks)
+    {
+        TurnMs = ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        SpentMs += TurnMs;
+    }
+
+    public static double TurnMs { get; private set; }
+
+    public static void BeginTurn() => TurnMs = 0.0;
 
     public static long Escalated { get; private set; }
 
@@ -127,6 +137,10 @@ public static class BotWalk
     public static long StationSearches { get; private set; }
 
     public static long StationReached { get; private set; }
+
+    public static long WalkerSearches => FixedSearches + ChaseSearches + FlightSearches + StationSearches;
+
+    public static long WalkerReached => FixedReached + ChaseReached + FlightReached + StationReached;
 
     public static long NoWay { get; private set; }
 
@@ -185,6 +199,7 @@ public static class BotWalk
         EscalationFailed = 0;
         Legs = 0;
         LegsFailed = 0;
+        LegEnded = 0;
         NoWay = 0;
         FixedSearches = 0;
         FixedReached = 0;
@@ -194,12 +209,19 @@ public static class BotWalk
         FlightReached = 0;
         StationSearches = 0;
         StationReached = 0;
+        ChasesGivenUp = 0;
+        ChasesReached = 0;
+        ThrashMoved = 0;
+        Holds = 0;
+        _chase.Clear();
         _burned.Clear();
         _lost.Clear();
     }
 
+    public static long LegEnded { get; private set; }
+
     public static string Describe() =>
-        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions, {Besides} plans one tile short taken as arriving, {Thrashed} walks ended for planning one place more than {ThrashPlans} times in {ThrashMs / 1000}s ({ThrashRefused} of the places written refused), {Knots} stepped aside from somebody who would not; the whole ceiling was burned by: {Top(_burned)} ({Stationed} station searches held to {StationCeilingMs:F0}ms instead); {Escalated} searches at the stranded ceiling for a way round, {EscalationFound} found one and {EscalationFailed} ended the errand instead of nine more searches; {Legs} plans drawn to a leg of a route and {LegsFailed} legs that could not be walked; routes drawn: {BotJourney.Routed} over the navigation graph, {BotJourney.Gated} to a gate into another land, {BotJourney.Charted} over the old chart where the graph was not drawn yet, {BotJourney.NoWay} with no way on the ground ({NoWay} plans the graph said had none{(TrustNoWay ? ", dropped" : ", planned straight instead")}); errands lost as hopeless or without a way round, by kind: {Top(_lost)}";
+        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions, {Besides} plans one tile short taken as arriving, {Thrashed} walks ended for planning one place more than {ThrashPlans} times in {ThrashMs / 1000}s ({ThrashRefused} of the places written refused; {ThrashMoved} counts started again for a walker that had come {ThrashTiles} tiles on), {Holds} turns a walk was held where it stood by its work with the plan kept,{ChasesGivenUp} chases ended for planning more than {ChasePlans} roads after one target with none reaching it ({ChasesReached} counts cleared by a plan that reached), {Knots} stepped aside from somebody who would not; the whole ceiling was burned by: {Top(_burned)} ({Stationed} station searches held to {StationCeilingMs:F0}ms instead); {Escalated} searches at the stranded ceiling for a way round, {EscalationFound} found one and {EscalationFailed} ended the errand instead of nine more searches; {Legs} plans drawn to a leg of a route and {LegsFailed} legs that could not be walked ({LegEnded} plans stopped where the leg had already dropped the errand); routes drawn: {BotJourney.Routed} over the navigation graph, {BotJourney.Gated} to a gate into another land, {BotJourney.Charted} over the old chart where the graph was not drawn yet, {BotJourney.NoWay} with no way on the ground ({NoWay} plans the graph said had none{(TrustNoWay ? ", dropped" : ", planned straight instead")}), {BotJourney.MapRefused} never asked of the planner for no open ground at the target on the reach map; {BotGates.Unwedged} bodies standing where nothing stands set on the nearest floor ({BotGates.Unwedgeable} left where they were for want of one); errands lost as hopeless or without a way round, by kind: {Top(_lost)}";
 
     public static int StepDelayMs(bool run) => run ? RunStepMs : WalkStepMs;
 
@@ -232,6 +254,20 @@ public static class BotWalk
         if (journey.Arrived(bot.Location))
         {
             return BotWalkResult.Arrived;
+        }
+
+        if (BotStewardship.TurnsBack(bot, journey.Target))
+        {
+            journey.Complete();
+
+            return BotWalkResult.Stalled;
+        }
+
+        if (journey.Held)
+        {
+            Holds++;
+
+            return BotWalkResult.Held;
         }
 
         if (journey.Stalled())
@@ -323,6 +359,8 @@ public static class BotWalk
 
             BotReach.Contradict(map, before, bot.Location);
 
+            BotReachMap.Stepped(bot, before, bot.Location);
+
             return journey.Arrived(bot.Location) ? BotWalkResult.Arrived : BotWalkResult.Stepped;
         }
 
@@ -360,9 +398,34 @@ public static class BotWalk
             BotGates.Alight(bot);
         }
 
-        if (journey.Leg(map, bot.Location, out var leg) && PlanLeg(bot, journey, map, leg))
+        bool legged;
+        Point3D leg;
+
+        BotDanger.For(bot);
+
+        BotDanger.Walks(bot, journey.Target);
+
+        try
+        {
+            legged = journey.Leg(map, bot.Location, out leg);
+        }
+        finally
+        {
+            BotDanger.Clear();
+        }
+
+        var legErrand = journey.Current;
+
+        if (legged && PlanLeg(bot, journey, map, leg))
         {
             return true;
+        }
+
+        if (legged && (!journey.Active || !ReferenceEquals(journey.Current, legErrand)))
+        {
+            LegEnded++;
+
+            return false;
         }
 
         if (journey.NoWayThere && Math.Max(Math.Abs(bot.X - journey.Target.X), Math.Abs(bot.Y - journey.Target.Y)) > BotJourney.DirectTiles)
@@ -392,7 +455,7 @@ public static class BotWalk
 
         var escalate = journey.Probed && !journey.Escalated && journey.PlansSinceCloser >= PlansBeforeAskingTheFarSide;
 
-        var ceiling = escalate ? BotPath.StrandedCeilingMs : journey.PlansSinceCloser > 0 ? BotPath.CeilingMs : 0.0;
+        var ceiling = escalate ? BotPath.StrandedCeilingMs : journey.PlansSinceCloser > 0 || journey.Sighted != null ? BotPath.CeilingMs : 0.0;
 
         if (ceiling > 0.0 && journey.Reason is "station" or "sweep")
         {
@@ -416,9 +479,19 @@ public static class BotWalk
 
         Noted(bot, journey, outcome);
 
+        if (outcome == BotPathOutcome.Partial && _path.Count == 0 && BotGates.Unwedge(bot))
+        {
+            return true;
+        }
+
         if (Thrashing(bot, journey, out var thrashed))
         {
             return Drop(bot, journey, thrashed, thrash: true);
+        }
+
+        if (Chasing(bot, journey, outcome, out var chased))
+        {
+            return Drop(bot, journey, chased);
         }
 
         if (outcome != BotPathOutcome.Reached && Math.Max(Math.Abs(bot.X - journey.Target.X), Math.Abs(bot.Y - journey.Target.Y)) <= BotJourney.BesideTiles(journey.Reason))
@@ -431,7 +504,17 @@ public static class BotWalk
 
         if (outcome == BotPathOutcome.Sealed)
         {
-            return Drop(bot, journey, "there is no way from here");
+            if (!BotReach.LastByMap && BotGates.Unwedge(bot))
+            {
+                return true;
+            }
+
+            if (!BotReach.LastByMap)
+            {
+                BotGates.WalkRefused(map, bot.Location, journey.Target);
+            }
+
+            return Drop(bot, journey, BotReach.LastByMap ? "the reach map has no ground a walk from home reaches there" : "there is no way from here");
         }
 
         journey.Planned(outcome, _path, bot.Location);
@@ -488,11 +571,17 @@ public static class BotWalk
 
     public static int ThrashMs { get; set; } = 20000;
 
+    public static int ThrashTiles { get; set; } = 12;
+
     public static long Thrashed { get; private set; }
+
+    public static long ThrashMoved { get; private set; }
+
+    public static long Holds { get; private set; }
 
     public static long ThrashRefused { get; private set; }
 
-    private static readonly Dictionary<Serial, (Point3D Goal, long Since, int Plans)> _thrash = [];
+    private static readonly Dictionary<Serial, (Point3D Goal, long Since, int Plans, Point3D From)> _thrash = [];
 
     private static bool Thrashing(Mobile bot, BotJourney journey, out string why)
     {
@@ -513,7 +602,15 @@ public static class BotWalk
                 _thrash.Clear();
             }
 
-            _thrash[bot.Serial] = (goal, now, 1);
+            _thrash[bot.Serial] = (goal, now, 1, bot.Location);
+
+            return false;
+        }
+
+        if (ThrashTiles > 0 && Math.Max(Math.Abs(bot.X - seen.From.X), Math.Abs(bot.Y - seen.From.Y)) >= ThrashTiles)
+        {
+            ThrashMoved++;
+            _thrash[bot.Serial] = (goal, now, 1, bot.Location);
 
             return false;
         }
@@ -531,6 +628,100 @@ public static class BotWalk
         why = $"it planned {seen.Plans} roads to one place in {(now - seen.Since) / 1000}s without getting anywhere";
 
         return true;
+    }
+
+    public static int ChasePlans { get; set; } = 12;
+
+    public static int ChaseMs { get; set; } = 120000;
+
+    public static long ChasesGivenUp { get; private set; }
+
+    public static long ChasesReached { get; private set; }
+
+    private static readonly Dictionary<Serial, (Serial Follow, long Since, long Last, int Plans, int Nearest)> _chase = [];
+
+    private static bool Chasing(Mobile bot, BotJourney journey, BotPathOutcome outcome, out string why)
+    {
+        why = null;
+
+        if (ChasePlans <= 0 || journey.Current?.Follow is not { } follow)
+        {
+            return false;
+        }
+
+        var now = Core.TickCount;
+        var target = journey.Target;
+        var away = Math.Max(Math.Abs(bot.X - target.X), Math.Abs(bot.Y - target.Y));
+
+        if (outcome == BotPathOutcome.Reached || away <= BotJourney.BesideTiles(journey.Reason))
+        {
+            if (_chase.Remove(bot.Serial))
+            {
+                ChasesReached++;
+            }
+
+            return false;
+        }
+
+        if (!_chase.TryGetValue(bot.Serial, out var seen) || seen.Follow != follow.Serial || now - seen.Last > ChaseMs)
+        {
+            if (_chase.Count > 1024)
+            {
+                _chase.Clear();
+            }
+
+            _chase[bot.Serial] = (follow.Serial, now, now, 1, away);
+
+            return false;
+        }
+
+        seen.Last = now;
+
+        if (away < seen.Nearest - BotJourney.FollowSlack)
+        {
+            seen.Nearest = away;
+            seen.Plans = 1;
+            _chase[bot.Serial] = seen;
+
+            return false;
+        }
+
+        seen.Plans++;
+        _chase[bot.Serial] = seen;
+
+        if (seen.Plans <= ChasePlans)
+        {
+            return false;
+        }
+
+        _chase.Remove(bot.Serial);
+        ChasesGivenUp++;
+        why = $"it planned {seen.Plans} roads after {follow.Name} in {(now - seen.Since) / 1000}s and none reached it, the nearest {seen.Nearest} tiles off";
+
+        if (_unreached.Count > 1024)
+        {
+            _unreached.Clear();
+        }
+
+        _unreached[bot.Serial] = (follow.Serial, now);
+
+        return true;
+    }
+
+    public static int UnreachedMs { get; set; } = 120000;
+
+    private static readonly Dictionary<Serial, (Serial Follow, long Tick)> _unreached = [];
+
+    public static bool Unreached(Mobile bot, Mobile follow) =>
+        bot != null && follow != null && _unreached.TryGetValue(bot.Serial, out var given) && given.Follow == follow.Serial
+        && Core.TickCount - given.Tick < UnreachedMs;
+
+    public static void ForgetChase(Mobile bot)
+    {
+        if (bot != null)
+        {
+            _chase.Remove(bot.Serial);
+        }
     }
 
     private static void Noted(Mobile bot, BotJourney journey, BotPathOutcome outcome)
@@ -596,7 +787,7 @@ public static class BotWalk
             journey.LegExact ? BotArrival.Exactly : BotArrival.Within(BotJourney.LegReached),
             _path,
             avoid,
-            journey.PlansSinceCloser > 0 ? BotPath.CeilingMs : 0.0
+            journey.PlansSinceCloser > 0 || avoid.HasReaches ? BotPath.CeilingMs : 0.0
         );
 
         Noted(bot, journey, outcome);

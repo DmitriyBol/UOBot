@@ -106,8 +106,8 @@ public static class BotSigns
         _workFailed = BotWill.Failed;
         _workDropped = BotWill.Dropped;
 
-        _marketSells = BotAuction.Sells;
-        _marketFills = BotAuction.Fills;
+        _marketSells = Sold();
+        _marketFills = BotMarket.Answered;
 
         _aliveTaken = BotWill.Taken;
         _aliveFinished = BotWill.Finished;
@@ -343,17 +343,19 @@ public static class BotSigns
         }
     }
 
+    private static long Sold() => BotShopkeep.Units + BotHandover.Units;
+
     private static void Market(long now)
     {
-        var sells = BotAuction.Sells - _marketSells;
-        var fills = BotAuction.Fills - _marketFills;
-        var stalls = BotAuction.Listings.Count;
-        var wants = BotAuction.Wants.Count;
+        var sells = Sold() - _marketSells;
+        var fills = BotMarket.Answered - _marketFills;
+        var stalls = BotShopkeep.OpenCount;
+        var wants = BotMarket.Wants.Count;
         var window = Window(now, _marketAt);
 
         _marketAt = now;
-        _marketSells = BotAuction.Sells;
-        _marketFills = BotAuction.Fills;
+        _marketSells = Sold();
+        _marketFills = BotMarket.Answered;
 
         if (stalls == 0 || wants == 0)
         {
@@ -364,8 +366,8 @@ public static class BotSigns
         {
             BotAlarm.Raise(
                 "market-quiet",
-                $"nothing has been bought or sold in {window}, with {stalls} stalls standing and"
-                + $" {wants} wants on the board",
+                $"nothing has been bought or sold in {window}, with {stalls} shops open by the bank and"
+                + $" {wants} wants said",
                 0,
                 stalls + wants,
                 window
@@ -397,7 +399,7 @@ public static class BotSigns
 
         BotAlarm.Alive(
             $"{BotPopulation.Count} bots alive, {finished} of {taken} pieces of work finished, {errors} errors,"
-            + $" {BotStall.Stuck} standing still, {BotAuction.Listings.Count} stalls and {BotAuction.Wants.Count} wants."
+            + $" {BotStall.Stuck} standing still, {BotShopkeep.OpenCount} shops open and {BotMarket.Wants.Count} wants."
             + $" Alarms standing: {BotAlarm.Standing}",
             finished,
             taken,

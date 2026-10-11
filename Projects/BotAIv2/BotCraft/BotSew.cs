@@ -7,7 +7,7 @@ using Server.Mobiles;
 namespace Server.BotAI.V2;
 
 /// <summary>
-/// Buy cloth, make something of it, put it on the market. The crafter's chain, and the first work in this
+/// Buy cloth, make something of it, sell it hand to hand. The crafter's chain, and the first work in this
 /// project that <b>creates</b> rather than extracts.
 ///
 /// <para>
@@ -54,8 +54,6 @@ public sealed class BotSew : BotDeed
 
     private int _repicks;
 
-    private BotListing _stall;
-
     private readonly Type _stuff;
 
     private readonly int _price;
@@ -73,8 +71,6 @@ public sealed class BotSew : BotDeed
     private CraftItem _recipe;
 
     private Type _kind;
-
-    private Point3D _counter;
 
     private int _had;
 
@@ -96,7 +92,7 @@ public sealed class BotSew : BotDeed
 
     private int _want;
 
-    public BotSew(BaseVendor shop, int price, int need)
+    public BotSew(BaseVendor shop, int price, int need, Type spec = null)
     {
         _stuff = typeof(Cloth);
         _shop = shop;
@@ -105,9 +101,10 @@ public sealed class BotSew : BotDeed
         _price = Math.Max(1, price);
         _take = Bolt;
         _need = Math.Max(1, need);
+        _spec = spec;
     }
 
-    public BotSew(Map map, Point3D where, int need)
+    public BotSew(Map map, Point3D where, int need, Type spec = null)
     {
         _stuff = typeof(Cloth);
         _map = map;
@@ -115,26 +112,28 @@ public sealed class BotSew : BotDeed
         _price = 1;
         _take = 0;
         _need = Math.Max(1, need);
+        _spec = spec;
     }
 
-    public BotSew(Map map, Point3D where, BotListing stall, int price, int take, int need)
-        : this(map, where, stall, price, take, need, null)
-    {
-    }
+    private readonly Type _spec;
 
-    public BotSew(Map map, Point3D where, BotListing stall, int price, int take, int need, BotWant order)
+    private int _guess;
+
+    public BotSew(Map map, Point3D where, int need, BotWant order, Type spec = null)
     {
         _stuff = typeof(Leather);
-        _stall = stall;
         _map = map;
         _where = where;
-        _price = Math.Max(1, price);
-        _take = Math.Max(0, take);
+        _price = 1;
+        _take = 0;
         _need = Math.Max(1, need);
         _order = order;
+        _spec = spec;
     }
 
     private readonly BotWant _order;
+
+    public BotWant Order => _order;
 
     public override string Kind => Trade;
 
@@ -142,7 +141,7 @@ public sealed class BotSew : BotDeed
 
     public override Point3D Where => _where;
 
-    public override double Expects => _order == null ? Prior : Prior * 1.6;
+    public override double Expects => _order != null ? Prior * 1.6 : BotGlut.Claim(_kind ?? _spec, Prior);
 
     public override double Minutes => WorkMinutes;
 
@@ -222,31 +221,14 @@ public sealed class BotSew : BotDeed
             return default;
         }
 
-        if (BotAuction.Reclaim(bot, _stuff) > 0 && BotThread.Amount(body, _stuff) >= _need)
+        if (BotMarket.FromBank(bot, _stuff, _need) > 0 && BotThread.Amount(body, _stuff) >= _need)
         {
             _leg = Leg.Work;
 
             return default;
         }
 
-        if (_stall != null)
-        {
-            if (_stall.IsEmpty)
-            {
-                return BotDoing.Failed($"the {_stuff.Name} stall is empty now");
-            }
-
-            if (BotAuction.Buy(body, _stall, _take) <= 0)
-            {
-                return BotDoing.Failed($"could not pay another bot for {_stuff.Name}");
-            }
-
-            _leg = Leg.Work;
-
-            return default;
-        }
-
-        if (_stall == null && _shop == null)
+        if (_shop == null)
         {
             return BotDoing.Failed($"the {_stuff.Name} it set out with is gone");
         }
@@ -306,9 +288,10 @@ public sealed class BotSew : BotDeed
             _want = BotThread.Units(_recipe);
             _had = BotThread.Made(body, _kind);
 
-            var floor = BotThread.Units(_recipe) * BotAuction.Worth(_stuff, _price) * 2;
+            var floor = BotThread.Units(_recipe) * BotMarket.Worth(_stuff, _price) * 2;
 
-            _worth = BotAuction.Worth(_kind, Math.Max(GoldPerPiece, floor));
+            _guess = Math.Max(GoldPerPiece, floor);
+            _worth = BotMarket.Worth(_kind, _guess);
         }
 
         var have = BotThread.Made(body, _kind);
@@ -320,7 +303,8 @@ public sealed class BotSew : BotDeed
             _pieces += have - _had;
             BotCraftwork.Produced(_kind, have - _had);
             _had = have;
-            _made = _pieces * _worth;
+
+            _made = BotGlut.Yield(_kind, _pieces, _guess);
         }
 
         if (kit == null)
@@ -400,44 +384,20 @@ public sealed class BotSew : BotDeed
             return BotDoing.Done($"{_swings} attempts, nothing came of it");
         }
 
-        if (_counter == Point3D.Zero)
-        {
-            _counter = BotGround.Counter(Map, body.Location);
-        }
-
-        if (_counter != Point3D.Zero && !body.InRange(_counter, BotDig.CounterReach))
-        {
-            return BotDoing.Walk(Map, _counter, BotArrival.Within(BotDig.CounterReach), "to a counter");
-        }
-
         var listed = 0;
         var ordered = 0;
         var made = BotThread.Gather(body, _kind);
 
         for (var i = 0; i < made.Count; i++)
         {
-            var piece = made[i];
-            var held = Math.Max(1, piece.Amount);
-            var want = _order ?? BotAuction.Demand(bot, _kind);
-            var sold = want == null ? 0 : BotAuction.Fill(bot, want, piece);
+            var held = Math.Max(1, made[i].Amount);
+            var want = _order ?? BotMarket.Demand(bot, _kind);
+            var answer = want == null ? 0 : Math.Min(held, Math.Max(0, want.Payable - ordered));
 
-            if (sold > 0)
-            {
-                ordered += sold;
-                _made -= sold * _worth;
-
-                if (sold >= held)
-                {
-                    continue;
-                }
-            }
-
-            if (BotAuction.List(bot, piece, _worth) != null)
-            {
-                listed++;
-            }
+            ordered += answer;
+            listed += held - answer;
         }
 
-        return BotDoing.Done($"{_pieces} {_kind?.Name} in {_swings} attempts, {ordered} to order and {listed} put out to sell");
+        return BotDoing.Done($"{_pieces} {_kind?.Name} in {_swings} attempts, {ordered} for an order and {listed} kept to sell");
     }
 }

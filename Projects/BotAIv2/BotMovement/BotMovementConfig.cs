@@ -63,6 +63,50 @@ public sealed class BotMovementSettings
     public bool? Barring { get; set; }
 
     public BotBarSettings[] Barred { get; set; }
+
+    public bool? DangerByWalker { get; set; }
+
+    public double? DeadlyVsWalker { get; set; }
+
+    public int? BloodBeyond { get; set; }
+
+    public bool? RefuseNodes { get; set; }
+
+    public bool? Roads { get; set; }
+
+    public double? RoadDare { get; set; }
+
+    public int? RoadStep { get; set; }
+
+    public double? ZoneRoadShare { get; set; }
+
+    public bool? RouteJudged { get; set; }
+
+    public bool? RouteAlways { get; set; }
+
+    public int? RoutePerSecond { get; set; }
+
+    public double? RoadStaleDare { get; set; }
+
+    public bool? SearchPrune { get; set; }
+
+    public bool? Sight { get; set; }
+
+    public int? SightEveryMs { get; set; }
+
+    public int? SightTiles { get; set; }
+
+    public double? SightOdds { get; set; }
+
+    public int? SightMargin { get; set; }
+
+    public int? SightStepCost { get; set; }
+
+    public int? SightRouteCost { get; set; }
+
+    public int? SightWaitMs { get; set; }
+
+    public bool? SightStanding { get; set; }
 }
 
 /// <summary>One rectangle of ground the population may not choose, as a configuration file writes it.</summary>
@@ -127,6 +171,30 @@ public static class BotMovementConfig
         BotRefused.MostRestMs = settings.MostRefusalRestMs ?? BotRefused.MostRestMs;
         BotRefused.MostPlaces = settings.MostRefusedPlaces ?? BotRefused.MostPlaces;
         BotBarred.Running = settings.Barring ?? BotBarred.Running;
+
+        BotDanger.ByWalker = settings.DangerByWalker ?? BotDanger.ByWalker;
+        BotDanger.DeadlyVsWalker = settings.DeadlyVsWalker ?? BotDanger.DeadlyVsWalker;
+        BotDanger.BloodBeyond = settings.BloodBeyond ?? BotDanger.BloodBeyond;
+        BotDanger.RefusesNodes = settings.RefuseNodes ?? BotDanger.RefusesNodes;
+        BotDanger.Roads = settings.Roads ?? BotDanger.Roads;
+        BotDanger.RoadDare = settings.RoadDare ?? BotDanger.RoadDare;
+        BotDanger.RoadStep = settings.RoadStep ?? BotDanger.RoadStep;
+        BotDanger.ZoneRoadShare = settings.ZoneRoadShare ?? BotDanger.ZoneRoadShare;
+        BotDanger.RouteJudged = settings.RouteJudged ?? BotDanger.RouteJudged;
+        BotDanger.RouteAlways = settings.RouteAlways ?? BotDanger.RouteAlways;
+        BotDanger.RoutePerSecond = settings.RoutePerSecond ?? BotDanger.RoutePerSecond;
+        BotDanger.RoadStaleDare = settings.RoadStaleDare ?? BotDanger.RoadStaleDare;
+        BotReachMap.PrunesSearch = settings.SearchPrune ?? BotReachMap.PrunesSearch;
+
+        BotSight.Running = settings.Sight ?? BotSight.Running;
+        BotSight.EveryMs = settings.SightEveryMs ?? BotSight.EveryMs;
+        BotSight.SightTiles = settings.SightTiles ?? BotSight.SightTiles;
+        BotSight.Odds = settings.SightOdds ?? BotSight.Odds;
+        BotSight.Margin = settings.SightMargin ?? BotSight.Margin;
+        BotSight.StepCost = settings.SightStepCost ?? BotSight.StepCost;
+        BotDanger.SightCost = settings.SightRouteCost ?? BotDanger.SightCost;
+        BotSight.WaitMs = settings.SightWaitMs ?? BotSight.WaitMs;
+        BotSight.Standing = settings.SightStanding ?? BotSight.Standing;
 
         if (settings.Barred != null)
         {

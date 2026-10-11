@@ -40,6 +40,8 @@ public sealed class BotPopulationModule : BotModule
     {
         BotPopulationConfig.Load();
 
+        BotRestConfig.Load();
+
         BotWill.Offer(new BotUndertaker());
 
         BotWill.Offer(new BotPorter());

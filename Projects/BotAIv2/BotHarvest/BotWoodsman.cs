@@ -77,7 +77,7 @@ public sealed class BotWoodsman : IBotProposer
         Asked++;
 
         var called = Fletching(body) || Wanted(typeof(Log)) || Wanted(typeof(Arrow));
-        var forStalls = !called && BotFletcher.Woodless && BotAuction.Stocked(typeof(Log)) < LeastOnMarket;
+        var forStalls = !called && BotFletcher.Woodless && BotShopkeep.Showing(typeof(Log)) < LeastOnMarket;
 
         if (!called && !forStalls)
         {
@@ -121,7 +121,7 @@ public sealed class BotWoodsman : IBotProposer
 
     private static bool Wanted(Type kind)
     {
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
 
         for (var i = 0; i < wants.Count; i++)
         {
@@ -152,8 +152,8 @@ public sealed class BotWoodsman : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? $"nobody has been offered wood ({NoAxe} answers went to bots with no axe, {TooHeavy} to bots whose only axe was too heavy to hold)"
-            : $"{Asked} asked to cut wood ({TooHeavy} not asked for carrying only an axe too heavy to hold):{Sent} sent to a tree ({ForStalls} of them because a fletcher went without wood and the stalls held under {LeastOnMarket} logs), {NoCall} found nobody asking for wood or arrows, {Stocked} were carrying enough already, {NoTree} had no tree within {BotTimber.Reach} tiles ({BotTimber.Townbound} passed over for standing inside a town and {BotTimber.Fenced} on ground that has refused the population, {BotTimber.Unwalkable} for a walk refused at the trunk lately); {BotChop.Bent} trees swapped for the next when the walk to one was refused; {BotChop.Spoken} trees given up because the engine said they were cut out against {BotChop.Silent} given up by the clock alone, {BotChop.Unreached} for the engine calling every swing out of range; "
-              + $"{BotTimber.Ordered} logs went straight into somebody's order and {BotTimber.Listed} onto a stall, above the {BotTimber.Keeps} a cutter that can fletch keeps back";
+            : $"{Asked} asked to cut wood ({TooHeavy} not asked for carrying only an axe too heavy to hold):{Sent} sent to a tree ({ForStalls} of them because a fletcher went without wood and the shops by the bank showed under {LeastOnMarket} logs), {NoCall} found nobody asking for wood or arrows, {Stocked} were carrying enough already, {NoTree} had no tree within {BotTimber.Reach} tiles ({BotTimber.Townbound} passed over for standing inside a town and {BotTimber.Fenced} on ground that has refused the population, {BotTimber.Unwalkable} for a walk refused at the trunk lately); {BotChop.Bent} trees swapped for the next when the walk to one was refused; {BotChop.Spoken} trees given up because the engine said they were cut out against {BotChop.Silent} given up by the clock alone, {BotChop.Unreached} for the engine calling every swing out of range; "
+              + $"{BotTimber.Ordered} logs kept for somebody's want, to be carried to it, and {BotTimber.Listed} kept to sell, above the {BotTimber.Keeps} a cutter that can fletch keeps back";
 
     public static void Forget()
     {

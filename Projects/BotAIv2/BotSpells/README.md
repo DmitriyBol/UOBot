@@ -9,6 +9,7 @@ bots' market that is itself a bot.
 | `BotQuill.cs` | inscription: what can be written, with what, and onto what |
 | `BotInscribe.cs` | the scribe's obligation: buy paper → write → keep it or sell it; a pen that wears through after the first attempt ends the batch at the market rather than failing it |
 | `BotScribe.cs` | the proposer: whoever is carrying a pen |
+| `BotScribes.cs` | who on the island can write which circle (a census every minute), the price a want for a scroll no shelf sells may ask (`Ceiling`), which scribe is writing which want (`Claim`), and the `scrolls:` clause of the `Needs:` line |
 | `BotAcquire.cs` | the caster's obligation: get one spell — off a shelf, off a stall, or by asking |
 | `BotSeeker.cs` | the proposer: whose book is short |
 | `BotSpellsConfig.cs` | `Configuration/bot-spells.json` |
@@ -146,7 +147,7 @@ write no longer ends the step: the remainder of a stack is still a stack of scro
 
 And one worth remembering although it does not touch us: `CraftItem.Craft` refuses outright if a recipe has a
 `RequiredExpansion`, because it checks it through `from.NetState` and a bot has no client. The first eight circles
-are pre-era with `RequiredExpansion` of `None`, and `BotQuill.Choose` only takes types present in the regular
+are pre-era with `RequiredExpansion` of `None`, and `BotQuill.Plan` only takes types present in the regular
 scroll map, so necromancy and mysticism filter themselves out. But if a bot ever fails to craft something for no
 reason, look here.
 
@@ -222,3 +223,77 @@ That is the largest unoccupied niche this folder opens.
 **Nothing survives a restart.** The population is rebuilt from configuration on every world load, so the book and
 the Inscribe live one session. The whole arc of development is intra-session — as it is for skills, but on a book
 it is more visible.
+
+---
+
+## Scroll lines, 03.10.2026 (build next)
+
+Patrick's order for the night: "the focus of tonight's work is 99 % fulfilment of Needs". Scroll lines were failing almost all
+of them — Greater Heal 0 met of 5, 4 and 2 lines on 02.10, Lightning 0 of 9, Harm 1 of 6 — named "passed over: trader found
+nowhere to have it", which is true and says nothing: above the third circle only a bot scribe can answer, and the scribes did
+not write ("took on inscribe" 0 times in 85 minutes, 0 in 60, once in 27).
+
+What was measured, link by link (logs of 02.10 15:26, 16:51, 17:54 and 03.10 03:08; `/api/state` at 03:25 and 03:55):
+
+- **Who can write.** 21 bots write (17 mages, 4 sages); 20 can write the fourth circle, 10 the fifth, 4 the sixth and seventh,
+  2 the eighth. Nobody is short of the skill for any circle on the board.
+- **The outlay.** `Outlay` was `Batch × price` — 100gp at 5gp a blank, 240gp at a 12gp counter — whatever the session was for.
+  Six of the 21 had 100gp in pack and bank; the median was 60gp. The log names "inscribe costs 100gp and it has 11gp free" as a
+  take's first refusal 68 times in four sessions, once from Kaelthas holding ten blanks left from the twenty it had just bought.
+- **The herbs.** A funded scroll was skipped when the pack lacked a herb (`Stocked`, eleven of each), and the session went to
+  practice instead. Kaelthas wrote Poison and Magic Arrow at 03:25 with three Lightning wants of 124gp standing; Lorandil wrote
+  Unlock at 03:32 over its own Lightning want; Elowir thirteen Magic Arrows at 03:45. Magic Arrow is ash alone and Unlock is ash
+  and bloodmoss, so the herb short was mandrake root: last of the eight on the shopper's restock list, which buys one kind an
+  errand, ash first (12–18 ash restocks a session, 0–2 of mandrake), and every herb is lost with a death (8–25 scribe deaths a
+  session).
+- **The scribes' own wants.** 5 of 64 scroll wants were asked by a bot that could write them (Mirthal and Lorandil for Lightning,
+  Caelith for Mark and Energy Bolt), and the money they held refused the same bots the paper: "inscribe costs 100gp and it has
+  82gp free of 383gp" (Caelith).
+- **The price.** A new want opened at the dearest one standing (`BotMarket.Worth`), so Greater Heal opened at 63, 82, then 142gp
+  and raised four times over that: Cirdan's reached 326gp for 17gp of paper and herbs, and at 03:12:25 its want for ribs stood
+  down for the money the scroll held. The highest offers: Greater Heal 326, Lightning 163, Arch Cure 163, Harm 139 (a trader).
+- **Delivery.** No scroll a scribe wrote reached a want in these sessions: every scroll handed over was a trader's from a counter.
+
+What changed:
+
+- **A session is planned, and sized to what it is for** (`BotQuill.Plan`, `BotQuillPlan`). Somebody else's want first — the
+  dearest one this scribe can carry to, a bot's own need before a trader's procurement, not one another scribe is writing
+  (`BotScribes.Claim`), and not one the pack already answers; then its own book's next gap or its own scrolls to throw, when
+  writing them costs it no more than asking would (`OwnPen`); then practice, as before. A session to order buys the blanks the
+  units take at this scribe's chance (`Chance`, the engine's own sum) and the herbs those attempts burn, at the paper's counter,
+  and keeps no herbs back to fight with for those few attempts; practice is unchanged. `Outlay` is what the plan buys; a session
+  that buys nothing is written where the scribe stands.
+- **A want that pays under what the scroll costs at this scribe's chance is passed over** (counted): a scribe with one chance in
+  eight does not buy eight blanks to be paid for one. The want stays for a better hand.
+- **Written for a want, the want comes first, and past what the scribe keeps**: the porter keeps a sage's three Energy Bolts
+  and a reader's Resurrection scroll (`BotUnload.Keeps`) and the carrier walks only what is over that, so a line's session writes
+  the want's units plus what the keep lacks, a kind kept whole is no line for that scribe, and a want the pack already answers
+  over its keep is the carrier's (`BotCourier.Holding`, as every maker asks). The book takes one only of what is beyond both.
+  An order keeps no herbs back only for the attempts it planned; past them the handful of ten is kept again. A claim lapses after
+  `BotWill.AsideCapMs` of a pause, and holds while the writer carries the scroll for the walk. A session for somebody's
+  want is an order — `Coin` 1.0 and `Expects` `Prior × OrderLift` (1.6), as the forge's, the needle's and the fletcher's are.
+- **A scribe that writes a scroll itself for less does not ask the island for it** (`BotSeeker`, `BotArmoury`): its pen is
+  offered the gap as its own order, and the money a want would hold stays free for the paper.
+- **A want for a scroll no shelf sells asks no more than writing it costs here** (`BotScribes.Ceiling`, applied in
+  `BotMarket.Ask` and, for the wants read back from the save, at the first census): the paper and herbs of one attempt at the
+  island's lowest counter prices, over the best chance among the scribes in the world (a census every minute; bots resting out of the world are not counted),
+  with the fifth `Markup`, never below the circle's shop step.
+  At its ceiling a want waits at its price to `MostAgeMs`, as a material's does. Raising past it bought nothing — a scribe takes
+  a paid scroll before practice whatever the price — and held the buyer's money away from its other lines. A circle nobody on the
+  island can write is said once in the log; its wants are held at the price they open at. Scrolls the shelves sell (circles 1–3)
+  keep their prices: a trader's carriage from the counter is real work.
+
+Counted in the `scrolls:` clause of the `Needs:` line (`BotScribes.Describe`): scribes able by circle and the best chance;
+looks by bots with a pen and what each was offered (no book, no counter for paper, nothing writable, a session for a want, own,
+practice, and how many of those were dearer than what the scribe had free); funded wants passed over (another scribe on it,
+under its cost at that hand, a herb the counter does not sell, paper and herbs dearer than the scribe has free — passed over for
+practice it can pay for, rather than offered and refused); sessions taken and scrolls written by what they were for (for a want: only what is over the
+writer's keep); scrolls no shelf sells handed over against wants and how many by a bot that writes — the lines a scribe actually
+answered, counted at the meeting; herbs bought; scrolls left to the asker's own pen; scroll wants opened at the price of writing them, cut to it when read back, raises
+not taken at it, and wants for a circle nobody can write. A want given up at that ceiling names its line "given up at the price
+of writing it".
+
+How to measure after a deploy: `measure_lines.py --since <deploy>` for scroll lines met in their hour by kind; `took on
+inscribe` and `finished inscribe` counts; the handed-over counts in the `scrolls:` clause (not "the session written for X's
+want", which names the session's purpose, not an answer); the highest offer in
+"raised its offer for … Scroll" (expected: none above the circle's step while a sage can write it); the `scrolls:` clause.

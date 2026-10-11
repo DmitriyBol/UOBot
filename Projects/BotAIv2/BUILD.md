@@ -149,7 +149,9 @@ The results land in `Distribution\Assemblies\BotAIv2.dll` and `BotMindAI.dll`.
 **6. Switch the modules on** in `Configuration/modernuo.json`: `bots.enabled` and one `bots.<module>.enabled` per
 module. The list is in `INSTALL.md`.
 
-**7. Start the shard** with `./start-shard-detached.ps1` from the fork root, which outlives the shell that ran it.
+**7. Start the shard** with `START_SHARD.bat` from the fork root (`START_SHARD.bat --nopause` from a script). It
+starts the shard through a scheduled task with no triggers, so the shard outlives the shell that ran it, and waits
+until it reports listening.
 
 **8. Read the log** — `logs/session-<yyyy-MM-dd_HH-mm>.log` — and compare it with §3. The configuration files create
 themselves on the first start.

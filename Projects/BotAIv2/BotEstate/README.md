@@ -67,7 +67,8 @@ design silently if it had gone the other way.
 | `BotWarStore.cs` | keeps the war ledger across restarts under `Saves/BotWars`: wars with their run time, kills and plunder, truces and declaration clocks as time left, and the halls a lost war still owes a move; before it every restart was an amnesty (14.09.2026) |
 | `BotSeat.cs` | where each guild lives: the point its hall is raised near, its members rise at, and "home" means; hand-set seats kept in `Saves/BotSeats`; no seat, in the file or by hand, nearer another guild's than `BotRegard.Neighbouring` (`TooNear`, build 64) |
 | `BotOffice.cs` | one guild, one officer, one errand — and offering is not the same as being on it |
-| `BotLand.cs` | which guild the ground belongs to, and what that does to what work is worth |
+| `BotLand.cs` | which guild the ground belongs to, and what that does to what work is worth; a held square answers before a hall's yard (06.10.2026) |
+| `BotBounds.cs` | ground another guild holds and what may not stand on it: a guild building wholly in its own square or on ground its guild holds (walls and steps, not the centre tile alone), a seat or town house never on another guild's ground, a bot's house only on its own or an ally's; every 30 s a hall now standing on another guild's ground owes a move (carried by `BotRemover`, seat follows), a bare seat is moved to the nearest point that is not, a town house is left; counted in the `Estate:` line (06.10.2026) |
 | `BotRegard.cs` | what one guild thinks of another, and the two thresholds that make it a war |
 | `BotEvict.cs` | the undertaking: walk over to somebody on your land and tell them to move along |
 | `BotBailiff.cs` | whether anybody is on this guild's land who should not be, and who says so |
@@ -76,9 +77,12 @@ design silently if it had gone the other way.
 | `BotFeuder.cs` | offers a member of a guild at war somebody of the enemy — the guild's standing call before its own eyes |
 | `BotExile.cs` | who won a war, and the debt the loser owes: its hall goes outside the winner's yard |
 | `BotRemove.cs` | the undertaking and its offer: carry a beaten guild's hall out of the winner's yard and put it down again |
-| `BotClaim.cs` | what a guild has claimed of the island square by square, what a claim costs, and how one is won; a square where the guild's muster failed rests for that guild, thirty minutes doubling (build 61) |
+| `BotClaim.cs` | what a guild has claimed of the island square by square, what a claim costs, and how one is won; a square where the guild's muster failed rests for that guild, thirty minutes doubling (build 61); the price of a claim on open ground is held until three gather, then paid to the city, or handed back whole to the guild's chest if they never do, while a claim on held ground pays at the declaration (build 408) |
 | `BotHold.cs` | the undertaking and its offer: declare a claim on a quadrant and stand in it until it is yours; no member is sent to a square the refusal memory holds, and no square is claimed again while its failed muster rests (build 61) |
-| `BotClaimStore.cs` | keeps who owns which square across restarts — the one board on this shard that survives, because it was paid for |
+| `BotClaimStore.cs` | keeps who owns which square across restarts — the one board on this shard that survives, because it was paid for — with each running claim's held price and the failed musters still resting (shape 2, build 408) |
+| `BotSeizure.cs` | a claim on a square another guild holds (to take it or to strike its name off) is war at once, without a meeting, and costs the claimant 30×n of every other guild's regard (never past the war line on that beat) and +2%×n in every town, n its seizures in two days, while time mends no opinion of it above −20×n; the staker weighs it first: not at war elsewhere, not an ally, fewer than two remembered, its side at least as mighty as the holder's (06.10.2026) |
+| `BotTownGround.cs` | no guild holds a square where a town's guards act (07.10.2026): any of its 900 tiles answering `Region.Find(...).GetRegion<GuardedRegion>()` not disabled; the staker passes it over (open or held, so it is never weighed for a seizure), `BotClaim.Open` refuses it, and the hourly sweep (first at boot) drops held ones, the price back out of the city's purse into the chest; a hall's yard is kept |
+| `BotSeizureStore.cs` | keeps the seizures each guild is remembered for across restarts under `Saves/BotSeizures`, as time ago of the shard running |
 | `BotEstateConfig.cs` | what `Configuration/bot-estate.json` is allowed to say |
 | `BotEstateModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Population` |
 | `BotToll.cs` | the toll on hunting a guild's land: posted (10% of a stranger's hunting coin) or patrolled (20%, once told), who pays, and the price it puts on hunting there (26.09.2026) |
@@ -280,3 +284,32 @@ finished supply: left 20 SulfurousAsh ...:     -60 in 0.9 min (-69/min)
 always stated in as many words: goods are worth what they cost. A hall, a bench, a shopkeeper and a shelf of
 reagents are goods. The errand comes out at about nothing a minute: never punished, never preferred over work
 that produces something.
+
+## A bandit is set on standing, not chased (07.10.2026, loops18)
+
+`BotFeuder` sets a fighter on a bandit of The Shadow in sight. On build 418 all 19 quarrels taken were against two recruits going
+about honest work - one mounted and carrying a scroll, one in a company - and none was finished: 15 "could not get nearer", 2
+"no quarrel any more", one death in six seconds. The bandit must now be standing (not walking unless beside the fighter,
+`BanditBeside` 2), in no company, not about steadfast work, and reachable on the reach ledger; the fighter out of a company, fit
+and not the weaker, in lawful ground. Each refusal is counted by its cause in the feuder's clause ("bandits in sight not set on").
+Dial `BotFeuder.BanditStands`.
+
+## Town ground is nobody's to claim (07.10.2026)
+
+Patrick, 07.10 ~10:20: "guilds may not claim town squares with guards. Remove such claims right now and give the guilds
+their money back if they paid for the claim." A thirty-tile square is town ground when any one of its 900 tiles is where a
+guard would come: `Region.Find(tile, map)` at z 0, then `GetRegion<GuardedRegion>()` not disabled (the question
+`BotHaven.Guarded` asks of a point). Towns and the moongates count; Buccaneer's Den, whose guards are off, does not. The
+staker (`BotHolder.Worth`) passes such a square over whether it is open or another guild's, so a held one is never weighed
+for a seizure; `BotClaim.Open` refuses it before any coin moves. `BotClaim.TownSweep` runs on the first claims look after the
+halls are adopted and every hour after: every held town square is dropped (WRN naming guild, square, town and how many of
+its tiles are guarded) and a square that was paid for is refunded what it cost: the price on record in
+`Configuration/bot-townground.json` (`Paid`: {Guild, X, Y, Gold}, read off the logs, each used once), else the standing
+price `BotClaim.Price` (5000gp; the store keeps "bought", not the price), out of the city's purse (`BotCity.Unclaim`) into
+the guild's chest — a purse that cannot cover it still makes the chest whole, and the shortfall is the city's debt,
+counted and logged once a sweep. A claim still mustering there is called off,
+its held price back to the chest. **Not touched:** a hall's own square (its yard) stays its guild's even where it reaches
+into a town, a seat is a point and no claim, and a guild house in a town is bought from the town (`BotGuildHouses`), a
+different thing. A yard in a town cannot be seized, since no claim is opened on town ground. Counted in the `Treasuries:`
+claims clause ("town ground (where guards act): …") and in the `City:` line ("refunded for town ground"); dials
+`BotTownGround.Running`, `SweepEveryMs`.

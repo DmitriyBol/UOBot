@@ -93,15 +93,16 @@ public sealed class BotTailor : IBotProposer
             return leather;
         }
 
-        if (BotThread.Amount(body, typeof(Cloth)) >= BotSew.Bolt)
+        if (BotThread.Amount(body, typeof(Cloth)) >= BotSew.Bolt && !BotRoom.SpecShut(body))
         {
             var own = BotThread.Choose(body, typeof(Cloth), BotSew.Bolt);
 
             if (own != null)
             {
                 OwnCloth++;
+                BotGlut.Spec(own.ItemType);
 
-                return new BotSew(map, body.Location, BotThread.Units(own));
+                return new BotSew(map, body.Location, BotThread.Units(own), own.ItemType);
             }
         }
 
@@ -142,18 +143,28 @@ public sealed class BotTailor : IBotProposer
 
         var price = BotShops.Price(shop, typeof(Cloth));
 
-        return price > 0 ? new BotSew(shop, price, BotThread.Units(recipe)) : null;
+        if (price <= 0)
+        {
+            return null;
+        }
+
+        BotGlut.Spec(recipe.ItemType);
+
+        return new BotSew(shop, price, BotThread.Units(recipe), recipe.ItemType);
     }
 
     private static BotDeed Leatherwork(IBotWilful bot, Mobile body)
     {
+        if (BotThread.Amount(body, typeof(Leather)) < BotSew.Bolt)
+        {
+            BotMarket.FromBank(bot, typeof(Leather), BotSew.Bolt);
+        }
+
         var carried = BotThread.Amount(body, typeof(Leather));
-        var stall = BotAuction.Cheapest(typeof(Leather), bot);
-        var take = stall == null || stall.IsEmpty ? 0 : Math.Min(BotSew.Bolt, stall.Amount);
 
         var order = Order(bot, body);
         var recipe = order == null
-            ? BotThread.Choose(body, typeof(Leather), carried + take)
+            ? BotThread.Choose(body, typeof(Leather), carried)
             : BotThread.Recipe(body, typeof(Leather), order.Kind);
 
         if (recipe == null)
@@ -165,30 +176,29 @@ public sealed class BotTailor : IBotProposer
 
         var need = BotThread.Units(recipe);
 
-        if (carried >= need)
+        if (order == null && BotRoom.SpecShut(body))
         {
-            Took(body, order);
-
-            return new BotSew(body.Map, body.Location, null, 0, 0, need, order);
-        }
-
-        if (take <= 0 || carried + take < need)
-        {
-            NoLeather++;
-
             return null;
         }
 
-        Took(body, order);
+        if (carried >= need)
+        {
+            Took(body, order, recipe.ItemType);
 
-        return new BotSew(body.Map, body.Location, stall, stall.Price, take, need, order);
+            return new BotSew(body.Map, body.Location, need, order, recipe.ItemType);
+        }
+
+        NoLeather++;
+
+        return null;
     }
 
-    private static void Took(Mobile body, BotWant order)
+    private static void Took(Mobile body, BotWant order, Type kind)
     {
         if (order == null)
         {
             OnSpec++;
+            BotGlut.Spec(kind);
 
             return;
         }
@@ -199,12 +209,14 @@ public sealed class BotTailor : IBotProposer
 
     private static BotWant Order(IBotWilful bot, Mobile body)
     {
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
 
         BotWant best = null;
         var bestWorth = 0;
 
         var starved = false;
+        var starvedNeed = 0;
+        var starvedWorth = 0;
 
         for (var i = 0; i < wants.Count; i++)
         {
@@ -222,19 +234,26 @@ public sealed class BotTailor : IBotProposer
                 continue;
             }
 
+            if (!BotCourier.Answerable(bot, want) || BotCourier.Holding(bot, want))
+            {
+                continue;
+            }
+
             var need = BotThread.Units(recipe);
             var carried = BotThread.Amount(body, typeof(Leather));
 
             if (carried < need)
             {
-                var stall = BotAuction.Cheapest(typeof(Leather), bot);
+                starved = true;
+                want.Passed(BotPass.Material);
 
-                if (stall == null || stall.IsEmpty || carried + Math.Min(BotSew.Bolt, stall.Amount) < need)
+                if (want.Worth > starvedWorth)
                 {
-                    starved = true;
-
-                    continue;
+                    starvedWorth = want.Worth;
+                    starvedNeed = need;
                 }
+
+                continue;
             }
 
             best = want;
@@ -244,6 +263,8 @@ public sealed class BotTailor : IBotProposer
         if (starved && best == null)
         {
             ShortOfLeather++;
+
+            BotCraftFirst.Short(body, typeof(Leather), starvedNeed);
         }
 
         return best;

@@ -31,9 +31,11 @@ public sealed class BotMuster : IBotProposer
 
     public static int Least { get; set; } = 2;
 
-    public static double MostBound { get; set; } = 0.34;
+    public static double MostBound { get; set; } = 0.5;
 
     public static long Enough { get; private set; }
+
+    public static long VeteransPastCeiling { get; private set; }
 
     private static bool _said;
 
@@ -101,13 +103,23 @@ public sealed class BotMuster : IBotProposer
             return null;
         }
 
+        if (BotTrading.Passes(body))
+        {
+            return null;
+        }
+
         var alive = BotPopulation.Count;
 
         if (alive > 0 && BotSquads.Bound >= alive * MostBound)
         {
-            Enough++;
+            if (!BotTraits.Veteran(body))
+            {
+                Enough++;
 
-            return null;
+                return null;
+            }
+
+            VeteransPastCeiling++;
         }
 
         if (body.HitsMax <= 0 || body.Hits < body.HitsMax * BotHunter.FitAt)
@@ -121,10 +133,24 @@ public sealed class BotMuster : IBotProposer
         {
             _urged.Remove(body.Serial);
 
-            if (urge.Quarry is { Deleted: false, Alive: true } foe && foe.Map == map && body.InRange(foe, Reach * 2))
+            if (urge.Quarry is { Deleted: false, Alive: true } foe && foe.Map == map && body.InRange(foe, Reach * 2) && !BotQuarry.Shunned(foe))
             {
-                if (Free(body, Reach) >= Least)
+                if (Free(body, Reach, out var levy) >= Least)
                 {
+                    if (Judged && (levy + BotThreat.Power(body)) * BotThreat.Tolerance < BotBand.Asked(map, foe, body))
+                    {
+                        Short++;
+
+                        return null;
+                    }
+
+                    if (Judged && BotSquad.BeyondFor(body, foe, levy + BotThreat.Power(body)))
+                    {
+                        Priced++;
+
+                        return null;
+                    }
+
                     UrgedBands++;
                     Called++;
                     Once(body, foe);
@@ -136,7 +162,7 @@ public sealed class BotMuster : IBotProposer
             }
         }
 
-        var quarry = BotQuarry.Company(body, Reach, out var why);
+        var quarry = BotQuarry.Company(body, Reach, BotSquad.ChoiceOdds, out var why);
 
         if (quarry == null)
         {
@@ -166,9 +192,23 @@ public sealed class BotMuster : IBotProposer
             return null;
         }
 
-        if (Free(body, Reach) < Least)
+        if (Free(body, Reach, out var brought) < Least)
         {
             TooFewNear++;
+
+            return null;
+        }
+
+        if (Judged && (brought + BotThreat.Power(body)) * BotThreat.Tolerance < BotBand.Asked(map, quarry, body))
+        {
+            Short++;
+
+            return null;
+        }
+
+        if (Judged && BotSquad.BeyondFor(body, quarry, brought + BotThreat.Power(body)))
+        {
+            Priced++;
 
             return null;
         }
@@ -180,10 +220,20 @@ public sealed class BotMuster : IBotProposer
         return new BotBand(quarry, BotThreat.OurPower(body, Reach));
     }
 
-    private static int Free(Mobile body, int range)
+    public static bool Judged { get; set; } = true;
+
+    public static long Short { get; private set; }
+
+    public static long Priced { get; private set; }
+
+    public static long HostileNear { get; private set; }
+
+    private static int Free(Mobile body, int range, out double strength)
     {
         var map = body.Map;
         var free = 0;
+
+        strength = 0.0;
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(body.Location, range))
         {
@@ -192,9 +242,18 @@ public sealed class BotMuster : IBotProposer
                 continue;
             }
 
-            if (mobile is IBotAlly { AbleToFight: true })
+            if (mobile is IBotAlly { AbleToFight: true } && (mobile is not IBotWilful wilful || BotSquads.Pressable(wilful))
+                && !BotTrading.Neutral(mobile))
             {
+                if (BotRegard.Hostile(body, mobile))
+                {
+                    HostileNear++;
+
+                    continue;
+                }
+
                 free++;
+                strength += BotThreat.Power(mobile);
             }
         }
 
@@ -222,7 +281,7 @@ public sealed class BotMuster : IBotProposer
             ? "nobody has been offered a company yet"
             : $"{Asked} asked: {Called} called ({UrgedBands} of them on a foe a bot had just found too many round, {UrgedAlone} such urges with too few free near), {Enough} refused because {BotSquads.Bound} of us are already in one, {Alone} had nobody of ours near enough, {AllSmall} found only one-bot work, "
               + $"{AllTooBig} found something beyond all of us together, {NothingBig} found nothing hostile at all, "
-              + $"{TooFewNear} found one but fewer than {Least} free, {Unfit} too hurt, {Held} already in one";
+              + $"{TooFewNear} found one but fewer than {Least} free, {Short} found one the free near fell short of (judged before the call{(Judged ? "" : ", off")}), {Priced} found one the company's own price put past them, {HostileNear} hostile bots near a caller left out of the count, {Unfit} too hurt, {Held} already in one";
 
     public static void Forget()
     {
@@ -236,6 +295,9 @@ public sealed class BotMuster : IBotProposer
         AllTooBig = 0;
         NothingBig = 0;
         TooFewNear = 0;
+        Short = 0;
+        Priced = 0;
+        HostileNear = 0;
         Called = 0;
     }
 }

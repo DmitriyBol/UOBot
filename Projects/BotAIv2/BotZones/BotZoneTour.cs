@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
@@ -38,6 +39,15 @@ namespace Server.BotAI.V2;
 /// not charting the dungeons) and <see cref="Move"/> (its own teleport) when it starts. With no debugger the tour stands still
 /// and says so.
 /// </para>
+///
+/// <para>
+/// <b>One of them is the zone keeper while the zone watch runs (07.10.2026, Patrick: "one debugger goes wholly onto the
+/// zones").</b> <see cref="Keeper"/> names it and <see cref="KeeperHook"/> says whether the squad has given it up to the zones;
+/// it walks first, without a pause between stops, and chooses by what the accuracy counter most needs: a zone with no verdict in
+/// the window first, then one whose last visit disagreed, then the oldest verdict. Every full hold by anybody is a check for
+/// <see cref="BotZoneWatch"/>: a living attacker in the zone's own patrol, or none, against the level the zone is painted. The
+/// tour walks only while the watch is on; when the watch ends it stops for every debugger.
+/// </para>
 /// </summary>
 public static class BotZoneTour
 {
@@ -60,6 +70,14 @@ public static class BotZoneTour
     public static bool Water { get; set; }
 
     public static int Bucket { get; set; } = 60;
+
+    public static string Keeper { get; set; } = "Heimdall";
+
+    public static Func<string> KeeperHook { get; set; }
+
+    public static string KeeperNow() => Running && BotZoneWatch.On ? KeeperHook?.Invoke() : null;
+
+    public static int RefusedRestMs { get; set; } = 600000;
 
     public static Func<IReadOnlyList<(string Name, Mobile Body)>> Walkers { get; set; }
 
@@ -101,6 +119,12 @@ public static class BotZoneTour
 
         public long Focused;
 
+        public bool Keeper;
+
+        public int Seen;
+
+        public int Looks;
+
         public readonly List<(int X, int Y)> Sectors = [];
     }
 
@@ -125,6 +149,12 @@ public static class BotZoneTour
 
     private static readonly List<Mobile> _dropped = [];
 
+    private static readonly Dictionary<int, long> _refused = [];
+
+    public static long Judged { get; private set; }
+
+    public static long KeeperStops { get; private set; }
+
     private static Map _map;
 
     public static void Open(long now)
@@ -133,6 +163,7 @@ public static class BotZoneTour
         _held.Clear();
         _visited.Clear();
         _walking.Clear();
+        _refused.Clear();
         _map = null;
     }
 
@@ -152,12 +183,17 @@ public static class BotZoneTour
 
     public static bool Holding(Mobile body) => body != null && _stops.ContainsKey(body);
 
+    public static string StopOf(Mobile body) =>
+        body != null && _stops.TryGetValue(body, out var stop)
+            ? $"holding {Math.Min(HoldMs, Core.TickCount - stop.Began) / 1000}/{HoldMs / 1000} s at zone {stop.Zone} ({stop.Label})"
+            : null;
+
     public static bool Beat(Map map, long now)
     {
         _map = map;
 
         var state = BotZones.State;
-        var walkers = Running ? Walkers?.Invoke() : null;
+        var walkers = Running && BotZoneWatch.On ? Walkers?.Invoke() : null;
 
         _walking.Clear();
 
@@ -235,7 +271,7 @@ public static class BotZoneTour
         return false;
     }
 
-    private static bool Eligible(BotZone zone) => zone.Level >= BotZoneLevel.Hostile && (Water || !zone.Water);
+    private static bool Eligible(BotZone zone) => zone.Level >= BotZoneLevel.Hostile && !zone.Stray && (Water || !zone.Water);
 
     private static void Count(BotZoneState state)
     {
@@ -265,7 +301,8 @@ public static class BotZoneTour
 
     private static void Begin(Map map, BotZoneState state, string name, Mobile body, long now)
     {
-        var zone = Pick(state, body);
+        var keeper = name != null && string.Equals(name, KeeperNow(), StringComparison.OrdinalIgnoreCase);
+        var zone = keeper ? PickForKeeper(state, body, now) : Pick(state, body);
 
         if (zone == null && Total > 0 && Visited >= Total)
         {
@@ -291,6 +328,7 @@ public static class BotZoneTour
         {
             Refused++;
             _visited.Add(zone.Id);
+            _refused[zone.Id] = now;
 
             return;
         }
@@ -303,7 +341,8 @@ public static class BotZoneTour
             Label = zone.Label,
             At = at,
             Began = now,
-            Focused = now
+            Focused = now,
+            Keeper = keeper
         };
 
         Sectors(map, zone, at, stop.Sectors);
@@ -351,6 +390,63 @@ public static class BotZoneTour
                 best = zone;
                 bestBucket = b;
                 bestDistance = d;
+            }
+        }
+
+        return best;
+    }
+
+    private static BotZone PickForKeeper(BotZoneState state, Mobile body, long now)
+    {
+        BotZone best = null;
+        var bestTier = int.MaxValue;
+        var bestOrder = long.MaxValue;
+        var unix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var window = unix - Math.Max(1, BotZoneWatch.AccuracyWindowHours) * 3600L;
+        var recheck = unix - Math.Max(0, BotZoneWatch.RecheckMinutes) * 60L;
+
+        for (var i = 0; i < state.Zones.Length; i++)
+        {
+            var zone = state.Zones[i];
+
+            if (zone.Stray || !Water && zone.Water || Taken(zone.Id)
+                || _refused.TryGetValue(zone.Id, out var refused) && now - refused < RefusedRestMs)
+            {
+                continue;
+            }
+
+            long d = body.Map == state.Map ? Math.Max(Math.Abs(body.X - zone.CenterX), Math.Abs(body.Y - zone.CenterY)) : int.MaxValue;
+            int tier;
+            long order;
+
+            var visited = BotZoneWatch.LastVisit(zone);
+
+            if (visited > recheck)
+            {
+                tier = 3;
+                order = visited;
+            }
+            else if (!BotZoneWatch.LastCheck(zone, out var at, out var agree) || at < window)
+            {
+                tier = 0;
+                order = d;
+            }
+            else if (!agree)
+            {
+                tier = 1;
+                order = d;
+            }
+            else
+            {
+                tier = 2;
+                order = Math.Max(at, visited);
+            }
+
+            if (tier < bestTier || tier == bestTier && order < bestOrder)
+            {
+                best = zone;
+                bestTier = tier;
+                bestOrder = order;
             }
         }
 
@@ -424,6 +520,52 @@ public static class BotZoneTour
         {
             stop.Focused = now;
             BotZoneScan.Focus(map, stop.Box, now);
+            Look(map, stop);
+        }
+    }
+
+    private static void Look(Map map, Stop stop)
+    {
+        var state = BotZones.State;
+
+        if (stop.Seen > 0 || state == null || state.Map != map)
+        {
+            return;
+        }
+
+        stop.Looks++;
+
+        var zone = BotZones.Find(stop.Zone);
+
+        if (zone == null)
+        {
+            return;
+        }
+
+        foreach (var c in map.GetMobilesInBounds<BaseCreature>(new Rectangle2D(zone.X1, zone.Y1, zone.X2 - zone.X1 + 1, zone.Y2 - zone.Y1 + 1)))
+        {
+            if (c is not { Deleted: false, Alive: true } || c.Controlled || c.Summoned || c.Blessed || c.IsDeadBondedPet
+                || !BotHaunts.AttacksFirst(c.FightMode) || BotHaunts.IsTownsfolk(c))
+            {
+                continue;
+            }
+
+            var cx = c.X >> BotZoneState.Shift;
+            var cy = c.Y >> BotZoneState.Shift;
+
+            if ((uint)cx >= (uint)state.Width || (uint)cy >= (uint)state.Height)
+            {
+                continue;
+            }
+
+            var v = state.Cells[cy * state.Width + cx];
+
+            if (v != 0 && (v & BotZoneState.Fringe) == 0 && state.Zones[(v & BotZoneState.IndexMask) - 1].Id == stop.Zone)
+            {
+                stop.Seen++;
+
+                return;
+            }
         }
     }
 
@@ -432,11 +574,22 @@ public static class BotZoneTour
         Stops++;
         _visited.Add(stop.Zone);
 
+        if (stop.Keeper)
+        {
+            KeeperStops++;
+        }
+
         var zone = BotZones.Find(stop.Zone);
 
         if (zone == null)
         {
             return;
+        }
+
+        if (stop.Looks > 0)
+        {
+            Judged++;
+            BotZoneWatch.Visited(zone, stop.Seen > 0, stop.Seen == 0 ? RefillMinutes(zone) : 0.0);
         }
 
         var haunts = BotHaunts.All;
@@ -452,6 +605,31 @@ public static class BotZoneTour
                 haunt.TouredAt = at;
             }
         }
+    }
+
+    private static double RefillMinutes(BotZone zone)
+    {
+        var minutes = 0.0;
+        var state = BotZones.State;
+        var haunts = BotHaunts.All;
+
+        for (var i = 0; i < haunts.Count; i++)
+        {
+            var haunt = haunts[i];
+
+            if (haunt.At.X < zone.X1 || haunt.At.X > zone.X2 || haunt.At.Y < zone.Y1 || haunt.At.Y > zone.Y2
+                || state?.Owner(haunt.At.X, haunt.At.Y)?.Id != zone.Id)
+            {
+                continue;
+            }
+
+            if (haunt.Spawner is { Deleted: false, Running: true } spawner && !spawner.IsFull)
+            {
+                minutes = Math.Max(minutes, Math.Max(1.0, 2.0 * spawner.MaxDelay.TotalMinutes));
+            }
+        }
+
+        return minutes;
     }
 
     private static void LetGo(Map map, long now)
@@ -519,7 +697,8 @@ public static class BotZoneTour
         var now = Core.TickCount;
 
         w.WriteStartObject();
-        w.WriteBoolean("running", Running && Walkers != null);
+        w.WriteBoolean("running", Running && BotZoneWatch.On && Walkers != null);
+        w.WriteString("keeper", KeeperNow());
         w.WriteNumber("round", Round);
         w.WriteNumber("visited", Visited);
         w.WriteNumber("total", Total);
@@ -549,13 +728,13 @@ public static class BotZoneTour
                 w.WriteNumberValue(stop.At.Y);
                 w.WriteEndArray();
                 w.WriteNumber("zone", stop.Zone);
-                w.WriteString("state", $"holding {Math.Min(HoldMs, now - stop.Began) / 1000}/{HoldMs / 1000} s at zone {stop.Zone} ({stop.Label})");
+                w.WriteString("state", $"{(stop.Keeper ? "zone keeper, " : "")}holding {Math.Min(HoldMs, now - stop.Began) / 1000}/{HoldMs / 1000} s at zone {stop.Zone} ({stop.Label})");
             }
             else
             {
                 w.WriteNull("target");
                 w.WriteNull("zone");
-                w.WriteString("state", Running ? "choosing the next zone" : "the tour is off");
+                w.WriteString("state", !Running ? "the tour is off" : !BotZoneWatch.On ? "the zone watch has ended" : "choosing the next zone");
             }
 
             w.WriteEndObject();
@@ -573,10 +752,10 @@ public static class BotZoneTour
 
         foreach (var (_, stop) in _stops)
         {
-            stops.Add($"{stop.Name} at zone {stop.Zone} {(now - stop.Began) / 1000}/{HoldMs / 1000}s");
+            stops.Add($"{stop.Name} at zone {stop.Zone} {(now - stop.Began) / 1000}/{HoldMs / 1000}s{(stop.Seen > 0 ? " (an attacker seen)" : "")}");
         }
 
-        return $"{(Running ? "on" : "off")}, round {Round}: {Visited} of {Total} zones stood in this round, {Stops} stops in all ({Abandoned} cut short, {Refused} refused moves); {who}{(stops.Count > 0 ? $" ({string.Join(", ", stops)})" : "")}; "
+        return $"{(!Running ? "off" : !BotZoneWatch.On ? "stopped, the zone watch having ended" : "on")}, keeper {KeeperNow() ?? "none"} ({KeeperStops} of its stops held), round {Round}: {Visited} of {Total} zones stood in this round, {Stops} stops in all ({Abandoned} cut short, {Refused} refused moves, {Judged} judged for the zone watch); {who}{(stops.Count > 0 ? $" ({string.Join(", ", stops)})" : "")}; "
             + $"{_held.Count} sectors held now, {Woken} woken, {PutBack} put back to sleep, {LeftAwake} left awake for a bot or a client";
     }
 
@@ -593,7 +772,9 @@ public static class BotZoneTour
         _held.Clear();
         _visited.Clear();
         _walking.Clear();
+        _refused.Clear();
         Stops = Abandoned = Refused = 0;
+        Judged = KeeperStops = 0;
         Woken = PutBack = LeftAwake = 0;
         Round = 1;
         Visited = Total = 0;

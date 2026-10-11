@@ -11,7 +11,7 @@ namespace Server.BotAI.V2;
 /// <para>
 /// The news is read where the shard keeps it: the roads the population has walked and how they read
 /// (<see cref="BotRoadbook"/>), the worst square near by the quadrant map (<see cref="BotQuad"/>), what the speaker is
-/// selling or after or what the board is paying most for (<see cref="BotAuction"/>), how its guild's war stands
+/// carrying that somebody wants, or after, or what the island's wants pay most for (<see cref="BotMarket"/>), how its guild's war stands
 /// (<see cref="BotWar"/>) or what it is working towards (<c>BotGuilds.Aim</c>).
 /// </para>
 ///
@@ -100,7 +100,7 @@ public static class BotCampTalk
                 "Don't go near ({x}, {y}). {deaths} dead there already."
             ],
             ["camp:quiet"] = ["Quiet around here, anyway.", "Nobody has died near here that I've heard.", "The woods are calm tonight."],
-            ["camp:selling"] = ["I've {amount} {item} on my stall at {price} apiece, if anybody wants them.", "Anybody need {item}? {price} each."],
+            ["camp:selling"] = ["I'm carrying {amount} {item}, and somebody is paying {price} apiece for them.", "Anybody need {item}? I have {amount}, {price} each, hand to hand."],
             ["camp:buying"] = ["I'm after {item}; paying {price} a piece.", "If you come across {item}, I'll give {price} for each."],
             ["camp:market"] = ["Everybody wants {item} these days; {price} a piece, they're paying.", "There's money in {item}. {price} on the board."],
             ["camp:war"] =
@@ -253,6 +253,11 @@ public static class BotCampTalk
 
     public static string Topic(Mobile speaker, Map map, Point3D at, Dictionary<string, string> fill, string small)
     {
+        if (BotBiography.Tale(speaker, fill) is { } tale)
+        {
+            return tale;
+        }
+
         var first = Utility.Random(4);
 
         for (var k = 0; k < 4; k++)
@@ -332,29 +337,40 @@ public static class BotCampTalk
 
     private static string Trade(Mobile speaker, Dictionary<string, string> fill)
     {
-        var listings = BotAuction.Listings;
-        BotListing stall = null;
+        var wants = BotMarket.Wants;
+        BotWant carried = null;
+        var held = 0;
         var seen = 0;
 
-        for (var i = 0; i < listings.Count; i++)
+        if (speaker is IBotWilful own)
         {
-            if (listings[i] is { IsEmpty: false } listing && ReferenceEquals(listing.Seller?.Self, speaker) && Utility.Random(++seen) == 0)
+            for (var i = 0; i < wants.Count; i++)
             {
-                stall = listing;
+                if (wants[i] is not { IsOpen: true } want || ReferenceEquals(want.Buyer?.Self, speaker))
+                {
+                    continue;
+                }
+
+                var have = BotHandover.Carried(own, want.Kind);
+
+                if (have > 0 && Utility.Random(++seen) == 0)
+                {
+                    carried = want;
+                    held = have;
+                }
             }
         }
 
-        if (stall != null)
+        if (carried != null)
         {
-            fill["item"] = stall.Label;
-            fill["amount"] = stall.Amount.ToString();
-            fill["price"] = stall.Price.ToString();
+            fill["item"] = carried.Label;
+            fill["amount"] = held.ToString();
+            fill["price"] = carried.Offer.ToString();
             Trades++;
 
             return "camp:selling";
         }
 
-        var wants = BotAuction.Wants;
         BotWant mine = null;
         BotWant best = null;
 

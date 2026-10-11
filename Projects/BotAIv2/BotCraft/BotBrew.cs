@@ -22,7 +22,7 @@ namespace Server.BotAI.V2;
 /// get made.
 /// </para>
 /// </summary>
-public sealed class BotBrew : BotDeed
+public sealed class BotBrew : BotDeed, IBotWantCarrier
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBrew));
 
@@ -39,6 +39,7 @@ public sealed class BotBrew : BotDeed
     private enum Leg
     {
         Glass,
+        Fund,
         Work,
         Sell
     }
@@ -58,6 +59,20 @@ public sealed class BotBrew : BotDeed
     private readonly BotWant _order;
 
     private readonly Type _potion;
+
+    private readonly bool _funded;
+
+    private readonly int _fundUnits;
+
+    private readonly int _fundGlass;
+
+    private readonly int _fundHerbs;
+
+    private readonly Type _reagent;
+
+    private readonly int _fundCost;
+
+    private bool _released;
 
     private Leg _leg;
 
@@ -92,19 +107,51 @@ public sealed class BotBrew : BotDeed
         _leg = take > 0 ? Leg.Glass : Leg.Work;
     }
 
+    public BotBrew(Map map, Point3D where, Type potion, BaseVendor shop, BotWant order, int units, int glass, int herbs, Type reagent, int cost)
+    {
+        _map = map;
+        _where = where;
+        _potion = potion;
+        _shop = shop;
+        _order = order;
+        _funded = true;
+        _fundUnits = Math.Max(1, units);
+        _fundGlass = Math.Max(0, glass);
+        _fundHerbs = Math.Max(0, herbs);
+        _reagent = reagent;
+        _fundCost = Math.Max(0, cost);
+        _leg = Leg.Fund;
+    }
+
+    public BotWant Order => _order;
+
+    public bool Carries(BotWant want) => _funded && !_released && ReferenceEquals(_order, want);
+
+    public bool Stale => false;
+
+    public Type Goods => _potion;
+
+    public override void Taken(IBotWilful bot)
+    {
+        if (_funded && _order != null && BotMarket.Stands(_order))
+        {
+            _order.Reserve(bot, _fundUnits);
+        }
+    }
+
     public override string Kind => Trade;
 
     public override Map Map => _map;
 
     public override Point3D Where => _where;
 
-    public override double Expects => _order == null ? Prior : Prior * 1.6;
+    public override double Expects => _order != null ? Prior * 1.6 : BotGlut.Claim(_potion, Prior);
 
     public override double Minutes => WorkMinutes;
 
     public override SkillName? Trains => SkillName.Alchemy;
 
-    public override int Outlay => _take * _price;
+    public override int Outlay => _funded ? 0 : _take * _price;
 
     public override bool AtCounter => _shop != null;
 
@@ -116,6 +163,7 @@ public sealed class BotBrew : BotDeed
         _leg switch
         {
             Leg.Glass => $"after {_take} Bottle to brew with",
+            Leg.Fund  => $"after {_fundGlass} Bottle and {_fundHerbs} {_reagent?.Name} for {_order?.Buyer?.Self?.Name ?? "a buyer"}'s {_fundUnits} {_potion?.Name}, on its money ({_fundCost}gp)",
             Leg.Work  => $"brewing ({_swings} attempts, {_bottled} made)",
             _         => $"putting {_bottled} bottles out"
         };
@@ -144,6 +192,7 @@ public sealed class BotBrew : BotDeed
             var doing = _leg switch
             {
                 Leg.Glass => Glass(bot, body),
+                Leg.Fund  => Fund(bot, body),
                 Leg.Work  => Brewing(body),
                 _         => Selling(bot, body)
             };
@@ -166,16 +215,7 @@ public sealed class BotBrew : BotDeed
             return default;
         }
 
-        if (BotAuction.Reclaim(bot, typeof(Bottle)) > 0 && BotFlask.Bottles(body) >= BotFlask.LeastBottles)
-        {
-            _leg = Leg.Work;
-
-            return default;
-        }
-
-        var lot = BotAuction.Cheapest(typeof(Bottle), bot);
-
-        if (lot is { IsEmpty: false } && BotAuction.Buy(body, lot, Math.Min(_take, lot.Amount)) > 0)
+        if (BotMarket.FromBank(bot, typeof(Bottle), _take) > 0 && BotFlask.Bottles(body) >= BotFlask.LeastBottles)
         {
             _leg = Leg.Work;
 
@@ -184,7 +224,7 @@ public sealed class BotBrew : BotDeed
 
         if (_shop == null || _shop.Deleted || _shop.Map == null || _shop.Map == Map.Internal)
         {
-            return BotDoing.Failed("no glass on any stall and no merchant selling it");
+            return BotDoing.Failed("no merchant selling glass");
         }
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
@@ -205,6 +245,87 @@ public sealed class BotBrew : BotDeed
 
             return BotDoing.Failed(refused ?? "no glass to be had");
         }
+
+        _leg = Leg.Work;
+
+        return default;
+    }
+
+    private BotDoing Fund(IBotWilful bot, Mobile body)
+    {
+        var buyer = _order?.Buyer?.Self;
+
+        if (!BotMarket.Stands(_order) || buyer is not { Deleted: false, Alive: true })
+        {
+            return BotDoing.Failed("the want it meant to brew for is gone");
+        }
+
+        if (_shop == null || _shop.Deleted || _shop.Map == null || _shop.Map == Map.Internal)
+        {
+            return BotDoing.Failed("no counter selling glass and herbs");
+        }
+
+        if (!body.InRange(_shop.Location, BotShops.CounterReach))
+        {
+            return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for glass and herbs on {buyer.Name}'s money");
+        }
+
+        var recipe = BotAdvance.Able(body, _potion, out _);
+
+        if (recipe == null)
+        {
+            return BotDoing.Failed("its Alchemy no longer carries the draught");
+        }
+
+        var (reagent, per, glass) = BotFlask.Costs(recipe);
+        var lackGlass = Math.Max(0, _fundUnits * glass - BotFlask.Bottles(body));
+        var lackHerbs = Math.Max(0, _fundUnits * per - BotFlask.Amount(body, reagent));
+
+        if (lackGlass + lackHerbs <= 0)
+        {
+            _leg = Leg.Work;
+
+            return default;
+        }
+
+        var factor = Math.Max(1.0, BotBurgh.Factor(body, _shop));
+        var glassPrice = lackGlass > 0 ? (int)Math.Ceiling(BotShops.Price(_shop, typeof(Bottle)) * factor) : 0;
+        var herbPrice = lackHerbs > 0 ? (int)Math.Ceiling(BotShops.Price(_shop, reagent) * factor) : 0;
+
+        if (lackGlass > 0 && glassPrice <= 0 || lackHerbs > 0 && herbPrice <= 0)
+        {
+            return BotDoing.Failed($"{_shop.Name} sells no glass or no {reagent?.Name} now");
+        }
+
+        var cost = lackGlass * glassPrice + lackHerbs * herbPrice;
+
+        if (cost > _fundUnits * _order.Offer)
+        {
+            return BotDoing.Failed($"{buyer.Name}'s {_order.Offer}gp a draught no longer pays for its glass and herbs at {cost}gp");
+        }
+
+        if (!BotAdvance.Lend(bot, _order, _fundUnits, cost))
+        {
+            return BotDoing.Failed($"{buyer.Name}'s money would not put {cost}gp down for its glass and herbs");
+        }
+
+        var before = BotYield.Wealth(body);
+        var bottles = lackGlass > 0 ? BotShops.Buy(bot, _shop, typeof(Bottle), lackGlass, out _) : 0;
+        var herbs = lackHerbs > 0 ? BotShops.Buy(bot, _shop, reagent, lackHerbs, out _) : 0;
+
+        BotAdvance.Spent(bot, Math.Max(0, before - BotYield.Wealth(body)), bottles, herbs);
+
+        logger.Information(
+            "{Name} bought {Bottles} bottles and {Herbs} {Reagent} on {Buyer}'s money for its want of {Units} {Potion} (want #{Id})",
+            body.Name,
+            bottles,
+            herbs,
+            reagent?.Name,
+            buyer.Name,
+            _fundUnits,
+            _potion?.Name,
+            _order.Id
+        );
 
         _leg = Leg.Work;
 
@@ -233,7 +354,8 @@ public sealed class BotBrew : BotDeed
             _bottled += have - _had;
             BotCraftwork.Produced(_potion, have - _had);
             _had = have;
-            _made = _bottled * BotFlask.Worth;
+
+            _made = BotGlut.Yield(_potion, _bottled, BotFlask.Worth);
         }
 
         if (tool == null)
@@ -305,6 +427,12 @@ public sealed class BotBrew : BotDeed
 
     private BotDoing Selling(IBotWilful bot, Mobile body)
     {
+        if (_funded && !_released)
+        {
+            _released = true;
+            _order?.Release(bot);
+        }
+
         var ordered = 0;
         var listed = 0;
 
@@ -335,30 +463,17 @@ public sealed class BotBrew : BotDeed
                 held = Math.Max(1, stack.Amount);
             }
 
-            var want = _order ?? BotAuction.Demand(bot, _potion);
-            var sold = want == null ? 0 : BotAuction.Fill(bot, want, stack);
+            var want = _order ?? BotMarket.Demand(bot, _potion);
+            var answer = want == null ? 0 : Math.Min(held, Math.Max(0, want.Payable - ordered));
 
-            if (sold > 0)
-            {
-                ordered += sold;
-                _made -= sold * BotFlask.Worth;
-
-                if (sold >= held)
-                {
-                    continue;
-                }
-            }
-
-            if (BotAuction.List(bot, stack, BotAuction.Worth(_potion, BotFlask.Worth), true, true) != null)
-            {
-                listed++;
-            }
+            ordered += answer;
+            listed += held - answer;
         }
 
         if (ordered > 0)
         {
             logger.Information(
-                "{Name} brewed {Bottles} bottles of {Potion} and {Ordered} of them went straight to an order",
+                "{Name} brewed {Bottles} bottles of {Potion} and {Ordered} of them are for an order, to be carried to it",
                 body.Name,
                 _bottled,
                 _potion?.Name,
@@ -366,7 +481,7 @@ public sealed class BotBrew : BotDeed
             );
         }
 
-        return BotDoing.Done($"{_bottled} bottles in {_swings} attempts, {ordered} to order and {listed} put out to sell");
+        return BotDoing.Done($"{_bottled} bottles in {_swings} attempts, {ordered} for an order and {listed} kept to sell");
     }
 
     private int Keeps(IBotWilful bot)

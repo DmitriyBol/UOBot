@@ -8,7 +8,7 @@ the ladder was written and was empty the whole time.
 | `BotMend.cs` | what a bot can mend with, who is worth mending, and the three ways of doing it |
 | `BotSalve.cs` | an obligation: get there → cast, bandage or drink → until whole; mending itself, its place is wherever the bot stands (build 49) |
 | `BotMedic.cs` | the `Failing` proposer: mend yourself, above everything else |
-| `BotSurgeon.cs` | the `Free` proposer: mend whoever is worst off — **including yourself** |
+| `BotSurgeon.cs` | the `Free` proposer: mend whoever is worst off — **including yourself**; `Call` has the nearest of ours able to mend look up the moment a bot becomes a patient (06.10.2026) |
 | `BotAccompany.cs` | a healer standing by one of ours who is fighting, and `BotAttendant`, which offers it to healers only |
 | `BotRetainer.cs` | healers for hire: a fighter worth `Affluent` going afield takes a healer at `Wage` a minute, paid from its pack for every minute the healer stood within `Near`; the escort is unpaid work for the healer so the ledger never learns a hire (build 67) |
 | `BotHouseCall.cs` | a healer with nobody to mend walking to where our fighters are, so the attendant and the surgeon have somebody to offer it; and `BotHouseCalls`, which offers it to idle healers only, further off than the attendant looks (build 73) |

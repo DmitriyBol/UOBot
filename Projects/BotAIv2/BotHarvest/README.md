@@ -5,7 +5,7 @@ the brain works at all.
 
 | File | What is in it |
 |---|---|
-| `BotOre.cs` | ore: what is in a hill, what digs it, one swing, and what ore becomes in a fire |
+| `BotOre.cs` | ore: what is in a hill, what digs it, one swing, and what ore becomes in a fire; what a vein is worth against iron by what its metal is paid for (a shopkeeper or a want), so a coloured vein nobody buys ranks below iron (06.10.2026); the counters' hourly purse for coloured bars (`ColouredPerHour`, `CounterRoom`; the smiths buy them at 3/2gp since ingots16) |
 | `BotHeard.cs` | what the harvest system last said to each bot, and which sentence means what |
 | `BotGround.cs` | what the population knows about places: one sweep yields veins, fires and counters; a seam struck off leaves the cached answers (`Untell`), and a hearth a cook found cold rests for every cook (`Cold`), a forge whose anvil the engine refused for every smith (`Unfit`); a seam on ground that has lately refused somebody is not chosen (`Unwalked`, build 51); nor one whose every rock in reach the engine has emptied — asked of the winner with the trip's own rings (`BotOre.Stocked`), rested as the trip would rest it, and chosen again (`Hollow`, build 63) |
 | `BotDig.cs` | an obligation with three legs: vein → fire → counter; a pickaxe worn through with ore worth melting still goes to the fire; the seam is held from the first step of the walk, and a miner whose seam another holds goes on to a free one; a seam whose rocks are all there and worked out rests rather than being struck off |

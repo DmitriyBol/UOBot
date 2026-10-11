@@ -82,7 +82,7 @@ public static class BotStable
             return false;
         }
 
-        if (BotYield.Wealth(bot) - BotSteed.Price < Reserve)
+        if (BotYield.Spendable(bot) - BotSteed.Price < Reserve)
         {
             return false;
         }
@@ -217,7 +217,7 @@ public static class BotStable
             return;
         }
 
-        if (Wants(bot) && keeper is { Deleted: false } && BotYield.Wealth(bot) - BotSteed.Price >= Reserve)
+        if (Wants(bot) && keeper is { Deleted: false } && BotYield.Spendable(bot) - BotSteed.Price >= Reserve)
         {
             return;
         }
@@ -305,7 +305,7 @@ public static class BotStable
 
         Asked++;
 
-        var wealth = BotYield.Wealth(bot);
+        var wealth = BotYield.Spendable(bot);
 
         if (wealth - BotSteed.Price < Reserve)
         {

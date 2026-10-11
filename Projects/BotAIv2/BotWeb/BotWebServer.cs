@@ -223,6 +223,44 @@ public static class BotWebServer
                     Text(response, BotWebSnapshot.Health(), "application/json; charset=utf-8");
 
                     return;
+
+                case "/api/live":
+                    Live(response, request.QueryString["bot"]);
+
+                    return;
+                case "/api/live/stream":
+                    LiveStream(response, request.QueryString["bot"]);
+
+                    return;
+                case "/api/debuggers":
+                    Text(response, BotWebLive.Debuggers(), "application/json; charset=utf-8");
+
+                    return;
+
+                case "/api/live/scene":
+                    LiveScene(response, request.QueryString["bot"]);
+
+                    return;
+
+                case "/api/reach":
+                    Text(response, BotReachWeb.Json, "application/json; charset=utf-8");
+
+                    return;
+                case "/api/reach/tiles":
+                    BotReachWeb.Tiles(request, response);
+
+                    return;
+                case "/api/reach/tile":
+                    Text(response, BotReachWeb.Tile(request), "application/json; charset=utf-8");
+
+                    return;
+            }
+
+            if (path.StartsWith("/api/art/", StringComparison.Ordinal) || path.StartsWith("/api/anim/", StringComparison.Ordinal))
+            {
+                BotWebArt.Serve(request, response, path);
+
+                return;
             }
 
             if (path.StartsWith("/api/bot/", StringComparison.Ordinal))
@@ -327,7 +365,7 @@ public static class BotWebServer
                    + "<h1>BotWeb is listening</h1><p>No page yet: put <code>index.html</code> in <code>" + WebUtility.HtmlEncode(FolderPath)
                    + "</code>. The data is at <a href=\"/api/state\">/api/state</a>, <a href=\"/api/events\">/api/events</a>, "
                    + "<a href=\"/api/paths\">/api/paths</a>, <a href=\"/api/history\">/api/history</a>, <a href=\"/api/craft\">/api/craft</a>, <a href=\"/api/zones\">/api/zones</a>, "
-                   + "<a href=\"/api/log\">/api/log</a>.</p></body>";
+                   + "<a href=\"/api/log\">/api/log</a>, <a href=\"/api/debuggers\">/api/debuggers</a>.</p></body>";
         }
 
         var stamp = System.IO.File.GetLastWriteTimeUtc(file);
@@ -411,6 +449,124 @@ public static class BotWebServer
             BotEvents.Unsubscribe(Sink);
             Interlocked.Decrement(ref _streams);
             queue.Dispose();
+
+            try
+            {
+                response.Close();
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private static void Live(HttpListenerResponse response, string bot)
+    {
+        if (!BotWebLive.Enabled)
+        {
+            response.StatusCode = 503;
+            Text(response, "{\"error\":\"the live window is off: bot-web.json says Live is false\"}", "application/json; charset=utf-8");
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(bot))
+        {
+            response.StatusCode = 400;
+            Text(response, "{\"error\":\"name a bot: /api/live?bot=Name\"}", "application/json; charset=utf-8");
+
+            return;
+        }
+
+        var (_, json) = BotWebLive.Ask(bot);
+
+        Text(
+            response,
+            json ?? BotJson.Object(
+                w =>
+                {
+                    w.WriteString("bot", bot.Trim());
+                    w.WriteBoolean("pending", true);
+                    w.WriteString("note", "watched from now; the first frame is built on the loop within a second");
+                }
+            ),
+            "application/json; charset=utf-8"
+        );
+    }
+
+    private static void LiveScene(HttpListenerResponse response, string bot)
+    {
+        if (!BotWebLive.Enabled || !BotWebLive.Picture)
+        {
+            response.StatusCode = 503;
+            Text(response, "{\"error\":\"the live picture is off: bot-web.json says Live or LivePicture is false\"}", "application/json; charset=utf-8");
+
+            return;
+        }
+
+        var scene = BotWebLive.SceneOf(bot);
+
+        Text(
+            response,
+            scene ?? BotJson.Object(
+                w =>
+                {
+                    w.WriteString("bot", bot?.Trim() ?? "");
+                    w.WriteBoolean("pending", true);
+                    w.WriteString("note", "no scene yet: ask /api/live?bot=Name first; the scene is cut on the loop within a second");
+                }
+            ),
+            "application/json; charset=utf-8"
+        );
+    }
+
+    private static void LiveStream(HttpListenerResponse response, string bot)
+    {
+        if (!BotWebLive.Enabled || string.IsNullOrWhiteSpace(bot))
+        {
+            Live(response, bot);
+
+            return;
+        }
+
+        Interlocked.Increment(ref _streams);
+
+        try
+        {
+            response.ContentType = "text/event-stream; charset=utf-8";
+            response.SendChunked = true;
+            response.Headers["X-Accel-Buffering"] = "no";
+
+            var output = response.OutputStream;
+            var shown = -1L;
+            var quiet = 0;
+
+            Write(output, $": open {DateTime.Now:HH:mm:ss}\n\n");
+
+            while (Running && !_stopping.IsCancellationRequested)
+            {
+                var (seq, json) = BotWebLive.Ask(bot);
+
+                if (json != null && seq != shown)
+                {
+                    shown = seq;
+                    quiet = 0;
+                    Write(output, "event: frame\ndata: " + json + "\n\n");
+                }
+                else if (++quiet % 20 == 0)
+                {
+                    Write(output, ": ping\n\n");
+                }
+
+                _stopping.Token.WaitHandle.WaitOne(250);
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _streams);
 
             try
             {

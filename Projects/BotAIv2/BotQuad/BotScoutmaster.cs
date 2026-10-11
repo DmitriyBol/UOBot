@@ -95,7 +95,7 @@ public sealed class BotScoutmaster : IBotProposer
             return null;
         }
 
-        var wealth = BotYield.Wealth(body);
+        var wealth = BotYield.Spendable(body);
 
         if (wealth - BotScout.Wage < BotScout.Solvent)
         {

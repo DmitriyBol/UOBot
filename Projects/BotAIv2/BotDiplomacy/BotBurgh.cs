@@ -368,6 +368,8 @@ public static class BotBurgh
         BotVoice.ToGuild(guild.Name, "parley:town-failed", new Dictionary<string, string> { ["town"] = st.Town });
         BotEvents.Post("parley", guild.Name, null, guild.Name, task.Target.X, task.Target.Y, $"{guild.Name} failed {st.Town}'s task: prices ×{st.Factor:F3}, {st.Fails} in a row", "failed", null);
 
+        BotCharters.Failed(guild.Name, st.Town, st.Fails);
+
         if (st.Fails >= FailsToExile)
         {
             Exile(st, guild);
@@ -464,6 +466,13 @@ public static class BotBurgh
                 continue;
             }
 
+            if (BotBounds.Foreign(guild.Name, map, at, out _))
+            {
+                BotBounds.SeatRefused();
+
+                continue;
+            }
+
             BotSeat.Set(guild.Name, at, false);
             Reseated++;
 
@@ -487,13 +496,22 @@ public static class BotBurgh
 
     public static double Factor(Mobile buyer, BaseVendor vendor)
     {
-        if (_priced == 0 || buyer?.Guild is not Guild guild || vendor == null || BotTowns.Of(vendor.Location) is not { } town)
+        var fair = BotFair.Counter(buyer, vendor) * BotStewardship.Levy(buyer, vendor);
+
+        fair *= BotRelics.Counter(buyer, vendor);
+
+        if (_priced == 0 && !BotCouncil.AnyOutcast || buyer?.Guild is not Guild guild || vendor == null
+            || BotTowns.Of(vendor.Location) is not { } town)
         {
-            return 1.0;
+            return fair;
         }
 
-        return _standing.TryGetValue((guild.Name, town.Name), out var st) ? st.Factor : 1.0;
+        var factor = _priced != 0 && _standing.TryGetValue((guild.Name, town.Name), out var st) ? st.Factor : 1.0;
+
+        return factor * BotCouncil.Surcharge(buyer, guild.Name, town.Name) * fair;
     }
+
+    public static double Factor(Mobile buyer, BaseVendor vendor, Type kind) => Factor(buyer, vendor) * BotCaravans.Notched(vendor, kind);
 
     public static int Dear(Mobile buyer, BaseVendor vendor, int price)
     {
@@ -518,6 +536,9 @@ public static class BotBurgh
                 Banker.Deposit(buyer, back);
                 Rebates++;
                 Rebated += back;
+                BotFair.Rebated(buyer, back);
+                BotRelics.Rebated(buyer, back);
+                BotStewardship.Settled(buyer, bill, factor);
             }
 
             return;
@@ -530,15 +551,52 @@ public static class BotBurgh
             return;
         }
 
-        if (BotAuction.Charge(buyer, more))
+        if (BotMarket.Charge(buyer, more))
         {
             Surcharges++;
             Surcharged += more;
+
+            BotCouncil.Taxed(buyer, bill, factor, more);
+            BotStewardship.Settled(buyer, bill, factor);
 
             return;
         }
 
         Unpaid++;
+    }
+
+    public static int Shame(string guild, double by, out double dearest, out double added)
+    {
+        dearest = 1.0;
+        added = 0.0;
+
+        if (!Running || string.IsNullOrEmpty(guild) || by <= 0.0)
+        {
+            return 0;
+        }
+
+        var raised = 0;
+        var towns = BotTowns.All;
+
+        for (var i = 0; i < towns.Count; i++)
+        {
+            var st = Of(guild, towns[i]);
+            var was = st.Factor;
+
+            st.Factor = Math.Clamp(was + by, Least, Most);
+
+            if (st.Factor - was > 0.0001)
+            {
+                raised++;
+                added += st.Factor - was;
+            }
+
+            dearest = Math.Max(dearest, st.Factor);
+        }
+
+        Recount();
+
+        return raised;
     }
 
     private static void Recount()
@@ -628,7 +686,7 @@ public static class BotBurgh
 
         foreach (var st in _standing.Values)
         {
-            if (st.Task == null && st.Done + st.Failed == 0 && !st.Exiled)
+            if (st.Task == null && st.Done + st.Failed == 0 && !st.Exiled && Math.Abs(st.Factor - 1.0) <= 0.0001)
             {
                 continue;
             }
@@ -654,7 +712,7 @@ public static class BotBurgh
         !Running
             ? "guilds do not deal with their towns"
             : $"the towns: {Tell()}; {Given} tasks set ({_givenBy[0]} to clear ground, {_givenBy[1]} to keep watch, {_givenBy[2]} to supply the market), {Succeeded} done and {FailedAll} failed (±{Step:P1} each, between ×{Least:F2} and ×{Most:F2}), {Exiles} guilds put out of a town for {ExileHours:0}h after {FailsToExile} in a row ({Reseated} seated elsewhere), {TurnedAway} choices of a home that passed a town over for it; "
-            + $"{Rebates} purchases at a guild's better price ({Rebated}gp handed back), {Surcharges} at a worse one ({Surcharged}gp taken on top, {Unpaid} that could not be), {SuppliedUnits} units counted towards a supply";
+            + $"{Rebates} purchases at a guild's better price ({Rebated}gp handed back), {Surcharges} at a worse one ({Surcharged}gp taken on top, {Unpaid} that could not be), {SuppliedUnits} units counted towards a supply; {BotCouncil.Describe()}";
 
     internal static void Save(IGenericWriter writer)
     {

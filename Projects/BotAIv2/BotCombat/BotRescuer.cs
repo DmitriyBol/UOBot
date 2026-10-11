@@ -1,4 +1,5 @@
 ﻿using Server.Logging;
+using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
@@ -137,9 +138,55 @@ public sealed class BotDefender : IBotProposer
 {
     public static int Reach { get; set; } = 12;
 
-    public string Name => "Defender";
+    public BotDefender(bool last = false) => _last = last;
 
-    public BotStanding Rung => BotStanding.Hunted;
+    private readonly bool _last;
+
+    public string Name => _last ? "LastStand" : "Defender";
+
+    public BotStanding Rung => _last ? BotStanding.Failing : BotStanding.Hunted;
+
+    public static bool Stands { get; set; } = true;
+
+    public static int StandReach { get; set; } = 2;
+
+    public static long StoodOn { get; set; }
+
+    private static BotDeed Stand(IBotWilful bot, Mobile body, BaseCreature foe)
+    {
+        if (!Stands || body.HitsMax <= 0 || foe == null)
+        {
+            return null;
+        }
+
+        var deed = bot.Resolve?.Deed;
+
+        if (bot.Squad != null || deed is BotBolt || deed is { Committed: true } || ReferenceEquals(deed?.Foe, foe))
+        {
+            return null;
+        }
+
+        if (!body.InRange(foe.Location, StandReach) && foe.AI is not (AIType.AI_Mage or AIType.AI_Archer))
+        {
+            return null;
+        }
+
+        if (BotFugitive.Calm(body, bot.Resolve) || BotQuarry.Shunned(foe) || BotQuarry.Crowded(foe)
+            || BotThreat.Decide(body, BotMobile.NoticeRange) == BotStand.Outmatched)
+        {
+            return null;
+        }
+
+        var trains = bot.Bond?.Weapon?.Skill ?? SkillName.Wrestling;
+
+        return new BotRescue(new BotSlay(foe, trains) { ToTheEnd = true }, body, foe, own: true);
+    }
+
+    public static string DescribeStands() =>
+        $"{StoodOn} fights carried on under {BotSlay.FleeAt:P0} of the bot's health by a bot with what was killing it on top of it and no flight on offer, "
+        + $"{UnderOwnShare} looks at a bot struck between {BotSlay.FleeAt:P0} and its own flight share by its nature answered as under the floor rather than with a fight that gives itself up";
+
+    public static long UnderOwnShare { get; private set; }
 
     public static long Already { get; private set; }
 
@@ -151,13 +198,17 @@ public sealed class BotDefender : IBotProposer
 
     public static long Below { get; set; }
 
+    public static long ToTown { get; private set; }
+
     public static void Forget()
     {
+        UnderOwnShare = 0;
         Already = 0;
         Outnumbered = 0;
         Leading = 0;
         Assailed = 0;
         Below = 0;
+        ToTown = 0;
     }
 
     public BotDeed Propose(IBotWilful bot)
@@ -168,6 +219,21 @@ public sealed class BotDefender : IBotProposer
         if (map == null || map == Map.Internal || !body.Alive)
         {
             return null;
+        }
+
+        if (_last)
+        {
+            if (body.HitsMax <= 0 || body.Hits >= body.HitsMax * BotTraits.FleeAt(body, false) || BotThreat.Hunter(body, Reach) is not { } on)
+            {
+                return null;
+            }
+
+            if (bot is IBotSquadMember { Squad: { } own } one && (ReferenceEquals(own.Leader, one) || BotDungeon.Under(body.Location)))
+            {
+                return null;
+            }
+
+            return Stand(bot, body, on);
         }
 
         var assailant = BotOutlaw.Assailant(body, Reach);
@@ -216,16 +282,23 @@ public sealed class BotDefender : IBotProposer
             return null;
         }
 
-        if (body.HitsMax <= 0 || body.Hits < body.HitsMax * BotSlay.FleeAt)
-        {
-            BotCry.Raise(body, foe);
+        var ownShare = BotTraits.FleeAt(body, false);
 
-            return null;
+        if (body.HitsMax > 0 && body.Hits >= body.HitsMax * BotSlay.FleeAt && body.Hits < body.HitsMax * ownShare)
+        {
+            UnderOwnShare++;
+        }
+
+        if (body.HitsMax <= 0 || body.Hits < body.HitsMax * ownShare)
+        {
+            BotCry.Raise(body, foe, dire: true);
+
+            return Stand(bot, body, foe);
         }
 
         if (BotQuarry.Crowded(foe) || BotQuarry.Shunned(foe))
         {
-            BotCry.Raise(body, foe);
+            BotCry.Raise(body, foe, dire: true);
 
             return null;
         }
@@ -234,7 +307,14 @@ public sealed class BotDefender : IBotProposer
         {
             BotQuarry.Crowd(foe);
             Outnumbered++;
-            BotCry.Raise(body, foe);
+            BotCry.Raise(body, foe, dire: true);
+
+            if (BotFugitive.ToTown(bot, body, foe) is { } run)
+            {
+                ToTown++;
+
+                return run;
+            }
 
             return null;
         }

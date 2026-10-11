@@ -34,6 +34,8 @@ public static class NavigationService
 
     public static Func<int, int, int> Danger { get; set; }
 
+    public static Action<Map, Rectangle2D> GroundChangedHook { get; set; }
+
     internal static int DangerAt(NavGraph graph, int node)
     {
         var danger = Danger;
@@ -455,6 +457,8 @@ public static class NavigationService
 
     public static void GroundChanged(Map map, Rectangle2D bounds)
     {
+        GroundChangedHook?.Invoke(map, bounds);
+
         if (map == null || !_graphs.TryGetValue(map.MapID, out var graph))
         {
             return;

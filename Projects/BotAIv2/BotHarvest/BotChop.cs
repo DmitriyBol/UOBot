@@ -128,7 +128,7 @@ public sealed class BotChop : BotDeed
 
     public override double Coin => 0.0;
 
-    public override int Made => _cut * BotTimber.Worth;
+    public override int Made => BotGlut.Yield(typeof(Log), _cut, BotTimber.Worth);
 
     public override string Stage =>
         _tree == null
@@ -313,6 +313,8 @@ public sealed class BotChop : BotDeed
         if (have > _had)
         {
             _cut += have - _had;
+
+            BotGlut.Made(typeof(Log), have - _had);
             _had = have;
             _grewTick = now;
             _grewSwings = _swings;

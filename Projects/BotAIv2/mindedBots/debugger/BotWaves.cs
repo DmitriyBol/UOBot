@@ -163,7 +163,7 @@ public static class BotWaves
         }
     }
 
-    private static bool IsHunt(string kind)
+    public static bool IsHunt(string kind)
     {
         if (kind == null)
         {

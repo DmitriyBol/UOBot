@@ -5,6 +5,12 @@
   "Local": true,
   "Mood": true,
   "Cry": true,
+  "Trade": true,
+  "TradeConference": "Trade",
+  "TradeAtLogin": false,
+  "TradeRepeatMs": 60000,
+  "TradeOverhead": true,
+  "TradeHandOvers": false,
   "SayEveryMs": 15000,
   "CryEveryMs": 20000,
   "MoodEveryMs": 900000,
@@ -16,6 +22,7 @@
   "GuildHue": 946,
   "CryHue": 34,
   "MoodHue": 946,
+  "TradeHue": 89,
   "Broadcast": true,
   "Phrases": {
     "took:*": [

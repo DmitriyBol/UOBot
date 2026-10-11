@@ -13,7 +13,7 @@ namespace Server.BotAI.V2;
 /// <b>Patrick's order of 29.09.2026, point 3: "the debugger is summoned, and feedback on the town's situation — economic,
 /// hostile, trade — is taken from him."</b> Nothing here is the model's: every figure is read off a record the shard already
 /// keeps — the shopkeepers <c>BotShops</c> knows inside the town's box, the island's shortages (<c>BotShops.Dry</c>) that none
-/// of them sells now, the market's board (<c>BotAuction.Board</c>), the squares of <c>BotQuad</c> within
+/// of them sells now, the market's board (<c>BotMarket.Board</c>), the squares of <c>BotQuad</c> within
 /// <see cref="Reach"/> of the town's hall, and the residents (<c>BotResidence</c>). The model is handed this and phrases it; the
 /// rule says it plainly. Built once per audience, so a pass over a thousand shopkeepers and fifty squares costs nothing that
 /// matters.
@@ -110,7 +110,7 @@ public sealed class BotTownReport
             Worst = worst,
             WorstReading = worst == null ? BotQuad.Fresh : worstReading,
             Quarantined = map != null && BotBarred.Holds(map, hall),
-            Market = BotAuction.Board(4)
+            Market = BotMarket.Board(4)
         };
 
         var dry = BotShops.Dry();

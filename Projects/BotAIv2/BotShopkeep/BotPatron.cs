@@ -3,16 +3,15 @@ using System;
 namespace Server.BotAI.V2;
 
 /// <summary>
-/// Offers a bot with money down on the board a walk to a bot's shop that sells the thing for less than it is offering.
+/// Offers a bot with a spoken want a walk to a bot's shop that sells the thing for no more than it says it will pay.
 ///
 /// <para>
-/// <b>The board's half of a shop's custom.</b> A want is a buyer that has already said what it needs and what it will pay —
-/// a tailor's leather, a cook's ribs, a warrior's replacement cap — and until now it could only wait for a supplier to fill it
-/// from wherever the supplier happened to be, or for a stall to cross it. A shop is somewhere the thing can be fetched: when an
-/// open shop within the bot's reach holds the kind and its price, with the walk counted (<see cref="BotShopkeep.Best"/>), is at
-/// or under the want's own offer, the bot is offered the walk, and at the till it takes its escrow back off the board and pays
-/// the keeper's price instead (<see cref="BotShopkeep.Visit"/>). What the shop cannot supply goes back on the board at the same
-/// offer.
+/// <b>The buyer's half of hand to hand.</b> A want is a buyer that has said aloud what it needs and what it will pay — a
+/// tailor's leather, a cook's ribs, a warrior's replacement cap — and it is answered one of two ways: a carrier walks the thing
+/// to it (<see cref="BotCourier"/>), or it walks to where the thing is on show. When an open shop within the bot's reach holds
+/// the kind and its price, with the walk counted (<see cref="BotShopkeep.Best"/>), is at or under the want's own offer, the bot
+/// is offered the walk; at the till it pays the keeper's price, never more than its offer, and the want comes down by what it
+/// bought (<see cref="BotShopkeep.Visit"/>). What the shop could not supply is still wanted.
 /// </para>
 ///
 /// <para>
@@ -50,7 +49,7 @@ public sealed class BotPatron : IBotProposer
 
         Looks++;
 
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
         var mine = false;
 
         BotStorefront best = null;

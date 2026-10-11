@@ -37,6 +37,8 @@ namespace Server.BotAI.V2;
 /// <c>BotRegard.Claimed</c>: it costs the holder's opinion of the claimant about half what a killing costs,
 /// so two claims against the same guild is roughly a war. That is the whole of how a contested claim comes
 /// to be fought over — the fighting itself belongs to <c>BotFeud</c>, which needs a war and will have one.
+/// Since 06.10.2026 the war is not left to the opinion: the claim is a war at once and has a price in everybody's
+/// regard (<c>BotSeizure</c>), and the staker weighs both before it declares (<c>BotHolder</c>).
 /// </para>
 /// </summary>
 public static class BotClaim
@@ -133,6 +135,176 @@ public static class BotClaim
         public int Fallen;
 
         public string From;
+
+        public int Escrow;
+
+        public int AtOnce;
+    }
+
+    public static long PaidAtOnce { get; private set; }
+
+    public static long Escrowed { get; private set; }
+
+    public static long EscrowedClaims { get; private set; }
+
+    public static long Released { get; private set; }
+
+    public static long ReleasedClaims { get; private set; }
+
+    public static long Returned { get; private set; }
+
+    public static long ReturnedClaims { get; private set; }
+
+    public static long Orphaned { get; private set; }
+
+    public static int HeldNow(out int claims)
+    {
+        var held = 0;
+
+        claims = 0;
+
+        foreach (var bid in _bids.Values)
+        {
+            if (bid.Escrow > 0)
+            {
+                held += bid.Escrow;
+                claims++;
+            }
+        }
+
+        return held;
+    }
+
+    private static void Close(Bid bid, bool gathered)
+    {
+        var coin = bid.Escrow;
+
+        if (coin <= 0)
+        {
+            return;
+        }
+
+        bid.Escrow = 0;
+
+        if (gathered)
+        {
+            Paid += coin;
+            Released += coin;
+            ReleasedClaims++;
+            BotCity.Tax(coin);
+
+            logger.Information(
+                "{Guild} gathered {Peak} on the square at {X},{Y}: the {Coin}gp held for the claim goes to the city's treasury",
+                bid.Guild,
+                bid.Peak,
+                bid.Middle.X,
+                bid.Middle.Y,
+                coin
+            );
+
+            return;
+        }
+
+        if (BaseGuild.FindByName(bid.Guild) is not Guild { Disbanded: false })
+        {
+            Paid += coin;
+            Orphaned += coin;
+            BotCity.Tax(coin);
+
+            logger.Information(
+                "{Guild} is gone and never gathered on the square at {X},{Y}: the {Coin}gp held for the claim goes to the city's treasury",
+                bid.Guild,
+                bid.Middle.X,
+                bid.Middle.Y,
+                coin
+            );
+
+            return;
+        }
+
+        BotChest.Put(bid.Guild, coin);
+        Returned += coin;
+        ReturnedClaims++;
+
+        logger.Information(
+            "{Guild} never gathered on the square at {X},{Y}: the {Coin}gp held for the claim goes back to its chest; {Held}gp in it",
+            bid.Guild,
+            bid.Middle.X,
+            bid.Middle.Y,
+            coin,
+            BotChest.Holds(bid.Guild)
+        );
+    }
+
+    private static readonly List<(string Guild, (int Map, int X, int Y) Key, int Coin)> _owed = [];
+
+    internal static IReadOnlyList<(string Guild, (int Map, int X, int Y) Key, int Coin)> Owed => _owed;
+
+    private static void PayOwed()
+    {
+        for (var i = 0; i < _owed.Count; i++)
+        {
+            var (guild, key, coin) = _owed[i];
+
+            if (BaseGuild.FindByName(guild) is not Guild { Disbanded: false })
+            {
+                Paid += coin;
+                Orphaned += coin;
+                BotCity.Tax(coin);
+            }
+            else
+            {
+                BotChest.Put(guild, coin);
+                Returned += coin;
+                ReturnedClaims++;
+            }
+
+            logger.Information(
+                "{Guild}'s claim on the square at {X},{Y} could not be put back after the boot: the {Coin}gp held for it goes to {Where}",
+                guild,
+                key.X * BotQuad.Side + BotQuad.Side / 2,
+                key.Y * BotQuad.Side + BotQuad.Side / 2,
+                coin,
+                BaseGuild.FindByName(guild) is Guild { Disbanded: false } ? "its chest" : "the city's treasury, the guild being gone"
+            );
+        }
+
+        _owed.Clear();
+    }
+
+    internal static IEnumerable<(string Guild, (int Map, int X, int Y) Key, int Failures, long Ago)> Rests()
+    {
+        var now = Core.TickCount;
+
+        foreach (var ((guild, key), (failures, tick)) in _unmustered)
+        {
+            var ago = now - tick;
+
+            if (guild != null && ago >= 0 && ago < MostUnmusteredRestMs)
+            {
+                yield return (guild, key, failures, ago);
+            }
+        }
+    }
+
+    internal static void Rest(string guild, (int Map, int X, int Y) key, int failures, long ago)
+    {
+        if (string.IsNullOrEmpty(guild) || failures <= 0 || ago < 0)
+        {
+            return;
+        }
+
+        _unmustered[(guild, key)] = (failures, Core.TickCount - ago);
+    }
+
+    public static string DescribeMoney()
+    {
+        var now = HeldNow(out var mustering);
+
+        return $"claims: {PaidAtOnce}gp paid to the city at the declaration on ground another guild held, {Escrowed}gp held over {EscrowedClaims} claims on open ground until {Gather} gathered "
+            + $"({now}gp held now over {mustering}), {Released}gp of it paid to the city for {ReleasedClaims} that gathered, {Returned}gp handed back to the chests for {ReturnedClaims} that never gathered, "
+            + $"{Orphaned}gp to the city for a guild gone before its muster ended; {BotHolder.RestedLooks} staker looks held off a square their guild lately failed to muster on "
+            + $"({BotHolder.Rested} squares passed over; rest {UnmusteredRestMs / 60000} minutes, doubling to {MostUnmusteredRestMs / 60000}); the city took {BotCity.AboveCap}gp of the guilds' payments above its {BotCity.Cap}gp cap, kept rather than lost; {BotTownGround.Describe()}";
     }
 
     private static readonly Dictionary<(int Map, int X, int Y), Holding> _held = [];
@@ -165,7 +337,16 @@ public static class BotClaim
             return;
         }
 
-        _held[BotQuad.Key(map, hall)] = new Holding { Guild = guild, Bought = true };
+        var key = BotQuad.Key(map, hall);
+
+        if (_held.TryGetValue(key, out var was) && was?.Guild != null && was.Guild != guild)
+        {
+            BotBounds.YardKept(guild, was.Guild, hall);
+
+            return;
+        }
+
+        _held[key] = new Holding { Guild = guild, Bought = true };
     }
 
     public static int Connect()
@@ -186,14 +367,34 @@ public static class BotClaim
 
             var root = BotQuad.Key(hall.Map, hall.Location);
 
-            if (!_held.TryGetValue(root, out var seat) || seat.Guild != name)
+            if (!_held.TryGetValue(root, out var seat))
             {
                 continue;
             }
 
             _frontier.Clear();
-            _frontier.Enqueue(root);
-            _reached.Add(root);
+
+            if (seat.Guild == name)
+            {
+                _frontier.Enqueue(root);
+                _reached.Add(root);
+            }
+            else
+            {
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    for (var dy = -1; dy <= 1; dy++)
+                    {
+                        var next = (root.Map, root.X + dx, root.Y + dy);
+
+                        if ((dx != 0 || dy != 0) && !_reached.Contains(next) && _held.TryGetValue(next, out var touching) && touching.Guild == name)
+                        {
+                            _reached.Add(next);
+                            _frontier.Enqueue(next);
+                        }
+                    }
+                }
+            }
 
             while (_frontier.Count > 0)
             {
@@ -211,6 +412,39 @@ public static class BotClaim
                         var next = (at.Map, at.X + dx, at.Y + dy);
 
                         if (!_reached.Contains(next) && _held.TryGetValue(next, out var held) && held.Guild == name)
+                        {
+                            _reached.Add(next);
+                            _frontier.Enqueue(next);
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach (var (name, colonyMap, at) in BotColonies.Roots())
+        {
+            var root = BotQuad.Key(colonyMap, at);
+
+            if (_reached.Contains(root) || !_held.TryGetValue(root, out var seat) || seat.Guild != name)
+            {
+                continue;
+            }
+
+            _frontier.Clear();
+            _frontier.Enqueue(root);
+            _reached.Add(root);
+
+            while (_frontier.Count > 0)
+            {
+                var near = _frontier.Dequeue();
+
+                for (var dx = -1; dx <= 1; dx++)
+                {
+                    for (var dy = -1; dy <= 1; dy++)
+                    {
+                        var next = (near.Map, near.X + dx, near.Y + dy);
+
+                        if ((dx != 0 || dy != 0) && !_reached.Contains(next) && _held.TryGetValue(next, out var held) && held.Guild == name)
                         {
                             _reached.Add(next);
                             _frontier.Enqueue(next);
@@ -299,6 +533,11 @@ public static class BotClaim
                 return 0;
             }
 
+            if (BotColonies.Site(guild, key))
+            {
+                return Price;
+            }
+
             return nth <= Cheap ? Price : Price + (nth - Cheap) * Step;
         }
 
@@ -331,7 +570,13 @@ public static class BotClaim
             return null;
         }
 
+        if (BotTownGround.Refuses(guild.Name, map, key))
+        {
+            return null;
+        }
+
         var price = Cost(guild.Name, key, want);
+        var escrow = 0;
 
         if (price > 0)
         {
@@ -344,9 +589,19 @@ public static class BotClaim
                 return null;
             }
 
-            Paid += price;
+            if (held != null)
+            {
+                Paid += price;
+                PaidAtOnce += price;
 
-            BotCity.Tax(price);
+                BotCity.Tax(price);
+            }
+            else
+            {
+                escrow = price;
+                Escrowed += price;
+                EscrowedClaims++;
+            }
         }
 
         var bid = new Bid
@@ -357,7 +612,9 @@ public static class BotClaim
             Middle = middle,
             Key = key,
             Began = Core.TickCount,
-            From = held?.Guild
+            From = held?.Guild,
+            Escrow = escrow,
+            AtOnce = held != null ? price : 0
         };
 
         _bids[key] = bid;
@@ -366,6 +623,8 @@ public static class BotClaim
 
         if (held != null)
         {
+            BotSeizure.Seize(guild, held.Guild, middle, want, price);
+
             BotRegard.Claimed(guild.Name, held.Guild, Important(held.Guild, map, middle));
 
             if (Important(held.Guild, map, middle))
@@ -379,14 +638,15 @@ public static class BotClaim
         }
 
         logger.Warning(
-            "{Guild} lays claim to the square at {X},{Y}{From} for {Price}gp; it has {Minutes} minutes to gather {Gather} there",
+            "{Guild} lays claim to the square at {X},{Y}{From} for {Price}gp; it has {Minutes} minutes to gather {Gather} there{Held}",
             guild.Name,
             middle.X,
             middle.Y,
             held == null ? "" : $", which {held.Guild} holds",
             price,
             MusterMs / 60000,
-            Gather
+            Gather,
+            escrow > 0 ? ", the price held until they do" : ""
         );
 
         return bid;
@@ -427,8 +687,12 @@ public static class BotClaim
 
         _looked = now;
 
+        PayOwed();
         Sweep();
+        TownSweep();
         Connect();
+
+        BotBounds.Look();
 
         var bots = BotPopulation.Bots;
         List<Bid> over = [];
@@ -475,6 +739,8 @@ public static class BotClaim
         _byGuild.Remove(bid.Guild);
 
         var before = _held.TryGetValue(bid.Key, out var was0) ? was0.Guild : null;
+
+        Close(bid, bid.Peak >= Gather);
 
         if (bid.Fallen > bid.Felled)
         {
@@ -567,6 +833,50 @@ public static class BotClaim
         Connect();
     }
 
+    public static long Conceded { get; private set; }
+
+    private static readonly List<Bid> _conceding = [];
+
+    public static int Concede(string winner, string loser)
+    {
+        if (!Running || winner == null || loser == null)
+        {
+            return 0;
+        }
+
+        _conceding.Clear();
+
+        foreach (var bid in _bids.Values)
+        {
+            if (bid.Guild == winner && bid.From == loser)
+            {
+                _conceding.Add(bid);
+            }
+        }
+
+        for (var i = 0; i < _conceding.Count; i++)
+        {
+            var bid = _conceding[i];
+
+            bid.Peak = Math.Max(bid.Peak, Gather);
+            bid.Fallen = 0;
+            Conceded++;
+
+            logger.Warning(
+                "{Loser} has capitulated: {Winner}'s claim on its square at {X},{Y} is decided for {Winner}",
+                loser,
+                winner,
+                bid.Middle.X,
+                bid.Middle.Y,
+                winner
+            );
+
+            Settle(bid);
+        }
+
+        return _conceding.Count;
+    }
+
     public static Point3D Middle(Map map, Point3D where)
     {
         var key = BotQuad.Key(map, where);
@@ -592,24 +902,25 @@ public static class BotClaim
         _held[(facet, x, y)] = new Holding { Guild = guild, Bought = bought };
     }
 
-    public static bool Reopen(int facet, int x, int y, string guild, Kind want, string from)
+    public static bool Reopen(int facet, int x, int y, string guild, Kind want, string from, int escrow = 0)
     {
-        if (string.IsNullOrEmpty(guild) || _bids.ContainsKey((facet, x, y)) || _byGuild.ContainsKey(guild))
+        if (string.IsNullOrEmpty(guild))
         {
             return false;
         }
 
         var map = Map.Maps[facet is >= 0 and < 0x100 ? facet : 0];
+        var middle = map == null || map == Map.Internal
+            ? Point3D.Zero
+            : Middle(map, new Point3D(x * BotQuad.Side + BotQuad.Side / 2, y * BotQuad.Side + BotQuad.Side / 2, 0));
 
-        if (map == null || map == Map.Internal)
+        if (_bids.ContainsKey((facet, x, y)) || _byGuild.ContainsKey(guild) || middle == Point3D.Zero)
         {
-            return false;
-        }
+            if (escrow > 0)
+            {
+                _owed.Add((guild, (facet, x, y), escrow));
+            }
 
-        var middle = Middle(map, new Point3D(x * BotQuad.Side + BotQuad.Side / 2, y * BotQuad.Side + BotQuad.Side / 2, 0));
-
-        if (middle == Point3D.Zero)
-        {
             return false;
         }
 
@@ -621,13 +932,79 @@ public static class BotClaim
             Middle = middle,
             Key = (facet, x, y),
             Began = Core.TickCount,
-            From = string.IsNullOrEmpty(from) ? null : from
+            From = string.IsNullOrEmpty(from) ? null : from,
+            Escrow = Math.Max(0, escrow)
         };
 
         _bids[bid.Key] = bid;
         _byGuild[guild] = bid;
 
         return true;
+    }
+
+    private static readonly List<((int Map, int X, int Y) Key, string Guild, bool Bought, string Town, int Tiles)> _town = [];
+
+    private static readonly List<(Bid Bid, string Town)> _townBids = [];
+
+    private static void TownSweep()
+    {
+        if (!BotTownGround.Due())
+        {
+            return;
+        }
+
+        BotTownGround.Begin();
+        _town.Clear();
+        _townBids.Clear();
+
+        foreach (var (key, held) in _held)
+        {
+            var map = key.Map is >= 0 and < 0x100 ? Map.Maps[key.Map] : null;
+
+            if (held?.Guild == null || map == null || !BotTownGround.Guarded(map, key, out var town, out var tiles))
+            {
+                continue;
+            }
+
+            if (BotEstate.Held.TryGetValue(held.Guild, out var hall) && hall is { Deleted: false } && hall.Map == map
+                && BotQuad.Key(map, hall.Location) == key)
+            {
+                BotTownGround.Yard(held.Guild, key, town, tiles);
+
+                continue;
+            }
+
+            _town.Add((key, held.Guild, held.Bought, town, tiles));
+        }
+
+        for (var i = 0; i < _town.Count; i++)
+        {
+            var (key, guild, bought, town, tiles) = _town[i];
+
+            _held.Remove(key);
+            BotTownGround.Drop(guild, key, bought, bought ? Price : 0, town, tiles);
+        }
+
+        foreach (var bid in _bids.Values)
+        {
+            if (BotTownGround.Guarded(bid.Map, bid.Key, out var town, out _))
+            {
+                _townBids.Add((bid, town));
+            }
+        }
+
+        for (var i = 0; i < _townBids.Count; i++)
+        {
+            var (bid, town) = _townBids[i];
+            var escrow = bid.Escrow;
+
+            bid.Escrow = 0;
+            _bids.Remove(bid.Key);
+            _byGuild.Remove(bid.Guild);
+            BotTownGround.CallOff(bid.Guild, bid.Key, escrow, bid.AtOnce, town);
+        }
+
+        BotTownGround.End();
     }
 
     private static void Sweep()
@@ -737,9 +1114,28 @@ public static class BotClaim
 
     public static void Forget()
     {
+        foreach (var bid in _bids.Values)
+        {
+            if (bid.Escrow > 0)
+            {
+                _owed.Add((bid.Guild, bid.Key, bid.Escrow));
+                bid.Escrow = 0;
+            }
+        }
+
+        PayOwed();
+
         _bids.Clear();
         _byGuild.Clear();
         _unmustered.Clear();
+        PaidAtOnce = 0;
+        Escrowed = 0;
+        EscrowedClaims = 0;
+        Released = 0;
+        ReleasedClaims = 0;
+        Returned = 0;
+        ReturnedClaims = 0;
+        Orphaned = 0;
         Declared = 0;
         Won = 0;
         Unmustered = 0;
@@ -747,6 +1143,7 @@ public static class BotClaim
         Beaten = 0;
         Stripped = 0;
         Paid = 0;
+        Conceded = 0;
         _looked = 0;
     }
 }

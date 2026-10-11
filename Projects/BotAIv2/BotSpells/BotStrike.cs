@@ -1,3 +1,4 @@
+using System;
 using Server.Items;
 using Server.Spells;
 
@@ -106,6 +107,28 @@ public static class BotStrike
         return -1;
     }
 
+    public static int Stocked(Mobile bot)
+    {
+        var stock = Stock(bot);
+
+        if (stock < 0)
+        {
+            return -1;
+        }
+
+        var ceiling = BotGrimoire.Circle(stock);
+
+        for (var i = Ladder.Length - 1; i >= 0; i--)
+        {
+            if (BotGrimoire.Circle(Ladder[i]) <= ceiling && BotGrimoire.Holds(bot, Ladder[i]))
+            {
+                return Ladder[i];
+            }
+        }
+
+        return -1;
+    }
+
     public static bool Can(Mobile bot)
     {
         var booked = BotGrimoire.Book(bot) != null;
@@ -194,8 +217,20 @@ public static class BotStrike
         return true;
     }
 
-    public static string Why(Mobile bot)
+    public static string Why(Mobile bot) => Why(bot, out _);
+
+    public const string NoSpell = "no attack spell";
+
+    public const string NoMana = "no mana";
+
+    public const string NoHerbs = "no reagents";
+
+    public const string Refused = "refused by the engine";
+
+    public static string Why(Mobile bot, out string gate)
     {
+        gate = NoSpell;
+
         if (bot == null)
         {
             return "no body";
@@ -203,12 +238,17 @@ public static class BotStrike
 
         var owned = 0;
         var affordable = 0;
+        var stocked = 0;
+        Type lacked = null;
+
+        var cheapest = (string)null;
 
         for (var i = 0; i < Ladder.Length; i++)
         {
             var spell = Ladder[i];
+            var scroll = Scroll(bot, spell) != null;
 
-            if (!BotGrimoire.Holds(bot, spell))
+            if (!scroll && !BotGrimoire.Holds(bot, spell))
             {
                 continue;
             }
@@ -217,25 +257,98 @@ public static class BotStrike
 
             var circle = BotGrimoire.Circle(spell);
 
-            if (circle < 1 || circle > ManaByCircle.Length || bot.Mana < ManaByCircle[circle - 1])
+            if (circle < 1 || circle > ManaByCircle.Length)
             {
                 continue;
             }
 
+            if (bot.Mana < ManaByCircle[circle - 1])
+            {
+                cheapest ??= NoMana;
+
+                continue;
+            }
+
             affordable++;
+
+            if (scroll)
+            {
+                stocked++;
+
+                continue;
+            }
+
+            var herbs = SpellRegistry.NewSpell(spell, bot, null)?.Reagents;
+
+            if (herbs == null)
+            {
+                continue;
+            }
+
+            var lacking = (Type)null;
+
+            for (var h = 0; h < herbs.Length; h++)
+            {
+                if ((bot.Backpack?.GetAmount(herbs[h]) ?? 0) < 1)
+                {
+                    lacking = herbs[h];
+
+                    break;
+                }
+            }
+
+            if (lacking == null)
+            {
+                stocked++;
+            }
+            else
+            {
+                lacked ??= lacking;
+                cheapest ??= NoHerbs;
+            }
         }
 
         if (owned == 0)
         {
-            return $"its book holds none of the {Ladder.Length} attack spells";
+            return $"its book holds none of the {Ladder.Length} attack spells and it carries no scroll of one";
         }
 
-        if (affordable == 0)
+        if (stocked == 0 && (affordable == 0 || cheapest == NoMana))
         {
-            return $"it owns {owned} attack spells and has the mana for none of them";
+            gate = NoMana;
+
+            return affordable == 0
+                ? $"it owns {owned} attack spells and has the mana for none of them ({bot.Mana} of {bot.ManaMax})"
+                : $"it owns {owned} attack spells, lacks the mana for the cheapest ({bot.Mana} of {bot.ManaMax}) and the herbs for the rest (no {lacked?.Name ?? "herbs"})";
         }
 
-        return $"it owns {owned} attack spells, can pay for {affordable}, and is out of reagents for every one";
+        if (stocked == 0)
+        {
+            gate = NoHerbs;
+
+            return $"it owns {owned} attack spells, can pay for {affordable}, and is out of reagents for every one (no {lacked?.Name ?? "herbs"})";
+        }
+
+        gate = Refused;
+
+        if (bot.Spell != null)
+        {
+            return $"it has the herbs and the mana for {stocked}, and a spell of its own is still going up";
+        }
+
+        if (bot.Paralyzed || bot.Frozen)
+        {
+            return $"it has the herbs and the mana for {stocked}, and is held fast";
+        }
+
+        var recovering = bot.NextSpellTime - Core.TickCount;
+
+        if (recovering > 0)
+        {
+            return $"it has the herbs and the mana for {stocked}, and is still recovering from its last spell ({recovering}ms)";
+        }
+
+        return $"it has the herbs and the mana for {stocked}, and the engine would not begin the cast";
     }
 
     public static bool Begin(Mobile bot, int spell)

@@ -24,7 +24,11 @@ public sealed class BotShopsSettings
 
     public double? WorkMinutes { get; set; }
 
-    public int? PeddleAfterMs { get; set; }
+    public double? AskFarMinutes { get; set; }
+
+    public int? AskFarMs { get; set; }
+
+    public int? PileMs { get; set; }
 
     public bool? CapitalRunning { get; set; }
 
@@ -66,7 +70,9 @@ public static class BotShopsConfig
         BotShopper.Short = settings.Short ?? BotShopper.Short;
 
         BotRestock.Prior = settings.Expects ?? BotRestock.Prior;
-        BotPeddler.IgnoredMs = settings.PeddleAfterMs ?? BotPeddler.IgnoredMs;
+        BotShopper.AskFarMinutes = settings.AskFarMinutes ?? BotShopper.AskFarMinutes;
+        BotShopper.AskFarMs = settings.AskFarMs ?? BotShopper.AskFarMs;
+        BotShopper.PileMs = settings.PileMs ?? BotShopper.PileMs;
         BotRestock.WorkMinutes = settings.WorkMinutes ?? BotRestock.WorkMinutes;
 
         BotCapital.Running = settings.CapitalRunning ?? BotCapital.Running;

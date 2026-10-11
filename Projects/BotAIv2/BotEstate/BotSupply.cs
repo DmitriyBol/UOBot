@@ -300,6 +300,11 @@ public sealed class BotSupply : BotDeed
             return BotDoing.Failed($"the {_kind.Name} was gone out of the pack before it got to the counter");
         }
 
+        if (!BotSupplier.Stacks(_kind))
+        {
+            return Singly(body, pack, merchant, spare);
+        }
+
         var lot = Lift(body, pack, _kind, spare);
 
         if (lot == null)
@@ -320,6 +325,50 @@ public sealed class BotSupply : BotDeed
 
         return BotDoing.Done(
             $"{spare} {_kind.Name} on the counter of {_guild.Name} at {asking}gp the lot, {_spent}gp of guild money"
+        );
+    }
+
+    public static long Loose { get; private set; }
+
+    public static long Unshelved { get; private set; }
+
+    private BotDoing Singly(Mobile body, Container pack, PlayerVendor merchant, int spare)
+    {
+        var each = Math.Max(1, (int)Math.Round(_price * BotShelf.Markup));
+        var put = 0;
+
+        while (put < spare)
+        {
+            var one = Lift(body, pack, _kind, 1);
+
+            if (one == null)
+            {
+                break;
+            }
+
+            if (!BotShelf.Put(merchant, one, each))
+            {
+                pack.DropItem(one);
+
+                break;
+            }
+
+            put++;
+        }
+
+        Loose += put;
+        Unshelved += spare - put;
+
+        if (put <= 0)
+        {
+            return BotDoing.Failed("the merchant would not take any more on its shelf");
+        }
+
+        _shelved = put;
+
+        return BotDoing.Done(
+            $"{put} {_kind.Name} on the counter of {_guild.Name} at {each}gp each, {_spent}gp of guild money"
+            + (put < spare ? $"; {spare - put} more the merchant would not take, left in the pack" : "")
         );
     }
 

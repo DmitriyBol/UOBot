@@ -252,6 +252,17 @@ public sealed class BotTame : BotDeed
 
     public override void Taken(IBotWilful bot) => Tried++;
 
+    public override bool Bend(IBotWilful bot)
+    {
+        BotTamerProposer.Unreachable(_beast);
+        BotTamerProposer.Failed(bot?.Self);
+        Unreached++;
+
+        return false;
+    }
+
+    public static long Unreached { get; private set; }
+
     public override BotDoing Advance(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -331,13 +342,14 @@ public sealed class BotTame : BotDeed
         return BotDoing.Work($"taming {_beast.Name}");
     }
 
-    public static string Describe() => $"{Tried} tamings tried, {Won} won, {Refused} given up";
+    public static string Describe() => $"{Tried} tamings tried, {Won} won, {Refused} given up, {Unreached} beasts found no way to and shunned";
 
     public static void Forget()
     {
         Tried = 0;
         Won = 0;
         Refused = 0;
+        Unreached = 0;
     }
 }
 
@@ -351,6 +363,28 @@ public sealed class BotTamerProposer : IBotProposer
     public static double LeastPower { get; set; } = 100.0;
 
     public static int RetryMs { get; set; } = 300000;
+
+    public static int UnreachableMs { get; set; } = 1800000;
+
+    private static readonly Dictionary<Serial, long> _unreachable = [];
+
+    public static void Unreachable(Mobile beast)
+    {
+        if (beast == null || UnreachableMs <= 0)
+        {
+            return;
+        }
+
+        if (_unreachable.Count > 1024)
+        {
+            _unreachable.Clear();
+        }
+
+        _unreachable[beast.Serial] = Core.TickCount + UnreachableMs;
+    }
+
+    private static bool Shunned(Mobile beast) =>
+        _unreachable.TryGetValue(beast.Serial, out var until) && Core.TickCount - until < 0;
 
     public static long Asked { get; private set; }
 
@@ -404,6 +438,11 @@ public sealed class BotTamerProposer : IBotProposer
         foreach (var creature in map.GetMobilesInRange<BaseCreature>(body.Location, Reach))
         {
             if (!BotPets.Beastly(creature) || creature.Controlled || !creature.Alive || creature.MinTameSkill > skill + 5.0)
+            {
+                continue;
+            }
+
+            if (Shunned(creature))
             {
                 continue;
             }
@@ -484,6 +523,7 @@ public sealed class BotTamerProposer : IBotProposer
     public static void Forget()
     {
         _failed.Clear();
+        _unreachable.Clear();
         _said = false;
         Asked = 0;
         Kept = 0;

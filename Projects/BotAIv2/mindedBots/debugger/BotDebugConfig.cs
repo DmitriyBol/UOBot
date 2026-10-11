@@ -61,6 +61,16 @@ public sealed class BotDebugSettings
     public int? MostTouched { get; set; }
 
     public int? RestMs { get; set; }
+
+    public int? TitleWaitMs { get; set; }
+
+    public bool? Venues { get; set; }
+
+    public bool? Arena { get; set; }
+
+    public int? MinEntrants { get; set; }
+
+    public int? StartHourLocal { get; set; }
 }
 
 /// <summary>Reads the debugger's file and moves the numbers it names.</summary>
@@ -109,5 +119,11 @@ public static class BotDebugConfig
         BotAudit.WindowMs = settings.WindowMs ?? BotAudit.WindowMs;
         BotAudit.MostTouched = settings.MostTouched ?? BotAudit.MostTouched;
         BotAudit.RestMs = settings.RestMs ?? BotAudit.RestMs;
+
+        BotTourney.TitleWaitMs = settings.TitleWaitMs ?? BotTourney.TitleWaitMs;
+        BotVenues.Running = settings.Venues ?? BotVenues.Running;
+        BotTourney.Arena = settings.Arena ?? BotTourney.Arena;
+        BotTourney.MinEntrants = settings.MinEntrants ?? BotTourney.MinEntrants;
+        BotTourney.StartHourLocal = settings.StartHourLocal ?? BotTourney.StartHourLocal;
     }
 }

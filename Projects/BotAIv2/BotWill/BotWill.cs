@@ -122,6 +122,8 @@ public static class BotWill
 
         public long Returned;
 
+        public long KeptOut;
+
         public long Auctioned;
     }
 
@@ -189,6 +191,8 @@ public static class BotWill
     public static long Kept { get; private set; }
 
     public static long Aided { get; private set; }
+
+    public static long RaiseHeld { get; private set; }
 
     public static bool Aid(BotDeed held, BotDeed best, BotStanding rung) =>
         held is BotEnlist && rung is BotStanding.Failing or BotStanding.Hunted && best is BotBolt or BotSalve;
@@ -381,8 +385,99 @@ public static class BotWill
 
     public static void Spent(long ticks)
     {
-        SpentMs += ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        TurnMs = ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        SpentMs += TurnMs;
         Decisions++;
+    }
+
+    public static double TurnMs { get; private set; }
+
+    public static double TurnAuctionMs { get; private set; }
+
+    public static string TurnProposer { get; private set; }
+
+    public static double TurnProposerMs { get; private set; }
+
+    public static void BeginTurn()
+    {
+        TurnMs = 0.0;
+        TurnAuctionMs = 0.0;
+        TurnProposer = null;
+        TurnProposerMs = 0.0;
+    }
+
+    /// <summary>What one proposer, or one kind of work's Advance, has cost the loop in all. See <see cref="Costliest"/>.</summary>
+    private sealed class Cost
+    {
+        public double Ms;
+
+        public double WorstMs;
+
+        public long Times;
+
+        public string WorstBot;
+    }
+
+    private static readonly Dictionary<string, Cost> _proposerCosts = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly Dictionary<string, Cost> _advanceCosts = new(StringComparer.OrdinalIgnoreCase);
+
+    private static void Charge(Dictionary<string, Cost> book, string name, double ms, string bot)
+    {
+        name ??= "?";
+
+        if (!book.TryGetValue(name, out var cost))
+        {
+            cost = new Cost();
+            book[name] = cost;
+        }
+
+        cost.Ms += ms;
+        cost.Times++;
+
+        if (ms > cost.WorstMs)
+        {
+            cost.WorstMs = ms;
+            cost.WorstBot = bot;
+        }
+    }
+
+    private static string Costliest(Dictionary<string, Cost> book)
+    {
+        if (book.Count == 0)
+        {
+            return "nothing yet";
+        }
+
+        List<KeyValuePair<string, Cost>> rows = new(book);
+
+        rows.Sort(static (a, b) => b.Value.Ms.CompareTo(a.Value.Ms));
+
+        using var say = ValueStringBuilder.Create(256);
+        var total = 0.0;
+        var times = 0L;
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            total += rows[i].Value.Ms;
+            times += rows[i].Value.Times;
+        }
+
+        say.Append($"{total:F0}ms over {times}: ");
+
+        for (var i = 0; i < rows.Count && i < 5; i++)
+        {
+            if (i > 0)
+            {
+                say.Append(", ");
+            }
+
+            var cost = rows[i].Value;
+
+            say.Append($"{rows[i].Key} {cost.Ms:F0}ms/{cost.Times} (worst {cost.WorstMs:F0}ms, {cost.WorstBot ?? "?"})");
+        }
+
+        return say.ToString();
     }
 
     public static void Decide(IBotWilful bot)
@@ -621,12 +716,42 @@ public static class BotWill
         }
     }
 
+    public static void Menaced(IBotWilful bot)
+    {
+        var resolve = bot?.Resolve;
+
+        if (resolve != null)
+        {
+            resolve.MenaceTick = Core.TickCount;
+            resolve.Menaced = true;
+        }
+    }
+
+    public static long Alerts { get; private set; }
+
+    public static void Alert(IBotWilful bot)
+    {
+        var resolve = bot?.Resolve;
+
+        if (resolve == null)
+        {
+            return;
+        }
+
+        resolve.Due = true;
+        Alerts++;
+
+        (bot.Self as BotMobile)?.Hurry();
+    }
+
     public static void Died(IBotWilful bot) => Settle(bot, BotEnding.Died);
 
     public static void Forget(IBotWilful bot)
     {
         BotBreaker.Forget(bot?.Self);
+        BotTreadmill.Forget(bot?.Self);
         BotYield.Forget(bot?.Self);
+        BotWalk.ForgetChase(bot?.Self);
 
         var resolve = bot?.Resolve;
         var deed = resolve?.Deed;
@@ -641,6 +766,7 @@ public static class BotWill
         resolve.Deed = null;
         resolve.Sent = default;
         resolve.Paused = null;
+        resolve.Under = null;
     }
 
     private static void Aside(
@@ -670,6 +796,7 @@ public static class BotWill
 
         if (standing == BotStanding.Hunted
             || resolve.Took <= standing
+            || standing == BotStanding.Failing && resolve.Deed is BotRescue { ToTheEnd: true }
             || standing == BotStanding.Bound && resolve.Deed.Alongside)
         {
             resolve.Aside = false;
@@ -708,8 +835,16 @@ public static class BotWill
 
     private static void Advance(IBotWilful bot, BotResolve resolve)
     {
+        if (bot is IBotSquadMember { Squad: { } company } && bot.Self is { } raiser && company.Raising(raiser))
+        {
+            RaiseHeld++;
+
+            return;
+        }
+
         var deed = resolve.Deed;
         BotDoing doing;
+        var began = System.Diagnostics.Stopwatch.GetTimestamp();
 
         try
         {
@@ -722,6 +857,15 @@ public static class BotWill
             Settle(bot, BotEnding.Failed);
 
             return;
+        }
+        finally
+        {
+            Charge(
+                _advanceCosts,
+                deed.Kind,
+                (System.Diagnostics.Stopwatch.GetTimestamp() - began) * 1000.0 / System.Diagnostics.Stopwatch.Frequency,
+                bot.Self?.Name
+            );
         }
 
         switch (doing.Kind)
@@ -787,6 +931,11 @@ public static class BotWill
 
                 if (doing.Follow == null && bot.Self is { Deleted: false } walker && walker.Map == doing.Map)
                 {
+                    if (journey.Held)
+                    {
+                        return;
+                    }
+
                     var away = journey.RoadLeft(walker.Location, doing.Where);
 
                     if (resolve.RouteStamp != journey.RouteStamp)
@@ -904,6 +1053,7 @@ public static class BotWill
             asked++;
 
             BotDeed offer = null;
+            var began = System.Diagnostics.Stopwatch.GetTimestamp();
 
             try
             {
@@ -912,6 +1062,17 @@ public static class BotWill
             catch (Exception e)
             {
                 logger.Error(e, "Proposer {Name} threw while offering work; it is skipped", proposer.Name);
+            }
+
+            var cost = (System.Diagnostics.Stopwatch.GetTimestamp() - began) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+            TurnAuctionMs += cost;
+            Charge(_proposerCosts, proposer.Name, cost, bot.Self?.Name);
+
+            if (cost > TurnProposerMs)
+            {
+                TurnProposerMs = cost;
+                TurnProposer = proposer.Name;
             }
 
             if (offer?.Map == null)
@@ -946,7 +1107,7 @@ public static class BotWill
             return false;
         }
 
-        resolve.Urges.Weigh(BotYield.Wealth(bot.Self), largestOutlay);
+        resolve.Urges.Weigh(BotYield.Spendable(bot.Self), largestOutlay);
 
         var grounded = BotLadder.Overloaded(bot.Self);
 
@@ -964,6 +1125,12 @@ public static class BotWill
         var mindedScore = 0.0;
         var mindedWeigh = default(BotWeigh);
         string mindedVeto = null;
+
+        var crafter = rung == BotStanding.Free && BotCraftFirst.Running && BotCraftFirst.Crafter(bot);
+        BotDeed work = null;
+        var workScore = 0.0;
+        var workRank = -1;
+        var workWeigh = default(BotWeigh);
 
         for (var i = 0; i < _offers.Count; i++)
         {
@@ -989,6 +1156,14 @@ public static class BotWill
 
             var rank = grounded && offer.Standing ? 1 : 0;
 
+            if (crafter && (rank > workRank || rank == workRank && score > workScore) && BotCraftFirst.Asked(offer))
+            {
+                work = offer;
+                workScore = score;
+                workRank = rank;
+                workWeigh = weigh;
+            }
+
             if (rank > bestRank || rank == bestRank && score > bestScore)
             {
                 second = best;
@@ -1005,6 +1180,21 @@ public static class BotWill
                 secondScore = score;
                 secondRank = rank;
             }
+        }
+
+        var gaveWay = false;
+
+        if (crafter && best != null && BotCraftFirst.Mining(best) && work != null && workRank >= bestRank)
+        {
+            gaveWay = true;
+
+            second = best;
+            secondScore = bestScore;
+            secondRank = bestRank;
+            best = work;
+            bestScore = workScore;
+            bestRank = workRank;
+            bestWeigh = workWeigh;
         }
 
         if (bestRank > 0 && secondScore > bestScore)
@@ -1164,6 +1354,15 @@ public static class BotWill
             Aided++;
         }
 
+        if (gaveWay)
+        {
+            BotCraftFirst.Gave(best);
+        }
+        else if (crafter && BotCraftFirst.Mining(best))
+        {
+            BotCraftFirst.Kept();
+        }
+
         Commit(bot, resolve, rung, best, bestWeigh, second, secondScore, now, _offers.Count, viable, firstVeto, how, heldNow, heldVeto);
 
         return true;
@@ -1230,10 +1429,13 @@ public static class BotWill
             var metFiller = MetCounts && how is "outbid" && (dropped is BotProwl || dropped is BotRounds);
             var met = metHome || metFiller || MetCounts && dropped is BotProwl && Meets(bot, deed);
 
+            var stack = Resume && StackAid && dropped is BotEnlist && resolve.Paused != null && resolve.Under == null
+                        && how is "jumped" or "interrupted" && Aid(dropped, deed, rung);
+
             var pause = !met
                         && Resume
                         && dropped.Resumes
-                        && resolve.Paused == null
+                        && (resolve.Paused == null || stack)
                         && how is "jumped" or "summoned" or "dislodged" or "interrupted";
 
             if (met)
@@ -1262,6 +1464,23 @@ public static class BotWill
             }
             else if (pause)
             {
+                if (resolve.Paused != null)
+                {
+                    if (resolve.Under != null)
+                    {
+                        var beneath = resolve.Under;
+                        resolve.Under = null;
+                        DropPaused(bot, resolve, $"put down two deep for {deed.Kind}");
+                        resolve.Under = beneath;
+                    }
+                    else
+                    {
+                        resolve.Under = resolve.Paused;
+                        resolve.Paused = null;
+                        Stacked++;
+                    }
+                }
+
                 Pause(bot, resolve, deed.Kind, now);
 
                 gone = $"; put down {dropped} to take up again ({account})";
@@ -1304,6 +1523,11 @@ public static class BotWill
         {
             logger.Error(e, "Undertaking {Kind} threw when it was taken on; carried on without it", deed.Kind);
         }
+
+        BotReflex.Took(bot, deed);
+
+        BotPurse.BeforeTrip(bot, deed);
+
         resolve.SinceTick = now;
         resolve.ReviewedTick = now;
         resolve.StirredTick = now;
@@ -1382,7 +1606,7 @@ public static class BotWill
 
     public static long Repeated { get; private set; }
 
-    public static bool Press(IBotWilful bot, BotDeed deed, string why)
+    public static bool Press(IBotWilful bot, BotDeed deed, string why, bool stack = false)
     {
         var resolve = bot?.Resolve;
         var body = bot?.Self;
@@ -1411,7 +1635,17 @@ public static class BotWill
                 putDown = $"; put down {held} to take up again";
                 PressPaused++;
 
-                Pause(bot, resolve, deed.Kind, now);
+                Pause(bot, resolve, deed.Kind, now, deed.Shelters);
+            }
+            else if (stack && Resume && held.Resumes && resolve.Paused != null && resolve.Under == null)
+            {
+                putDown = $"; put down {held} to take up again, over {resolve.Paused.Deed} already put down";
+                resolve.Under = resolve.Paused;
+                resolve.Paused = null;
+                Stacked++;
+                PressPaused++;
+
+                Pause(bot, resolve, deed.Kind, now, deed.Shelters);
             }
             else
             {
@@ -1431,6 +1665,10 @@ public static class BotWill
         {
             logger.Error(e, "Undertaking {Kind} threw when it was pressed; carried on without it", deed.Kind);
         }
+
+        BotReflex.Took(bot, deed);
+
+        BotPurse.BeforeTrip(bot, deed);
 
         resolve.SinceTick = now;
         resolve.ReviewedTick = now;
@@ -1488,6 +1726,8 @@ public static class BotWill
         {
             return;
         }
+
+        BotReflex.Ended(bot, deed, ending);
 
         var takings = BotYield.Settle(bot, deed, resolve.Stake, ending);
 
@@ -1558,12 +1798,24 @@ public static class BotWill
 
         var defence = deed is BotRescue { Own: true };
 
+        if (ending == BotEnding.Failed)
+        {
+            BotTreadmill.Failed(bot.Self, deed, why, Core.TickCount - resolve.SinceTick, takings.Made, takings.Skill);
+        }
+
         switch (ending)
         {
             case BotEnding.Done:
                 if (defence)
                 {
                     DefenceFinished++;
+                }
+                else if (deed.KeptOut)
+                {
+                    KeptOut++;
+                    tallied.KeptOut++;
+
+                    break;
                 }
                 else
                 {
@@ -1641,6 +1893,11 @@ public static class BotWill
         }
 
         resolve.Due = true;
+
+        if (deed.Foe != null || deed is BotBolt || deed is BotSalve)
+        {
+            (bot.Self as BotMobile)?.Hurry();
+        }
 
         try
         {
@@ -1744,7 +2001,7 @@ public static class BotWill
         return own > 0.0 ? Math.Max(held, (long)(own * 60000.0)) : held;
     }
 
-    private static void Pause(IBotWilful bot, BotResolve resolve, string forKind, long now)
+    private static void Pause(IBotWilful bot, BotResolve resolve, string forKind, long now, bool sheltered = false)
     {
         var deed = resolve.Deed;
         var body = bot.Self;
@@ -1762,7 +2019,8 @@ public static class BotWill
             Wealth = BotYield.Standing(body),
             Aside = BotYield.AsideOf(body),
             Skill = BotYield.SkillOf(body, deed.Trains),
-            For = forKind
+            For = forKind,
+            Sheltered = sheltered
         };
 
         Count(deed.Kind, -1);
@@ -1809,7 +2067,7 @@ public static class BotWill
         {
             refusal = "the bot died while it was put down";
         }
-        else if (away >= AsideCapMs)
+        else if (away >= AsideCapMs && !pause.Sheltered)
         {
             refusal = $"it was put down for {away / 60000.0:F0} minutes";
         }
@@ -1823,6 +2081,10 @@ public static class BotWill
         else if (deed.Map != body.Map)
         {
             refusal = "the bot is on another map now";
+        }
+        else if (deed.Stale(bot) is { } stale)
+        {
+            refusal = stale;
         }
 
         resolve.Deed = deed;
@@ -1849,6 +2111,7 @@ public static class BotWill
             Unresumed++;
             MetFiller++;
             Settle(bot, BotEnding.Done, $"its time went to {after} instead", unpause: false);
+            Surface(bot, resolve, ending, after);
 
             return;
         }
@@ -1858,6 +2121,7 @@ public static class BotWill
             Unresumed++;
 
             Settle(bot, died ? BotEnding.Died : BotEnding.Dropped, $"not taken up again after {after}: {refusal}", unpause: false, echo: died);
+            Surface(bot, resolve, ending, after);
 
             return;
         }
@@ -1871,12 +2135,21 @@ public static class BotWill
             logger.Error(e, "Undertaking {Kind} threw when it was taken up again; it is given up", deed.Kind);
 
             Settle(bot, BotEnding.Failed, unpause: false);
+            Surface(bot, resolve, ending, after);
 
             return;
         }
 
+        if (resolve.Under != null)
+        {
+            resolve.Paused = resolve.Under;
+            resolve.Under = null;
+        }
+
         Resumed++;
         TallyOf(deed.Kind).Resumed++;
+
+        BotReflex.Took(bot, deed, resumed: true);
 
         if (Chatty)
         {
@@ -1890,6 +2163,25 @@ public static class BotWill
         }
     }
 
+    private static void Surface(IBotWilful bot, BotResolve resolve, BotEnding ending, string after)
+    {
+        if (resolve.Under == null || resolve.Paused != null || resolve.Deed != null)
+        {
+            return;
+        }
+
+        resolve.Paused = resolve.Under;
+        resolve.Under = null;
+
+        Unpause(bot, resolve, ending, after);
+    }
+
+    public static bool StackAid { get; set; } = true;
+
+    public static long Stacked { get; private set; }
+
+    public static long KeptOut { get; private set; }
+
     private static void DropPaused(IBotWilful bot, BotResolve resolve, string why)
     {
         var pause = resolve.Paused;
@@ -1901,6 +2193,14 @@ public static class BotWill
 
         resolve.Paused = null;
         Unresumed++;
+
+        if (resolve.Under != null)
+        {
+            resolve.Paused = resolve.Under;
+            resolve.Under = null;
+            DropPaused(bot, resolve, why);
+            resolve.Paused = null;
+        }
 
         var body = bot.Self;
         var deed = pause.Deed;
@@ -2030,7 +2330,7 @@ public static class BotWill
         var ended = Finished + Failed + Dropped + Deaths;
 
         line.Append(
-            $"{Finished} of {ended} endings finished ({Percent(Finished, ended)}%), {Failed} failed, {Dropped} dropped, {Deaths} died ({EchoDeaths} more pieces of work that had been put down died with their bot, counted with their trades only); self-defence kept out of the share: {DefenceFinished} finished, {DefenceFailed} failed, {DefenceDropped} dropped, {DefenceDeaths} died; of the drops {Jumped} for something that would not wait, {Summoned} for a call from outside, {Interrupted} for a rung above, {Dislodged} for a full pack and {Outbid} outbid; {Held} better offers refused inside a hold, {Repeated} offers of the work already in hand let alone and {Troubled} holds lifted for trouble; {Paused} put down ({PressPaused} of them for a press), {Resumed} taken up again, {Unresumed} not and {HeldHurt} left put down until the bot was mended; {Returned} kinds of work taken back within {ReturnMs / 60000} minutes of being dropped; {Pressed} pieces pressed into hands, {Repressed} presses let alone as the work already in hand; by trade, taken: finished/dropped %, held, put down/taken up:"
+            $"{Finished} of {ended} endings finished ({Percent(Finished, ended)}%), {Failed} failed, {Dropped} dropped, {Deaths} died ({EchoDeaths} more pieces of work that had been put down died with their bot, counted with their trades only); self-defence kept out of the share: {DefenceFinished} finished, {DefenceFailed} failed, {DefenceDropped} dropped, {DefenceDeaths} died; of the drops {Jumped} for something that would not wait, {Summoned} for a call from outside, {Interrupted} for a rung above, {Dislodged} for a full pack and {Outbid} outbid; {Held} better offers refused inside a hold, {Repeated} offers of the work already in hand let alone and {Troubled} holds lifted for trouble; {Paused} put down ({PressPaused} of them for a press), {Resumed} taken up again, {Unresumed} not and {HeldHurt} left put down until the bot was mended; {Returned} kinds of work taken back within {ReturnMs / 60000} minutes of being dropped; {Pressed} pieces pressed into hands, {Repressed} presses let alone as the work already in hand; {Stacked} enlistments put down for a flight or a bandage over work they had already put down; {KeptOut} endings kept out of the share for being no work at all (levied members let go before they ever stood with their company); by trade, taken: finished/dropped %, held, put down/taken up:"
         );
 
         var rows = new List<KeyValuePair<string, Tally>>(_tallies);
@@ -2043,6 +2343,11 @@ public static class BotWill
             var ends = t.Finished + t.Failed + t.Dropped + t.Died;
 
             line.Append($" {kind} {t.Taken}: {Percent(t.Finished, ends)}/{Percent(t.Dropped, ends)}");
+
+            if (t.KeptOut > 0)
+            {
+                line.Append($" ({t.KeptOut} kept out)");
+            }
 
             if (t.Held > 0 || t.Paused > 0)
             {
@@ -2237,6 +2542,11 @@ public static class BotWill
             line.Append($"; {BotBreaker.Describe()}");
         }
 
+        if (BotTreadmill.Any)
+        {
+            line.Append($"; {BotTreadmill.Describe()}");
+        }
+
         if (Resent > 0)
         {
             line.Append($"; {Resent} walks sent again because the road no longer carried them");
@@ -2264,6 +2574,11 @@ public static class BotWill
         if (Aided > 0)
         {
             line.Append($"; {Aided} times a member of a company put its enlistment down to run or to bind its wounds");
+        }
+
+        if (RaiseHeld > 0)
+        {
+            line.Append($"; {RaiseHeld} beats a company member's own work waited while it raised one of ours");
         }
 
         if (Filed > 0)
@@ -2296,6 +2611,8 @@ public static class BotWill
             line.Append($"; {BotAppraisal.Unpaid} times work that is paid nothing on purpose was let past the earnings veto");
         }
 
+        line.Append($"; the proposers cost {Costliest(_proposerCosts)}; advancing work cost {Costliest(_advanceCosts)}");
+
         return line.ToString();
     }
 
@@ -2321,6 +2638,7 @@ public static class BotWill
         Dislodged = 0;
         Kept = 0;
         Aided = 0;
+        RaiseHeld = 0;
         Filed = 0;
         SecondGuesses = 0;
         MindOffers = 0;
@@ -2344,8 +2662,12 @@ public static class BotWill
         Unresumed = 0;
         HeldHurt = 0;
         Returned = 0;
+        Stacked = 0;
+        KeptOut = 0;
 
         _tallies.Clear();
+        _proposerCosts.Clear();
+        _advanceCosts.Clear();
         BotCalling.Forget();
         BotYield.Reset();
     }

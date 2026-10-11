@@ -42,7 +42,8 @@ public static class BotPopulation
     public static int Scatter { get; set; } = 350;
 
     public static bool Within(Map map, Point3D where) =>
-        Home == null || map == Home && (Utility.InRange(Where, where, Roam) || BotDungeon.Under(where) || BotTowns.Within(where) || BotResidence.Around(where));
+        Home == null || map == Home && (Utility.InRange(Where, where, Roam) || BotDungeon.Under(where) || BotTowns.Within(where) || BotResidence.Around(where)
+                                        || BotColonies.Within(map, where));
 
     public static double GrownProgress { get; set; } = 1.0;
 
@@ -64,6 +65,14 @@ public static class BotPopulation
 
     public static bool Reachable(Map map, Point3D from, Point3D to)
     {
+        if (BotReachMap.Refuses(map, from, to, BotReachMap.SampleReach))
+        {
+            Unreached++;
+            BotReachMap.NoteSampler();
+
+            return false;
+        }
+
         if (BotGates.Joined(map, from, to))
         {
             return true;
@@ -76,6 +85,8 @@ public static class BotPopulation
 
     public static long Unjoined { get; private set; }
 
+    public static long Unreached { get; private set; }
+
     public static Point3D HomeOf(Mobile body) => body is BotMobile bot ? BotResidence.Home(bot) : Where;
 
     public static Point3D Centre(Mobile body) => HomeOf(body);
@@ -87,7 +98,8 @@ public static class BotPopulation
             return false;
         }
 
-        if (body == null || BotDungeon.Under(where) || BotTowns.Within(where) || Utility.InRange(Centre(body), where, Leash(body)))
+        if (body == null || BotDungeon.Under(where) || BotTowns.Within(where) || Utility.InRange(Centre(body), where, Leash(body))
+            || BotColonies.Within(map, where))
         {
             return true;
         }
@@ -168,6 +180,36 @@ public static class BotPopulation
 
     public static int Count => _bots.Count - _holes;
 
+    public static BotMobile Holder(BotClass klass)
+    {
+        if (klass == null)
+        {
+            return null;
+        }
+
+        for (var i = 0; i < _bots.Count; i++)
+        {
+            if (_bots[i] is { Deleted: false } bot && bot.Class != null && bot.Class.Name.InsensitiveEquals(klass.Name))
+            {
+                return bot;
+            }
+        }
+
+        for (var i = 0; i < _away.Count; i++)
+        {
+            if (_away[i] is { Deleted: false } bot && bot.Class != null && bot.Class.Name.InsensitiveEquals(klass.Name))
+            {
+                return bot;
+            }
+        }
+
+        return null;
+    }
+
+    public static long SecondRefused { get; private set; }
+
+    public static int SecondDeleted { get; private set; }
+
     public static int Living
     {
         get
@@ -189,17 +231,24 @@ public static class BotPopulation
     public static int Reclaim(IReadOnlyDictionary<string, int> mix, out Dictionary<string, int> kept)
     {
         List<BotMobile> saved = [];
+        List<BotMobile> offices = [];
         kept = [];
 
         foreach (var mobile in World.Mobiles.Values)
         {
             if (mobile is BotMobile bot)
             {
-                saved.Add(bot);
+                (BotClasses.Find(bot.Was) is { Office: true } ? offices : saved).Add(bot);
             }
         }
 
+        offices.Sort(Senior);
+        offices.AddRange(saved);
+        saved = offices;
+
         var deleted = 0;
+        Dictionary<string, BotMobile> holders = new(StringComparer.OrdinalIgnoreCase);
+        SecondDeleted = 0;
 
         for (var i = 0; i < saved.Count; i++)
         {
@@ -209,9 +258,32 @@ public static class BotPopulation
 
             var resting = BotRest.Resting(bot.Name);
 
-            if (klass == null || mix == null || !mix.TryGetValue(klass.Name, out var want)
-                || kept.GetValueOrDefault(klass.Name) >= want || !bot.Revive(klass, resting))
+            var want = 0;
+            var asked = klass != null && mix != null && mix.TryGetValue(klass.Name, out want);
+
+            if (klass is { Office: true })
             {
+                want = Math.Min(want, 1);
+            }
+
+            if (!asked || kept.GetValueOrDefault(klass.Name) >= want || !bot.Revive(klass, resting))
+            {
+                if (asked && klass.Office && holders.TryGetValue(klass.Name, out var holder))
+                {
+                    SecondDeleted++;
+                    logger.Warning(
+                        "{Name} the {Class} ({Skills:F1} skill points, serial {Serial}, {Gold}gp in pack and bank, deleted with it) was a second holder of an office and is deleted; {Holder} ({Held:F1}, serial {HeldSerial}) keeps it",
+                        bot.Name,
+                        klass.Name,
+                        bot.SkillsTotal / 10.0,
+                        bot.Serial,
+                        BotYield.Wealth(bot),
+                        holder.Name,
+                        holder.SkillsTotal / 10.0,
+                        holder.Serial
+                    );
+                }
+
                 bot.Delete();
                 deleted++;
 
@@ -219,6 +291,11 @@ public static class BotPopulation
             }
 
             kept[klass.Name] = kept.GetValueOrDefault(klass.Name) + 1;
+
+            if (klass.Office)
+            {
+                holders[klass.Name] = bot;
+            }
 
             if (resting)
             {
@@ -231,7 +308,19 @@ public static class BotPopulation
 
         Unduplicate();
 
+        if (SecondDeleted > 0)
+        {
+            logger.Warning("{Deleted} second holders of an office came back from the save and were deleted; one of each office is kept", SecondDeleted);
+        }
+
         return deleted;
+    }
+
+    private static int Senior(BotMobile a, BotMobile b)
+    {
+        var bySkill = b.SkillsTotal.CompareTo(a.SkillsTotal);
+
+        return bySkill != 0 ? bySkill : a.Serial.CompareTo(b.Serial);
     }
 
     public static int PurgeSaved()
@@ -278,9 +367,11 @@ public static class BotPopulation
                 continue;
             }
 
+            var asked = klass.Office ? Math.Min(count, 1) : count;
+
             var wanted = already != null && already.TryGetValue(klass.Name, out var standing)
-                ? count - standing
-                : count;
+                ? asked - standing
+                : asked;
 
             for (var i = 0; i < wanted; i++)
             {
@@ -452,6 +543,19 @@ public static class BotPopulation
             return null;
         }
 
+        if (klass.Office && Holder(klass) is { } holder)
+        {
+            SecondRefused++;
+            logger.Warning(
+                "No second {Class}: {Holder} holds the office, so none was raised ({Refused} refused this session)",
+                klass.Name,
+                holder.Name,
+                SecondRefused
+            );
+
+            return null;
+        }
+
         var bot = new BotMobile();
         var female = Utility.Random(2) == 0;
 
@@ -471,6 +575,8 @@ public static class BotPopulation
         bot.Become(klass, name, female, people);
 
         BotProgress.Restore(bot);
+
+        BotTraits.Born(bot, BotCharacterModule.Started);
 
         BotResidence.Raised(bot);
 
@@ -506,6 +612,11 @@ public static class BotPopulation
             return true;
         }
 
+        if (BotRaise.Holding(bot))
+        {
+            return false;
+        }
+
         if (Core.TickCount - bot.FellTick < ReviveMs)
         {
             return false;
@@ -534,6 +645,8 @@ public static class BotPopulation
         }
 
         logger.Information("{Name} the {Class} is back on its feet at {Where}", bot.Name, bot.Class?.Name, bot.Location);
+
+        BotUndertaker.Risen(bot);
 
         return true;
     }
@@ -687,15 +800,17 @@ public static class BotPopulation
         }
 
         return $"{Count} bots, {Living} on their feet, {fallen} waiting to be revived, {_away.Count} resting; "
-            + $"roam {Roam} tiles, a leash of {(int)(Roam * Math.Clamp(LeashFloor, 0.0, 1.0))} to {Roam} from where the bot lives by trade progress against {GrownProgress:F2}, {Leashed} choices refused by one, {Unjoined} places refused for lying on a land no gate joins";
+            + $"roam {Roam} tiles, a leash of {(int)(Roam * Math.Clamp(LeashFloor, 0.0, 1.0))} to {Roam} from where the bot lives by trade progress against {GrownProgress:F2}, {Leashed} choices refused by one, {Unjoined} places refused for lying on a land no gate joins, {Unreached} with no open ground on the reach map within {BotReachMap.SampleReach}";
     }
 
     private static void Enlist(BotMobile bot)
     {
         var step = Math.Max(1, BotWalk.StepDelayMs(BotMobile.Runs));
 
+        var spread = Math.Max(step, BotWill.IdleMs);
+
         bot.Scheduled = true;
-        bot.DueTick = Core.TickCount + Count * BotBeat.IntervalMs % step;
+        bot.DueTick = Core.TickCount + Count * BotBeat.IntervalMs % spread;
 
         if (_holes > 0)
         {

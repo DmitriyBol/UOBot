@@ -63,7 +63,7 @@ public static class BotGuilds
 
     public static int Least { get; set; } = 5;
 
-    public static int Most { get; set; } = 15;
+    public static int Most { get; set; } = 35;
 
     public static int WidenBy { get; set; } = 10;
 
@@ -165,7 +165,7 @@ public static class BotGuilds
 
     public static readonly string[] Makers = ["Crafter"];
 
-    public static readonly string[] Barred = ["Baron", "Captain", "Architect", "Sage", "Brawler"];
+    public static readonly string[] Barred = ["Baron", "Captain", "Architect", "Sage", "Brawler", "Trader"];
 
     public static long Excused { get; private set; }
 
@@ -176,8 +176,16 @@ public static class BotGuilds
             return true;
         }
 
-        var klass = bot?.Class?.Name;
+        if (BotCrime.Unrepentant(bot))
+        {
+            return true;
+        }
 
+        return bot?.Class is { Neutral: true } || Bars(bot?.Class?.Name);
+    }
+
+    public static bool Bars(string klass)
+    {
         if (klass == null)
         {
             return false;
@@ -203,8 +211,64 @@ public static class BotGuilds
         ("The Lantern", "LAN"),
         ("The Anchor", "ANC"),
         ("The Wolf", "WLF"),
-        ("The Ash", "ASH")
+        ("The Ash", "ASH"),
+        ("The Raven", "RVN"),
+        ("The Oak", "OAK"),
+        ("The Stag", "STG"),
+        ("The Forge", "FRG"),
+        ("The Compass", "CMP"),
+        ("The Tide", "TID"),
+        ("The Ember", "EMB"),
+        ("The Thorn", "THN"),
+        ("The Falcon", "FAL"),
+        ("The Chalice", "CHL"),
+        ("The Gauntlet", "GNT"),
+        ("The Lyre", "LYR"),
+        ("The Sickle", "SCK"),
+        ("The Mill", "MIL"),
+        ("The Bell", "BEL"),
+        ("The Scroll", "SCR"),
+        ("The Loom", "LOM"),
+        ("The Hearth", "HRT"),
+        ("The Vine", "VIN"),
+        ("The Griffin", "GRF"),
+        ("The Serpent", "SRP"),
+        ("The Boar", "BOR"),
+        ("The Heron", "HRN"),
+        ("The Otter", "OTR"),
+        ("The Badger", "BDG"),
+        ("The Hawk", "HWK"),
+        ("The Bear", "BER"),
+        ("The Rose", "ROS"),
+        ("The Lily", "LIL"),
+        ("The Star", "STR"),
+        ("The Moon", "MON"),
+        ("The Sun", "SUN"),
+        ("The Comet", "CMT"),
+        ("The Storm", "STM"),
+        ("The Frost", "FRS"),
+        ("The Flint", "FLN"),
+        ("The Anvil", "ANV"),
+        ("The Plough", "PLW"),
+        ("The Sheaf", "SHF"),
+        ("The Barrel", "BRL"),
+        ("The Key", "KEY"),
+        ("The Tower", "TWR"),
+        ("The Bridge", "BRG"),
+        ("The Gate", "GAT"),
+        ("The Harp", "HRP"),
+        ("The Horn", "HOR"),
+        ("The Banner", "BNR"),
+        ("The Shield", "SHL"),
+        ("The Spear", "SPR"),
+        ("The Arrow", "ARW")
     ];
+
+    private const int Inherited = 8;
+
+    public static int MostGuilds { get; set; } = 10;
+
+    public static long AtMost { get; private set; }
 
     public static long Enrolled { get; private set; }
 
@@ -355,18 +419,47 @@ public static class BotGuilds
         );
 
         logger.Information(
-            "Guild membership: founding is {Founding} — every {Gather}s one bot without a guild joins the smallest guild under {Band}, or founds its own with the {Fellows} nearest bots without one if no guild is under {Band}, {Names} names to go round, {Most} the ceiling; a member gives a guild with nothing to show {Patience} minutes before it may leave, one a minute at most, {Defecting}, and is then barred from joining any guild for {Rejoin} hours, though not from founding one; a leader may put one member out and take one bot on every {Roster} minutes, and may not take back somebody who walked out of its own guild; the head of a guild neither leaves nor is put out",
+            "Guild membership: founding is {Founding} — every {Gather}s one bot without a guild joins the smallest guild under {Band}, or founds its own with the {Fellows} nearest bots without one if no guild is under {Band}, {Names} names to go round (the first {Inherited} in order, the rest drawn at random), at most {MostGuilds} guilds, {Most} the ceiling; a member gives a guild with nothing to show {Patience} minutes before it may leave, one a minute at most, {Defecting}, and is then barred from joining any guild for {Rejoin} hours, though not from founding one; a leader may put one member out and take one bot on every {Roster} minutes, and may not take back somebody who walked out of its own guild; the head of a guild neither leaves nor is put out; closing is {Closing}: a guild of fewer than {Least} with attractiveness under {LowAppeal} and nobody joining for {CloseAfter} minutes closes, its chest shared among its members, its name resting {Rest} hours ({Clocks} clocks and {Closed} closed names read back off the save)",
             Founding ? "ON" : "OFF",
             GatherMs / 1000,
             Band,
             Least - 1,
             Band,
             Names.Length,
+            Inherited,
+            MostGuilds,
             Most,
             Patience / 60000,
             Defecting ? "and only for a guild that has something to show and room" : "into no guild at all",
             RejoinMs / 3600000,
-            BotRoster.EveryMs / 60000
+            BotRoster.EveryMs / 60000,
+            Closing ? "ON" : "OFF",
+            Least,
+            LowAppeal,
+            CloseAfterMs / 60000,
+            NameRestHours,
+            _low.Count,
+            _closed.Count
+        );
+
+        logger.Information(
+            "Guild splits: {Splitting} — a guild at its ceiling loses {Least} members to a new guild under one of the fifty names when {Least} of them, not its head, not in a company, not inside the walk-out bar, have a reason: under the {Keep}gp keep for {Unshared} minutes while its chest holds {Rich}gp or more, living in another town than its house or hall or out of {Reach} tiles of both, or a guild half the others hold at {Enmity} or under or a town that put it out; not while it is at war, not within {Cool} hours of its last split, not with {MostGuilds} guilds standing, not while a guild with room reads appeal {Bar} or more, not within {Gap} hours of any split; founders barred from their old guild and from crossing for {Rejoin} hours of running time ({Barred} inside the bar read back off the save), the new guild spared the closing clock for {Young} hours ({Spared} read back)",
+            Splitting ? "ON" : "OFF",
+            Least,
+            Least,
+            BotEstate.Keep,
+            UnsharedMs / 60000,
+            RichChest,
+            BotSeat.Settled,
+            BotRegard.Enmity,
+            SplitParentMs / 3600000,
+            MostGuilds,
+            SplitBar,
+            SplitGapMs / 3600000,
+            RejoinMs / 3600000,
+            InsideBar(),
+            YoungMs / 3600000,
+            _young.Count
         );
     }
 
@@ -420,6 +513,39 @@ public static class BotGuilds
     public static bool IsHead(BotMobile bot) =>
         bot?.Guild is Guild guild && ReferenceEquals(Head(guild), bot);
 
+    public static bool Crown(Guild guild, BotMobile head)
+    {
+        if (guild is not { Disbanded: false } || head is not { Deleted: false } || head.Guild != guild)
+        {
+            return false;
+        }
+
+        if (!ReferenceEquals(guild.Leader, head))
+        {
+            guild.Leader = head;
+        }
+
+        for (var i = 0; i < guild.Members.Count; i++)
+        {
+            if (guild.Members[i] is { Deleted: false } member)
+            {
+                member.GuildFealty = head;
+            }
+        }
+
+        if (BotEstate.Hall(guild) is { Deleted: false } hall && hall.Owner != head)
+        {
+            BotEstate.Take(guild, hall);
+        }
+
+        if (BotOutpost.Of(guild.Name) is { Deleted: false } outpost && outpost.Owner != head)
+        {
+            BotOutpost.Keep(guild, outpost);
+        }
+
+        return true;
+    }
+
     private static bool Loose(BotMobile bot) =>
         bot is { Deleted: false, Alive: true, Guild: null, Class: not null }
         && bot.Map != null
@@ -457,6 +583,7 @@ public static class BotGuilds
             for (var i = 0; i < dead.Count; i++)
             {
                 _guilds.Remove(dead[i]);
+                _young.Remove(dead[i]);
 
                 logger.Information("{Guild} is no more: its last member is gone, and the name is free to be taken again", dead[i]);
             }
@@ -489,7 +616,11 @@ public static class BotGuilds
             return;
         }
 
-        if (FreeName(out var named))
+        if (Living() >= MostGuilds)
+        {
+            AtMost++;
+        }
+        else if (FreeName(out var named))
         {
             var fellows = Nearest(bot, Least - 1);
 
@@ -519,6 +650,9 @@ public static class BotGuilds
                     string.Join(", ", names),
                     _guilds.Count
                 );
+
+                _foundedNames.Add(named.Name);
+                BotAlarm.Note("guild", $"{named.Name} [{named.Abbrev}] was founded by {bot.Name} the {bot.Class?.Name} with {fellows.Count} others", Count, MostGuilds, "-");
 
                 return;
             }
@@ -623,11 +757,13 @@ public static class BotGuilds
         return best;
     }
 
-    private static bool FreeName(out (string Name, string Abbrev) named)
+    private static bool FreeName(out (string Name, string Abbrev) named) => FreeName(out named, false);
+
+    private static bool FreeName(out (string Name, string Abbrev) named, bool split)
     {
-        for (var i = 0; i < Names.Length; i++)
+        for (var i = 0; !split && i < Inherited && i < Names.Length; i++)
         {
-            if (!_guilds.TryGetValue(Names[i].Name, out var guild) || guild.Disbanded)
+            if (Free(Names[i].Name))
             {
                 named = Names[i];
 
@@ -635,10 +771,53 @@ public static class BotGuilds
             }
         }
 
+        var free = 0;
+
+        for (var i = Inherited; i < Names.Length; i++)
+        {
+            if (Free(Names[i].Name) && (!split || Bare(Names[i].Name)))
+            {
+                free++;
+            }
+        }
+
+        if (free > 0)
+        {
+            var pick = Utility.Random(free);
+
+            for (var i = Inherited; i < Names.Length; i++)
+            {
+                if (Free(Names[i].Name) && (!split || Bare(Names[i].Name)) && pick-- == 0)
+                {
+                    named = Names[i];
+
+                    return true;
+                }
+            }
+        }
+
         named = default;
 
         return false;
     }
+
+    private static bool Free(string name)
+    {
+        if (_guilds.TryGetValue(name, out var guild) && !guild.Disbanded)
+        {
+            return false;
+        }
+
+        if (Resting(name))
+        {
+            return false;
+        }
+
+        return BaseGuild.FindByName(name) is not Guild { Disbanded: false };
+    }
+
+    private static bool Bare(string name) =>
+        !BotEstate.Held.ContainsKey(name) && BotGuildHouses.Of(name) == null && BotClaim.Holds(name) == 0;
 
     private static List<BotMobile> Nearest(BotMobile founder, int many)
     {
@@ -906,7 +1085,7 @@ public static class BotGuilds
 
     public static void Review()
     {
-        if (!Running || !Leaving || _guilds.Count == 0)
+        if (!Running || _guilds.Count == 0)
         {
             return;
         }
@@ -919,6 +1098,15 @@ public static class BotGuilds
         }
 
         _reviewed = now;
+
+        Wane(now);
+
+        Hive(now);
+
+        if (!Leaving || _guilds.Count == 0)
+        {
+            return;
+        }
 
         List<Guild> bands = [.. _guilds.Values];
 
@@ -1010,6 +1198,993 @@ public static class BotGuilds
 
             return;
         }
+    }
+
+    public static double Appeal(Guild guild) =>
+        guild is not { Disbanded: false } ? 0.0 : Worth(guild) + (double)guild.Members.Count / Math.Max(1, Least) + BotRelics.AppealOf(guild);
+
+    public static bool Closing { get; set; } = true;
+
+    public static double LowAppeal { get; set; } = 2.0;
+
+    public static int CloseAfterMs { get; set; } = 7200000;
+
+    public static int NameRestHours { get; set; } = 168;
+
+    public static long Closed { get; private set; }
+
+    public static long ClosedGold { get; private set; }
+
+    public static long Released { get; private set; }
+
+    public static long HeldAtWar { get; private set; }
+
+    public static long HeldClaiming { get; private set; }
+
+    public static long HeldInCompany { get; private set; }
+
+    public static long HeldNoRoom { get; private set; }
+
+    private static readonly Dictionary<string, long> _low = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly Dictionary<string, int> _seen = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly Dictionary<string, DateTime> _closed = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly List<string> _foundedNames = [];
+
+    private static readonly List<string> _closedNames = [];
+
+    public static int LowMinutes(Guild guild) =>
+        guild?.Name != null && _low.TryGetValue(guild.Name, out var since) ? (int)Math.Max(0, (Core.TickCount - since) / 60000) : 0;
+
+    private static bool Resting(string name) =>
+        name != null && _closed.TryGetValue(name, out var when) && Core.Now - when < TimeSpan.FromHours(Math.Max(0, NameRestHours));
+
+    private static int RestingNames()
+    {
+        var n = 0;
+
+        foreach (var name in _closed.Keys)
+        {
+            if (Resting(name))
+            {
+                n++;
+            }
+        }
+
+        return n;
+    }
+
+    private static int Living()
+    {
+        var n = 0;
+
+        foreach (var guild in _guilds.Values)
+        {
+            if (!guild.Disbanded)
+            {
+                n++;
+            }
+        }
+
+        return n;
+    }
+
+    private static int Room(Guild but)
+    {
+        var room = 0;
+
+        foreach (var guild in _guilds.Values)
+        {
+            if (ReferenceEquals(guild, but) || guild.Disbanded)
+            {
+                continue;
+            }
+
+            room += Math.Max(0, Ceiling(guild) - guild.Members.Count);
+        }
+
+        return room;
+    }
+
+    private static void Wane(long now)
+    {
+        List<Guild> due = null;
+        List<string> stale = null;
+
+        foreach (var name in _low.Keys)
+        {
+            if (!_guilds.ContainsKey(name))
+            {
+                (stale ??= []).Add(name);
+            }
+        }
+
+        for (var i = 0; stale != null && i < stale.Count; i++)
+        {
+            _low.Remove(stale[i]);
+        }
+
+        foreach (var (name, guild) in _guilds)
+        {
+            if (guild.Disbanded)
+            {
+                continue;
+            }
+
+            var count = guild.Members.Count;
+            var gained = _seen.TryGetValue(name, out var was) && count > was;
+
+            _seen[name] = count;
+
+            if (count >= Least || gained || Appeal(guild) >= LowAppeal)
+            {
+                _low.Remove(name);
+
+                continue;
+            }
+
+            if (Young(name, now))
+            {
+                _low.Remove(name);
+                HeldYoung++;
+
+                continue;
+            }
+
+            if (!_low.TryGetValue(name, out var since))
+            {
+                _low[name] = now;
+
+                continue;
+            }
+
+            if (now - (since + CloseAfterMs) >= 0)
+            {
+                (due ??= []).Add(guild);
+            }
+        }
+
+        if (!Closing || due == null)
+        {
+            return;
+        }
+
+        for (var i = 0; i < due.Count; i++)
+        {
+            var guild = due[i];
+
+            if (BotWar.Fighting(guild.Name) > 0)
+            {
+                HeldAtWar++;
+
+                continue;
+            }
+
+            if (BotClaim.Making(guild) != null)
+            {
+                HeldClaiming++;
+
+                continue;
+            }
+
+            if (InCompany(guild))
+            {
+                HeldInCompany++;
+
+                continue;
+            }
+
+            if (Room(guild) < guild.Members.Count)
+            {
+                HeldNoRoom++;
+
+                continue;
+            }
+
+            if (Close(guild, now))
+            {
+                return;
+            }
+        }
+    }
+
+    private static bool InCompany(Guild guild)
+    {
+        for (var i = 0; i < guild.Members.Count; i++)
+        {
+            if (guild.Members[i] is BotMobile { Deleted: false, Squad: not null })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool Close(Guild guild, long now)
+    {
+        var name = guild.Name;
+        var abbrev = guild.Abbreviation;
+        var appeal = Appeal(guild);
+        var lowMinutes = LowMinutes(guild);
+        var head = Head(guild);
+        List<BotMobile> members = [];
+
+        if (head != null)
+        {
+            members.Add(head);
+        }
+
+        for (var i = 0; i < guild.Members.Count; i++)
+        {
+            if (guild.Members[i] is BotMobile { Deleted: false } member && !ReferenceEquals(member, head))
+            {
+                members.Add(member);
+            }
+        }
+
+        if (members.Count == 0)
+        {
+            return false;
+        }
+
+        var gold = BotChest.Empty(name);
+        var each = gold / members.Count;
+        var odd = gold - each * members.Count;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            var share = each + (i == 0 ? odd : 0);
+
+            if (share > 0 && !Banker.Deposit(members[i], share))
+            {
+                members[i].AddToBackpack(new Gold(share));
+            }
+        }
+
+        guild.Disband();
+
+        var released = new string[members.Count];
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            var bot = members[i];
+
+            bot.DisplayGuildTitle = false;
+            _joined.Remove(bot.Serial);
+
+            _quit.Remove(bot.Serial);
+            released[i] = $"{bot.Name} the {bot.Class?.Name}";
+        }
+
+        _guilds.Remove(name);
+        _low.Remove(name);
+        _seen.Remove(name);
+        _widened.Remove(name);
+        _young.Remove(name);
+        _splitAt.Remove(name);
+        _left.Remove(name);
+        _closed[name] = Core.Now;
+        _closedNames.Add(name);
+        BotSeat.Drop(name);
+
+        Closed++;
+        ClosedGold += gold;
+        Released += members.Count;
+
+        logger.Warning(
+            "{Guild} [{Abbrev}] has closed: attractiveness {Appeal:F1} under {Line:F1} with {Members} members for {Minutes} minutes and nobody joining; its chest of {Gold}gp was shared among {Released}; {Left} guilds stand, and the name rests {Hours} hours",
+            name,
+            abbrev,
+            appeal,
+            LowAppeal,
+            members.Count,
+            lowMinutes,
+            gold,
+            string.Join(", ", released),
+            _guilds.Count,
+            NameRestHours
+        );
+
+        BotAlarm.Note("guild", $"{name} closed: attractiveness {appeal:F1} with {members.Count} members for {lowMinutes} minutes, nobody joining; {gold}gp shared", members.Count, _guilds.Count, $"{lowMinutes}m");
+
+        return true;
+    }
+
+    internal static void SaveClosings(IGenericWriter writer)
+    {
+        var now = Core.TickCount;
+
+        writer.WriteEncodedInt(_low.Count);
+
+        foreach (var (name, since) in _low)
+        {
+            writer.Write(name);
+            writer.Write(Math.Max(0L, now - since));
+        }
+
+        writer.WriteEncodedInt(_closed.Count);
+
+        foreach (var (name, when) in _closed)
+        {
+            writer.Write(name);
+            writer.Write(when);
+        }
+    }
+
+    internal static int LoadClosings(IGenericReader reader)
+    {
+        _low.Clear();
+        _closed.Clear();
+
+        var now = Core.TickCount;
+        var low = reader.ReadEncodedInt();
+
+        for (var i = 0; i < low; i++)
+        {
+            var name = reader.ReadString();
+            var elapsed = reader.ReadLong();
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                _low[name] = now - Math.Max(0L, elapsed);
+            }
+        }
+
+        var closed = reader.ReadEncodedInt();
+
+        for (var i = 0; i < closed; i++)
+        {
+            var name = reader.ReadString();
+            var when = reader.ReadDateTime();
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                _closed[name] = when;
+            }
+        }
+
+        return _low.Count;
+    }
+
+    public static bool Splitting { get; set; } = true;
+
+    public static double SplitBar { get; set; } = 5.0;
+
+    public static int UnsharedMs { get; set; } = 3600000;
+
+    public static int RichChest => BotEstate.Price / 2;
+
+    public static int SplitGapMs { get; set; } = 10800000;
+
+    public static int SplitParentMs { get; set; } = 43200000;
+
+    public static int YoungMs { get; set; } = 21600000;
+
+    public static long Splits { get; private set; }
+
+    public static long FoundersUnshared { get; private set; }
+
+    public static long FoundersFar { get; private set; }
+
+    public static long FoundersQuarrel { get; private set; }
+
+    public static long SplitFew { get; private set; }
+
+    public static long SplitAtWar { get; private set; }
+
+    public static long SplitParentCool { get; private set; }
+
+    public static long SplitAtMost { get; private set; }
+
+    public static long SplitRoom { get; private set; }
+
+    public static long SplitGap { get; private set; }
+
+    public static long SplitNameless { get; private set; }
+
+    public static long HeldYoung { get; private set; }
+
+    private static readonly Dictionary<Serial, long> _unshared = [];
+
+    private static readonly HashSet<Serial> _unsharedNow = [];
+
+    private static readonly List<Serial> _unsharedGone = [];
+
+    private static readonly Dictionary<string, long> _splitAt = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly Dictionary<string, int> _left = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly Dictionary<string, (long Tick, string From)> _young = new(StringComparer.OrdinalIgnoreCase);
+
+    private static long _lastSplit;
+
+    private static bool _hasSplit;
+
+    private static readonly List<string> _splitNames = [];
+
+    private const int WhyUnshared = 1;
+
+    private const int WhyFar = 2;
+
+    private const int WhyQuarrel = 4;
+
+    private static bool Young(string name, long now) =>
+        name != null && _young.TryGetValue(name, out var young) && now - (young.Tick + YoungMs) < 0;
+
+    private static void Hive(long now)
+    {
+        if (!Running || !_dealt)
+        {
+            return;
+        }
+
+        Unshared(now);
+        ShrinkLeft();
+
+        if (!Splitting)
+        {
+            return;
+        }
+
+        Guild parent = null;
+        List<(BotMobile Bot, int Why, int Far)> leavers = null;
+        var war = false;
+        var cool = false;
+
+        foreach (var guild in _guilds.Values)
+        {
+            if (guild.Disbanded || guild.Members.Count < Ceiling(guild))
+            {
+                continue;
+            }
+
+            var found = Leavers(guild, now);
+
+            if (found.Count < Least)
+            {
+                continue;
+            }
+
+            if (_splitAt.TryGetValue(guild.Name, out var at) && now - (at + SplitParentMs) < 0)
+            {
+                cool = true;
+
+                continue;
+            }
+
+            if (BotWar.Fighting(guild.Name) > 0)
+            {
+                war = true;
+
+                continue;
+            }
+
+            if (leavers == null || found.Count > leavers.Count)
+            {
+                parent = guild;
+                leavers = found;
+            }
+        }
+
+        if (parent == null)
+        {
+            if (war)
+            {
+                SplitAtWar++;
+            }
+            else if (cool)
+            {
+                SplitParentCool++;
+            }
+            else
+            {
+                SplitFew++;
+            }
+
+            return;
+        }
+
+        if (Living() >= MostGuilds)
+        {
+            SplitAtMost++;
+
+            return;
+        }
+
+        if (WantedRoom(parent) != null)
+        {
+            SplitRoom++;
+
+            return;
+        }
+
+        if (_hasSplit && now - (_lastSplit + SplitGapMs) < 0)
+        {
+            SplitGap++;
+
+            return;
+        }
+
+        if (!FreeName(out var named, true))
+        {
+            SplitNameless++;
+
+            return;
+        }
+
+        Found(parent, leavers, named, now);
+    }
+
+    private static void Unshared(long now)
+    {
+        _unsharedNow.Clear();
+
+        foreach (var guild in _guilds.Values)
+        {
+            if (guild.Disbanded || BotChest.Holds(guild.Name) < RichChest)
+            {
+                continue;
+            }
+
+            for (var i = 0; i < guild.Members.Count; i++)
+            {
+                if (guild.Members[i] is BotMobile { Deleted: false } member && BotYield.Spendable(member) < BotEstate.Keep)
+                {
+                    _unsharedNow.Add(member.Serial);
+                    _unshared.TryAdd(member.Serial, now);
+                }
+            }
+        }
+
+        _unsharedGone.Clear();
+
+        foreach (var serial in _unshared.Keys)
+        {
+            if (!_unsharedNow.Contains(serial))
+            {
+                _unsharedGone.Add(serial);
+            }
+        }
+
+        for (var i = 0; i < _unsharedGone.Count; i++)
+        {
+            _unshared.Remove(_unsharedGone[i]);
+        }
+    }
+
+    private static void ShrinkLeft()
+    {
+        if (_left.Count == 0)
+        {
+            return;
+        }
+
+        List<(string Name, int Left)> change = null;
+
+        foreach (var (name, left) in _left)
+        {
+            var free = _guilds.TryGetValue(name, out var guild) && !guild.Disbanded ? Math.Max(0, Ceiling(guild) - guild.Members.Count) : 0;
+
+            if (free < left)
+            {
+                (change ??= []).Add((name, free));
+            }
+        }
+
+        for (var i = 0; change != null && i < change.Count; i++)
+        {
+            if (change[i].Left <= 0)
+            {
+                _left.Remove(change[i].Name);
+            }
+            else
+            {
+                _left[change[i].Name] = change[i].Left;
+            }
+        }
+    }
+
+    private static List<(BotMobile Bot, int Why, int Far)> Leavers(Guild guild, long now)
+    {
+        List<(BotMobile Bot, int Why, int Far)> found = [];
+        var despised = Despised(guild);
+        var hall = BotEstate.Hall(guild);
+        var seat = BotSeat.Of(guild.Name);
+
+        for (var i = 0; i < guild.Members.Count; i++)
+        {
+            if (guild.Members[i] is not BotMobile { Deleted: false, Alive: true, Squad: null } bot
+                || bot.Map == null || bot.Map == Map.Internal || IsHead(bot) || Outside(bot) || Cools(bot)
+                || hall is { Deleted: false } && hall.Owner == bot)
+            {
+                continue;
+            }
+
+            var why = 0;
+
+            if (_unshared.TryGetValue(bot.Serial, out var since) && now - (since + UnsharedMs) >= 0)
+            {
+                why |= WhyUnshared;
+            }
+
+            var lives = BotResidence.Of(bot);
+
+            if (Far(lives, guild, hall))
+            {
+                why |= WhyFar;
+            }
+
+            if (despised || lives != null && BotBurgh.Bars(guild, lives))
+            {
+                why |= WhyQuarrel;
+            }
+
+            if (why != 0)
+            {
+                found.Add((bot, why, seat == Point3D.Zero ? 0 : BotSeat.Gap(bot.Location, seat)));
+            }
+        }
+
+        return found;
+    }
+
+    private static bool Far(BotTowns.Town lives, Guild guild, Server.Multis.BaseHouse hall)
+    {
+        if (lives == null)
+        {
+            return false;
+        }
+
+        var standing = hall is { Deleted: false };
+        var home = BotGuildHouses.TownOf(guild) ?? (standing ? BotTowns.Nearest(hall.Location) : null);
+
+        if (home != null && !string.Equals(home.Name, lives.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var house = BotGuildHouses.Seat(guild.Name);
+        var nearHall = standing && BotSeat.Gap(hall.Location, lives.Square) <= BotSeat.Settled;
+        var nearHouse = house != Point3D.Zero && BotSeat.Gap(house, lives.Square) <= BotSeat.Settled;
+
+        return !nearHall && !nearHouse;
+    }
+
+    private static bool Despised(Guild guild)
+    {
+        var others = 0;
+        var enemies = 0;
+
+        foreach (var other in _guilds.Values)
+        {
+            if (ReferenceEquals(other, guild) || other.Disbanded)
+            {
+                continue;
+            }
+
+            others++;
+
+            if (BotRegard.Of(other.Name, guild.Name) <= BotRegard.Enmity)
+            {
+                enemies++;
+            }
+        }
+
+        return enemies > 0 && enemies * 2 >= others;
+    }
+
+    private static Guild WantedRoom(Guild but)
+    {
+        foreach (var guild in _guilds.Values)
+        {
+            if (ReferenceEquals(guild, but) || guild.Disbanded)
+            {
+                continue;
+            }
+
+            var room = Ceiling(guild) - guild.Members.Count - _left.GetValueOrDefault(guild.Name);
+
+            if (room > 0 && Appeal(guild) >= SplitBar)
+            {
+                return guild;
+            }
+        }
+
+        return null;
+    }
+
+    private static void Found(Guild parent, List<(BotMobile Bot, int Why, int Far)> leavers, (string Name, string Abbrev) named, long now)
+    {
+        Dictionary<string, int> towns = [];
+        BotTowns.Town town = null;
+        var most = 0;
+
+        for (var i = 0; i < leavers.Count; i++)
+        {
+            if (BotResidence.Of(leavers[i].Bot) is not { } lives)
+            {
+                continue;
+            }
+
+            var n = towns.GetValueOrDefault(lives.Name) + 1;
+            towns[lives.Name] = n;
+
+            if (n > most)
+            {
+                most = n;
+                town = lives;
+            }
+        }
+
+        leavers.Sort(
+            (a, b) =>
+            {
+                var aHere = town != null && ReferenceEquals(BotResidence.Of(a.Bot), town);
+                var bHere = town != null && ReferenceEquals(BotResidence.Of(b.Bot), town);
+
+                if (aHere != bHere)
+                {
+                    return aHere ? -1 : 1;
+                }
+
+                var byWhy = Reasons(b.Why).CompareTo(Reasons(a.Why));
+
+                return byWhy != 0 ? byWhy : b.Far.CompareTo(a.Far);
+            }
+        );
+
+        List<BotMobile> band = [];
+        var said = new string[Least];
+
+        for (var i = 0; i < leavers.Count && band.Count < Least; i++)
+        {
+            var (bot, why, _) = leavers[i];
+
+            band.Add(bot);
+            said[band.Count - 1] = $"{bot.Name} the {bot.Class?.Name} ({Say(why)})";
+
+            if ((why & WhyUnshared) != 0)
+            {
+                FoundersUnshared++;
+            }
+
+            if ((why & WhyFar) != 0)
+            {
+                FoundersFar++;
+            }
+
+            if ((why & WhyQuarrel) != 0)
+            {
+                FoundersQuarrel++;
+            }
+        }
+
+        town ??= BotTowns.Nearest(band[0].Location);
+
+        var keys = Unkey(BotEstate.Hall(parent), band) + Unkey(BotOutpost.Of(parent.Name), band);
+
+        Form(named, band);
+
+        if (town != null && BotSettle.Hearth(town) is var hearth && hearth != Point3D.Zero)
+        {
+            BotSeat.Restore(named.Name, hearth);
+        }
+
+        for (var i = 0; i < band.Count; i++)
+        {
+            _quit[band[i].Serial] = (now, parent.Name);
+        }
+
+        _splitAt[parent.Name] = now;
+        _left[parent.Name] = _left.GetValueOrDefault(parent.Name) + band.Count;
+        _young[named.Name] = (now, parent.Name);
+        _lastSplit = now;
+        _hasSplit = true;
+        Splits++;
+        _splitNames.Add($"{named.Name} ← {parent.Name}");
+
+        logger.Warning(
+            "{Guild} [{Abbrev}] has been founded by a split: {Count} left {Parent} ({Left} of {Ceiling} now, appeal {Appeal:F1}) — {Founders}, led by {Leader}; seated by {Town}, with no hall, no ground and no house, the chest left behind, {Keys} keys to the old hall and outpost given back; barred from {Parent} and any other guild for {Bar} hours, {Parent} splits again no sooner than {Cool} hours, nobody splits for {Gap} hours, and the closing clock spares {Guild} for {Young} hours; {Standing} guilds stand",
+            named.Name,
+            named.Abbrev,
+            band.Count,
+            parent.Name,
+            parent.Members.Count,
+            Ceiling(parent),
+            Appeal(parent),
+            string.Join(", ", said),
+            band[0].Name,
+            town?.Name ?? "nowhere known",
+            keys,
+            parent.Name,
+            RejoinMs / 3600000,
+            parent.Name,
+            SplitParentMs / 3600000,
+            SplitGapMs / 3600000,
+            named.Name,
+            YoungMs / 3600000,
+            _guilds.Count
+        );
+
+        BotAlarm.Note("guild", $"{named.Name} [{named.Abbrev}] was founded by {band.Count} who left {parent.Name}, led by {band[0].Name}", band.Count, _guilds.Count, "-");
+    }
+
+    private static int Reasons(int why) => (why & WhyUnshared) + ((why & WhyFar) >> 1) + ((why & WhyQuarrel) >> 2);
+
+    private static string Say(int why)
+    {
+        var say = (why & WhyUnshared) != 0 ? "no share" : null;
+
+        if ((why & WhyFar) != 0)
+        {
+            say = say == null ? "far" : say + ", far";
+        }
+
+        if ((why & WhyQuarrel) != 0)
+        {
+            say = say == null ? "a quarrel" : say + ", a quarrel";
+        }
+
+        return say ?? "none";
+    }
+
+    private static int Unkey(Server.Multis.BaseHouse house, List<BotMobile> band)
+    {
+        if (house is not { Deleted: false })
+        {
+            return 0;
+        }
+
+        var n = 0;
+
+        for (var i = 0; i < band.Count; i++)
+        {
+            if (house.CoOwners?.Remove(band[i]) == true)
+            {
+                n++;
+            }
+
+            if (house.Friends?.Remove(band[i]) == true)
+            {
+                n++;
+            }
+        }
+
+        return n;
+    }
+
+    private static int InsideBar()
+    {
+        var now = Core.TickCount;
+        var n = 0;
+
+        foreach (var (_, quit) in _quit)
+        {
+            if (now - (quit.Tick + RejoinMs) < 0)
+            {
+                n++;
+            }
+        }
+
+        return n;
+    }
+
+    internal static void SaveSplits(IGenericWriter writer)
+    {
+        var now = Core.TickCount;
+
+        writer.WriteEncodedInt(InsideBar());
+
+        foreach (var (serial, quit) in _quit)
+        {
+            if (now - (quit.Tick + RejoinMs) < 0)
+            {
+                writer.Write(serial);
+                writer.Write(Math.Max(0L, now - quit.Tick));
+                writer.Write(quit.Guild ?? "");
+            }
+        }
+
+        writer.WriteEncodedInt(_splitAt.Count);
+
+        foreach (var (name, at) in _splitAt)
+        {
+            writer.Write(name);
+            writer.Write(Math.Max(0L, now - at));
+        }
+
+        writer.WriteEncodedInt(_left.Count);
+
+        foreach (var (name, left) in _left)
+        {
+            writer.Write(name);
+            writer.WriteEncodedInt(left);
+        }
+
+        writer.WriteEncodedInt(_young.Count);
+
+        foreach (var (name, young) in _young)
+        {
+            writer.Write(name);
+            writer.Write(Math.Max(0L, now - young.Tick));
+            writer.Write(young.From ?? "");
+        }
+
+        writer.Write(_hasSplit);
+        writer.Write(_hasSplit ? Math.Max(0L, now - _lastSplit) : 0L);
+    }
+
+    internal static int LoadSplits(IGenericReader reader, out int young)
+    {
+        _quit.Clear();
+        _splitAt.Clear();
+        _left.Clear();
+        _young.Clear();
+
+        var now = Core.TickCount;
+        var quits = reader.ReadEncodedInt();
+
+        for (var i = 0; i < quits; i++)
+        {
+            var serial = reader.ReadSerial();
+            var elapsed = reader.ReadLong();
+            var guild = reader.ReadString();
+
+            _quit[serial] = (now - Math.Max(0L, elapsed), guild);
+        }
+
+        var splits = reader.ReadEncodedInt();
+
+        for (var i = 0; i < splits; i++)
+        {
+            var name = reader.ReadString();
+            var elapsed = reader.ReadLong();
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                _splitAt[name] = now - Math.Max(0L, elapsed);
+            }
+        }
+
+        var lefts = reader.ReadEncodedInt();
+
+        for (var i = 0; i < lefts; i++)
+        {
+            var name = reader.ReadString();
+            var left = reader.ReadEncodedInt();
+
+            if (!string.IsNullOrEmpty(name) && left > 0)
+            {
+                _left[name] = left;
+            }
+        }
+
+        var youngs = reader.ReadEncodedInt();
+
+        for (var i = 0; i < youngs; i++)
+        {
+            var name = reader.ReadString();
+            var elapsed = reader.ReadLong();
+            var from = reader.ReadString();
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                _young[name] = (now - Math.Max(0L, elapsed), from);
+            }
+        }
+
+        _hasSplit = reader.ReadBool();
+
+        var since = reader.ReadLong();
+
+        _lastSplit = _hasSplit ? now - Math.Max(0L, since) : 0;
+
+        young = _young.Count;
+
+        return _quit.Count;
     }
 
     public static string Aim(Guild guild)
@@ -1167,6 +2342,63 @@ public static class BotGuilds
         return true;
     }
 
+    public static long Poached { get; private set; }
+
+    public static bool Poach(Guild from, Guild to, BotMobile bot, string why)
+    {
+        if (!Running || !Leaving || !Defecting || from == null || to == null || to.Disbanded || ReferenceEquals(from, to)
+            || bot is not { Deleted: false, Alive: true } || !ReferenceEquals(bot.Guild, from) || IsHead(bot))
+        {
+            return false;
+        }
+
+        if (Cools(bot) || Spurned(bot, to))
+        {
+            Cooling++;
+
+            return false;
+        }
+
+        if (from.Enemies != null && from.Enemies.Contains(to))
+        {
+            return false;
+        }
+
+        if (to.Members.Count >= Ceiling(to))
+        {
+            Crowded++;
+
+            return false;
+        }
+
+        var now = Core.TickCount;
+        var since = _joined.TryGetValue(bot.Serial, out var joined) ? joined : now;
+
+        to.AddMember(bot);
+        Show(bot);
+
+        _quit[bot.Serial] = (now, from.Name);
+        Joined(bot);
+        Walked++;
+        Crossed++;
+        Poached++;
+
+        logger.Information(
+            "{Bot} the {Class} has left {From} for {To} after {Minutes} minutes in it — {Why}; {To} is {Count} of {Most} now",
+            bot.Name,
+            bot.Class?.Name,
+            from.Name,
+            to.Name,
+            (now - since) / 60000,
+            why ?? "no reason given",
+            to.Name,
+            to.Members.Count,
+            Ceiling(to)
+        );
+
+        return true;
+    }
+
     public static long HeldElsewhere { get; private set; }
 
     public static long Crowded { get; private set; }
@@ -1225,6 +2457,10 @@ public static class BotGuilds
 
     public static long Cannot { get; private set; }
 
+    public static double StandShare { get; set; } = 0.25;
+
+    public static long CappedGold { get; private set; }
+
     public static bool Stand(BotMobile member, int need)
     {
         if (!Running || member is not { Deleted: false } || need <= 0 || member.Guild is not Guild guild)
@@ -1256,7 +2492,22 @@ public static class BotGuilds
                 continue;
             }
 
-            var spare = Math.Min(BotYield.Wealth(mate) - Keep, need - got);
+            var above = BotYield.Spendable(mate) - Keep;
+
+            if (above <= 0)
+            {
+                continue;
+            }
+
+            var allowed = Math.Max(0, (int)(above * Math.Clamp(StandShare, 0.0, 1.0)));
+            var asked = Math.Min(above, need - got);
+
+            if (allowed < asked)
+            {
+                CappedGold += asked - allowed;
+            }
+
+            var spare = Math.Min(allowed, need - got);
 
             if (spare <= 0)
             {
@@ -1359,6 +2610,16 @@ public static class BotGuilds
                     say.Append(head.Class?.Name ?? "?");
                 }
 
+                say.Append(" appeal ");
+                say.Append(Appeal(guild).ToString("F1"));
+
+                if (_low.ContainsKey(name))
+                {
+                    say.Append(" unwanted ");
+                    say.Append(LowMinutes(guild).ToString());
+                    say.Append("m");
+                }
+
                 if (Maker(guild) == null)
                 {
                     makerless++;
@@ -1378,7 +2639,7 @@ public static class BotGuilds
 
             var stood = (Standings == 0
                     ? "; nothing has been stood for anybody yet"
-                    : $"; {Stood}gp stood for members {Standings} times, {Cannot} times a guild could not")
+                    : $"; {Stood}gp stood for members {Standings} times, {Cannot} times a guild could not, {CappedGold}gp left with their holders by the {StandShare:P0} cap on a call above the {Keep}gp keep")
                 + $"; {Walked} members left a guild that had nothing to show ({Crossed} of them for a guild that had, {Nowhere} looks found no guild worth leaving for), {Cooling} refused a guild for having lately left one"
                 + $"; {BotRoster.Describe()}"
                 + $"; {BotCharter.Describe()}";
@@ -1387,12 +2648,29 @@ public static class BotGuilds
                 ? "founding is OFF"
                 : $"{Founded} founded and {Gathered} joined since the shard came up, {Stones} given the stone the engine wants; "
                   + $"looks that placed nobody: {TooFew} found fewer than {Least - 1} others without a guild to found with, "
-                  + $"{Nameless} found every name taken, {Barred48} were inside the bar for walking out, {Unplaced} found every guild full";
+                  + $"{Nameless} found every name taken, {AtMost} found {MostGuilds} guilds standing, {Barred48} were inside the bar for walking out, {Unplaced} found every guild full"
+                  + (_foundedNames.Count == 0 ? "" : $" (founded: {string.Join(", ", _foundedNames)})");
+
+            var closing = !Closing
+                ? "; closing is OFF"
+                : $"; closing: a guild of fewer than {Least} with attractiveness (worth + members/{Least}) under {LowAppeal:F1} and nobody joining for {CloseAfterMs / 60000} minutes closes — "
+                  + $"{Closed} closed{(_closedNames.Count == 0 ? "" : $" ({string.Join(", ", _closedNames)})")}, {ClosedGold}gp of their chests shared among {Released} members let go, "
+                  + $"looks that held a due guild open: {HeldAtWar} at war, {HeldClaiming} laying claim, {HeldInCompany} with a member in a company, {HeldNoRoom} with too few free places elsewhere; "
+                  + $"{RestingNames()} names resting";
+
+            var splits = !Splitting
+                ? "; splits are OFF"
+                : $"; splits: five of a full guild with a reason found under one of the fifty while no guild with room reads appeal {SplitBar:F1} or more — "
+                  + $"{Splits} founded by a split{(_splitNames.Count == 0 ? "" : $" ({string.Join(", ", _splitNames)})")}, "
+                  + $"founders' reasons: {FoundersUnshared} no share (under the {BotEstate.Keep}gp keep {UnsharedMs / 60000}m while the chest held {RichChest}gp+), {FoundersFar} far from the guild's house or hall, {FoundersQuarrel} a quarrel; "
+                  + $"looks that split nobody: {SplitFew} no full guild had {Least} free to go with a reason, {SplitAtWar} at war, {SplitParentCool} inside a guild's {SplitParentMs / 3600000}h after its split, "
+                  + $"{SplitAtMost} at {MostGuilds} guilds, {SplitRoom} a guild with room at the bar, {SplitGap} inside {SplitGapMs / 3600000}h of the last split, {SplitNameless} no bare name; "
+                  + $"{_unshared.Count} members under the keep in a rich guild now; {HeldYoung} closing looks spared a split guild under {YoungMs / 3600000}h; {InsideBar()} bots inside the walk-out bar (kept across restarts)";
 
             var rule = $"{Least} to found and {Most} at most, anybody may found, a full guild widening by {WidenBy} for {WidenPrice}gp up to {MostWidenings} times ({Widenings} bought, {Unwidened} wanted and not raised)";
             var short_ = makerless == 0 ? "" : $", {makerless} of them with nobody to make anything";
 
-            return $"{_guilds.Count} guilds holding {held} bots with {loose} outside them ({rule}{short_}), a guildmate worth ×{Kinship:F2}: {say.ToString()}; {founding}{stood}";
+            return $"{_guilds.Count} guilds holding {held} bots with {loose} outside them ({rule}{short_}), a guildmate worth ×{Kinship:F2}: {say.ToString()}; {founding}{closing}{splits}{stood}; {BotElection.Describe()}";
         }
         finally
         {
@@ -1415,12 +2693,14 @@ public static class BotGuilds
         Stood = 0;
         Standings = 0;
         Cannot = 0;
+        CappedGold = 0;
         Hired = 0;
         Expelled = 0;
         HeldElsewhere = 0;
         Crowded = 0;
         Spared = 0;
         Crossed = 0;
+        Poached = 0;
         Nowhere = 0;
         Founded = 0;
         Gathered = 0;
@@ -1433,6 +2713,40 @@ public static class BotGuilds
         _widened.Clear();
         Widenings = 0;
         Unwidened = 0;
+
+        _low.Clear();
+        _seen.Clear();
+        _closed.Clear();
+        _foundedNames.Clear();
+        _closedNames.Clear();
+        AtMost = 0;
+        Closed = 0;
+        ClosedGold = 0;
+        Released = 0;
+        HeldAtWar = 0;
+        HeldClaiming = 0;
+        HeldInCompany = 0;
+        HeldNoRoom = 0;
+
+        _unshared.Clear();
+        _splitAt.Clear();
+        _left.Clear();
+        _young.Clear();
+        _splitNames.Clear();
+        _hasSplit = false;
+        _lastSplit = 0;
+        Splits = 0;
+        FoundersUnshared = 0;
+        FoundersFar = 0;
+        FoundersQuarrel = 0;
+        SplitFew = 0;
+        SplitAtWar = 0;
+        SplitParentCool = 0;
+        SplitAtMost = 0;
+        SplitRoom = 0;
+        SplitGap = 0;
+        SplitNameless = 0;
+        HeldYoung = 0;
 
         BotRoster.Forget();
     }

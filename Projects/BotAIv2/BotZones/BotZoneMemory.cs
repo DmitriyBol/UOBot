@@ -9,8 +9,8 @@ using Server.Logging;
 namespace Server.BotAI.V2;
 
 /// <summary>
-/// What the zones learned, kept across a restart: each haunt's awake seconds, sightings, observed range and tour stops, and the
-/// cells patrols were seen in.
+/// What the zones learned, kept across a restart: each haunt's awake seconds, sightings, observed range, tour stops and the calm
+/// sightings its reach is read from (08.10.2026), and the cells patrols were seen in.
 ///
 /// <para>
 /// <b>Because the shard restarts more often than the tour finishes.</b> A round of the tour is a few hundred zones at a minute
@@ -68,7 +68,9 @@ public static class BotZoneMemory
 
         public int Width;
 
-        public readonly Dictionary<string, (double Awake, long Samples, int Range, long LastAwake, int Toured, long TouredAt)> Haunts = [];
+        public readonly Dictionary<string, (double Awake, long Samples, int Range, long LastAwake, int Toured, long TouredAt, float[] Bins)> Haunts = [];
+
+        public readonly Dictionary<string, (int Reach, double Weight)> Points = [];
 
         public readonly List<(int Cell, float Weight)> Cells = [];
     }
@@ -154,7 +156,26 @@ public static class BotZoneMemory
 
         foreach (var h in root.GetProperty("haunts").EnumerateArray())
         {
-            read.Haunts[h[0].GetString() ?? ""] = (h[1].GetDouble(), h[2].GetInt64(), h[3].GetInt32(), h[4].GetInt64(), h[5].GetInt32(), h[6].GetInt64());
+            var key = h[0].GetString() ?? "";
+            float[] bins = null;
+
+            if (h.GetArrayLength() > 7 && h[7].ValueKind == JsonValueKind.Array)
+            {
+                bins = new float[h[7].GetArrayLength()];
+
+                var d = 0;
+
+                foreach (var b in h[7].EnumerateArray())
+                {
+                    bins[d++] = b.GetSingle();
+                }
+            }
+            else if (h.GetArrayLength() > 8 && h[7].ValueKind == JsonValueKind.Number)
+            {
+                read.Points[key] = (h[7].GetInt32(), h[8].GetDouble());
+            }
+
+            read.Haunts[key] = (h[1].GetDouble(), h[2].GetInt64(), h[3].GetInt32(), h[4].GetInt64(), h[5].GetInt32(), h[6].GetInt64(), bins);
         }
 
         foreach (var c in root.GetProperty("cells").EnumerateArray())
@@ -179,6 +200,9 @@ public static class BotZoneMemory
         var haunts = BotHaunts.All;
         var restored = 0;
 
+        var down = Math.Max(0, (DateTimeOffset.UtcNow.ToUnixTimeSeconds() - read.SavedAt) / 60.0);
+        var reachFade = Math.Pow(0.5, down / Math.Max(1, BotZones.ReachHalfLifeMinutes));
+
         for (var i = 0; i < haunts.Count; i++)
         {
             var haunt = haunts[i];
@@ -191,7 +215,16 @@ public static class BotZoneMemory
             restored++;
             haunt.AwakeSeconds += was.Awake;
             haunt.Samples += was.Samples;
-            haunt.ObservedRange = Math.Max(haunt.ObservedRange, was.Range);
+
+            haunt.ObservedRange = Math.Max(haunt.ObservedRange, Math.Min(was.Range, haunt.Radius));
+            if (was.Bins != null)
+            {
+                haunt.Restore(was.Bins, reachFade, now);
+            }
+            else if (read.Points.TryGetValue(haunt.Key, out var point))
+            {
+                haunt.Seed(point.Reach, point.Weight * reachFade, now);
+            }
             haunt.Toured += was.Toured;
 
             if (was.LastAwake > 0)
@@ -270,8 +303,9 @@ public static class BotZoneMemory
 
         BotZoneRaster.Collect(Core.TickCount, BotZoneRaster.Forgotten * 2, cells, weights);
 
-        List<(string Key, double Awake, long Samples, int Range, long LastAwake, int Toured, long TouredAt)> haunts = [];
+        List<(string Key, double Awake, long Samples, int Range, long LastAwake, int Toured, long TouredAt, float[] Bins)> haunts = [];
         var all = BotHaunts.All;
+        var now = Core.TickCount;
 
         for (var i = 0; i < all.Count; i++)
         {
@@ -290,7 +324,8 @@ public static class BotZoneMemory
                     haunt.ObservedRange,
                     haunt.LastAwake == DateTime.MinValue ? 0 : new DateTimeOffset(haunt.LastAwake, TimeSpan.Zero).ToUnixTimeSeconds(),
                     haunt.Toured,
-                    haunt.TouredAt == DateTime.MinValue ? 0 : new DateTimeOffset(haunt.TouredAt, TimeSpan.Zero).ToUnixTimeSeconds()
+                    haunt.TouredAt == DateTime.MinValue ? 0 : new DateTimeOffset(haunt.TouredAt, TimeSpan.Zero).ToUnixTimeSeconds(),
+                    haunt.ReachBins(now)
                 )
             );
         }
@@ -338,7 +373,7 @@ public static class BotZoneMemory
     }
 
     private static byte[] Serialize(
-        List<(string Key, double Awake, long Samples, int Range, long LastAwake, int Toured, long TouredAt)> haunts,
+        List<(string Key, double Awake, long Samples, int Range, long LastAwake, int Toured, long TouredAt, float[] Bins)> haunts,
         List<int> cells, List<float> weights, int width, int most
     )
     {
@@ -373,6 +408,25 @@ public static class BotZoneMemory
                 w.WriteNumberValue(haunt.LastAwake);
                 w.WriteNumberValue(haunt.Toured);
                 w.WriteNumberValue(haunt.TouredAt);
+                if (haunt.Bins != null)
+                {
+                    var last = haunt.Bins.Length - 1;
+
+                    while (last >= 0 && haunt.Bins[last] < 0.005f)
+                    {
+                        last--;
+                    }
+
+                    w.WriteStartArray();
+
+                    for (var d = 0; d <= last; d++)
+                    {
+                        w.WriteNumberValue(Math.Round(haunt.Bins[d], 2));
+                    }
+
+                    w.WriteEndArray();
+                }
+
                 w.WriteEndArray();
             }
 

@@ -90,6 +90,10 @@ public static class BotLooms
         return false;
     }
 
+    public static bool WorkshopsInBritain { get; set; } = true;
+
+    private static bool Allowed(Point3D where) => !WorkshopsInBritain || BotMarket.InBritain(where);
+
     public static (Point3D Where, ISpinningWheel Wheel) NearestWheel(Point3D at, int reach)
     {
         var best = (Point3D.Zero, (ISpinningWheel)null);
@@ -99,7 +103,7 @@ public static class BotLooms
         {
             var away = Math.Max(Math.Abs(_wheels[i].Where.X - at.X), Math.Abs(_wheels[i].Where.Y - at.Y));
 
-            if (away < nearest && _wheels[i].Wheel is Item { Deleted: false })
+            if (away < nearest && _wheels[i].Wheel is Item { Deleted: false } && Allowed(_wheels[i].Where))
             {
                 nearest = away;
                 best = _wheels[i];
@@ -118,7 +122,7 @@ public static class BotLooms
         {
             var away = Math.Max(Math.Abs(_looms[i].Where.X - at.X), Math.Abs(_looms[i].Where.Y - at.Y));
 
-            if (away < nearest && _looms[i].Loom is Item { Deleted: false })
+            if (away < nearest && _looms[i].Loom is Item { Deleted: false } && Allowed(_looms[i].Where))
             {
                 nearest = away;
                 best = _looms[i];
@@ -474,8 +478,6 @@ public sealed class BotWeave : BotDeed
 
     public static long ClothOrdered { get; private set; }
 
-    public static long ClothUnlisted { get; private set; }
-
     public static long Unreached { get; private set; }
 
     private enum Leg
@@ -537,8 +539,8 @@ public sealed class BotWeave : BotDeed
         _woolWanted = Math.Clamp(wool, WoolWanted, Math.Max(WoolWanted, WoolAfield));
         _far = far;
         _cap = far ? Math.Max(CapMs, AfieldCapMs) : CapMs;
-        _clothWorth = Math.Max(1, BotAuction.Worth(typeof(Cloth), ClothGuess));
-        _bandageWorth = Math.Max(1, BotAuction.Worth(typeof(Bandage), 5));
+        _clothWorth = Math.Max(1, BotMarket.Worth(typeof(Cloth), ClothGuess));
+        _bandageWorth = Math.Max(1, BotMarket.Worth(typeof(Bandage), 5));
     }
 
     private readonly bool _far;
@@ -557,7 +559,7 @@ public sealed class BotWeave : BotDeed
 
     public override double Coin => 0.6;
 
-    public override int Made => _cloth * _clothWorth + _bandaged * _bandageWorth;
+    public override int Made => BotGlut.Yield(typeof(Cloth), _cloth, _clothWorth) + BotGlut.Yield(typeof(Bandage), _bandaged, _bandageWorth);
 
     public override bool Bend(IBotWilful bot)
     {
@@ -588,6 +590,8 @@ public sealed class BotWeave : BotDeed
     }
 
     public override bool Steadfast => true;
+
+    public override double HoldsFor => _cap / 60000.0;
 
     public override string Stage => _leg switch
     {
@@ -925,7 +929,7 @@ public sealed class BotWeave : BotDeed
         var listed = Spare(bot, body);
 
         logger.Information(
-            "{Name} sheared {Wool} wool, wove {Bolts} bolts and cut {Cloth} cloth and {Bandages} bandages, {Listed} cloth to the market at {Price}gp{Because}",
+            "{Name} sheared {Wool} wool, wove {Bolts} bolts and cut {Cloth} cloth and {Bandages} bandages, {Listed} cloth spare to sell by hand at {Price}gp{Because}",
             body.Name,
             _sheared,
             _bolts,
@@ -943,65 +947,33 @@ public sealed class BotWeave : BotDeed
 
     public static int Ask(IBotWilful bot)
     {
-        var worth = BotAuction.Worth(typeof(Cloth), ClothGuess);
+        var worth = BotMarket.Worth(typeof(Cloth), ClothGuess);
         var shelf = BotShops.Shelf(bot, typeof(Cloth), worth);
 
-        return Math.Max(BotAuction.Floor, Math.Min(worth, shelf));
+        return Math.Max(BotMarket.Floor, Math.Min(worth, shelf));
     }
 
     private static int Spare(IBotWilful bot, Mobile body)
     {
-        if (!BotDig.ListGoods || body?.Backpack == null)
+        if (body?.Backpack == null)
         {
             return 0;
         }
 
-        var spare = BotThread.Amount(body, typeof(Cloth)) - BotSew.Bolt * 2;
-        var price = Ask(bot);
-        var went = 0;
+        var spare = Math.Max(0, BotThread.Amount(body, typeof(Cloth)) - BotSew.Bolt * 2);
+        var want = BotMarket.Demand(bot, typeof(Cloth));
+        var ordered = want == null ? 0 : Math.Min(spare, want.Payable);
 
-        List<Item> carried = [.. body.Backpack.Items];
+        ClothOrdered += ordered;
+        ClothListed += spare - ordered;
 
-        for (var i = 0; i < carried.Count && spare > 0; i++)
-        {
-            if (carried[i] is not Cloth { Deleted: false, Movable: true } cloth)
-            {
-                continue;
-            }
-
-            var give = Math.Min(spare, cloth.Amount);
-
-            if (give < cloth.Amount && Mobile.LiftItemDupe(cloth, give) == null)
-            {
-                continue;
-            }
-
-            var want = BotAuction.Demand(bot, typeof(Cloth));
-            var ordered = want == null ? 0 : BotAuction.Fill(bot, want, cloth);
-
-            ClothOrdered += ordered;
-
-            var listed = cloth.Deleted || ordered >= give ? 0
-                : BotAuction.List(bot, cloth, price, true, true) == null ? 0 : give - ordered;
-
-            if (!cloth.Deleted && ordered < give && listed == 0)
-            {
-                ClothUnlisted += give - ordered;
-            }
-
-            went += ordered + listed;
-            spare -= give;
-        }
-
-        ClothListed += went;
-
-        return went;
+        return spare;
     }
 
     public static string Describe() =>
         Stints == 0
             ? $"no weaving has ended yet; {BotPastures.Describe()}"
-            : $"{Stints} weaving stints ended ({Afield} of them sent past {SheepReach} tiles to the flock or on to the loom): {Sheared} wool sheared, {Bolts} bolts woven, {ClothMade} cloth and {BandagesMade} bandages cut, {ClothListed} cloth put out ({ClothOrdered} to orders, {ClothUnlisted} the market would not take); {NoSheep} looks found no sheep, {Unreached} sheep could not be walked up to and {NoLoom} looks found no wheel or loom; {BotPastures.Describe()}";
+            : $"{Stints} weaving stints ended ({Afield} of them sent past {SheepReach} tiles to the flock or on to the loom): {Sheared} wool sheared, {Bolts} bolts woven, {ClothMade} cloth and {BandagesMade} bandages cut, {ClothListed} cloth spare to sell by hand ({ClothOrdered} of it for somebody's want); {NoSheep} looks found no sheep, {Unreached} sheep could not be walked up to and {NoLoom} looks found no wheel or loom{(BotLooms.WorkshopsInBritain ? " in Britain" : "")}; {BotPastures.Describe()}";
 
     public static void Forget()
     {
@@ -1015,7 +987,6 @@ public sealed class BotWeave : BotDeed
         Afield = 0;
         ClothListed = 0;
         ClothOrdered = 0;
-        ClothUnlisted = 0;
         Unreached = 0;
     }
 }
@@ -1030,8 +1001,9 @@ public sealed class BotWeave : BotDeed
 /// Britain never wove at all and the island bought its cloth. Now every pasture the spawners keep (<see cref="BotPastures"/>) is
 /// weighed as the woods and the seams are: within the bot's leash and <see cref="PastureReach"/>, on the bot's own land, not refused
 /// to the population or lately to this bot, not on ground that asks more than the weaver brings, not sealed, and with a wheel and a
-/// loom within <see cref="BotWeave.LoomReach"/> of it. Of those, the one with the least road per sheep ready to shear. The walk
-/// there is priced by the auction like every other walk: a flock three hundred tiles off wins only when its wool is worth the road.
+/// loom within <see cref="BotWeave.LoomReach"/> of it — in Britain since 01.10.2026 (<see cref="BotLooms.WorkshopsInBritain"/>). Of
+/// those, the one with the least road per sheep ready to shear. The walk there is priced by the auction like every other walk: a
+/// flock three hundred tiles off wins only when its wool is worth the road.
 /// </para>
 /// </summary>
 public sealed class BotWeaver : IBotProposer
@@ -1269,6 +1241,13 @@ public sealed class BotWeaver : IBotProposer
                 continue;
             }
 
+            if (BotZones.LevelAt(map, where.X, where.Y) == BotZoneLevel.Deadly)
+            {
+                Perilous++;
+
+                continue;
+            }
+
             if (BotReach.Ask(map, body.Location, where, BotArrival.Within(ArriveWithin)) == BotReachVerdict.Sealed)
             {
                 Sealed++;
@@ -1322,7 +1301,7 @@ public sealed class BotWeaver : IBotProposer
 
     private static bool Demanded(Type kind)
     {
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
 
         for (var i = 0; i < wants.Count; i++)
         {
@@ -1335,21 +1314,7 @@ public sealed class BotWeaver : IBotProposer
         return false;
     }
 
-    private static int OnMarket(Type kind)
-    {
-        var listings = BotAuction.Listings;
-        var have = 0;
-
-        for (var i = 0; i < listings.Count; i++)
-        {
-            if (listings[i]?.Kind == kind)
-            {
-                have += listings[i].Amount;
-            }
-        }
-
-        return have;
-    }
+    private static int OnMarket(Type kind) => BotShopkeep.Showing(kind);
 
     private static bool Wants(BotClass klass)
     {
@@ -1369,7 +1334,7 @@ public sealed class BotWeaver : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody with the needle has been asked to weave"
-            : $"{Asked} asked to weave: {Offered} offered a stint ({Afield} to a flock past {BotWeave.SheepReach} tiles, {(Afield == 0 ? 0 : AfieldTiles / Afield)} tiles off on average), {Stocked} with cloth enough and the stalls stocked, {NoSheep} with no flock they could get to with wool grown, {NoLoom} with no wheel or loom within reach, {NoScissors} without scissors; "
+            : $"{Asked} asked to weave: {Offered} offered a stint ({Afield} to a flock past {BotWeave.SheepReach} tiles, {(Afield == 0 ? 0 : AfieldTiles / Afield)} tiles off on average), {Stocked} with cloth enough and the shops stocked, {NoSheep} with no flock they could get to with wool grown, {NoLoom} with no wheel or loom within reach, {NoScissors} without scissors; "
               + $"{Looked} pastures within {PastureReach} tiles looked at: {Shorn} shorn, {Rested} let be after a weaver found them shorn, {Leashed} past the weaver's leash, {Unjoined} on another land, {Refused} refused, {Perilous} on ground asking more than the weaver brings, {Sealed} with no way there and {LoomFar} with no wheel and loom within {BotWeave.LoomReach}; {BotWeave.Describe()}";
 
     public static void Forget()

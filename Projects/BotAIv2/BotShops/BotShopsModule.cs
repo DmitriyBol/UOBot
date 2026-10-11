@@ -46,11 +46,20 @@ public sealed class BotShopsModule : BotModule
         BotWill.Offer(new BotBullion());
 
         logger.Information(
-            "Shops ready: shopkeepers swept {Reach} tiles around the first bot to ask, traded with from {Counter} tiles, a supply is restocked once it falls below {Short:P0} of what the bot was born with, and goods the market has ignored for {Peddle} minutes are carried to a counter",
+            "Shops ready: shopkeepers swept {Reach} tiles around the first bot to ask, traded with from {Counter} tiles, a supply is restocked once it falls below {Short:P0} of what the bot was born with (a counter {Far} minutes' walk or more off is asked of the island aloud first), and goods nobody on the island is asking for are carried to a counter out of the pack or, at a bank, out of the bank box",
             BotShops.Reach,
             BotShops.CounterReach,
             BotShopper.Short,
-            BotPeddler.IgnoredMs / 60000
+            BotShopper.AskFarMinutes
+        );
+
+        logger.Information(
+            BotAskFirst.Running
+                ? "Restocks of cloth and bandages, reagents, arrows and bolts and tools ask the island first when a bot within a carrier's reach holds them over its keep: a want at the counter's price, {Wait:F0} min for a carrier, then the walk; not again for {Again:F0} min; never for a bot under {Hurt:P0} health, in a fight or out of a supply it fights or mends with"
+                : "Restocks do not ask the island first (BotAskFirst off; {Wait:F0} min, {Again:F0} min, {Hurt:P0} unused)",
+            BotAskFirst.WaitMs / 60000.0,
+            BotAskFirst.AgainMs / 60000.0,
+            BotAskFirst.HurtShare
         );
 
         logger.Information(
@@ -71,6 +80,7 @@ public sealed class BotShopsModule : BotModule
 
         BotShops.Reset();
         BotShopper.Forget();
+        BotAskFirst.Reset();
         BotPeddler.Forget();
         BotUpkeep.Forget();
         BotBullion.Forget();

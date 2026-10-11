@@ -39,13 +39,29 @@ public static class BotLadder
 
     public static double NoviceFraction { get; set; } = 0.5;
 
-    public static bool Novice(Mobile bot) =>
-        bot is BotMobile { Class.MainSkill: { } main } body && body.Skills[main].Value < NoviceSkill;
+    public static bool Novice(Mobile bot)
+    {
+        if (bot is not BotMobile { Class: { } klass } body)
+        {
+            return false;
+        }
+
+        var judged = klass.Role == BotRole.Producer ? body.Bond?.Weapon?.Skill ?? klass.MainSkill : klass.MainSkill;
+
+        return judged is { } main && body.Skills[main].Value < NoviceSkill;
+    }
 
     public static double Fraction(Mobile bot) => Novice(bot) ? NoviceFraction : FailingFraction;
 
     public static bool Hunted(BotResolve resolve) =>
-        resolve is { Struck: true } && Core.TickCount - resolve.HurtTick < HuntedMs;
+        resolve is { Struck: true } && Core.TickCount - resolve.HurtTick < HuntedMs
+        || resolve is { Menaced: true } && Core.TickCount - resolve.MenaceTick < MenacedMs;
+
+    public static int MenacedMs { get; set; } = 3000;
+
+    public static bool Forewarned(BotResolve resolve) =>
+        resolve is { Menaced: true } && Core.TickCount - resolve.MenaceTick < MenacedMs
+        && !(resolve.Struck && Core.TickCount - resolve.HurtTick < HuntedMs);
 
     public static BotStanding Standing(IBotWilful bot)
     {

@@ -101,9 +101,9 @@ public static class BotRetainer
             return 0;
         }
 
-        var pocket = fighter.Backpack?.GetAmount(typeof(Gold)) ?? 0;
+        var free = BotYield.Spendable(fighter);
 
-        if (pocket < Wage * Minutes || BotYield.Wealth(fighter) < Affluent)
+        if (free < Wage * Minutes || free < Affluent)
         {
             Poor++;
 
@@ -123,7 +123,7 @@ public static class BotRetainer
             return false;
         }
 
-        if (pack.GetAmount(typeof(Gold)) < wage || !pack.ConsumeTotal(typeof(Gold), wage))
+        if (!BotMarket.Charge(fighter, wage))
         {
             Broke++;
 

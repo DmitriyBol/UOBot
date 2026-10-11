@@ -100,6 +100,11 @@ public sealed class BotProspect : BotDeed
 
         BotGround.Survey(_map, body.Location);
 
+        if (BotGround.Sweeping(_map, body.Location))
+        {
+            return BotDoing.Work("waiting for the ground here to be swept");
+        }
+
         _looked = true;
         _found = System.Math.Max(0, BotGround.Seams.Count - _knew);
 

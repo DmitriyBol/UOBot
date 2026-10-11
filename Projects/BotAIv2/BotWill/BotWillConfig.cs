@@ -97,6 +97,20 @@ public sealed class BotWillSettings
     public int? CensusMs { get; set; }
 
     public bool? Chatty { get; set; }
+
+    public int? GroundDeaths { get; set; }
+
+    public int? GroundWindowMs { get; set; }
+
+    public int? GroundHalf { get; set; }
+
+    public int? GroundRestMs { get; set; }
+
+    public int? GroundStep { get; set; }
+
+    public int? GroundHome { get; set; }
+
+    public double? GroundCompany { get; set; }
 }
 
 /// <summary>Reads the decision file and moves the numbers it names.</summary>
@@ -166,5 +180,13 @@ public static class BotWillConfig
 
         BotLadder.FailingFraction = settings.FailingFraction ?? BotLadder.FailingFraction;
         BotLadder.HuntedMs = settings.HuntedMs ?? BotLadder.HuntedMs;
+
+        BotBreaker.GroundDeaths = settings.GroundDeaths ?? BotBreaker.GroundDeaths;
+        BotBreaker.GroundWindowMs = settings.GroundWindowMs ?? BotBreaker.GroundWindowMs;
+        BotBreaker.GroundHalf = settings.GroundHalf ?? BotBreaker.GroundHalf;
+        BotBreaker.GroundRestMs = settings.GroundRestMs ?? BotBreaker.GroundRestMs;
+        BotBreaker.GroundStep = settings.GroundStep ?? BotBreaker.GroundStep;
+        BotBreaker.GroundHome = settings.GroundHome ?? BotBreaker.GroundHome;
+        BotBreaker.GroundCompany = settings.GroundCompany ?? BotBreaker.GroundCompany;
     }
 }

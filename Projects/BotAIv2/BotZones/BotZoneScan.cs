@@ -186,7 +186,7 @@ public static class BotZoneScan
             var water = c.CantWalk && c.CanSwim;
             var attacks = BotHaunts.AttacksFirst(c.FightMode);
 
-            if (attacks && awake && !water)
+            if (attacks && awake && !water && c.Combatant == null)
             {
                 BotZoneRaster.Record(c.X, c.Y, now);
             }

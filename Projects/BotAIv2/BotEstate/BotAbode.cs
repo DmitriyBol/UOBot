@@ -330,7 +330,7 @@ public sealed class BotAbodeBuyer : IBotProposer
             return null;
         }
 
-        var wealth = BotYield.Wealth(body);
+        var wealth = BotYield.Spendable(body);
         var kind = BotAbode.Affordable(wealth);
 
         if (kind == null)
@@ -458,6 +458,13 @@ public sealed class BotAbodeBuy : BotDeed
             return BotDoing.Walk(_map, _plot, BotArrival.Within(Reach), $"to the ground for a house at {_plot.X},{_plot.Y}");
         }
 
+        if (BotBounds.Refuse(BotBounds.Placing.Abode, (body.Guild as Server.Guilds.Guild)?.Name, _map, _plot, _kind.Multi, out var foreign))
+        {
+            BotPlot.Spend();
+
+            return BotDoing.Failed(foreign);
+        }
+
         var result = HousePlacement.Check(body, _kind.Multi, _plot, out var toMove, Direction.South);
 
         if (result != HousePlacementResult.Valid)
@@ -479,7 +486,7 @@ public sealed class BotAbodeBuy : BotDeed
         }
 
         var price = BotAbode.Price(_kind);
-        var wealth = BotYield.Wealth(body);
+        var wealth = BotYield.Spendable(body);
 
         if (wealth < price + BotAbode.Keep || !Pay(body, price))
         {
@@ -534,7 +541,7 @@ public sealed class BotAbodeBuy : BotDeed
         Done++;
 
         logger.Information(
-            "{Name} the {Class} has bought {Kind} of its own at {X},{Y} for {Price}gp — {Wealth}gp before, {Left}gp left",
+            "{Name} the {Class} has bought {Kind} of its own at {X},{Y} for {Price}gp — {Wealth}gp free before, {Left}gp left",
             body.Name,
             (body as BotMobile)?.Class?.Name,
             _kind,

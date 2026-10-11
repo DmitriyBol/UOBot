@@ -17,8 +17,8 @@ namespace Server.BotAI.V2;
 ///
 /// <para>
 /// <b>It buys by asking rather than by shopping, and that is the whole elegance of it.</b> An order on the
-/// board is read by every miner on the shard before it banks a single ingot — <c>BotDig</c> checks
-/// <see cref="BotAuction.Demand"/> ahead of the bank box, and has since it was written. So a crafter putting
+/// board is read by every miner on the shard before it banks a single ingot — the carrier (<see cref="BotCourier"/>) weighs
+/// every want against what a miner holds, and walks the ingots over. So a crafter putting
 /// up money for metal does not merely acquire metal: it redirects the population's miners onto the thing the
 /// population is short of, without anybody being told anything. That is the same trick as everything else
 /// here — a fact left where others will pass it, and arithmetic on the far side.
@@ -68,6 +68,12 @@ public sealed class BotBullion : IBotProposer
 
     public static long Ordered { get; private set; }
 
+    public static long GlutBids { get; private set; }
+
+    public static long FromBoxes { get; private set; }
+
+    public static long ForOrders { get; private set; }
+
     public string Name => "Bullion";
 
     public BotStanding Rung => BotStanding.Free;
@@ -96,36 +102,54 @@ public sealed class BotBullion : IBotProposer
             return null;
         }
 
-        var kind = BotAnvil.Best(body, Batch);
+        var kind = BotAnvil.Order(body, Batch, out var boxed);
 
         var carried = body.Backpack?.GetAmount(kind) ?? 0;
 
-        if (carried >= Enough)
+        var forOrder = BotSmith.Short(body);
+        var enough = Math.Max(Enough, forOrder);
+
+        if (carried >= enough)
         {
             Stocked++;
 
             return null;
         }
 
-        if (BotAuction.Selling(bot, kind))
+        if (BotMarket.FromBank(bot, kind, enough - carried) > 0)
         {
             Shelved++;
 
             return null;
         }
 
-        if (BotAuction.Wanted(bot, kind) != null)
+        if (boxed && BotAnvil.Fetch(bot, body, enough - carried) > 0)
+        {
+            Shelved++;
+
+            return null;
+        }
+
+        if (BotMarket.Wanted(bot, kind) != null)
         {
             Standing++;
 
             return null;
         }
 
-        var offer = BotAuction.Worth(kind, Guess);
+        var offer = BotMarket.Worth(kind, Math.Max(Guess, BotAnvil.Reckon(kind)));
 
-        var wealth = BotYield.Wealth(body);
+        var factor = BotGlut.Enabled ? BotGlut.Factor(kind) : 1.0;
+
+        if (factor < 1.0)
+        {
+            offer = Math.Max(1, (int)Math.Round(offer * factor));
+            GlutBids++;
+        }
+
+        var wealth = BotYield.Spendable(body);
         var afford = offer <= 0 ? 0 : (wealth - Reserve) / offer;
-        var units = Math.Min(Batch, afford);
+        var units = Math.Min(Math.Max(Batch, enough - carried), afford);
 
         if (units < Least)
         {
@@ -134,7 +158,18 @@ public sealed class BotBullion : IBotProposer
             return null;
         }
 
+        if (enough > Enough && carried + Batch < enough)
+        {
+            ForOrders++;
+        }
+
         Ordered++;
+
+        if (boxed)
+        {
+            FromBoxes++;
+        }
+
         Once(body);
 
         return BotOrder.For(map, body.Location, bot, kind, offer, units);
@@ -173,11 +208,14 @@ public sealed class BotBullion : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "no crafter has been asked about metal"
-            : $"{Asked} asked: {Ordered} ordered metal, {Standing} already have an order out, {Stocked} have {Enough} ingots already, {Shelved} have their own out on a stall, {Poor} cannot afford to buy it, {Soon} asked again inside the minute";
+            : $"{Asked} asked: {Ordered} ordered metal ({FromBoxes} of them in a coloured metal the bank boxes hold {BotAnvil.BoxedLeast} bars or more of, {GlutBids} bid at a glut's surplus price, {ForOrders} sized to an armour order the smith had passed over), {Standing} already have an order out, {Stocked} have {Enough} ingots already (or what the order they passed over takes), {Shelved} took their own out of their bank box at a bank, {Poor} cannot afford to buy it, {Soon} asked again inside the minute";
 
     public static void Forget()
     {
         _said = false;
+        GlutBids = 0;
+        FromBoxes = 0;
+        ForOrders = 0;
         Asked = 0;
         Poor = 0;
         Soon = 0;

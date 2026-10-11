@@ -58,6 +58,26 @@ public sealed class BotSlay : BotDeed
 
     private bool _begun;
 
+    private bool _counted;
+
+    private Point3D _last;
+
+    private bool _fought;
+
+    private bool _pastLeash;
+
+    private Point3D _ran;
+
+    public static int FarLeash { get; set; } = 3;
+
+    public static int JumpTiles { get; set; } = 40;
+
+    public static long Rebased { get; private set; }
+
+    public static long Dragged { get; private set; }
+
+    public static long Unleashed { get; private set; }
+
     public static double FillFraction { get; set; } = 0.8;
 
     public static int OddsMs { get; set; } = 1000;
@@ -89,6 +109,8 @@ public sealed class BotSlay : BotDeed
 
     private readonly BaseCreature _quarry;
 
+    public BaseCreature Quarry => _quarry;
+
     private readonly Map _map;
 
     private readonly Point3D _found;
@@ -106,6 +128,10 @@ public sealed class BotSlay : BotDeed
     private int _coins;
 
     private int _casts;
+
+    private int _castCap = -1;
+
+    private bool _thrifted;
 
     private int _hides;
 
@@ -138,6 +164,7 @@ public sealed class BotSlay : BotDeed
         _quarry = quarry;
         _map = quarry.Map;
         _found = quarry.Location;
+        _ran = quarry.Location;
         _fell = quarry.Location;
         _trains = trains;
 
@@ -155,6 +182,10 @@ public sealed class BotSlay : BotDeed
 
     private int _kited;
 
+    public bool ToTheEnd { get; init; }
+
+    private bool _stood;
+
     public override void Resumed(IBotWilful bot)
     {
         var now = Core.TickCount;
@@ -163,7 +194,48 @@ public sealed class BotSlay : BotDeed
         _progressTick = now;
         _seenTick = now;
         _leg = Leg.Close;
+
+        _begun = false;
+        _crowdedTick = 0;
+
+        if (_quarry is { Deleted: false } quarry)
+        {
+            _ran = quarry.Location;
+        }
     }
+
+    public override string Stale(IBotWilful bot)
+    {
+        var body = bot?.Self;
+
+        if (body == null || body.Map != _map)
+        {
+            return null;
+        }
+
+        var down = Down();
+        var at = down ? _fell : _quarry.Location;
+        var away = Math.Max(Math.Abs(body.X - at.X), Math.Abs(body.Y - at.Y));
+
+        if (away <= BotQuarry.Reach + Leash)
+        {
+            return null;
+        }
+
+        StaleResumes++;
+
+        return down ? $"{_quarry?.Name ?? "the quarry"} went down {away} tiles off" : $"{_quarry.Name} is {away} tiles off now";
+    }
+
+    public static long PoorBegun { get; private set; }
+
+    public static bool CastsByGold { get; set; } = true;
+
+    public static int CastFloor { get; set; } = 2;
+
+    public static long Thrifted { get; private set; }
+
+    public static long StaleResumes { get; private set; }
 
     public override Mobile Foe => _quarry;
 
@@ -236,25 +308,65 @@ public sealed class BotSlay : BotDeed
         {
             _begun = true;
             _began = body.Location;
+            _last = body.Location;
             _outward = Math.Max(Math.Abs(_found.X - _began.X), Math.Abs(_found.Y - _began.Y));
-            Begun++;
 
-            var asked = BotQuad.Muscle(_map, _found);
-
-            if (asked > 0.0 && asked > BotQuad.Strength(body))
+            if (!_counted)
             {
-                Undaring++;
+                _counted = true;
+                Begun++;
+
+                if (BotYield.Spendable(body) < BotHunter.PoorBelow)
+                {
+                    PoorBegun++;
+                }
+
+                var asked = BotQuad.Muscle(_map, _found);
+
+                if (asked > 0.0 && asked > BotQuad.Strength(body))
+                {
+                    Undaring++;
+                }
             }
         }
 
+        if (Math.Max(Math.Abs(body.X - _last.X), Math.Abs(body.Y - _last.Y)) > JumpTiles)
+        {
+            _began = body.Location;
+            _outward = Math.Max(Math.Abs(_quarry.X - _began.X), Math.Abs(_quarry.Y - _began.Y));
+            Rebased++;
+        }
+
+        _last = body.Location;
+
         var drawn = Math.Max(Math.Abs(body.X - _began.X), Math.Abs(body.Y - _began.Y));
 
-        if (drawn > Leash + _outward)
+        var strayed = Math.Max(Math.Abs(_quarry.X - _ran.X), Math.Abs(_quarry.Y - _ran.Y));
+        var engaged = _fought || ReferenceEquals(_quarry.Combatant, body);
+
+        if (strayed > Leash && !engaged)
         {
             BotQuarry.Crowd(_quarry);
             Slipped++;
 
+            return BotDoing.Failed($"{_quarry.Name} ran {strayed} tiles from where it was found and was let go");
+        }
+
+        if (drawn > Leash * FarLeash + _outward)
+        {
+            BotQuarry.Crowd(_quarry);
+            Dragged++;
+
             return BotDoing.Failed($"{_quarry.Name} drew it {drawn - _outward} tiles past where it was found and was let go");
+        }
+
+        if (drawn > Leash + _outward)
+        {
+            if (!_pastLeash)
+            {
+                _pastLeash = true;
+                Unleashed++;
+            }
         }
 
         _fell = _quarry.Location;
@@ -269,6 +381,7 @@ public sealed class BotSlay : BotDeed
 
         _seenTick = Core.TickCount;
         _leg = Leg.Fight;
+        _fought = true;
 
         return Fighting(bot, body);
     }
@@ -278,6 +391,8 @@ public sealed class BotSlay : BotDeed
         if (Down())
         {
             _leg = Leg.Spoils;
+
+            BotBiography.Slew(body, _quarry);
 
             return Looting(bot, body);
         }
@@ -355,7 +470,13 @@ public sealed class BotSlay : BotDeed
             return BotDoing.Failed($"ran out of time on {_quarry.Name} with {left}% of it left");
         }
 
-        if (body.HitsMax > 0 && body.Hits < body.HitsMax * FleeAt && _quarry is not Server.Mobiles.BaseCreature { AI: Server.Mobiles.AIType.AI_Mage })
+        if (ToTheEnd && body.HitsMax > 0 && body.Hits < body.HitsMax * FleeAt && !_stood)
+        {
+            _stood = true;
+            BotDefender.StoodOn++;
+        }
+
+        if (!ToTheEnd && body.HitsMax > 0 && body.Hits < body.HitsMax * BotTraits.FleeAt(body) && _quarry is not Server.Mobiles.BaseCreature { AI: Server.Mobiles.AIType.AI_Mage })
         {
             body.Combatant = null;
             body.Warmode = false;
@@ -381,6 +502,14 @@ public sealed class BotSlay : BotDeed
         }
 
         _fell = _quarry.Location;
+
+        if (Thrifty(body))
+        {
+            BotQuarry.Shun(_quarry, BotQuarry.ShunMs);
+            BotQuarry.Release(_quarry);
+
+            return BotDoing.Done($"left {_quarry.Name} alive after {_casts} casts: one of its kind pays {BotQuarry.Pays(_quarry.GetType()):F0}gp, {_castCap} casts' worth");
+        }
 
         var casting = BotStrike.Can(body);
 
@@ -417,7 +546,21 @@ public sealed class BotSlay : BotDeed
 
         var yields = casting ? dry : standoff > TooClose;
 
-        if (yields && yield > TooClose && body.InRange(_quarry.Location, TooClose))
+        var crowded = yields && yield > TooClose && body.InRange(_quarry.Location, TooClose);
+
+        if (crowded && !casting && !GainsGround(body))
+        {
+            crowded = false;
+            Outpaced++;
+            Stand(body);
+        }
+
+        if (!crowded)
+        {
+            _crowdedTick = 0;
+        }
+
+        if (crowded)
         {
             var closing = BotArms.Suit(body, _quarry, TooClose);
 
@@ -436,6 +579,22 @@ public sealed class BotSlay : BotDeed
                 }
 
                 var back = _backing != Point3D.Zero ? _backing : Away(body, _quarry, yield);
+
+                if (!casting && back != Point3D.Zero)
+                {
+                    if (_crowdedTick == 0)
+                    {
+                        _crowdedTick = Core.TickCount;
+                    }
+                    else if (Core.TickCount - _crowdedTick >= PlantMs)
+                    {
+                        _planted = true;
+                        _crowdedTick = 0;
+                        back = Point3D.Zero;
+                        Planted++;
+                        Stand(body);
+                    }
+                }
 
                 if (back != Point3D.Zero)
                 {
@@ -550,18 +709,20 @@ public sealed class BotSlay : BotDeed
 
         BotQuarry.Paid(_quarry?.GetType(), _coins);
 
+        var head = BotCity.Collect(_quarry?.GetType(), body);
+
         BotQuarry.Release(_quarry);
 
-        return BotDoing.Done(
-            (_casts > 0, _hides > 0) switch
-            {
-                (true, true) =>
-                    $"{_taken} things and {_coins}gp off {_quarry?.Name}, {_hides} leather, {_casts} spells thrown",
-                (true, false) => $"{_taken} things and {_coins}gp off {_quarry?.Name}, {_casts} spells thrown",
-                (false, true) => $"{_taken} things and {_coins}gp off {_quarry?.Name}, {_hides} leather",
-                (false, false) => $"{_taken} things and {_coins}gp off {_quarry?.Name}"
-            }
-        );
+        var said = (_casts > 0, _hides > 0) switch
+        {
+            (true, true) =>
+                $"{_taken} things and {_coins}gp off {_quarry?.Name}, {_hides} leather, {_casts} spells thrown",
+            (true, false) => $"{_taken} things and {_coins}gp off {_quarry?.Name}, {_casts} spells thrown",
+            (false, true) => $"{_taken} things and {_coins}gp off {_quarry?.Name}, {_hides} leather",
+            (false, false) => $"{_taken} things and {_coins}gp off {_quarry?.Name}"
+        };
+
+        return BotDoing.Done(head > 0 ? $"{said}, {head}gp from the city for its head" : said);
     }
 
     public static int Skin(Mobile body, Corpse corpse)
@@ -714,9 +875,9 @@ public sealed class BotSlay : BotDeed
             }
 
             var floor = BotShops.Buyer(body, item, out var offered) != null ? offered : 1;
-            var worth = BotAuction.Worth(item.GetType(), Math.Max(1, floor));
+            var worth = BotMarket.Worth(item.GetType(), Math.Max(1, floor));
 
-            if (BotAuction.List(bot, item, worth) != null)
+            if (worth >= BotMarket.FloorFor(item.GetType()))
             {
                 made += worth * (item.Amount > 0 ? item.Amount : 1);
             }
@@ -732,9 +893,47 @@ public sealed class BotSlay : BotDeed
         return false;
     }
 
+    private bool Thrifty(Mobile body)
+    {
+        if (!CastsByGold || _quarry == null || body is not BotMobile { Class.Role: BotRole.Caster }
+            || ReferenceEquals(_quarry.Combatant, body) || !BotStrike.Can(body))
+        {
+            return false;
+        }
+
+        if (_castCap < 0)
+        {
+            var spell = BotStrike.Best(body);
+
+            if (spell < 0)
+            {
+                spell = BotStrike.Stock(body);
+            }
+
+            var cost = BotProvision.CastCost(body, spell);
+
+            _castCap = Math.Max(CastFloor, (int)(BotQuarry.Pays(_quarry.GetType()) / Math.Max(1, cost)));
+        }
+
+        if (_casts < _castCap)
+        {
+            return false;
+        }
+
+        if (!_thrifted)
+        {
+            _thrifted = true;
+            Thrifted++;
+        }
+
+        return true;
+    }
+
     public override void Drop(IBotWilful bot)
     {
         BotQuarry.Release(_quarry);
+
+        BotSweepRecord.Hunted(bot?.Self, _coins + _made);
 
         if (bot?.Self is BotMobile { Class.Closes: true } closer)
         {
@@ -761,7 +960,8 @@ public sealed class BotSlay : BotDeed
         Asked == 0
             ? "nobody has been offered a kite"
             : $"{Asked} asked: {Handless} were melee and have no kite to give, {Kited} gave ground, {Distant} were far enough off to simply shoot, {Rushed} had the shot too near, {Closed} drew steel instead — longest clock seen {Longest}ms against {StillMs + KiteSlackMs}ms needed; "
-              + $"{Steady} of them had been standing still long enough for the engine to loose an arrow, longest stillness seen {Stillest}ms against the {StillMs}ms it wants";
+              + $"{Steady} of them had been standing still long enough for the engine to loose an arrow, longest stillness seen {Stillest}ms against the {StillMs}ms it wants; "
+              + $"{Outpaced} beats an archer stood and shot rather than give ground to a quarry that steps as fast as it runs, {Planted} fights an archer stopped backing off in after {PlantMs / 1000}s with the quarry still inside {TooClose} tiles";
 
     public static void ForgetBows()
     {
@@ -774,6 +974,12 @@ public sealed class BotSlay : BotDeed
         Closed = 0;
         Stillest = 0;
         Steady = 0;
+        Outpaced = 0;
+        Planted = 0;
+        Rebased = 0;
+        Dragged = 0;
+        Unleashed = 0;
+        StaleResumes = 0;
     }
 
     public static long Stillest { get; private set; }
@@ -806,6 +1012,14 @@ public sealed class BotSlay : BotDeed
         if (!body.InRange(_quarry.Location, KiteWithin))
         {
             Distant++;
+
+            return false;
+        }
+
+        if (!GainsGround(body))
+        {
+            Outpaced++;
+            Stand(body);
 
             return false;
         }
@@ -872,6 +1086,51 @@ public sealed class BotSlay : BotDeed
         return Point3D.Zero;
     }
 
+    private bool GainsGround(Mobile body)
+    {
+        if (_planted)
+        {
+            return false;
+        }
+
+        var step = _quarry?.ActiveSpeed ?? 0.0;
+
+        if (step <= 0.0)
+        {
+            return true;
+        }
+
+        return step * 1000.0 >= (body.Mounted ? MountStepMs : FootStepMs) * OutpaceShare;
+    }
+
+    private void Stand(Mobile body)
+    {
+        _backing = Point3D.Zero;
+
+        if (body is BotMobile { Journey: { Active: true } journey })
+        {
+            journey.Finish();
+        }
+    }
+
+    public static double OutpaceShare { get; set; } = 1.25;
+
+    public static int FootStepMs { get; set; } = 200;
+
+    public static int MountStepMs { get; set; } = 100;
+
+    public static int PlantMs { get; set; } = 3000;
+
+    private long _crowdedTick;
+
+    private bool _planted;
+
+    public static long Outpaced { get; private set; }
+
+    public static long Planted { get; private set; }
+
     private bool Down() =>
         _quarry == null || _quarry.Deleted || !_quarry.Alive || _quarry.Map != _map;
+
+    public bool Engaged => _leg == Leg.Fight && !Down();
 }

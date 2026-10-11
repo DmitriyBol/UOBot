@@ -113,32 +113,27 @@ public sealed class BotArmoury : IBotProposer
             return null;
         }
 
-        if (BotAuction.Selling(bot, kind))
+        if (BotMarket.FromBank(bot, kind, Stock) > 0)
         {
             Vending++;
 
             return null;
         }
 
-        var want = BotAuction.Wanted(bot, kind);
-
-        if (want is { Waiting: > 0 })
-        {
-            return BotAcquire.Delivery(kind, spell, map, body.Location, toCast: true);
-        }
+        var want = BotMarket.Wanted(bot, kind);
 
         BotShops.Survey(map, body.Location);
 
         var shop = BotShops.Nearest(bot, kind);
         var counter = shop == null ? 0 : BotShops.Price(shop, kind);
-        var stall = BotAuction.Cheapest(kind, bot);
+        var front = BotShopkeep.Best(bot, kind, 1, out var ask, out _, out var landed);
 
         Offered++;
         Once(body);
 
-        if (stall != null && (counter <= 0 || stall.Price <= counter))
+        if (front != null && (counter <= 0 || landed <= counter))
         {
-            return BotAcquire.Stalled(kind, spell, stall, map, body.Location, toCast: true);
+            return BotAcquire.AtShop(kind, spell, front, ask, toCast: true);
         }
 
         if (counter > 0)
@@ -151,7 +146,14 @@ public sealed class BotArmoury : IBotProposer
             return null;
         }
 
-        var offer = BotAuction.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
+        if (BotQuill.OwnPen(bot, kind))
+        {
+            BotScribes.LeftToPen(body, kind);
+
+            return null;
+        }
+
+        var offer = BotMarket.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
 
         return BotAcquire.Board(kind, spell, map, body.Location, offer, toCast: true);
     }
@@ -175,7 +177,7 @@ public sealed class BotArmoury : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered scrolls yet"
-            : $"{Asked} asked: {Offered} sent shopping, {Stocked} already carrying {Stock}, {Broke} too poor to spare it, {Vending} selling the scroll themselves, {NoPool} with too small a pool";
+            : $"{Asked} asked: {Offered} sent shopping, {Stocked} already carrying {Stock}, {Broke} too poor to spare it, {Vending} took their own out of their bank box at a bank, {NoPool} with too small a pool";
 
     public static void Forget()
     {

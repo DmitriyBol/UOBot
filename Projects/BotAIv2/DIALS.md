@@ -15,34 +15,55 @@ changed without a rebuild.
 | `BotBeat` | `IntervalMs` | `100` | `BeatMs` |
 | `BotBeat` | `SlowMs` | `100.0` | *code only* |
 | `BotBeat` | `SummaryMs` | `300000` | *code only* |
+| `BotBirth` | `KeepShare` | `0.5` | *code only* |
+| `BotBirth` | `Leans` | `true` | *code only* |
 | `BotCharter` | `Boost` | `1.5` | *code only* |
 | `BotCharter` | `ByProposer` | `true` | *code only* |
 | `BotCharter` | `HoldsMs` | `900000` | *code only* |
 | `BotCharter` | `Reach` | `60` | *code only* |
 | `BotCharter` | `Running` | `true` | *code only* |
 | `BotCharter` | `WantHoldsMs` | `1800000` | *code only* |
-| `BotGrowth` | `By` | `2` | *code only* |
-| `BotGrowth` | `EveryMinutes` | `120` | *code only* |
-| `BotGrowth` | `Most` | `120` | *code only* |
-| `BotGrowth` | `Running` | `true` | *code only* |
+| `BotCritical` | `EarlyMinutes` | `480` | `EarlyMinutes` |
+| `BotCritical` | `Running` | `true` | `Running` |
+| `BotGrowth` | `BurstBy` | `5` | `BurstBy` |
+| `BotGrowth` | `By` | `2` | `By` |
+| `BotGrowth` | `EveryMinutes` | `120` | `EveryMinutes` |
+| `BotGrowth` | `FillTo` | `200` | `FillTo` |
+| `BotGrowth` | `LeastToWant` | `3` | `LeastToWant` |
+| `BotGrowth` | `Most` | `210` | `Most` |
+| `BotGrowth` | `Running` | `true` | `Running` |
 | `BotGuilds` | `Band` | `10` | *code only* |
+| `BotGuilds` | `CloseAfterMs` | `7200000` | *code only* |
+| `BotGuilds` | `Closing` | `true` | *code only* |
 | `BotGuilds` | `Defecting` | `true` | *code only* |
 | `BotGuilds` | `Founding` | `true` | *code only* |
 | `BotGuilds` | `GatherMs` | `5000` | *code only* |
 | `BotGuilds` | `Kinship` | `1.35` | *code only* |
 | `BotGuilds` | `Least` | `5` | *code only* |
 | `BotGuilds` | `Leaving` | `true` | *code only* |
-| `BotGuilds` | `Most` | `15` | *code only* |
+| `BotGuilds` | `LowAppeal` | `2.0` | *code only* |
+| `BotGuilds` | `Most` | `35` | *code only* |
+| `BotGuilds` | `MostGuilds` | `10` | *code only* |
 | `BotGuilds` | `MostWidenings` | `3` | *code only* |
+| `BotGuilds` | `NameRestHours` | `168` | *code only* |
 | `BotGuilds` | `Patience` | `1800000` | *code only* |
 | `BotGuilds` | `RejoinMs` | `172800000` | *code only* |
 | `BotGuilds` | `ReviewMs` | `60000` | *code only* |
 | `BotGuilds` | `Running` | `true` | *code only* |
+| `BotGuilds` | `SplitBar` | `5.0` | *code only* |
+| `BotGuilds` | `SplitGapMs` | `10800000` | *code only* |
+| `BotGuilds` | `SplitParentMs` | `43200000` | *code only* |
+| `BotGuilds` | `Splitting` | `true` | *code only* |
+| `BotGuilds` | `StandShare` | `0.25` | *code only* |
+| `BotGuilds` | `UnsharedMs` | `3600000` | *code only* |
 | `BotGuilds` | `WidenBy` | `10` | *code only* |
 | `BotGuilds` | `WidenPrice` | `10000` | *code only* |
+| `BotGuilds` | `YoungMs` | `21600000` | *code only* |
 | `BotHomeward` | `Arrived` | `20` | *code only* |
 | `BotHomeward` | `Away` | `120` | *code only* |
 | `BotHomeward` | `BarrenFor` | `0.5` | *code only* |
+| `BotHomeward` | `SealedMs` | `1800000` | *code only* |
+| `BotHomeward` | `SealedReach` | `12` | *code only* |
 | `BotHomeward` | `Worth` | `5.0` | *code only* |
 | `BotInns` | `BuffShare` | `1.0 / 3.0` | `InnBuffShare` |
 | `BotInns` | `Cheer` | `200.0` | *code only* |
@@ -59,38 +80,61 @@ changed without a rebuild.
 | `BotMobile` | `DressEveryMs` | `15000` | *code only* |
 | `BotMobile` | `FitFraction` | `0.25` | `FitFraction` |
 | `BotMobile` | `GriefAt` | `4` | *code only* |
+| `BotMobile` | `MembersMeet` | `true` | *code only* |
+| `BotMobile` | `MenaceAskMs` | `500` | *code only* |
+| `BotMobile` | `MenaceByReach` | `true` | *code only* |
+| `BotMobile` | `MenaceRange` | `8` | *code only* |
 | `BotMobile` | `NoticeRange` | `10` | `NoticeRange` |
 | `BotMobile` | `RewieldRestMs` | `300000` | *code only* |
 | `BotMobile` | `RunAbove` | `0.2` | *code only* |
 | `BotMobile` | `SayEveryMs` | `60000` | *code only* |
+| `BotMobile` | `SeesComing` | `true` | *code only* |
 | `BotMobile` | `WeaponMargin` | `1.05` | *code only* |
 | `BotPopulation` | `GateReach` | `400` | *code only* |
 | `BotPopulation` | `GateStride` | `8` | *code only* |
+| `BotPopulation` | `GrownProgress` | `1.0` | *code only* |
+| `BotPopulation` | `LeashFloor` | `0.3` | *code only* |
 | `BotPopulation` | `ReviveMs` | `60000` | `ReviveMs` |
 | `BotPopulation` | `Roam` | `200` | `Roam` |
 | `BotPopulation` | `Scatter` | `350` | *code only* |
 | `BotPopulation` | `Spread` | `10` | `Spread` |
 | `BotPopulation` | `StrandedLimit` | `12` | *code only* |
 | `BotPopulation` | `Where` | `new(1592, 1680, 10)` | *code only* |
+| `BotPrime` | `RampMinutes` | `30` | `RampMinutes` |
+| `BotPrime` | `ReturnPerLook` | `5` | `ReturnPerLook` |
+| `BotPrime` | `Running` | `true` | `Running` |
+| `BotPrime` | `TirePerLook` | `5` | `TirePerLook` |
+| `BotPurse` | `BanksBeforeTrips` | `true` | *code only* |
 | `BotPurse` | `Float` | `100` | *code only* |
 | `BotPurse` | `KeepBack` | `100` | *code only* |
 | `BotPurse` | `Reach` | `3` | *code only* |
+| `BotPurse` | `TripBankTiles` | `40` | *code only* |
+| `BotPurse` | `TripFloat` | `50` | *code only* |
+| `BotPurse` | `TripLeast` | `20` | *code only* |
+| `BotReclaim` | `Deep` | `true` | *code only* |
+| `BotReclaim` | `DustMinutes` | `14.0` | *code only* |
+| `BotReclaim` | `HeldMs` | `840000` | *code only* |
+| `BotReclaim` | `HeldReach` | `24` | *code only* |
+| `BotReclaim` | `HoldMinutes` | `15.0` | *code only* |
+| `BotReclaim` | `IslandRecord` | `false` | *code only* |
+| `BotReclaim` | `Least` | `20` | *code only* |
 | `BotReclaim` | `Prior` | `20.0` | *code only* |
 | `BotReclaim` | `Reach` | `2` | *code only* |
+| `BotReclaim` | `TilesPerMinute` | `120.0` | *code only* |
 | `BotReclaim` | `WorkMinutes` | `1.5` | *code only* |
-| `BotRest` | `CallGraceMs` | `600000` | *code only* |
-| `BotRest` | `CallMost` | `5` | *code only* |
-| `BotRest` | `CallMostBig` | `10` | *code only* |
-| `BotRest` | `CalledLeastRestHours` | `1.0` | *code only* |
-| `BotRest` | `Calls` | `true` | *code only* |
-| `BotRest` | `EarlyMinutes` | `60` | *code only* |
-| `BotRest` | `FirstShare` | `0.85` | *code only* |
-| `BotRest` | `FloorShare` | `0.5` | *code only* |
-| `BotRest` | `GraceMs` | `3600000` | *code only* |
-| `BotRest` | `LeastRestHours` | `5.0` | *code only* |
-| `BotRest` | `LookMs` | `20000` | *code only* |
-| `BotRest` | `MostRestHours` | `8.0` | *code only* |
-| `BotRest` | `Running` | `true` | *code only* |
+| `BotRest` | `CallGraceMs` | `600000` | `CallGraceMs` |
+| `BotRest` | `CallMost` | `5` | `CallMost` |
+| `BotRest` | `CallMostBig` | `10` | `CallMostBig` |
+| `BotRest` | `CalledLeastRestHours` | `1.0` | `CalledLeastRestHours` |
+| `BotRest` | `Calls` | `true` | `Calls` |
+| `BotRest` | `EarlyMinutes` | `60` | `EarlyMinutes` |
+| `BotRest` | `FirstShare` | `0.85` | `FirstShare` |
+| `BotRest` | `FloorShare` | `0.5` | `FloorShare` |
+| `BotRest` | `GraceMs` | `3600000` | `GraceMs` |
+| `BotRest` | `LeastRestHours` | `5.0` | `LeastRestHours` |
+| `BotRest` | `LookMs` | `20000` | `LookMs` |
+| `BotRest` | `MostRestHours` | `8.0` | `MostRestHours` |
+| `BotRest` | `Running` | `true` | `Running` |
 | `BotRoster` | `EveryMs` | `1800000` | *code only* |
 | `BotRoster` | `Running` | `true` | *code only* |
 | `BotRoster` | `Shortlist` | `5` | *code only* |
@@ -101,18 +145,28 @@ changed without a rebuild.
 | `BotStall` | `PatienceMs` | `240000` | *code only* |
 | `BotStall` | `PocketMs` | `1800000` | *code only* |
 | `BotStall` | `SayEveryMs` | `600000` | *code only* |
+| `BotSurplus` | `SlotMs` | `300000` | *code only* |
+| `BotSurplus` | `TidyMs` | `600000` | *code only* |
 | `BotTidy` | `LookEveryMs` | `5000` | *code only* |
 | `BotTidy` | `RobeBandages` | `4` | *code only* |
 | `BotTidy` | `Running` | `true` | *code only* |
-| `BotUnload` | `BoardMs` | `2000` | *code only* |
+| `BotUnload` | `BankBy` | `12` | *code only* |
 | `BotUnload` | `Census` | `6` | *code only* |
 | `BotUnload` | `Heavy` | `0.7` | *code only* |
 | `BotUnload` | `Hoard` | `40` | *code only* |
+| `BotUnload` | `HoldMs` | `900000` | *code only* |
+| `BotUnload` | `KitNear` | `60` | *code only* |
+| `BotUnload` | `KitSlack` | `3` | *code only* |
+| `BotUnload` | `KitWaitMs` | `600000` | *code only* |
+| `BotUnload` | `MostPasses` | `3` | *code only* |
+| `BotUnload` | `OverMs` | `30000` | *code only* |
+| `BotUnload` | `PassMs` | `60000` | *code only* |
 | `BotUnload` | `Prior` | `30.0` | *code only* |
 | `BotUnload` | `Purse` | `250` | *code only* |
 | `BotUnload` | `Risk` | `8` | *code only* |
 | `BotUnload` | `SpareTools` | `2` | *code only* |
 | `BotUnload` | `Stuck` | `120.0` | *code only* |
+| `BotUnload` | `TreadmillMs` | `120000` | *code only* |
 | `BotUnload` | `WedgedMs` | `120000` | *code only* |
 | `BotUnload` | `WorkMinutes` | `2.0` | *code only* |
 
@@ -133,7 +187,19 @@ changed without a rebuild.
 | `BotAppraisal` | `Root` | `5` | *code only* |
 | `BotAppraisal` | `StoppedShare` | `0.02` | *code only* |
 | `BotAppraisal` | `Suspicion` | `0.15` | `Suspicion` |
+| `BotBreaker` | `DeathRestMs` | `900000` | *code only* |
+| `BotBreaker` | `DeathWindowMs` | `1800000` | *code only* |
+| `BotBreaker` | `DeathsToRest` | `2` | *code only* |
 | `BotBreaker` | `Failures` | `6` | *code only* |
+| `BotBreaker` | `GroundCompany` | `1.5` | `GroundCompany` |
+| `BotBreaker` | `GroundDeaths` | `2` | `GroundDeaths` |
+| `BotBreaker` | `GroundHalf` | `64` | `GroundHalf` |
+| `BotBreaker` | `GroundHome` | `24` | `GroundHome` |
+| `BotBreaker` | `GroundRestMs` | `1800000` | `GroundRestMs` |
+| `BotBreaker` | `GroundStep` | `16` | `GroundStep` |
+| `BotBreaker` | `GroundWindowMs` | `1800000` | `GroundWindowMs` |
+| `BotBreaker` | `HardFailures` | `2` | *code only* |
+| `BotBreaker` | `HardWindowMs` | `60000` | *code only* |
 | `BotBreaker` | `LongestRestMs` | `2400000` | *code only* |
 | `BotBreaker` | `RestMs` | `300000` | *code only* |
 | `BotBreaker` | `Running` | `true` | *code only* |
@@ -148,6 +214,7 @@ changed without a rebuild.
 | `BotCommons` | `TradeConfidence` | `25` | *code only* |
 | `BotLadder` | `FailingFraction` | `0.35` | `FailingFraction` |
 | `BotLadder` | `HuntedMs` | `8000` | `HuntedMs` |
+| `BotLadder` | `MenacedMs` | `3000` | *code only* |
 | `BotLadder` | `NoviceFraction` | `0.5` | *code only* |
 | `BotLadder` | `NoviceSkill` | `50.0` | *code only* |
 | `BotLedger` | `BandSize` | `64` | `BandSize` |
@@ -159,6 +226,11 @@ changed without a rebuild.
 | `BotLedger` | `Smoothing` | `0.35` | `Smoothing` |
 | `BotLedger` | `SpinHalfLifeMs` | `900000` | `SpinHalfLifeMs` |
 | `BotResolve` | `BruiseHalfLifeMs` | `1800000` | *code only* |
+| `BotTreadmill` | `InstantMs` | `2000` | *code only* |
+| `BotTreadmill` | `LosingRestMs` | `15000` | *code only* |
+| `BotTreadmill` | `RestMs` | `15000` | *code only* |
+| `BotTreadmill` | `Running` | `true` | *code only* |
+| `BotTreadmill` | `TwiceMs` | `2000` | *code only* |
 | `BotUrges` | `BoredomPerMinute` | `0.10` | `BoredomPerMinute` |
 | `BotUrges` | `ReliefPerHundred` | `0.25` | `ReliefPerHundred` |
 | `BotUrges` | `Restless` | `0.5` | `Restless` |
@@ -178,10 +250,12 @@ changed without a rebuild.
 | `BotWill` | `ResumeHealth` | `0.5` | `ResumeHealth` |
 | `BotWill` | `ReturnMs` | `600000` | `ReturnMs` |
 | `BotWill` | `ReviewMs` | `15000` | `ReviewMs` |
+| `BotWill` | `StackAid` | `true` | *code only* |
 | `BotWill` | `SwitchMargin` | `1.25` | `SwitchMargin` |
 | `BotWill` | `TrekLimit` | `600` | *code only* |
 | `BotWill` | `TroubleShare` | `0.33` | `TroubleShare` |
 | `BotYield` | `DeathMinutes` | `3.0` | `DeathMinutes` |
+| `BotYield` | `DeathTollShare` | `1.0` | *code only* |
 | `BotYield` | `GoldPerSkillPoint` | `500.0` | `GoldPerSkillPoint` |
 | `BotYield` | `LeastMinutes` | `0.25` | `LeastMinutes` |
 | `BotYield` | `MostPerMinute` | `2000.0` | `MostPerMinute` |
@@ -191,7 +265,14 @@ changed without a rebuild.
 
 | class | dial | default | config key |
 |---|---|---|---|
+| `BotBarred` | `EmptyOdds` | `1.5` | *code only* |
+| `BotBarred` | `KillingDeaths` | `3` | *code only* |
+| `BotBarred` | `KillingWindowMs` | `1800000` | *code only* |
+| `BotBarred` | `QuarantineHalf` | `45` | *code only* |
+| `BotBarred` | `QuarantineMs` | `7200000` | *code only* |
+| `BotBarred` | `QuarantinePower` | `30000.0` | *code only* |
 | `BotBarred` | `Running` | `true` | `Barring` |
+| `BotBarred` | `StorePath` | `Path.Combine("Data", "bot-quarantines.json")` | *code only* |
 | `BotChart` | `Anchorage` | `3` | *code only* |
 | `BotChart` | `LongGate` | `8` | *code only* |
 | `BotChart` | `MostExpanded` | `80000` | *code only* |
@@ -200,13 +281,56 @@ changed without a rebuild.
 | `BotChart` | `ShunMs` | `600000` | *code only* |
 | `BotChart` | `Side` | `16` | *code only* |
 | `BotChart` | `SliceMs` | `8.0` | *code only* |
+| `BotDanger` | `BarredCost` | `800` | *code only* |
+| `BotDanger` | `BloodBeyond` | `300` | `BloodBeyond` |
+| `BotDanger` | `BloodCost` | `60` | *code only* |
+| `BotDanger` | `ByWalker` | `true` | `DangerByWalker` |
+| `BotDanger` | `DeadlyCost` | `300` | *code only* |
+| `BotDanger` | `DeadlyVsWalker` | `3.0` | `DeadlyVsWalker` |
+| `BotDanger` | `EdgeMost` | `40` | *code only* |
+| `BotDanger` | `EdgePerBot` | `10` | *code only* |
+| `BotDanger` | `HostileLeast` | `20` | *code only* |
+| `BotDanger` | `HostileMost` | `150` | *code only* |
+| `BotDanger` | `HostilePerBot` | `30` | *code only* |
+| `BotDanger` | `RefusesNodes` | `true` | `RefuseNodes` |
+| `BotDanger` | `RoadDare` | `1.5` | `RoadDare` |
+| `BotDanger` | `RoadStep` | `32` | `RoadStep` |
+| `BotDanger` | `Roads` | `true` | `Roads` |
+| `BotDanger` | `Running` | `true` | *code only* |
+| `BotDanger` | `SightCost` | `200` | `SightRouteCost` |
+| `BotDanger` | `ZoneRoadShare` | `0.5` | `ZoneRoadShare` |
+| `BotDanger` | `ZonesPriced` | `true` | *code only* |
+| `BotDangerRoute` | `RoadFreshMs` | `10800000` | *code only* |
+| `BotDangerRoute` | `RoadStaleDare` | `4.5` | *code only* |
+| `BotDangerRoute` | `RouteBusyShare` | `0.34` | *code only* |
+| `BotDangerRoute` | `RouteDeathMs` | `120000` | *code only* |
+| `BotDangerRoute` | `RouteDetour` | `240` | *code only* |
+| `BotDangerRoute` | `RouteJudged` | `true` | *code only* |
+| `BotDangerRoute` | `RouteKeepMs` | `120000` | *code only* |
+| `BotDangerRoute` | `RouteMost` | `4000` | *code only* |
+| `BotDangerRoute` | `RouteMsPerSecond` | `15.0` | *code only* |
+| `BotDangerRoute` | `RoutePerSecond` | `12` | *code only* |
+| `BotDangerRoute` | `RouteSlack` | `300` | *code only* |
+| `BotDangerRoute` | `RouteWatchMs` | `1800000` | *code only* |
 | `BotFooting` | `Most` | `2048` | *code only* |
 | `BotFooting` | `RestMs` | `1800000` | *code only* |
+| `BotGates` | `DungeonToll` | `3000` | *code only* |
+| `BotGates` | `Edge` | `5120` | *code only* |
 | `BotGates` | `Fold` | `4` | *code only* |
+| `BotGates` | `LandCacheMost` | `50000` | *code only* |
 | `BotGates` | `LandCacheMs` | `60000` | *code only* |
+| `BotGates` | `Moongates` | `true` | *code only* |
+| `BotGates` | `NudgeEveryMs` | `4000` | *code only* |
 | `BotGates` | `RaiseMissing` | `true` | *code only* |
+| `BotGates` | `RaiseMoongates` | `true` | *code only* |
+| `BotGates` | `RefuseShutMs` | `600000` | *code only* |
+| `BotGates` | `RefuseTimes` | `2` | *code only* |
+| `BotGates` | `RefuseWindowMs` | `300000` | *code only* |
 | `BotGates` | `Running` | `true` | *code only* |
+| `BotGates` | `SayAlighted` | `12` | *code only* |
 | `BotGates` | `Through` | `6` | *code only* |
+| `BotGates` | `UnwedgeMs` | `10000` | *code only* |
+| `BotGates` | `UnwedgeReach` | `2` | *code only* |
 | `BotJourney` | `DangerAvoidMs` | `120000` | `DangerAvoidMs` |
 | `BotJourney` | `DirectTiles` | `24` | *code only* |
 | `BotJourney` | `LegReached` | `3` | *code only* |
@@ -227,6 +351,7 @@ changed without a rebuild.
 | `BotPath` | `EnclosureGapMs` | `250` | `EnclosureGapMs` |
 | `BotPath` | `FloorMs` | `1.0` | `FloorMs` |
 | `BotPath` | `MaxMargin` | `256` | `MaxMargin` |
+| `BotPath` | `MemoMs` | `2000` | *code only* |
 | `BotPath` | `MinMargin` | `256` | `MinMargin` |
 | `BotPath` | `MsPerTile` | `0.25` | `MsPerTile` |
 | `BotPath` | `ShortMs` | `4.0` | `ShortMs` |
@@ -241,8 +366,32 @@ changed without a rebuild.
 | `BotRoads` | `Running` | `true` | *code only* |
 | `BotRoads` | `SliceEveryMs` | `100` | *code only* |
 | `BotRoads` | `SliceMs` | `8.0` | *code only* |
+| `BotSight` | `AllyTiles` | `8` | *code only* |
+| `BotSight` | `DeathWindowMs` | `60000` | *code only* |
+| `BotSight` | `EveryMs` | `1000` | `SightEveryMs` |
+| `BotSight` | `FightCalmMs` | `5000` | *code only* |
+| `BotSight` | `Imminent` | `6` | *code only* |
+| `BotSight` | `KeepMs` | `8000` | *code only* |
+| `BotSight` | `LookAhead` | `48` | *code only* |
+| `BotSight` | `Margin` | `2` | `SightMargin` |
+| `BotSight` | `MostWeighed` | `24` | *code only* |
+| `BotSight` | `Odds` | `1.5` | `SightOdds` |
+| `BotSight` | `PackTiles` | `12` | *code only* |
+| `BotSight` | `ReplanMs` | `4000` | *code only* |
+| `BotSight` | `RouteAhead` | `72` | *code only* |
+| `BotSight` | `Running` | `true` | `Sight` |
+| `BotSight` | `SightTiles` | `20` | `SightTiles` |
+| `BotSight` | `Standing` | `true` | `SightStanding` |
+| `BotSight` | `StepCost` | `30` | `SightStepCost` |
+| `BotSight` | `WaitMs` | `30000` | `SightWaitMs` |
+| `BotWalk` | `ChaseMs` | `120000` | *code only* |
+| `BotWalk` | `ChasePlans` | `12` | *code only* |
 | `BotWalk` | `PlansBeforeAskingTheFarSide` | `2` | `PlansBeforeAskingTheFarSide` |
 | `BotWalk` | `StationCeilingMs` | `15.0` | *code only* |
+| `BotWalk` | `ThrashMs` | `20000` | *code only* |
+| `BotWalk` | `ThrashPlans` | `30` | *code only* |
+| `BotWalk` | `ThrashTiles` | `12` | *code only* |
+| `BotWalk` | `UnreachedMs` | `120000` | *code only* |
 
 ## `BotClasses/`  —  `bot-classes.json`
 
@@ -277,6 +426,7 @@ changed without a rebuild.
 |---|---|---|---|
 | `BotChop` | `AdriftMost` | `4` | *code only* |
 | `BotChop` | `GiveUpSwings` | `80` | *code only* |
+| `BotChop` | `MostBends` | `3` | *code only* |
 | `BotChop` | `Prior` | `60.0` | *code only* |
 | `BotChop` | `QuietSwings` | `20` | *code only* |
 | `BotChop` | `StallMs` | `30000` | *code only* |
@@ -287,7 +437,7 @@ changed without a rebuild.
 | `BotDig` | `DryLimit` | `6` | `DryLimit` |
 | `BotDig` | `FillFraction` | `0.8` | `FillFraction` |
 | `BotDig` | `GoldPerIngot` | `6` | `GoldPerIngot` |
-| `BotDig` | `ListGoods` | `true` | *code only* |
+| `BotDig` | `HoldMinutes` | `12.0` | *code only* |
 | `BotDig` | `MaxBends` | `3` | `MaxBends` |
 | `BotDig` | `MaxSpent` | `8` | `MaxSpent` |
 | `BotDig` | `MostDry` | `24` | *code only* |
@@ -295,6 +445,7 @@ changed without a rebuild.
 | `BotDig` | `NearingMs` | `1800000` | *code only* |
 | `BotDig` | `Prior` | `45.0` | `Expects` |
 | `BotDig` | `RepickLimit` | `2` | *code only* |
+| `BotDig` | `SeamStandTiles` | `4` | *code only* |
 | `BotDig` | `StrikeWithin` | `48` | *code only* |
 | `BotDig` | `SwingMs` | `2000` | *code only* |
 | `BotDig` | `TargetOre` | `20` | `TargetOre` |
@@ -304,7 +455,8 @@ changed without a rebuild.
 | `BotForage` | `ApproachBeats` | `20` | *code only* |
 | `BotForage` | `FillFraction` | `0.8` | *code only* |
 | `BotForage` | `Guess` | `5` | *code only* |
-| `BotForage` | `ListGoods` | `true` | *code only* |
+| `BotForage` | `MostDoublings` | `4` | *code only* |
+| `BotForage` | `MostPiles` | `2` | *code only* |
 | `BotForage` | `Prior` | `20.0` | *code only* |
 | `BotForage` | `Reach` | `18` | *code only* |
 | `BotForage` | `ShunMs` | `600000` | *code only* |
@@ -317,9 +469,10 @@ changed without a rebuild.
 | `BotGround` | `DrainedMs` | `600000` | *code only* |
 | `BotGround` | `FootingSweep` | `1` | *code only* |
 | `BotGround` | `Lode` | `new(1446, 1227, 0)` | *code only* |
-| `BotGround` | `MaxPlaces` | `48` | `MaxPlaces` |
+| `BotGround` | `MaxPlaces` | `128` | `MaxPlaces` |
 | `BotGround` | `MaxSeams` | `2048` | `MaxSeams` |
-| `BotGround` | `MaxSurveys` | `64` | `MaxSurveys` |
+| `BotGround` | `MaxSurveys` | `192` | `MaxSurveys` |
+| `BotGround` | `MineOdds` | `1.5` | *code only* |
 | `BotGround` | `NeedFooting` | `true` | *code only* |
 | `BotGround` | `OutReach` | `4` | *code only* |
 | `BotGround` | `Patience` | `80` | *code only* |
@@ -328,6 +481,7 @@ changed without a rebuild.
 | `BotGround` | `Rings` | `12` | *code only* |
 | `BotGround` | `SeamSpacing` | `16` | `SeamSpacing` |
 | `BotGround` | `ShiedLimit` | `3` | *code only* |
+| `BotGround` | `SliceMs` | `6.0` | *code only* |
 | `BotGround` | `StockPasses` | `2` | *code only* |
 | `BotGround` | `Storey` | `BotStep.StandingReach` | *code only* |
 | `BotGround` | `Stride` | `4` | `SweepStride` |
@@ -345,40 +499,70 @@ changed without a rebuild.
 | `BotHerbs` | `Range` | `200` | *code only* |
 | `BotHerbs` | `Samples` | `6` | *code only* |
 | `BotHerbs` | `WorkMinutes` | `3.0` | *code only* |
+| `BotOre` | `Batch` | `20` | *code only* |
+| `BotOre` | `ColouredPerHour` | `10000` | *code only* |
+| `BotOre` | `CounterMs` | `600000` | *code only* |
 | `BotOre` | `FireReach` | `2` | `FireReach` |
+| `BotOre` | `PurseHoldMs` | `600000` | *code only* |
 | `BotOre` | `Reach` | `12` | `LookReach` |
 | `BotOre` | `StockedLeast` | `4` | *code only* |
+| `BotOre` | `WorstPremium` | `-0.9` | *code only* |
 | `BotOre` | `WorthSmelting` | `4` | `WorthSmelting` |
 | `BotProspect` | `Prior` | `30.0` | *code only* |
 | `BotProspect` | `WorkMinutes` | `4.0` | *code only* |
 | `BotTimber` | `Keeps` | `20` | *code only* |
 | `BotTimber` | `Reach` | `80` | *code only* |
 | `BotTimber` | `SwingReach` | `2` | *code only* |
+| `BotTimber` | `TreeRestMs` | `1800000` | *code only* |
 | `BotTimber` | `Worth` | `3` | *code only* |
 | `BotTimber` | `Worthwhile` | `20` | *code only* |
+| `BotWoodsman` | `LeastOnMarket` | `40` | *code only* |
 
 ## `BotCraft/`  —  `bot-craft.json`
 
 | class | dial | default | config key |
 |---|---|---|---|
+| `BotAdvance` | `CallMs` | `1200000` | *code only* |
+| `BotAdvance` | `LeastChance` | `0.8` | *code only* |
+| `BotAdvance` | `LookMs` | `30000` | *code only* |
+| `BotAdvance` | `MostUnits` | `5` | *code only* |
+| `BotAdvance` | `Running` | `true` | *code only* |
+| `BotAdvance` | `WaitMs` | `180000` | *code only* |
+| `BotAnvil` | `BoxedLeast` | `200` | *code only* |
+| `BotAnvil` | `ColouredPremium` | `1.0` | *code only* |
 | `BotAnvil` | `LeastPlentiful` | `10` | *code only* |
+| `BotAnvil` | `OrdersBoxed` | `true` | *code only* |
 | `BotAnvil` | `PlentifulMs` | `60000` | *code only* |
 | `BotAnvil` | `Reach` | `2` | *code only* |
 | `BotAnvil` | `Tries` | `3` | `AnvilTries` |
 | `BotBake` | `Keeps` | `1` | *code only* |
+| `BotBake` | `MostHops` | `2` | *code only* |
 | `BotBake` | `Prior` | `70.0` | *code only* |
 | `BotBake` | `SettleMs` | `SwingMs` | *code only* |
 | `BotBake` | `StallMs` | `SwingMs * 8` | *code only* |
 | `BotBake` | `SwingMs` | `3000` | *code only* |
 | `BotBake` | `WorkMinutes` | `2.0` | *code only* |
+| `BotBowyer` | `Batch` | `2` | *code only* |
+| `BotBowyer` | `Guess` | `40` | *code only* |
+| `BotBowyer` | `LeastOnMarket` | `2` | *code only* |
+| `BotBowyer` | `LeastWood` | `14` | *code only* |
+| `BotBowyer` | `MaxSwings` | `10` | *code only* |
+| `BotBowyer` | `Prior` | `150.0` | *code only* |
+| `BotBowyer` | `SwingMs` | `3000` | *code only* |
+| `BotBowyer` | `WorkMinutes` | `4.0` | *code only* |
 | `BotBrew` | `Prior` | `90.0` | *code only* |
 | `BotBrew` | `StallMs` | `SwingMs * 8` | *code only* |
 | `BotBrew` | `SwingMs` | `3000` | *code only* |
 | `BotBrew` | `WorkMinutes` | `1.5` | *code only* |
 | `BotCraftEar` | `FreshMs` | `30000` | *code only* |
+| `BotCraftFirst` | `DrawClaim` | `120.0` | *code only* |
+| `BotCraftFirst` | `DrawReach` | `400` | *code only* |
+| `BotCraftFirst` | `Running` | `true` | *code only* |
+| `BotCraftFirst` | `ShortMs` | `600000` | *code only* |
 | `BotCraftwork` | `CookingLeastChance` | `0.15` | *code only* |
 | `BotCraftwork` | `LeastChance` | `0.35` | *code only* |
 | `BotCraftwork` | `Margin` | `5.0` | *code only* |
+| `BotDraw` | `Near` | `4` | *code only* |
 | `BotFlask` | `Batch` | `20` | *code only* |
 | `BotFlask` | `Cap` | `5` | *code only* |
 | `BotFlask` | `Herbs` | `5` | *code only* |
@@ -390,6 +574,8 @@ changed without a rebuild.
 | `BotFletch` | `StallMs` | `SwingMs * 8` | *code only* |
 | `BotFletch` | `SwingMs` | `3000` | *code only* |
 | `BotFletch` | `WorkMinutes` | `1.5` | *code only* |
+| `BotFletcher` | `CallMs` | `600000` | *code only* |
+| `BotFletcher` | `LeastFeathers` | `5` | *code only* |
 | `BotFletching` | `Keeps` | `20` | *code only* |
 | `BotFletching` | `LeastArrows` | `20` | *code only* |
 | `BotFletching` | `Worth` | `2` | *code only* |
@@ -412,7 +598,10 @@ changed without a rebuild.
 | `BotSew` | `SwingMs` | `3000` | `SwingMs` |
 | `BotSew` | `WorkMinutes` | `6.0` | `WorkMinutes` |
 | `BotSmith` | `LeastMetal` | `6` | *code only* |
+| `BotSmith` | `MostForOrder` | `50` | *code only* |
 | `BotSmith` | `OrderPieces` | `2` | *code only* |
+| `BotSmith` | `ShortMs` | `600000` | *code only* |
+| `BotSmith` | `WorkshopsInBritain` | `true` | *code only* |
 | `BotThread` | `Margin` | `5.0` | `Margin` |
 | `BotTinker` | `Batch` | `3` | `TinkerBatch` |
 | `BotTinker` | `Guess` | `25` | *code only* |
@@ -431,6 +620,24 @@ changed without a rebuild.
 | `BotTutor` | `Reach` | `300` | *code only* |
 | `BotTutor` | `Reserve` | `100` | *code only* |
 | `BotTutor` | `Running` | `true` | *code only* |
+| `BotWeave` | `AfieldCapMs` | `1800000` | *code only* |
+| `BotWeave` | `ArriveWithin` | `8` | *code only* |
+| `BotWeave` | `BandageShare` | `0.2` | *code only* |
+| `BotWeave` | `CapMs` | `900000` | *code only* |
+| `BotWeave` | `ClothGuess` | `2` | *code only* |
+| `BotWeave` | `LeastOnMarket` | `20` | *code only* |
+| `BotWeave` | `LoomReach` | `800` | *code only* |
+| `BotWeave` | `MostBends` | `3` | *code only* |
+| `BotWeave` | `PastureReach` | `600` | *code only* |
+| `BotWeave` | `Prior` | `140.0` | *code only* |
+| `BotWeave` | `RestLeastMs` | `600000` | *code only* |
+| `BotWeave` | `RestMostMs` | `10800000` | *code only* |
+| `BotWeave` | `SheepReach` | `150` | *code only* |
+| `BotWeave` | `StepMs` | `1500` | *code only* |
+| `BotWeave` | `WoolAfield` | `10` | *code only* |
+| `BotWeave` | `WoolWanted` | `2` | *code only* |
+| `BotWeave` | `WorkMinutes` | `6.0` | *code only* |
+| `BotWeave` | `WorkshopsInBritain` | `true` | *code only* |
 
 ## `BotHunt/`  —  `bot-hunt.json`
 
@@ -442,7 +649,15 @@ changed without a rebuild.
 | `BotAmbush` | `MeleeStunMs` | `5000` | *code only* |
 | `BotAmbush` | `Running` | `true` | *code only* |
 | `BotAmbush` | `Times` | `3.0` | *code only* |
+| `BotBand` | `AskedReach` | `8` | *code only* |
+| `BotBand` | `EngageTiles` | `10` | `BandEngageTiles` |
+| `BotBand` | `GatherMs` | `30000` | `BandGatherMs` |
+| `BotBand` | `GatherTiles` | `12` | `BandGatherTiles` |
+| `BotBand` | `Gathers` | `true` | `BandGathers` |
+| `BotBand` | `MedicReach` | `150` | `BandMedicReach` |
+| `BotBand` | `Medics` | `true` | *code only* |
 | `BotBand` | `Prior` | `30.0` | `BandExpects` |
+| `BotBand` | `Rejudged` | `true` | *code only* |
 | `BotBand` | `WorkMinutes` | `4.0` | *code only* |
 | `BotBarrier` | `Enough` | `2` | *code only* |
 | `BotBarrier` | `KeepMs` | `2400000` | *code only* |
@@ -451,18 +666,29 @@ changed without a rebuild.
 | `BotBarrier` | `Running` | `false` | *code only* |
 | `BotBarrier` | `SameWay` | `0.7` | *code only* |
 | `BotBurgle` | `AgainMs` | `3600000` | *code only* |
+| `BotBurgle` | `BreakChance` | `0.35` | *code only* |
 | `BotBurgle` | `CapMs` | `600000` | *code only* |
 | `BotBurgle` | `HideAt` | `14` | *code only* |
 | `BotBurgle` | `Least` | `200` | *code only* |
+| `BotBurgle` | `LeastThings` | `3` | *code only* |
 | `BotBurgle` | `MostPicks` | `6` | *code only* |
 | `BotBurgle` | `MostTake` | `2000` | *code only* |
+| `BotBurgle` | `MostThings` | `3` | *code only* |
 | `BotBurgle` | `NoiseChance` | `0.25` | *code only* |
 | `BotBurgle` | `PickMs` | `3000` | *code only* |
+| `BotBurgle` | `PicksIssued` | `5` | *code only* |
 | `BotBurgle` | `Prior` | `300.0` | *code only* |
 | `BotBurgle` | `Reach` | `800` | *code only* |
 | `BotBurgle` | `Running` | `true` | *code only* |
 | `BotBurgle` | `Share` | `0.3` | *code only* |
+| `BotBurgle` | `Sight` | `12` | *code only* |
 | `BotBurgle` | `TakeShare` | `0.25` | *code only* |
+| `BotCompanyRecord` | `CacheMs` | `5000` | *code only* |
+| `BotCompanyRecord` | `FightMs` | `120000` | *code only* |
+| `BotCompanyRecord` | `Margin` | `1.5` | *code only* |
+| `BotCompanyRecord` | `MostEvents` | `256` | *code only* |
+| `BotCompanyRecord` | `Prices` | `true` | *code only* |
+| `BotCompanyRecord` | `Vouch` | `3.0` | *code only* |
 | `BotFence` | `CompanyWithin` | `4` | *code only* |
 | `BotFence` | `DwellMs` | `10000` | *code only* |
 | `BotFence` | `HeadPrice` | `5000` | *code only* |
@@ -508,9 +734,19 @@ changed without a rebuild.
 | `BotHunter` | `EmptyRestMs` | `900000` | *code only* |
 | `BotHunter` | `FearedReach` | `800` | `FearedReach` |
 | `BotHunter` | `FitAt` | `0.8` | `FitAt` |
+| `BotHunter` | `GrazersLast` | `true` | *code only* |
 | `BotHunter` | `Near` | `5` | *code only* |
+| `BotHunter` | `PoorBelow` | `100` | *code only* |
 | `BotHunter` | `ReadsRoads` | `true` | *code only* |
+| `BotHunter` | `ReadsZones` | `true` | *code only* |
+| `BotHunter` | `SweepTries` | `3` | *code only* |
 | `BotHunter` | `TroddenOnly` | `true` | *code only* |
+| `BotHunter` | `ZoneCompanies` | `true` | *code only* |
+| `BotHunter` | `ZoneDare` | `1.0` | *code only* |
+| `BotHunter` | `ZoneFirst` | `true` | *code only* |
+| `BotHunter` | `ZoneLooks` | `3` | *code only* |
+| `BotHunter` | `ZoneReach` | `40` | *code only* |
+| `BotHunter` | `ZoneReachLeast` | `8` | *code only* |
 | `BotInquest` | `FindWithin` | `6` | *code only* |
 | `BotInquest` | `Running` | `true` | *code only* |
 | `BotInquest` | `SceneMs` | `900000` | *code only* |
@@ -529,9 +765,11 @@ changed without a rebuild.
 | `BotLieLow` | `HideTries` | `4` | *code only* |
 | `BotLieLow` | `Prior` | `400.0` | *code only* |
 | `BotLieLow` | `StillMs` | `180000` | *code only* |
+| `BotMuster` | `Judged` | `true` | `MusterJudged` |
 | `BotMuster` | `Least` | `2` | `MusterLeast` |
-| `BotMuster` | `MostBound` | `0.34` | *code only* |
+| `BotMuster` | `MostBound` | `0.5` | *code only* |
 | `BotMuster` | `Reach` | `120` | `MusterReach` |
+| `BotMuster` | `UrgeMs` | `15000` | *code only* |
 | `BotOutlaw` | `BankFine` | `1000` | *code only* |
 | `BotOutlaw` | `BloodReach` | `24` | *code only* |
 | `BotOutlaw` | `EveryMs` | `1000` | *code only* |
@@ -560,13 +798,21 @@ changed without a rebuild.
 | `BotProwl` | `ArriveWithin` | `8` | `ProwlArriveWithin` |
 | `BotProwl` | `ByRoad` | `true` | *code only* |
 | `BotProwl` | `ClaimMs` | `60000` | *code only* |
+| `BotProwl` | `CompanyFights` | `6` | *code only* |
 | `BotProwl` | `GatherWithin` | `3` | *code only* |
+| `BotProwl` | `LookWider` | `48` | *code only* |
+| `BotProwl` | `MinutesPerSquare` | `1.0` | *code only* |
 | `BotProwl` | `Prior` | `8.0` | *code only* |
 | `BotProwl` | `RedartReach` | `40` | *code only* |
 | `BotProwl` | `RedartSamples` | `8` | *code only* |
 | `BotProwl` | `RedartVetMs` | `300.0` | *code only* |
 | `BotProwl` | `RedartVets` | `2` | *code only* |
 | `BotProwl` | `Redarts` | `1` | *code only* |
+| `BotProwl` | `Seeks` | `2` | *code only* |
+| `BotProwl` | `ShortRestMs` | `600000` | *code only* |
+| `BotProwl` | `SweepLeast` | `2` | *code only* |
+| `BotProwl` | `SweepMost` | `4` | *code only* |
+| `BotProwl` | `Sweeps` | `true` | *code only* |
 | `BotProwl` | `TrekLimit` | `200` | *code only* |
 | `BotProwl` | `WorkMinutes` | `2.0` | *code only* |
 | `BotQuarry` | `Bounty` | `200.0` | *code only* |
@@ -576,14 +822,27 @@ changed without a rebuild.
 | `BotQuarry` | `GroundWithin` | `12` | *code only* |
 | `BotQuarry` | `HandMs` | `10000` | *code only* |
 | `BotQuarry` | `HopelessMs` | `900000` | *code only* |
+| `BotQuarry` | `HostileFirst` | `true` | *code only* |
 | `BotQuarry` | `HunterReadsRefusals` | `true` | *code only* |
 | `BotQuarry` | `LootReach` | `2` | *code only* |
 | `BotQuarry` | `Notice` | `12` | `Notice` |
+| `BotQuarry` | `OutsideTowns` | `true` | *code only* |
+| `BotQuarry` | `PayFirst` | `true` | *code only* |
+| `BotQuarry` | `PayKnown` | `3` | *code only* |
+| `BotQuarry` | `PayReach` | `2` | *code only* |
+| `BotQuarry` | `PricesRisk` | `true` | *code only* |
 | `BotQuarry` | `Reach` | `30` | `Reach` |
 | `BotQuarry` | `ReadsGround` | `true` | *code only* |
+| `BotQuarry` | `RiskFair` | `0.25` | *code only* |
+| `BotQuarry` | `RiskHalfMs` | `3600000` | *code only* |
+| `BotQuarry` | `RiskLeast` | `3.0` | *code only* |
+| `BotQuarry` | `RiskMost` | `8.0` | *code only* |
+| `BotQuarry` | `RiskSteep` | `2.0` | *code only* |
 | `BotQuarry` | `ShunMs` | `120000` | *code only* |
 | `BotQuarry` | `StillWithin` | `2` | *code only* |
 | `BotQuarry` | `Untried` | `25.0` | *code only* |
+| `BotQuarry` | `ZoneLeast` | `0.5` | *code only* |
+| `BotQuarry` | `ZoneMost` | `2.0` | *code only* |
 | `BotQuarter` | `Bolt` | `60` | *code only* |
 | `BotQuarter` | `Helpers` | `20` | *code only* |
 | `BotQuarter` | `RunMs` | `10000` | *code only* |
@@ -636,13 +895,21 @@ changed without a rebuild.
 | `BotSkulk` | `Wander` | `4` | *code only* |
 | `BotSlay` | `BlindMs` | `6000` | *code only* |
 | `BotSlay` | `CapMs` | `150000` | `SlayCapMs` |
+| `BotSlay` | `CastFloor` | `2` | *code only* |
+| `BotSlay` | `CastsByGold` | `true` | *code only* |
+| `BotSlay` | `FarLeash` | `3` | *code only* |
 | `BotSlay` | `FillFraction` | `0.8` | `FillFraction` |
 | `BotSlay` | `FleeAt` | `0.4` | `FleeAt` |
+| `BotSlay` | `FootStepMs` | `200` | *code only* |
+| `BotSlay` | `JumpTiles` | `40` | *code only* |
 | `BotSlay` | `KiteSlackMs` | `700` | *code only* |
 | `BotSlay` | `KiteWithin` | `5` | *code only* |
 | `BotSlay` | `Leash` | `50` | *code only* |
+| `BotSlay` | `MountStepMs` | `100` | *code only* |
 | `BotSlay` | `NoProgressMs` | `45000` | `SlayNoProgressMs` |
 | `BotSlay` | `OddsMs` | `1000` | *code only* |
+| `BotSlay` | `OutpaceShare` | `1.25` | *code only* |
+| `BotSlay` | `PlantMs` | `3000` | *code only* |
 | `BotSlay` | `Prior` | `60.0` | `Expects` |
 | `BotSlay` | `StillMs` | `1000` | *code only* |
 | `BotSlay` | `TooClose` | `3` | *code only* |
@@ -650,6 +917,19 @@ changed without a rebuild.
 | `BotStash` | `EveryMs` | `120000` | *code only* |
 | `BotStash` | `Least` | `200` | *code only* |
 | `BotStash` | `Prior` | `350.0` | *code only* |
+| `BotTame` | `AdoptReach` | `24` | *code only* |
+| `BotTame` | `FeedMs` | `600000` | *code only* |
+| `BotTame` | `Leash` | `18` | *code only* |
+| `BotTame` | `LeastPower` | `100.0` | *code only* |
+| `BotTame` | `LeastSkill` | `20.0` | *code only* |
+| `BotTame` | `Most` | `2` | *code only* |
+| `BotTame` | `MostTries` | `6` | *code only* |
+| `BotTame` | `Prior` | `60.0` | *code only* |
+| `BotTame` | `Reach` | `14` | *code only* |
+| `BotTame` | `RetryMs` | `300000` | *code only* |
+| `BotTame` | `Running` | `true` | *code only* |
+| `BotTame` | `TryMs` | `4000` | *code only* |
+| `BotTame` | `UnreachableMs` | `1800000` | *code only* |
 | `BotUnderworld` | `BanditEveryMs` | `300000` | *code only* |
 | `BotUnderworld` | `ExtortEdge` | `0.6` | *code only* |
 | `BotUnderworld` | `ExtortShare` | `0.5` | *code only* |
@@ -676,29 +956,56 @@ changed without a rebuild.
 
 | class | dial | default | config key |
 |---|---|---|---|
+| `BotAskFirst` | `AgainMs` | `540000` | *code only* |
+| `BotAskFirst` | `HoldersMs` | `15000` | *code only* |
+| `BotAskFirst` | `HurtShare` | `0.5` | *code only* |
+| `BotAskFirst` | `Running` | `true` | *code only* |
+| `BotAskFirst` | `SweepMs` | `5000` | *code only* |
+| `BotAskFirst` | `WaitMs` | `180000` | *code only* |
 | `BotBullion` | `Batch` | `20` | *code only* |
 | `BotBullion` | `Enough` | `20` | *code only* |
 | `BotBullion` | `Guess` | `8` | *code only* |
 | `BotBullion` | `Least` | `6` | *code only* |
 | `BotBullion` | `Prior` | `20.0` | *code only* |
+| `BotCapital` | `Name` | `"Britain"` | *code only* |
+| `BotCapital` | `Premium` | `1.25` | `CapitalPremium` |
+| `BotCapital` | `Reach` | `1000` | `CapitalReach` |
+| `BotCapital` | `Running` | `true` | `CapitalRunning` |
 | `BotNeeds` | `EveryMs` | `60000` | *code only* |
 | `BotNeeds` | `MostStamps` | `4096` | *code only* |
 | `BotPeddle` | `WorkMinutes` | `3.0` | *code only* |
-| `BotPeddler` | `IgnoredMs` | `600000` | `PeddleAfterMs` |
+| `BotPeddler` | `BarLoad` | `300` | *code only* |
+| `BotPeddler` | `CrowdedShare` | `0.5` | *code only* |
+| `BotPeddler` | `FullShare` | `0.9` | *code only* |
+| `BotPeddler` | `HunterSells` | `true` | *code only* |
+| `BotPeddler` | `LootLoad` | `60` | *code only* |
+| `BotPeddler` | `PackLookMs` | `60000` | *code only* |
+| `BotPeddler` | `PettyGold` | `15` | *code only* |
+| `BotPeddler` | `PettyPerTile` | `0.1` | *code only* |
 | `BotProvision` | `AmmoShare` | `0.5` | *code only* |
-| `BotProvision` | `BandageShare` | `0.5` | *code only* |
+| `BotProvision` | `BandageGuess` | `5` | *code only* |
+| `BotProvision` | `BandageShare` | `0.25` | *code only* |
+| `BotProvision` | `BottleGuess` | `15` | *code only* |
 | `BotProvision` | `Bottles` | `1` | *code only* |
 | `BotProvision` | `Casts` | `5` | *code only* |
+| `BotProvision` | `HerbGuess` | `3` | *code only* |
 | `BotProvision` | `Running` | `true` | *code only* |
+| `BotProvision` | `ScrollGuess` | `10` | *code only* |
 | `BotRestock` | `Prior` | `12.0` | `Expects` |
 | `BotRestock` | `Spare` | `180.0` | *code only* |
 | `BotRestock` | `WorkMinutes` | `2.0` | `WorkMinutes` |
+| `BotShopper` | `AskFarMinutes` | `4.0` | `AskFarMinutes` |
+| `BotShopper` | `AskFarMs` | `600000` | `AskFarMs` |
+| `BotShopper` | `CutsBandages` | `true` | *code only* |
 | `BotShopper` | `ForgetMs` | `900000` | *code only* |
 | `BotShopper` | `Guess` | `5` | *code only* |
+| `BotShopper` | `PileMs` | `180000` | `PileMs` |
+| `BotShopper` | `PurseSized` | `true` | *code only* |
 | `BotShopper` | `Short` | `0.5` | `Short` |
 | `BotShops` | `CounterReach` | `3` | `CounterReach` |
 | `BotShops` | `KeepEveryMs` | `60000` | *code only* |
-| `BotShops` | `MaxShops` | `96` | `MaxShops` |
+| `BotShops` | `LowestMs` | `300000` | *code only* |
+| `BotShops` | `MaxShops` | `1024` | `MaxShops` |
 | `BotShops` | `Reach` | `160` | `Reach` |
 | `BotShops` | `RepickLimit` | `2` | *code only* |
 | `BotStores` | `Batch` | `20` | *code only* |
@@ -708,35 +1015,24 @@ changed without a rebuild.
 | `BotStores` | `GuessLeather` | `6` | *code only* |
 | `BotStores` | `GuessLog` | `3` | *code only* |
 | `BotStores` | `GuessMeat` | `3` | *code only* |
+| `BotStores` | `HoldLapseMs` | `300000` | *code only* |
 | `BotStores` | `Least` | `5` | *code only* |
+| `BotStores` | `MeatBatch` | `5` | *code only* |
+| `BotStores` | `MeatLeast` | `3` | *code only* |
 | `BotStores` | `Prior` | `20.0` | *code only* |
+| `BotStores` | `StockFloor` | `30` | *code only* |
+| `BotStores` | `StockShare` | `0.5` | *code only* |
+| `BotStores` | `SupplyGated` | `true` | *code only* |
+| `BotStores` | `TakeBackSated` | `true` | *code only* |
+| `BotStores` | `ThinShare` | `0.5` | *code only* |
 | `BotUpkeep` | `Guess` | `60` | *code only* |
 | `BotUpkeep` | `Prior` | `30.0` | *code only* |
 | `BotUpkeep` | `Worn` | `0.34` | *code only* |
 
-## `BotAuction/`  —  `bot-auction.json`
+## `BotMarket/`  —  `bot-market.json`
 
 | class | dial | default | config key |
 |---|---|---|---|
-| `BotAuction` | `BeatMs` | `30000` | `BeatMs` |
-| `BotAuction` | `BriskMs` | `600000` | `BriskMs` |
-| `BotAuction` | `CutStep` | `0.10` | `CutStep` |
-| `BotAuction` | `Floor` | `2` | *code only* |
-| `BotAuction` | `ForgetMs` | `3600000` | `ForgetMs` |
-| `BotAuction` | `LeastLevy` | `1` | *code only* |
-| `BotAuction` | `LeastMultiple` | `0.25` | `LeastMultiple` |
-| `BotAuction` | `Levy` | `0.01` | *code only* |
-| `BotAuction` | `LotsPerBot` | `0` | *code only* |
-| `BotAuction` | `MadeUncapped` | `true` | *code only* |
-| `BotAuction` | `MaxListings` | `1024` | `MaxListings` |
-| `BotAuction` | `MaxWants` | `512` | `MaxWants` |
-| `BotAuction` | `MostMultiple` | `4.0` | `MostMultiple` |
-| `BotAuction` | `RaiseStep` | `0.15` | `RaiseStep` |
-| `BotAuction` | `Slice` | `5` | `Slice` |
-| `BotAuction` | `SliceMs` | `60000` | `SliceMs` |
-| `BotAuction` | `StaleMs` | `600000` | `StaleMs` |
-| `BotAuction` | `StuckMs` | `1800000` | *code only* |
-| `BotAuction` | `UnfundedSayMs` | `60000` | *code only* |
 | `BotCity` | `BountyMs` | `7200000` | *code only* |
 | `BotCity` | `Cap` | `20000` | *code only* |
 | `BotCity` | `EveryMs` | `60000` | *code only* |
@@ -746,14 +1042,92 @@ changed without a rebuild.
 | `BotCity` | `FairMs` | `3600000` | *code only* |
 | `BotCity` | `FairReserve` | `2000` | *code only* |
 | `BotCity` | `FairShare` | `0.8` | *code only* |
+| `BotCity` | `HeadCap` | `10000` | *code only* |
+| `BotCity` | `HeadEveryMs` | `600000` | *code only* |
+| `BotCity` | `HeadHourCap` | `300` | *code only* |
+| `BotCity` | `HeadKills` | `2` | *code only* |
+| `BotCity` | `HeadLeast` | `20` | *code only* |
+| `BotCity` | `HeadMost` | `60` | *code only* |
+| `BotCity` | `HeadPerPower` | `25.0` | *code only* |
+| `BotCity` | `HeadShare` | `0.5` | *code only* |
 | `BotCity` | `MintPerHour` | `3000` | *code only* |
 | `BotCity` | `MostBounties` | `6` | *code only* |
+| `BotCity` | `MostKinds` | `6` | *code only* |
 | `BotCity` | `MostWants` | `8` | *code only* |
 | `BotCity` | `Opening` | `1000` | *code only* |
 | `BotCity` | `Running` | `true` | *code only* |
-| `BotCity` | `StuckFirst` | `true` | *code only* |
-| `BotHaggle` | `EveryMs` | `5000` | *code only* |
-| `BotHaggle` | `Step` | `0.25` | *code only* |
+| `BotCourier` | `FarGoldPerTile` | `0.1` | *code only* |
+| `BotCourier` | `FarLeastGold` | `30` | *code only* |
+| `BotCourier` | `FarQuietMs` | `600000` | *code only* |
+| `BotCourier` | `FarReach` | `1200` | *code only* |
+| `BotCourier` | `LeastClaim` | `4.0` | *code only* |
+| `BotCourier` | `LeastGold` | `8` | `CourierLeastGold` |
+| `BotCourier` | `MostClaim` | `300.0` | *code only* |
+| `BotCourier` | `Reach` | `400` | `CourierReach` |
+| `BotCourier` | `TailExempt` | `true` | *code only* |
+| `BotDeliver` | `GiveUpMs` | `480000` | `DeliverGiveUpMs` |
+| `BotDeliver` | `HoldStretch` | `1.5` | *code only* |
+| `BotDeliver` | `ReleaseDownMs` | `180000` | *code only* |
+| `BotDeliver` | `WorkMinutes` | `0.5` | *code only* |
+| `BotGlut` | `Enabled` | `true` | `GlutEnabled` |
+| `BotGlut` | `Floor` | `0.1` | `GlutFloor` |
+| `BotGlut` | `ReadMs` | `5000` | *code only* |
+| `BotGlut` | `Shunned` | `0.34` | `GlutShunned` |
+| `BotGlut` | `Tolerance` | `6` | `GlutTolerance` |
+| `BotGlut` | `WindowMs` | `1800000` | `GlutWindowMs` |
+| `BotHandover` | `MeetTiles` | `2` | `MeetTiles` |
+| `BotLines` | `DeadCauseMs` | `900000` | *code only* |
+| `BotLines` | `GraceMs` | `600000` | *code only* |
+| `BotLines` | `KeptWatchMs` | `1200000` | *code only* |
+| `BotLines` | `NewLineMs` | `600000` | *code only* |
+| `BotLines` | `WindowMs` | `3600000` | *code only* |
+| `BotMarket` | `AtBankMs` | `10000` | *code only* |
+| `BotMarket` | `BankReach` | `12` | `BankReach` |
+| `BotMarket` | `BeatMs` | `30000` | `BeatMs` |
+| `BotMarket` | `BespokeMs` | `2000` | *code only* |
+| `BotMarket` | `BriskMs` | `600000` | `BriskMs` |
+| `BotMarket` | `CeilingMs` | `300000` | *code only* |
+| `BotMarket` | `Ceilings` | `true` | *code only* |
+| `BotMarket` | `CutStep` | `0.10` | `CutStep` |
+| `BotMarket` | `Floor` | `2` | `Floor` |
+| `BotMarket` | `LeastMultiple` | `0.25` | `LeastMultiple` |
+| `BotMarket` | `MaterialShare` | `2.0` | *code only* |
+| `BotMarket` | `MaxWants` | `512` | `MaxWants` |
+| `BotMarket` | `MostAgeMs` | `6600000` | `MostAgeMs` |
+| `BotMarket` | `MostMultiple` | `4.0` | `MostMultiple` |
+| `BotMarket` | `RaiseStep` | `0.15` | `RaiseStep` |
+| `BotMarket` | `ReaskMs` | `7200000` | *code only* |
+| `BotMarket` | `RecapMs` | `600000` | *code only* |
+| `BotMarket` | `RisenGraceMs` | `300000` | `RisenGraceMs` |
+| `BotMarket` | `Running` | `true` | `Running` |
+| `BotMarket` | `SayWantMs` | `120000` | `SayWantMs` |
+| `BotMarket` | `SecuresReserve` | `true` | *code only* |
+| `BotMarket` | `StaleMs` | `600000` | `StaleMs` |
+| `BotMarket` | `SupplyBucketMs` | `300000` | *code only* |
+| `BotMarket` | `SupplyHalfLifeMs` | `900000` | *code only* |
+| `BotMarket` | `UnfundedSayMs` | `60000` | *code only* |
+| `BotRendezvous` | `CallTiles` | `60` | `MeetingCallTiles` |
+| `BotRendezvous` | `MeetMs` | `180000` | `MeetingMs` |
+| `BotRendezvous` | `Prior` | `150.0` | `MeetingExpects` |
+| `BotRendezvous` | `Running` | `true` | `Meetings` |
+| `BotRendezvous` | `SafeReach` | `160` | `MeetingSafeReach` |
+| `BotRendezvous` | `StaleMs` | `45000` | *code only* |
+| `BotRendezvous` | `WaitMs` | `20000` | `MeetingWaitMs` |
+| `BotRoom` | `MarkMs` | `600000` | *code only* |
+| `BotRoom` | `PackedShare` | `0.8` | *code only* |
+| `BotRoom` | `Places` | `3` | *code only* |
+| `BotRoom` | `Running` | `true` | *code only* |
+| `BotRoom` | `SpecPlaces` | `20` | *code only* |
+| `BotUnreached` | `Grain` | `512` | *code only* |
+| `BotUnreached` | `MostKept` | `1024` | *code only* |
+| `BotUnreached` | `MostRestMs` | `7200000` | *code only* |
+| `BotUnreached` | `RestMs` | `1800000` | *code only* |
+| `BotUnreached` | `Running` | `true` | *code only* |
+| `BotUnreached` | `SameFailureMs` | `60000` | *code only* |
+| `BotWayless` | `Grain` | `8` | *code only* |
+| `BotWayless` | `RestMs` | `1800000` | *code only* |
+| `BotWayless` | `Running` | `true` | *code only* |
+| `BotWayless` | `Strikes` | `2` | *code only* |
 
 ## `BotShopkeep/`  —  `bot-botshops.json`
 
@@ -762,33 +1136,42 @@ changed without a rebuild.
 | `BotKeepShop` | `MostRepitches` | `2` | *code only* |
 | `BotShopBook` | `MostRows` | `512` | *code only* |
 | `BotShopkeep` | `Apart` | `2` | `Apart` |
-| `BotShopkeep` | `AuctionLots` | `3` | `AuctionLots` |
 | `BotShopkeep` | `BankMemoryMs` | `600000` | *code only* |
-| `BotShopkeep` | `BankTiles` | `80` | `BankTiles` |
+| `BotShopkeep` | `BankTiles` | `240` | `BankTiles` |
 | `BotShopkeep` | `CryMs` | `45000` | `CryMs` |
 | `BotShopkeep` | `DemandMs` | `5000` | *code only* |
 | `BotShopkeep` | `HeldMs` | `300000` | *code only* |
+| `BotShopkeep` | `KeepOffDoors` | `true` | *code only* |
 | `BotShopkeep` | `LeastClaim` | `2.0` | `LeastClaim` |
 | `BotShopkeep` | `LeastShifts` | `5` | `LeastShifts` |
 | `BotShopkeep` | `LookMs` | `20000` | *code only* |
 | `BotShopkeep` | `MostClaim` | `120.0` | `MostClaim` |
-| `BotShopkeep` | `MostOpen` | `16` | `MostOpen` |
+| `BotShopkeep` | `MostOpen` | `24` | `MostOpen` |
 | `BotShopkeep` | `MostPrices` | `8192` | *code only* |
-| `BotShopkeep` | `OpenWorth` | `80` | `OpenWorth` |
-| `BotShopkeep` | `PerBank` | `4` | `PerBank` |
+| `BotShopkeep` | `OpenStandingMs` | `30000` | *code only* |
+| `BotShopkeep` | `OpenWorth` | `40` | `OpenWorth` |
+| `BotShopkeep` | `PerBank` | `8` | `PerBank` |
 | `BotShopkeep` | `PitchClimb` | `6` | *code only* |
 | `BotShopkeep` | `PitchFar` | `6` | `PitchFar` |
 | `BotShopkeep` | `PitchNear` | `2` | `PitchNear` |
 | `BotShopkeep` | `RestMs` | `600000` | `RestMs` |
 | `BotShopkeep` | `Running` | `true` | `Running` |
-| `BotShopkeep` | `SeekTiles` | `160` | `SeekTiles` |
+| `BotShopkeep` | `SeekTiles` | `240` | `SeekTiles` |
 | `BotShopkeep` | `SellShare` | `0.5` | `SellShare` |
-| `BotShopkeep` | `ServeReach` | `3` | `ServeReach` |
+| `BotShopkeep` | `ServeReach` | `2` | `ServeReach` |
 | `BotShopkeep` | `ShelfMs` | `60000` | *code only* |
+| `BotShopkeep` | `ShelfShare` | `0.8` | *code only* |
 | `BotShopkeep` | `ShiftMinutes` | `8.0` | `ShiftMinutes` |
 | `BotShopkeep` | `StandReach` | `1` | *code only* |
 | `BotShopkeep` | `StockMs` | `3000` | *code only* |
+| `BotShopkeep` | `StrikeMs` | `1800000` | *code only* |
+| `BotShopkeep` | `StrikeSpread` | `1` | *code only* |
+| `BotShopkeep` | `StripTiles` | `6` | *code only* |
 | `BotShopkeepModule` | `SayEveryMs` | `300000` | `SayEveryMs` |
+| `BotShopkeeper` | `BritainReach` | `200` | *code only* |
+| `BotShopkeeper` | `FightersKeepShop` | `false` | *code only* |
+| `BotShopkeeper` | `HomeMs` | `60000` | *code only* |
+| `BotShopkeeper` | `ShiftReach` | `200` | *code only* |
 
 ## `BotSpells/`  —  `bot-spells.json`
 
@@ -802,6 +1185,7 @@ changed without a rebuild.
 | `BotArmoury` | `Reserve` | `150` | *code only* |
 | `BotArmoury` | `Stock` | `3` | *code only* |
 | `BotInscribe` | `Batch` | `20` | `Batch` |
+| `BotInscribe` | `OrderLift` | `1.6` | *code only* |
 | `BotInscribe` | `Patience` | `10` | *code only* |
 | `BotInscribe` | `PatienceMs` | `60000` | `PatienceMs` |
 | `BotInscribe` | `Prior` | `60.0` | `Expects` |
@@ -811,6 +1195,8 @@ changed without a rebuild.
 | `BotQuill` | `Margin` | `5.0` | `Margin` |
 | `BotQuill` | `Markup` | `0.20` | `Markup` |
 | `BotQuill` | `Reserve` | `10` | `Reserve` |
+| `BotScribes` | `CensusMs` | `60000` | *code only* |
+| `BotScribes` | `PaperGuess` | `5` | *code only* |
 | `BotStrike` | `CastMs` | `1500` | *code only* |
 | `BotStrike` | `PoolCasts` | `2` | *code only* |
 | `BotStrike` | `Range` | `8` | *code only* |
@@ -822,8 +1208,17 @@ changed without a rebuild.
 |---|---|---|---|
 | `BotArms` | `EveryMs` | `5000` | *code only* |
 | `BotBolt` | `Bound` | `18` | *code only* |
+| `BotBolt` | `ClearCalmMs` | `4000` | *code only* |
+| `BotBolt` | `Clearance` | `8` | *code only* |
 | `BotBolt` | `GiveUpMs` | `30000` | *code only* |
+| `BotBolt` | `GuardsEveryMs` | `3000` | *code only* |
+| `BotBolt` | `HavenMs` | `150000` | *code only* |
+| `BotBolt` | `HelpReach` | `60` | *code only* |
+| `BotBolt` | `HelpWeight` | `0.75` | *code only* |
+| `BotBolt` | `HoldsSwing` | `true` | *code only* |
 | `BotBolt` | `Prior` | `2000.0` | *code only* |
+| `BotBolt` | `Pursuit` | `24` | *code only* |
+| `BotBolt` | `StuckMs` | `4000` | *code only* |
 | `BotBolt` | `VetMs` | `6.0` | *code only* |
 | `BotBolt` | `Watch` | `14` | *code only* |
 | `BotBolt` | `WorkMinutes` | `0.5` | *code only* |
@@ -834,13 +1229,39 @@ changed without a rebuild.
 | `BotBrawl` | `Prior` | `200.0` | *code only* |
 | `BotBrawl` | `Restride` | `6` | *code only* |
 | `BotBrawl` | `WorkMinutes` | `3.0` | *code only* |
+| `BotCry` | `CarrierReach` | `12` | *code only* |
 | `BotCry` | `Carries` | `60` | *code only* |
+| `BotCry` | `CommittedReach` | `20` | *code only* |
+| `BotCry` | `Companies` | `true` | *code only* |
+| `BotCry` | `DireAt` | `0.7` | *code only* |
+| `BotCry` | `Healers` | `true` | *code only* |
+| `BotCry` | `HelperRestMs` | `45000` | *code only* |
 | `BotCry` | `HoldsMs` | `20000` | *code only* |
+| `BotCry` | `MemberReach` | `true` | *code only* |
+| `BotCry` | `MostCalled` | `3` | *code only* |
+| `BotCry` | `MostRounds` | `2` | *code only* |
+| `BotCry` | `RecallMs` | `5000` | *code only* |
+| `BotCry` | `Shortlist` | `8` | *code only* |
+| `BotCry` | `StackCalls` | `true` | *code only* |
+| `BotCry` | `Summons` | `true` | *code only* |
 | `BotDuel` | `CapMs` | `120000` | *code only* |
 | `BotDuel` | `YieldAt` | `0.35` | *code only* |
 | `BotFugitive` | `Bearable` | `0.5` | *code only* |
 | `BotFugitive` | `CalmMs` | `8000` | *code only* |
+| `BotFugitive` | `ContactOdds` | `3.0` | *code only* |
+| `BotFugitive` | `CorneredRestMs` | `20000` | *code only* |
 | `BotFugitive` | `CorneredSayMs` | `60000` | *code only* |
+| `BotFugitive` | `EarlyBar` | `1.5` | *code only* |
+| `BotFugitive` | `EarlyHealth` | `0.7` | *code only* |
+| `BotFugitive` | `MostRepeats` | `2` | *code only* |
+| `BotFugitive` | `PoisonedHealth` | `0.9` | *code only* |
+| `BotFugitive` | `RepeatMs` | `120000` | *code only* |
+| `BotHaven` | `MostSeconds` | `90` | *code only* |
+| `BotHaven` | `NearTiles` | `40` | *code only* |
+| `BotHaven` | `Reach` | `300` | *code only* |
+| `BotHaven` | `Running` | `true` | *code only* |
+| `BotHaven` | `Stride` | `8` | *code only* |
+| `BotHaven` | `Towns` | `3` | *code only* |
 | `BotPeril` | `BaulkMs` | `600000` | *code only* |
 | `BotPeril` | `CloseDeaths` | `3.0` | *code only* |
 | `BotPeril` | `Deadly` | `1` | *code only* |
@@ -858,11 +1279,19 @@ changed without a rebuild.
 | `BotPeril` | `SweptTo` | `0.25` | *code only* |
 | `BotPeril` | `Tries` | `5` | *code only* |
 | `BotPeril` | `Worrying` | `12.0` | *code only* |
+| `BotReflex` | `LapseMs` | `30000` | *code only* |
+| `BotReflex` | `LostMs` | `10000` | *code only* |
+| `BotReflex` | `On` | `true` | *code only* |
+| `BotReflex` | `Sight` | `18` | *code only* |
 | `BotRescue` | `Prior` | `200.0` | *code only* |
 | `BotRescue` | `Steady` | `100.0` | *code only* |
 | `BotRescuer` | `FitAt` | `0.55` | *code only* |
 | `BotRescuer` | `Reach` | `12` | *code only* |
 | `BotRescuer` | `Reach` | `60` | *code only* |
+| `BotRescuer` | `StandReach` | `2` | *code only* |
+| `BotRescuer` | `Stands` | `true` | *code only* |
+| `BotThreat` | `SkillFloor` | `0.25` | *code only* |
+| `BotThreat` | `SkillWeighs` | `true` | *code only* |
 | `BotThreat` | `Tolerance` | `1.5` | *code only* |
 
 ## `BotMend/`  —  `bot-mend.json`
@@ -878,6 +1307,9 @@ changed without a rebuild.
 | `BotAccompany` | `Reach` | `60` | *code only* |
 | `BotAccompany` | `ShunMs` | `300000` | *code only* |
 | `BotAccompany` | `Stay` | `5` | *code only* |
+| `BotAwaitMend` | `MostMs` | `60000` | *code only* |
+| `BotAwaitMend` | `Nearer` | `4` | *code only* |
+| `BotAwaitMend` | `Running` | `true` | *code only* |
 | `BotHouseCall` | `CapMs` | `300000` | *code only* |
 | `BotHouseCall` | `Prior` | `8.0` | *code only* |
 | `BotHouseCall` | `Range` | `800` | *code only* |
@@ -902,44 +1334,135 @@ changed without a rebuild.
 | `BotRetainer` | `Reach` | `100` | *code only* |
 | `BotRetainer` | `Running` | `true` | *code only* |
 | `BotRetainer` | `Wage` | `5` | *code only* |
+| `BotSalve` | `AskEveryMs` | `5000` | *code only* |
+| `BotSalve` | `MostBends` | `3` | *code only* |
 | `BotSalve` | `Prior` | `30.0` | `Expects` |
 | `BotSalve` | `TryMs` | `1500` | `TryMs` |
 | `BotSalve` | `Urgency` | `3.0` | `Urgency` |
 | `BotSalve` | `WorkMinutes` | `1.0` | `WorkMinutes` |
+| `BotSurgeon` | `Calls` | `true` | *code only* |
 | `BotSurgeon` | `MovingMs` | `1500` | *code only* |
 | `BotSurgeon` | `Reach` | `20` | `Watch` |
+| `BotSurgeon` | `Upstairs` | `8` | *code only* |
 
 ## `BotSquad/`  —  `bot-squad.json`
 
 | class | dial | default | config key |
 |---|---|---|---|
+| `BotClearer` | `ClearedRestMs` | `3600000` | *code only* |
+| `BotClearer` | `IslandMs` | `60000` | *code only* |
+| `BotClearer` | `LeastDeaths` | `2` | `ClearDeaths` |
+| `BotClearer` | `LeastSkill` | `50.0` | `ClearLeastSkill` |
+| `BotClearer` | `MostAtOnce` | `3` | *code only* |
+| `BotClearer` | `Reach` | `600` | `ClearReach` |
+| `BotClearer` | `RecentMs` | `7200000` | `ClearRecentMs` |
+| `BotClearer` | `RoadMemoryMs` | `600000` | *code only* |
+| `BotClearer` | `RoadWidth` | `30` | `ClearRoadWidth` |
+| `BotClearer` | `Running` | `true` | `Clearings` |
+| `BotClearer` | `StrongestMs` | `10000` | *code only* |
+| `BotEnlist` | `CloseTries` | `8` | *code only* |
+| `BotEnlist` | `CloseTryMs` | `5000` | *code only* |
+| `BotEnlist` | `CloseUp` | `6` | *code only* |
+| `BotEnlist` | `HoldNear` | `24` | *code only* |
+| `BotEnlist` | `HoldStillMs` | `30000` | *code only* |
 | `BotEnlist` | `Left` | `0.4` | *code only* |
+| `BotEnlist` | `MoonReach` | `120` | *code only* |
+| `BotEnlist` | `Odds` | `3.0` | *code only* |
 | `BotEnlist` | `Prior` | `24.0` | *code only* |
 | `BotEnlist` | `Reach` | `32` | *code only* |
+| `BotEnlist` | `ServeMs` | `15000` | *code only* |
 | `BotEnlist` | `WorkMinutes` | `3.0` | *code only* |
 | `BotFormation` | `PressReach` | `8` | *code only* |
+| `BotRaise` | `ClaimMs` | `40000` | *code only* |
+| `BotRaise` | `ClearReach` | `8` | *code only* |
+| `BotRaise` | `EngineHealth` | `true` | *code only* |
+| `BotRaise` | `HoldMs` | `120000` | *code only* |
+| `BotRaise` | `JudgeMs` | `3000` | *code only* |
+| `BotRaise` | `MaxTries` | `20` | *code only* |
+| `BotRaise` | `PerCompany` | `3` | *code only* |
+| `BotRaise` | `RaisedHits` | `10` | *code only* |
+| `BotRaise` | `Reach` | `18` | *code only* |
+| `BotRaise` | `Running` | `true` | *code only* |
+| `BotRaise` | `Stock` | `1` | *code only* |
+| `BotRaise` | `StockChance` | `0.10` | *code only* |
+| `BotRaise` | `StockReserve` | `300` | *code only* |
 | `BotScatter` | `KnotSize` | `3` | `KnotSize` |
 | `BotScatter` | `Spread` | `24` | `Spread` |
 | `BotSpoils` | `Earshot` | `12` | `Earshot` |
+| `BotSquad` | `AnswerReach` | `40` | *code only* |
+| `BotSquad` | `BindClaimMs` | `8000` | *code only* |
+| `BotSquad` | `BindReach` | `14` | *code only* |
+| `BotSquad` | `BindSkill` | `20.0` | *code only* |
+| `BotSquad` | `BindWalks` | `true` | *code only* |
 | `BotSquad` | `BlindMs` | `4000` | `BlindMs` |
 | `BotSquad` | `Blows` | `3` | `Blows` |
+| `BotSquad` | `CallOdds` | `2.0` | *code only* |
 | `BotSquad` | `CloseMs` | `30000` | *code only* |
+| `BotSquad` | `DefendReach` | `8` | *code only* |
+| `BotSquad` | `DyingShare` | `0.5` | *code only* |
 | `BotSquad` | `FightCapMs` | `240000` | `FightCapMs` |
+| `BotSquad` | `FocusHoldMs` | `4000` | *code only* |
+| `BotSquad` | `GuestMs` | `30000` | *code only* |
 | `BotSquad` | `HuntEveryMs` | `3000` | *code only* |
 | `BotSquad` | `IdleCapMs` | `8000` | `IdleCapMs` |
-| `BotSquad` | `MaxSize` | `5` | `MaxSize` |
+| `BotSquad` | `LagBeyond` | `6` | *code only* |
+| `BotSquad` | `MarchFar` | `200` | *code only* |
+| `BotSquad` | `MarchHuntReach` | `16` | *code only* |
+| `BotSquad` | `MarchUnstationed` | `true` | *code only* |
+| `BotSquad` | `MaxSize` | `20` | `MaxSize` |
 | `BotSquad` | `MendAbove` | `0.8` | *code only* |
+| `BotSquad` | `Nurses` | `true` | *code only* |
+| `BotSquad` | `PacedSteps` | `1` | *code only* |
+| `BotSquad` | `PoisonWeight` | `0.3` | *code only* |
 | `BotSquad` | `PressReach` | `12` | *code only* |
+| `BotSquad` | `QuickHelpMs` | `3000` | *code only* |
+| `BotSquad` | `QuickMs` | `2000` | *code only* |
+| `BotSquad` | `Recovered` | `0.15` | *code only* |
 | `BotSquad` | `RestCapMs` | `30000` | `RestCapMs` |
 | `BotSquad` | `RestationMs` | `1500` | *code only* |
-| `BotSquad` | `SlowestBlowMs` | `4000` | `SlowestBlowMs` |
+| `BotSquad` | `SlowMs` | `10000` | *code only* |
+| `BotSquad` | `SlowestBlowMs` | `6000` | `SlowestBlowMs` |
+| `BotSquad` | `StationReach` | `120` | *code only* |
+| `BotSquad` | `StationRestMs` | `15000` | *code only* |
+| `BotSquad` | `TieShare` | `0.8` | *code only* |
+| `BotSquad` | `Usual` | `5` | *code only* |
+| `BotSquad` | `WithdrawOdds` | `1.5` | *code only* |
+| `BotSquad` | `WithdrawRunMs` | `60000` | *code only* |
+| `BotSquad` | `WithdrawShunMs` | `120000` | *code only* |
+| `BotSquad` | `Withdraws` | `true` | *code only* |
+| `BotSquadField` | `BleedDeaths` | `2` | *code only* |
+| `BotSquadField` | `BleedMs` | `60000` | *code only* |
+| `BotSquadField` | `BleedRestMs` | `45000` | *code only* |
+| `BotSquadField` | `Bleeds` | `true` | *code only* |
+| `BotSquadField` | `CastersFirst` | `true` | *code only* |
+| `BotSquadField` | `ChooseOdds` | `1.0` | *code only* |
+| `BotSquadField` | `FieldReach` | `16` | *code only* |
+| `BotSquadField` | `MusterMs` | `30000` | *code only* |
+| `BotSquadField` | `MusterOff` | `14` | *code only* |
+| `BotSquadField` | `MusterShare` | `0.75` | *code only* |
+| `BotSquadField` | `Musters` | `true` | *code only* |
+| `BotSquadField` | `Peels` | `true` | *code only* |
+| `BotSquadSpare` | `MostSpared` | `2` | *code only* |
+| `BotSquadSpare` | `SpareMs` | `30000` | *code only* |
+| `BotSquadSpare` | `SpareReach` | `24` | *code only* |
+| `BotSquadSpare` | `SpareShare` | `0.5` | *code only* |
+| `BotSquadSpare` | `Spares` | `true` | *code only* |
+| `BotSquads` | `AnswersAtOnce` | `true` | *code only* |
 | `BotSquads` | `JoinReach` | `400` | *code only* |
+| `BotSquads` | `Protects` | `true` | *code only* |
 | `BotSquads` | `Reach` | `12` | `Reach` |
 | `BotSquads` | `SayEveryMs` | `300000` | *code only* |
+| `BotSquads` | `SpareCarriers` | `true` | *code only* |
+| `BotSquads` | `SpareFighters` | `true` | *code only* |
+| `BotSquads` | `SpareThieves` | `true` | *code only* |
 | `BotSquads` | `Switch` | `1.5` | *code only* |
 | `BotSweep` | `CapMs` | `1800000` | *code only* |
+| `BotSweep` | `GatherMs` | `90000` | *code only* |
 | `BotSweep` | `HoldMs` | `300000` | *code only* |
 | `BotSweep` | `Least` | `3` | *code only* |
+| `BotSweep` | `MarchHoldMs` | `90000` | *code only* |
+| `BotSweep` | `MarchLost` | `60` | *code only* |
+| `BotSweep` | `MarchSpread` | `8` | *code only* |
 | `BotSweep` | `MaxBends` | `4` | *code only* |
 | `BotSweep` | `Prior` | `45.0` | *code only* |
 | `BotSweep` | `Reach` | `40` | *code only* |
@@ -987,6 +1510,8 @@ changed without a rebuild.
 | `BotBaronModule` | `SayEveryMs` | `300000` | *code only* |
 | `BotHarrow` | `Assembly` | `24` | *code only* |
 | `BotHarrow` | `CapMs` | `1800000` | `CapMs` |
+| `BotHarrow` | `ClearFit` | `1.25` | *code only* |
+| `BotHarrow` | `ClearPrior` | `150.0` | *code only* |
 | `BotHarrow` | `Company` | `6` | `Company` |
 | `BotHarrow` | `DutyPrior` | `300.0` | *code only* |
 | `BotHarrow` | `GrandmasterAt` | `100.0` | *code only* |
@@ -1030,16 +1555,36 @@ changed without a rebuild.
 | `BotDelve` | `Assembly` | `24` | *code only* |
 | `BotDelve` | `CapMs` | `1200000` | `CapMs` |
 | `BotDelve` | `Company` | `5` | `Company` |
+| `BotDelve` | `Fewest` | `3` | *code only* |
 | `BotDelve` | `Fighters` | `1` | `Fighters` |
+| `BotDelve` | `GateApart` | `300` | *code only* |
+| `BotDelve` | `GoOnShare` | `0.6` | *code only* |
+| `BotDelve` | `HoldBeatMs` | `1500` | *code only* |
+| `BotDelve` | `HoldMs` | `90000` | *code only* |
 | `BotDelve` | `LeaveMs` | `300000` | *code only* |
 | `BotDelve` | `LevyMs` | `2000` | *code only* |
+| `BotDelve` | `LevyWalkingMs` | `10000` | *code only* |
+| `BotDelve` | `LineReach` | `400` | *code only* |
+| `BotDelve` | `MarchBends` | `2` | *code only* |
+| `BotDelve` | `MarchCapTimes` | `3` | *code only* |
+| `BotDelve` | `MarchFightMs` | `0` | *code only* |
+| `BotDelve` | `MarchLost` | `60` | *code only* |
 | `BotDelve` | `MarchMs` | `900000` | *code only* |
+| `BotDelve` | `MarchSpread` | `8` | *code only* |
+| `BotDelve` | `MarchStallMs` | `300000` | *code only* |
 | `BotDelve` | `MaxBends` | `200` | *code only* |
 | `BotDelve` | `MaxStrays` | `2` | `MaxStrays` |
+| `BotDelve` | `MostParty` | `20` | *code only* |
+| `BotDelve` | `MouthHoldMs` | `180000` | *code only* |
+| `BotDelve` | `MouthTiles` | `12` | *code only* |
+| `BotDelve` | `MusterBack` | `48` | *code only* |
 | `BotDelve` | `MusterMs` | `180000` | `MusterMs` |
+| `BotDelve` | `OfferHoldMs` | `15000` | *code only* |
 | `BotDelve` | `Prior` | `260.0` | `Prior` |
+| `BotDelve` | `ProgressEveryMs` | `5000` | *code only* |
+| `BotDelve` | `ProgressTiles` | `8` | *code only* |
 | `BotDelve` | `Quota` | `20` | `Quota` |
-| `BotDelve` | `Reach` | `200` | `Reach` |
+| `BotDelve` | `Reach` | `320` | `Reach` |
 | `BotDelve` | `RestMs` | `600000` | *code only* |
 | `BotDelve` | `RoomMs` | `60000` | `RoomMs` |
 | `BotDelve` | `Sight` | `18` | `Sight` |
@@ -1049,6 +1594,7 @@ changed without a rebuild.
 | `BotDelveModule` | `Enabled` | `true` | *code only* |
 | `BotDelveModule` | `SayEveryMs` | `300000` | *code only* |
 | `BotDelveModule` | `WatchMs` | `10000` | *code only* |
+| `BotDelveParty` | `FreeRaisings` | `false` | *code only* |
 | `BotDelveParty` | `GraceMs` | `60000` | *code only* |
 | `BotDelveParty` | `LeadersShare` | `0.5` | `LeadersShare` |
 | `BotDelveParty` | `LeaveMs` | `600000` | *code only* |
@@ -1069,6 +1615,7 @@ changed without a rebuild.
 | `BotHalls` | `Spread` | `3` | *code only* |
 | `BotHalls` | `Within` | `2` | *code only* |
 | `BotVenture` | `EveryMs` | `3600000` | *code only* |
+| `BotVenture` | `LeastProgress` | `0.3` | *code only* |
 | `BotVenture` | `MarchMs` | `900000` | *code only* |
 | `BotVenture` | `Odds` | `1.5` | *code only* |
 | `BotVenture` | `Prior` | `12.0` | *code only* |
@@ -1079,16 +1626,217 @@ changed without a rebuild.
 | class | dial | default | config key |
 |---|---|---|---|
 | `BotRoadbook` | `Thin` | `4` | *code only* |
+| `BotRoadbook` | `TrackJump` | `48` | *code only* |
+| `BotRoadbook` | `TrackStep` | `16` | *code only* |
 | `BotTowns` | `LeastSide` | `60` | *code only* |
 | `BotTowns` | `Roam` | `600` | `TownRoam` |
 | `BotTravel` | `Arrival` | `10` | *code only* |
 | `BotTravel` | `Curiosity` | `2.0` | *code only* |
 | `BotTravel` | `EveryMs` | `7200000` | *code only* |
 | `BotTravel` | `Furthest` | `1800` | *code only* |
+| `BotTravel` | `LeastProgress` | `0.15` | *code only* |
 | `BotTravel` | `MarchMs` | `1500000` | *code only* |
+| `BotTravel` | `Odds` | `1.5` | *code only* |
 | `BotTravel` | `Prior` | `8.0` | `Prior` |
 | `BotTravelModule` | `Enabled` | `true` | *code only* |
 | `BotTravelModule` | `SliceMs` | `250` | *code only* |
+
+## `BotResidence/`  —  `bot-residence.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotRelocate` | `DeathHours` | `2.0` | `DeathHours` |
+| `BotRelocate` | `DeathsToMove` | `3` | `DeathsToMove` |
+| `BotRelocate` | `LookEveryMs` | `60000` | *code only* |
+| `BotRelocate` | `MoveEveryHours` | `4.0` | `MoveEveryHours` |
+| `BotRelocate` | `MoveOdds` | `0.5` | `MoveOdds` |
+| `BotRelocate` | `NewbornMinutes` | `10.0` | *code only* |
+| `BotRelocate` | `PendingMinutes` | `60.0` | `PendingMinutes` |
+| `BotRelocate` | `PoorGold` | `150` | `PoorGold` |
+| `BotRelocate` | `PoorProgress` | `0.01` | `PoorProgress` |
+| `BotRelocate` | `StayHome` | `["Baron", "Captain", "Trader"]` | `StayHome` |
+| `BotRelocate` | `StretchHours` | `2.0` | `StretchHours` |
+| `BotResettle` | `Prior` | `10.0` | `Prior` |
+| `BotResidence` | `CacheMs` | `5000` | *code only* |
+| `BotResidence` | `Running` | `true` | `Running` |
+| `BotResidence` | `TownScatter` | `40` | `TownScatter` |
+| `BotResidenceModule` | `SliceMs` | `5000` | *code only* |
+| `BotSettle` | `GateTowns` | `false` | `GateTowns` |
+| `BotSettle` | `GuildPull` | `1.0` | `GuildPull` |
+| `BotSettle` | `HinterlandTiles` | `60` | *code only* |
+| `BotSettle` | `HomeShare` | `0.35` | `HomeShare` |
+| `BotSettle` | `LeastShops` | `5` | `LeastShops` |
+| `BotSettle` | `NeedsBank` | `true` | `NeedsBank` |
+| `BotSettle` | `SpreadWeight` | `3.0` | `SpreadWeight` |
+
+## `BotGuildHouse/`  —  `bot-guildhouse.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotGuildHouseModule` | `TickMs` | `100` | *code only* |
+| `BotGuildHouses` | `BritainAfterHall` | `true` | `BritainAfterHall` |
+| `BotGuildHouses` | `BritainPrice` | `10000` | `BritainPrice` |
+| `BotGuildHouses` | `FitTownsOnly` | `true` | `FitTownsOnly` |
+| `BotGuildHouses` | `GoneLooks` | `2` | `GoneLooks` |
+| `BotGuildHouses` | `LookMs` | `60000` | `LookMs` |
+| `BotGuildHouses` | `MostInBritain` | `3` | `MostInBritain` |
+| `BotGuildHouses` | `MostPerTown` | `2` | `MostPerTown` |
+| `BotGuildHouses` | `RecountMs` | `600000` | `RecountMs` |
+| `BotGuildHouses` | `Rehouse` | `true` | `Rehouse` |
+| `BotGuildHouses` | `Running` | `true` | `Running` |
+| `BotGuildHouses` | `Spread` | `3` | `Spread` |
+| `BotGuildHouses` | `TownPrice` | `0` | `TownPrice` |
+| `BotHouseSurvey` | `Cache` | `true` | `Cache` |
+| `BotHouseSurvey` | `MaxArea` | `400` | `MaxArea` |
+| `BotHouseSurvey` | `MinArea` | `64` | `MinArea` |
+| `BotHouseSurvey` | `MostEntrances` | `2` | `MostEntrances` |
+| `BotHouseSurvey` | `RoofShare` | `0.75` | `RoofShare` |
+| `BotHouseSurvey` | `SliceMs` | `6.0` | `SliceMs` |
+
+## `BotCamp/`  —  `bot-camp.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotCamp` | `BedGraceMs` | `60000` | *code only* |
+| `BotCamp` | `BoredWorth` | `30.0` | *code only* |
+| `BotCamp` | `FireBuffShare` | `1.0 / 6.0` | `FireBuffShare` |
+| `BotCamp` | `FireGraceMs` | `30000` | *code only* |
+| `BotCamp` | `FireSpacing` | `30` | *code only* |
+| `BotCamp` | `HostileReach` | `12` | *code only* |
+| `BotCamp` | `JoinLeastMs` | `120000` | *code only* |
+| `BotCamp` | `JoinReach` | `40` | `JoinReach` |
+| `BotCamp` | `LeastSafety` | `0.0` | *code only* |
+| `BotCamp` | `LighterShare` | `0.5` | `LighterShare` |
+| `BotCamp` | `LonelyMs` | `180000` | *code only* |
+| `BotCamp` | `MostAtFire` | `6` | `MostAtFire` |
+| `BotCamp` | `MostFires` | `6` | `MostFires` |
+| `BotCamp` | `PrepareMs` | `240000` | *code only* |
+| `BotCamp` | `RelightWhenDim` | `true` | *code only* |
+| `BotCamp` | `RestShare` | `1.0` | `RestShare` |
+| `BotCamp` | `Running` | `true` | `Running` |
+| `BotCamp` | `SecureMs` | `30000` | *code only* |
+| `BotCamp` | `SitMinutes` | `6.0` | `SitMinutes` |
+| `BotCamp` | `SleepByFire` | `true` | `SleepByFire` |
+| `BotCamp` | `TendTryMs` | `1500` | *code only* |
+| `BotCamp` | `ThreatMs` | `4000` | *code only* |
+| `BotCamp` | `ToFireRetryMs` | `600000` | *code only* |
+| `BotCamp` | `WearyFrom` | `0.6` | *code only* |
+| `BotCamp` | `WearyWorth` | `40.0` | *code only* |
+| `BotCampModule` | `TickMs` | `1000` | *code only* |
+| `BotCampTalk` | `CheerPerLine` | `12.0` | *code only* |
+| `BotCampTalk` | `DangerReach` | `250` | *code only* |
+| `BotCampTalk` | `LineMs` | `7000` | *code only* |
+| `BotCampTalk` | `LineSpreadMs` | `4000` | *code only* |
+| `BotCampTalk` | `MostLinesEach` | `5` | `MostLinesEach` |
+| `BotCampTalk` | `ReplyChance` | `0.35` | *code only* |
+| `BotCampTalk` | `ReplyMs` | `3000` | *code only* |
+| `BotChat` | `Apart` | `5` | *code only* |
+| `BotChat` | `Chance` | `0.2` | *code only* |
+| `BotChat` | `EveryMs` | `8000` | *code only* |
+| `BotChat` | `LineMs` | `3500` | *code only* |
+| `BotChat` | `MissRestMs` | `120000` | *code only* |
+| `BotChat` | `MostMs` | `30000` | *code only* |
+| `BotChat` | `NewsChance` | `0.7` | *code only* |
+| `BotChat` | `PairRestMs` | `3600000` | *code only* |
+| `BotChat` | `Prior` | `6.0` | *code only* |
+| `BotChat` | `Reach` | `3` | *code only* |
+| `BotChat` | `RestMs` | `900000` | *code only* |
+| `BotChat` | `Running` | `true` | *code only* |
+| `BotFireside` | `EveryMs` | `1200000` | *code only* |
+| `BotFireside` | `GuestMinutes` | `4.0` | `GuestMinutes` |
+| `BotFireside` | `GuestSpread` | `1.5` | *code only* |
+| `BotFireside` | `MostBends` | `2` | *code only* |
+| `BotFireside` | `Prior` | `24.0` | `JoinPrior` |
+| `BotFireside` | `SeatPatienceMs` | `10000` | *code only* |
+| `BotFireside` | `WalkMs` | `180000` | *code only* |
+| `BotKindle` | `CutMs` | `1200` | *code only* |
+| `BotKindle` | `EveryMs` | `2700000` | *code only* |
+| `BotKindle` | `FletchMs` | `2500` | *code only* |
+| `BotKindle` | `GatherMs` | `120000` | *code only* |
+| `BotKindle` | `IdleMinutes` | `1.0` | *code only* |
+| `BotKindle` | `KindlingBuy` | `5` | *code only* |
+| `BotKindle` | `KindlingWant` | `5` | *code only* |
+| `BotKindle` | `LeastSeats` | `3` | *code only* |
+| `BotKindle` | `LookMs` | `20000` | *code only* |
+| `BotKindle` | `MostCuts` | `12` | *code only* |
+| `BotKindle` | `MostFletches` | `8` | *code only* |
+| `BotKindle` | `MostFumbles` | `60` | *code only* |
+| `BotKindle` | `PickReach` | `6` | *code only* |
+| `BotKindle` | `PickTries` | `8` | *code only* |
+| `BotKindle` | `Prior` | `18.0` | `CampPrior` |
+| `BotKindle` | `ShopReach` | `40` | *code only* |
+| `BotKindle` | `StrikeMs` | `1500` | *code only* |
+| `BotKindle` | `TreeReach` | `12` | *code only* |
+
+## `BotRunes/`  —  `bot-runes.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotMark` | `CapMs` | `180000` | *code only* |
+| `BotMark` | `MouthReach` | `40` | *code only* |
+| `BotMark` | `Prior` | `30.0` | *code only* |
+| `BotMark` | `RestMs` | `1200000` | *code only* |
+| `BotMark` | `SeatReach` | `40` | *code only* |
+| `BotPassage` | `Assembly` | `12` | *code only* |
+| `BotPassage` | `CrossMs` | `22000` | *code only* |
+| `BotPassage` | `GatherMs` | `60000` | *code only* |
+| `BotPassage` | `RejoinMs` | `600000` | *code only* |
+| `BotPassage` | `WaitMs` | `60000` | *code only* |
+| `BotRecall` | `ReconsiderMs` | `30000` | *code only* |
+| `BotRuneBuy` | `Prior` | `12.0` | *code only* |
+| `BotRuneBuy` | `RestMs` | `600000` | *code only* |
+| `BotRuneLibrary` | `EveryMs` | `5000` | *code only* |
+| `BotRuneLibrary` | `KeeperReach` | `8` | *code only* |
+| `BotRuneLibrary` | `Reach` | `16` | *code only* |
+| `BotRunes` | `Blanks` | `3` | `Blanks` |
+| `BotRunes` | `Far` | `200` | `Far` |
+| `BotRunes` | `GateMagery` | `60.0` | `GateMagery` |
+| `BotRunes` | `GateNear` | `60` | `GateNear` |
+| `BotRunes` | `Learn` | `true` | `Learn` |
+| `BotRunes` | `LeastChance` | `0.2` | `LeastChance` |
+| `BotRunes` | `LeastMagery` | `40.0` | `LeastMagery` |
+| `BotRunes` | `LeastSaved` | `150` | `LeastSaved` |
+| `BotRunes` | `Near` | `12` | *code only* |
+| `BotRunes` | `RetryMs` | `4000` | *code only* |
+| `BotRunes` | `Running` | `true` | `Running` |
+| `BotRunes` | `Shelf` | `16` | *code only* |
+| `BotRunes` | `Tries` | `3` | `Tries` |
+
+## `BotSea/`  —  `bot-sea.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotDocks` | `BerthReach` | `48` | *code only* |
+| `BotDocks` | `Candidates` | `8` | *code only* |
+| `BotDocks` | `Gangway` | `6` | *code only* |
+| `BotDocks` | `HarbourReach` | `128` | *code only* |
+| `BotDocks` | `MostBerths` | `3` | *code only* |
+| `BotDocks` | `Reach` | `200` | `DockReach` |
+| `BotDocks` | `Spread` | `16` | *code only* |
+| `BotDocks` | `Tries` | `24` | *code only* |
+| `BotHelm` | `BecalmedMs` | `180000` | *code only* |
+| `BotHelm` | `CrewReach` | `12` | *code only* |
+| `BotHelm` | `MostReroutes` | `3` | *code only* |
+| `BotHelm` | `SlackMs` | `600000` | *code only* |
+| `BotHelm` | `Speed` | `3` | *code only* |
+| `BotHelm` | `StrokeMs` | `750` | *code only* |
+| `BotHelm` | `StuckStrokes` | `8` | *code only* |
+| `BotSea` | `Furthest` | `8000` | `Furthest` |
+| `BotSea` | `GuildPays` | `true` | `GuildPays` |
+| `BotSea` | `ListPrice` | `10177` | *code only* |
+| `BotSea` | `Order` | `""` | *code only* |
+| `BotSea` | `Running` | `true` | `Running` |
+| `BotSea` | `Share` | `0.25` | `Share` |
+| `BotSeaChart` | `Cache` | `true` | `Cache` |
+| `BotSeaChart` | `SeaLevel` | `-5` | *code only* |
+| `BotSeaChart` | `SliceMs` | `6.0` | *code only* |
+| `BotSeaCourse` | `ShutMs` | `600000` | *code only* |
+| `BotSeaModule` | `SliceMs` | `100` | *code only* |
+| `BotVoyage` | `Arrival` | `10` | *code only* |
+| `BotVoyage` | `AshoreMs` | `600000` | *code only* |
+| `BotVoyage` | `BerthWaitMs` | `120000` | *code only* |
+| `BotVoyage` | `HomeWorth` | `6.0` | `HomeWorth` |
+| `BotVoyage` | `Prior` | `8.0` | `Prior` |
 
 ## `BotProving/`  —  `bot-proving.json`
 
@@ -1110,6 +1858,7 @@ changed without a rebuild.
 | `BotProving` | `MostFoes` | `6` | *code only* |
 | `BotProving` | `NetFloor` | `0.02` | *code only* |
 | `BotProving` | `PartyLeast` | `3` | *code only* |
+| `BotProving` | `PartyMultiple` | `2` | *code only* |
 | `BotProving` | `PartyRings` | `1` | *code only* |
 | `BotProving` | `PartySize` | `5` | *code only* |
 | `BotProving` | `Pass` | `1.0` | `Pass` |
@@ -1132,12 +1881,13 @@ changed without a rebuild.
 | `BotProving` | `TraceRanged` | `3` | *code only* |
 | `BotProving` | `UnfitMs` | `600000` | *code only* |
 | `BotProvingModule` | `SayEveryMs` | `300000` | *code only* |
+| `BotRoomTrial` | `Doctrine` | `true` | *code only* |
 | `BotWake` | `CensusReach` | `18` | *code only* |
 | `BotWake` | `DeepsOnly` | `true` | `WakeDeepsOnly` |
 | `BotWake` | `EveryMs` | `2000` | *code only* |
 | `BotWake` | `GraceMs` | `60000` | *code only* |
 
-## `BotEstate/`  —  `bot-estate.json`
+## `BotEstate/`  —  `bot-townground.json`
 
 | class | dial | default | config key |
 |---|---|---|---|
@@ -1162,6 +1912,14 @@ changed without a rebuild.
 | `BotBench` | `Prior` | `300.0` | *code only* |
 | `BotBench` | `Reach` | `4` | *code only* |
 | `BotBench` | `WorkMinutes` | `1.0` | *code only* |
+| `BotBounds` | `LookMs` | `30000` | *code only* |
+| `BotBounds` | `OpenLooks` | `40` | *code only* |
+| `BotBounds` | `OpenReach` | `90` | *code only* |
+| `BotBounds` | `Running` | `true` | *code only* |
+| `BotBounds` | `SeatReach` | `90` | *code only* |
+| `BotBounds` | `ShiftChecks` | `150` | *code only* |
+| `BotBounds` | `ShiftSquares` | `2` | *code only* |
+| `BotBounds` | `TolerateMs` | `3600000` | *code only* |
 | `BotChest` | `Rate` | `0.1` | *code only* |
 | `BotChest` | `Running` | `true` | *code only* |
 | `BotClaim` | `Cheap` | `10` | *code only* |
@@ -1177,12 +1935,17 @@ changed without a rebuild.
 | `BotClaim` | `Step` | `1000` | *code only* |
 | `BotClaim` | `Stripping` | `2500` | *code only* |
 | `BotClaim` | `UnmusteredRestMs` | `1800000` | *code only* |
+| `BotDues` | `Ceiling` | `20000` | `DuesCeiling` |
+| `BotDues` | `Running` | `true` | `DuesRunning` |
+| `BotDues` | `SaveShare` | `0.75` | *code only* |
+| `BotDues` | `Saving` | `true` | `DuesSaving` |
+| `BotDues` | `Share` | `0.2` | `Dues` |
 | `BotEnlarge` | `ClaimMs` | `180000` | *code only* |
 | `BotEnlarge` | `Fullness` | `2` | *code only* |
 | `BotEnlarge` | `LookMs` | `60000` | *code only* |
 | `BotEnlarge` | `Prior` | `400.0` | *code only* |
 | `BotEnlarge` | `WorkMinutes` | `2.0` | *code only* |
-| `BotEstate` | `Keep` | `300` | `Keep` |
+| `BotEstate` | `Keep` | `800` | `Keep` |
 | `BotEstate` | `MaxHalls` | `4` | `MaxHalls` |
 | `BotEstate` | `Merchanting` | `true` | *code only* |
 | `BotEstate` | `MostMerchants` | `1` | *code only* |
@@ -1198,7 +1961,7 @@ changed without a rebuild.
 | `BotFeud` | `Answer` | `100` | *code only* |
 | `BotFeud` | `Assembly` | `12` | *code only* |
 | `BotFeud` | `CallMs` | `40000` | *code only* |
-| `BotFeud` | `CompanySize` | `15` | *code only* |
+| `BotFeud` | `CompanySize` | `20` | *code only* |
 | `BotFeud` | `Defend` | `250` | `Defend` |
 | `BotFeud` | `LeastToAttack` | `3` | *code only* |
 | `BotFeud` | `MusterMs` | `90000` | *code only* |
@@ -1209,7 +1972,9 @@ changed without a rebuild.
 | `BotFeud` | `WatchMs` | `5000` | *code only* |
 | `BotFeud` | `Wave` | `3` | *code only* |
 | `BotFeud` | `WaveMs` | `60000` | *code only* |
+| `BotFeuder` | `BanditBeside` | `2` | *code only* |
 | `BotFeuder` | `BanditOdds` | `0.8` | *code only* |
+| `BotFeuder` | `BanditStands` | `true` | *code only* |
 | `BotFeuder` | `DisagreeSayMs` | `60000` | *code only* |
 | `BotFeuder` | `Fit` | `0.5` | *code only* |
 | `BotFeuder` | `Watch` | `20` | *code only* |
@@ -1220,16 +1985,17 @@ changed without a rebuild.
 | `BotHall` | `Prior` | `400.0` | `Expects` |
 | `BotHall` | `Reach` | `5` | *code only* |
 | `BotHall` | `WorkMinutes` | `1.0` | *code only* |
-| `BotHallKind` | `LargePatioHolds` | `35` | *code only* |
+| `BotHallKind` | `LargePatioHolds` | `55` | *code only* |
 | `BotHallKind` | `LargePatioPrice` | `35000` | *code only* |
-| `BotHallKind` | `MarbleHolds` | `45` | *code only* |
+| `BotHallKind` | `MarbleHolds` | `65` | *code only* |
 | `BotHallKind` | `MarblePrice` | `60000` | *code only* |
-| `BotHallKind` | `PatioHolds` | `25` | *code only* |
+| `BotHallKind` | `PatioHolds` | `45` | *code only* |
 | `BotHallKind` | `PatioPrice` | `15000` | *code only* |
 | `BotHire` | `Prior` | `300.0` | *code only* |
 | `BotHire` | `TrekLimit` | `200` | *code only* |
 | `BotHire` | `WorkMinutes` | `1.0` | *code only* |
 | `BotHirer` | `ClaimMs` | `240000` | *code only* |
+| `BotHirer` | `RestMs` | `600000` | *code only* |
 | `BotHold` | `FootingRings` | `12` | *code only* |
 | `BotHold` | `Look` | `180` | *code only* |
 | `BotHold` | `MissedMs` | `600000` | *code only* |
@@ -1253,6 +2019,7 @@ changed without a rebuild.
 | `BotPlot` | `Budget` | `60` | `PlotBudget` |
 | `BotPlot` | `Clearance` | `20` | `PlotClearance` |
 | `BotPlot` | `Far` | `90` | `PlotFar` |
+| `BotPlot` | `Mainland` | `true` | *code only* |
 | `BotPlot` | `MostBehind` | `60` | *code only* |
 | `BotPlot` | `MultiID` | `0x0064` | `MultiID` |
 | `BotPlot` | `Near` | `14` | `PlotNear` |
@@ -1305,15 +2072,26 @@ changed without a rebuild.
 | `BotSeat` | `Settled` | `120` | `SeatSettled` |
 | `BotSeat` | `Spread` | `6` | *code only* |
 | `BotSeat` | `TownSpread` | `40` | *code only* |
+| `BotSeizure` | `Cold` | `20.0` | *code only* |
+| `BotSeizure` | `MemoryMs` | `172800000` | *code only* |
+| `BotSeizure` | `MostRemembered` | `2` | *code only* |
+| `BotSeizure` | `Odds` | `1.0` | *code only* |
+| `BotSeizure` | `Regard` | `30.0` | *code only* |
+| `BotSeizure` | `Running` | `true` | *code only* |
+| `BotSeizure` | `TownStep` | `0.02` | *code only* |
+| `BotSeizure` | `WeighMs` | `60000` | *code only* |
 | `BotShelf` | `Float` | `240` | `ShelfFloat` |
 | `BotShelf` | `Markup` | `1.0` | `ShelfMarkup` |
 | `BotShelf` | `Wages` | `120` | *code only* |
+| `BotShift` | `Prior` | `400.0` | *code only* |
+| `BotShift` | `WorkMinutes` | `1.0` | *code only* |
 | `BotSteward` | `ClaimMs` | `180000` | *code only* |
 | `BotSteward` | `LookAt` | `0.5` | `LookAt` |
 | `BotSteward` | `LookMs` | `2000` | `LookMs` |
 | `BotSupplier` | `Batch` | `20` | `ShelfBatch` |
 | `BotSupplier` | `ClaimMs` | `240000` | *code only* |
 | `BotSupplier` | `Considered` | `8` | *code only* |
+| `BotSupplier` | `Loose` | `10` | *code only* |
 | `BotSupplier` | `Shelf` | `60` | `ShelfDepth` |
 | `BotSupplier` | `Spend` | `240` | `ShelfSpend` |
 | `BotSupplier` | `Tools` | `10` | *code only* |
@@ -1332,6 +2110,8 @@ changed without a rebuild.
 | `BotTollman` | `ClaimMs` | `30000` | *code only* |
 | `BotTollman` | `Reach` | `160` | *code only* |
 | `BotTollman` | `ShunMs` | `300000` | *code only* |
+| `BotTownGround` | `Running` | `true` | *code only* |
+| `BotTownGround` | `SweepEveryMs` | `3600000` | *code only* |
 | `BotWar` | `BigAt` | `10` | *code only* |
 | `BotWar` | `DauntedAt` | `2.0` | *code only* |
 | `BotWar` | `DeclareEveryMs` | `1800000` | *code only* |
@@ -1349,6 +2129,7 @@ changed without a rebuild.
 | `BotWar` | `TruceMs` | `3600000` | *code only* |
 | `BotWar` | `YieldBehind` | `8` | *code only* |
 | `BotWar` | `YieldMight` | `1.5` | *code only* |
+| `BotWar` | `YieldOdds` | `5.0` | *code only* |
 | `BotWar` | `YieldRatio` | `3.0` | *code only* |
 | `BotWard` | `ChaseMs` | `120000` | *code only* |
 | `BotWard` | `Prior` | `300.0` | *code only* |
@@ -1380,6 +2161,7 @@ changed without a rebuild.
 | `BotParley` | `CallOdds` | `0.2` | `CallOdds` |
 | `BotParley` | `ClaimMs` | `180000` | *code only* |
 | `BotParley` | `Cordial` | `25.0` | `Cordial` |
+| `BotParley` | `DoorstepTiles` | `16` | *code only* |
 | `BotParley` | `HostCallTiles` | `150` | `HostCallTiles` |
 | `BotParley` | `HostWaitMs` | `240000` | *code only* |
 | `BotParley` | `JudgeKeepAlive` | `"10s"` | *code only* |
@@ -1406,8 +2188,65 @@ changed without a rebuild.
 | `BotTownTask` | `GuardMinutes` | `90.0` | `GuardMinutes` |
 | `BotTownTask` | `Hours` | `2.0` | `TaskHours` |
 | `BotTownTask` | `SupplyUnits` | `20` | `SupplyUnits` |
+| `BotTownWatch` | `MostAtOnce` | `3` | *code only* |
+| `BotTownWatch` | `Prior` | `18.0` | *code only* |
+| `BotTownWatch` | `Reach` | `250` | *code only* |
+| `BotTownWatch` | `StandMs` | `300000` | *code only* |
 
-The `*code only*` rows above whose names end in `Ms` are settable all the same, in minutes or seconds under the key named after them (`OfferMinutes`, `MarchMinutes`, `HostWaitMinutes`, `WitnessWaitMinutes`, `JudgeWaitSeconds`, `LineSeconds`, `LongestMinutes`, `MeetEveryMinutes`, `RetryMinutes`, `AudienceEveryMinutes`); `JudgeModel` and `JudgeKeepAlive` are read too. The generator only recognises `X = settings.Y ??`.
+## `BotRelics/`  —  `bot-relics.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotRelicHomeward` | `Prior` | `50.0` | *code only* |
+| `BotRelicHomeward` | `Reach` | `8` | *code only* |
+| `BotRelicHomeward` | `Running` | `true` | *code only* |
+| `BotRelicLair` | `ArriveReach` | `20` | *code only* |
+| `BotRelicLair` | `CallRetryMs` | `120000` | *code only* |
+| `BotRelicLair` | `EveryMs` | `14400000` | *code only* |
+| `BotRelicLair` | `Far` | `200` | *code only* |
+| `BotRelicLair` | `FirstMs` | `2400000` | *code only* |
+| `BotRelicLair` | `GoneMs` | `180000` | *code only* |
+| `BotRelicLair` | `Jitter` | `0.25` | *code only* |
+| `BotRelicLair` | `LapseMs` | `7200000` | *code only* |
+| `BotRelicLair` | `Leash` | `6` | *code only* |
+| `BotRelicLair` | `MostCalls` | `6` | *code only* |
+| `BotRelicLair` | `MostCompanies` | `2` | *code only* |
+| `BotRelicLair` | `Near` | `60` | *code only* |
+| `BotRelicLair` | `Odds` | `0.7` | *code only* |
+| `BotRelicLair` | `Prior` | `60.0` | *code only* |
+| `BotRelicLair` | `Reach` | `300` | *code only* |
+| `BotRelicLair` | `Running` | `true` | *code only* |
+| `BotRelicSnatch` | `Bar` | `30.0` | *code only* |
+| `BotRelicSnatch` | `CloseMs` | `120000` | *code only* |
+| `BotRelicSnatch` | `EveryMs` | `1800000` | *code only* |
+| `BotRelicSnatch` | `Most` | `0.6` | *code only* |
+| `BotRelicSnatch` | `Odds` | `0.6` | *code only* |
+| `BotRelicSnatch` | `Prior` | `60.0` | *code only* |
+| `BotRelicSnatch` | `Reach` | `150` | *code only* |
+| `BotRelicSnatch` | `Running` | `true` | *code only* |
+| `BotRelicSnatch` | `SeenChance` | `0.5` | *code only* |
+| `BotRelicSnatch` | `Worth` | `300` | *code only* |
+| `BotRelics` | `Appeal` | `3.0` | *code only* |
+| `BotRelics` | `BannerRansom` | `1500` | *code only* |
+| `BotRelics` | `CarryMostMs` | `3600000` | *code only* |
+| `BotRelics` | `ChestKeep` | `500` | *code only* |
+| `BotRelics` | `Discount` | `0.95` | *code only* |
+| `BotRelics` | `FenceWaitMs` | `7200000` | *code only* |
+| `BotRelics` | `FenceWordMs` | `600000` | *code only* |
+| `BotRelics` | `GreatEveryMs` | `86400000` | *code only* |
+| `BotRelics` | `GreatGapMs` | `21600000` | *code only* |
+| `BotRelics` | `Grudge` | `-30.0` | *code only* |
+| `BotRelics` | `NewsKept` | `20` | *code only* |
+| `BotRelics` | `RansomAfterMs` | `3600000` | *code only* |
+| `BotRelics` | `RelicRansom` | `1000` | *code only* |
+| `BotRelics` | `ReturnAfterMs` | `86400000` | *code only* |
+| `BotRelics` | `Revenge` | `true` | *code only* |
+| `BotRelics` | `RevengeMs` | `21600000` | *code only* |
+| `BotRelics` | `Running` | `true` | *code only* |
+| `BotRelics` | `SyncEveryMs` | `30000` | *code only* |
+| `BotRelics` | `WarTakesAll` | `true` | *code only* |
+| `BotRelicsModule` | `EveryMs` | `5000` | *code only* |
+| `BotRelicsModule` | `SayEveryMs` | `300000` | *code only* |
 
 ## `BotQuest/`
 
@@ -1448,6 +2287,7 @@ The `*code only*` rows above whose names end in `Ms` are settable all the same, 
 | `BotMarkers` | `EveryMs` | `60000` | *code only* |
 | `BotMarkers` | `Most` | `10000` | *code only* |
 | `BotMarkers` | `Path` | `@"..\..\ClassicUO\Data\Client\userMarkers.usr"` | *code only* |
+| `BotQuad` | `AfterMs` | `3600000` | *code only* |
 | `BotQuad` | `BaronWorth` | `-0.5` | *code only* |
 | `BotQuad` | `BaulkMs` | `600000` | *code only* |
 | `BotQuad` | `BlowsWorth` | `-0.01` | *code only* |
@@ -1490,6 +2330,13 @@ The `*code only*` rows above whose names end in `Ms` are settable all the same, 
 | `BotScout` | `Wage` | `50` | *code only* |
 | `BotScout` | `WorkMinutes` | `6.0` | *code only* |
 | `BotScoutmaster` | `VetMs` | `300.0` | *code only* |
+| `BotSweepRecord` | `CreditMs` | `180000` | *code only* |
+| `BotSweepRecord` | `HalfLifeMs` | `3600000` | *code only* |
+| `BotSweepRecord` | `MostSquares` | `8192` | *code only* |
+| `BotSweepRecord` | `PriorWeight` | `2.0` | *code only* |
+| `BotSweepRecord` | `ResumeMs` | `300000` | *code only* |
+| `BotSweepRecord` | `SquarePrior` | `1.0` | *code only* |
+| `BotSweepRecord` | `WaylessMs` | `3600000` | *code only* |
 | `BotWarden` | `Least` | `1` | *code only* |
 | `BotWarden` | `Rounds` | `20` | *code only* |
 
@@ -1518,12 +2365,18 @@ The `*code only*` rows above whose names end in `Ms` are settable all the same, 
 
 | class | dial | default | config key |
 |---|---|---|---|
+| `BotMoods` | `GrieveMs` | `1200000` | *code only* |
+| `BotMoods` | `LonelyFrom` | `0.3` | *code only* |
+| `BotMoods` | `PoorNeed` | `0.5` | *code only* |
+| `BotMoods` | `ProudMs` | `600000` | *code only* |
+| `BotMoods` | `ProudPerMinute` | `40.0` | *code only* |
 | `BotVoice` | `Broadcast` | `true` | `Broadcast` |
 | `BotVoice` | `CryEveryMs` | `20000` | `CryEveryMs` |
 | `BotVoice` | `CryHue` | `0x22` | `CryHue` |
 | `BotVoice` | `CryOn` | `true` | `Cry` |
 | `BotVoice` | `Desperate` | `0.3` | *code only* |
 | `BotVoice` | `DropChance` | `0.15` | `DropChance` |
+| `BotVoice` | `Earshot` | `12` | `Earshot` |
 | `BotVoice` | `Enabled` | `true` | `Enabled` |
 | `BotVoice` | `FailChance` | `0.6` | `FailChance` |
 | `BotVoice` | `GuildHue` | `0x3B2` | `GuildHue` |
@@ -1531,24 +2384,78 @@ The `*code only*` rows above whose names end in `Ms` are settable all the same, 
 | `BotVoice` | `Hurt` | `0.7` | *code only* |
 | `BotVoice` | `LocalOn` | `true` | `Local` |
 | `BotVoice` | `MoodEveryMs` | `900000` | `MoodEveryMs` |
+| `BotVoice` | `MoodHoldMs` | `600000` | `MoodHoldMs` |
 | `BotVoice` | `MoodHue` | `0x3B2` | `MoodHue` |
 | `BotVoice` | `MoodOn` | `true` | `Mood` |
+| `BotVoice` | `MoodRetryMs` | `60000` | `MoodRetryMs` |
 | `BotVoice` | `MostLetters` | `160` | `MostLetters` |
 | `BotVoice` | `SayEveryMs` | `15000` | `SayEveryMs` |
+| `BotVoice` | `TradeAtLogin` | `false` | `TradeAtLogin` |
+| `BotVoice` | `TradeConference` | `"Trade"` | `TradeConference` |
+| `BotVoice` | `TradeHandOvers` | `false` | `TradeHandOvers` |
+| `BotVoice` | `TradeHue` | `0x59` | `TradeHue` |
+| `BotVoice` | `TradeOn` | `true` | `Trade` |
+| `BotVoice` | `TradeOverhead` | `true` | `TradeOverhead` |
+| `BotVoice` | `TradeRepeatMs` | `60000` | `TradeRepeatMs` |
 | `BotVoice` | `WorkChance` | `0.35` | `WorkChance` |
 | `BotVoice` | `WorldHue` | `0x59` | `WorldHue` |
 | `BotVoice` | `WorldOn` | `true` | `World` |
 | `BotVoiceModule` | `TickMs` | `5000` | *code only* |
 
+## `BotSocial/`  —  `bot-social.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotSocial` | `AnswerEveryMs` | `120000` | *code only* |
+| `BotSocial` | `FellowWorth` | `12.0` | `FellowWorth` |
+| `BotSocial` | `InviteMs` | `90000` | *code only* |
+| `BotSocial` | `InviteReach` | `24` | `InviteReach` |
+| `BotSocial` | `MostListeners` | `2` | `MostListeners` |
+| `BotSocial` | `OffersCompany` | `true` | `OffersCompany` |
+| `BotSocial` | `OffersFires` | `true` | `OffersFires` |
+| `BotSocial` | `OffersHunts` | `true` | `OffersHunts` |
+| `BotSocial` | `OffersMending` | `true` | `OffersMending` |
+| `BotSocial` | `PairEveryMs` | `1200000` | *code only* |
+| `BotSocial` | `ReplyMs` | `3000` | *code only* |
+| `BotSocial` | `ReplySpreadMs` | `2500` | *code only* |
+| `BotSocial` | `Running` | `true` | `Running` |
+| `BotSocial` | `ThanksChance` | `0.5` | `ThanksChance` |
+| `BotSocialModule` | `TickMs` | `1000` | *code only* |
+
 ## `BotWeb/`  —  `bot-web.json`
 
 | class | dial | default | config key |
 |---|---|---|---|
+| `BotEarnings` | `Excluded` | `["Baron", "Captain", "Architect", "Sage"]` | *code only* |
+| `BotEarnings` | `SampleMs` | `60000` | *code only* |
+| `BotEarnings` | `WindowMs` | `3600000` | *code only* |
 | `BotEvents` | `Keep` | `3000` | `KeepEvents` |
 | `BotEvents` | `KeepAlarms` | `50` | *code only* |
 | `BotEvents` | `KeepPaths` | `2000` | `KeepPaths` |
+| `BotWebArt` | `MostKept` | `4096` | *code only* |
+| `BotWebArt` | `MostKeptBytes` | `96L * 1024 * 1024` | *code only* |
 | `BotWebHistory` | `EveryMs` | `60000` | `HistoryMs` |
 | `BotWebHistory` | `Keep` | `1440` | `KeepHistory` |
+| `BotWebLive` | `Enabled` | `true` | `Live` |
+| `BotWebLive` | `EveryMs` | `1000` | *code only* |
+| `BotWebLive` | `FeedKeep` | `40` | *code only* |
+| `BotWebLive` | `KeepMs` | `10000` | *code only* |
+| `BotWebLive` | `MostBlocks` | `8192` | *code only* |
+| `BotWebLive` | `MostItems` | `60` | *code only* |
+| `BotWebLive` | `MostLogBytes` | `2 * 1024 * 1024` | *code only* |
+| `BotWebLive` | `MostMobiles` | `80` | *code only* |
+| `BotWebLive` | `MostRoute` | `48` | *code only* |
+| `BotWebLive` | `MostWatched` | `4` | *code only* |
+| `BotWebLive` | `Picture` | `true` | `LivePicture` |
+| `BotWebLive` | `Radius` | `20` | *code only* |
+| `BotWebLive` | `Slack` | `4` | *code only* |
+| `BotWebLive` | `TailBytes` | `256 * 1024` | *code only* |
+| `BotWebLive` | `TerrainBudget` | `1024` | *code only* |
+| `BotWebLivePicture` | `MostGround` | `300` | *code only* |
+| `BotWebLivePicture` | `MostSceneBlocks` | `16384` | *code only* |
+| `BotWebLivePicture` | `PictureRadius` | `18` | *code only* |
+| `BotWebLivePicture` | `PictureSlack` | `6` | *code only* |
+| `BotWebLivePicture` | `SceneBlockBudget` | `32` | *code only* |
 | `BotWebMap` | `Enabled` | `true` | `MapImage` |
 | `BotWebMap` | `RowsPerSlice` | `12` | *code only* |
 | `BotWebMap` | `Scale` | `4` | `MapScale` |
@@ -1646,8 +2553,11 @@ The `*code only*` rows above whose names end in `Ms` are settable all the same, 
 | `BotRevel` | `TaxMs` | `900000` | *code only* |
 | `BotRevel` | `TaxShare` | `0.06` | `TaxShare` |
 | `BotRevel` | `Treasury` | `6000` | *code only* |
+| `BotStewardArgus` | `MostSpeech` | `200` | *code only* |
+| `BotStewardArgus` | `Running` | `true` | *code only* |
 | `BotTourney` | `Apart` | `3` | *code only* |
 | `BotTourney` | `BetweenMs` | `8000` | *code only* |
+| `BotTourney` | `BootGraceMs` | `300000` | *code only* |
 | `BotTourney` | `Entrants` | `30` | *code only* |
 | `BotTourney` | `EveryMs` | `3600000L` | *code only* |
 | `BotTourney` | `LeastGapMs` | `3600000L` | *code only* |
@@ -1661,6 +2571,17 @@ The `*code only*` rows above whose names end in `Ms` are settable all the same, 
 | `BotTourney` | `SupplyCures` | `2` | *code only* |
 | `BotTourney` | `SupplyHeals` | `3` | *code only* |
 | `BotTourney` | `SupplyReagents` | `20` | *code only* |
+| `BotTourney` | `TitleWaitMs` | `900000` | `TitleWaitMs` |
+| `BotVenues` | `EmptyWeight` | `0.25` | *code only* |
+| `BotVenues` | `FieldFar` | `42` | *code only* |
+| `BotVenues` | `FieldNear` | `18` | *code only* |
+| `BotVenues` | `HeraldHoldMs` | `120000` | *code only* |
+| `BotVenues` | `NearReach` | `200` | *code only* |
+| `BotVenues` | `Recent` | `3` | *code only* |
+| `BotVenues` | `RepeatApart` | `40` | *code only* |
+| `BotVenues` | `RingOpen` | `60` | *code only* |
+| `BotVenues` | `Running` | `true` | `Venues` |
+| `BotVenues` | `SafeRadius` | `12` | *code only* |
 | `BotVigil` | `Helpers` | `["Lynceus", "Heimdall"]` | `Helpers` |
 | `BotVigil` | `HoverMs` | `20000` | `HoverMs` |
 | `BotVigil` | `Hues` | `[33, 99, 63]` | `Hues` |
@@ -1687,6 +2608,7 @@ The `*code only*` rows above whose names end in `Ms` are settable all the same, 
 | `BotWatch` | `QuickMs` | `15000` | *code only* |
 | `BotWatch` | `SettledMs` | `1200000` | `SettledMs` |
 | `BotWatch` | `WorthSayingMs` | `20000` | *code only* |
+| `BotWatcher` | `FeedKeep` | `12` | *code only* |
 | `BotWaves` | `MostAlive` | `8` | *code only* |
 | `BotWaves` | `Reach` | `40` | *code only* |
 | `BotWaves` | `RestMs` | `12000` | *code only* |
@@ -1696,3 +2618,806 @@ The `*code only*` rows above whose names end in `Ms` are settable all the same, 
 | `BotWitness` | `MostSpeech` | `320` | *code only* |
 | `BotWitness` | `Running` | `true` | *code only* |
 | `BotWitness` | `TickMs` | `1000` | *code only* |
+
+## `BotCharacter/`  —  `bot-character.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotBiography` | `MostTales` | `3` | *code only* |
+| `BotBiography` | `On` | `true` | `Biography` |
+| `BotBiography` | `TaleChance` | `0.3` | `TaleChance` |
+| `BotBiography` | `TradeChance` | `0.25` | *code only* |
+| `BotBiography` | `VoiceChance` | `0.12` | *code only* |
+| `BotCharacterModule` | `LeastRegard` | `10.0` | *code only* |
+| `BotCharacterModule` | `MostTies` | `6` | *code only* |
+| `BotCharacterModule` | `TickMs` | `2000` | *code only* |
+| `BotGrudge` | `FitAt` | `0.8` | *code only* |
+| `BotGrudge` | `ForgivingChance` | `0.2` | *code only* |
+| `BotGrudge` | `GiveUpMs` | `240000` | *code only* |
+| `BotGrudge` | `LookEveryMs` | `30000` | *code only* |
+| `BotGrudge` | `On` | `true` | *code only* |
+| `BotGrudge` | `PairEveryMs` | `3600000` | *code only* |
+| `BotGrudge` | `PlainChance` | `0.5` | *code only* |
+| `BotGrudge` | `Reach` | `8` | *code only* |
+| `BotGrudge` | `RefusedRestMs` | `300000` | *code only* |
+| `BotGrudge` | `SeekReach` | `90` | *code only* |
+| `BotGrudge` | `VindictiveChance` | `1.0` | *code only* |
+| `BotGrudge` | `Worth` | `15.0` | *code only* |
+| `BotTies` | `Beside` | `0.5` | *code only* |
+| `BotTies` | `DecayEveryMs` | `600000` | *code only* |
+| `BotTies` | `DecayLeast` | `0.2` | *code only* |
+| `BotTies` | `DecayShare` | `0.01` | *code only* |
+| `BotTies` | `DuelAt` | `-60.0` | `DuelAt` |
+| `BotTies` | `Extorted` | `-40.0` | *code only* |
+| `BotTies` | `FriendAt` | `40.0` | `FriendAt` |
+| `BotTies` | `FriendPull` | `1000` | *code only* |
+| `BotTies` | `Healed` | `8.0` | *code only* |
+| `BotTies` | `MostTies` | `12` | *code only* |
+| `BotTies` | `Murdered` | `-80.0` | *code only* |
+| `BotTies` | `On` | `true` | `Ties` |
+| `BotTies` | `RaisedBy` | `45.0` | *code only* |
+| `BotTies` | `Raiser` | `10.0` | *code only* |
+| `BotTies` | `Saved` | `45.0` | *code only* |
+| `BotTies` | `Saver` | `20.0` | *code only* |
+| `BotTies` | `Settled` | `40.0` | *code only* |
+| `BotTies` | `SpurnAt` | `-30.0` | *code only* |
+| `BotTies` | `Traded` | `2.0` | *code only* |
+| `BotTies` | `WarKilled` | `-75.0` | *code only* |
+| `BotTraits` | `CautiousDaring` | `0.85` | *code only* |
+| `BotTraits` | `CautiousFlee` | `1.1` | *code only* |
+| `BotTraits` | `FarTiles` | `120` | *code only* |
+| `BotTraits` | `FleeFloor` | `0.3` | *code only* |
+| `BotTraits` | `Lean` | `0.15` | `Lean` |
+| `BotTraits` | `Least` | `0.8` | `Least` |
+| `BotTraits` | `Most` | `1.25` | `Most` |
+| `BotTraits` | `On` | `true` | `Traits` |
+| `BotTraits` | `RecklessDaring` | `1.1` | *code only* |
+| `BotTraits` | `RecklessFlee` | `0.9` | *code only* |
+| `BotTraits` | `VeteranKills` | `100` | `VeteranKills` |
+| `BotTraits` | `VeteranTitle` | `"the Veteran"` | *code only* |
+
+## `BotCharters/`  —  `bot-charters.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotCharters` | `Appetite` | `0.8` | `Appetite` |
+| `BotCharters` | `CraftSkill` | `30.0` | `CraftSkill` |
+| `BotCharters` | `EveryMs` | `21600000` | *code only* |
+| `BotCharters` | `FailsToLose` | `2` | `FailsToLose` |
+| `BotCharters` | `FirstMs` | `3600000` | *code only* |
+| `BotCharters` | `LeastBid` | `50` | `LeastBid` |
+| `BotCharters` | `LeastPeriodMs` | `1800000` | *code only* |
+| `BotCharters` | `LeastShare` | `0.1` | `LeastShare` |
+| `BotCharters` | `Levy` | `0.10` | `Levy` |
+| `BotCharters` | `LootFree` | `true` | `LootFree` |
+| `BotCharters` | `LostRegard` | `-8.0` | `LostRegard` |
+| `BotCharters` | `Running` | `true` | `Running` |
+| `BotCharters` | `SayLevy` | `true` | `SayLevy` |
+| `BotCharters` | `SpareShare` | `0.5` | `SpareShare` |
+| `BotChartersModule` | `LookMs` | `60000` | *code only* |
+| `BotChartersModule` | `SayEveryMs` | `300000` | *code only* |
+
+## `BotColonies/`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotColonies` | `AbandonMs` | `10800000` | *code only* |
+| `BotColonies` | `BuyShip` | `true` | *code only* |
+| `BotColonies` | `CaptainShare` | `0.1` | *code only* |
+| `BotColonies` | `CargoAt` | `60` | *code only* |
+| `BotColonies` | `CargoLoad` | `0.85` | *code only* |
+| `BotColonies` | `ClaimRetryMs` | `300000` | *code only* |
+| `BotColonies` | `ConsiderMs` | `600000` | *code only* |
+| `BotColonies` | `Cost` | `1500` | *code only* |
+| `BotColonies` | `CrewShare` | `0.3` | *code only* |
+| `BotColonies` | `FlatClaim` | `true` | *code only* |
+| `BotColonies` | `Islands` | `"Nujel'm,Magincia,Moonglow,Ocllo"` | *code only* |
+| `BotColonies` | `LeastParty` | `5` | *code only* |
+| `BotColonies` | `LookMs` | `30000` | *code only* |
+| `BotColonies` | `MinRocks` | `4` | *code only* |
+| `BotColonies` | `MusterMs` | `240000` | *code only* |
+| `BotColonies` | `MusterReach` | `400` | *code only* |
+| `BotColonies` | `Order` | `""` | *code only* |
+| `BotColonies` | `PartySize` | `8` | *code only* |
+| `BotColonies` | `Reach` | `45` | *code only* |
+| `BotColonies` | `RunEveryMs` | `2700000` | *code only* |
+| `BotColonies` | `Running` | `true` | *code only* |
+| `BotColonies` | `Salvage` | `true` | *code only* |
+| `BotColonies` | `ShiftMs` | `7200000` | *code only* |
+| `BotColonies` | `SiteRings` | `5` | *code only* |
+| `BotColonies` | `SiteStride` | `4` | *code only* |
+| `BotColonyRun` | `MostKinds` | `6` | *code only* |
+| `BotColonyRun` | `Prior` | `45.0` | *code only* |
+| `BotExpedition` | `Prior` | `150.0` | *code only* |
+| `BotPiracy` | `ChooseOdds` | `1.0` | *code only* |
+| `BotPiracy` | `EveryMs` | `1800000` | *code only* |
+| `BotPiracy` | `LayAheadMs` | `150000` | *code only* |
+| `BotPiracy` | `LeastParty` | `2` | *code only* |
+| `BotPiracy` | `LeastWorth` | `150` | *code only* |
+| `BotPiracy` | `MostParty` | `3` | *code only* |
+| `BotPiracy` | `PartyReach` | `400` | *code only* |
+| `BotPiracy` | `Running` | `true` | *code only* |
+| `BotSignOn` | `HandsPrior` | `40.0` | *code only* |
+| `BotSignOn` | `Prior` | `80.0` | *code only* |
+| `BotSignOn` | `StandMs` | `330000` | *code only* |
+| `BotSignOn` | `WaitMs` | `900000` | *code only* |
+
+## `BotCrime/`  —  `bot-crime.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotBounty` | `Healthy` | `0.8` | *code only* |
+| `BotBounty` | `HuntersPer` | `2` | *code only* |
+| `BotBounty` | `ListMs` | `10000` | *code only* |
+| `BotBounty` | `Minutes` | `6.0` | *code only* |
+| `BotBounty` | `Odds` | `1.2` | *code only* |
+| `BotBounty` | `Reach` | `400` | *code only* |
+| `BotBounty` | `Running` | `true` | *code only* |
+| `BotCrime` | `BountyBase` | `200` | *code only* |
+| `BotCrime` | `BountyMost` | `2000` | *code only* |
+| `BotCrime` | `ChestKeep` | `500` | *code only* |
+| `BotCrime` | `HotMs` | `3600000` | *code only* |
+| `BotCrime` | `MostDoublings` | `3` | *code only* |
+| `BotCrime` | `PoorBelow` | `150` | *code only* |
+| `BotCrime` | `PostedMs` | `21600000` | *code only* |
+| `BotCrime` | `RansomAfterMs` | `300000` | *code only* |
+| `BotCrime` | `RansomBase` | `300` | *code only* |
+| `BotCrime` | `RansomPerMinute` | `20` | *code only* |
+| `BotCrime` | `Ransoms` | `true` | *code only* |
+| `BotCrime` | `RecruitEveryMs` | `900000` | *code only* |
+| `BotCrime` | `RecruitLeastSkills` | `2500` | *code only* |
+| `BotCrime` | `RepentMs` | `7200000` | *code only* |
+| `BotCrime` | `ReportsToPost` | `2` | *code only* |
+| `BotCrime` | `Running` | `true` | *code only* |
+| `BotCrime` | `SweepMs` | `60000` | *code only* |
+| `BotCrime` | `TermMs` | `1800000` | *code only* |
+| `BotCrime` | `ThiefPerBots` | `20` | *code only* |
+| `BotCrime` | `YieldShare` | `0.25` | *code only* |
+| `BotCrime` | `Yields` | `true` | *code only* |
+| `BotCutpurse` | `CloseMs` | `45000` | *code only* |
+| `BotCutpurse` | `CrowdLookMs` | `30000` | *code only* |
+| `BotCutpurse` | `CrowdReach` | `400` | *code only* |
+| `BotCutpurse` | `CrowdTiles` | `8` | *code only* |
+| `BotCutpurse` | `CrowdWaitMs` | `60000` | *code only* |
+| `BotCutpurse` | `EveryMs` | `900000` | *code only* |
+| `BotCutpurse` | `Holds` | `true` | *code only* |
+| `BotCutpurse` | `LeastCrowd` | `2` | *code only* |
+| `BotCutpurse` | `NoticeChance` | `0.5` | *code only* |
+| `BotCutpurse` | `PerHour` | `6` | *code only* |
+| `BotCutpurse` | `Prior` | `40.0` | *code only* |
+| `BotCutpurse` | `Running` | `true` | *code only* |
+| `BotCutpurse` | `SlipTiles` | `14` | *code only* |
+| `BotCutpurse` | `Tries` | `3` | *code only* |
+| `BotCutpurse` | `WitnessTiles` | `8` | *code only* |
+| `BotFencer` | `ChoiceMs` | `60000` | *code only* |
+| `BotFencer` | `FenceShare` | `0.5` | *code only* |
+| `BotFencer` | `LeastLot` | `20` | *code only* |
+| `BotFencer` | `Minutes` | `6.0` | *code only* |
+| `BotFencer` | `Running` | `true` | *code only* |
+| `BotFencer` | `TraceAtHome` | `0.5` | *code only* |
+| `BotFencer` | `TraceChance` | `0.1` | *code only* |
+| `BotFencer` | `TracesToPost` | `3` | *code only* |
+| `BotHighway` | `AheadTiles` | `24` | *code only* |
+| `BotHighway` | `CapMs` | `900000` | *code only* |
+| `BotHighway` | `CargoFloor` | `40` | *code only* |
+| `BotHighway` | `CargoSeen` | `40` | *code only* |
+| `BotHighway` | `CargoShare` | `0.25` | *code only* |
+| `BotHighway` | `ChooseOdds` | `1.0` | *code only* |
+| `BotHighway` | `EscortWithin` | `12` | *code only* |
+| `BotHighway` | `EveryMs` | `1200000` | *code only* |
+| `BotHighway` | `HireHands` | `true` | *code only* |
+| `BotHighway` | `Lead` | `1.3` | *code only* |
+| `BotHighway` | `LeadSlack` | `20` | *code only* |
+| `BotHighway` | `LeastCargo` | `100` | *code only* |
+| `BotHighway` | `LeastParty` | `2` | *code only* |
+| `BotHighway` | `MostAhead` | `300` | *code only* |
+| `BotHighway` | `MostParty` | `3` | *code only* |
+| `BotHighway` | `MostRelays` | `3` | *code only* |
+| `BotHighway` | `MusterMs` | `180000` | *code only* |
+| `BotHighway` | `OnRoad` | `12` | *code only* |
+| `BotHighway` | `PartyReach` | `250` | *code only* |
+| `BotHighway` | `Press` | `true` | *code only* |
+| `BotHighway` | `Prior` | `1.0` | *code only* |
+| `BotHighway` | `Running` | `true` | *code only* |
+| `BotHighway` | `StrikeTogether` | `true` | *code only* |
+| `BotHighway` | `StrikeWithin` | `12` | *code only* |
+| `BotHighway` | `SweepMs` | `30000` | *code only* |
+| `BotHighway` | `ThrowBelow` | `40.0` | *code only* |
+| `BotHighway` | `WaitMs` | `240000` | *code only* |
+
+## `BotEvents/`  —  `bot-events.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotCaravans` | `ArriveReach` | `8` | *code only* |
+| `BotCaravans` | `Behind` | `60` | *code only* |
+| `BotCaravans` | `BehindMs` | `180000` | *code only* |
+| `BotCaravans` | `CapMs` | `2700000` | *code only* |
+| `BotCaravans` | `DefendReach` | `12` | *code only* |
+| `BotCaravans` | `EveryMs` | `2700000` | *code only* |
+| `BotCaravans` | `FirstMs` | `1200000` | *code only* |
+| `BotCaravans` | `GatherMs` | `150000` | *code only* |
+| `BotCaravans` | `GuardOdds` | `1.5` | *code only* |
+| `BotCaravans` | `GuardPrior` | `30.0` | *code only* |
+| `BotCaravans` | `GuardRate` | `60.0` | *code only* |
+| `BotCaravans` | `GuardReach` | `60` | *code only* |
+| `BotCaravans` | `LateMs` | `300000` | *code only* |
+| `BotCaravans` | `LeastGuards` | `2` | *code only* |
+| `BotCaravans` | `LeastPremium` | `100` | *code only* |
+| `BotCaravans` | `LeastRoad` | `120` | *code only* |
+| `BotCaravans` | `LowShare` | `0.25` | *code only* |
+| `BotCaravans` | `Markup` | `0.25` | *code only* |
+| `BotCaravans` | `MostGuards` | `3` | *code only* |
+| `BotCaravans` | `MostStones` | `60` | *code only* |
+| `BotCaravans` | `Notch` | `0.95` | *code only* |
+| `BotCaravans` | `NotchMs` | `7200000` | *code only* |
+| `BotCaravans` | `PayReach` | `24` | *code only* |
+| `BotCaravans` | `PostedMs` | `1200000` | *code only* |
+| `BotCaravans` | `Prior` | `40.0` | *code only* |
+| `BotCaravans` | `Reach` | `300` | *code only* |
+| `BotCaravans` | `Running` | `true` | *code only* |
+| `BotCaravans` | `TripPrior` | `8.0` | *code only* |
+| `BotCaravans` | `Units` | `10` | *code only* |
+| `BotCaravans` | `Wage` | `100` | *code only* |
+| `BotCaravans` | `WorkMinutes` | `15.0` | *code only* |
+| `BotFair` | `AheadMs` | `3600000` | *code only* |
+| `BotFair` | `Discount` | `0.9` | *code only* |
+| `BotFair` | `EveryMs` | `86400000` | *code only* |
+| `BotFair` | `FirstMs` | `5400000` | *code only* |
+| `BotFair` | `LastsMs` | `7200000` | *code only* |
+| `BotFair` | `LeastShops` | `3` | *code only* |
+| `BotFair` | `LotteryLeast` | `200` | *code only* |
+| `BotFair` | `Prior` | `15.0` | *code only* |
+| `BotFair` | `Reach` | `300` | *code only* |
+| `BotFair` | `Running` | `true` | *code only* |
+| `BotFair` | `StayMs` | `180000` | *code only* |
+| `BotFair` | `Ticket` | `10` | *code only* |
+| `BotFair` | `TicketEveryMs` | `60000` | *code only* |
+| `BotFairgoer` | `LeastLeftMs` | `1800000` | *code only* |
+| `BotInvasion` | `ArriveReach` | `20` | *code only* |
+| `BotInvasion` | `CallRetryMs` | `60000` | *code only* |
+| `BotInvasion` | `DeathReach` | `30` | *code only* |
+| `BotInvasion` | `EveryMs` | `10800000` | *code only* |
+| `BotInvasion` | `Far` | `100` | *code only* |
+| `BotInvasion` | `FirstMs` | `2700000` | *code only* |
+| `BotInvasion` | `GoneMs` | `120000` | *code only* |
+| `BotInvasion` | `Jitter` | `0.25` | *code only* |
+| `BotInvasion` | `LeastMilitia` | `4` | *code only* |
+| `BotInvasion` | `LeastPurse` | `300` | *code only* |
+| `BotInvasion` | `LifeMs` | `2400000` | *code only* |
+| `BotInvasion` | `MilitiaPrior` | `60.0` | *code only* |
+| `BotInvasion` | `MostCalls` | `3` | *code only* |
+| `BotInvasion` | `MostCompanies` | `1` | *code only* |
+| `BotInvasion` | `MostHeads` | `8` | *code only* |
+| `BotInvasion` | `MostOut` | `400` | *code only* |
+| `BotInvasion` | `MostProbeLines` | `60` | *code only* |
+| `BotInvasion` | `MusterMs` | `1200000` | *code only* |
+| `BotInvasion` | `Near` | `60` | *code only* |
+| `BotInvasion` | `Odds` | `0.8` | *code only* |
+| `BotInvasion` | `PastEdge` | `20` | *code only* |
+| `BotInvasion` | `PastEdgeMost` | `70` | *code only* |
+| `BotInvasion` | `Purse` | `1500` | *code only* |
+| `BotInvasion` | `RestMs` | `20000` | *code only* |
+| `BotInvasion` | `RoadStep` | `4` | *code only* |
+| `BotInvasion` | `Running` | `true` | *code only* |
+| `BotInvasion` | `SingleShare` | `0.4` | *code only* |
+| `BotInvasion` | `Spread` | `10` | *code only* |
+| `BotInvasion` | `TownReach` | `120` | *code only* |
+| `BotInvasion` | `Waves` | `3` | *code only* |
+| `BotMilitia` | `CountEveryMs` | `30000` | *code only* |
+| `BotNight` | `From` | `22` | *code only* |
+| `BotNight` | `NightDanger` | `1.25` | *code only* |
+| `BotNight` | `NightPay` | `1.25` | *code only* |
+| `BotNight` | `Running` | `true` | *code only* |
+| `BotNight` | `To` | `6` | *code only* |
+| `BotRumour` | `ChestGold` | `300` | *code only* |
+| `BotRumour` | `EveryMs` | `3600000` | *code only* |
+| `BotRumour` | `Far` | `200` | *code only* |
+| `BotRumour` | `FirstMs` | `1200000` | *code only* |
+| `BotRumour` | `LapseMs` | `2400000` | *code only* |
+| `BotRumour` | `LeastGold` | `50` | *code only* |
+| `BotRumour` | `LoneOdds` | `3.0` | *code only* |
+| `BotRumour` | `MostSeekers` | `2` | *code only* |
+| `BotRumour` | `Near` | `60` | *code only* |
+| `BotRumour` | `Prior` | `30.0` | *code only* |
+| `BotRumour` | `Reach` | `300` | *code only* |
+| `BotRumour` | `Running` | `true` | *code only* |
+| `BotSeasons` | `CityReserve` | `1000` | *code only* |
+| `BotSeasons` | `EveryMs` | `5000` | *code only* |
+| `BotSeasons` | `Hue` | `0x35` | *code only* |
+| `BotSeasons` | `Running` | `true` | *code only* |
+| `BotSeasons` | `SayEveryMs` | `300000` | *code only* |
+
+## `BotOfficers/`  —  `bot-officers.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotGuildBout` | `AcceptOdds` | `0.6` | *code only* |
+| `BotGuildBout` | `EveryMs` | `14400000` | *code only* |
+| `BotGuildBout` | `PurseLeast` | `100` | *code only* |
+| `BotGuildBout` | `PurseMost` | `800` | `BoutPurseMost` |
+| `BotGuildBout` | `PurseShare` | `0.05` | *code only* |
+| `BotGuildBout` | `Reach` | `150` | *code only* |
+| `BotGuildBout` | `RingTiles` | `5` | *code only* |
+| `BotGuildBout` | `Running` | `true` | `Bouts` |
+| `BotGuildBout` | `WaitMs` | `300000` | *code only* |
+| `BotGuildScout` | `FocusMs` | `3000` | *code only* |
+| `BotGuildScout` | `HoldMs` | `60000` | *code only* |
+| `BotGuildScout` | `Margin` | `4` | *code only* |
+| `BotGuildScout` | `MostVsBot` | `3.0` | *code only* |
+| `BotGuildScout` | `PatrolReach` | `220` | *code only* |
+| `BotGuildScout` | `Patrols` | `true` | `Patrols` |
+| `BotGuildScout` | `Prior` | `28.0` | *code only* |
+| `BotGuildScout` | `RestMs` | `900000` | *code only* |
+| `BotGuildScout` | `RumourLean` | `1.5` | *code only* |
+| `BotGuildScout` | `Rumours` | `true` | `Rumours` |
+| `BotGuildScout` | `ShadowKeep` | `16` | *code only* |
+| `BotGuildScout` | `ShadowLeast` | `4` | *code only* |
+| `BotGuildScout` | `ShadowMs` | `90000` | *code only* |
+| `BotGuildScout` | `ShadowReach` | `160` | *code only* |
+| `BotGuildScout` | `ShadowRestMs` | `1200000` | *code only* |
+| `BotGuildScout` | `Shadows` | `true` | `Shadows` |
+| `BotGuildScout` | `WalkMs` | `300000` | *code only* |
+| `BotGuildScout` | `WarnReach` | `90` | *code only* |
+| `BotGuildStore` | `CollectMs` | `60000` | *code only* |
+| `BotGuildStore` | `DefaultHours` | `6.0` | `DefaultHours` |
+| `BotGuildStore` | `GiftsCount` | `true` | *code only* |
+| `BotGuildStore` | `KeepShare` | `0.6` | *code only* |
+| `BotGuildStore` | `LienShare` | `0.5` | `LienShare` |
+| `BotGuildStore` | `MostBottles` | `30` | *code only* |
+| `BotGuildStore` | `MostOwed` | `0` | *code only* |
+| `BotGuildStore` | `MostUnits` | `120` | *code only* |
+| `BotGuildStore` | `PoorBelow` | `150` | `PoorBelow` |
+| `BotGuildStore` | `PorterGives` | `true` | `PorterGives` |
+| `BotGuildStore` | `PriceGuess` | `5` | *code only* |
+| `BotGuildStore` | `Running` | `true` | `Stores` |
+| `BotGuildStore` | `ShelfLot` | `40` | *code only* |
+| `BotGuildStore` | `SurplusAfterMs` | `10800000` | *code only* |
+| `BotGuildStore` | `TakeReach` | `40` | *code only* |
+| `BotHeraldStand` | `CrossChance` | `0.35` | *code only* |
+| `BotHeraldStand` | `Far` | `200` | *code only* |
+| `BotHeraldStand` | `InviteRestMs` | `7200000` | *code only* |
+| `BotHeraldStand` | `JoinChance` | `0.6` | *code only* |
+| `BotHeraldStand` | `LookMs` | `6000` | *code only* |
+| `BotHeraldStand` | `NewsEveryMs` | `75000` | *code only* |
+| `BotHeraldStand` | `Poaching` | `true` | `Poaching` |
+| `BotHeraldStand` | `Prior` | `26.0` | *code only* |
+| `BotHeraldStand` | `Reach` | `14` | *code only* |
+| `BotHeraldStand` | `RestMs` | `2700000` | *code only* |
+| `BotHeraldStand` | `ShiftMinutes` | `10` | *code only* |
+| `BotHeraldStand` | `SourRegard` | `-30` | *code only* |
+| `BotHeraldStand` | `StandTiles` | `5` | *code only* |
+| `BotOfficers` | `EmptyRetryMs` | `1800000` | *code only* |
+| `BotOfficers` | `Heralds` | `true` | `Heralds` |
+| `BotOfficers` | `LeastMembers` | `4` | *code only* |
+| `BotOfficers` | `Margin` | `1.2` | *code only* |
+| `BotOfficers` | `MostNews` | `8` | *code only* |
+| `BotOfficers` | `NewcomerMs` | `7200000` | *code only* |
+| `BotOfficers` | `NewsMs` | `7200000` | *code only* |
+| `BotOfficers` | `Quartermasters` | `true` | `Quartermasters` |
+| `BotOfficers` | `Running` | `true` | `Running` |
+| `BotOfficers` | `Scouts` | `true` | `Scouts` |
+| `BotOfficers` | `TermMs` | `21600000` | *code only* |
+| `BotOfficers` | `VeteranLean` | `1.4` | *code only* |
+| `BotOfficersModule` | `SettleMs` | `180000` | *code only* |
+| `BotOfficersModule` | `TickMs` | `1000` | *code only* |
+| `BotQuartermaster` | `ActMs` | `5000` | *code only* |
+| `BotQuartermaster` | `Counter` | `6` | *code only* |
+| `BotQuartermaster` | `EveryMs` | `1800000` | *code only* |
+| `BotQuartermaster` | `LeastLeftMs` | `150000` | *code only* |
+| `BotQuartermaster` | `Prior` | `30.0` | *code only* |
+| `BotQuartermaster` | `Prior` | `40.0` | *code only* |
+| `BotQuartermaster` | `Reach` | `100` | *code only* |
+| `BotQuartermaster` | `Reach` | `200` | *code only* |
+| `BotQuartermaster` | `RestMs` | `2400000` | *code only* |
+| `BotQuartermaster` | `SettleMs` | `30000` | *code only* |
+| `BotQuartermaster` | `ShiftMinutes` | `6` | *code only* |
+| `BotQuartermaster` | `StoreTiles` | `4` | *code only* |
+| `BotQuartermaster` | `TargetShare` | `0.5` | *code only* |
+| `BotQuartermaster` | `WaitedRestMs` | `300000` | *code only* |
+| `BotQuartermaster` | `WaitingWorth` | `8.0` | *code only* |
+| `BotQuartermaster` | `WalkMs` | `240000` | *code only* |
+| `BotQuartermaster` | `WantHoldMs` | `5400000` | *code only* |
+| `BotQuartermaster` | `WantLeast` | `10` | *code only* |
+| `BotQuartermaster` | `WantMost` | `30` | *code only* |
+| `BotQuartermaster` | `Wants` | `true` | `GuildWants` |
+| `BotQuartermaster` | `WarFactor` | `2.0` | *code only* |
+
+## `BotPolitics/`  —  `bot-politics.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotCouncil` | `Captaincy` | `true` | *code only* |
+| `BotCouncil` | `FirstMs` | `900000` | *code only* |
+| `BotCouncil` | `LeastDone` | `1` | *code only* |
+| `BotCouncil` | `MostOnDuty` | `2` | *code only* |
+| `BotCouncil` | `OutcastFactor` | `1.05` | `OutcastFactor` |
+| `BotCouncil` | `OutcastRegard` | `-60.0` | `OutcastRegard` |
+| `BotCouncil` | `Reach` | `250` | *code only* |
+| `BotCouncil` | `Running` | `true` | `Councils` |
+| `BotCouncil` | `TaxShare` | `0.10` | `TaxShare` |
+| `BotCouncil` | `TermMs` | `7200000` | *code only* |
+| `BotCouncil` | `Wage` | `20` | `Wage` |
+| `BotCouncil` | `WageBudget` | `400` | `WageBudget` |
+| `BotElection` | `Candidates` | `3` | *code only* |
+| `BotElection` | `CarryShare` | `0.5` | `CarryShare` |
+| `BotElection` | `DiscontentShare` | `0.4` | `DiscontentShare` |
+| `BotElection` | `EveryMs` | `21600000` | *code only* |
+| `BotElection` | `FameWeight` | `0.01` | *code only* |
+| `BotElection` | `FighterKills` | `1.5` | *code only* |
+| `BotElection` | `FirstMs` | `3600000` | *code only* |
+| `BotElection` | `GapMs` | `3600000` | *code only* |
+| `BotElection` | `GiftPer` | `100` | *code only* |
+| `BotElection` | `GraceMs` | `10800000` | *code only* |
+| `BotElection` | `Incumbency` | `5.0` | *code only* |
+| `BotElection` | `KillWeight` | `5.0` | *code only* |
+| `BotElection` | `LostInRow` | `2` | *code only* |
+| `BotElection` | `LowRegard` | `-30.0` | *code only* |
+| `BotElection` | `OnFall` | `true` | `ElectOnFall` |
+| `BotElection` | `PlotLookMs` | `600000` | *code only* |
+| `BotElection` | `Plotting` | `true` | `Plotting` |
+| `BotElection` | `PoorGifts` | `2.0` | *code only* |
+| `BotElection` | `RegardWeight` | `0.2` | *code only* |
+| `BotElection` | `RivalMargin` | `1.25` | *code only* |
+| `BotElection` | `Running` | `true` | `Elections` |
+| `BotElection` | `SelfVote` | `true` | *code only* |
+| `BotElection` | `UnpaidMs` | `10800000` | *code only* |
+| `BotElection` | `VeteranBonus` | `15.0` | *code only* |
+| `BotElection` | `WinWeight` | `10.0` | *code only* |
+| `BotPolitics` | `LookMs` | `60000` | *code only* |
+| `BotPolitics` | `SettleMs` | `300000` | *code only* |
+| `BotPurpose` | `EveryMs` | `7200000` | *code only* |
+| `BotPurpose` | `FirstMs` | `1800000` | *code only* |
+| `BotPurpose` | `Running` | `true` | `Purposes` |
+| `BotPurpose` | `WarChest` | `3000` | `WarChest` |
+| `BotStewardship` | `Allowance` | `100` | *code only* |
+| `BotStewardship` | `AskEvery` | `4` | *code only* |
+| `BotStewardship` | `BarCost` | `100` | *code only* |
+| `BotStewardship` | `BarHours` | `24.0` | *code only* |
+| `BotStewardship` | `BarRegard` | `-60.0` | *code only* |
+| `BotStewardship` | `BountyAbove` | `1000` | *code only* |
+| `BotStewardship` | `BountyAgainMs` | `3600000` | *code only* |
+| `BotStewardship` | `BountyRaise` | `150` | *code only* |
+| `BotStewardship` | `BountyWaitMs` | `900000` | *code only* |
+| `BotStewardship` | `CaravanEveryMs` | `7200000` | *code only* |
+| `BotStewardship` | `CaravanGold` | `300` | *code only* |
+| `BotStewardship` | `ChooseMs` | `7200000` | *code only* |
+| `BotStewardship` | `CityKeep` | `5000` | *code only* |
+| `BotStewardship` | `CofferMost` | `5000` | *code only* |
+| `BotStewardship` | `CutCover` | `20` | *code only* |
+| `BotStewardship` | `DeposedMs` | `21600000` | *code only* |
+| `BotStewardship` | `EveryMs` | `900000` | *code only* |
+| `BotStewardship` | `FallLeast` | `4.0` | *code only* |
+| `BotStewardship` | `FallMs` | `7200000` | *code only* |
+| `BotStewardship` | `FirstMs` | `600000` | *code only* |
+| `BotStewardship` | `Floor` | `50` | *code only* |
+| `BotStewardship` | `HireGold` | `200` | *code only* |
+| `BotStewardship` | `HireMs` | `7200000` | *code only* |
+| `BotStewardship` | `HolidayCost` | `250` | *code only* |
+| `BotStewardship` | `HolidayEveryHours` | `24.0` | *code only* |
+| `BotStewardship` | `HolidayGapHours` | `8.0` | *code only* |
+| `BotStewardship` | `HolidayRegard` | `45.0` | *code only* |
+| `BotStewardship` | `LeastDone` | `1` | *code only* |
+| `BotStewardship` | `MilitiaGold` | `300` | *code only* |
+| `BotStewardship` | `MilitiaWaitMs` | `300000` | *code only* |
+| `BotStewardship` | `ModelChooses` | `true` | *code only* |
+| `BotStewardship` | `MoodMost` | `40.0` | *code only* |
+| `BotStewardship` | `MostBars` | `2` | *code only* |
+| `BotStewardship` | `PoorMs` | `3600000` | *code only* |
+| `BotStewardship` | `Remembered` | `8` | *code only* |
+| `BotStewardship` | `RetryMs` | `600000` | *code only* |
+| `BotStewardship` | `Rich` | `1200` | *code only* |
+| `BotStewardship` | `Running` | `true` | *code only* |
+| `BotStewardship` | `SayEveryMs` | `300000` | *code only* |
+| `BotStewardship` | `TaxCeiling` | `0.05` | *code only* |
+| `BotStewardship` | `TaxEveryMs` | `3600000` | *code only* |
+| `BotStewardship` | `TaxFloor` | `-0.03` | *code only* |
+| `BotStewardship` | `TaxMostStep` | `3` | *code only* |
+| `BotStewardship` | `TaxPress` | `0.15` | *code only* |
+| `BotStewardship` | `WalkerBars` | `true` | *code only* |
+| `BotTribute` | `EndOdds` | `1.5` | *code only* |
+| `BotTribute` | `EveryMs` | `3600000` | *code only* |
+| `BotTribute` | `Hours` | `24.0` | `TributeHours` |
+| `BotTribute` | `LapseRegard` | `-30.0` | *code only* |
+| `BotTribute` | `Least` | `240` | *code only* |
+| `BotTribute` | `Most` | `4800` | *code only* |
+| `BotTribute` | `Odds` | `2.0` | `TributeOdds` |
+| `BotTribute` | `RefuseMs` | `21600000` | *code only* |
+| `BotTribute` | `Running` | `true` | `Ultimatums` |
+| `BotTribute` | `Share` | `0.25` | `TributeShare` |
+
+## `BotReachMap/`  —  `bot-reach.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotReachCheck` | `AnchorReach` | `8` | *code only* |
+| `BotReachCheck` | `BudgetMs` | `10.0` | `CheckBudgetMs` |
+| `BotReachCheck` | `Carry` | `true` | `CheckCarry` |
+| `BotReachCheck` | `CeilingMs` | `30.0` | `CheckCeilingMs` |
+| `BotReachCheck` | `FloodCells` | `3000` | `CheckFloodCells` |
+| `BotReachCheck` | `OnBoot` | `true` | `CheckOnBoot` |
+| `BotReachCheck` | `Samples` | `240` | `CheckSamples` |
+| `BotReachCheck` | `TickMs` | `400` | *code only* |
+| `BotReachMap` | `EveryMs` | `50` | `EveryMs` |
+| `BotReachMap` | `IdleCheckMs` | `10000` | *code only* |
+| `BotReachMap` | `JsonEveryMs` | `2000` | *code only* |
+| `BotReachMap` | `OffLoopCores` | `3` | `OffLoopCores` |
+| `BotReachMap` | `Persist` | `true` | `Persist` |
+| `BotReachMap` | `PrunesSearch` | `true` | *code only* |
+| `BotReachMap` | `RedrawAfter` | `3` | `RedrawAfter` |
+| `BotReachMap` | `Running` | `true` | `Enabled` |
+| `BotReachMap` | `SampleReach` | `2` | `SampleReach` |
+| `BotReachMap` | `SayContradictions` | `25` | `SayContradictions` |
+| `BotReachMap` | `SliceMs` | `6.0` | `SliceMs` |
+| `BotReachModule` | `SayEveryMs` | `300000` | *code only* |
+| `BotReachSolve` | `LargestKept` | `32` | *code only* |
+| `BotReachWeb` | `MostCells` | `2 * 1024 * 1024` | *code only* |
+
+## `BotTraders/`  —  `bot-traders.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotTrading` | `BankStand` | `4` | *code only* |
+| `BotTrading` | `BatchTiles` | `200` | `BatchTiles` |
+| `BotTrading` | `BookHistory` | `40` | `BookHistory` |
+| `BotTrading` | `BuyMinutes` | `0.5` | *code only* |
+| `BotTrading` | `CarriageShare` | `0.5` | `CarriageShare` |
+| `BotTrading` | `ChaseMs` | `480000` | `ChaseMs` |
+| `BotTrading` | `DeadWaitMs` | `180000` | `DeadWaitMs` |
+| `BotTrading` | `FreshMs` | `60000` | `FreshMs` |
+| `BotTrading` | `GatherMs` | `300000` | `GatherMs` |
+| `BotTrading` | `GatherShunMs` | `1800000` | `GatherShunMs` |
+| `BotTrading` | `GatherYield` | `0.5` | `GatherYield` |
+| `BotTrading` | `HandMinutes` | `0.5` | *code only* |
+| `BotTrading` | `LeastCapital` | `60` | `LeastCapital` |
+| `BotTrading` | `LeastClaim` | `4.0` | `LeastClaim` |
+| `BotTrading` | `LeastMarkup` | `0.15` | `LeastMarkup` |
+| `BotTrading` | `LeastProfit` | `12` | `LeastProfit` |
+| `BotTrading` | `LookMs` | `20000` | `LookMs` |
+| `BotTrading` | `MostClaim` | `200.0` | `MostClaim` |
+| `BotTrading` | `MostHaulMs` | `2700000` | `MostHaulMs` |
+| `BotTrading` | `MostLooked` | `64` | `MostLooked` |
+| `BotTrading` | `MostMarkup` | `1.0` | `MostMarkup` |
+| `BotTrading` | `MostOrders` | `3` | `MostOrders` |
+| `BotTrading` | `MostUnits` | `80` | `MostUnits` |
+| `BotTrading` | `NearTiles` | `40` | `NearTiles` |
+| `BotTrading` | `NeutralInWars` | `true` | `NeutralInWars` |
+| `BotTrading` | `PocketFloat` | `100` | `PocketFloat` |
+| `BotTrading` | `PutAwayLeast` | `20` | `PutAwayLeast` |
+| `BotTrading` | `RestEarlyMinutes` | `180` | `RestEarlyMinutes` |
+| `BotTrading` | `RestShare` | `0.5` | `RestShare` |
+| `BotTrading` | `RoadDare` | `1.5` | `RoadDare` |
+| `BotTrading` | `RoadStep` | `32` | `RoadStep` |
+| `BotTrading` | `Running` | `true` | `Running` |
+| `BotTrading` | `SailWealth` | `12000` | `SailWealth` |
+| `BotTrading` | `Sails` | `true` | `Sails` |
+| `BotTrading` | `SayEveryMs` | `300000` | `SayEveryMs` |
+| `BotTrading` | `SellersMs` | `60000` | *code only* |
+| `BotTrading` | `ShunMs` | `600000` | `ShunMs` |
+
+## `BotTrades/`  —  `bot-trades.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotBorrow` | `EveryMs` | `1800000` | *code only* |
+| `BotBorrow` | `LeastPays` | `10.0` | *code only* |
+| `BotBorrow` | `LeastSettled` | `2` | *code only* |
+| `BotBorrow` | `Prior` | `40.0` | *code only* |
+| `BotBorrow` | `Reach` | `200` | *code only* |
+| `BotBorrow` | `WalkMs` | `300000` | *code only* |
+| `BotInfirmary` | `AwayMs` | `180000` | *code only* |
+| `BotInfirmary` | `ClaimWithinMs` | `30000` | *code only* |
+| `BotInfirmary` | `DemandHoldMs` | `90000` | *code only* |
+| `BotInfirmary` | `DemandMinutes` | `3.0` | *code only* |
+| `BotInfirmary` | `DemandMs` | `120000` | *code only* |
+| `BotInfirmary` | `DemandRestMs` | `120000` | *code only* |
+| `BotInfirmary` | `EveryMs` | `600000` | *code only* |
+| `BotInfirmary` | `FeeLeast` | `5` | *code only* |
+| `BotInfirmary` | `FeePerHit` | `0.5` | *code only* |
+| `BotInfirmary` | `HealTries` | `6` | *code only* |
+| `BotInfirmary` | `HurtUnder` | `0.7` | *code only* |
+| `BotInfirmary` | `HurtWorth` | `80.0` | *code only* |
+| `BotInfirmary` | `IdleMs` | `120000` | *code only* |
+| `BotInfirmary` | `KeeperReach` | `150` | *code only* |
+| `BotInfirmary` | `LeastBandages` | `10` | *code only* |
+| `BotInfirmary` | `MostWaiting` | `6` | *code only* |
+| `BotInfirmary` | `OnDemand` | `true` | *code only* |
+| `BotInfirmary` | `PatientReach` | `160` | *code only* |
+| `BotInfirmary` | `Prior` | `20.0` | *code only* |
+| `BotInfirmary` | `Prior` | `25.0` | *code only* |
+| `BotInfirmary` | `RaiseFee` | `60` | *code only* |
+| `BotInfirmary` | `RaiseHoldMs` | `180000` | *code only* |
+| `BotInfirmary` | `RaiseMarkup` | `1.25` | *code only* |
+| `BotInfirmary` | `RaiseReach` | `150` | *code only* |
+| `BotInfirmary` | `RestMs` | `1200000` | *code only* |
+| `BotInfirmary` | `Running` | `true` | *code only* |
+| `BotInfirmary` | `ScanMs` | `3000` | *code only* |
+| `BotInfirmary` | `ScrollKeep` | `100` | *code only* |
+| `BotInfirmary` | `SelfBindSkill` | `30.0` | *code only* |
+| `BotInfirmary` | `ShiftMinutes` | `20.0` | *code only* |
+| `BotInfirmary` | `SpareKeepers` | `true` | *code only* |
+| `BotInfirmary` | `TraceTrigger` | `true` | *code only* |
+| `BotInfirmary` | `WaitMs` | `180000` | *code only* |
+| `BotInfirmary` | `WalkMs` | `240000` | *code only* |
+| `BotLibrary` | `CountMs` | `15000` | *code only* |
+| `BotLibrary` | `DemandMs` | `60000` | *code only* |
+| `BotLibrary` | `EveryMs` | `300000` | *code only* |
+| `BotLibrary` | `KeeperReach` | `150` | *code only* |
+| `BotLibrary` | `LeastInscribe` | `50.0` | *code only* |
+| `BotLibrary` | `LeastScrolls` | `3` | *code only* |
+| `BotLibrary` | `LookMs` | `60000` | *code only* |
+| `BotLibrary` | `Markup` | `1.0` | *code only* |
+| `BotLibrary` | `Prior` | `16.0` | *code only* |
+| `BotLibrary` | `ReaderReach` | `150` | *code only* |
+| `BotLibrary` | `RestMs` | `1200000` | *code only* |
+| `BotLibrary` | `SellThrough` | `0.5` | *code only* |
+| `BotLibrary` | `ShiftMinutes` | `20.0` | *code only* |
+| `BotLibrary` | `StockScrolls` | `30` | *code only* |
+| `BotLibrary` | `WalkMs` | `240000` | *code only* |
+| `BotLibrary` | `WantWorth` | `8.0` | *code only* |
+| `BotLoans` | `CollectMs` | `60000` | *code only* |
+| `BotLoans` | `DefaultGuess` | `0.1` | *code only* |
+| `BotLoans` | `DefaultHours` | `4.0` | `DefaultHours` |
+| `BotLoans` | `Interest` | `0.2` | `LoanInterest` |
+| `BotLoans` | `Least` | `30` | *code only* |
+| `BotLoans` | `LeastSettled` | `5` | *code only* |
+| `BotLoans` | `LenderKeeps` | `800` | `LenderKeeps` |
+| `BotLoans` | `LenderWealth` | `1200` | `LenderWealth` |
+| `BotLoans` | `LienShare` | `0.5` | `LienShare` |
+| `BotLoans` | `MindsRisk` | `true` | *code only* |
+| `BotLoans` | `MostStanding` | `40` | *code only* |
+| `BotLoans` | `PerLender` | `5` | *code only* |
+| `BotLoans` | `PoorBar` | `100` | `PoorBar` |
+| `BotLoans` | `Sum` | `150` | `LoanSum` |
+| `BotRagman` | `CreatureMargin` | `4` | *code only* |
+| `BotRagman` | `EveryMs` | `600000` | *code only* |
+| `BotRagman` | `FarGain` | `60` | *code only* |
+| `BotRagman` | `Heavy` | `0.6` | *code only* |
+| `BotRagman` | `KeepPurse` | `150` | *code only* |
+| `BotRagman` | `KeeperReach` | `600` | *code only* |
+| `BotRagman` | `LeastLoad` | `40` | *code only* |
+| `BotRagman` | `LeastPurse` | `400` | *code only* |
+| `BotRagman` | `LeastTraffic` | `2` | *code only* |
+| `BotRagman` | `LookMs` | `30000` | *code only* |
+| `BotRagman` | `LookMs` | `60000` | *code only* |
+| `BotRagman` | `MostOpen` | `3` | *code only* |
+| `BotRagman` | `PostFar` | `80` | *code only* |
+| `BotRagman` | `PostMemoryMs` | `600000` | *code only* |
+| `BotRagman` | `PostNear` | `40` | *code only* |
+| `BotRagman` | `Prior` | `25.0` | *code only* |
+| `BotRagman` | `Reach` | `120` | *code only* |
+| `BotRagman` | `RestMs` | `1800000` | *code only* |
+| `BotRagman` | `SafeSlack` | `16` | *code only* |
+| `BotRagman` | `Share` | `0.6` | *code only* |
+| `BotRagman` | `ShiftMinutes` | `25.0` | *code only* |
+| `BotRagman` | `TrafficMs` | `60000` | *code only* |
+| `BotRagman` | `TrafficReach` | `200` | *code only* |
+| `BotRagman` | `UnsafeMs` | `1800000` | *code only* |
+| `BotRagman` | `WalkMs` | `240000` | *code only* |
+| `BotSupper` | `BoredFrom` | `0.3` | *code only* |
+| `BotSupper` | `EveryMs` | `2400000` | *code only* |
+| `BotSupper` | `HungryWorth` | `6.0` | *code only* |
+| `BotSupper` | `HurtUnder` | `0.8` | *code only* |
+| `BotSupper` | `HurtWorth` | `30.0` | *code only* |
+| `BotSupper` | `Prior` | `26.0` | *code only* |
+| `BotSupper` | `WearyFrom` | `0.4` | *code only* |
+| `BotTavern` | `CryMs` | `90000` | *code only* |
+| `BotTavern` | `Detour` | `60` | *code only* |
+| `BotTavern` | `GuestKeeps` | `100` | *code only* |
+| `BotTavern` | `GuestMinutes` | `5.0` | *code only* |
+| `BotTavern` | `GuestReach` | `100` | *code only* |
+| `BotTavern` | `KeeperReach` | `150` | *code only* |
+| `BotTavern` | `LeastMeals` | `4` | *code only* |
+| `BotTavern` | `LineMs` | `9000` | *code only* |
+| `BotTavern` | `Markup` | `1.0` | *code only* |
+| `BotTavern` | `MostGuests` | `8` | *code only* |
+| `BotTavern` | `MostOpen` | `6` | *code only* |
+| `BotTavern` | `RegenEveryMs` | `4000` | *code only* |
+| `BotTavern` | `RegenPoints` | `2` | *code only* |
+| `BotTavern` | `RestMs` | `1200000` | *code only* |
+| `BotTavern` | `RestShare` | `1.5` | *code only* |
+| `BotTavern` | `ShiftMinutes` | `20.0` | *code only* |
+| `BotTavern` | `Spacing` | `40` | *code only* |
+| `BotTavern` | `StockMeals` | `15` | *code only* |
+| `BotTavern` | `SupperBuff` | `1.5` | *code only* |
+| `BotTavern` | `SupperWalkMs` | `60000` | *code only* |
+| `BotTavern` | `SupperWindowMs` | `1800000` | *code only* |
+| `BotTavern` | `WalkMs` | `240000` | *code only* |
+| `BotTrades` | `Lenders` | `true` | `Lenders` |
+| `BotTrades` | `Libraries` | `true` | `Libraries` |
+| `BotTrades` | `Ragmen` | `true` | `Ragmen` |
+| `BotTrades` | `Running` | `true` | `Running` |
+| `BotTrades` | `Taverns` | `true` | `Taverns` |
+| `BotTradesModule` | `CryMs` | `30000` | *code only* |
+| `BotTradesModule` | `TickMs` | `1000` | *code only* |
+
+## `BotZones/`  —  `bot-zones.json`
+
+| class | dial | default | config key |
+|---|---|---|---|
+| `BotHaunts` | `MeasurePerBeat` | `2` | *code only* |
+| `BotHaunts` | `RepowerEvery` | `16` | *code only* |
+| `BotHaunts` | `ResurveyMs` | `1800000` | *code only* |
+| `BotHaunts` | `StaleMs` | `180000` | *code only* |
+| `BotHaunts` | `StripTiles` | `256` | *code only* |
+| `BotZoneMemory` | `File` | `"Data/bot-zones-seen.json"` | *code only* |
+| `BotZoneMemory` | `MostCells` | `80000` | *code only* |
+| `BotZoneMemory` | `Running` | `true` | `Memory` |
+| `BotZoneMemory` | `SaveEveryMs` | `600000` | `MemorySaveMs` |
+| `BotZoneRaster` | `Forgotten` | `0.05f` | *code only* |
+| `BotZoneRaster` | `HalfLifeMinutes` | `360` | `HalfLifeMinutes` |
+| `BotZoneRaster` | `MostWeight` | `64f` | *code only* |
+| `BotZoneScan` | `BudgetMs` | `0.6` | `ScanBudgetMs` |
+| `BotZoneScan` | `MostWindows` | `48` | `ScanMostWindows` |
+| `BotZoneScan` | `WindowSectors` | `8` | `ScanWindowSectors` |
+| `BotZoneTour` | `Bucket` | `60` | *code only* |
+| `BotZoneTour` | `FocusMs` | `2000` | `TourFocusMs` |
+| `BotZoneTour` | `GraceMs` | `30000` | `TourGraceMs` |
+| `BotZoneTour` | `HoldMs` | `75000` | `TourHoldMs` |
+| `BotZoneTour` | `Keeper` | `"Heimdall"` | `TourKeeper` |
+| `BotZoneTour` | `MostSectors` | `81` | `TourMostSectors` |
+| `BotZoneTour` | `MostWalkers` | `4` | `TourMostWalkers` |
+| `BotZoneTour` | `Reach` | `2` | `TourReach` |
+| `BotZoneTour` | `RefusedRestMs` | `600000` | *code only* |
+| `BotZoneTour` | `Running` | `true` | `Tour` |
+| `BotZoneTour` | `TickMs` | `1000` | *code only* |
+| `BotZoneWatch` | `AccuracyHoldMinutes` | `60` | `AccuracyHoldMinutes` |
+| `BotZoneWatch` | `AccuracyMinDeaths` | `100` | `AccuracyMinDeaths` |
+| `BotZoneWatch` | `AccuracyMinZones` | `200` | `AccuracyMinZones` |
+| `BotZoneWatch` | `AccuracyTarget` | `0.99` | `AccuracyTarget` |
+| `BotZoneWatch` | `AccuracyWindowHours` | `6` | `AccuracyWindowHours` |
+| `BotZoneWatch` | `AlarmMinDeaths` | `100` | `AlarmMinDeaths` |
+| `BotZoneWatch` | `AlarmWindowHours` | `12` | `AlarmWindowHours` |
+| `BotZoneWatch` | `File` | `"Data/bot-zones-accuracy.json"` | *code only* |
+| `BotZoneWatch` | `MostDeaths` | `50000` | *code only* |
+| `BotZoneWatch` | `RecheckMinutes` | `30` | *code only* |
+| `BotZoneWatch` | `RespawnGraceMinutes` | `30` | *code only* |
+| `BotZoneWatch` | `ResumeAfterMinutes` | `60` | `ResumeAfterMinutes` |
+| `BotZoneWatch` | `ResumeBelow` | `0.97` | `ResumeBelow` |
+| `BotZoneWatch` | `SaveEveryMs` | `300000` | *code only* |
+| `BotZones` | `AwakeGapMs` | `45000` | *code only* |
+| `BotZones` | `BuildLostMs` | `120000` | *code only* |
+| `BotZones` | `ClearLeastLive` | `3` | `ClearLeastLive` |
+| `BotZones` | `ClearMostPoints` | `32` | `ClearMostPoints` |
+| `BotZones` | `ConfidentSamples` | `60` | `ConfidentSamples` |
+| `BotZones` | `ConfidentSeconds` | `600` | `ConfidentSeconds` |
+| `BotZones` | `ConvergeTiles` | `20` | `ConvergeTiles` |
+| `BotZones` | `DeadlyVsBot` | `6.0` | `DeadlyVsBot` |
+| `BotZones` | `DeathsPromote` | `6` | `DeathsPromote` |
+| `BotZones` | `DeathsWindowHours` | `24` | `DeathsWindowHours` |
+| `BotZones` | `DeclaredMost` | `64` | `DeclaredMost` |
+| `BotZones` | `EmptyWeight` | `0.5` | `EmptyWeight` |
+| `BotZones` | `InlineRefreshMs` | `120000` | `InlineRefreshMs` |
+| `BotZones` | `JoinGap` | `8` | `JoinGap` |
+| `BotZones` | `JsonEveryMs` | `4000` | `JsonEveryMs` |
+| `BotZones` | `LiveRadius` | `4` | `LiveRadius` |
+| `BotZones` | `LooseRadius` | `12` | `LooseRadius` |
+| `BotZones` | `MostDeaths` | `20000` | *code only* |
+| `BotZones` | `MostKinds` | `8` | `MostKinds` |
+| `BotZones` | `MostPoints` | `64` | `MostPoints` |
+| `BotZones` | `MostRings` | `4` | `MostRings` |
+| `BotZones` | `ObservedLeast` | `0.5` | `ObservedLeast` |
+| `BotZones` | `ObservedMargin` | `1` | `ObservedMargin` |
+| `BotZones` | `ObservedSlack` | `8` | `ObservedSlack` |
+| `BotZones` | `ObservedWins` | `0.8` | `ObservedWins` |
+| `BotZones` | `OffLoop` | `true` | `OffLoop` |
+| `BotZones` | `OffLoopCores` | `4` | `OffLoopCores` |
+| `BotZones` | `PassiveRadius` | `8` | `PassiveRadius` |
+| `BotZones` | `PerceptionMost` | `20` | `PerceptionMost` |
+| `BotZones` | `ReferenceEveryMs` | `120000` | *code only* |
+| `BotZones` | `ReferenceFloor` | `1116` | *code only* |
+| `BotZones` | `RefreshMs` | `20000` | `RefreshMs` |
+| `BotZones` | `RootedReach` | `3` | `RootedReach` |
+| `BotZones` | `Running` | `true` | `Enabled` |
+| `BotZones` | `SeaMostPoints` | `16` | `SeaMostPoints` |
+| `BotZones` | `SimplifyTiles` | `2.0` | `SimplifyTiles` |
+| `BotZones` | `SmoothPasses` | `2` | `SmoothPasses` |
+| `BotZones` | `StrayBeyond` | `16` | `StrayBeyond` |
+| `BotZones` | `TickMs` | `250` | `TickMs` |
+| `BotZones` | `TownsClear` | `true` | `TownsClear` |
+| `BotZones` | `WaterCasterReach` | `12` | `WaterCasterReach` |
+| `BotZones` | `WaterGroup` | `40` | `WaterGroup` |
+| `BotZones` | `WaterMeleeReach` | `3` | `WaterMeleeReach` |
+| `BotZones` | `WaterRadius` | `8` | `WaterRadius` |
+| `BotZones` | `ZoneMostTiles` | `192` | `ZoneMostTiles` |
+| `BotZonesModule` | `SayEveryMs` | `300000` | *code only* |

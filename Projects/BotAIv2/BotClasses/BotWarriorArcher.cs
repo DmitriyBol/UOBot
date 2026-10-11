@@ -32,6 +32,12 @@ public sealed class BotWarriorArcher : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("marksman", null, 4, 56.0, 70.0, Weapon: true),
+            BotLeaning.Even(1)
+        ];
+
         Kit = new BotKit
         {
             Ranged = BotArsenal.BowOrCrossbow(75.0),

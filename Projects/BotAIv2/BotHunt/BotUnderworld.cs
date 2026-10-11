@@ -1073,7 +1073,7 @@ public static class BotUnderworld
             ? $"The Shadow is not founded ({Bandits()} of the {Math.Max(1, Founders)} bandits it wants)"
             : $"The Shadow, the enemy of every guild ({Enmities} set against it): {string.Join(", ", _members)}, hideout at ({_hideout.X}, {_hideout.Y}){(_hideoutKnown ? $", given away by {_givenAwayBy}" : "")}; founded {Founded} times, {Recruited} taken in, {Reformed} put back at a boot, {GivenAway} hideouts given away and {Burned} burned";
 
-        return $"{_sheets.Count} bots on record, {murderers} of them murderers and {unseen} killers from hiding, {extortions} demands paid on record, {Outcasts} walked out of their guilds for it; {guild}; {BotFence.Describe()}; {BotSilence.Describe()}; {BotLair.Describe()}; {BotStash.Describe()}; {Sweeps} sweeps for a walk out ({NoChest} found no chest, {Busy} members at the band's own business, {Light} carrying nothing worth the walk, {Unready} not free to go, {Sent} sent); {BotFetch.Describe()}; {BotRaid.Describe()}; {BotBurgle.Describe()}";
+        return $"{_sheets.Count} bots on record, {murderers} of them murderers and {unseen} killers from hiding, {extortions} demands paid on record, {Outcasts} walked out of their guilds for it; {guild}; {BotFence.Describe()}; {BotSilence.Describe()}; {BotLair.Describe()}; {BotStash.Describe()}; {Sweeps} sweeps for a walk out ({NoChest} found no chest, {Busy} members at the band's own business, {Light} carrying nothing worth the walk, {Unready} not free to go, {Sent} sent); {BotFetch.Describe()}; {BotRaid.Describe()}; {BotBurgle.Describe()}; {BotCrime.Describe()}";
     }
 
     internal static void Save(IGenericWriter writer)

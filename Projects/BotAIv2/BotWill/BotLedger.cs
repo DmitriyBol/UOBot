@@ -247,5 +247,22 @@ public sealed class BotLedger
         }
     }
 
+    public double Best(int least, out string kind)
+    {
+        kind = null;
+        var best = 0.0;
+
+        foreach (var (key, tally) in _tallies)
+        {
+            if (tally.Settled >= least && tally.Measured > best)
+            {
+                best = tally.Measured;
+                kind = key.Kind;
+            }
+        }
+
+        return best;
+    }
+
     public override string ToString() => $"{_tallies.Count} places remembered";
 }

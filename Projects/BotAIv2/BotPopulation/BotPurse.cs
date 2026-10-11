@@ -45,6 +45,111 @@ public static class BotPurse
 
     public static int Reach { get; set; } = 3;
 
+    public static bool BanksBeforeTrips { get; set; } = true;
+
+    public static int TripFloat { get; set; } = 50;
+
+    public static int TripLeast { get; set; } = 20;
+
+    public static int TripBankTiles { get; set; } = 40;
+
+    public static long TripBanks { get; private set; }
+
+    public static long TripGold { get; private set; }
+
+    public static long TripAfield { get; private set; }
+
+    public static long TripAfieldGold { get; private set; }
+
+    public static long TripNoBank { get; private set; }
+
+    public static int BeforeTrip(IBotWilful bot, BotDeed deed)
+    {
+        if (!BanksBeforeTrips || deed == null || bot?.Self is not BotMobile { Deleted: false, Alive: true } body
+            || body.Map is not { } map || map == Map.Internal || body.Backpack is not { } pack)
+        {
+            return 0;
+        }
+
+        if (body.Class is { Stipend: > 0 } || BotFence.Is(body) || BotTrading.Trader(body) || deed.Paperwork || deed.Standing)
+        {
+            return 0;
+        }
+
+        var keep = Math.Max(TripFloat, deed.Outlay);
+        var excess = pack.GetAmount(typeof(Gold)) - keep;
+
+        if (excess < Math.Max(1, TripLeast))
+        {
+            return 0;
+        }
+
+        var where = deed.Where;
+        var leaving = deed.Braves || deed.Kind == BotEnlist.Trade || where != Point3D.Zero && BotTowns.Of(where) == null;
+
+        if (!leaving)
+        {
+            return 0;
+        }
+
+        if (BotTowns.Of(body.Location) == null)
+        {
+            TripAfield++;
+            TripAfieldGold += excess;
+
+            return 0;
+        }
+
+        var banker = false;
+
+        foreach (var near in map.GetMobilesInRange<Banker>(body.Location, Math.Max(1, TripBankTiles)))
+        {
+            if (near is { Deleted: false })
+            {
+                banker = true;
+
+                break;
+            }
+        }
+
+        if (!banker)
+        {
+            TripNoBank++;
+
+            return 0;
+        }
+
+        if (!pack.ConsumeTotal(typeof(Gold), excess))
+        {
+            return 0;
+        }
+
+        if (!Banker.Deposit(body, excess))
+        {
+            pack.DropItem(new Gold(excess));
+
+            return 0;
+        }
+
+        TripBanks++;
+        TripGold += excess;
+
+        logger.Information(
+            "{Name} put {Gold}gp in the bank before setting out on {Kind}, keeping {Keep}",
+            body.Name,
+            excess,
+            deed.Kind,
+            keep
+        );
+
+        return excess;
+    }
+
+    public static string DescribeTrips() =>
+        !BanksBeforeTrips
+            ? "nothing is banked before a trip"
+            : $"{TripBanks} deposits worth {TripGold}gp made by bots setting out of town (keeping {TripFloat}gp), {TripAfield} trips begun out of town with {TripAfieldGold}gp over the purse, {TripNoBank} begun in a town with no banker within {TripBankTiles} tiles";
+
     public static long Banked { get; private set; }
 
     public static long Deposits { get; private set; }
@@ -53,9 +158,14 @@ public static class BotPurse
     {
         Banked = 0;
         Deposits = 0;
+        TripBanks = 0;
+        TripGold = 0;
+        TripAfield = 0;
+        TripAfieldGold = 0;
+        TripNoBank = 0;
     }
 
-    public static string Describe() => $"{Deposits} deposits worth {Banked}gp; {Wealthy()}; {BotYield.DescribeAside()}";
+    public static string Describe() => $"{Deposits} deposits worth {Banked}gp; {Wealthy()}; {BotYield.DescribeAside()}; {BotYield.DescribeDeaths()}; {BotUndertaker.Describe()}; before a trip: {DescribeTrips()}";
 
     public static string Wealthy()
     {

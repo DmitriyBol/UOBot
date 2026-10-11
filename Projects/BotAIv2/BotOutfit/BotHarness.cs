@@ -82,6 +82,25 @@ public static class BotHarness
 
         public int Cost { get; init; }
 
+        public Type Material { get; init; }
+
+        public int Units { get; init; }
+
+        public int PerUnit { get; init; }
+
+        public int Making()
+        {
+            if (Material == null || Units <= 0)
+            {
+                return Cost * 2;
+            }
+
+            var stand = Math.Max(1, PerUnit);
+            var unit = Math.Max(stand, BotMarket.Worth(Material, Math.Max(stand, BotShops.Lowest(Material))));
+
+            return (int)Math.Min(int.MaxValue, Math.Max((long)Cost, (long)Units * unit) * 2);
+        }
+
         public override string ToString() =>
             $"{Kind.Name} ({Rating:F0} armour × {Lasts} wear = {Absorbs:F0} damage stopped for {Cost}gp, {Craft} {Needs:F0})";
     }
@@ -194,7 +213,10 @@ public static class BotHarness
                         Female = armour.AllowFemaleWearer,
                         Craft = craft,
                         Needs = BotCraftwork.Requirement(recipe, craft),
-                        Cost = Math.Max(LeastCost, BotCraftwork.Cost(recipe) * perUnit)
+                        Cost = Math.Max(LeastCost, BotCraftwork.Cost(recipe) * perUnit),
+                        Material = material,
+                        Units = BotCraftwork.Cost(recipe),
+                        PerUnit = perUnit
                     }
                 );
             }

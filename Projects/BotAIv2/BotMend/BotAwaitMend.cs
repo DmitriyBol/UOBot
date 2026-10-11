@@ -91,10 +91,14 @@ public sealed class BotAwaitMend : BotDeed
 
         Asked++;
 
-        if (bot is not { Deleted: false, Alive: true, Hidden: false } || bot.Map != healer.Map || bot.InRange(healer.Location, Nearer))
+        var walking = bot is { Journey.Moving: true };
+
+        if (bot is not { Deleted: false, Alive: true, Hidden: false } || bot.Map != healer.Map || (!walking && bot.InRange(healer.Location, Nearer)))
         {
             return false;
         }
+
+        var near = walking && bot.InRange(healer.Location, Nearer);
 
         if (bot.Combatant != null || bot.Squad != null || BotMend.Embattled(bot))
         {
@@ -121,8 +125,15 @@ public sealed class BotAwaitMend : BotDeed
 
         Pressed++;
 
+        if (near)
+        {
+            PressedNear++;
+        }
+
         return true;
     }
+
+    public static long PressedNear { get; private set; }
 
     public override void Taken(IBotWilful bot) => _began = Core.TickCount;
 
@@ -174,5 +185,5 @@ public sealed class BotAwaitMend : BotDeed
     }
 
     public static string Describe() =>
-        $"{Pressed} patients of {Asked} asked stood still for their healer ({Whole} whole, {Forsaken} left when the healer went elsewhere, {Fought} broke off for a fight, {Outwaited} gave up after {MostMs / 1000}s)";
+        $"{Pressed} patients of {Asked} asked stood still for their healer ({PressedNear} of them walking within {Nearer} tiles of it; {Whole} whole, {Forsaken} left when the healer went elsewhere, {Fought} broke off for a fight, {Outwaited} gave up after {MostMs / 1000}s)";
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -98,6 +99,16 @@ public sealed class BotHomeward : BotDeed
     }
 
     public override string Stage => "going home";
+
+    public override bool Bend(IBotWilful bot)
+    {
+        if (bot?.Self is { } body && body.Map == _map && BotDungeon.Under(body.Location) && !BotDelveParty.Delving(body))
+        {
+            BotHomer.Sealed(body.Map, body.Location);
+        }
+
+        return false;
+    }
 }
 
 /// <summary>
@@ -156,13 +167,20 @@ public sealed class BotHomer : IBotProposer
             return null;
         }
 
+        var at = body.Location;
+
         if (body is BotMobile below && BotDungeon.Under(body.Location) && !BotDelveParty.Delving(body)
-            && !BotGates.Joined(body.Map, body.Location, hearth))
+            && (!BotGates.Joined(body.Map, body.Location, hearth) || WalledIn(body.Map, body.Location)))
         {
             if (BotPopulation.Carry(below))
             {
                 below.Journey?.Finish();
                 Surfaced++;
+
+                if (BotGates.Joined(below.Map, at, hearth))
+                {
+                    SurfacedSealed++;
+                }
 
                 logger.Information(
                     "{Name} was underground with no party to bring it up and no work for {Minutes:F1} minutes, and has been put back on the island at {Where}",
@@ -182,8 +200,61 @@ public sealed class BotHomer : IBotProposer
 
     public static long Surfaced { get; private set; }
 
+    public static long SurfacedSealed { get; private set; }
+
+    public static long SealedNoted { get; private set; }
+
+    public static int SealedReach { get; set; } = 12;
+
+    public static int SealedMs { get; set; } = 1800000;
+
+    private static readonly List<(Map Map, Point3D At, long Tick)> _sealed = [];
+
+    public static void Sealed(Map map, Point3D at)
+    {
+        var now = Core.TickCount;
+
+        for (var i = _sealed.Count - 1; i >= 0; i--)
+        {
+            var (m, p, t) = _sealed[i];
+
+            if (now - t >= SealedMs)
+            {
+                _sealed.RemoveAt(i);
+            }
+            else if (m == map && Utility.InRange(p, at, SealedReach))
+            {
+                _sealed[i] = (m, p, now);
+
+                return;
+            }
+        }
+
+        _sealed.Add((map, at, now));
+        SealedNoted++;
+    }
+
+    private static bool WalledIn(Map map, Point3D at)
+    {
+        var now = Core.TickCount;
+
+        for (var i = 0; i < _sealed.Count; i++)
+        {
+            var (m, p, t) = _sealed[i];
+
+            if (m == map && now - t < SealedMs && Utility.InRange(p, at, SealedReach))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static void Forget()
     {
+        SurfacedSealed = 0;
+        SealedNoted = 0;
         Asked = 0;
         Near = 0;
         Busy = 0;
@@ -194,5 +265,6 @@ public sealed class BotHomer : IBotProposer
     public static string Describe() =>
         $"{Asked} asked whether to go home: {Near} were already within {BotHomeward.Away} tiles of it, "
         + $"{Busy} were far but had not been out of work for {BotHomeward.BarrenFor:F1} minutes yet, {Sent} were sent back"
-        + $" and {Surfaced} were underground with no party and were brought up instead";
+        + $" and {Surfaced} were underground with no party and were brought up instead"
+        + $" ({SurfacedSealed} of them from a pocket where a walk home had been refused; {SealedNoted} such pockets noted)";
 }

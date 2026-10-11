@@ -41,6 +41,10 @@ public sealed class BotZone
 
     public bool Water { get; init; }
 
+    public bool Stray { get; init; }
+
+    public bool Event { get; init; }
+
     public int CenterX { get; init; }
 
     public int CenterY { get; init; }
@@ -78,6 +82,8 @@ public sealed class BotZone
     public double Threat { get; init; }
 
     public double VsBot { get; init; }
+
+    public double Declared { get; init; }
 
     public int DeclaredRange { get; init; }
 
@@ -131,6 +137,10 @@ public sealed class BotZoneState
 
     public ushort[] Cells { get; init; }
 
+    public ushort[] Fight { get; init; }
+
+    public const int FightUnit = 4;
+
     public BotZone[] Zones { get; init; } = [];
 
     public int NextId { get; init; }
@@ -158,6 +168,28 @@ public sealed class BotZoneState
     public int Kept { get; init; }
 
     public int Born { get; init; }
+
+    public int PaintedCells { get; init; }
+
+    public int LandZones { get; init; }
+
+    public int LandCoreCells { get; init; }
+
+    public int LandAggressive { get; init; }
+
+    public int StrayZones { get; init; }
+
+    public int GrownHaunts { get; init; }
+
+    public int EventZones { get; init; }
+
+    public int TrailCells { get; init; }
+
+    public BotZone Largest { get; init; }
+
+    public int TownsInside { get; init; }
+
+    public int GuardedKept { get; init; }
 
     public int DeathsDeadly { get; init; }
 

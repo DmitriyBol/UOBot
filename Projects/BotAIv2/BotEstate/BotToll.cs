@@ -127,6 +127,11 @@ public static class BotToll
             return 0.0;
         }
 
+        if (BotTrading.Neutral(payer))
+        {
+            return 0.0;
+        }
+
         var theirs = payer.Guild?.Name;
 
         if (theirs == holder)
@@ -209,6 +214,13 @@ public static class BotToll
 
     private static bool Exempted(string holder, Mobile payer)
     {
+        if (BotTrading.Neutral(payer))
+        {
+            BotTrading.Waive();
+
+            return true;
+        }
+
         var theirs = payer.Guild?.Name;
 
         return theirs != null && (BotWar.Of(holder, theirs) != null || BotUnderworld.Band(payer.Guild as Guild)
@@ -229,7 +241,7 @@ public static class BotToll
         {
             var one = list[i];
 
-            if (one is not { Deleted: false, Alive: true } || one.Map != from.Map || Warned(one, guild))
+            if (one is not { Deleted: false, Alive: true } || one.Map != from.Map || Warned(one, guild) || BotTrading.Neutral(one))
             {
                 continue;
             }

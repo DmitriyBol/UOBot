@@ -143,8 +143,379 @@ public static class BotOre
     public static bool CanWork(Mobile bot, double required) =>
         bot != null && bot.Skills[SkillName.Mining].Value >= required;
 
-    public static double Worth(Mobile bot, HarvestResource vein) =>
-        IsCommon(vein) || !CanWork(bot, vein.ReqSkill) ? 0.0 : vein.ReqSkill / 10.0;
+    public static double Worth(Mobile bot, Map map, int x, int y) => Premium(bot, VeinOf(map, x, y), null);
+
+    public static HarvestVein VeinOf(Map map, int x, int y)
+    {
+        var definition = Mining.System?.OreAndStone;
+
+        if (definition == null || map == null || map == Map.Internal)
+        {
+            return null;
+        }
+
+        return definition.GetVeinAt(map, x / definition.BankWidth, y / definition.BankHeight);
+    }
+
+    public static int Batch { get; set; } = 20;
+
+    public static double WorstPremium { get; set; } = -0.9;
+
+    public static int CounterMs { get; set; } = 600000;
+
+    private static readonly Dictionary<Type, Type> _ingots = [];
+
+    private static readonly Dictionary<Type, (int Price, long Tick)> _counters = [];
+
+    public static Type IngotOf(Type ore)
+    {
+        if (ore == null)
+        {
+            return null;
+        }
+
+        if (_ingots.TryGetValue(ore, out var known))
+        {
+            return known;
+        }
+
+        Type ingot = null;
+        var resource = CraftResources.GetFromType(ore);
+
+        if (resource != CraftResource.None && CraftResources.GetInfo(resource)?.ResourceTypes is { Length: > 0 } types
+            && typeof(BaseIngot).IsAssignableFrom(types[0]))
+        {
+            ingot = types[0];
+        }
+
+        _ingots[ore] = ingot;
+
+        return ingot;
+    }
+
+    public static int CounterPays(Type ingot)
+    {
+        if (ingot == null)
+        {
+            return 0;
+        }
+
+        var now = Core.TickCount;
+
+        if (_counters.TryGetValue(ingot, out var known) && now - known.Tick < CounterMs)
+        {
+            return known.Price;
+        }
+
+        var best = 0;
+        var shops = BotShops.Shops;
+
+        if (shops.Count == 0)
+        {
+            return 0;
+        }
+
+        var sample = ingot.CreateInstance<Item>();
+
+        if (sample != null)
+        {
+
+            for (var i = 0; i < shops.Count; i++)
+            {
+                if (BotShops.Buys(shops[i], sample, out var price) && price > best)
+                {
+                    best = price;
+                }
+            }
+
+            sample.Delete();
+        }
+
+        _counters[ingot] = (best, now);
+
+        return best;
+    }
+
+    public static double IngotWorth(Type ingot)
+    {
+        if (ingot == null)
+        {
+            return 1.0;
+        }
+
+        var batch = Math.Max(1, Batch);
+        var guess = ingot == typeof(IronIngot) ? BotDig.GoldPerIngot : Math.Max(1, BotAnvil.Reckon(ingot));
+        var bots = BotGlut.Yield(ingot, batch, guess) / (double)batch;
+
+        return Math.Max(1.0, Math.Max(CounterPays(ingot), bots));
+    }
+
+    public static double Premium(Mobile bot, HarvestVein vein, Type seen)
+    {
+        var metal = vein?.PrimaryResource;
+
+        if (bot == null || IsCommon(metal) || !CanWork(bot, metal.ReqSkill))
+        {
+            return 0.0;
+        }
+
+        var iron = IngotWorth(typeof(IronIngot));
+        var fallback = Math.Clamp(vein.ChanceToFallback, 0.0, 1.0);
+        var own = IngotWorth(IngotOf(metal.Types is { Length: > 0 } types ? types[0] : null));
+
+        if (seen != null && seen != typeof(IronIngot))
+        {
+            own = Math.Max(own, IngotWorth(seen));
+        }
+
+        var perBar = fallback * iron + (1.0 - fallback) * own;
+
+        return Math.Max(WorstPremium, perBar / iron - 1.0);
+    }
+
+    public static double Premium(Mobile bot, Map map, Point3D where, int seenRank)
+    {
+        Type seen = null;
+
+        if (seenRank > (int)CraftResource.Iron && CraftResources.GetInfo((CraftResource)seenRank)?.ResourceTypes is { Length: > 0 } types
+            && typeof(BaseIngot).IsAssignableFrom(types[0]))
+        {
+            seen = types[0];
+        }
+
+        return Premium(bot, VeinOf(map, where.X, where.Y), seen);
+    }
+
+    public static long Passed { get; private set; }
+
+    public static long ChoseIron { get; private set; }
+
+    public static long ChoseWanted { get; private set; }
+
+    public static long ChoseUnwanted { get; private set; }
+
+    public static void Chose(double premium, bool passed)
+    {
+        if (premium > 0.0)
+        {
+            ChoseWanted++;
+        }
+        else if (premium < 0.0)
+        {
+            ChoseUnwanted++;
+        }
+        else
+        {
+            ChoseIron++;
+        }
+
+        if (passed)
+        {
+            Passed++;
+        }
+    }
+
+    private static readonly Dictionary<Type, (long Smelted, long Peddled, long Sold, long Paid)> _bars = [];
+
+    public static void Smelted(Type ingot, int units) => Book(ingot, units, 0, 0, 0);
+
+    public static void Peddled(Type ingot, int units, int gold)
+    {
+        Book(ingot, 0, units, 0, gold);
+
+        if (Coloured(ingot) && gold > 0)
+        {
+            Purse();
+            _purse -= gold;
+            ColouredBars += Math.Max(0, units);
+            ColouredGold += gold;
+        }
+    }
+
+    public static void Sold(Type ingot, int units) => Book(ingot, 0, 0, units, 0);
+
+    private static void Book(Type kind, int smelted, int peddled, int sold, int paid)
+    {
+        if (kind == null || !typeof(BaseIngot).IsAssignableFrom(kind))
+        {
+            return;
+        }
+
+        var (s, p, b, g) = _bars.GetValueOrDefault(kind);
+        _bars[kind] = (s + Math.Max(0, smelted), p + Math.Max(0, peddled), b + Math.Max(0, sold), g + Math.Max(0, paid));
+    }
+
+    public static int ColouredPerHour { get; set; } = 10000;
+
+    public static int PurseHoldMs { get; set; } = 600000;
+
+    private static double _purse;
+
+    private static long _purseTick;
+
+    private static bool _pursePrimed;
+
+    private static readonly Dictionary<Serial, (int Gold, long Tick)> _held = [];
+
+    public static long ColouredBars { get; private set; }
+
+    public static long ColouredGold { get; private set; }
+
+    public static long PurseShut { get; private set; }
+
+    public static long PurseCut { get; private set; }
+
+    public static bool Coloured(Type kind) =>
+        kind != null && kind != typeof(IronIngot) && typeof(BaseIngot).IsAssignableFrom(kind);
+
+    private static double Purse()
+    {
+        var most = Math.Max(0, ColouredPerHour);
+        var now = Core.TickCount;
+
+        if (!_pursePrimed)
+        {
+            _pursePrimed = true;
+            _purse = most;
+            _purseTick = now;
+
+            return _purse;
+        }
+
+        var elapsed = now - _purseTick;
+
+        if (elapsed > 0)
+        {
+            _purse = Math.Min(most, _purse + elapsed * (most / 3600000.0));
+            _purseTick = now;
+        }
+
+        return _purse;
+    }
+
+    public static int CounterRoom(Mobile bot, Type kind, int price)
+    {
+        if (!Coloured(kind))
+        {
+            return int.MaxValue;
+        }
+
+        if (ColouredPerHour <= 0 || price <= 0 || bot == null)
+        {
+            return 0;
+        }
+
+        var free = Purse();
+        var now = Core.TickCount;
+
+        foreach (var (who, (gold, tick)) in _held)
+        {
+            if (who != bot.Serial && now - tick < PurseHoldMs)
+            {
+                free -= gold;
+            }
+        }
+
+        return free < price ? 0 : (int)(free / price);
+    }
+
+    public static void Hold(Mobile bot, Type kind, int gold, bool cut)
+    {
+        if (bot == null || !Coloured(kind))
+        {
+            return;
+        }
+
+        if (_held.Count > 512)
+        {
+            _held.Clear();
+        }
+
+        _held[bot.Serial] = (Math.Max(0, gold), Core.TickCount);
+
+        if (cut)
+        {
+            PurseCut++;
+        }
+    }
+
+    public static void Release(Mobile bot)
+    {
+        if (bot != null)
+        {
+            _held.Remove(bot.Serial);
+        }
+    }
+
+    public static void Shut() => PurseShut++;
+
+    private static string PurseLine()
+    {
+        if (ColouredPerHour <= 0)
+        {
+            return $"coloured bars to a shopkeeper: {ColouredBars} for {ColouredGold}gp since the load; not offered (the hourly purse is off)";
+        }
+
+        var held = 0;
+        var now = Core.TickCount;
+
+        foreach (var (_, (gold, tick)) in _held)
+        {
+            if (now - tick < PurseHoldMs)
+            {
+                held += gold;
+            }
+        }
+
+        return $"coloured bars to a shopkeeper: {ColouredBars} for {ColouredGold}gp since the load, at most {ColouredPerHour}gp an hour ({Math.Max(0, (int)Purse())}gp of it free now, {held}gp held by loads on their way); {PurseShut} coloured kinds not offered for a spent purse, {PurseCut} loads cut to what was left of it";
+    }
+
+    public static string Describe()
+    {
+        var say = new System.Text.StringBuilder();
+
+        say.Append(
+            $"ore: {ChoseIron + ChoseWanted + ChoseUnwanted} seams chosen, {ChoseIron} iron (or past the miner's skill), {ChoseWanted} a metal worth more than iron, {ChoseUnwanted} a metal worth less; {Passed} coloured veins passed for a metal nobody buys; bars smelted/to a shopkeeper/to a bot/the rest:"
+        );
+
+        var any = false;
+
+        foreach (var (kind, (smelted, peddled, sold, paid)) in _bars)
+        {
+            var name = kind.Name.EndsWith("Ingot", StringComparison.Ordinal) ? kind.Name[..^5] : kind.Name;
+
+            say.Append(
+                $" {name} {smelted}/{peddled}/{sold}/{smelted - peddled - sold} (worth {IngotWorth(kind):F1}gp, the counter pays {CounterPays(kind)}gp, {paid}gp paid),"
+            );
+            any = true;
+        }
+
+        if (!any)
+        {
+            say.Append(" none yet,");
+        }
+
+        say.Length--;
+        say.Append("; ").Append(PurseLine());
+
+        return say.ToString();
+    }
+
+    public static void Forget()
+    {
+        Passed = 0;
+        ChoseIron = 0;
+        ChoseWanted = 0;
+        ChoseUnwanted = 0;
+        _bars.Clear();
+        _counters.Clear();
+        ColouredBars = 0;
+        ColouredGold = 0;
+        PurseShut = 0;
+        PurseCut = 0;
+        _held.Clear();
+        _pursePrimed = false;
+    }
 
     public static string NameOf(HarvestResource vein)
     {
@@ -220,6 +591,7 @@ public static class BotOre
 
         IPoint3D nearest = null;
         IPoint3D richest = null;
+
         var bestWorth = 0.0;
 
         LastRocks = 0;
@@ -267,7 +639,7 @@ public static class BotOre
 
                     nearest ??= found;
 
-                    var worth = Worth(bot, VeinAt(map, found.X, found.Y));
+                    var worth = Worth(bot, map, found.X, found.Y);
 
                     if (worth <= bestWorth)
                     {

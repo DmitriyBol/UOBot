@@ -149,11 +149,31 @@ public static class BotPhrases
                 "Who has {item}? Coin waiting.",
                 "I will buy {item}, {amount} of them."
             ],
+            ["market:want"] =
+            [
+                "Buying {amount} {item} at {price} gold each. Bring them to me in {town}, coin on the spot.",
+                "Wanted: {amount} {item}, {price} apiece. Find me and I pay by hand.",
+                "Who has {item}? {amount} of them, {price} each, paid when you hand them over."
+            ],
+            ["market:raise"] =
+            [
+                "Still after {amount} {item} — {price} each now.",
+                "{item}, {amount} of them: I'll pay {price} apiece.",
+                "Nobody has brought me {item}. {price} gold each, then."
+            ],
+            ["market:bring"] =
+            [
+                "{buyer}, I have your {amount} {item} at {price} each. Coming to you.",
+                "On my way to {buyer} with {amount} {item}.",
+                "{buyer}, hold still — {amount} {item} for you."
+            ],
+            ["market:hand"] = ["Here you are, {buyer}: {amount} {item}.", "{amount} {item}, as asked, {buyer}.", "Count them, {buyer}. {amount} {item}."],
+            ["market:paid"] = ["{price} gold, as agreed. Thank you, {seller}.", "Good. Here is your {price}, {seller}.", "Just what I needed, {seller}. {price} gold."],
             ["shop:open"] =
             [
-                "Open for trade by the bank: {goods}.",
-                "Goods for sale here — {goods}.",
-                "Come and look: {goods}, no dearer than the shops in town."
+                "Open for trade by the bank in {town}: {goods}.",
+                "Goods for sale by the bank in {town} — {goods}.",
+                "Come and look, by the bank in {town}: {goods}, no dearer than the shops."
             ],
             ["shop:cry"] =
             [
@@ -205,6 +225,13 @@ public static class BotPhrases
                 "My purse is empty and so is my patience.",
                 "Something had better turn up."
             ],
+            ["mood:hurt"] = ["I am bleeding and I have nothing to bind it with.", "Every step hurts. I need a bandage.", "Hurt, and no healer in sight.", "Look at me. Half dead on my feet."],
+            ["mood:tired"] = ["I am done in. My legs will not carry me much further.", "Tired to the bone. A fire and a sit would do it.", "I could sleep standing up.", "Worn out. Somebody tell me where a fire is."],
+            ["mood:grieving"] = ["We lost one of ours. I keep seeing it.", "A friend is dead and I was not there.", "Grief is heavy and the road is long.", "Not today. We are burying somebody."],
+            ["mood:poor"] = ["Not a coin to my name. I need to kill something that pays.", "My purse is empty. Hunting is all that is left.", "Broke. Anyone hunting? I'll take a share.", "I cannot afford so much as a bandage."],
+            ["mood:lonely"] = ["Nobody to talk to for miles. I could use some company.", "Alone again. Anyone going anywhere?", "A company would be welcome. Any company.", "I miss having somebody at my back."],
+            ["mood:bored"] = ["Bored stiff. Give me something to do.", "Nothing pays around here and nothing moves.", "I would fight a tree for something to do.", "Something had better turn up, and soon."],
+            ["mood:proud"] = ["That went well. Very well, if I say so myself.", "Purse heavier, blade sharper. Good day.", "Did you see that? Nobody did. Shame.", "I am getting good at this."],
             ["war:declared"] =
             [
                 "{guild}: we are at war with {enemy}. To arms.",

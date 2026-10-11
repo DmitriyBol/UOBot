@@ -148,7 +148,7 @@ public static class BotRelocate
         BotResidence.Refresh();
     }
 
-    public static string[] StayHome { get; set; } = ["Baron", "Captain"];
+    public static string[] StayHome { get; set; } = ["Baron", "Captain", "Trader"];
 
     public static bool Pinned(BotMobile bot)
     {

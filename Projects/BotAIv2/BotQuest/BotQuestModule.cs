@@ -14,7 +14,7 @@ public sealed class BotQuestModule : BotModule
 
     public override BotPhase Phase => BotPhase.World;
 
-    public override string[] Requires => ["Will", "Auction", "Hunt"];
+    public override string[] Requires => ["Will", "Market", "Hunt"];
 
     public override void Start()
     {

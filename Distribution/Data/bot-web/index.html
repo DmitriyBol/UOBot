@@ -136,6 +136,14 @@ canvas.spark { width: 100%; height: 34px; display: block; margin-top: 4px; }
 #dangerBar .sw.dash { border-style: dashed; }
 #dangerBar b { color: var(--ink); font-weight: 600; }
 #dangerBar .note { margin-left: auto; color: var(--muted); }
+/* the reach map (/api/reach): a line under the danger line with the class filters, the counts, the check and the tile last asked about */
+#reachBar { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 5px 12px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--ink-2); align-items: center; }
+#reachBar .li { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+#reachBar .li.off { opacity: .35; text-decoration: line-through; }
+#reachBar .sw { width: 12px; height: 9px; border-radius: 2px; border: 1px solid transparent; }
+#reachBar b { color: var(--ink); font-weight: 600; }
+#reachBar .note { margin-left: auto; color: var(--muted); }
+#reachBar .tile { color: var(--ink); }
 #zoneDetail { flex: 0 1 auto; max-height: 42%; display: flex; flex-direction: column; min-height: 0; }
 #zoneDetail .card-b { overflow: auto; min-height: 0; }
 #zoneDetail h3 { margin: 10px 0 4px; }
@@ -173,6 +181,7 @@ canvas.spark { width: 100%; height: 34px; display: block; margin-top: 4px; }
 .ev.say.mood .txt { color: var(--ink-2); font-style: italic; }
 .ev.say.cry { border-left-color: var(--serious); }
 .ev.say.guild .k { color: var(--ink-2); }
+.ev.say.trade .k { color: var(--accent); }
 .ev.death { border-left-color: var(--crit); }
 .ev.alarm { border-left-color: var(--warn); }
 .ev.war { border-left-color: var(--serious); }
@@ -281,6 +290,46 @@ td .hp i.crit { background: var(--crit); }
 #detail .head { display: flex; align-items: center; gap: 8px; }
 #detail .head b { font-size: 15px; }
 .mini td, .mini th { padding: 3px 6px; font-size: 12px; }
+/* ---------- live window (/api/live, /api/debuggers) ---------- */
+#liveGrid { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.lvBox { border: 1px solid var(--border); border-radius: 8px; padding: 10px; min-width: 0; }
+.lvHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.lvHead b { font-size: 15px; }
+.lvBody { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); align-items: start; }
+#liveCanvas { width: 100%; max-width: 440px; aspect-ratio: 1 / 1; display: block; background: var(--map-bg); border-radius: 6px; border: 1px solid var(--border); }
+.lvBar { display: grid; grid-template-columns: 40px minmax(40px, 1fr) 84px; gap: 6px; align-items: center; font-size: 12px; margin: 2px 0; }
+.lvBar .bar { height: 7px; background: var(--surface-3); border-radius: 4px; overflow: hidden; }
+.lvBar .bar i { display: block; height: 100%; border-radius: 4px; }
+.lvBar .v { color: var(--ink-2); font-variant-numeric: tabular-nums; text-align: right; }
+.lvFlags { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0; }
+.lvLegend { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11px; color: var(--muted); margin-top: 6px; max-width: 440px; }
+.lvLegend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+/* the picture: the scene in the client's own pictures (/api/live/scene, /api/art, /api/anim) */
+.lvPicBar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; font-size: 12px; }
+.lvPicBar .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.lvPicBar .seg button { border: 0; border-radius: 0; }
+.lvPicBar .seg button.on { background: var(--accent); color: #fff; }
+#liveIso { width: 100%; aspect-ratio: 4 / 3; max-height: 72vh; display: block; background: #000; border-radius: 6px; border: 1px solid var(--border); touch-action: manipulation; }
+.lvBox.pic #liveFlat { display: none; }
+.lvBox:not(.pic) #liveIsoWrap { display: none; }
+#liveFeed { max-height: 340px; overflow: auto; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 4px; }
+.ev.log .k { color: var(--accent); }
+.ev.log .body { color: var(--ink-2); font-family: ui-monospace, Consolas, "Cascadia Mono", Menlo, monospace; font-size: 11.5px; }
+#liveDebuggers { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); align-items: start; min-width: 0; }
+.dbg { border: 1px solid var(--border); border-left: 4px solid var(--muted); border-radius: 8px; padding: 8px 10px; font-size: 12px; min-width: 0; }
+.dbg .t { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.dbg .t b { font-size: 13px; }
+.dbg .what { color: var(--ink-2); margin: 3px 0; overflow-wrap: anywhere; }
+.dbg .think { margin-top: 5px; padding: 5px 7px; background: var(--surface-2); border-radius: 6px; overflow-wrap: anywhere; }
+.dbg .think .q { color: var(--muted); font-size: 11.5px; }
+.dbg .think .a { color: var(--ink-2); font-size: 11.5px; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.dbg .think .a.open { display: block; }
+.dbg .asking { color: var(--warn); font-size: 11.5px; margin-top: 4px; overflow-wrap: anywhere; }
+.dbg .feed { margin-top: 5px; font-size: 11px; color: var(--muted); max-height: 120px; overflow: auto; }
+.dbg .feed div { overflow-wrap: anywhere; }
+.dbg .feed span { color: var(--ink-2); margin-right: 5px; font-variant-numeric: tabular-nums; }
+.dbg .cnt { color: var(--muted); font-size: 11px; margin-top: 4px; }
+a.subj { cursor: pointer; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -313,6 +362,14 @@ td .hp i.crit { background: var(--crit); }
       <div class="sub" id="tWorkSub">target 95 %</div>
       <canvas class="spark" id="spWork"></canvas>
     </div>
+    <div class="card tile" id="tileNeeds" style="cursor:pointer" title="Needs: the bots' wants on the board, each line judged once by its first hour: met in time, failed, or kept out (the buyer could not pay or took it back in its first 10 minutes). Target 99 %. Click for the lines.">
+      <div class="lbl">Needs met in the first hour</div>
+      <div class="val hero" id="tNeeds">–</div>
+      <div class="meter"><div class="fill" id="tNeedsFill" style="width:0"></div><div class="tgt" style="left:99%"></div></div>
+      <div class="sub" id="tNeedsSub">target 99 %</div>
+      <div class="sub" id="tNeedsWhy"></div>
+      <div class="sub" id="tNeedsHeld"></div>
+    </div>
     <div class="card tile" id="tileMoney" style="cursor:pointer" title="Coin the bots' work brought into their packs over the last hour; the special classes are left out. Click for the table.">
       <div class="lbl">Money earned</div>
       <div class="val"><span id="tCoin">–</span><small>gp / hour</small></div>
@@ -339,12 +396,6 @@ td .hp i.crit { background: var(--crit); }
       <div class="sub" id="tRouteSub">–</div>
       <div class="sub" id="tGraphSub">–</div>
     </div>
-    <div class="card tile">
-      <div class="lbl">Minds</div>
-      <div class="val"><span id="tAwake">–</span><small>awake</small></div>
-      <div class="sub"><span class="status"><span class="dot" id="mindDot" style="background:var(--muted)"></span><span id="mindReach">–</span></span> · <b id="mindModel">–</b></div>
-      <div class="sub"><span id="mindEndpoint">–</span> · last <b id="mindMs">–</b> · <b id="mindChoices">–</b> choices</div>
-    </div>
   </section>
 
   <div id="alarms"></div>
@@ -361,10 +412,13 @@ td .hp i.crit { background: var(--crit); }
       <span class="grp" id="layerBtns">
         <button data-layer="zones" class="on" title="Squares the guilds hold (BotClaim)">claims</button>
         <button data-layer="danger" class="on" title="Danger and safety round the mobs' spawns (/api/zones): the filled core is where they patrol, the dashed halo how far they see and come for a walker. Green clear (safe passage, hunting ground), yellow edge, orange hostile, red deadly for a bot. Hover or click a zone for its mobs">danger zones</button>
+        <button data-layer="reach" class="on" title="Where a walker from home can get to, tile by tile (/api/reach): isle — ground no walk reaches with a shore a ship could land at; pocket — ground nothing reaches; water — a ship's, never a walker's; blocked — nowhere to stand. No path is formed into any of them. Zoom in for single tiles; hover names a tile, a click asks the shard about it">reach</button>
         <button data-layer="halls" class="on">halls</button>
+        <button data-layer="houses" class="on" title="The bots' own houses (BotAbode): a small house with its owner's name; filled in the owner's class colour when the owner is at home">houses</button>
         <button data-layer="gates" class="on" title="Cave mouths and other teleporters the bots walk through (BotGates)">gates</button>
         <button data-layer="towns" class="on" title="Towns the bots can walk to (BotTowns)">towns</button>
         <button data-layer="shops" class="on" title="Bots keeping shop by a bank: keeper, what it holds, what it has sold (BotShopkeep)">shops</button>
+        <button data-layer="relics" class="on" title="Relics and banners (BotRelics): a gold diamond where each lies, with its holder; a town relic's lair dashed red with its warden">relics</button>
         <button data-layer="barred" class="on" title="Ground closed to the bots: standing bars, quarantines and killing fields (BotBarred)">barred</button>
         <button data-layer="roads" class="on" title="Roads between towns, drawn once somebody has walked them (BotRoadbook)">roads</button>
         <button data-layer="squads" class="on">squads</button>
@@ -378,6 +432,7 @@ td .hp i.crit { background: var(--crit); }
     </div>
     <div id="legend"></div>
     <div id="dangerBar" class="hidden"></div>
+    <div id="reachBar" class="hidden"></div>
     <div id="mapWrap">
       <canvas id="map"></canvas>
       <div id="mapNote" class="muted"></div>
@@ -391,7 +446,7 @@ td .hp i.crit { background: var(--crit); }
       <div class="card-b" id="zoneBody"></div>
     </section>
     <section id="detail" class="card hidden">
-      <div class="card-h"><h2>Bot</h2><span class="spacer" style="flex:1"></span><button id="btnCentre" title="Centre the map on this bot">centre</button><button id="btnClose">close</button></div>
+      <div class="card-h"><h2>Bot</h2><span class="spacer" style="flex:1"></span><button id="btnLive" title="Watch this bot live, once a second">live</button><button id="btnCentre" title="Centre the map on this bot">centre</button><button id="btnClose">close</button></div>
       <div class="card-b" id="detailBody"></div>
     </section>
     <section id="events" class="card">
@@ -419,10 +474,12 @@ td .hp i.crit { background: var(--crit); }
       <button data-tab="stuck">Stuck<span class="badge" id="bStuck">0</span></button>
       <button data-tab="paths">Paths</button>
       <button data-tab="work">Work</button>
+      <button data-tab="needs" title="The wants on the board and how they are met">Needs<span class="badge" id="bNeeds">0</span></button>
       <button data-tab="money">Money</button>
       <button data-tab="guilds">Guilds &amp; wars</button>
       <button data-tab="craft">Craft</button>
       <button data-tab="log">Log</button>
+      <button data-tab="live" title="One bot once a second, and what the debuggers are doing and thinking">Live</button>
     </div>
 
     <div class="pane on" data-pane="bots">
@@ -470,6 +527,23 @@ td .hp i.crit { background: var(--crit); }
       </div>
     </div>
 
+    <div class="pane" data-pane="needs">
+      <div class="toolbar"><span class="muted" id="needsNote"></span></div>
+      <div class="cols">
+        <div style="grid-column: span 2">
+          <h3>Open lines <span class="count" id="needsCount"></span></h3>
+          <div class="tblWrap"><table class="mini" id="needsTbl"><thead><tr><th>Line</th><th>Buyer</th><th>Wants</th><th class="num">Brought</th><th class="num">Of</th><th class="num">Offer gp</th><th class="num">Age</th><th class="num">Hands</th><th>For</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div>
+          <h3>Judged by the first hour</h3><div class="kv" id="needsTotals"></div>
+          <h3 style="margin-top:14px">Failed, by cause</h3><div class="kv" id="needsFailed"></div>
+          <h3 style="margin-top:14px">Kept out, by cause</h3><div class="kv" id="needsKept"></div>
+          <h3 style="margin-top:14px">Money held for wants</h3><div class="kv" id="needsHeld"></div>
+          <h3 style="margin-top:14px">Traders' own procurement</h3><div class="kv" id="needsProc"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="pane" data-pane="money">
       <div class="toolbar"><span class="muted" id="moneyNote"></span></div>
       <div class="cols">
@@ -508,6 +582,47 @@ td .hp i.crit { background: var(--crit); }
         <span class="sp"></span><span class="muted" id="logInfo"></span>
       </div>
       <pre id="logOut" class="mono"></pre>
+    </div>
+    <div class="pane" data-pane="live">
+      <div class="toolbar">
+        <input type="search" id="liveName" placeholder="bot name…" list="liveNames" autocomplete="off">
+        <datalist id="liveNames"></datalist>
+        <button id="liveGo" title="Watch this bot, once a second">watch</button>
+        <label title="Clicking a bot on the map or in the list watches it here"><input type="checkbox" id="liveFollowSel" checked> follow selection</label>
+        <span class="sp"></span>
+        <span class="muted" id="liveInfo"></span>
+      </div>
+      <div id="liveGrid">
+        <div class="lvBox">
+          <div class="lvHead" id="liveHead"></div>
+          <div class="lvPicBar">
+            <span class="seg"><button id="livePicOn" title="The bot's surroundings drawn with the game's own pictures, from the client's files">picture</button><button id="livePicOff" title="The flat scheme: radar colours and dots">scheme</button></span>
+            <span class="seg" id="liveZoomBox"><button id="liveZoomOut" title="zoom out">−</button><button id="liveZoomFit" title="fit the panel">fit</button><button id="liveZoomIn" title="zoom in">+</button></span>
+            <span class="muted" id="livePicInfo"></span>
+          </div>
+          <div id="liveIsoWrap"><canvas id="liveIso"></canvas></div>
+          <div class="lvBody">
+            <div id="liveFlat">
+              <canvas id="liveCanvas"></canvas>
+              <div class="lvLegend">
+                <span><i style="background:var(--s1)"></i>bot (by class)</span>
+                <span><i style="background:var(--crit)"></i>hostile monster</span>
+                <span><i style="background:var(--serious)"></i>aggressive</span>
+                <span><i style="background:var(--muted)"></i>passive</span>
+                <span><i style="background:var(--s3)"></i>animal</span>
+                <span><i style="background:#fab219"></i>vendor / npc</span>
+                <span>ring: hostile to the bot · red line: its combatant · dashed: its target · dotted: its route · ×: corpse · ▲: fire · □: its shop</span>
+              </div>
+            </div>
+            <div id="liveState"></div>
+          </div>
+          <div id="liveFeed"></div>
+        </div>
+        <div>
+          <h3>Debuggers</h3>
+          <div id="liveDebuggers"></div>
+        </div>
+      </div>
     </div>
   </section>
 </div>
@@ -573,15 +688,15 @@ const colorOfFamily = f => { const i = FAMILIES.indexOf(f); return i >= 0 && i <
 const colorOfClass = c => colorOfFamily(familyOf(c));
 
 // ================================================================ state
-const EV_KINDS = ['say', 'work', 'path', 'death', 'war', 'alarm', 'market', 'craft'];
-const EV_CHANNELS = ['world', 'guild', 'local', 'mood', 'cry'];
+const EV_KINDS = ['say', 'work', 'path', 'death', 'war', 'alarm', 'market', 'craft', 'event'];
+const EV_CHANNELS = ['world', 'trade', 'guild', 'local', 'mood', 'cry'];
 const S = {
   state: null, bots: [], botByName: new Map(), paths: null, history: null, craft: null, roads: null,
   events: [], lastSeq: 0, seen: new Set(),
   selected: null, detail: null, follow: false,
   conn: 'polling', lostSince: null, lastOk: 0,
   hidden: new Set(), tab: 'bots',
-  layers: { zones: true, halls: true, gates: true, towns: true, barred: true, roads: true, squads: true, hot: true, routes: false, names: false, grid: true },
+  layers: { zones: true, halls: true, houses: true, gates: true, towns: true, barred: true, roads: true, squads: true, hot: true, routes: false, names: false, grid: true },
   sort: { key: 'name', dir: 1 }, filters: { q: '', cls: '', standing: '', work: '', guild: '', stuckOnly: false },
   evKinds: new Set(EV_KINDS), evChannels: new Set(EV_CHANNELS), evPaused: false, evPending: 0,
   evCounts: {},
@@ -647,6 +762,7 @@ function applyState(st) {
   renderMoney(st);
   updateFilterOptions(st);
   updateDetailFromState();
+  lvNames();
   map.dirty = true;
 }
 
@@ -696,7 +812,7 @@ function renderPurposes(pa) {
   barList($('#pPurpose'), rows.map(r => ({ label: r.purpose, value: isNum(r.share) ? r.share : 0, cls: meterClass(r.share, 0.99), sub: r.searches !== null ? `${fmtInt(r.reached)}/${fmtInt(r.searches)}` : '' })), { max: 1, target: 0.99, fmt: v => fmtPct(v) });
 }
 function renderTiles(st) {
-  const p = st.population || {}, w = st.work || {}, pa = st.paths || {}, m = st.minds || {};
+  const p = st.population || {}, w = st.work || {}, pa = st.paths || {};
   $('#tAlive').textContent = fmtInt(p.alive);
   $('#tAliveOf').textContent = `of ${fmtInt(p.total)}`;
   $('#tAliveSub').textContent = `${fmtInt(p.dead)} dead${isNum(p.offline) && p.offline ? ` · ${fmtInt(p.offline)} offline` : ''}`;
@@ -704,7 +820,7 @@ function renderTiles(st) {
   $('#tWork').textContent = fmtPct(w.share);
   $('#tWorkFill').style.width = isNum(w.share) ? (Math.min(1, w.share) * 100) + '%' : '0';
   $('#tWorkFill').className = 'fill ' + meterClass(w.share, 0.95);
-  $('#tWorkSub').replaceChildren('target 95 % · ', el('b', { text: fmtInt(w.finished) }), ` finished · ${fmtInt(w.failed)} failed · ${fmtInt(w.dropped)} dropped · ${fmtInt(w.died)} died`);
+  $('#tWorkSub').replaceChildren('target 95 % · ', el('b', { text: `with deaths ${fmtPct(w.shareWithDeaths)}` }), ' · ', el('b', { text: fmtInt(w.finished) }), ` finished · ${fmtInt(w.failed)} failed · ${fmtInt(w.dropped)} dropped · ${fmtInt(w.died)} died`);
 
   // The headline is the journeys by purpose (fixed, chase, flight, station): did the walk get where it was going. The raw
   // count of every search includes the walker's re-plans beside a moving target, most of which end partial by design
@@ -729,16 +845,56 @@ function renderTiles(st) {
   $('#tRouteSub').textContent = `${fmtInt(r.direct)} direct · ${fmtInt(r.unreachable)} unreachable · ${fmtInt(r.unplaced)} unplaced · ${fmtInt(r.overBudget)} over budget`;
   $('#tGraphSub').textContent = `graph ${g.complete === true ? 'complete' : g.complete === false ? 'incomplete' : '–'} · ${fmtInt(g.nodes)} nodes · ${fmtInt(g.components)} components`;
 
-  $('#tAwake').textContent = fmtInt(m.awake);
-  $('#mindReach').textContent = m.reachable === true ? 'reachable' : m.reachable === false ? 'unreachable' : 'unknown';
-  $('#mindDot').style.background = m.reachable === true ? 'var(--good)' : m.reachable === false ? 'var(--crit)' : 'var(--muted)';
-  $('#mindModel').textContent = str(m.model) || '–';
-  $('#mindEndpoint').textContent = str(m.endpoint) || '–';
-  $('#mindMs').textContent = isNum(m.lastMs) ? fmtInt(m.lastMs) + ' ms' : '–';
-  $('#mindChoices').textContent = fmtInt(m.choices);
+  renderNeedsTile(st.needs || {});
   $('#bBots').textContent = fmtInt(S.bots.length);
   const bs = $('#bStuck'); bs.textContent = fmtInt(stuck.length); bs.classList.toggle('warn', stuck.length > 0);
 }
+// Needs: every want is a line judged once by its first hour (BotLines, build 391). The share is met in time over everything
+// judged; a line the buyer could not pay or took back in its first 10 minutes is kept out of it (02.10.2026, Patrick: "replace
+// the Minds window with a Needs window; there we will watch the wants and how they are met, the plan is 99 %").
+const fmtMin = v => isNum(v) ? (v < 10 ? v.toFixed(1) : fmtInt(v)) + ' min' : '–';
+const topCauses = (o, n) => Object.entries(o && typeof o === 'object' ? o : {}).filter(([, v]) => isNum(v) && v > 0).sort((a, b) => b[1] - a[1]).slice(0, n);
+function renderNeedsTile(n) {
+  $('#tNeeds').textContent = fmtPct(n.share);
+  $('#tNeedsFill').style.width = isNum(n.share) ? (Math.min(1, n.share) * 100) + '%' : '0';
+  $('#tNeedsFill').className = 'fill ' + meterClass(n.share, 0.99);
+  $('#tNeedsSub').replaceChildren('target 99 % · ', el('b', { text: fmtInt(n.met) }), ` met${n.metJoint ? ` (${fmtInt(n.metJoint)} jointly)` : ''} · `,
+    el('b', { class: n.failed ? 'crit' : null, text: fmtInt(n.failed) }), ` failed · ${fmtInt(n.keptOut)} kept out · ${fmtInt(n.open)} open, ${fmtInt(n.openPastHalf)} past 30 min · median ${fmtMin(n.medianMin)}, 90 % by ${fmtMin(n.p90Min)}`);
+  const why = topCauses(n.failedBy, 2);
+  $('#tNeedsWhy').textContent = why.length ? 'failed: ' + why.map(([k, v]) => `${k} ${v}`).join(' · ') : 'no line failed in its hour';
+  const r = n.reserve || {};
+  $('#tNeedsHeld').textContent = `${fmtGold(r.gold)} gp held for ${fmtInt(r.wants)} wants of ${fmtInt(r.buyers)} buyers`;
+  $('#bNeeds').textContent = fmtInt(n.open);
+  if (S.tab === 'needs') renderNeeds(n);
+}
+function renderNeeds(n) {
+  const lines = (Array.isArray(n.lines) ? n.lines : []).filter(l => l && typeof l === 'object').slice().sort((a, b) => (b.ageMin || 0) - (a.ageMin || 0));
+  $('#needsCount').textContent = `(${lines.length}${isNum(n.open) && n.open > lines.length ? ` oldest of ${fmtInt(n.open)}` : ''}; oldest first; past 30 min amber, past an hour red)`;
+  $('#needsNote').textContent = `lines judged by their first ${fmtInt(n.windowMin)} minutes · ${fmtInt(n.opened)} opened this session, ${fmtInt(n.restored)} read back from the save`;
+  $('#needsTbl tbody').replaceChildren(...lines.map(l => {
+    const age = isNum(l.ageMin) ? l.ageMin : 0;
+    const tone = age >= 60 ? 'color:var(--crit)' : age >= 30 ? 'color:var(--warn)' : null;
+    return el('tr', {},
+      el('td', { class: 'num', text: str(l.line) }),
+      el('td', {}, el('span', { text: str(l.buyer), style: 'cursor:pointer;color:var(--ink-2)', onclick: () => selectBot(l.buyer) })),
+      el('td', { text: str(l.kind) }),
+      el('td', { class: 'num', text: fmtInt(l.filled) }),
+      el('td', { class: 'num', text: fmtInt(l.units) }),
+      el('td', { class: 'num', text: fmtInt(l.offer) }),
+      el('td', { class: 'num', style: tone, text: fmtMin(l.ageMin) }),
+      el('td', { class: 'num', text: fmtInt(l.hands) }),
+      el('td', { class: 'muted', text: l.procurement ? "a trader's stock" : str(l.state) }));
+  }));
+  $('#needsTotals').replaceChildren(...kvRows({ 'met in the hour': fmtPct(n.share), 'met': fmtInt(n.met), 'of them jointly': fmtInt(n.metJoint), 'failed': fmtInt(n.failed), 'met late': fmtInt(n.metLate), 'kept out': fmtInt(n.keptOut), 'open now': fmtInt(n.open), 'open past 30 min': fmtInt(n.openPastHalf), 'median to met': fmtMin(n.medianMin), '90 % met by': fmtMin(n.p90Min) }));
+  const kv = o => { const e = topCauses(o, 12); return e.length ? kvRows(Object.fromEntries(e.map(([k, v]) => [k, fmtInt(v)]))) : kvRows({ none: '–' }); };
+  $('#needsFailed').replaceChildren(...kv(n.failedBy));
+  $('#needsKept').replaceChildren(...kv(n.keptOutBy));
+  const r = n.reserve || {};
+  $('#needsHeld').replaceChildren(...kvRows({ 'gold held': fmtGold(r.gold), 'buyers': fmtInt(r.buyers), 'wants': fmtInt(r.wants), 'kept through a death': fmtInt(r.keptThroughDeath), 'raises held': fmtInt(r.raisesHeld), 'payments refused for held money': fmtInt(r.chargesRefused), 'could not pay': fmtInt(r.unpaid), 'could not pay after a death': fmtInt(r.unpaidAfterDeath) }));
+  const pr = n.procurement || {};
+  $('#needsProc').replaceChildren(...kvRows({ opened: fmtInt(pr.opened), met: fmtInt(pr.met), failed: fmtInt(pr.failed), 'kept out': fmtInt(pr.keptOut) }));
+}
+
 function renderAlarms(st) {
   const list = Array.isArray(st.alarms) ? st.alarms.filter(a => a && typeof a === 'object') : [];
   const last = new Map();
@@ -868,6 +1024,17 @@ function drawTownHouse(ctx, sx, sy, size, abbr, col) {
   if (abbr) { ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.lineWidth = 3; ctx.strokeStyle = CSS.surface; ctx.strokeText(abbr, sx, sy + size * 0.6); ctx.fillStyle = CSS.ink; ctx.fillText(abbr, sx, sy + size * 0.6); }
   ctx.restore();
 }
+// a bot's own house: a small roofed house like a hall's, the owner's class colour on the walls while the owner is at home
+function drawAbode(ctx, sx, sy, a, named) {
+  const col = colorOfClass(a.class), size = 9;
+  ctx.save();
+  ctx.lineWidth = 1.5; ctx.strokeStyle = a.alive === false ? CSS.muted : CSS.ink2; ctx.fillStyle = a.home ? col : CSS.surface;
+  ctx.beginPath(); ctx.rect(sx - size / 2, sy - size * 0.2, size, size * 0.7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.moveTo(sx - size * 0.65, sy - size * 0.2); ctx.lineTo(sx, sy - size * 0.75); ctx.lineTo(sx + size * 0.65, sy - size * 0.2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  if (named) haloText(ctx, str(a.owner), sx, sy + size * 0.95, a.alive === false ? CSS.muted : CSS.ink, '10px system-ui', 'center');
+  ctx.restore();
+}
 function haloText(ctx, text, x, y, color, font, align) {
   ctx.font = font || '11px system-ui'; ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
   ctx.lineWidth = 3; ctx.strokeStyle = CSS.surface; ctx.strokeText(text, x, y); ctx.fillStyle = color || CSS.ink; ctx.fillText(text, x, y);
@@ -897,6 +1064,8 @@ function drawMap(now) {
   }
   ctx.strokeStyle = CSS.axis; ctx.lineWidth = 1; ctx.strokeRect(Math.round(ox) + .5, Math.round(oy) + .5, Math.round(ww), Math.round(wh));
   const st = S.state || {};
+  // the reach map first, over the picture of the ground: what a walker can and cannot get to (see drawReach)
+  drawReach(ctx);
   // danger zones under everything else: the cached fills of the mobs' patrol and aggro areas (see drawDangerZones)
   drawDangerZones(ctx);
   // hot failed-path bins (32 tiles)
@@ -993,6 +1162,37 @@ function drawMap(now) {
     }
     ctx.globalAlpha = 1;
   }
+  // relics and banners (BotRelics, 07.10.2026): a gold diamond where each lies in the world — on a hall's floor, in a carrier's or a
+  // thief's pack, in a lair's chest — named with its holder; the lair standing dashed red with its warden. A relic kept out of the
+  // world (hidden, or kept by a guild with no hall) has no pin. The layer's flag starts on here, as the shops' does.
+  if (S.layers.relics === undefined) S.layers.relics = true;
+  if (S.layers.relics && st.relics) {
+    const lair = st.relics.lair;
+    if (lair && isNum(lair.x) && isNum(lair.y)) {
+      const [lx, ly] = toS(lair.x, lair.y);
+      const lr = Math.max(8, 20 * k);
+      ctx.save(); ctx.globalAlpha = 0.9; ctx.strokeStyle = CSS.crit; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.arc(lx, ly, lr, 0, 7); ctx.stroke(); ctx.restore();
+      haloText(ctx, `lair · ${str(lair.relic)}${lair.warden ? ' · ' + str(lair.warden) : ''}${isNum(lair.leftMin) ? ' · ' + lair.leftMin + ' min' : ''}`, lx, ly - lr - 6, CSS.crit, 'bold 10px system-ui', 'center');
+    }
+    if (Array.isArray(st.relics.list)) {
+      const r = Math.max(4, Math.min(7, 2.5 * k));
+      for (const rl of st.relics.list) {
+        if (!rl || !isNum(rl.x) || !isNum(rl.y) || rl.place === 'Lair') continue;
+        const [sx, sy] = toS(rl.x, rl.y);
+        if (sx < -60 || sy < -20 || sx > w + 60 || sy > h + 20) continue;
+        const banner = rl.kind === 'banner', trophy = banner && rl.guild && rl.of && rl.guild !== rl.of;
+        ctx.globalAlpha = 0.95; ctx.fillStyle = banner && !trophy ? CSS.ink2 : CSS.warn;
+        ctx.beginPath(); ctx.moveTo(sx, sy - r); ctx.lineTo(sx + r, sy); ctx.lineTo(sx, sy + r); ctx.lineTo(sx - r, sy); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = rl.place === 'Stolen' ? CSS.crit : CSS.ink; ctx.lineWidth = 1; ctx.stroke();
+        if (!banner || trophy || k >= 0.5) {
+          const who = rl.place === 'Stolen' ? `stolen by ${str(rl.holder)}` : rl.place === 'Carried' ? `carried by ${str(rl.holder)}` : str(rl.holder);
+          haloText(ctx, `${str(rl.name)} · ${who}`, sx + r + 3, sy, CSS.ink, (banner ? '' : 'bold ') + '10px system-ui', 'left');
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
   // barred ground: standing bars (solid amber), quarantines (dashed) and killing fields (dashed red, with the dead and the minutes left)
   if (S.layers.barred && Array.isArray(st.barred)) {
     for (const b of st.barred) {
@@ -1035,6 +1235,18 @@ function drawMap(now) {
       if (hall) { const [sx, sy] = toS(hall[0], hall[1]); if (near(sx, sy)) drawHouse(ctx, sx, sy, 12, str(g.abbr)); }
       if (house) { const [sx, sy] = toS(house[0], house[1]); if (near(sx, sy)) drawTownHouse(ctx, sx, sy, 10, hall ? '' : str(g.abbr), colorOfGuild(g.name)); }
       if (!hall && !house && seat) { const [sx, sy] = toS(seat[0], seat[1]); if (near(sx, sy)) { ctx.save(); ctx.globalAlpha = 0.8; ctx.setLineDash([3, 3]); ctx.strokeStyle = colorOfGuild(g.name); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy, 7, 0, 7); ctx.stroke(); ctx.restore(); haloText(ctx, str(g.abbr), sx, sy + 12, CSS.ink, 'bold 10px system-ui', 'center'); } }
+    }
+  }
+  // the bots' own houses (BotAbode, 07.10.2026): a small house where each stands, the owner's name beside it once the map is
+  // close enough; the walls take the owner's class colour while the owner is inside, and go grey when the owner is dead.
+  // The name from k >= 0.5, the bots' own threshold (07.10.2026, review of build 424): at 0.35, about three tiles a pixel,
+  // houses clustered by a town overlapped their names.
+  if (S.layers.houses && Array.isArray(st.abodes)) {
+    for (const a of st.abodes) {
+      if (!a || !isNum(a.x) || !isNum(a.y)) continue;
+      const [sx, sy] = toS(a.x, a.y);
+      if (sx < -20 || sy < -20 || sx > w + 20 || sy > h + 20) continue;
+      drawAbode(ctx, sx, sy, a, k >= 0.5 || S.layers.names);
     }
   }
   // the danger zone under the pointer and the selected one, outlined above the roads and under the bots
@@ -1109,6 +1321,13 @@ function hitTest(sx, sy) {
   let best = null, bd = 100; // 10px
   for (const b of S.bots) { if (!botVisible(b)) continue; const [bx, by] = toS(b.x, b.y); const d = (bx - sx) ** 2 + (by - sy) ** 2; if (d < bd) { bd = d; best = { kind: 'bot', bot: b }; } }
   if (best) return best;
+  // the houses before the halls (07.10.2026, review of build 424): they are drawn over the halls, so the one on top answers
+  if (S.layers.houses && S.state && Array.isArray(S.state.abodes)) {
+    for (const a of S.state.abodes) {
+      if (!a || !isNum(a.x) || !isNum(a.y)) continue; const [ax, ay] = toS(a.x, a.y);
+      if (Math.abs(ax - sx) < 8 && Math.abs(ay - sy) < 8) return { kind: 'abode', abode: a, at: [a.x, a.y] };
+    }
+  }
   const gs = S.state && Array.isArray(S.state.guilds) ? S.state.guilds : [];
   for (const g of gs) {
     if (!g) continue;
@@ -1139,6 +1358,13 @@ function guildTipRows(g, what) {
   rows.push(['muted', `${g.hall ? 'hall' : 'no hall'} · ${Array.isArray(g.squares) ? g.squares.length : 0} squares held`]);
   return rows;
 }
+// a bot's own house: whose, what size, whether the owner is in — and the owner's guild and class
+function abodeTipRows(a) {
+  const rows = [['b', str(a.sign) || str(a.owner) + "'s house"], ['muted', `${str(a.kind)} · ${a.home ? 'the owner is at home' : a.alive === false ? 'the owner is dead' : 'the owner is away'}`]];
+  rows.push(['ink2', `${str(a.owner)} · ${str(a.class)}${a.guild ? ' · ' + str(a.guild) : ' · no guild'}`]);
+  rows.push(['muted', `(${a.x}, ${a.y}) ${str(a.map)} — click to centre; click the owner's dot to follow`]);
+  return rows;
+}
 function botTipRows(b) {
   const rows = [['b', str(b.name)], ['muted', `${str(b.class)}${b.guild ? ' · ' + str(b.guild) : ''}${b.minded ? ' · minded' : ''}${b.offline ? ' · resting' : b.alive === false ? ' · dead' : ''}`]];
   rows.push(['ink2', `${str(b.work) || 'no work'}${b.standing ? ' · ' + str(b.standing) : ''}`]);
@@ -1162,13 +1388,14 @@ function botTipRows(b) {
     map.hover = hv; c.classList.toggle('hover', !!hv); map.dirty = true;
     if (hv && hv.kind === 'bot') showTip(e.clientX, e.clientY, botTipRows(hv.bot));
     else if (hv && hv.kind === 'hall') showTip(e.clientX, e.clientY, guildTipRows(hv.guild, hv.what));
+    else if (hv && hv.kind === 'abode') showTip(e.clientX, e.clientY, abodeTipRows(hv.abode));
     else if (hv && (hv.kind === 'zone' || hv.kind === 'walker')) showTip(e.clientX, e.clientY, dangerTipRows(hv, sx, sy));
-    else { const [wx, wy] = toW(sx, sy); showTip(e.clientX, e.clientY, [['muted', `(${Math.round(wx)}, ${Math.round(wy)})`]]); }
+    else { const [wx, wy] = toW(sx, sy); showTip(e.clientX, e.clientY, [['muted', `(${Math.floor(wx)}, ${Math.floor(wy)})`], ...reachTipRows(wx, wy)]); }
   });
   const end = e => {
     if (!map.drag) return;
     const moved = map.drag.moved; map.drag = null; c.classList.remove('dragging');
-    if (!moved) { const r = c.getBoundingClientRect(); const hv = hitTest(e.clientX - r.left, e.clientY - r.top); if (hv && hv.kind === 'bot') selectBot(hv.bot.name); else if (hv && hv.kind === 'hall') { const p = hv.at; if (p) centreOn(p[0], p[1], Math.max(map.k, map.fitK * 4)); } else if (hv && hv.kind === 'zone') selectZone(hv.zone.id); else if (hv && hv.kind === 'walker') { if (hv.zone) selectZone(hv.zone.id); } else { selectBot(null); selectZone(null); } }
+    if (!moved) { const r = c.getBoundingClientRect(); const hv = hitTest(e.clientX - r.left, e.clientY - r.top); if (hv && hv.kind === 'bot') selectBot(hv.bot.name); else if (hv && (hv.kind === 'hall' || hv.kind === 'abode')) { const p = hv.at; if (p) centreOn(p[0], p[1], Math.max(map.k, map.fitK * 4)); } else if (hv && hv.kind === 'zone') selectZone(hv.zone.id); else if (hv && hv.kind === 'walker') { if (hv.zone) selectZone(hv.zone.id); } else { selectBot(null); selectZone(null); if (S.layers.reach) { const [wx, wy] = toW(e.clientX - r.left, e.clientY - r.top); rmAsk(wx, wy); } } }
   };
   c.addEventListener('pointerup', end); c.addEventListener('pointercancel', () => { map.drag = null; c.classList.remove('dragging'); });
   c.addEventListener('pointerleave', () => { map.hover = null; c.classList.remove('hover'); hideTip(); map.dirty = true; });
@@ -1514,12 +1741,198 @@ function renderDangerBar() {
       el('span', { text: '◎', style: 'color:var(--ink)' }), 'tour ', el('b', { text: `${fmtInt(tour.visited)}/${fmtInt(tour.total)}` }), el('span', { class: 'muted', text: ` visited · ${nw} walker${nw === 1 ? '' : 's'}${tour.running === false ? ' · stopped' : ''}` })));
   }
   if (dz.data) items.push(el('span', { class: 'muted', text: `${fmtInt(c.spawners)} spawners · ${fmtInt(c.creatures)} creatures${isNum(d.refBotPower) ? ' · a bot ' + fmtInt(d.refBotPower) : ''}` }));
+  // how local the map is (build 389): the land's zones, the tiles they paint, the largest, attackers a thousand tiles, towns under paint
+  const acc = d.accuracy && typeof d.accuracy === 'object' ? d.accuracy : null;
+  if (acc) {
+    const lg = acc.largest && typeof acc.largest === 'object' ? acc.largest : null;
+    const per = isNum(acc.patrolTiles) && acc.patrolTiles > 0 && isNum(acc.attackers) ? (acc.attackers * 1000 / acc.patrolTiles).toFixed(2) : '–';
+    items.push(el('span', { class: 'li', style: 'cursor:default', title: 'How local the zones are: zones of the land\'s attackers (wanderers among them), tiles painted as their patrol or fringe, the largest zone, living attackers a thousand tiles of patrol, towns whose square lies under a patrol — click the largest to select it', onclick: () => { if (lg && dz.byId.has(str(lg.id))) { dz.sel = str(lg.id); renderZoneDetail(); map.dirty = true; } } },
+      el('span', { text: '◧', style: 'color:var(--ink)' }), 'local ', el('b', { text: `${fmtInt(acc.landZones)}` }), el('span', { class: 'muted', text: ` land zones (${fmtInt(acc.strayZones)} wandering) · ${isNum(acc.paintedTiles) ? Math.round(acc.paintedTiles / 1000) + 'k' : '–'} tiles · largest ${lg ? '#' + str(lg.id) + ' ' + fmtInt(lg.width) + '×' + fmtInt(lg.height) : '–'} · ${per} attackers/1k tiles · ${fmtInt(acc.townsInside)} towns under paint` })));
+  }
   items.push(el('span', { class: 'note', text: dzNote() }));
   bar.replaceChildren(...items);
 }
 $('#layerBtns button[data-layer="danger"]').addEventListener('click', () => { if (map.hover && (map.hover.kind === 'zone' || map.hover.kind === 'walker')) map.hover = null; renderDangerBar(); if (S.layers.danger) pollZones(); });
 $('#zoneClose').addEventListener('click', () => selectZone(null));
 $('#zoneCentre').addEventListener('click', () => { const z = dz.sel !== null && dz.byId.get(dz.sel); if (z) dzCentre(z); });
+
+// ================================================================ reach map (/api/reach, 01.10.2026)
+// Patrick's order of 30.09.2026, night: unreachability zones to one tile, no path formed into them, water unreachable to a
+// walker but sailable in a boat, all of it on the dashboard. The shard names every tile (BotReachMap): open — standing ground
+// a walk from home reaches, over the ground and through the gates; isle — standing ground no walk reaches, with a shore a ship
+// could land at; pocket — standing ground nothing reaches (a roof, a sealed yard); water — a ship's, never a walker's;
+// blocked — nowhere to stand. It sends classes, a byte a tile, and the page paints them in its own colours: the whole map at
+// four tiles a pixel once per map version (the most telling class of each square — a pocket two tiles wide still shows), and,
+// zoomed in to a pixel a tile or closer, the tiles in view one by one. Hover names the tile; a click asks the shard about it.
+const RM_CLASSES = ['open', 'isle', 'pocket', 'water', 'blocked'];
+const RM_INDEX = { unknown: 0, open: 1, isle: 2, pocket: 3, water: 4, blocked: 5 };
+const RM_VAR = { open: '--good', isle: '--warn', pocket: '--s5', water: '--s1', blocked: '--muted' };
+const RM_ALPHA = { open: 0.2, isle: 0.5, pocket: 0.65, water: 0.35, blocked: 0.3 };
+const RM_NOTE = { open: 'ground a walk from home reaches', isle: 'ground no walk reaches; a ship could land at its shore', pocket: 'ground nothing reaches: a roof, a sealed yard, a closed room', water: 'water: unreachable to a walker, sailable in a boat', blocked: 'nowhere to stand: rock, wall, a tree, the void', unknown: 'not drawn yet' };
+const rm = { data: null, state: 'loading', version: 0, over: null, overCv: null, overKey: '', det: null, detCv: null, detKey: '', detBusy: false, detTimer: null, hide: new Set(['open', 'water']), timer: null, busy: false, tile: null, rgb: null, rgbKey: '' };
+if (S.layers.reach === undefined) S.layers.reach = true;
+(() => {
+  let v = null; try { v = JSON.parse(localStorage.getItem('botweb.reach') || 'null'); } catch (e) { v = null; }
+  if (v && typeof v === 'object') { if (Array.isArray(v.hide)) { rm.hide = new Set(v.hide.filter(c => RM_CLASSES.includes(c))); } if (v.on === false) S.layers.reach = false; }
+  const b = $('#layerBtns button[data-layer="reach"]'); if (b) b.classList.toggle('on', !!S.layers.reach);
+})();
+function rmSave() { try { localStorage.setItem('botweb.reach', JSON.stringify({ hide: [...rm.hide], on: !!S.layers.reach })); } catch (e) { /* storage blocked */ } }
+function rmForeign() { const a = rm.data && str(rm.data.map), b = S.state && S.state.map && str(S.state.map.name); return !!(a && b && a !== b); }
+// the theme's colours as bytes, for painting classes into pixels
+function rmColours() {
+  const cs = getComputedStyle(document.documentElement);
+  const key = RM_CLASSES.map(c => cs.getPropertyValue(RM_VAR[c]).trim()).join('|');
+  if (rm.rgb && rm.rgbKey === key) return rm.rgb;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 1; const c = cv.getContext('2d', { willReadFrequently: true });
+  const out = [[0, 0, 0, 0]];
+  for (const cls of RM_CLASSES) {
+    c.clearRect(0, 0, 1, 1); c.fillStyle = cs.getPropertyValue(RM_VAR[cls]).trim() || '#888'; c.fillRect(0, 0, 1, 1);
+    const d = c.getImageData(0, 0, 1, 1).data; out.push([d[0], d[1], d[2], Math.round(255 * RM_ALPHA[cls])]);
+  }
+  rm.rgb = out; rm.rgbKey = key; return out;
+}
+function rmPaint(pic, cv) {
+  // one pixel a class byte; hidden classes and open ground left clear
+  const canvas = cv || document.createElement('canvas');
+  if (canvas.width !== pic.cols || canvas.height !== pic.rows) { canvas.width = pic.cols; canvas.height = pic.rows; }
+  const c = canvas.getContext('2d'); const img = c.createImageData(pic.cols, pic.rows); const px = img.data; const pal = rmColours();
+  const show = [false, ...RM_CLASSES.map(k => !rm.hide.has(k))];
+  for (let i = 0; i < pic.bytes.length; i++) { const k = pic.bytes[i]; if (k > 5 || !show[k]) continue; const p = pal[k], o = i * 4; px[o] = p[0]; px[o + 1] = p[1]; px[o + 2] = p[2]; px[o + 3] = p[3]; }
+  c.putImageData(img, 0, 0);
+  return canvas;
+}
+async function rmFetch(x, y, w, h, s) {
+  try {
+    const r = await fetch(`/api/reach/tiles?x=${x}&y=${y}&w=${w}&h=${h}&s=${s}`, { cache: 'no-store' });
+    if (!r.ok) return null;
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    const n = k => parseInt(r.headers.get(k), 10);
+    const pic = { x0: n('X-Reach-X'), y0: n('X-Reach-Y'), cols: n('X-Reach-Columns'), rows: n('X-Reach-Rows'), s: n('X-Reach-Scale'), v: n('X-Reach-Version'), bytes };
+    return [pic.x0, pic.y0, pic.cols, pic.rows, pic.s, pic.v].every(isNum) && bytes.length === pic.cols * pic.rows ? pic : null;
+  } catch (e) { return null; }
+}
+async function pollReach() {
+  if (rm.timer) { clearTimeout(rm.timer); rm.timer = null; }
+  if (!rm.busy && S.layers.reach) {
+    rm.busy = true;
+    let d = null, status = 0;
+    try { const r = await fetch('/api/reach', { cache: 'no-store' }); status = r.status; if (r.ok) d = await r.json(); } catch (e) { d = null; }
+    if (d && typeof d === 'object') {
+      rm.data = d; rm.state = d.ready ? 'ok' : 'drawing';
+      if (d.ready && isNum(d.version) && d.version !== rm.version) {
+        const pic = await rmFetch(0, 0, d.width, d.height, 4);
+        if (pic) { rm.over = pic; rm.version = pic.v; rm.overKey = ''; rm.det = null; rm.detKey = ''; map.dirty = true; }
+      }
+    } else rm.state = status === 404 ? 'missing' : status ? 'error ' + status : 'unreachable';
+    rm.busy = false;
+    renderReachBar();
+  }
+  rm.timer = setTimeout(pollReach, rm.data && rm.data.ready ? 10000 : 3000);
+}
+// the tiles in view, one by one, once the map is drawn a pixel a tile or closer
+function rmWantDetail() {
+  if (!S.layers.reach || !rm.over || map.k < 1) return;
+  const [ax, ay] = toW(0, 0), [bx, by] = toW(map.w, map.h);
+  const x0 = Math.max(0, Math.floor(ax / 16) * 16 - 32), y0 = Math.max(0, Math.floor(ay / 16) * 16 - 32);
+  const x1 = Math.min(map.W, Math.ceil(bx / 16) * 16 + 32), y1 = Math.min(map.H, Math.ceil(by / 16) * 16 + 32);
+  const d = rm.det;
+  if (d && d.v === rm.version && d.x0 <= Math.max(0, ax) && d.y0 <= Math.max(0, ay) && d.x0 + d.cols >= Math.min(map.W, bx) && d.y0 + d.rows >= Math.min(map.H, by)) return;
+  if ((x1 - x0) * (y1 - y0) > 2 * 1024 * 1024 || x1 <= x0 || y1 <= y0) return;
+  // one pending fetch at a time, never reset: with a stuck bot in view the map redraws every 40 ms, and a debounce restarted
+  // on every frame never fired, so the single tiles never came (Fable review, 01.10.2026)
+  if (rm.detTimer) return;
+  rm.detTimer = setTimeout(async () => {
+    rm.detTimer = null;
+    if (rm.detBusy) return;
+    rm.detBusy = true;
+    const pic = await rmFetch(x0, y0, x1 - x0, y1 - y0, 1);
+    rm.detBusy = false;
+    if (pic && pic.v === rm.version) { rm.det = pic; rm.detKey = ''; map.dirty = true; }
+  }, 200);
+}
+function drawReach(ctx) {
+  if (!S.layers.reach || !rm.over || rmForeign()) return;
+  const k = map.k, [ox, oy] = toS(0, 0);
+  const key = [rm.version, [...rm.hide].join(), CSS.good, CSS.warn, CSS.muted, CSS.s[0], CSS.s[4]].join('|');
+  if (!rm.overCv || rm.overKey !== key) { rm.overCv = rmPaint(rm.over, rm.overCv); rm.overKey = key; }
+  let d = null;
+  if (k >= 1) { rmWantDetail(); if (rm.det && rm.det.v === rm.version) d = rm.det; }
+  ctx.save(); ctx.imageSmoothingEnabled = false;
+  if (d) {
+    // the overview everywhere but where the tiles themselves are drawn, so a tile shows as what it is, not as its square
+    const [dx, dy] = toS(d.x0, d.y0);
+    ctx.beginPath(); ctx.rect(0, 0, map.w, map.h); ctx.rect(dx, dy, d.cols * k, d.rows * k); ctx.clip('evenodd');
+  }
+  ctx.drawImage(rm.overCv, ox, oy, rm.over.cols * rm.over.s * k, rm.over.rows * rm.over.s * k);
+  ctx.restore();
+  if (d) {
+    if (!rm.detCv || rm.detKey !== key) { rm.detCv = rmPaint(d, rm.detCv); rm.detKey = key; }
+    const [dx, dy] = toS(d.x0, d.y0);
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(rm.detCv, dx, dy, d.cols * k, d.rows * k);
+    if (k >= 6) { // tile edges, faintly, where a tile is big enough to be one
+      ctx.globalAlpha = 0.18; ctx.strokeStyle = CSS.ink2; ctx.lineWidth = 1; ctx.beginPath();
+      const [ax, ay] = toW(0, 0), [bx, by] = toW(map.w, map.h);
+      for (let x = Math.max(d.x0, Math.floor(ax)); x <= Math.min(d.x0 + d.cols, Math.ceil(bx)); x++) { const sx = Math.round(ox + x * k) + .5; ctx.moveTo(sx, Math.max(0, dy)); ctx.lineTo(sx, Math.min(map.h, dy + d.rows * k)); }
+      for (let y = Math.max(d.y0, Math.floor(ay)); y <= Math.min(d.y0 + d.rows, Math.ceil(by)); y++) { const sy = Math.round(oy + y * k) + .5; ctx.moveTo(Math.max(0, dx), sy); ctx.lineTo(Math.min(map.w, dx + d.cols * k), sy); }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  if (rm.tile && isNum(rm.tile.x) && isNum(rm.tile.y)) { // the tile last asked about
+    const [tx, ty] = toS(rm.tile.x, rm.tile.y), sz = Math.max(6, k);
+    ctx.save(); ctx.strokeStyle = CSS.ink; ctx.lineWidth = 2; ctx.strokeRect(tx - (sz - k) / 2, ty - (sz - k) / 2, sz, sz); ctx.restore();
+  }
+}
+// what the page holds about a tile: exact from the tiles in view, else the overview's square (its most telling class)
+function rmClassAt(x, y) {
+  x = Math.floor(x); y = Math.floor(y);
+  const d = rm.det;
+  if (d && d.v === rm.version && x >= d.x0 && y >= d.y0 && x < d.x0 + d.cols && y < d.y0 + d.rows) return { k: d.bytes[(y - d.y0) * d.cols + (x - d.x0)], exact: true };
+  const o = rm.over;
+  if (o) { const px = Math.floor(x / o.s), py = Math.floor(y / o.s); if (px >= 0 && py >= 0 && px < o.cols && py < o.rows) return { k: o.bytes[py * o.cols + px], exact: false }; }
+  return null;
+}
+function reachTipRows(x, y) {
+  if (!S.layers.reach || rmForeign()) return [];
+  const c = rmClassAt(x, y); if (!c) return [];
+  const name = Object.keys(RM_INDEX).find(n => RM_INDEX[n] === c.k) || 'unknown';
+  return [['ink2', `${name}${c.exact ? '' : ` (the ${rm.over.s}×${rm.over.s} square — zoom in for the tile)`}`], ['muted', RM_NOTE[name]]];
+}
+async function rmAsk(x, y) {
+  x = Math.floor(x); y = Math.floor(y);
+  if (x < 0 || y < 0 || x >= map.W || y >= map.H) return;
+  const t = await getJSON(`/api/reach/tile?x=${x}&y=${y}`);
+  rm.tile = t && t.ready && isNum(t.x) ? t : { x, y, error: t && t.error ? t.error : 'the shard did not answer' };
+  renderReachBar(); map.dirty = true;
+}
+function renderReachBar() {
+  const bar = $('#reachBar');
+  bar.classList.toggle('hidden', !S.layers.reach);
+  if (!S.layers.reach) return;
+  const d = rm.data || {}, t = d.tiles || {}, ck = d.check || {}, rf = d.refused || {}, st = d.steps || {};
+  const items = [el('span', { class: 'muted', text: 'reach' })];
+  for (const cls of RM_CLASSES) items.push(el('span', { class: 'li' + (rm.hide.has(cls) ? ' off' : ''), title: `${cls}: ${RM_NOTE[cls]} — click to hide/show`, onclick: () => { if (rm.hide.has(cls)) rm.hide.delete(cls); else rm.hide.add(cls); rmSave(); renderReachBar(); map.dirty = true; } },
+    el('span', { class: 'sw', style: `background:color-mix(in srgb, var(${RM_VAR[cls]}) ${Math.round(RM_ALPHA[cls] * 100)}%, transparent);border-color:var(${RM_VAR[cls]})` }), cls, el('span', { class: 'muted', text: isNum(t[cls]) ? ' ' + fmtInt(t[cls]) : '' })));
+  if (d.ready) {
+    items.push(el('span', { class: 'muted', title: 'lands no walk from home reaches (islands, sealed pockets, dungeons no gate leads to), and the clusters of 16 tiles with a border in them', text: `${fmtInt(d.lands)} lands no walk reaches · ${fmtInt(d.borders)} border clusters` }));
+    const agree = ck.agree || 0, dis = ck.disagree || 0;
+    if (isNum(ck.asked) && ck.asked > 0) items.push(el('span', { class: 'li', style: 'cursor:default', title: `The check: border tiles examined by the walker's own search and footing (${str(ck.state)}); a debugger stood on ${fmtInt(ck.stood)} of them.${Array.isArray(ck.misses) && ck.misses.length ? ' Misses: ' + ck.misses.slice(0, 5).join(' | ') : ''}` },
+      el('span', { text: '✓', style: 'color:var(--good)' }), 'check ', el('b', { text: agree + dis ? fmtPct(agree / (agree + dis)) : '–' }), el('span', { class: 'muted', text: ` of ${fmtInt(agree + dis)} tiles${ck.unsure ? ` · ${fmtInt(ck.unsure)} unsure` : ''}${ck.done < ck.asked ? ` · ${fmtInt(ck.done)}/${fmtInt(ck.asked)}` : ''}` })));
+    items.push(el('span', { class: 'muted', title: 'walks refused a place with no open ground near it, from open ground (and land refused from a deck); places refused to the samplers; routes never asked of the planner; steps the bots took from open ground onto ground the map calls unreachable', text: `refused ${fmtInt(rf.walks)} walks · ${fmtInt(rf.samplers)} places · ${fmtInt(rf.planner)} routes · ${fmtInt(rf.aboard)} from a deck · ${fmtInt(st.contradicted)} steps against the map` }));
+  }
+  if (rm.tile) {
+    const tl = rm.tile;
+    const layers = Array.isArray(tl.layers) && tl.layers.length ? ' · ' + tl.layers.map(l => `z ${l.z} ${str(l.class)}`).join(', ') : '';
+    items.push(el('span', { class: 'tile', title: 'the tile last clicked, as the shard names it' }, el('b', { text: `(${tl.x}, ${tl.y})` }), ' ', tl.error ? str(tl.error) : `${str(tl.class)} — walker: ${str(tl.walker)}, ship: ${str(tl.ship)}${tl.land ? ` · land of ${fmtInt(tl.land.tiles)} tiles` : ''}${layers}`));
+  }
+  const note = !rm.data ? (rm.state === 'loading' ? 'loading the reach map…' : rm.state === 'missing' ? '/api/reach is not served by this build' : 'the reach map is unreachable')
+    : d.ready ? `map v${fmtInt(d.version)} · ${timeOf(d.at)}${rmForeign() ? ` · of ${str(d.map)}, not drawn here` : ''}${S.layers.reach && map.k < 1 ? ' · zoom in for single tiles' : ''}`
+      : `${str(d.state)} ${fmtPct(d.progress, 0)}`;
+  items.push(el('span', { class: 'note', text: note }));
+  bar.replaceChildren(...items);
+}
+$('#layerBtns button[data-layer="reach"]').addEventListener('click', () => { rmSave(); renderReachBar(); if (S.layers.reach) pollReach(); });
 
 // ================================================================ selection + detail
 let detailTimer = null;
@@ -1546,6 +1959,7 @@ function selectBot(name, opts) {
     }
   }
   map.dirty = true;
+  lvOnSelect(nm);
 }
 async function fetchDetail() {
   if (detailTimer) { clearTimeout(detailTimer); detailTimer = null; }
@@ -1894,9 +2308,12 @@ function showTab(name) {
   if (name === 'craft' && !S.craft) loadCraft();
   if (name === 'log' && !$('#logOut').textContent) loadLog();
   if (name === 'work') renderHistory();
+  if (name === 'live') lvShow();
+  if (name === 'needs' && S.state) renderNeeds(S.state.needs || {});
 }
 $$('#tabbar button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 $('#tileMoney').addEventListener('click', () => { showTab('money'); $('#tabs').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+$('#tileNeeds').addEventListener('click', () => { showTab('needs'); $('#tabs').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 
 // ================================================================ events
 const evList = $('#evList');
@@ -1996,6 +2413,713 @@ async function pollEvents() {
   if (!sse.open) pollTimer = setTimeout(pollEvents, 2000);
 }
 
+// ================================================================ live window: one bot once a second, and the debugger squad (/api/live, /api/debuggers)
+// Asking is what keeps a bot watched on the shard, so the page asks only while this tab is open and the page is visible;
+// ten seconds after it stops, the shard stops building. Every number is one the frame carries; nothing is computed here.
+const LV = { bot: null, frame: null, deb: null, gen: 0, timer: null, feed: [], keys: new Set(), shown: new Set(), terrain: { data: null, img: null }, names: '', cards: new Map() };
+const DEB_HUES = { 33: '#d03b3b', 99: '#3987e5', 63: '#199e70', 53: '#c98500' };
+const NOTO_COL = [null, '#3987e5', '#0ca30c', '#898781', '#898781', '#ec835a', '#d03b3b', '#fab219'];
+const lvCanvas = $('#liveCanvas');
+
+function lvSet(name) {
+  const nm = str(name).trim();
+  if (!nm) return;
+  $('#liveName').value = nm;
+  if (nm === LV.bot) return;
+  LV.bot = nm; LV.frame = null; LV.feed = []; LV.keys = new Set(); LV.shown = new Set();
+  $('#liveFeed').replaceChildren();
+  try { localStorage.setItem('botweb.live', nm); } catch (e) { /* storage blocked */ }
+  lvRender();
+  if (S.tab === 'live') lvKick();
+}
+function lvOnSelect(nm) { if (nm && $('#liveFollowSel').checked) lvSet(nm); }
+function lvShow() { if (!LV.bot && S.selected) lvSet(S.selected); lvKick(); }
+function lvKick() { LV.gen++; if (LV.timer) { clearTimeout(LV.timer); LV.timer = null; } lvPoll(LV.gen); }
+async function lvPoll(gen) {
+  if (gen !== LV.gen || S.tab !== 'live' || document.hidden) return;
+  const nm = LV.bot;
+  const [f, d] = await Promise.all([nm ? getJSON('/api/live?bot=' + encodeURIComponent(nm)) : null, getJSON('/api/debuggers')]);
+  if (gen !== LV.gen) return;
+  if (nm && nm === LV.bot && f && typeof f === 'object') { LV.frame = f; lvAbsorb(f); }
+  if (d && typeof d === 'object') LV.deb = d;
+  try { lvRender(); } catch (e) { console.warn('live window', e); }
+  LV.timer = setTimeout(() => lvPoll(gen), 1000);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.tab === 'live') lvKick(); });
+
+// --- the feed: the frame carries the newest 40 events and 40 log lines each time; keep the ones not seen yet
+function lvAbsorb(f) {
+  for (const ev of (Array.isArray(f.events) ? f.events : [])) {
+    if (!ev || typeof ev !== 'object' || !isNum(ev.seq)) continue;
+    const k = 'e' + ev.seq; if (LV.keys.has(k)) continue;
+    LV.keys.add(k); LV.feed.push({ k, ev });
+  }
+  for (const l of (Array.isArray(f.log) ? f.log : [])) {
+    if (!Array.isArray(l) || !isNum(l[0])) continue;
+    const k = 'l' + l[0]; if (LV.keys.has(k)) continue;
+    LV.keys.add(k); LV.feed.push({ k, line: str(l[1]) });
+  }
+  if (LV.feed.length > 300) LV.feed.splice(0, LV.feed.length - 300);
+  // The seen keys would grow for as long as the tab stays open: kept to what is in the feed and in this frame, since a line
+  // the shard has dropped from its own newest 40 never comes back.
+  if (LV.keys.size > 2000) {
+    const keep = new Set(LV.feed.map(x => x.k));
+    for (const ev of (Array.isArray(f.events) ? f.events : [])) if (ev && isNum(ev.seq)) keep.add('e' + ev.seq);
+    for (const l of (Array.isArray(f.log) ? f.log : [])) if (Array.isArray(l) && isNum(l[0])) keep.add('l' + l[0]);
+    LV.keys = keep;
+    LV.shown = new Set([...LV.shown].filter(k => keep.has(k)));
+  }
+}
+function lvLogRow(line) {
+  const m = /^\[(\d\d:\d\d:\d\d) (\w{3})\] ?(.*)$/.exec(line);
+  const row = el('div', { class: 'ev log' });
+  row.append(el('span', { class: 'at', text: m ? m[1] : '' }), el('span', { class: 'k', text: m ? 'log ' + m[2].toLowerCase() : 'log' }), el('span', { class: 'body', text: m ? m[3] : line }));
+  return row;
+}
+function lvFeed() {
+  const box = $('#liveFeed');
+  const fresh = LV.feed.filter(x => !LV.shown.has(x.k));
+  if (!fresh.length) return;
+  const frag = document.createDocumentFragment();
+  for (const x of fresh.slice().reverse()) { LV.shown.add(x.k); frag.append(x.ev ? eventRow(x.ev) : lvLogRow(x.line)); }
+  box.prepend(frag);
+  while (box.childNodes.length > 300) box.lastChild.remove();
+}
+
+// --- the state beside the picture
+function lvLink(name) {
+  const nm = str(name);
+  return S.botByName.has(nm) ? el('a', { class: 'subj', text: nm, title: 'watch this bot', onclick: () => { lvSet(nm); selectBot(nm, { scroll: false }); } }) : el('span', { text: nm });
+}
+function lvBar(label, v, max, col) {
+  const p = isNum(v) && isNum(max) && max > 0 ? Math.max(0, Math.min(1, v / max)) : 0;
+  return el('div', { class: 'lvBar' }, el('span', { class: 'muted', text: label }), el('span', { class: 'bar' }, el('i', { style: `width:${(p * 100).toFixed(1)}%;background:${col}` })), el('span', { class: 'v', text: `${fmtInt(v)} / ${fmtInt(max)}` }));
+}
+function lvWho(o) {
+  if (!o || typeof o !== 'object') return null;
+  return el('span', {}, lvLink(o.name), ` · ${str(o.kind)} · ${isNum(o.dist) && o.dist >= 0 ? o.dist + ' tiles' : 'elsewhere'} · ${fmtInt(o.hp)}% hp${o.alive === false ? ' · dead' : ''}`);
+}
+// replaceChildren would print a null as the word "null" and an array as its text: flattened and filtered as el() does.
+function lvFill(node, ...kids) { node.replaceChildren(...kids.flat(Infinity).filter(k => k !== null && k !== undefined && k !== false)); }
+function lvState(f) {
+  const head = $('#liveHead'), body = $('#liveState');
+  if (!f || f.pending || f.found === false) {
+    lvFill(head, el('b', { text: LV.bot || 'no bot chosen' }), f && f.found === false ? el('span', { class: 'muted', text: f.error ? 'error: ' + str(f.error) : str(f.note) }) : null);
+    lvFill(body);
+    return;
+  }
+  const g = f.guild && typeof f.guild === 'object' ? f.guild : null, sq = f.squad && typeof f.squad === 'object' ? f.squad : null;
+  lvFill(head,
+    el('span', { class: 'sw', style: `display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorOfClass(f.class)}` }),
+    el('b', { text: str(f.bot) }),
+    el('span', { class: 'ink2', text: str(f.rank) || str(f.class) }),
+    el('span', { class: 'muted', text: `${str(f.class)} · ${str(f.role)}` }),
+    g ? el('span', { class: 'badge', text: `[${str(g.abbr)}] ${str(g.name)}${g.leader ? ' · leader' : ''}` }) : null,
+    sq ? el('span', { class: 'badge', text: `company ${sq.id} · ${sq.leads ? 'leads it' : 'under ' + str(sq.leader)} · ${fmtInt(sq.members)} · ${str(sq.stance).toLowerCase()}${sq.warring ? ' · at war' : ''}` }) : null,
+    el('span', { class: 'muted', text: `(${f.x}, ${f.y}, ${f.z}) ${str(f.map)}` }));
+  const flags = [];
+  const flag = (on, text, cls) => { if (on) flags.push(el('span', { class: 'badge ' + (cls || ''), text })); };
+  flag(f.offline, 'resting away', 'Dead'); flag(!f.offline && f.alive === false, 'ghost', 'Dead'); flag(f.war, 'war mode', 'Hunted');
+  flag(f.mounted, 'mounted'); flag(f.hidden, 'hidden'); flag(f.criminal, 'criminal', 'Failing'); flag(f.murderer, 'murderer', 'Failing');
+  flag(!!f.spell, 'casting ' + str(f.spell), 'Bound');
+  const kv = [];
+  const row = (k, v) => { if (v !== null && v !== undefined && v !== '') kv.push(el('span', { class: 'k', text: k }), el('span', { class: 'v' }, v)); };
+  row('standing', str(f.standing));
+  row('work', f.work ? `${str(f.work)}${isNum(f.sinceMs) ? ' · ' + fmtDur(f.sinceMs) : ''}${isNum(f.expects) ? ' · expects ' + f.expects : ''}` : 'none');
+  row('stage', str(f.stage));
+  row('because', str(f.because));
+  row('combatant', lvWho(f.combatant));
+  if (f.foe && (!f.combatant || str(f.foe.name) !== str(f.combatant.name))) row('target', lvWho(f.foe));
+  if (f.dest && typeof f.dest === 'object') row('going to', `(${f.dest.x}, ${f.dest.y}) ${str(f.dest.why)}${f.dest.noWay ? ' · no way there' : ''}`);
+  row('gold', `${fmtInt(f.purse)} gp in the pack`);
+  row('weight', `${fmtInt(f.weight)} / ${fmtInt(f.weightMax)} stones`);
+  const hp = isNum(f.hp) && isNum(f.hpMax) && f.hpMax > 0 ? f.hp / f.hpMax : 1;
+  const skills = Array.isArray(f.skills) ? f.skills.filter(Array.isArray) : [];
+  lvFill(body,
+    lvBar('HP', f.hp, f.hpMax, hp < 0.3 ? CSS.crit : hp < 0.6 ? CSS.warn : CSS.good),
+    lvBar('Mana', f.mana, f.manaMax, CSS.s[0]),
+    lvBar('Stam', f.stam, f.stamMax, CSS.s[3]),
+    el('div', { class: 'lvFlags' }, flags),
+    el('div', { class: 'kv' }, kv),
+    skills.length ? el('h3', { text: 'Top skills', style: 'margin:10px 0 4px' }) : null,
+    skills.map(s => el('div', { class: 'skill' }, el('span', { text: str(s[0]) }), el('span', { class: 'bar' }, el('i', { style: `width:${Math.max(0, Math.min(100, +s[1] || 0))}%` })), el('span', { class: 'num muted', text: isNum(s[1]) ? s[1].toFixed(1) : '–' }))));
+}
+
+// --- the picture: 41 x 41 tiles of radar colour with the bot in the middle
+function lvTerrainImage(t) {
+  try {
+    const bin = atob(t.data), n = t.side * t.side;
+    if (bin.length < n * 2) return null;
+    const cv = document.createElement('canvas'); cv.width = t.side; cv.height = t.side;
+    const c2 = cv.getContext('2d'), img = c2.createImageData(t.side, t.side), d = img.data;
+    for (let i = 0; i < n; i++) {
+      const c = bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8);
+      if (c === 0xFFFF) continue; // not read yet: left to the background
+      d[i * 4] = ((c >> 10) & 31) << 3; d[i * 4 + 1] = ((c >> 5) & 31) << 3; d[i * 4 + 2] = (c & 31) << 3; d[i * 4 + 3] = 255;
+    }
+    c2.putImageData(img, 0, 0);
+    return cv;
+  } catch (e) { return null; }
+}
+function lvColour(m) {
+  if (m.k === 'bot') return colorOfClass(m.cls);
+  if (m.k === 'monster') return m.hostile ? CSS.crit : m.aggr ? CSS.serious : CSS.muted;
+  if (m.k === 'animal') return m.hostile ? CSS.serious : CSS.s[2];
+  if (m.k === 'pet') return CSS.s[6];
+  return NOTO_COL[m.noto] || CSS.muted;
+}
+function lvShort(name) { return str(name).replace(/^(a|an|the) /i, '').slice(0, 12); }
+function lvDraw(f) {
+  const cv = lvCanvas, ctx = cv.getContext('2d');
+  const dpr = window.devicePixelRatio || 1, px = Math.max(100, Math.round((cv.clientWidth || 410) * dpr));
+  if (cv.width !== px || cv.height !== px) { cv.width = px; cv.height = px; }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = CSS.mapBg; ctx.fillRect(0, 0, px, px);
+  const font = `${Math.round(11 * dpr)}px system-ui, sans-serif`;
+  if (!f || f.found === false || f.pending || f.offline || !isNum(f.x) || !isNum(f.y)) {
+    haloText(ctx, !LV.bot ? 'choose a bot' : f && f.offline ? 'resting away from the world' : 'waiting for a frame…', px / 2, px / 2, CSS.muted, font, 'center');
+    return;
+  }
+  const R = isNum(f.radius) ? f.radius : 20, side = 2 * R + 1, ts = px / side, vx = f.x - R, vy = f.y - R;
+  const sx = x => (x - vx + 0.5) * ts, sy = y => (y - vy + 0.5) * ts;
+  const t = f.terrain;
+  if (t && typeof t === 'object' && t.data) {
+    if (LV.terrain.data !== t.data) LV.terrain = { data: t.data, img: lvTerrainImage(t) };
+    if (LV.terrain.img) { ctx.imageSmoothingEnabled = false; ctx.drawImage(LV.terrain.img, (t.x0 - vx) * ts, (t.y0 - vy) * ts, t.side * ts, t.side * ts); }
+    ctx.globalAlpha = 0.3; ctx.fillStyle = CSS.mapBg; ctx.fillRect(0, 0, px, px); ctx.globalAlpha = 1;
+  }
+  const line = (x1, y1, x2, y2) => { ctx.beginPath(); ctx.moveTo(sx(x1), sy(y1)); ctx.lineTo(sx(x2), sy(y2)); ctx.stroke(); };
+  // the route ahead, dotted, and where it ends
+  const route = Array.isArray(f.route) ? f.route : [];
+  if (route.length >= 2) {
+    ctx.save(); ctx.setLineDash([ts * 0.35, ts * 0.35]); ctx.strokeStyle = CSS.accent; ctx.lineWidth = Math.max(1.5, ts * 0.16);
+    ctx.beginPath(); ctx.moveTo(sx(f.x), sy(f.y));
+    for (let i = 0; i + 1 < route.length; i += 2) ctx.lineTo(sx(route[i]), sy(route[i + 1]));
+    ctx.stroke(); ctx.restore();
+  }
+  if (f.dest && isNum(f.dest.x) && Math.abs(f.dest.x - f.x) <= R && Math.abs(f.dest.y - f.y) <= R) {
+    ctx.strokeStyle = CSS.accent; ctx.lineWidth = Math.max(1.5, ts * 0.14);
+    ctx.beginPath(); ctx.arc(sx(f.dest.x), sy(f.dest.y), ts * 0.6, 0, Math.PI * 2); ctx.stroke();
+  }
+  // corpses, fires, the shop
+  for (const it of (Array.isArray(f.items) ? f.items : [])) {
+    if (!it || !isNum(it.x)) continue;
+    const x = sx(it.x), y = sy(it.y), h = ts * 0.35;
+    ctx.lineWidth = Math.max(1, ts * 0.12);
+    if (it.k === 'corpse') { ctx.strokeStyle = it.own ? CSS.crit : it.bot ? CSS.ink2 : CSS.muted; ctx.beginPath(); ctx.moveTo(x - h, y - h); ctx.lineTo(x + h, y + h); ctx.moveTo(x + h, y - h); ctx.lineTo(x - h, y + h); ctx.stroke(); }
+    else if (it.k === 'fire') { ctx.fillStyle = CSS.s[1]; ctx.beginPath(); ctx.moveTo(x, y - h * 1.3); ctx.lineTo(x + h, y + h); ctx.lineTo(x - h, y + h); ctx.closePath(); ctx.fill(); }
+    else if (it.k === 'shop') { ctx.strokeStyle = CSS.s[3]; ctx.strokeRect(x - h * 1.4, y - h * 1.4, h * 2.8, h * 2.8); }
+  }
+  // fights among the others, faint; the bot's own target dashed and its combatant solid
+  const mobs = Array.isArray(f.mobiles) ? f.mobiles.filter(m => m && isNum(m.x)) : [];
+  ctx.lineWidth = Math.max(1, ts * 0.07); ctx.globalAlpha = 0.55;
+  for (const m of mobs) if (isNum(m.fx) && isNum(m.fy)) { ctx.strokeStyle = m.hostile ? CSS.crit : CSS.ink2; line(m.x, m.y, m.fx, m.fy); }
+  ctx.globalAlpha = 1;
+  if (f.foe && isNum(f.foe.x) && f.foe.dist >= 0) { ctx.save(); ctx.setLineDash([ts * 0.3, ts * 0.25]); ctx.strokeStyle = CSS.serious; ctx.lineWidth = Math.max(1.5, ts * 0.14); line(f.x, f.y, f.foe.x, f.foe.y); ctx.restore(); }
+  if (f.combatant && isNum(f.combatant.x) && f.combatant.dist >= 0) { ctx.strokeStyle = CSS.crit; ctx.lineWidth = Math.max(2, ts * 0.2); line(f.x, f.y, f.combatant.x, f.combatant.y); }
+  // everybody about, then the bot on top
+  const r = Math.max(2.5, ts * 0.36);
+  for (const m of mobs) {
+    const x = sx(m.x), y = sy(m.y), col = lvColour(m);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (m.dead) { ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, ts * 0.1); ctx.stroke(); } else { ctx.fillStyle = col; ctx.fill(); }
+    if (m.hostile) { ctx.strokeStyle = CSS.crit; ctx.lineWidth = Math.max(1, ts * 0.1); ctx.beginPath(); ctx.arc(x, y, r + ts * 0.18, 0, Math.PI * 2); ctx.stroke(); }
+    haloText(ctx, lvShort(m.n), x, y + r + 6 * dpr, CSS.ink2, `${Math.round(9.5 * dpr)}px system-ui, sans-serif`, 'center');
+  }
+  const bx = sx(f.x), by = sy(f.y);
+  ctx.beginPath(); ctx.arc(bx, by, r * 1.5, 0, Math.PI * 2); ctx.fillStyle = f.alive === false ? CSS.surface : colorOfClass(f.class); ctx.fill();
+  ctx.lineWidth = Math.max(1.5, ts * 0.14); ctx.strokeStyle = CSS.ink; ctx.stroke();
+  haloText(ctx, str(f.bot), bx, by - r * 1.5 - 7 * dpr, CSS.ink, `600 ${Math.round(11 * dpr)}px system-ui, sans-serif`, 'center');
+  if (t && t.complete === false) haloText(ctx, 'terrain still being read', 6 * dpr, px - 9 * dpr, CSS.muted, `${Math.round(10 * dpr)}px system-ui, sans-serif`, 'left');
+}
+
+// --- one small window per debugger
+function lvDebuggers(d) {
+  const box = $('#liveDebuggers');
+  const list = d && Array.isArray(d.debuggers) ? d.debuggers.filter(x => x && typeof x === 'object') : null;
+  if (!list) { LV.cards.clear(); box.replaceChildren(el('div', { class: 'muted', text: d && d.note ? str(d.note) : 'no word from the debuggers yet' })); return; }
+  // A card is rebuilt only when what it shows has changed, so a link under the pointer and an opened answer survive the second.
+  const nodes = list.map(g => {
+    const { asking, ...rest } = g;
+    const key = JSON.stringify([rest, asking ? [asking.what, asking.since] : null]);
+    const old = LV.cards.get(str(g.name));
+    if (old && old.key === key) return old.node;
+    const node = lvCard(g);
+    LV.cards.set(str(g.name), { key, node });
+    return node;
+  });
+  if (nodes.length !== box.childNodes.length || nodes.some((n, i) => box.childNodes[i] !== n)) box.replaceChildren(...nodes);
+}
+function lvCard(g) {
+  const col = DEB_HUES[g.hue] || CSS.muted, th = g.thought && typeof g.thought === 'object' ? g.thought : null, ask = g.asking && typeof g.asking === 'object' ? g.asking : null;
+  const c = g.counts && typeof g.counts === 'object' ? g.counts : {};
+  const ans = th && (th.answer || th.question) ? el('div', { class: 'a', title: 'click to open or close', onclick: e => e.currentTarget.classList.toggle('open') },
+    th.answer ? str(th.answer) : '', th.question ? el('div', { class: 'q', text: 'asked: ' + str(th.question) }) : null) : null;
+  return el('div', { class: 'dbg', style: `border-left-color:${col}` },
+    el('div', { class: 't' }, el('b', { style: `color:${col}`, text: str(g.name) }), el('span', { class: 'badge', text: str(g.doing) }),
+      el('span', { class: 'muted', text: `${g.organiser ? 'marshal · ' : ''}(${fmtInt(g.x)}, ${fmtInt(g.y)})${g.shown ? ' · shown' : ''}` })),
+    el('div', { class: 'what' }, str(g.doingWhat), g.subject ? [' → ', lvLink(g.subject)] : null),
+    th ? el('div', { class: 'think' },
+      el('div', { class: 'q' }, `${str(th.kind)} at ${str(th.at)}`, th.about ? [' · about ', lvLink(th.about)] : null, isNum(th.sure) ? ` · ${Math.round(th.sure * 100)}% sure` : ''),
+      el('div', { text: str(th.text) }), ans) : el('div', { class: 'think muted', text: 'nothing heard back from the model yet this session' }),
+    ask ? el('div', { class: 'asking', text: `asking the model since ${str(ask.since)}: ${str(ask.what)}` }) : null,
+    el('div', { class: 'feed' }, (Array.isArray(g.feed) ? g.feed : []).filter(Array.isArray).slice(-8).reverse().map(l => el('div', {}, el('span', { text: str(l[0]) }), str(l[1])))),
+    el('div', { class: 'cnt', text: `${fmtInt(c.asked)} asked · ${fmtInt(c.findings)} findings · ${fmtInt(c.quiet)} quiet · ${fmtInt(c.reflections)} reflections · ${fmtInt(c.labels)} labels · ${fmtInt(c.echoes)} echoes · ${fmtInt(c.hops)} hops` }));
+}
+
+// --- the picture: the bot's surroundings drawn with the game's own pictures (02.10.2026)
+// The shard says what stands where: the frame carries the bot (look), the mobiles with their bodies, hues, facing, mounts
+// and worn items, and the items on the ground; /api/live/scene carries the land and the statics when the bot has walked off
+// the last square (pic.scene says which). The pictures are the client's own, decoded by the shard from its files
+// (/api/art, /api/anim) and kept by the browser. Drawn in the client's order: by the diagonal x+y, then the height the client
+// sorts by (land a little below its height, a background a little below, anything with height a little above, a mobile
+// above its feet), land first where they tie; roofs and upper floors hidden when the bot stands under them.
+const ISO = {
+  on: true, zoom: 0, td: null, tdState: 0, tdError: '', v: '',
+  scene: null, sceneBusy: false, list: null, listKey: '',
+  spr: new Map(), queue: [], busy: 0, drawn: 0,
+  pos: new Map(), frame: null, raf: 0, rafTimer: 0, ms: 0,
+};
+const ISO_ORDER = [5, 4, 3, 24, 13, 8, 9, 14, 15, 19, 7, 23, 17, 22, 10, 11, 12, 16, 18, 1, 20, 6, 2];
+const ISO_ORDER_DOWN = [20, 5, 4, 3, 24, 13, 8, 9, 14, 15, 19, 7, 23, 17, 22, 12, 10, 11, 16, 18, 6, 1, 2];
+const ISO_GHOSTS = new Set([402, 403, 607, 608, 694, 695, 970]);
+const ISO_STEP = 900;
+const isoCanvas = $('#liveIso');
+const isoNoDraw = id => id === 0x0001 || id === 0x21BC || id === 0x5690 || id === 0xA1FE || (id >= 0x2198 && id <= 0x21A4);
+const isoB64 = s => { const bin = atob(s), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; };
+const isoSX = (x, y) => (x - y) * 22;
+const isoSY = (x, y, z) => (x + y) * 22 - z * 4;
+const isoQ = (hue, rest) => `?v=${encodeURIComponent(ISO.v)}${rest || ''}${hue ? '&hue=' + hue : ''}`;
+const uLand = id => `/api/art/land/${id}.png` + isoQ(0);
+const uTex = id => `/api/art/tex/${id}.png` + isoQ(0);
+const uStatic = (id, hue) => `/api/art/static/${id}.png` + isoQ(hue);
+const uBody = (b, d, a, hue) => `/api/anim/${b}/${d}.png` + isoQ(hue, '&a=' + a);
+const uWorn = (item, d, body, a, hue) => `/api/anim/item/${item}/${d}.png` + isoQ(hue, `&body=${body}&a=${a}`);
+
+// --- what the picture needs from the shard: tiledata once, the scene when it changes, each picture once
+async function isoTileData() {
+  if (ISO.tdState === 1 || ISO.tdState === 2 || (ISO.tdState === 3 && Date.now() < ISO.tdRetry)) return;
+  ISO.tdState = 1;
+  try {
+    const r = await fetch('/api/art/tiledata');
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.items) { ISO.tdState = 3; ISO.tdRetry = Date.now() + 10000; ISO.tdError = j && j.error ? str(j.error) : 'the shard has no pictures to give'; isoRequest(); return; }
+    ISO.td = { items: isoB64(j.items), land: isoB64(j.land) }; ISO.v = str(j.v); ISO.tdState = 2; ISO.tdError = ''; ISO.list = null;
+  } catch (e) { ISO.tdState = 3; ISO.tdRetry = Date.now() + 10000; ISO.tdError = 'the shard did not answer'; }
+  isoRequest();
+}
+async function isoLoadScene(bot) {
+  if (ISO.sceneBusy) return;
+  ISO.sceneBusy = true;
+  try {
+    const j = await getJSON('/api/live/scene?bot=' + encodeURIComponent(bot));
+    if (j && !j.pending && j.land && bot === LV.bot) { ISO.scene = isoParse(j); ISO.list = null; }
+  } finally { ISO.sceneBusy = false; isoRequest(); }
+}
+function isoParse(j) {
+  const side = j.side, land = isoB64(j.land), st = isoB64(j.statics), per = new Array(side * side);
+  for (let i = 0; i + 7 <= st.length; i += 7) {
+    const k = st[i + 1] * side + st[i];
+    (per[k] || (per[k] = [])).push({ id: st[i + 2] | (st[i + 3] << 8), z: (st[i + 4] << 24) >> 24, hue: st[i + 5] | (st[i + 6] << 8) });
+  }
+  return { ver: j.ver, bot: str(j.bot), map: str(j.map), x0: j.x0, y0: j.y0, side, land, per, complete: !!j.complete, slopes: new Map() };
+}
+function isoLand(sc, x, y) {
+  const tx = x - sc.x0, ty = y - sc.y0;
+  if (tx < 0 || ty < 0 || tx >= sc.side || ty >= sc.side) return null;
+  const i = (ty * sc.side + tx) * 3, id = sc.land[i] | (sc.land[i + 1] << 8);
+  return id === 0xFFFF ? null : { id, z: (sc.land[i + 2] << 24) >> 24 };
+}
+const isoStatics = (sc, x, y) => { const tx = x - sc.x0, ty = y - sc.y0; return tx < 0 || ty < 0 || tx >= sc.side || ty >= sc.side ? null : sc.per[ty * sc.side + tx]; };
+// A picture by its address: null until it has come; asked for at most eight at a time, the newest wanted first.
+function isoSprite(url) {
+  let e = ISO.spr.get(url);
+  if (!e) { e = { st: 0, img: null, ax: 0, ay: 0, used: 0 }; ISO.spr.set(url, e); ISO.queue.push([url, e]); isoPump(); }
+  e.used = ISO.drawn;
+  return e.st === 1 ? e : null;
+}
+function isoPump() {
+  while (ISO.busy < 8 && ISO.queue.length) {
+    const [url, e] = ISO.queue.shift();
+    ISO.busy++;
+    isoFetch(url, e).finally(() => { ISO.busy--; isoRequest(); isoPump(); });
+  }
+}
+// A 404 is the client having no such picture, kept for good; a shard that did not answer (restarting, 5xx) is asked again later.
+function isoRetryLater(url, e) {
+  e.st = 2;
+  setTimeout(() => { if (ISO.spr.get(url) === e) ISO.spr.delete(url); }, 30000);
+}
+async function isoFetch(url, e) {
+  let r;
+  try { r = await fetch(url); } catch (err) { isoRetryLater(url, e); return; }
+  try {
+    if (!r.ok) { if (r.status === 404) e.st = 2; else isoRetryLater(url, e); return; }
+    const a = (r.headers.get('X-Anchor') || '0,0').split(',').map(Number);
+    const blob = await r.blob();
+    e.img = window.createImageBitmap ? await createImageBitmap(blob) : await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = URL.createObjectURL(blob); });
+    e.ax = a[0] || 0; e.ay = a[1] || 0; e.st = 1;
+  } catch (err) { e.st = 2; }
+}
+// Pictures not drawn for a while are let go once there are many, so a page left open for a day does not grow without end.
+function isoTrim() {
+  if (ISO.spr.size < 6000) return;
+  for (const [url, e] of ISO.spr) if (e.st !== 0 && ISO.drawn - e.used > 120) { if (e.img && e.img.close) e.img.close(); ISO.spr.delete(url); }
+}
+
+// --- roofs: the client's rule. Something solid above the head on the bot's own tile, or a roof on the tile in front of it,
+// lowers the ceiling: nothing at or above it is drawn, and no roof at all.
+function isoRoofs(sc, bx, by, bz) {
+  const td = ISO.td.items, pz14 = bz + 14, pz16 = bz + 16;
+  let maxZ = 127, noRoofs = false;
+  for (const s of isoStatics(sc, bx, by) || []) {
+    const f = td[s.id * 2 + 1];
+    if (s.z > pz14 && maxZ > s.z && !(f & (4 | 16)) && (!(f & 8) || (f & 2))) { maxZ = s.z; noRoofs = true; }
+  }
+  let ground = maxZ;
+  for (const s of isoStatics(sc, bx + 1, by + 1) || []) {
+    const f = td[s.id * 2 + 1];
+    if ((f & (16 | 2)) || !(f & 8)) continue;
+    if (s.z > pz14 && maxZ > s.z) { maxZ = s.z; ground = s.z; noRoofs = true; }
+  }
+  let maxGround = maxZ;
+  if (ground < pz16) { maxZ = pz16; maxGround = pz16; }
+  const under = isoLand(sc, bx, by);
+  if (under && under.z >= pz16) maxGround = Math.min(maxGround, pz16);
+  return { maxZ, maxGround, noRoofs };
+}
+
+// --- the ground and what is built on it, sorted once per scene and tile the bot stands on
+const isoCmp = (a, b) => a.k - b.k || a.p - b.p || a.r - b.r || a.i - b.i;
+function isoAvgZ(t, l, r, b) { return Math.abs(t - b) <= Math.abs(l - r) ? (t + b) >> 1 : (l + r) >> 1; }
+function isoBuild(sc, bx, by, bz, R) {
+  const td = ISO.td.items, tl = ISO.td.land, roof = isoRoofs(sc, bx, by, bz), list = [];
+  let seq = 0;
+  const y0 = Math.max(sc.y0, by - R - 6), y1 = Math.min(sc.y0 + sc.side - 1, by + R + 6), x0 = Math.max(sc.x0, bx - R - 6), x1 = Math.min(sc.x0 + sc.side - 1, bx + R + 6);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const L = isoLand(sc, x, y);
+    if (L && !isoNoLand(L.id) && L.z <= roof.maxGround) {
+      const zr = (isoLand(sc, x + 1, y) || L).z, zl = (isoLand(sc, x, y + 1) || L).z, zb = (isoLand(sc, x + 1, y + 1) || L).z;
+      const stretched = tl[L.id] === 1 && !(L.z === zr && L.z === zl && L.z === zb);
+      list.push({ t: 0, k: x + y, p: (stretched ? isoAvgZ(L.z, zl, zr, zb) : L.z) - 2, r: 0, i: seq++, x, y, z: L.z, id: L.id, s: stretched ? [L.z, zr, zb, zl] : null });
+    }
+    for (const s of isoStatics(sc, x, y) || []) {
+      if (isoNoDraw(s.id)) continue;
+      const f = td[s.id * 2 + 1], h = td[s.id * 2];
+      if (s.z >= roof.maxZ || (roof.noRoofs && (f & 8))) continue;
+      list.push({ t: 1, k: x + y, p: s.z - (f & 1 ? 1 : 0) + (h ? 1 : 0), r: 1, i: seq++, x, y, z: s.z, id: s.id, hue: s.hue });
+    }
+  }
+  list.sort(isoCmp);
+  return { list, roof };
+}
+// Land the client never draws: the "no draw" tiles, whose pictures say so in letters.
+const isoNoLand = id => id === 2 || id === 0x1DB || (id >= 0x1AE && id <= 0x1B5);
+// How dark a corner of a slope is: the client lights its slopes by the ground's tilt round each corner, smoothly across the
+// tile. Lit from the north-west and above; a tile is about eight height steps across; ground turned to the light, or flat, is
+// left as the texture has it, ground turned away is darkened.
+const ISO_LIGHT = (() => { const L = [-1, -1, 1.6], l = Math.hypot(...L); return L.map(v => v / l); })();
+function isoDark(sc, x, y) {
+  const h = (dx, dy) => { const L = isoLand(sc, x + dx, y + dy); return L ? L.z : null; };
+  const c = h(0, 0) ?? 0, gx = ((h(1, 0) ?? c) - (h(-1, 0) ?? c)) / 16, gy = ((h(0, 1) ?? c) - (h(0, -1) ?? c)) / 16;
+  const n = Math.hypot(gx, gy, 1), dot = (-gx * ISO_LIGHT[0] - gy * ISO_LIGHT[1] + ISO_LIGHT[2]) / n;
+  return Math.max(0, Math.min(0.6, (ISO_LIGHT[2] - dot) * 1.6));
+}
+// A slope: the land's texture laid over the four corner heights, split along the left-right diagonal as the client splits
+// it, shaded corner by corner, drawn once into a small canvas kept with the scene.
+function isoSlope(o, sc) {
+  const key = o.y * 65536 + o.x, kept = sc.slopes.get(key);
+  if (kept) return kept;
+  const e = isoSprite(uTex(o.id));
+  if (!e) return null;
+  const [zt, zr, zb, zl] = o.s;
+  const P = [[22, -zt * 4], [44, 22 - zr * 4], [22, 44 - zb * 4], [0, 22 - zl * 4]];
+  const top = Math.min(...P.map(p => p[1])) - 1, bottom = Math.max(...P.map(p => p[1])) + 1;
+  const cv = document.createElement('canvas'); cv.width = 46; cv.height = Math.max(2, Math.ceil(bottom - top) + 1);
+  const c = cv.getContext('2d'), W = e.img.width, H = e.img.height;
+  const pts = P.map(p => [p[0] + 1, p[1] - top]);
+  const tri = (a, b, d, ta, tb, td, va, vb, vd) => {
+    // a little larger than exact, so neighbouring triangles leave no hairline between them
+    const cx = (a[0] + b[0] + d[0]) / 3, cy = (a[1] + b[1] + d[1]) / 3, g = q => { const dx = q[0] - cx, dy = q[1] - cy, l = Math.hypot(dx, dy) || 1; return [q[0] + dx / l * 0.7, q[1] + dy / l * 0.7]; };
+    const [A, B, D] = [g(a), g(b), g(d)];
+    const du1 = tb[0] - ta[0], dv1 = tb[1] - ta[1], du2 = td[0] - ta[0], dv2 = td[1] - ta[1], det = du1 * dv2 - du2 * dv1;
+    if (!det) return;
+    const dx1 = b[0] - a[0], dy1 = b[1] - a[1], dx2 = d[0] - a[0], dy2 = d[1] - a[1];
+    const m11 = (dx1 * dv2 - dx2 * dv1) / det, m12 = (dy1 * dv2 - dy2 * dv1) / det, m21 = (dx2 * du1 - dx1 * du2) / det, m22 = (dy2 * du1 - dy1 * du2) / det;
+    c.save(); c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.lineTo(D[0], D[1]); c.closePath(); c.clip();
+    c.setTransform(m11, m12, m21, m22, a[0] - m11 * ta[0] - m21 * ta[1], a[1] - m12 * ta[0] - m22 * ta[1]);
+    c.drawImage(e.img, 0, 0);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    // The shade varies linearly across the triangle, which a linear gradient along its slope draws exactly.
+    const sd = (b[0] - a[0]) * (d[1] - a[1]) - (d[0] - a[0]) * (b[1] - a[1]) || 1;
+    const ga = ((vb - va) * (d[1] - a[1]) - (vd - va) * (b[1] - a[1])) / sd, gb = ((b[0] - a[0]) * (vd - va) - (d[0] - a[0]) * (vb - va)) / sd;
+    const lo = Math.min(va, vb, vd), hi = Math.max(va, vb, vd), g2 = ga * ga + gb * gb;
+    if (hi > 0.01) {
+      if (g2 < 1e-9 || hi - lo < 0.01) c.fillStyle = `rgba(0,0,0,${hi})`;
+      else {
+        const p = va === lo ? a : vb === lo ? b : d, k = (hi - lo) / g2, gr = c.createLinearGradient(p[0], p[1], p[0] + ga * k, p[1] + gb * k);
+        gr.addColorStop(0, `rgba(0,0,0,${lo})`); gr.addColorStop(1, `rgba(0,0,0,${hi})`); c.fillStyle = gr;
+      }
+      c.fill();
+    }
+    c.restore();
+  };
+  const dk = [isoDark(sc, o.x, o.y), isoDark(sc, o.x + 1, o.y), isoDark(sc, o.x + 1, o.y + 1), isoDark(sc, o.x, o.y + 1)];
+  tri(pts[0], pts[1], pts[3], [0, 0], [W, 0], [0, H], dk[0], dk[1], dk[3]);
+  tri(pts[1], pts[2], pts[3], [W, 0], [W, H], [0, H], dk[1], dk[2], dk[3]);
+  const made = { cv, dx: -1, dy: top };
+  sc.slopes.set(key, made);
+  return made;
+}
+
+// Text over the game's picture, outlined in black as the client outlines its names.
+function isoText(ctx, text, x, y, color, font, dpr) {
+  ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  ctx.lineWidth = 3 * dpr; ctx.strokeStyle = 'rgba(0,0,0,0.9)'; ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+
+// --- a mobile: the mount, the body, then what it wears in the client's order for its facing
+function isoPose(m) { return m.mb ? 'ride' : m.w === 2 ? 'war2' : m.w === 1 ? 'war' : 'stand'; }
+function isoDrawBody(ctx, ax, ay, body, hue, d, pose, eq, mount, mountHue, war, alpha) {
+  let top = ay - 40, got = false;
+  const put = e => { if (!e) return; ctx.drawImage(e.img, ax - e.ax, ay - e.ay); top = Math.min(top, ay - e.ay); got = true; };
+  ctx.globalAlpha = alpha;
+  if (mount) put(isoSprite(uBody(mount, d, war ? 'war' : 'stand', mountHue)));
+  const b = isoSprite(uBody(body, d, pose, hue));
+  put(b);
+  if (Array.isArray(eq) && eq.length) {
+    const worn = new Map();
+    for (let i = 0; i + 2 < eq.length; i += 3) worn.set(eq[i], [eq[i + 1], eq[i + 2]]);
+    for (const layer of (d === 3 ? ISO_ORDER_DOWN : ISO_ORDER)) { const it = worn.get(layer); if (it) put(isoSprite(uWorn(it[0], d, body, pose, it[1]))); }
+  }
+  if (!b) { ctx.beginPath(); ctx.ellipse(ax, ay - 2, 9, 4.5, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fill(); }
+  ctx.globalAlpha = 1;
+  return got ? top : ay - 60;
+}
+
+// --- moving smoothly between frames: each mobile walks from where it was drawn to where the new frame has it
+function isoTrack(f) {
+  const now = performance.now(), seen = new Set();
+  const take = (key, x, y, z) => {
+    seen.add(key);
+    const p = ISO.pos.get(key), at = p ? isoAt(p, now) : null;
+    if (!at || Math.max(Math.abs(at.x - x), Math.abs(at.y - y)) > 3) ISO.pos.set(key, { fx: x, fy: y, fz: z, tx: x, ty: y, tz: z, t0: now });
+    else if (p.tx !== x || p.ty !== y || p.tz !== z) ISO.pos.set(key, { fx: at.x, fy: at.y, fz: at.z, tx: x, ty: y, tz: z, t0: now });
+  };
+  take('me', f.x, f.y, f.z);
+  for (const m of (Array.isArray(f.mobiles) ? f.mobiles : [])) if (m && isNum(m.s)) take(m.s, m.x, m.y, isNum(m.z) ? m.z : f.z);
+  for (const k of [...ISO.pos.keys()]) if (!seen.has(k)) ISO.pos.delete(k);
+}
+function isoAt(p, now) {
+  const t = Math.max(0, Math.min(1, (now - p.t0) / ISO_STEP));
+  return { x: p.fx + (p.tx - p.fx) * t, y: p.fy + (p.ty - p.fy) * t, z: p.fz + (p.tz - p.fz) * t, done: t >= 1 };
+}
+
+// --- drawing
+// One drawing per animation frame; a pane the browser does not paint (a side panel behind another) gets one by timer instead.
+function isoRequest() {
+  if (ISO.raf || !ISO.on || S.tab !== 'live' || document.hidden) return;
+  ISO.raf = requestAnimationFrame(isoRender);
+  ISO.rafTimer = setTimeout(() => { if (ISO.raf) { cancelAnimationFrame(ISO.raf); isoRender(); } }, 250);
+}
+function isoUpdate(f) {
+  ISO.frame = f;
+  if (f && f.found !== false && !f.pending && !f.offline && isNum(f.x)) {
+    isoTileData();
+    const pic = f.pic && typeof f.pic === 'object' ? f.pic : null;
+    if (pic && LV.bot && (!ISO.scene || ISO.scene.ver !== pic.scene || ISO.scene.bot.toLowerCase() !== LV.bot.toLowerCase())) isoLoadScene(LV.bot);
+    isoTrack(f);
+  }
+  isoRequest();
+}
+function isoRender() {
+  ISO.raf = 0; clearTimeout(ISO.rafTimer);
+  const began = performance.now();
+  isoPaint();
+  const ms = performance.now() - began;
+  ISO.ms = ISO.ms ? ISO.ms * 0.9 + ms * 0.1 : ms;
+}
+function isoPaint() {
+  const cv = isoCanvas, ctx = cv.getContext('2d'), f = ISO.frame;
+  const dpr = window.devicePixelRatio || 1, cw = cv.clientWidth || 640, ch = cv.clientHeight || 480;
+  const W = Math.max(100, Math.round(cw * dpr)), H = Math.max(80, Math.round(ch * dpr));
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const font = `${Math.round(12 * dpr)}px system-ui, sans-serif`;
+  const say = text => { isoText(ctx, text, W / 2, H / 2, '#c3c2b7', font, dpr); $('#livePicInfo').textContent = ''; };
+  if (!f || f.found === false || f.pending || !isNum(f.x)) return say(!LV.bot ? 'choose a bot' : 'waiting for a frame…');
+  if (f.offline) return say('resting away from the world');
+  if (!f.pic) return say('the shard sends no picture: bot-web.json says LivePicture is false');
+  if (ISO.tdState === 3) return say('no pictures: ' + ISO.tdError);
+  if (!ISO.td) return say('reading the client’s tiledata…');
+  const sc = ISO.scene;
+  if (!sc || sc.bot.toLowerCase() !== str(f.bot).toLowerCase()) return say('cutting the scene…');
+  ISO.drawn++;
+  const t = performance.now(), me = ISO.pos.get('me'), at = me ? isoAt(me, t) : { x: f.x, y: f.y, z: f.z, done: true };
+  const R = isNum(f.pic.radius) ? f.pic.radius : 18, bx = f.x, by = f.y, bz = f.z;
+  const key = `${sc.ver}|${bx}|${by}|${bz}|${R}`;
+  if (ISO.listKey !== key || !ISO.list) { ISO.list = isoBuild(sc, bx, by, bz, R); ISO.listKey = key; }
+  const roof = ISO.list.roof;
+  // the camera: on the bot's chest, wherever it is between two frames
+  const fit = isoFit(cw), zoom = ISO.zoom || fit, s = zoom * dpr;
+  const camX = isoSX(at.x, at.y) + 22, camY = isoSY(at.x, at.y, at.z) + 22 - 3 - 28;
+  const ox = W / 2 - camX * s, oy = H / 2 - camY * s;
+  ctx.setTransform(s, 0, 0, s, ox, oy);
+  ctx.imageSmoothingEnabled = s < 1;
+  const left = -ox / s - 120, right = (W - ox) / s + 120, topY = -oy / s - 60, bottomY = (H - oy) / s + 260;
+  const visible = (x, y, z) => { const X = isoSX(x, y) + 22, Y = isoSY(x, y, z) + 22; return X >= left && X <= right && Y >= topY && Y <= bottomY; };
+  // what moves, sorted the same way, then merged with the ground's list
+  const dyn = [], td = ISO.td.items;
+  let seq = 0;
+  for (const g of (Array.isArray(f.ground) ? f.ground : [])) {
+    if (!Array.isArray(g) || g.length < 7) continue;
+    const [id, x, y, z] = g;
+    if (Math.max(Math.abs(x - bx), Math.abs(y - by)) > R || z >= roof.maxZ || isoNoDraw(id)) continue;
+    const fl = td[id * 2 + 1], h = td[id * 2];
+    if (roof.noRoofs && (fl & 8)) continue;
+    dyn.push({ t: id === 0x2006 ? 3 : 2, k: x + y, p: id === 0x2006 ? z + 1 : z - (fl & 1 ? 1 : 0) + (h ? 1 : 0), r: 2, i: seq++, x, y, z, g });
+  }
+  const mobs = [{ me: true, m: f.look || {}, n: f.bot, hp: isNum(f.hp) && f.hpMax > 0 ? Math.round(f.hp * 100 / f.hpMax) : 100, dead: f.alive === false, hidden: f.hidden, key: 'me' }];
+  for (const m of (Array.isArray(f.mobiles) ? f.mobiles : [])) if (m && isNum(m.b)) mobs.push({ m, n: m.n, hp: m.hp, dead: m.dead, hidden: m.hidden, key: m.s });
+  for (const o of mobs) {
+    const p = ISO.pos.get(o.key), a = p ? isoAt(p, t) : { x: o.me ? bx : o.m.x, y: o.me ? by : o.m.y, z: isNum(o.m.z) ? o.m.z : bz };
+    if (Math.max(Math.abs(a.x - bx), Math.abs(a.y - by)) > R + 1 || (p ? p.tz : a.z) >= roof.maxZ) continue;
+    o.a = a;
+    dyn.push({ t: 4, k: Math.round(a.x) + Math.round(a.y), p: Math.round(a.z) + 1, r: 3, i: seq++, o });
+  }
+  dyn.sort(isoCmp);
+  const list = ISO.list.list, marks = [];
+  let i = 0, j = 0;
+  while (i < list.length || j < dyn.length) {
+    const o = j >= dyn.length || (i < list.length && isoCmp(list[i], dyn[j]) <= 0) ? list[i++] : dyn[j++];
+    if (o.t === 0) {
+      if (!visible(o.x, o.y, o.z)) continue;
+      const sx = isoSX(o.x, o.y), sy0 = (o.x + o.y) * 22;
+      const sl = o.s ? isoSlope(o, sc) : null;
+      if (sl) ctx.drawImage(sl.cv, sx + sl.dx, sy0 + sl.dy);
+      else { const e = isoSprite(uLand(o.id)); if (e) ctx.drawImage(e.img, sx, sy0 - o.z * 4); }
+    } else if (o.t === 1 || o.t === 2) {
+      if (!visible(o.x, o.y, o.z)) continue;
+      const id = o.t === 1 ? o.id : o.g[0], hue = o.t === 1 ? o.hue : o.g[4];
+      const e = isoSprite(uStatic(id, hue));
+      if (!e) continue;
+      const X = isoSX(o.x, o.y) + 22 - e.ax, Y = isoSY(o.x, o.y, o.z) + 44 - e.ay;
+      ctx.drawImage(e.img, X, Y);
+      if (o.t === 2 && o.g[5] === 1) ctx.drawImage(e.img, X - 5, Y - 5);
+    } else if (o.t === 3) {
+      if (!visible(o.x, o.y, o.z)) continue;
+      const g = o.g, ax = isoSX(o.x, o.y) + 22, ay = isoSY(o.x, o.y, o.z) + 22 - 3;
+      isoDrawBody(ctx, ax, ay, g[5], g[4], g[6] & 7, 'die', Array.isArray(g[7]) ? g[7] : null, 0, 0, false, 1);
+    } else {
+      const { o: mo } = o, m = mo.m, a = mo.a;
+      if (!visible(a.x, a.y, a.z)) continue;
+      const ax = isoSX(a.x, a.y) + 22, ay = isoSY(a.x, a.y, a.z) + 22 - 3;
+      const alpha = mo.hidden ? 0.45 : mo.dead || ISO_GHOSTS.has(m.b) ? 0.55 : 1;
+      // the client's ring under the feet: the watched bot in its class colour, whoever threatens it in red
+      if (mo.me || m.hostile) { ctx.beginPath(); ctx.ellipse(ax, ay + 1, 15, 7, 0, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = mo.me ? colorOfClass(f.class) : CSS.crit; ctx.stroke(); }
+      const top = isoDrawBody(ctx, ax, ay, m.b, m.h, (m.d || 0) & 7, isoPose(m), m.eq, m.mb, m.mh, !!m.w, alpha);
+      marks.push({ mo, ax, ay, top });
+    }
+  }
+  // --- what the client writes over the picture: names in their notoriety colour, health, and what the bot is about
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const toS = (X, Y) => [X * s + ox, Y * s + oy];
+  const tileS = (x, y, z) => toS(isoSX(x, y) + 22, isoSY(x, y, z) + 22 - 3);
+  const zAt = (x, y) => { const L = isoLand(sc, x, y); return L ? L.z : bz; };
+  const route = Array.isArray(f.route) ? f.route : [];
+  if (route.length >= 2) {
+    ctx.fillStyle = CSS.accent;
+    for (let k = 0; k + 1 < route.length; k += 2) { if (Math.max(Math.abs(route[k] - bx), Math.abs(route[k + 1] - by)) > R) continue; const [X, Y] = tileS(route[k], route[k + 1], zAt(route[k], route[k + 1])); ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(X, Y, 3 * dpr, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  }
+  if (f.dest && isNum(f.dest.x) && Math.max(Math.abs(f.dest.x - bx), Math.abs(f.dest.y - by)) <= R) {
+    const [X, Y] = tileS(f.dest.x, f.dest.y, zAt(f.dest.x, f.dest.y)); ctx.strokeStyle = CSS.accent; ctx.lineWidth = 2 * dpr; ctx.beginPath(); ctx.ellipse(X, Y, 16 * s, 8 * s, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  const chest = mk => toS(mk.ax, mk.ay - 28);
+  const meMark = marks.find(mk => mk.mo.me), bySerial = new Map(marks.filter(mk => !mk.mo.me).map(mk => [mk.mo.m.s, mk]));
+  const line = (other, colour, dash) => {
+    if (!meMark || !other) return;
+    const mk = bySerial.get(other.s); if (!mk) return;
+    const [x1, y1] = chest(meMark), [x2, y2] = chest(mk);
+    ctx.save(); if (dash) ctx.setLineDash([6 * dpr, 5 * dpr]); ctx.strokeStyle = colour; ctx.lineWidth = 2.2 * dpr; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore();
+  };
+  if (f.foe && (!f.combatant || f.foe.s !== f.combatant.s)) line(f.foe, CSS.serious, true);
+  line(f.combatant, CSS.crit, false);
+  const small = `${Math.round(10.5 * dpr)}px system-ui, sans-serif`, bold = `600 ${Math.round(11.5 * dpr)}px system-ui, sans-serif`;
+  for (const mk of marks) {
+    const mo = mk.mo, [X, Y] = toS(mk.ax, mk.top);
+    const col = mo.me ? (f.murderer ? NOTO_COL[6] : f.criminal ? NOTO_COL[4] : NOTO_COL[1]) : NOTO_COL[mo.m.noto] || '#c3c2b7';
+    const name = mo.me ? str(mo.n) : lvShort(mo.n);
+    isoText(ctx, name, X, Y - 15 * dpr, col, mo.me ? bold : small, dpr);
+    if (isNum(mo.hp) && !mo.dead) {
+      const w = 30 * dpr, h = 4 * dpr, x = X - w / 2, y = Y - 8 * dpr, p = Math.max(0, Math.min(100, mo.hp)) / 100;
+      ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(x - dpr, y - dpr, w + 2 * dpr, h + 2 * dpr);
+      ctx.fillStyle = p < 0.3 ? CSS.crit : p < 0.6 ? CSS.warn : CSS.good; ctx.fillRect(x, y, w * p, h);
+    }
+  }
+  const coming = ISO.queue.length + ISO.busy;
+  $('#livePicInfo').textContent = `${Math.round(zoom * 100)}% · ${str(sc.map)} · scene ${sc.ver}${sc.complete ? '' : ' (still being cut)'}${roof.noRoofs ? ' · under a roof' : ''}${coming ? ` · ${coming} pictures coming` : ''} · drawn in ${Math.round(ISO.ms || 0)} ms`;
+  isoTrim();
+  // keep drawing while anybody is still walking between two frames, at most thirty times a second
+  let moving = false;
+  for (const p of ISO.pos.values()) if (t - p.t0 < ISO_STEP && (p.fx !== p.tx || p.fy !== p.ty || p.fz !== p.tz)) { moving = true; break; }
+  if (moving && S.tab === 'live' && !document.hidden) setTimeout(isoRequest, 33);
+}
+function isoSetOn(on) {
+  ISO.on = on;
+  try { localStorage.setItem('botweb.livePicture', on ? '1' : '0'); } catch (e) { /* storage blocked */ }
+  $('#livePicOn').classList.toggle('on', on); $('#livePicOff').classList.toggle('on', !on);
+  $('#liveZoomBox').style.display = on ? '' : 'none';
+  $('#liveIso').closest('.lvBox').classList.toggle('pic', on);
+  if (!on) $('#livePicInfo').textContent = '';
+  lvRender();
+}
+function isoSetZoom(z) {
+  ISO.zoom = z ? Math.max(0.35, Math.min(4, z)) : 0;
+  try { localStorage.setItem('botweb.liveZoom', String(ISO.zoom)); } catch (e) { /* storage blocked */ }
+  isoRequest();
+}
+// Fit: about the client's own view across a wide panel (eight hundred pixels at one to one), never smaller than half size.
+function isoFit(cw) { return Math.max(0.5, Math.min(2.5, cw / 760)); }
+const isoNowZoom = () => ISO.zoom || isoFit(isoCanvas.clientWidth || 640);
+$('#livePicOn').addEventListener('click', () => isoSetOn(true));
+$('#livePicOff').addEventListener('click', () => isoSetOn(false));
+$('#liveZoomIn').addEventListener('click', () => isoSetZoom(isoNowZoom() * 1.25));
+$('#liveZoomOut').addEventListener('click', () => isoSetZoom(isoNowZoom() / 1.25));
+$('#liveZoomFit').addEventListener('click', () => isoSetZoom(0));
+(() => {
+  let on = '1', z = '0';
+  try { on = localStorage.getItem('botweb.livePicture') ?? '1'; z = localStorage.getItem('botweb.liveZoom') ?? '0'; } catch (e) { /* storage blocked */ }
+  ISO.on = on !== '0'; ISO.zoom = +z || 0;
+  $('#livePicOn').classList.toggle('on', ISO.on); $('#livePicOff').classList.toggle('on', !ISO.on);
+  $('#liveZoomBox').style.display = ISO.on ? '' : 'none';
+  $('#liveIso').closest('.lvBox').classList.toggle('pic', ISO.on);
+})();
+
+function lvRender() {
+  const f = LV.frame;
+  $('#liveInfo').textContent = !LV.bot ? 'choose a bot: click it on the map or in the list, or type a name' : !f ? `asking for ${LV.bot}…` : f.pending ? `${LV.bot}: watched from now; the first frame comes within a second` : `frame ${fmtInt(f.seq)} at ${str(f.at)}`;
+  lvState(f);
+  // The picture where the shard sends one; a frame without it (LivePicture off) falls back to the scheme.
+  const pic = ISO.on && !(f && !f.pending && f.found !== false && !f.offline && !f.pic);
+  isoCanvas.closest('.lvBox').classList.toggle('pic', pic);
+  if (pic) isoUpdate(f); else { if (ISO.on) $('#livePicInfo').textContent = 'the shard sends no picture (LivePicture is off): the scheme instead'; lvDraw(f); }
+  lvFeed();
+  lvDebuggers(LV.deb);
+}
+function lvNames() {
+  const names = S.bots.map(b => str(b.name)).filter(Boolean).sort();
+  const key = names.join('|');
+  if (key === LV.names) return;
+  LV.names = key;
+  $('#liveNames').replaceChildren(...names.map(n => el('option', { value: n })));
+}
+$('#liveGo').addEventListener('click', () => lvSet($('#liveName').value));
+$('#liveName').addEventListener('keydown', e => { if (e.key === 'Enter') lvSet($('#liveName').value); });
+$('#btnLive').addEventListener('click', () => { if (S.selected) lvSet(S.selected); showTab('live'); $('#tabs').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+window.addEventListener('resize', () => { if (S.tab === 'live') { if (ISO.on) isoRequest(); else lvDraw(LV.frame); } });
+(() => { let nm = null; try { nm = localStorage.getItem('botweb.live'); } catch (e) { nm = null; } if (nm) { LV.bot = nm; $('#liveName').value = nm; } })();
+
 // ================================================================ theme
 function applyTheme(t) {
   if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
@@ -2019,7 +3143,7 @@ bindSpark($('#chWork'), samples, 'workShare', { label: 'work finished share', fm
 bindSpark($('#chPath'), samples, 'pathShare', { label: 'paths reached share', fmt: fmtPct, target: 0.99, max: 1 });
 bindSpark($('#chAlive'), samples, 'alive', { label: 'alive', fmt: fmtInt, area: true, min: 0 });
 bindSpark($('#chStuck'), samples, 'stuck', { label: 'stuck', fmt: fmtInt, area: true, min: 0, color: CSS.warn });
-renderLegend(); renderChips(); renderDangerBar();
+renderLegend(); renderChips(); renderDangerBar(); renderReachBar();
 resizeMap();
 loadMapImage('/api/map.png');
 requestAnimationFrame(loop);
@@ -2027,6 +3151,7 @@ pollState();
 pollPaths();
 pollRoads();
 pollZones();
+pollReach();
 pollHistory();
 startSSE();
 window.addEventListener('resize', () => { for (const d of sparkDefs) d.render(); });

@@ -105,6 +105,24 @@ public static class BotWitness
 
     public static bool Busy(BotWatcher w) => w != null && _held.ContainsKey(w);
 
+    public static string Held(BotWatcher w) =>
+        w != null && _held.TryGetValue(w, out var m)
+            ? $"witness to meeting #{m.Id}: {m.Guest} {(m.Between ? $"to {m.Host}" : "to the town")} at {m.Town?.Name ?? "their seat"} over {BotDuke.Word(m.Topic)}, shown at {w.Body?.X},{w.Body?.Y}"
+            : null;
+
+    public static BotWatcher WitnessOf(int id)
+    {
+        foreach (var (w, m) in _held)
+        {
+            if (m.Id == id)
+            {
+                return w;
+            }
+        }
+
+        return null;
+    }
+
     private static Mobile Summon(BotHearing m)
     {
         if (!Running || m?.Map == null || m.Map == Map.Internal)
@@ -120,7 +138,7 @@ public static class BotWitness
             {
                 var w = BotVigil.Squad[i];
 
-                if (w.Organiser != (pass == 1) || _held.ContainsKey(w) || w.Body is not { Deleted: false })
+                if (w.Organiser != (pass == 1) || _held.ContainsKey(w) || w.Body is not { Deleted: false } || BotVigil.IsKeeper(w))
                 {
                     continue;
                 }
@@ -233,6 +251,14 @@ public static class BotWitness
                 AskedMs += waited;
 
                 var v = Read(m, json);
+
+                WitnessOf(m.Id)?.Think(
+                    v == null ? "unread" : "meeting",
+                    $"{(m.Between ? "the duke's word" : "the town's word")} at meeting #{m.Id}: {m.Guest} {(m.Between ? $"to {m.Host}" : "to the town")} over {BotDuke.Word(m.Topic)}",
+                    v == null ? "the model gave no word that could be read" : $"{v.Outcome} — \"{v.Speech}\"",
+                    v == null ? null : $"{v.Reason}{(v.Report != null ? $"; the town: \"{v.Report}\"" : "")}",
+                    null
+                );
 
                 if (v == null)
                 {

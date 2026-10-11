@@ -39,9 +39,9 @@ ROOT = "(root)"
 # subsystems that watch rather than act.
 ORDER = [
     ROOT, "BotModules", "BotPopulation", "BotWill", "BotMovement", "BotClasses", "BotOutfit",
-    "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotAuction", "BotShopkeep", "BotSpells",
-    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotTravel", "BotResidence", "BotGuildHouse", "BotCamp", "BotRunes", "BotSea", "BotProving", "BotEstate", "BotDiplomacy", "BotQuest", "BotQuad", "BotRanger",
-    "BotDashboard", "BotAlarm", "BotVoice", "BotWeb", "mindedBots", "mindedBots/debugger",
+    "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotMarket", "BotShopkeep", "BotSpells",
+    "BotCombat", "BotMend", "BotSquad", "BotDrill", "BotBaron", "BotDelve", "BotTravel", "BotResidence", "BotGuildHouse", "BotCamp", "BotRunes", "BotSea", "BotProving", "BotEstate", "BotDiplomacy", "BotRelics", "BotQuest", "BotQuad", "BotRanger",
+    "BotDashboard", "BotAlarm", "BotVoice", "BotSocial", "BotWeb", "mindedBots", "mindedBots/debugger",
 ]
 
 # folder -> (title, what it is, [traps])
@@ -164,28 +164,45 @@ BLOCKS = {
         ["The engine pays out of the pack, and a bot only walks to a bank above a threshold. Three files "
          "once closed on each other so that money existed and could not be spent."],
     ),
-    "BotAuction": (
-        "the bots' own market",
-        "Both sides of trade between bots. A stall is a standing offer of one kind of thing at one price; a "
-        "want is money already down for something a bot needs. Prices move on what actually sold and what "
-        "actually got filled, not on a table. This is where the crafts sell to and where the orders that make "
-        "crafting worth doing come from.",
-        ["A stall and a want can both be healthy and never meet. When trade is low the question is not "
-         "whether either side works but whether there is an edge between them."],
+    "BotMarket": (
+        "the bots' market, hand to hand",
+        "Trade between bots with the auction taken out (Patrick's order of 30.09.2026): Britain's square by the "
+        "bank, the wants bots say aloud in the trade chat (no gold held), the carrier who walks what somebody "
+        "wants over to them and the meeting at which goods go pack to pack and coin pack to pack, the prices "
+        "learned from goods that really changed hands, and the city's treasury, which buys at the bots' shops. "
+        "Nothing changes hands between two bots that are not standing within two tiles of each other.",
+        ["A want and the goods can both exist and never meet: the carrier offers a walk only within its reach "
+         "and to a buyer on its land who could pay for one. When trade is low, read the carriers' clause of "
+         "`The market:` before the wants.",
+         "A want holds no gold, so the buyer pays at the meeting in the middle of its own work; the meeting "
+         "books that coin aside (`BotYield.Aside`) or the buyer's hunt would learn that hunting loses money."],
     ),
     "BotShopkeep": (
         "bots' shops by the bank",
-        "Trade between bots in a place (Patrick's order of 29.09.2026). A bot holding what the island is short "
-        "of stands beside the bank of the town it lives in for a shift and calls out what it sells; a bot short "
-        "of a supply, or with money down on the board, weighs the shop against the shopkeeper and the stall on "
-        "price and the walk, walks over, and buys out of the keeper's bank box and pack. The goods never leave "
-        "the world. The auction is cut to `BotAuction.LotsPerBot` kinds a bot, set here, and what it turns away "
-        "is sold from here.",
-        ["The cap on the auction is set by this module's start. With the module off the auction is uncapped, "
-         "because a cap with no shop to take the rest only fills bank boxes.",
+        "Trade between bots in a place, and since 01.10.2026 the market itself. A maker or gatherer holding what "
+        "the island is short of or somebody asks for stands by Britain's bank (a guild's member by its guild's "
+        "own town's) for a shift and calls out what it sells in the trade chat; a bot short of "
+        "a supply, or with a want said, weighs the shop against the shopkeeper on price and the walk, walks "
+        "over, and buys out of the keeper's bank box and pack within two tiles of it. The goods never leave the "
+        "world. The city's buys, fairs and standing orders are served here too.",
+        ["Fighters keep no shop (`BotShopkeeper.Merchant`): 88 of 103 shift-hours on 30.09.2026 were theirs "
+         "and 53 % of shifts sold nothing.",
          "A shop's stock is a count, not the goods: it is taken every few seconds and at every sale, and the "
          "till counts again before anything moves. A customer can arrive to find the thing gone; a supplies "
          "errand then goes on to a shopkeeper."],
+    ),
+    "BotPolitics": (
+        "elections, plots, councils and tribute",
+        "Politics inside the guilds and the towns, Patrick's order of 07.10.2026: a guild's head elected by its members on "
+        "their records (renown, kills of other guilds, wars won, dues given) every six hours or when the head is gone or has "
+        "fallen, and deposed by a vote of no confidence when enough are discontented; what the chest saves for, by vote; each "
+        "town's tax collector and captain of the guard by the guilds' standing there, paid out of the treasury, and a surcharge "
+        "on the town's outcasts taxed into it; and an ultimatum before a war on a guild half as strong, with tribute paid "
+        "chest to chest instead.",
+        ["The elected head sticks only because every member's fealty is sworn to it (`BotGuilds.Crown`): the engine "
+         "recounts fealty once a day at a save and would otherwise put the founder back.",
+         "An ultimatum stands only in front of a war the existing rules already allowed; it can lower the wars per hour, "
+         "never raise them. A tribute standing refuses any declaration between the pair (`BotWar.MayDeclare`)."],
     ),
     "BotQuest": (
         "the board of errands",
@@ -383,6 +400,21 @@ BLOCKS = {
          "The duke's model answer is waited for two minutes after the last line and then given by rule; the log line "
          "`the word, by <who>` says which."],
     ),
+    "BotRelics": (
+        "relics and banners",
+        "Five town relics — the Crown of Britannia, the Bell of Minoc, the Anchor of Trinsic, the Lantern of Vesper, the Scales "
+        "of Yew — and one banner per guild, each an engine item the world save keeps and a registry (`BotRelics`, kept by "
+        "`BotRelicStore`) that says whose it is. A town relic is laid in a lair behind a warden (`BotRelicLair`); the company "
+        "that clears it takes it and walks it home (`BotRelicHomeward`); its holder's members pay 95 % at that town's counters "
+        "(through `BotBurgh.Factor`), the guild gains appeal (`BotGuilds.Appeal`) and calls the Great Fair once a day "
+        "(`BotFair.CallGreat`). A thief may lift one from a carrier (`BotRelicSnatch`) and the fence sells it back; a relic in a "
+        "hall is taken only by a war: the loser's banner goes to the winner (`BotWar.End` → `BotRelics.WarEnded`), the loser "
+        "may declare a war of revenge past a truce (`BotWar.MayDeclare` → `BotRelics.Avenges`) and buys its banner back chest "
+        "to chest. Patrick's order of 07.10.2026.",
+        ["A relic item is `Movable = false` and blessed: everything that moves it is code, and the registry's look every 30 "
+         "seconds puts it where the registry says. Never delete a `BotRelicItem` by hand without `do relic <name> ; hide`.",
+         "A restart hides a relic that was in a lair and takes its warden away; every other relic stays where it was."],
+    ),
     "BotQuad": (
         "the island as squares",
         "The map cut into squares thirty tiles across, each carrying one number: how safe the population has "
@@ -422,6 +454,22 @@ BLOCKS = {
          "the population does.",
          "The occasions are the will's own hooks (`BotWill.Started`, `BotWill.Ended`), the damage and death "
          "hooks on `BotMobile`, and three lines in `BotWar` and `BotHall`."],
+    ),
+    "BotSocial": (
+        "bots answering each other's moods",
+        "A mood line carries one word behind it — hurt, tired, grieving, poor, lonely, bored, proud, or a shade of "
+        "content (`BotMoods`, read off facts the shard keeps) — and is said only when somebody is in earshot, waiting up "
+        "to ten minutes for an audience. The nearest two listeners not of a hostile guild answer it a few seconds later: "
+        "always in words, and where they can with help — a bandage, a fire laid beside the tired, the nearest quarry "
+        "called as a hunt for two for the poor, a place in a company for the lonely — written against the listener as "
+        "an invitation and handed to its own auction by `BotFellow`, where a seam that pays keeps the bot and an idle bot "
+        "goes. Offers taken are followed through the will's own hooks to how they ended. Patrick's point 4 of 01.10.2026.",
+        ["The listener answers the tag, never the speaker's insides; the deed that carries the help out checks the world "
+         "itself (a bandage is wound only on a wound).",
+         "No handouts: a poor bot is pointed at a hunt. A company's call (`BotSquads.Enrol`) is the one answer that is "
+         "not an auction, and it takes only a bot whose work resumes and is not on paying work.",
+         "`Society:` counts what was heard by mood, offered by kind, accepted, finished, lapsed, and refused for hostility; "
+         "`Voice:` counts moods said to somebody against moods said to nobody."],
     ),
     "BotWeb": (
         "the shard as a page",
@@ -474,7 +522,7 @@ LINES = {
     "BotHarvest": ["The ground:"],
     "BotCraft": ["Needs:"],
     "BotShops": ["Needs:"],
-    "BotAuction": ["The market:"],
+    "BotMarket": ["The market:", "The board:"],
     "BotShopkeep": ["Bot shops:"],
     "BotSpells": ["Arms:"],
     "BotCombat": ["Arms:", "Bows:"],
@@ -489,6 +537,7 @@ LINES = {
     "BotProving": ["Proving:"],
     "BotEstate": ["Estate:", "Treasuries:"],
     "BotDiplomacy": ["Diplomacy:"],
+    "BotRelics": ["Relics:"],
     "BotGuildHouse": ["Houses:"],
     "BotQuest": ["Quests:"],
     "BotQuad": ["The captain:"],
@@ -523,7 +572,7 @@ def purpose(text):
 
 DIAL = re.compile(r"public static ([\w<>?\[\]]+) (\w+) \{ get; set; \} = ([^;]{1,60});")
 
-# A configuration file can only reach a dial through a line like `BotAuction.StaleMs = settings.StaleMs ??`
+# A configuration file can only reach a dial through a line like `BotMarket.StaleMs = settings.StaleMs ??`
 # in that subsystem's *Config.cs. Anything not on the left of one of those needs a rebuild to change.
 SETTABLE = re.compile(r"(\w+)\.(\w+)\s*=\s*(?:settings|cfg|c)\.(\w+)\s*\?\?")
 

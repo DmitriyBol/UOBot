@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using Server.Engines.Craft;
 using Server.Items;
 using Server.Logging;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -73,6 +75,8 @@ public sealed class BotForge : BotDeed
 
     private readonly BotWant _order;
 
+    public BotWant Order => _order;
+
     private Leg _leg;
 
     private bool _rounded;
@@ -87,6 +91,12 @@ public sealed class BotForge : BotDeed
 
     private Type _metal;
 
+    private Type _swungMetal;
+
+    private Dictionary<Type, int> _byMetal;
+
+    private static readonly Dictionary<Type, long> _piecesByMetal = [];
+
     private int _made;
 
     private int _had = -1;
@@ -99,12 +109,15 @@ public sealed class BotForge : BotDeed
 
     private long _swungTick;
 
-    public BotForge(Map map, Point3D smithy, BotWant order = null)
+    private readonly Type _spec;
+
+    public BotForge(Map map, Point3D smithy, BotWant order = null, Type spec = null)
     {
         _map = map;
         _smithy = smithy;
         _order = order;
         _kind = order?.Kind;
+        _spec = spec;
     }
 
     public override string Kind => Trade;
@@ -113,7 +126,7 @@ public sealed class BotForge : BotDeed
 
     public override Point3D Where => _smithy;
 
-    public override double Expects => _order == null ? Prior : Prior * 1.6;
+    public override double Expects => _order != null ? Prior * 1.6 : BotGlut.Claim(_kind ?? _spec, Prior);
 
     public override double Minutes => WorkMinutes;
 
@@ -121,7 +134,7 @@ public sealed class BotForge : BotDeed
 
     public override double Coin => _order == null ? 0.4 : 1.0;
 
-    public override int Made => _made * BotAuction.Worth(_kind, Guess);
+    public override int Made => BotGlut.Yield(_kind, _made, Guess);
 
     public override string Stage =>
         _leg switch
@@ -248,6 +261,7 @@ public sealed class BotForge : BotDeed
         {
             BotCraftwork.Produced(_kind, _made - had);
             _made += BotCraftwork.Bonus(body, _kind);
+            Book(_made - had);
         }
 
         if (_made > 0 && (_order != null || _swings >= MaxSwings))
@@ -266,10 +280,10 @@ public sealed class BotForge : BotDeed
             _metal = BotAnvil.Best(body, cost);
         }
 
-        if (_swings < MaxSwings && BotAnvil.Ingots(body, _metal) < cost && BotAuction.Reclaim(bot, _metal) > 0)
+        if (_swings < MaxSwings && BotAnvil.Ingots(body, _metal) < cost && BotMarket.FromBank(bot, _metal, cost * BotAnvil.Tries) > 0)
         {
             logger.Information(
-                "{Name} took its own {Metal} back off the market to make {Item}",
+                "{Name} took its own {Metal} out of its bank box to make {Item}",
                 body.Name,
                 _metal.Name,
                 _kind?.Name
@@ -308,6 +322,8 @@ public sealed class BotForge : BotDeed
         _swungTick = Core.TickCount;
         _swings++;
 
+        _swungMetal = _metal;
+
         BotAnvil.Swing(body, _recipe, tool, _metal);
 
         return BotDoing.Work($"beating out {_kind?.Name}");
@@ -327,37 +343,25 @@ public sealed class BotForge : BotDeed
             return BotDoing.Done($"{_swings} attempts at {_kind?.Name} and nothing to show");
         }
 
-        var filled = 0;
+        var want = _order ?? BotMarket.Demand(bot, _kind);
+        var made = 0;
 
-        var want = _order ?? BotAuction.Demand(bot, _kind);
-
-        for (var i = 0; i < goods.Count && want != null; i++)
+        for (var i = 0; i < goods.Count; i++)
         {
-            filled += BotAuction.Fill(bot, want, goods[i]);
+            made += Math.Max(1, goods[i].Amount);
         }
 
-        var listed = 0;
+        var filled = want == null ? 0 : Math.Min(made, want.Payable);
+        var listed = made - filled;
 
-        if (BotDig.ListGoods)
-        {
-            var left = BotAnvil.Gather(body, _kind);
-
-            left.RemoveAll(item => BotBinding.IsBound(item, bot?.Bond));
-
-            for (var i = 0; i < left.Count; i++)
-            {
-                if (BotAuction.List(bot, left[i], BotAuction.Worth(_kind, Guess)) != null)
-                {
-                    listed++;
-                }
-            }
-        }
+        var metals = Metals();
 
         logger.Information(
-            "{Name} beat out {Made} {Item} in {Swings} attempts: {Filled} to order, {Listed} to the market",
+            "{Name} beat out {Made} {Item} of {Metal} in {Swings} attempts: {Filled} for somebody's order, to be carried to them, and {Listed} kept",
             body.Name,
             _made,
             _kind?.Name ?? "iron",
+            metals,
             _swings,
             filled,
             listed
@@ -369,7 +373,98 @@ public sealed class BotForge : BotDeed
         Wrought++;
         Pieces += _made;
 
-        return BotDoing.Done($"{_made} {_kind?.Name} made, {filled} to order and {listed} on the stall");
+        return BotDoing.Done($"{_made} {_kind?.Name} of {metals} made, {filled} for an order and {listed} kept");
+    }
+
+    private void Book(int pieces)
+    {
+        if (pieces <= 0)
+        {
+            return;
+        }
+
+        var metal = _swungMetal ?? _metal ?? BotAnvil.Base;
+
+        _byMetal ??= [];
+        _byMetal[metal] = _byMetal.GetValueOrDefault(metal) + pieces;
+        _piecesByMetal[metal] = _piecesByMetal.GetValueOrDefault(metal) + pieces;
+    }
+
+    private string Metals()
+    {
+        if (_byMetal == null || _byMetal.Count == 0)
+        {
+            return BotAnvil.Named(_swungMetal ?? _metal);
+        }
+
+        if (_byMetal.Count == 1)
+        {
+            foreach (var only in _byMetal.Keys)
+            {
+                return BotAnvil.Named(only);
+            }
+        }
+
+        using var said = ValueStringBuilder.Create(64);
+
+        var i = 0;
+
+        foreach (var (metal, pieces) in _byMetal)
+        {
+            said.Append(i == 0 ? "" : i == _byMetal.Count - 1 ? " and " : ", ");
+            said.Append(BotAnvil.Named(metal));
+            said.Append(" (");
+            said.Append(pieces);
+            said.Append(')');
+            i++;
+        }
+
+        return said.ToString();
+    }
+
+    private static string ByMetal()
+    {
+        var metals = BotAnvil.System?.CraftSubRes;
+
+        if (_piecesByMetal.Count == 0 || metals == null)
+        {
+            return "no piece beaten out yet";
+        }
+
+        using var said = ValueStringBuilder.Create(160);
+
+        long all = 0;
+        long coloured = 0;
+
+        for (var i = 0; i < metals.Count; i++)
+        {
+            var metal = metals.GetAt(i);
+
+            if (metal?.ItemType == null || !_piecesByMetal.TryGetValue(metal.ItemType, out var pieces))
+            {
+                continue;
+            }
+
+            all += pieces;
+
+            if (metal.RequiredSkill > 0.0)
+            {
+                coloured += pieces;
+            }
+
+            if (said.Length > 0)
+            {
+                said.Append(", ");
+            }
+
+            said.Append(BotAnvil.Named(metal.ItemType));
+            said.Append(' ');
+            said.Append(pieces);
+        }
+
+        said.Append($" ({coloured} of {all} in a coloured metal)");
+
+        return said.ToString();
     }
 
     public static string Describe() =>
@@ -377,7 +472,8 @@ public sealed class BotForge : BotDeed
             ? "no stint at an anvil has ended yet"
             : $"{Stints} stints at an anvil ended: {Wrought} with {Pieces} pieces beaten out, {RanOut} out of metal, "
               + $"{Fruitless} that used every swing and made nothing, {NoPlace} that found no anvil the engine would take, "
-              + $"{Rounded} that walked round the forge to its anvil's side, {Preowned} that began with pieces of the kind already in the pack and left them out of what they made; {BotCraftEar.Describe()}";
+              + $"{Rounded} that walked round the forge to its anvil's side, {Preowned} that began with pieces of the kind already in the pack and left them out of what they made; "
+              + $"pieces by metal: {ByMetal()}; hammers by the best metal their Blacksmithy opens: {BotAnvil.Hands()}; {BotCraftEar.Describe()}";
 
     public static void Forget()
     {
@@ -388,5 +484,6 @@ public sealed class BotForge : BotDeed
         Fruitless = 0;
         NoPlace = 0;
         Rounded = 0;
+        _piecesByMetal.Clear();
     }
 }

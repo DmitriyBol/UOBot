@@ -172,15 +172,82 @@ public static class BotVigil
         return null;
     }
 
+    public static BotWatcher Keeper
+    {
+        get
+        {
+            if (!BotZoneWatch.On || !BotZoneTour.Running || !BotZones.Running || BotZoneTour.Walkers == null
+                || string.IsNullOrWhiteSpace(BotZoneTour.Keeper))
+            {
+                return null;
+            }
+
+            var w = Called(BotZoneTour.Keeper.Trim());
+
+            return w is { Organiser: false, Rank: > 0, Body: { Deleted: false } } ? w : null;
+        }
+    }
+
+    public static string KeeperName() => Keeper?.Name;
+
+    public static bool IsKeeper(BotWatcher w) => w != null && ReferenceEquals(Keeper, w);
+
+    public static List<BotWatcher> Heirs()
+    {
+        List<BotWatcher> heirs = [];
+        var keeper = Keeper;
+
+        if (keeper == null)
+        {
+            return heirs;
+        }
+
+        for (var i = 0; i < Squad.Count; i++)
+        {
+            if (!Squad[i].Organiser && !ReferenceEquals(Squad[i], keeper))
+            {
+                heirs.Add(Squad[i]);
+            }
+        }
+
+        return heirs;
+    }
+
+    public static IReadOnlyList<(string Name, Mobile Body)> TourWalkers()
+    {
+        List<(string, Mobile)> walkers = [];
+        var keeper = Keeper;
+
+        if (keeper?.Body is { Deleted: false } body && !BotWitness.Busy(keeper) && !BotVenues.Holds(keeper))
+        {
+            walkers.Add((keeper.Name, body));
+        }
+
+        var free = Walkers();
+
+        for (var i = 0; i < free.Count; i++)
+        {
+            walkers.Add(free[i]);
+        }
+
+        return walkers;
+    }
+
     public static IReadOnlyList<(string Name, Mobile Body)> Walkers()
     {
         List<(string, Mobile)> free = [];
+        var keeper = Keeper;
 
         for (var i = 0; i < Squad.Count; i++)
         {
             var w = Squad[i];
 
-            if (w.Body is not { Deleted: false } || BotWitness.Busy(w))
+            if (ReferenceEquals(w, keeper))
+            {
+                continue;
+            }
+
+            if (w.Body is not { Deleted: false } || BotWitness.Busy(w) || BotVenues.Holds(w))
             {
                 continue;
             }
@@ -390,7 +457,7 @@ public static class BotVigil
             {
                 var w = Squad[i];
 
-                if (BotWitness.Busy(w) || BotZoneTour.Holding(w.Body))
+                if (BotWitness.Busy(w) || BotZoneTour.Holding(w.Body) || BotVenues.Keep(w) || IsKeeper(w))
                 {
                     continue;
                 }
@@ -454,7 +521,7 @@ public static class BotVigil
 
             _reflectTurn++;
 
-            if (thinker.Organiser && Squad.Count > 1)
+            for (var tries = 0; tries < Squad.Count && (thinker.Organiser || IsKeeper(thinker)) && Squad.Count > 1; tries++)
             {
                 thinker = Squad[_reflectTurn % Squad.Count];
                 _reflectTurn++;
@@ -467,10 +534,16 @@ public static class BotVigil
         }
 
         BotWatcher due = null;
+        var keeper = Keeper;
 
         for (var i = 0; i < Squad.Count; i++)
         {
             var w = Squad[i];
+
+            if (ReferenceEquals(w, keeper))
+            {
+                continue;
+            }
 
             if (!w.Organiser && now - w.ReportedTick >= ReportMs && (due == null || w.ReportedTick < due.ReportedTick))
             {
@@ -589,12 +662,14 @@ public static class BotVigil
             return;
         }
 
+        w.Beside = bot.Name;
         w.Body.Hover(bot.Map, bot.Location);
     }
 
     private static void Revel()
     {
         _asking = true;
+        Lead?.Ask(RevelQuestion);
 
         var report = BotDebugSight.Report(
             Beside(Lead),
@@ -626,6 +701,7 @@ public static class BotVigil
 
         if (plan == null)
         {
+            Lead?.Think("unread", RevelQuestion, "the model said nothing that could be read", null, null);
             logger.Warning("The watcher was asked for a revel and said nothing that could be read");
 
             return;
@@ -633,6 +709,7 @@ public static class BotVigil
 
         if (string.Equals(plan.Kind, "nothing", StringComparison.OrdinalIgnoreCase))
         {
+            Lead?.Think("nothing", RevelQuestion, "no revel this time", plan.Why, null);
             BotDebugLog.Write($"no revel this time ({waited}ms): {plan.Why}");
 
             return;
@@ -640,6 +717,7 @@ public static class BotVigil
 
         if (!BotRevel.Known(plan.Kind))
         {
+            Lead?.Think("refused", RevelQuestion, $"a revel for {plan.Kind}, which is not work anybody takes; nothing declared", plan.Why, null);
             logger.Warning(
                 "The watcher wanted a revel for {Kind}, which is not work anybody takes; nothing is declared",
                 plan.Kind
@@ -650,8 +728,11 @@ public static class BotVigil
 
         var said = BotRevel.Declare(plan.Kind, plan.Prize, plan.Say, plan.Why, plan.Camp, plan.Spot);
 
+        Lead?.Think("revel", RevelQuestion, said, plan.Why, null);
         BotDebugLog.Write($"revel after {waited}ms — {said}");
     }
+
+    private const string RevelQuestion = "a revel for the population, or nothing";
 
     private static void Organise(long now)
     {
@@ -685,6 +766,7 @@ public static class BotVigil
         BotDebugLog.Write(
             $"{marshal.Name} is asked in {question.Length} characters: the report {report.Length}{(report.Length > room ? $", cut to {room}" : "")}, its own sight {sight.Length}"
         );
+        marshal.Ask($"{MarshalQuestion} ({question.Length} characters)");
 
         BotOllama.Ask(
             BotMarshal.System(marshal.Name),
@@ -698,6 +780,8 @@ public static class BotVigil
         );
     }
 
+    private const string MarshalQuestion = "an event for the population — a revel, a camp, a tournament, an errand, an order, a bounty, a price on a head, a fair — or nothing";
+
     private static string _marshalQuestion;
 
     public static int UnansweredWritten { get; private set; }
@@ -710,6 +794,14 @@ public static class BotVigil
 
         var plan = BotMarshalPlan.Read(json);
         var said = BotMarshal.Act(plan, BotPopulation.Home);
+
+        BotMarshal.Standing?.Think(
+            said == null ? "unread" : "event",
+            MarshalQuestion,
+            said ?? "the model said nothing that could be read",
+            plan?.Why,
+            plan?.What
+        );
 
         if (said == null)
         {
@@ -745,6 +837,7 @@ public static class BotVigil
 
         _asking = true;
         w.Asked++;
+        w.Ask(LookQuestion);
 
         var asked = DateTime.Now;
 
@@ -867,9 +960,11 @@ public static class BotVigil
         _asking = false;
 
         var note = BotDebugNote.Read(json);
+        var question = $"{LookQuestion}, measured at {asked:HH:mm:ss}";
 
         if (note == null)
         {
+            w.Think("unread", question, "the model said nothing that could be read", null, null);
             logger.Warning("{Name} looked at the population and the model said nothing that could be read", w.Name);
 
             return;
@@ -881,6 +976,7 @@ public static class BotVigil
             {
                 w.Labels++;
                 Labels++;
+                w.Think("label", question, note.Finding, "not filed: a label rather than a finding", note.Bot, note.Confidence);
 
                 BotDebugLog.Write($"{w.Name}: a label rather than a finding, not filed — [{note.Kind}] about {note.Bot}: {note.Finding}");
                 logger.Information(
@@ -898,6 +994,7 @@ public static class BotVigil
             {
                 w.Echoes++;
                 Echoes++;
+                w.Think("echo", question, note.Finding, $"not filed: it repeated {whose} last claim word for word", note.Bot, note.Confidence);
 
                 BotDebugLog.Write($"{w.Name}: repeated {whose} last claim about {note.Bot} word for word, not filed — {note.Finding}");
                 logger.Information(
@@ -912,6 +1009,15 @@ public static class BotVigil
         }
 
         w.Last = note;
+
+        w.Think(
+            string.Equals(note.Kind, "nothing", StringComparison.OrdinalIgnoreCase) ? "nothing" : $"finding: {note.Kind}",
+            question,
+            note.Finding,
+            Said(note),
+            note.Bot,
+            note.Confidence
+        );
 
         if (string.Equals(note.Kind, "nothing", StringComparison.OrdinalIgnoreCase))
         {
@@ -982,6 +1088,40 @@ public static class BotVigil
         );
     }
 
+    private const string LookQuestion = "the single thing most worth a person's attention in its charge, and whom to stand beside next";
+
+    private static string Said(BotDebugNote note)
+    {
+        var parts = new List<string>(5);
+
+        if (!string.IsNullOrWhiteSpace(note.Evidence))
+        {
+            parts.Add($"evidence it quoted: {note.Evidence}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(note.Cause))
+        {
+            parts.Add($"what it thinks is behind it (conjecture): {note.Cause}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(note.Fix))
+        {
+            parts.Add($"change it suggests (conjecture): {note.Fix}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(note.Probe))
+        {
+            parts.Add($"its hands: {note.Probe} {note.At}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(note.Watch) && note.Watch != "-")
+        {
+            parts.Add($"next it stands beside {note.Watch}");
+        }
+
+        return parts.Count == 0 ? null : string.Join("; ", parts);
+    }
+
     private static void Reach(BotWatcher w, BotDebugNote note)
     {
         if (note == null)
@@ -1005,6 +1145,7 @@ public static class BotVigil
     {
         _asking = true;
         w.Asked++;
+        w.Ask(ReflectQuestion);
 
         var asked = DateTime.Now;
 
@@ -1036,10 +1177,20 @@ public static class BotVigil
 
         if (thought == null)
         {
+            w.Think("unread", ReflectQuestion, "it thought for a while and the answer could not be read", null, null);
             logger.Warning("{Name} thought about the shard for a while and the answer could not be read", w.Name);
 
             return;
         }
+
+        w.Think(
+            "reflection",
+            $"{ReflectQuestion}, measured at {asked:HH:mm:ss}, thought for {waited / 1000}s",
+            thought.Blocking,
+            $"evidence: {thought.Evidence}; change to make: {thought.Change}; second most likely: {thought.Second}; what would show this to be wrong: {thought.Wrong}",
+            null,
+            thought.Confidence
+        );
 
         w.Reflections++;
 
@@ -1061,6 +1212,8 @@ public static class BotVigil
 
         logger.Information("{Name} has thought about the shard: {What}", w.Name, thought.Blocking);
     }
+
+    private const string ReflectQuestion = "what most blocks these bots, thinking at length";
 
     private static void Remember(BotWatcher w, string line)
     {
@@ -1266,6 +1419,7 @@ public static class BotVigil
         if (Lead != null)
         {
             Lead.Asked++;
+            Lead.Ask($"a question at the door: {question}");
         }
 
         var asked = DateTime.Now;
@@ -1290,6 +1444,7 @@ public static class BotVigil
 
                 var said = BotDebugThought.ReadAnswer(json);
 
+                Lead?.Think(said == null ? "unread" : "door", $"asked at the door at {asked:HH:mm:ss}: {question}", said ?? "nothing that could be read", null, null);
                 BotDebugLog.Rule();
                 BotDebugLog.Write($"ASKED AT THE DOOR at {asked:HH:mm:ss}, answered {waited / 1000}s later");
                 BotDebugLog.Block("  question:", question);
@@ -1806,6 +1961,25 @@ public static class BotVigil
             rows.Add(sorted[i].Row(now));
         }
 
+        var keeper = Keeper;
+        var heirs = keeper != null && w != null ? Heirs() : null;
+        var at = heirs?.IndexOf(w) ?? -1;
+
+        if (at >= 0 && sorted.Count > Rows)
+        {
+            var theirs = Math.Min(keeper.Rank * (Rows / 2), Math.Max(0, sorted.Count - Rows));
+
+            for (var j = 0; j < Rows && theirs + j < sorted.Count; j++)
+            {
+                var i = theirs + j;
+
+                if ((i < from || i >= from + Rows) && j % heirs.Count == at)
+                {
+                    rows.Add(sorted[i].Row(now));
+                }
+            }
+        }
+
         return rows;
     }
 
@@ -1815,15 +1989,30 @@ public static class BotVigil
 
         var sb = ValueStringBuilder.Create(4096);
 
+        var heirs = w != null && BotVigil.Keeper != null ? Heirs() : null;
+        var lent = heirs != null && heirs.Contains(w);
+        var own = budget;
+
+        if (lent)
+        {
+            budget += budget / heirs.Count;
+        }
+
         try
         {
             var spent = 0;
 
-            for (var i = 0; i < _describers.Length && spent < budget; i++)
+            for (var n = 0; n < (lent ? 2 * _describers.Length : _describers.Length) && spent < budget; n++)
             {
+                var i = n % _describers.Length;
                 var method = _describers[i];
 
-                if (w != null && !w.Watches(method.DeclaringType?.Name))
+                if (w != null && !(n < _describers.Length ? w.Owns(method.DeclaringType?.Name) : w.Borrows(method.DeclaringType?.Name)))
+                {
+                    continue;
+                }
+
+                if (lent && n < _describers.Length && spent >= own)
                 {
                     continue;
                 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Server.Items;
 using Server.Logging;
 
@@ -34,8 +35,7 @@ namespace Server.BotAI.V2;
 /// reason the trade she is sewing for can never be supplied. The same lesson is written out in
 /// <see cref="BotUpkeep"/> about collecting goods already paid for, and in <see cref="BotOrder"/> in as many
 /// words: <em>an errand that costs nothing and takes no time cannot win an auction against work that pays,
-/// and it never did.</em> Both live on the population's beat now beside <c>BotAuction.Fetch</c>, and so does
-/// this.
+/// and it never did.</em> This lives on the population's beat for that reason.
 /// </para>
 ///
 /// <para>
@@ -68,6 +68,125 @@ public static class BotStores
     public static int Enough { get; set; } = 20;
 
     public static int Batch { get; set; } = 20;
+
+    public static int MeatBatch { get; set; } = 5;
+
+    public static bool SupplyGated { get; set; } = true;
+
+    public static double StockShare { get; set; } = 0.5;
+
+    public static int StockFloor { get; set; } = 30;
+
+    public static int StockRoom(Type kind) => Math.Max(StockFloor, (int)(BotMarket.Supply(kind) * Math.Max(0.0, StockShare)));
+
+    public static int MeatLeast { get; set; } = 3;
+
+    public static double ThinShare { get; set; } = 0.5;
+
+    public static bool Thin(Type kind) => ThinShare > 0 && BotMarket.Pace(kind) < BotMarket.Brought(kind) * ThinShare;
+
+    public static long SizedToRoom { get; private set; }
+
+    public static long SizedThin { get; private set; }
+
+    public static long SizedUnits { get; private set; }
+
+    public static bool TakeBackSated { get; set; } = true;
+
+    public static long Sated { get; private set; }
+
+    public static long SatedEarly { get; private set; }
+
+    public static long SatedUnits { get; private set; }
+
+    private static readonly Dictionary<Serial, long> _satedLook = [];
+
+    private static void TakeBack(IBotWilful bot, Mobile body)
+    {
+        if (!TakeBackSated || BotOven.Kit(body) == null)
+        {
+            return;
+        }
+
+        var ribs = BotOven.Amount(body, typeof(RawRibs));
+
+        if (ribs < BotOven.Worthwhile)
+        {
+            return;
+        }
+
+        var now = Core.TickCount;
+
+        if (_satedLook.TryGetValue(body.Serial, out var last) && now - last < 60000)
+        {
+            return;
+        }
+
+        if (_satedLook.Count > 4096)
+        {
+            _satedLook.Clear();
+        }
+
+        _satedLook[body.Serial] = now;
+
+        var want = BotMarket.Wanted(bot, typeof(RawRibs));
+
+        if (want == null || want.Coming > 0 || ribs < want.Amount)
+        {
+            return;
+        }
+
+        var early = now - want.PostedTick < BotLines.GraceMs;
+        var units = BotMarket.Withdrawn(bot, typeof(RawRibs), BotWithdraw.Have);
+
+        if (units <= 0)
+        {
+            return;
+        }
+
+        Sated++;
+        SatedUnits += units;
+
+        if (early)
+        {
+            SatedEarly++;
+        }
+
+        logger.Information(
+            "{Name} took back its want for {Units} Raw Ribs: it holds {Ribs} of its own, and its ribs are for other buyers now",
+            body.Name,
+            units,
+            ribs
+        );
+    }
+
+    public static long Outrun { get; private set; }
+
+    public static long OutrunBots { get; private set; }
+
+    public static long OutrunUnits { get; private set; }
+
+    public static int HoldLapseMs { get; set; } = 300000;
+
+    private static readonly Dictionary<(Serial Bot, Type Kind), long> _holding = [];
+
+    public static int HeldNow()
+    {
+        var now = Core.TickCount;
+        var held = 0;
+
+        foreach (var (_, tick) in _holding)
+        {
+            if (now - tick < HoldLapseMs)
+            {
+                held++;
+            }
+        }
+
+        return held;
+    }
+
+    public static long MealCapped { get; private set; }
 
     public static int Least { get; set; } = 5;
 
@@ -115,6 +234,8 @@ public static class BotStores
             return;
         }
 
+        TakeBack(bot, body);
+
         var count = Materials(body, _wanted);
 
         if (count == 0)
@@ -151,28 +272,53 @@ public static class BotStores
             return false;
         }
 
-        if (BotAuction.Selling(bot, kind))
+        if (BotMarket.FromBank(bot, kind, Enough - (body.Backpack?.GetAmount(kind) ?? 0)) > 0)
         {
             Shelved++;
 
             return false;
         }
 
-        if (BotAuction.Wanted(bot, kind) != null)
+        if (BotMarket.Wanted(bot, kind) != null)
         {
             Standing++;
 
             return false;
         }
 
-        var offer = BotAuction.Worth(kind, Guess(kind));
+        var offer = BotMarket.Worth(kind, Guess(kind));
 
-        var wealth = BotYield.Wealth(body);
+        var meal = BotOven.MealWorth(kind);
+        var batch = Batch;
+        var least = Least;
+        var capped = false;
+        var thin = false;
+
+        if (meal > 0)
+        {
+            batch = MeatBatch;
+
+            if (SupplyGated && MeatLeast < batch && Thin(kind))
+            {
+                batch = Math.Max(1, MeatLeast);
+                least = Math.Min(least, batch);
+                thin = true;
+            }
+
+            capped = offer > meal;
+
+            if (capped)
+            {
+                offer = meal;
+            }
+        }
+
+        var wealth = BotYield.Spendable(body);
 
         var afford = offer <= 0 ? 0 : (wealth - Reserve) / offer;
-        var units = Math.Min(Batch, afford);
+        var units = Math.Min(batch, afford);
 
-        if (units < Least)
+        if (units < least)
         {
             Poor++;
 
@@ -184,7 +330,45 @@ public static class BotStores
             return false;
         }
 
-        if (BotAuction.Ask(bot, kind, units, offer) == null)
+        var left = meal > 0 && SupplyGated ? StockRoom(kind) - BotMarket.Wanting(kind) : int.MaxValue;
+        var asked = units;
+
+        if (units > left && left >= Math.Max(1, MeatLeast))
+        {
+            units = left;
+        }
+
+        if (meal > 0 && SupplyGated && units > left)
+        {
+            Outrun++;
+
+            var key = (body.Serial, kind);
+            var now = Core.TickCount;
+
+            if (!_holding.TryGetValue(key, out var last) || now - last >= HoldLapseMs)
+            {
+                OutrunBots++;
+                OutrunUnits += units;
+            }
+
+            if (_holding.Count > 4096)
+            {
+                _holding.Clear();
+            }
+
+            _holding[key] = now;
+
+            return false;
+        }
+
+        _holding.Remove((body.Serial, kind));
+
+        if (capped)
+        {
+            MealCapped++;
+        }
+
+        if (BotMarket.Ask(bot, kind, units, offer) == null)
         {
             Standing++;
 
@@ -193,6 +377,21 @@ public static class BotStores
 
         Ordered++;
         Once(body, kind);
+
+        if (units < asked)
+        {
+            SizedToRoom++;
+        }
+
+        if (thin)
+        {
+            SizedThin++;
+        }
+
+        if (meal > 0 && units < MeatBatch && (thin || units < asked))
+        {
+            SizedUnits += MeatBatch - units;
+        }
 
         return true;
     }
@@ -264,8 +463,12 @@ public static class BotStores
         Asked == 0
             ? $"no crafter has been asked about its materials ({NoTrade} answers went to bots with neither kit)"
             : $"{Asked} asked about a feather, a log, a hide or a rib: {Ordered} put the order to the population, {Standing} already have one out, "
-              + $"{Stocked} have {Enough} already, {Shelved} have their own out on a stall, "
-              + $"{Poor} cannot afford one (the fattest purse among them held {Richest}gp); {Soon} crafters came again inside the minute (Asked counts materials, this counts bots)";
+              + $"{Stocked} have {Enough} already, {Shelved} took their own out of their bank box at a bank instead, "
+              + $"{Poor} cannot afford one (the fattest purse among them held {Richest}gp); {Soon} crafters came again inside the minute (Asked counts materials, this counts bots); "
+              + $"{MealCapped} asks for raw meat brought down to what the meal is worth (a cook orders {MeatBatch} at a time), "
+              + $"{OutrunBots} bots held back from asking for {OutrunUnits} units ({Outrun} asks counting each minute's retry, {HeldNow()} held now) while the board already asked for more than {StockShare:P0} of what the island brings an hour (RawRibs now: {BotMarket.Wanting(typeof(RawRibs))} asked by buyers in the world against room for {StockRoom(typeof(RawRibs))}, {BotMarket.Brought(typeof(RawRibs))} brought in the hour, {BotMarket.Pace(typeof(RawRibs))} an hour at the pace of the last quarter-hour (half-life {BotMarket.SupplyHalfLifeMs / 60000} min; the room is sized to the lesser{(Thin(typeof(RawRibs)) ? ", and the pace is thin" : "")}), floor {StockFloor}{(SupplyGated ? "" : "; off")}); "
+              + $"{SizedToRoom + SizedThin} raw meat lines said smaller than {MeatBatch} ({SizedToRoom} to the room left on the board, {SizedThin} to {MeatLeast} while the pace ran under {ThinShare:P0} of the hour's; {SizedUnits} units fewer); "
+              + $"{Sated} raw meat wants taken back because their buyer held what they asked for from its own hunting ({SatedUnits} units; {SatedEarly} inside the want's first {BotLines.GraceMs / 60000} min, kept out, the rest counted failed{(TakeBackSated ? "" : "; off")})";
 
     public static void Forget()
     {
@@ -279,5 +482,17 @@ public static class BotStores
         Soon = 0;
         Ordered = 0;
         Richest = 0;
+        MealCapped = 0;
+        Outrun = 0;
+        OutrunBots = 0;
+        OutrunUnits = 0;
+        _holding.Clear();
+        SizedToRoom = 0;
+        SizedThin = 0;
+        SizedUnits = 0;
+        Sated = 0;
+        SatedEarly = 0;
+        SatedUnits = 0;
+        _satedLook.Clear();
     }
 }

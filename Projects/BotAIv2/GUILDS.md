@@ -25,6 +25,40 @@ This document is the reasoning. The rules themselves live in `BotPopulation/BotG
 >
 > The full reasoning and the measurements are in `DECISIONS.md`, entries for builds 170 and 171.
 
+> **Amended 06.10.2026, on Patrick's order: guilds nobody wants may close; fifty more names.**
+>
+> - **58 names.** The eight are taken first, in order (their halls are inherited by the name on the sign); past
+>   them a founding draws one of the free fifty at random. The bound on guilds is now `BotGuilds.MostGuilds`
+>   (10), not the pool.
+> - **Attractiveness** (`BotGuilds.Appeal`) = `Worth` (hall 2, a square 1 each, a town house 1, a purse of half a
+>   hall's price 1) + members / 5. In the `Guilds:` line as `appeal N.N` and in `/api/state` → `guilds[].appeal`.
+> - **Closing** (`BotGuilds.Wane`): fewer than five members, attractiveness under 2.0 and nobody joining, for two
+>   hours of uptime (kept across restarts) — the guild closes. Not while at war, laying claim, with a member in a
+>   company, or while the other guilds lack the places to take its members. The chest is shared among the last
+>   members, the members are placed by `Gather`, the engine disbands the guild (guildstone, enemies, allies), the
+>   seat and widenings are dropped; squares and a town house are released by the code that already handles a guild
+>   that is gone. The name rests a week (`NameRestHours`).
+> - §4's "Decline is deliberately not modelled" no longer holds for a guild with nothing: a guild with a hall is
+>   never closed by this rule (a hall alone is 2.0).
+
+> **Amended 06.10.2026 (~10:00), on Patrick's word: "five leaving a full guild to found a new one under one of the
+> fifty names: we do it."** (`BotGuilds.Hive`, every `ReviewMs`.)
+>
+> - **Who leaves.** A guild at its ceiling loses five members who each have a reason of their own: *no share* (under
+>   the 800gp keep for an hour unbroken while the chest holds 2500gp or more), *far* (living in another town than the
+>   guild's house or hall, or neither within 120 tiles of its town), or *a quarrel* (half the other guilds hold the guild
+>   at −40 or under, or its town has put it out). Never the head, a member in a company, or one inside the walk-out bar.
+> - **When.** Not while the guild is at war, not within 12 h of its last split, not with `MostGuilds` (10) standing, not
+>   while another guild with room (beyond the places splits left) reads attractiveness 5.0 or more, not within 3 h of
+>   any split.
+> - **What they take.** Their own packs and banks. The chest stays; their keys to the old hall and outpost are taken
+>   back. The new guild has one of the fifty names with nothing under it, no hall, no ground, no house, a bare seat by
+>   the town most of them live in, and claims free squares by the rules every guild does.
+> - **No ping-pong.** The walk-out bar is now saved (`BotGuildSplitStore`): the founders may not cross out or go back for
+>   48 h of running time, across restarts. The new guild is spared the closing clock for 6 h.
+> - Replayed on the night's logs: one split per 3.5-hour log (The Hammer at 02:10, no hall and no house; The Anchor at
+>   09:12, no share). Without the gap and the cooldown, two and one.
+
 ---
 
 ## 1. What went wrong with the first version, and why it is worth stating first

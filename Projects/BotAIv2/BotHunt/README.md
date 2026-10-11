@@ -6,7 +6,7 @@ The first work in the project that **brings new gold into the world**. Everythin
 |---|---|
 | `BotQuarry.cs` | what is worth fighting, and where what is left of it is lying; a company is not handed a creature swimming where nobody can stand (`Afloat`); a creature found unreachable again where it stood is shunned twice as long each time (`Reshunned`); a lone hunter asks the reach ledger and the refusal memory about its quarry, as a company always did (build 59), counted apart as `Penned` and `Unwelcome`, and both hunter and company ask whether the creature's own cell is in a proved pocket rather than the ground around it (`ShutOff`, build 60) |
 | `BotSlay.cs` | an obligation: close → fight → go through the corpse |
-| `BotHunter.cs` | the proposer: who is whole enough to want a fight; a prowl's company is counted at the edge of the town, where it will be raised; ground where bots have lately died is prowled only by a company (`Deadly`); ground whose road from home runs more than `Detour` past the straight line from the asker is counted (`Roundabout`) and passed over only with `ReadsRoads` on (build 63, see `BotRoads`) |
+| `BotHunter.cs` | the proposer: who is whole enough to want a fight; a prowl's company is counted at the edge of the town, where it will be raised; ground where bots have lately died is prowled only by a company (`Deadly`); ground whose road from home runs more than `Detour` past the straight line from the asker is counted (`Roundabout`) and passed over only with `ReadsRoads` on (build 63, see `BotRoads`); the prowl it offers is a sweep: the chosen ground and the best squares beside it the hunter takes alone (`Sweep`), or the squares a sweep left for a fight (`Again`) |
 | `BotHuntConfig.cs` | `Configuration/bot-hunt.json` |
 | `BotHuntModule.cs` | module, phase `World`, requires `Classes`, `Will`, `Auction` |
 | `BotBand.cs` | calling a company together for something one bot cannot take, and seeing it through |
@@ -15,7 +15,7 @@ The first work in the project that **brings new gold into the world**. Everythin
 | `BotPickings.cs` | going through something this bot killed without meaning to |
 | `BotPlunder.cs` | going through a chest, crate or barrel standing out in the world — a camp's, a ruin's |
 | `BotFreedom.cs` | getting a prisoner out of a camp and walking it home for the engine's bounty; the prisoner is the chooser's from the moment it chooses, so a boot does not send the whole population to one cage (build 57); a prisoner the engine has paid for and let go is delivered, not lost (build 58) |
-| `BotProwl.cs` | going to look for a fight, when there is nothing to fight where the bot is standing; its failures say the strength gathered and the tile the walk stopped on; a walk that stops closing looks once for ground on its own side a search proves walkable (`Redart`) before it gives up, and so does a walk whose road is refused on the way (`Bend`, build 62) |
+| `BotProwl.cs` | going to look for a fight, when there is nothing to fight where the bot is standing; its failures say the strength gathered and the tile the walk stopped on; a walk that stops closing looks once for ground on its own side a search proves walkable (`Redart`) before it gives up, and so does a walk whose road is refused on the way (`Bend`, build 62); from 06.10.2026 a sweep of 2–4 squares (`BotHunter.Sweep`), each waypoint reached before the next, "found nothing" finished only with every square walked, a fight found leaves the rest for after it (`BotSweepRecord.Leave`), priced by what sweeps of its squares paid (`BotSweepRecord.Worth`, `Unpaid`) |
 | `BotBarrier.cs` | where walks have stopped getting nearer and which way they were heading, so the hunt stops throwing darts past those places |
 | `BotOutlaw.cs` | murderers: red for an hour by the engine's own count of kills, ten cells at the bottom of the map with one bot to a cell, the clock that places, releases and redeems, `BotSentence` (sitting the sentence out) and `BotManhunt` (the Baron's patrol against a red, a posse pressed into it) (build 70) |
 | `BotOutlawStore.cs` | keeps the murderers and the cells across restarts, each clock as what is left of it; a restart used to be an amnesty the engine did not grant (build 83) |
@@ -385,3 +385,13 @@ one four-hour session, all of them the fence, 78% of that session in a cell. It 
 price out. Not hidden — a Sage has no Hiding worth the name — but away, because the hideout is two hundred and fifty to
 five hundred road steps from anywhere anybody lives and patrols are raised within `BotOutlaw.Reach` of a murder. The
 price still stands and a raid still finds it there; it simply stops walking past the people who would collect.
+
+## Sweeps are not sent where a sweep could not walk; hunters at their fight are not called away (07.10.2026, work18)
+
+- `BotHunter.NoWay`: a square whose waypoint a sweep's walk was refused or gave up on within `BotSweepRecord.WaylessMs` (an hour;
+  filed by `BotProwl.Bend`), or whose point the reach map calls an island or a pocket, is not a sweep's square: asked of the darts,
+  the named pickers, the ring of a sweep and the first square in `Offer`. Counted at the end of `The island:`'s sweep clause
+  ("looks at a square refused …, prowls not offered for their first square") and "squares filed as having no way".
+- `BotSlay.Engaged` (the quarry within reach and standing) makes `BotSquads.Pressable` false, and the delve's party and the
+  harrowing skip such a hunter too (`BotSquads.SpareFighters`, counter "hunters at their fight left to it" in the squads line).
+  On build 416, 103 of 133 hunt drops were "not taken up again after enlist", 87 of 163 presses caught the hunter fighting.

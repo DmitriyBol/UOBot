@@ -20,6 +20,13 @@ namespace Server.BotAI.V2;
 /// The ledger must not learn that <em>writing</em> is worthless for a reason that has nothing to do with
 /// writing.
 /// </para>
+///
+/// <para>
+/// <b>Except for a scroll somebody needs (03.10.2026).</b> A session to order — somebody's want, or its own book's next gap —
+/// buys the herbs its few attempts burn at the paper's counter as part of the session, so a want is not passed over for want
+/// of the one herb the shopper buys last (<see cref="BotQuill.Plan"/>). Every answer this proposer gives is counted in the
+/// <c>scrolls:</c> clause of the <c>Needs:</c> line (<see cref="BotScribes.Describe"/>).
+/// </para>
 /// </summary>
 public sealed class BotScribe : IBotProposer
 {
@@ -43,8 +50,12 @@ public sealed class BotScribe : IBotProposer
             return null;
         }
 
+        BotScribes.Looked();
+
         if (BotGrimoire.Book(body) == null)
         {
+            BotScribes.Bookless();
+
             return null;
         }
 
@@ -66,6 +77,8 @@ public sealed class BotScribe : IBotProposer
 
         if (shop == null)
         {
+            BotScribes.Paperless();
+
             if (!_saidNoPaper)
             {
                 _saidNoPaper = true;
@@ -83,10 +96,23 @@ public sealed class BotScribe : IBotProposer
 
         if (price <= 0)
         {
+            BotScribes.Paperless();
+
             return null;
         }
 
-        return BotQuill.Choose(body, price, out _, out _) == null ? null : new BotInscribe(shop, price);
+        var plan = BotQuill.Plan(bot, shop, price);
+
+        if (plan == null)
+        {
+            BotScribes.Idle();
+
+            return null;
+        }
+
+        BotScribes.Offered(plan, BotYield.Spendable(body) < plan.Outlay);
+
+        return new BotInscribe(shop, price, plan, body);
     }
 
     public static void Forget()

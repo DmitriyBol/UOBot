@@ -158,33 +158,34 @@ public static class BotWebCraft
 
         Dictionary<Type, (int Units, int Cheapest)> stock = [];
 
-        foreach (var listing in BotAuction.Listings)
+        foreach (var front in BotShopkeep.Open)
         {
-            if (listing?.Kind == null || listing.Amount <= 0)
+            if (front == null || front.Shut)
             {
                 continue;
             }
 
-            if (stock.TryGetValue(listing.Kind, out var s))
+            foreach (var (kind, units, ask) in front.Ranked())
             {
-                stock[listing.Kind] = (s.Units + listing.Amount, Math.Min(s.Cheapest, listing.Price));
-            }
-            else
-            {
-                stock[listing.Kind] = (listing.Amount, listing.Price);
+                if (kind == null || units <= 0)
+                {
+                    continue;
+                }
+
+                stock[kind] = stock.TryGetValue(kind, out var s) ? (s.Units + units, Math.Min(s.Cheapest, ask)) : (units, ask);
             }
         }
 
         Dictionary<Type, int> wanted = [];
 
-        foreach (var want in BotAuction.Wants)
+        foreach (var want in BotMarket.Wants)
         {
             if (want?.Kind == null)
             {
                 continue;
             }
 
-            var left = Math.Max(0, want.Amount - want.Filled);
+            var left = Math.Max(0, want.Amount);
 
             wanted[want.Kind] = wanted.TryGetValue(want.Kind, out var n) ? n + left : left;
         }
@@ -329,7 +330,7 @@ public static class BotWebCraft
                 w.WritePropertyName("wants");
                 w.WriteStartArray();
 
-                foreach (var want in BotAuction.Wants)
+                foreach (var want in BotMarket.Wants)
                 {
                     if (want?.Kind == null)
                     {
@@ -338,9 +339,10 @@ public static class BotWebCraft
 
                     w.WriteStartObject();
                     w.WriteString("item", want.Kind.Name);
-                    w.WriteNumber("amount", Math.Max(0, want.Amount - want.Filled));
+                    w.WriteNumber("amount", Math.Max(0, want.Amount));
                     w.WriteNumber("price", want.Offer);
-                    w.WriteNumber("lodged", want.Escrow);
+                    w.WriteNumber("lodged", 0);
+                    w.WriteNumber("coming", want.Coming);
                     w.WriteNumber("raised", want.Raises);
                     w.WriteNumber("filled", want.Filled);
                     BotJson.StringOrNull(w, "by", want.Buyer?.Self?.Name);

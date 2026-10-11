@@ -50,6 +50,8 @@ public static class BotShops
 
     public static long Walled { get; private set; }
 
+    public static long Unjoined { get; private set; }
+
     public static int RepickLimit { get; set; } = 2;
 
     public static long Repicked { get; private set; }
@@ -226,7 +228,9 @@ public static class BotShops
 
     public const string ShopKind = "shop";
 
-    public static BaseVendor Nearest(IBotWilful bot, Type wanted)
+    public static BaseVendor Nearest(IBotWilful bot, Type wanted) => Nearest(bot, wanted, Point3D.Zero);
+
+    public static BaseVendor Nearest(IBotWilful bot, Type wanted, Point3D from)
     {
         var body = bot?.Self;
         var ledger = bot?.Resolve?.Ledger;
@@ -259,6 +263,20 @@ public static class BotShops
                 continue;
             }
 
+            if (!BotPopulation.Reachable(map, body.Location, vendor.Location))
+            {
+                Unjoined++;
+
+                continue;
+            }
+
+            if (BotDanger.Road(body, map, body.Location, vendor.Location, BotQuad.Strength(body), out _, out _, out _))
+            {
+                DeadlyRoad++;
+
+                continue;
+            }
+
             if (Unplaced(map, vendor) || BotReach.Ask(map, body.Location, vendor.Location, BotArrival.Within(CounterReach)) == BotReachVerdict.Sealed)
             {
                 Walled++;
@@ -266,7 +284,10 @@ public static class BotShops
                 continue;
             }
 
-            var away = body.GetDistanceToSqrt(vendor.Location);
+            var origin = from == Point3D.Zero ? body.Location : from;
+            var dx = vendor.X - origin.X;
+            var dy = vendor.Y - origin.Y;
+            var away = Math.Sqrt(dx * dx + dy * dy);
 
             if (away >= bestAway)
             {
@@ -283,6 +304,8 @@ public static class BotShops
     private static readonly Dictionary<Serial, (bool Placed, int Epoch)> _placed = [];
 
     public static long Unplaceable { get; private set; }
+
+    public static long DeadlyRoad { get; private set; }
 
     private static bool Unplaced(Map map, BaseVendor vendor)
     {
@@ -480,7 +503,7 @@ public static class BotShops
 
     public static BaseVendor Buyer(IBotWilful bot, Item item, out int price) => Buyer(bot, item, 1, false, out price, out _, out _);
 
-    public static BaseVendor Buyer(IBotWilful bot, Item item, int units, bool stall, out int price, out double factor, out int nearer)
+    public static BaseVendor Buyer(IBotWilful bot, Item item, int units, bool drawn, out int price, out double factor, out int nearer)
     {
         price = 0;
         factor = 1.0;
@@ -553,7 +576,7 @@ public static class BotShops
 
             if (premium > 1.0 && (with > bestNet || with == bestNet && tiles < bestTiles))
             {
-                var why = BotCapital.Pull(bot, vendor, stall);
+                var why = BotCapital.Pull(bot, vendor, drawn);
 
                 if (why == BotCapital.Why.Pulled)
                 {
@@ -655,6 +678,8 @@ public static class BotShops
 
         List<SellItemResponse> order = [];
 
+        List<(Type Kind, int Amount, int Paying)> lines = [];
+
         var capital = BotCapital.In(vendor.Location);
         long owed = 0;
 
@@ -682,6 +707,7 @@ public static class BotShops
             }
 
             order.Add(new SellItemResponse(item, amount));
+            lines.Add((item.GetType(), amount, paying));
         }
 
         if (order.Count == 0)
@@ -709,6 +735,13 @@ public static class BotShops
             return 0;
         }
 
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var (kind, amount, paying) = lines[i];
+
+            BotGlut.Peddled(kind, amount, amount * paying);
+        }
+
         Sold += order.Count;
         Earned += earned;
 
@@ -721,6 +754,8 @@ public static class BotShops
         );
 
         premium = BotCapital.Sold(body, vendor, units, earned, owed);
+
+        BotCharters.Counter(body, vendor.Location, lines, earned);
 
         return earned;
     }
@@ -774,9 +809,10 @@ public static class BotShops
         }
 
         var price = entry.Price;
-        var purse = BotYield.Wealth(body);
 
-        var factor = BotBurgh.Factor(body, vendor);
+        var purse = BotYield.Spendable(body);
+
+        var factor = BotBurgh.Factor(body, vendor, wanted);
         var dear = factor > 1.0 ? (int)Math.Ceiling(price * factor) : price;
         var affordable = Math.Min(Math.Min(amount, entry.Amount), purse / dear);
 
@@ -852,6 +888,7 @@ public static class BotShops
 
         Bought = 0;
         Walled = 0;
+        Unjoined = 0;
         Spent = 0;
         Sold = 0;
         Earned = 0;
@@ -862,5 +899,5 @@ public static class BotShops
     }
 
     public static string Describe() =>
-        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp, {Walled} counters passed over for having no way through to them, {Refills} shelves refilled on their own hour, {Repicked} errands sent on to another shopkeeper when the shelf emptied before they arrived, {BotPeddle.SoldOnTheWay} loads bought off their stall while they were being carried to one and {BotPeddle.HandedBack} handed back into the pack on the way and sold from it, {BotRestock.FellThrough} errands that found their guild's shelf bought out and went on to one, {BotRestock.Restalled} stall purchases that found the stall bought out and took the next cheapest; the town is oftenest out of {Driest()}; {BotCapital.Describe()}";
+        $"{_shops.Count} shopkeepers known from {_swept.Count} sweeps; {Bought} things bought for {Spent}gp, {Sold} sold for {Earned}gp, {Walled} counters passed over for having no way through to them, {Unjoined} as on another land or in a pocket no gate leaves and {DeadlyRoad} for a road that asks more than the buyer brings, {Refills} shelves refilled on their own hour, {Repicked} errands sent on to another shopkeeper when the shelf emptied before they arrived, {BotPeddle.FromBox} loads ({BotPeddle.FromBoxUnits} things) taken out of a bank box at a bank to be carried to one, {BotRestock.FellThrough} errands that found their guild's shelf bought out and went on to one; the town is oftenest out of {Driest()}; {BotCapital.Describe()}";
 }

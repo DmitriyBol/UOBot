@@ -61,6 +61,8 @@ public sealed class BotBowmake : BotDeed
 
     private readonly BotWant _order;
 
+    public BotWant Order => _order;
+
     private readonly Type _kind;
 
     private CraftItem _recipe;
@@ -89,7 +91,7 @@ public sealed class BotBowmake : BotDeed
 
     public override Point3D Where => _where;
 
-    public override double Expects => _order == null ? Prior : Prior * 1.4;
+    public override double Expects => _order != null ? Prior * 1.4 : BotGlut.Claim(_kind, Prior);
 
     public override double Minutes => WorkMinutes;
 
@@ -97,7 +99,7 @@ public sealed class BotBowmake : BotDeed
 
     public override double Coin => _order == null ? 0.5 : 1.0;
 
-    public override int Made => _made * BotAuction.Worth(_kind, Guess);
+    public override int Made => BotGlut.Yield(_kind, _made, Guess);
 
     public override bool Steadfast => true;
 
@@ -155,9 +157,9 @@ public sealed class BotBowmake : BotDeed
 
         var cost = BotCraftwork.Cost(_recipe);
 
-        if (BotFletching.Logs(body) < cost && BotAuction.Reclaim(bot, typeof(Log)) > 0)
+        if (BotFletching.Logs(body) < cost && BotMarket.FromBank(bot, typeof(Log), cost * 2) > 0)
         {
-            logger.Information("{Name} took its own logs back off the market to make {Item}", body.Name, _kind.Name);
+            logger.Information("{Name} took its own logs out of its bank box to make {Item}", body.Name, _kind.Name);
         }
 
         if (BotFletching.Logs(body) < cost)
@@ -201,33 +203,19 @@ public sealed class BotBowmake : BotDeed
             return BotDoing.Done($"{_swings} attempts at {_kind.Name} and nothing to show");
         }
 
-        var filled = 0;
-        var want = _order ?? BotAuction.Demand(bot, _kind);
+        var want = _order ?? BotMarket.Demand(bot, _kind);
+        var made = 0;
 
-        for (var i = 0; i < goods.Count && want != null; i++)
+        for (var i = 0; i < goods.Count; i++)
         {
-            filled += BotAuction.Fill(bot, want, goods[i]);
+            made += Math.Max(1, goods[i].Amount);
         }
 
-        var listed = 0;
-
-        if (BotDig.ListGoods)
-        {
-            var left = BotCraftwork.Gather(body, _kind);
-
-            left.RemoveAll(item => BotBinding.IsBound(item, bot?.Bond));
-
-            for (var i = 0; i < left.Count; i++)
-            {
-                if (BotAuction.List(bot, left[i], BotAuction.Worth(_kind, Guess)) != null)
-                {
-                    listed++;
-                }
-            }
-        }
+        var filled = want == null ? 0 : Math.Min(made, want.Payable);
+        var listed = made - filled;
 
         logger.Information(
-            "{Name} made {Made} {Item} in {Swings} attempts: {Filled} to order, {Listed} to the market{Because}",
+            "{Name} made {Made} {Item} in {Swings} attempts: {Filled} for somebody's order, to be carried to them, and {Listed} kept{Because}",
             body.Name,
             _made,
             _kind.Name,
@@ -243,13 +231,13 @@ public sealed class BotBowmake : BotDeed
         ToOrder += filled;
         Listed += listed;
 
-        return BotDoing.Done($"{_made} {_kind.Name} made, {filled} to order and {listed} on the stall");
+        return BotDoing.Done($"{_made} {_kind.Name} made, {filled} for an order and {listed} kept");
     }
 
     public static string Describe() =>
         Stints == 0
             ? "no bow-making has ended yet"
-            : $"{Stints} bow-making stints ended: {Wrought} with {Pieces} bows made, {ToOrder} to order and {Listed} on the stalls, {RanOut} out of logs, {Fruitless} that made nothing";
+            : $"{Stints} bow-making stints ended: {Wrought} with {Pieces} bows made, {ToOrder} for an order and {Listed} kept for the shop by the bank, {RanOut} out of logs, {Fruitless} that made nothing";
 
     public static void Forget()
     {
@@ -347,7 +335,7 @@ public sealed class BotBowyer : IBotProposer
 
         if (BotFletching.Logs(body) < LeastWood)
         {
-            BotAuction.Reclaim(bot, typeof(Log));
+            BotMarket.FromBank(bot, typeof(Log), LeastWood * 2);
         }
 
         if (BotFletching.Logs(body) < LeastWood)
@@ -362,6 +350,7 @@ public sealed class BotBowyer : IBotProposer
         if (order != null)
         {
             ToOrder++;
+            order.Offered();
             Once(body, order.Kind.Name, "to order");
 
             return new BotBowmake(map, body.Location, order.Kind, order);
@@ -377,14 +366,15 @@ public sealed class BotBowyer : IBotProposer
         }
 
         OnSpec++;
-        Once(body, kind.Name, "because the stalls are short of it");
+        BotGlut.Spec(kind);
+        Once(body, kind.Name, "because the island is short of it");
 
         return new BotBowmake(map, body.Location, kind);
     }
 
     private static BotWant Order(IBotWilful bot, Mobile body)
     {
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
         BotWant best = null;
         var bestWorth = 0;
 
@@ -393,6 +383,11 @@ public sealed class BotBowyer : IBotProposer
             var want = wants[i];
 
             if (!want.IsOpen || ReferenceEquals(want.Buyer, bot) || !IsBow(want.Kind) || want.Worth <= bestWorth || Recipe(body, want.Kind) == null)
+            {
+                continue;
+            }
+
+            if (!BotCourier.Answerable(bot, want) || BotCourier.Holding(bot, want))
             {
                 continue;
             }
@@ -408,20 +403,11 @@ public sealed class BotBowyer : IBotProposer
     {
         Type best = null;
         var shortest = int.MaxValue;
-        var listings = BotAuction.Listings;
 
         for (var i = 0; i < Bows.Length; i++)
         {
             var kind = Bows[i];
-            var have = 0;
-
-            for (var j = 0; j < listings.Count; j++)
-            {
-                if (listings[j]?.Kind == kind && listings[j].Amount > 0)
-                {
-                    have += listings[j].Amount;
-                }
-            }
+            var have = BotMarket.Stock(body, kind);
 
             if (have >= LeastOnMarket || have >= shortest || Recipe(body, kind) == null)
             {
@@ -450,7 +436,7 @@ public sealed class BotBowyer : IBotProposer
     public static string Describe() =>
         Asked == 0
             ? "nobody able to make a bow has been asked"
-            : $"{Asked} asked to make bows: {ToOrder} to order, {OnSpec} for the stalls, {Stocked} found every bow stocked, {NoWood} had no logs; {NoKit} asked without fletcher's tools; {BotBowmake.Describe()}";
+            : $"{Asked} asked to make bows: {ToOrder} to order, {OnSpec} for the island's stock, {Stocked} found every bow stocked, {NoWood} had no logs; {NoKit} asked without fletcher's tools; {BotBowmake.Describe()}";
 
     public static void Forget()
     {

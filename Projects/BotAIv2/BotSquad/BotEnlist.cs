@@ -1,4 +1,5 @@
 using System;
+using Server.Mobiles;
 using Server.Logging;
 
 namespace Server.BotAI.V2;
@@ -46,6 +47,12 @@ public sealed class BotEnlist : BotDeed
 
     public static long Hostile { get; private set; }
 
+    public static double Odds { get; set; } = 3.0;
+
+    public static long Overmanned { get; private set; }
+
+    public static void Manned() => Overmanned++;
+
     public static void Foe() => Hostile++;
 
     public static long Unlawful { get; private set; }
@@ -56,13 +63,24 @@ public sealed class BotEnlist : BotDeed
 
     public static void Far() => Remote++;
 
+    public static long Doomed { get; private set; }
+
+    public static void Hopeless() => Doomed++;
+
     public static void Forget()
     {
         Ending = 0;
         Lonely = 0;
         Hostile = 0;
+        Overmanned = 0;
         Unlawful = 0;
         Remote = 0;
+        Doomed = 0;
+        Trailing = 0;
+        Struck = 0;
+        Unserved = 0;
+        MoonFollowed = 0;
+        BindKept = 0;
     }
 
     private readonly BotSquad _squad;
@@ -138,9 +156,19 @@ public sealed class BotEnlist : BotDeed
 
         if (!Standing())
         {
-            return _joined || _pressedIn
-                ? BotDoing.Done("the company broke up")
-                : BotDoing.Failed("the company was gone before it got there");
+            if (_joined || _pressedIn)
+            {
+                _letGo = !_served;
+
+                if (_letGo)
+                {
+                    Unserved++;
+                }
+
+                return BotDoing.Done(_served ? "the company broke up" : $"company {_squad?.Id} broke up before it stood with it");
+            }
+
+            return BotDoing.Failed("the company was gone before it got there");
         }
 
         if (member.Squad != null)
@@ -149,7 +177,22 @@ public sealed class BotEnlist : BotDeed
             {
                 _pressedIn = true;
 
-                return Holding(member);
+                var doing = Holding(member);
+
+                if (doing.Kind == BotDoingKind.Work && !_served)
+                {
+                    var now = Core.TickCount;
+
+                    if (_workTick != 0)
+                    {
+                        _with += Math.Min(now - _workTick, 1000);
+                    }
+
+                    _workTick = now;
+                    _served = _inFight || _with >= ServeMs;
+                }
+
+                return doing;
             }
 
             return BotDoing.Done("fell in with another company on the way");
@@ -158,6 +201,14 @@ public sealed class BotEnlist : BotDeed
         if (_pressedIn || _joined)
         {
             Released++;
+            _letGo = !_served;
+
+            if (_letGo)
+            {
+                Unserved++;
+
+                return BotDoing.Done($"company {_squad.Id} let it go before it stood with it");
+            }
 
             return BotDoing.Done($"company {_squad.Id} went on without it");
         }
@@ -196,18 +247,61 @@ public sealed class BotEnlist : BotDeed
         var self = member.Self;
         var anchor = _squad.Anchor;
 
+        if (_squad.Mustering && _squad.Focus is { Deleted: false, Alive: true } mustered && self is { Deleted: false, Alive: true }
+            && anchor != Point3D.Zero)
+        {
+            _closeTries = 0;
+            _stillUntil = 0;
+            _inFight = true;
+
+            if (self.InRange(anchor, BotSquad.FieldReach) || member.Journey is { Active: true })
+            {
+                return BotDoing.Work($"forming up with company {_squad.Id} against {mustered.Name}");
+            }
+
+            if (!ReferenceEquals(_toFight, mustered))
+            {
+                _toFight = mustered;
+                ToTheFight++;
+            }
+
+            return BotDoing.Walk(_map, anchor, BotArrival.Within(CloseUp), $"to company {_squad.Id}'s muster against {mustered.Name}");
+        }
+
         if (_squad.Stance == BotSquadStance.Fighting && _squad.Focus is { Deleted: false, Alive: true } foe
             && self is { Deleted: false, Alive: true } && foe.Map == self.Map)
         {
             _closeTries = 0;
             _stillUntil = 0;
 
+            if (_squad.Binding(self) || BotMend.Winding(self))
+            {
+                _inFight = true;
+                BindKept++;
+
+                return BotDoing.Work($"binding one of company {_squad.Id}'s own in its fight with {foe.Name}");
+            }
+
             var going = member.Journey is { Active: true } road && road.Target != Point3D.Zero
                         && Math.Max(Math.Abs(road.Target.X - foe.X), Math.Abs(road.Target.Y - foe.Y)) <= BotSquad.PressReach;
 
             if (going || self.InRange(foe.Location, BotSquad.PressReach))
             {
+                _inFight = true;
+
                 return BotDoing.Work($"in company {_squad.Id}'s fight with {foe.Name}");
+            }
+
+            if (foe is BaseCreature && BotWalk.Unreached(self, foe))
+            {
+                if (_squad.Unreachable(foe))
+                {
+                    return BotDoing.Work($"company {_squad.Id} let {foe.Name} go: no road any of us drew reached it");
+                }
+
+                UnreachedFight++;
+
+                return BotDoing.Failed($"no road reached company {_squad.Id}'s fight with {foe.Name} at {foe.Location}");
             }
 
             if (!ReferenceEquals(_toFight, foe))
@@ -227,6 +321,23 @@ public sealed class BotEnlist : BotDeed
 
         if (self is { Deleted: false, Alive: true } && anchor != Point3D.Zero && !self.InRange(anchor, CloseUp))
         {
+            if (_squad.Leader?.Self is { Deleted: false, Alive: true } across
+                && Math.Max(Math.Abs(self.X - across.X), Math.Abs(self.Y - across.Y)) > BotDelve.GateApart
+                && BotGates.MoongateAt(self.Location, across.Location) is { } moon && BotGates.Travel(self, moon))
+            {
+                MoonFollowed++;
+                member.Journey?.Finish();
+
+                return BotDoing.Work($"through the moongate after company {_squad.Id}");
+            }
+
+            if (_squad.Leader?.Self is { Deleted: false, Alive: true } beyond
+                && Math.Max(Math.Abs(self.X - beyond.X), Math.Abs(self.Y - beyond.Y)) > BotDelve.GateApart
+                && BotGates.MoongateNear(self.Location, beyond.Location, MoonReach) is { } near)
+            {
+                return BotDoing.Walk(_map, near.From, BotArrival.Exactly, $"to the moongate after company {_squad.Id}");
+            }
+
             var journey = member.Journey;
             var bound = journey is { Moving: true } && journey.Target != Point3D.Zero
                 && Math.Max(Math.Abs(journey.Target.X - anchor.X), Math.Abs(journey.Target.Y - anchor.Y)) <= CloseUp;
@@ -250,13 +361,19 @@ public sealed class BotEnlist : BotDeed
                     return BotDoing.Work($"with company {_squad.Id}, {off} tiles off and no nearer to be had");
                 }
 
-                if (Core.TickCount - _closeTick >= CloseTryMs || _closeTries == 0)
+                var leadWalking = _squad.Leader?.Journey is { Moving: true };
+
+                if (leadWalking)
+                {
+                    Trailing++;
+                }
+                else if (Core.TickCount - _closeTick >= CloseTryMs || _closeTries == 0)
                 {
                     _closeTick = Core.TickCount;
                     _closeTries++;
                 }
 
-                if (_closeTries >= CloseTries)
+                if (!leadWalking && _closeTries >= CloseTries)
                 {
                     _closeTries = 0;
 
@@ -309,6 +426,8 @@ public sealed class BotEnlist : BotDeed
 
     public static long ToTheFight { get; private set; }
 
+    public static long BindKept { get; private set; }
+
     private Mobile _toFight;
 
     public static int CloseTries { get; set; } = 8;
@@ -329,6 +448,8 @@ public sealed class BotEnlist : BotDeed
 
     public static long Unclosed { get; private set; }
 
+    public static long Trailing { get; private set; }
+
     private long _closeTick;
 
     public static int CloseTryMs { get; set; } = 5000;
@@ -341,10 +462,40 @@ public sealed class BotEnlist : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
+        if (bot is IBotSquadMember member && member.Squad != null && ReferenceEquals(member.Squad, _squad)
+            && !ReferenceEquals(_squad.Leader, member) && !_squad.Disbanded)
+        {
+            BotSquads.Leave(member);
+            Struck++;
+        }
     }
 
+    public static int MoonReach { get; set; } = 120;
+
+    public static long MoonFollowed { get; private set; }
+
+    public static long UnreachedFight { get; private set; }
+
+    public static long Struck { get; private set; }
+
+    public static long Unserved { get; private set; }
+
+    public static int ServeMs { get; set; } = 15000;
+
+    public override bool KeptOut => _letGo;
+
+    private bool _served;
+
+    private bool _inFight;
+
+    private bool _letGo;
+
+    private long _workTick;
+
+    private long _with;
+
     private bool Standing() =>
-        _squad is { Count: >= 2 } && _squad.Map == _map && _squad.Leader?.Self is { Deleted: false, Alive: true };
+        _squad is { Count: >= 2, Disbanded: false } && _squad.Map == _map && _squad.Leader?.Self is { Deleted: false, Alive: true };
 }
 
 /// <summary>
@@ -408,6 +559,11 @@ public sealed class BotEnlister : IBotProposer
             return null;
         }
 
+        if (BotTrading.Passes(body))
+        {
+            return null;
+        }
+
         var squad = Nearest(body, map);
 
         if (squad == null)
@@ -452,7 +608,7 @@ public sealed class BotEnlister : IBotProposer
                 continue;
             }
 
-            if (squad.Leader?.Self is Mobile lead && BotRegard.AtWar(body, lead))
+            if (squad.Leader?.Self is Mobile lead && BotRegard.Hostile(body, lead))
             {
                 BotEnlist.Foe();
 
@@ -481,6 +637,29 @@ public sealed class BotEnlister : IBotProposer
                 continue;
             }
 
+            if (squad.Count >= BotSquad.Usual && squad.Focus is { Deleted: false } against
+                && Strength(squad) >= BotThreat.Power(against) * BotEnlist.Odds)
+            {
+                BotEnlist.Manned();
+
+                continue;
+            }
+
+            if (squad.Focus is { Deleted: false } doomed && !BotSquad.Caster(doomed)
+                && (squad.Beyond(doomed, BotThreat.Power(body), BotSquad.WithdrawOdds) || BotSquad.Shuns(doomed, squad.Able() + BotThreat.Power(body))))
+            {
+                BotEnlist.Hopeless();
+
+                continue;
+            }
+
+            if (squad.Focus is BaseCreature unreached && BotWalk.Unreached(body, unreached))
+            {
+                Walled++;
+
+                continue;
+            }
+
             if (BotReach.Ask(map, body.Location, anchor, BotArrival.Within(BotEnlist.Reach)) == BotReachVerdict.Sealed)
             {
                 Walled++;
@@ -500,10 +679,26 @@ public sealed class BotEnlister : IBotProposer
         return best;
     }
 
+    private static double Strength(BotSquad squad)
+    {
+        var members = squad.Members;
+        var sum = 0.0;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            if (members[i] is IBotAlly { AbleToFight: true } && members[i].Self is { Deleted: false, Alive: true } self)
+            {
+                sum += BotThreat.Power(self);
+            }
+        }
+
+        return sum;
+    }
+
     public static string Describe() =>
         Asked == 0
             ? "nobody has been offered a place in a company"
-            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it, {BotEnlist.Ending} passed one over whose fight was nearly won, {BotEnlist.Lonely} passed over a company of one, {BotEnlist.Hostile} passed over the enemy's, {BotEnlist.Unlawful} passed over one whose fight would have made it a criminal, {BotEnlist.Remote} passed over one whose leader stood more than {BotSquads.JoinReach} tiles off; in the companies, {BotEnlist.ClosedUp} walks to close up ({BotEnlist.Repointed} points set afresh as the leader moved on, {BotEnlist.Reaimed} of them because the member stood at its point still more than {BotEnlist.CloseUp} tiles from the leader), {BotEnlist.ToTheFight} walks to the company's fight rather than to its leader, {BotEnlist.HeldNear} stood near their company for want of a nearer tile ({BotEnlist.GaveUpNear} at once, the walker having given the close-up up) and {BotEnlist.Unclosed} let go for want of any, {BotEnlist.Released} levied members released when their company went on";
+            : $"{Asked} asked: {Sent} sent to fall in, {Held} were already in a company, {Unfit} were too hurt to be any help, {None} had no company fighting within {BotEnlist.Reach} tiles with room in it, {Walled} passed one over for having no way through to it, {BotEnlist.Ending} passed one over whose fight was nearly won, {BotEnlist.Lonely} passed over a company of one, {BotEnlist.Hostile} passed over a hostile guild's, {BotEnlist.Overmanned} passed over one already {BotEnlist.Odds:F0} times its enemy's strength, {BotEnlist.Unlawful} passed over one whose fight would have made it a criminal, {BotEnlist.Remote} passed over one whose leader stood more than {BotSquads.JoinReach} tiles off, {BotEnlist.Doomed} passed over one fighting something reckoned past ×{BotSquad.WithdrawOdds:F1} it and this bot together; in the companies, {BotEnlist.ClosedUp} walks to close up ({BotEnlist.Repointed} points set afresh as the leader moved on, {BotEnlist.Reaimed} of them because the member stood at its point still more than {BotEnlist.CloseUp} tiles from the leader), {BotEnlist.ToTheFight} walks to the company's fight rather than to its leader ({BotEnlist.BindKept} beats a member binding one of ours was left to it instead), {BotEnlist.HeldNear} stood near their company for want of a nearer tile ({BotEnlist.GaveUpNear} at once, the walker having given the close-up up) and {BotEnlist.Unclosed} let go for want of any ({BotEnlist.Trailing} close-up beats behind a leader that was itself walking, no try counted), {BotEnlist.Released} levied members released when their company went on, {BotEnlist.Unserved} levied members let go or whose company broke up before they had stood with it {BotEnlist.ServeMs / 1000}s (kept out of the share), {BotEnlist.Struck} struck off their company's roster when their enlistment ended, {BotEnlist.UnreachedFight} let go for finding no road to their company's fight ({BotSquad.UnreachedLet} fights let go by a company none of whose members could reach)";
 
     public static void Forget()
     {

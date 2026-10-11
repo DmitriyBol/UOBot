@@ -141,9 +141,44 @@ public static class BotChest
         Draws++;
         DrawnGold += drawn;
 
+        _lastDraw[guild] = Core.TickCount;
+
         logger.Information("{Guild}'s chest paid {Gold}gp of the {Want}gp asked of the guild; {Left}gp left in it", guild, drawn, want, held - drawn);
 
         return drawn;
+    }
+
+    private static readonly Dictionary<string, long> _lastDraw = new(StringComparer.Ordinal);
+
+    private static long _openedTick = Core.TickCount;
+
+    public static long SinceDraw(string guild) =>
+        Core.TickCount - (guild != null && _lastDraw.TryGetValue(guild, out var at) ? at : _openedTick);
+
+    public static long Transfers { get; private set; }
+
+    public static long TransferGold { get; private set; }
+
+    public static int Pay(string from, string to, int gold)
+    {
+        if (!Running || string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to) || from == to || gold <= 0)
+        {
+            return 0;
+        }
+
+        var moved = Math.Min(Holds(from), gold);
+
+        if (moved <= 0)
+        {
+            return 0;
+        }
+
+        _chests[from] = Holds(from) - moved;
+        _chests[to] = Holds(to) + moved;
+        Transfers++;
+        TransferGold += moved;
+
+        return moved;
     }
 
     public static long Thefts { get; private set; }
@@ -166,6 +201,16 @@ public static class BotChest
         StolenGold += taken;
 
         return taken;
+    }
+
+    public static int Empty(string guild)
+    {
+        if (string.IsNullOrEmpty(guild) || !_chests.Remove(guild, out var gold))
+        {
+            return 0;
+        }
+
+        return Math.Max(0, gold);
     }
 
     internal static void Save(IGenericWriter writer)
@@ -245,5 +290,9 @@ public static class BotChest
         Draws = 0;
         DrawnGold = 0;
         Returned = 0;
+        Transfers = 0;
+        TransferGold = 0;
+        _lastDraw.Clear();
+        _openedTick = Core.TickCount;
     }
 }

@@ -429,7 +429,7 @@ public sealed class BotBeckon : IBotProposer
         Asked == 0
             ? "nobody has been asked to a fire"
             : $"{Asked} asked to a fire: {Offered} offered a seat; {TooSoon} within {EveryMs / 60000} minutes of their last, {Hurt} hurt, "
-              + $"{Far} with none open within {BotCamp.JoinReach} tiles, {Full} with the ring full, {Unwelcome} not welcome at it";
+              + $"{Far} with none open within {BotCamp.JoinReach} tiles ({BotCamp.Ending} fires passed over as about to go out), {Full} with the ring full, {Unwelcome} not welcome at it";
 
     public static void Forget()
     {

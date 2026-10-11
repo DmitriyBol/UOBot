@@ -6,8 +6,8 @@ using Server.Mobiles;
 namespace Server.BotAI.V2;
 
 /// <summary>
-/// Britain as the centre of trade: the capital's shopkeepers pay better for goods, a load on a stall walks to them when the
-/// better price pays for the road, and a bot with a shop's worth of goods, offered a journey, takes it to the capital.
+/// Britain as the centre of trade: the capital's shopkeepers pay better for goods, a load drawn out of a bank box walks to them
+/// when the better price pays for the road, and a bot with a shop's worth of goods, offered a journey, takes it to the capital.
 ///
 /// <para>
 /// <b>Patrick's order of 30.09.2026, evening: «rework the trade: the traders must put Britain first as the centre
@@ -27,14 +27,14 @@ namespace Server.BotAI.V2;
 /// the next is a trade), the difference out of the city's treasury (<see cref="BotCity.Draw"/>) above <see cref="Reserve"/> — a
 /// lever with a budget, never more than the mint — and the peddler weighs every buyer by what the load fetches there less the
 /// road at the peddler's own price of a tile (<see cref="BotPeddler.PettyPerTile"/>, the number its "worth less than the walk"
-/// gate already reads, so the chooser and the gate cannot disagree). A stall of four hundred gold of ingots from Skara Brae pays
-/// for its road; a handful of reagents does not, and goes where it always went.
+/// gate already reads, so the chooser and the gate cannot disagree). Four hundred gold of ingots from Skara Brae pays for its
+/// road; a handful of reagents does not, and goes where it always went.
 /// </para>
 ///
 /// <para>
-/// <b>Who is pulled, and who trades at home.</b> The premium is counted in the choice (<see cref="Pull"/>) only for a load on a
-/// stall — the goods ride safe in the market until the counter, so a death on the road loses the walk and not the load; goods
-/// carried in the pack go to the best buyer at its own price — and only where the capital's counter lies within the bot's own
+/// <b>Who is pulled, and who trades at home.</b> The premium is counted in the choice (<see cref="Pull"/>) only for a load drawn
+/// out of a bank box at a bank for the walk (until 01.10.2026, a load on a stall, which rode safe in the market); goods already
+/// riding about in the pack go to the best buyer at its own price — and only where the capital's counter lies within the bot's own
 /// leash from home (<see cref="BotPopulation.Leash"/>: a newcomer at a quarter of its trade stays within three hundred tiles of
 /// its seat), within <see cref="Reach"/> of the bot, on a land the gates join to the bot's (<see cref="BotGates.Joined"/>), and
 /// while the treasury can pay. Jhelom, Minoc, Vesper and the islands trade at home. The price itself is paid to whoever sells
@@ -176,7 +176,7 @@ public static class BotCapital
     public static long Owed(Type kind, int amount, int price) =>
         amount <= 0 || price <= 0 ? 0 : (long)Math.Floor(amount * (double)price * (Factor(kind, price) - 1.0));
 
-    public static Why Pull(IBotWilful bot, BaseVendor vendor, bool stall)
+    public static Why Pull(IBotWilful bot, BaseVendor vendor, bool drawn)
     {
         var body = bot?.Self;
 
@@ -185,7 +185,7 @@ public static class BotCapital
             return Why.NotCapital;
         }
 
-        if (!stall)
+        if (!drawn)
         {
             return Why.Pack;
         }
@@ -392,7 +392,8 @@ public static class BotCapital
 
     public static bool Trader(BotMobile bot)
     {
-        if (!Running || !BotShopkeep.Running || bot == null || bot.Kills >= 5 || bot.Criminal || BotUnderworld.Member(bot))
+        if (!Running || !BotShopkeep.Running || bot == null || bot.Kills >= 5 || bot.Criminal || BotUnderworld.Member(bot)
+            || !BotShopkeeper.FightersKeepShop && !BotShopkeeper.Merchant(bot))
         {
             return false;
         }

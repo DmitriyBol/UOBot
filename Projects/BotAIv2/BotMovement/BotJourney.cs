@@ -169,6 +169,8 @@ public sealed class BotJourney
 
     public static long NoWay { get; private set; }
 
+    public static long MapRefused { get; private set; }
+
     private BotErrand _legErrand;
 
     public int RouteStamp { get; private set; }
@@ -180,6 +182,29 @@ public sealed class BotJourney
     public Point3D Aim => Legging && _legErrand != null ? _legErrand.Aim : Target;
 
     public int RouteLeft => Current is { } errand ? System.Math.Max(0, errand.Route.Count - errand.Leg) : 0;
+
+    public int RoadLeft(Point3D from)
+    {
+        if (Current is not { } errand || errand.Route.Count == 0 || errand.Leg >= errand.Route.Count)
+        {
+            return 0;
+        }
+
+        var tiles = 0;
+        var at = from;
+
+        for (var i = System.Math.Max(0, errand.Leg); i < errand.Route.Count; i++)
+        {
+            var next = errand.Route[i];
+
+            tiles += System.Math.Max(System.Math.Abs(next.X - at.X), System.Math.Abs(next.Y - at.Y));
+            at = next;
+        }
+
+        var target = errand.Target;
+
+        return tiles + System.Math.Max(System.Math.Abs(target.X - at.X), System.Math.Abs(target.Y - at.Y));
+    }
 
     public bool NoWayThere => Current?.Unreachable == true;
 
@@ -206,6 +231,8 @@ public sealed class BotJourney
 
         if (errand.Gate != Point3D.Zero && Away(at, errand.GateTo) <= BotGates.Through)
         {
+            BotGates.WalkedThrough(map, errand.Gate);
+
             errand.Gate = Point3D.Zero;
             errand.GateTo = Point3D.Zero;
             errand.RouteGoal = Point3D.Zero;
@@ -303,6 +330,17 @@ public sealed class BotJourney
         errand.GateTo = Point3D.Zero;
         RouteStamp++;
 
+        if (BotReachMap.Refuses(map, at, target, Math.Max(errand.Arrival.Tiles, 2)))
+        {
+            BotReachMap.NotePlanner();
+            MapRefused++;
+            errand.Unreachable = true;
+            errand.NoWaySaid = true;
+            errand.Route.Clear();
+
+            return;
+        }
+
         switch (Server.Engines.Pathing.Tiered.NavigationService.Route(map, at, target, errand.Route, errand.Arrival.Tiles))
         {
             case Server.Engines.Pathing.Tiered.NavStatus.Ok:
@@ -384,6 +422,21 @@ public sealed class BotJourney
     }
 
     private int Distance(Point3D at) => RoadLeft(at, Target);
+
+    public bool HoldsRoadTo(Point3D where)
+    {
+        for (var i = _errands.Count - 1; i >= 0; i--)
+        {
+            var errand = _errands[i];
+
+            if (!errand.RouteSpent && errand.Route.Count > 0 && errand.Leg < errand.Route.Count && Away(errand.RouteGoal, where) <= LegTiles / 2)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public int RoadLeft(Point3D at, Point3D where)
     {
@@ -566,6 +619,12 @@ public sealed class BotJourney
         _dangerous = false;
     }
 
+    public void Hold(int ms) => _heldUntil = Core.TickCount + System.Math.Max(0, ms);
+
+    public bool Held => Active && Core.TickCount < _heldUntil;
+
+    private long _heldUntil;
+
     private bool _beside;
 
     public void Beside() => _beside = true;
@@ -655,7 +714,9 @@ public sealed class BotJourney
             Escalated = false;
         }
 
-        if (away < _bestAway)
+        var slack = Current?.Follow != null ? FollowSlack : 0;
+
+        if (away < _bestAway - slack)
         {
             _bestAway = away;
             _plansSinceCloser = 0;
@@ -684,7 +745,90 @@ public sealed class BotJourney
             avoid = avoid.And(_avoidTile);
         }
 
+        if (Sighted is { } reaches)
+        {
+            avoid = avoid.Reaches(reaches);
+        }
+
         return avoid;
+    }
+
+    private BotReaches _sighted;
+
+    private long _sightedUntil;
+
+    public BotReaches Sighted => _sighted is { Count: > 0 } && Core.TickCount - _sightedUntil < 0 ? _sighted : null;
+
+    public void Sight(BotReaches reaches, long until)
+    {
+        _sighted = reaches;
+        _sightedUntil = until;
+    }
+
+    public int PlanEnters(BotReaches reaches, int ahead, int slack)
+    {
+        if (reaches == null)
+        {
+            return -1;
+        }
+
+        var last = Math.Min(_plan.Count, _step + Math.Max(1, ahead));
+
+        for (var i = _step; i < last; i++)
+        {
+            if (reaches.Within(_plan[i].X, _plan[i].Y, slack))
+            {
+                return i - _step;
+            }
+        }
+
+        return -1;
+    }
+
+    public long PlanBuilt => _plan.Count > 0 ? _planBuiltTick : 0;
+
+    public Point3D PlanAt(int ahead) =>
+        _step + ahead >= 0 && _step + ahead < _plan.Count ? _plan[_step + ahead] : Point3D.Zero;
+
+    public bool RouteEnters(BotReaches reaches, Point3D at, int ahead)
+    {
+        var errand = Current;
+
+        if (reaches == null || errand == null || errand.RouteSpent || errand.Gate != Point3D.Zero || errand.RouteGoal == Point3D.Zero
+            || errand.Leg >= errand.Route.Count)
+        {
+            return false;
+        }
+
+        var along = 0;
+        var from = at;
+
+        for (var i = errand.Leg; i < errand.Route.Count && along <= ahead; i++)
+        {
+            var point = errand.Route[i];
+
+            along += Away(from, point);
+            from = point;
+
+            if (reaches.Within(point.X, point.Y, 0))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void Resight()
+    {
+        if (Current is { } errand && errand.Gate == Point3D.Zero && !errand.RouteSpent)
+        {
+            errand.RouteGoal = Point3D.Zero;
+            errand.Route.Clear();
+            errand.Leg = 0;
+        }
+
+        Discard();
     }
 
     public void AvoidTile(Point3D tile) => _avoidTile = tile;
@@ -762,6 +906,7 @@ public sealed class BotJourney
         _plan.Clear();
         _step = 0;
         _beside = false;
+        _heldUntil = 0;
         _planErrand = null;
         _planGoal = Point3D.Zero;
         _planBuiltTick = 0;

@@ -66,9 +66,7 @@ public static class BotFlask
             return 0;
         }
 
-        var shelved = BotAuction.Find(bot, kind);
-
-        return Amount(body, kind) + (shelved is { IsEmpty: false } ? shelved.Amount : 0);
+        return Amount(body, kind) + (body?.FindBankNoCreate()?.GetAmount(kind) ?? 0);
     }
 
     public static bool AtCap(IBotWilful will, Mobile bot)
@@ -388,7 +386,7 @@ public static class BotFlask
                 continue;
             }
 
-            var bid = BotAuction.Best(kind);
+            var bid = BotMarket.Best(kind);
 
             if (bid > bestBid)
             {

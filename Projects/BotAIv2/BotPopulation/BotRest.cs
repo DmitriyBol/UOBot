@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Logging;
+using Server.Text;
 
 namespace Server.BotAI.V2;
 
@@ -79,6 +80,47 @@ public static class BotRest
 
     private static int _heldByFloor;
 
+    private static int _heldTraders;
+
+    private static int _heldCritical;
+
+    private static int _heldPace;
+
+    private static int _floor;
+
+    private static int Traders(out int all)
+    {
+        var resting = 0;
+        var away = BotPopulation.Away;
+        var bots = BotPopulation.Bots;
+
+        all = 0;
+
+        for (var i = 0; i < away.Count; i++)
+        {
+            if (away[i] is { Deleted: false } bot && BotTrading.Trader(bot))
+            {
+                all++;
+                resting++;
+            }
+        }
+
+        for (var i = 0; i < bots.Count; i++)
+        {
+            if (bots[i] is { Deleted: false } bot && bot.Map != null && bot.Map != Map.Internal && BotTrading.Trader(bot))
+            {
+                all++;
+
+                if (bot.Tired)
+                {
+                    resting++;
+                }
+            }
+        }
+
+        return resting;
+    }
+
     private static readonly (string Name, double Share, double Least, double Most)[] Kinds =
     [
         ("an evening player", 0.30, 2.5, 4.0),
@@ -102,6 +144,8 @@ public static class BotRest
         public int Sessions;
 
         public long TiredTick;
+
+        public long HeldTick;
 
         public string CalledBy;
 
@@ -170,6 +214,60 @@ public static class BotRest
             BotPopulation.Away.Count,
             GraceMs / 60000
         );
+
+        logger.Information(
+            "Prime time {State}: {Schedule} of the island in the world, local time, the target moving over {Ramp} minutes at a band's start, at most {Tire} tired and {Back} brought back a look; without it the floor is {Floor:P0}; critical floors {Critical}: {Floors}, filled from rest up to {Early} minutes early",
+            BotPrime.Running ? "ON" : "OFF",
+            BotPrime.Schedule(),
+            BotPrime.RampMinutes,
+            BotPrime.TirePerLook,
+            BotPrime.ReturnPerLook,
+            FloorShare,
+            BotCritical.Running ? "ON" : "OFF",
+            Floors(),
+            BotCritical.EarlyMinutes
+        );
+    }
+
+    private static string Floors()
+    {
+        var posts = BotCritical.Posts;
+
+        if (posts.Count == 0)
+        {
+            return "none";
+        }
+
+        using var line = ValueStringBuilder.Create(160);
+
+        for (var i = 0; i < posts.Count; i++)
+        {
+            if (i > 0)
+            {
+                line.Append(", ");
+            }
+
+            line.Append(posts[i]);
+            line.Append(' ');
+            line.Append(BotCritical.Floor(posts[i]));
+        }
+
+        return line.ToString();
+    }
+
+    internal static void Spread(BotMobile bot)
+    {
+        if (bot is not { Deleted: false } || string.IsNullOrEmpty(bot.Name))
+        {
+            return;
+        }
+
+        var record = Of(bot);
+
+        if (record.Sessions == 0 && record.RestUntil == default)
+        {
+            record.PlayedMinutes = record.Hours * 60 * Utility.RandomDouble() * Math.Clamp(FirstShare, 0, 1);
+        }
     }
 
     private static int Deal()
@@ -335,6 +433,7 @@ public static class BotRest
 
         _due.Clear();
         _heldByFloor = 0;
+        _heldTraders = 0;
 
         var tiredAlready = 0;
         var onCall = 0;
@@ -389,7 +488,7 @@ public static class BotRest
                 continue;
             }
 
-            record.PlayedMinutes = Math.Max(0.0, record.PlayedMinutes + BotCamp.Played(bot, minutes, record.Hours));
+            record.PlayedMinutes = Math.Max(0.0, record.PlayedMinutes + (BotTaverns.Played(bot, minutes, record.Hours) ?? BotCamp.Played(bot, minutes, record.Hours)));
 
             var over = record.PlayedMinutes - record.Hours * 60;
 
@@ -411,7 +510,21 @@ public static class BotRest
         }
 
         var island = BotPopulation.Count + BotPopulation.Away.Count;
-        var allowance = BotPopulation.Count - onCall - (int)Math.Ceiling(Math.Clamp(FloorShare, 0, 1) * island) - tiredAlready;
+
+        var share = BotPrime.Share(Core.Now, out var band, out var ramping);
+
+        _floor = (int)Math.Ceiling(share * island);
+
+        var allowance = BotPopulation.Count - onCall - _floor - tiredAlready;
+
+        var tradersResting = Traders(out var tradersAll);
+        var tradersMayRest = (int)Math.Floor(Math.Clamp(BotTrading.RestShare, 0, 1) * tradersAll);
+
+        BotCritical.Count();
+        _heldCritical = 0;
+        _heldPace = 0;
+
+        var tiredNow = 0;
 
         _due.Sort((a, b) => b.Over.CompareTo(a.Over));
 
@@ -425,9 +538,54 @@ public static class BotRest
                 continue;
             }
 
+            if (BotPrime.Running && tiredNow >= Math.Max(1, BotPrime.TirePerLook))
+            {
+                _heldPace++;
+                BotPrime.TiresPaced++;
+                continue;
+            }
+
+            var trader = BotTrading.Trader(bot);
+
+            if (trader && tradersResting >= tradersMayRest)
+            {
+                _heldTraders++;
+                BotTrading.RestHeld++;
+                continue;
+            }
+
+            if (BotCritical.Holds(bot, out var post))
+            {
+                _heldCritical++;
+                BotCritical.Held++;
+
+                if (record.HeldTick == 0)
+                {
+                    record.HeldTick = tick;
+
+                    logger.Information(
+                        "{Name} the {Class} is past its hours but plays on: the island would be under its {Floor} {Post}(s) without it",
+                        bot.Name,
+                        bot.Class?.Name,
+                        BotCritical.Floor(post),
+                        post
+                    );
+                }
+
+                continue;
+            }
+
+            if (trader)
+            {
+                tradersResting++;
+            }
+
             allowance--;
+            tiredNow++;
             bot.Tired = true;
             record.TiredTick = tick;
+            record.HeldTick = 0;
+            BotCritical.Tired(bot);
 
             logger.Information(
                 "{Name} the {Class}, {Kind}, is tired after {Played:0.0}h of play and takes on nothing new; it leaves when it is free",
@@ -511,7 +669,10 @@ public static class BotRest
         if (Running)
         {
             var present = BotPopulation.Count - onCall;
-            var floor = (int)Math.Ceiling(Math.Clamp(FloorShare, 0, 1) * (BotPopulation.Count + away.Count));
+            var floor = _floor;
+            var scheduled = BotPrime.Running;
+            var window = scheduled ? double.MaxValue : EarlyMinutes;
+            var most = scheduled ? Math.Max(1, BotPrime.ReturnPerLook) : int.MaxValue;
 
             if (present < floor)
             {
@@ -520,7 +681,7 @@ public static class BotRest
                 for (var i = 0; i < away.Count; i++)
                 {
                     if (away[i] is { Deleted: false } bot && _records.TryGetValue(bot.Name ?? "", out var record)
-                        && record.RestUntil != default && (record.RestUntil - now).TotalMinutes <= EarlyMinutes)
+                        && record.RestUntil != default && (record.RestUntil - now).TotalMinutes <= window)
                     {
                         soon.Add((bot, record));
                     }
@@ -528,15 +689,110 @@ public static class BotRest
 
                 soon.Sort((a, b) => a.Record.RestUntil.CompareTo(b.Record.RestUntil));
 
-                for (var i = 0; i < soon.Count && present < floor; i++)
+                var came = 0;
+
+                for (var i = 0; i < soon.Count && present < floor && came < most; i++)
                 {
                     var (bot, record) = soon[i];
                     var early = (record.RestUntil - now).TotalMinutes;
 
-                    Return(bot, record, $"back {early:0} minutes early: the island was under its floor of {floor}");
+                    if (scheduled && early > EarlyMinutes)
+                    {
+                        Return(bot, record, $"back {early:0} minutes early: prime time ({band?.ToString() ?? "no band"}{(ramping ? ", ramping" : "")}) wants {floor} of the island's {island} in the world and it had {present}");
+                        BotPrime.Returned++;
+                    }
+                    else
+                    {
+                        Return(bot, record, $"back {early:0} minutes early: the island was under its floor of {floor}");
+                        Early++;
+                    }
 
                     present++;
-                    Early++;
+                    came++;
+                }
+
+                if (scheduled && present < floor && came >= most && soon.Count > came)
+                {
+                    BotPrime.ReturnsPaced++;
+                }
+            }
+
+            BotPrime.Read(band, share, ramping, island, floor, BotPopulation.Count);
+        }
+
+        if (Running && BotCritical.Running)
+        {
+            var posts = BotCritical.Posts;
+
+            for (var p = 0; p < posts.Count; p++)
+            {
+                var post = posts[p];
+                var shortBy = BotCritical.Short(post);
+
+                if (shortBy <= 0)
+                {
+                    continue;
+                }
+
+                List<(BotMobile Bot, Record Record)> own = [];
+
+                for (var i = 0; i < away.Count; i++)
+                {
+                    if (away[i] is { Deleted: false } bot && _records.TryGetValue(bot.Name ?? "", out var record)
+                        && record.RestUntil != default && record.CalledBy == null
+                        && (record.RestUntil - now).TotalMinutes <= BotCritical.EarlyMinutes && BotCritical.Fills(bot, post))
+                    {
+                        own.Add((bot, record));
+                    }
+                }
+
+                if (own.Count == 0)
+                {
+                    continue;
+                }
+
+                own.Sort((a, b) => a.Record.RestUntil.CompareTo(b.Record.RestUntil));
+
+                for (var i = 0; i < own.Count && shortBy > 0; i++)
+                {
+                    var (bot, record) = own[i];
+                    var early = (record.RestUntil - now).TotalMinutes;
+
+                    Return(bot, record, $"back {early:0} minutes early: the island had {BotCritical.Present(post)} of its {BotCritical.Floor(post)} {post}(s)");
+
+                    BotCritical.Brought++;
+                    shortBy--;
+                }
+            }
+        }
+
+        if (Running && BotTrading.RestShare < 1.0)
+        {
+            var resting = Traders(out var all);
+            var mayRest = (int)Math.Floor(Math.Clamp(BotTrading.RestShare, 0, 1) * all);
+
+            if (resting > mayRest)
+            {
+                BotMobile soonest = null;
+                Record soonestRecord = null;
+
+                for (var i = 0; i < away.Count; i++)
+                {
+                    if (away[i] is { Deleted: false } bot && BotTrading.Trader(bot) && _records.TryGetValue(bot.Name ?? "", out var record)
+                        && record.RestUntil != default && (record.RestUntil - now).TotalMinutes <= BotTrading.RestEarlyMinutes
+                        && (soonestRecord == null || record.RestUntil < soonestRecord.RestUntil))
+                    {
+                        soonest = bot;
+                        soonestRecord = record;
+                    }
+                }
+
+                if (soonest != null)
+                {
+                    var early = (soonestRecord.RestUntil - now).TotalMinutes;
+
+                    Return(soonest, soonestRecord, $"back {early:0} minutes early: more than {BotTrading.RestShare:P0} of the traders were resting");
+                    BotTrading.RestEarly++;
                 }
             }
         }
@@ -657,7 +913,8 @@ public static class BotRest
         bot.LogoutMap = map;
 
         var inn = BotInns.Settle(bot, out var paid);
-        var from = inn?.Name;
+
+        var from = BotTaverns.Supped(bot, inn?.Name);
 
         if (inn == null && BotAbode.Of(bot) is { Deleted: false } house && house.Map == map && house.IsInside(bot))
         {
@@ -735,11 +992,13 @@ public static class BotRest
             ReturnedHome++;
         }
 
+        BotCritical.Back(bot);
+
         var buff = "";
 
         if (record is { Paid: > 0, Inn: not null } && call == null && rested > 0.0)
         {
-            BotInns.Rested(bot, rested, out var until);
+            BotInns.Rested(bot, rested * BotTaverns.SupperFactor(record.Inn), out var until);
             record.BuffUntil = until;
             buff = $", rested well at {record.Inn}: regenerating until {until.ToLocalTime():HH:mm}";
         }
@@ -895,7 +1154,9 @@ public static class BotRest
 
         var tires = tiringName == null ? "" : $"; {tiringName} tires next, in {Math.Max(0, tiring):0} minutes";
 
-        return $"{BotPopulation.Count} in the world, {away.Count} resting ({next}{tires}); {_heldByFloor} past their hours and playing on so the island is not left under {FloorShare:P0}; {_tired} tired and not yet free "
+        return $"{BotPopulation.Count} in the world, {away.Count} resting ({next}{tires}); {BotPrime.Describe()}; "
+               + $"{_heldByFloor} past their hours and playing on so the island is not left under its floor of {_floor} ({_heldTraders} traders so no more than {BotTrading.RestShare:P0} of the traders rest at once, {_heldCritical} for a critical post, {_heldPace} put off a look by the pace); "
+               + $"{BotCritical.Describe()}; {_tired} tired and not yet free "
                + $"({_heldWorking} finishing work, {_heldCompany} in a company, {_heldFight} in a fight, {_heldUnder} underground, "
                + $"{_heldCell} in a cell, {_heldDead} dead); this session {Left} left to rest ({LetGo} let go of what held them after "
                + $"{GraceMs / 60000} minutes) and {Returned} came back ({ReturnedHome} at home); {Called} called back from rest to fight "

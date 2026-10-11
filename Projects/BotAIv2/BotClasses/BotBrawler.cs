@@ -46,6 +46,12 @@ public sealed class BotBrawler : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        Leanings =
+        [
+            new BotLeaning("brawler", SkillName.Wrestling, 4, 58.0, 72.0),
+            BotLeaning.Even(1)
+        ];
+
         HandsAlwaysFree = true;
 
         PotionLimits[BotPotionKind.Heal] = 2;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Server.BotAI.V2;
 
 namespace Server.BotAI.Mind;
 
@@ -20,6 +21,13 @@ namespace Server.BotAI.Mind;
 /// measurements are the same for all three — one pass over the population, taken once — and the model is
 /// the same; what differs is what each is told to look at, which is what a division of labour is.
 /// </para>
+///
+/// <para>
+/// <b>A charge can be lent (07.10.2026).</b> While the zone keeper (<see cref="BotVigil.Keeper"/>) is wholly on the zones, its
+/// charge is carried by the other watchers who diagnose (<see cref="BotVigil.Heirs"/>): each is told the keeper's topics beside
+/// its own, and the keeper's subsystem lines are dealt between them stem by stem. Nothing in <see cref="Charges"/> changes; the
+/// loan is read from the watch's state each time, so it ends the moment the watch does.
+/// </para>
 /// </summary>
 public sealed class BotWatcher
 {
@@ -31,7 +39,7 @@ public sealed class BotWatcher
         ),
         (
             "the work, the trades, the market and the money: what is taken on and finished, what each craft makes, what sells, who is poor and why",
-            ["Will", "Appraisal", "Commons", "Auction", "Haggle", "Listing", "Ledger", "Purse", "Shop", "Peddl", "Quarry", "Smith", "Tailor", "Fletch", "Alchem", "Cook", "Store", "Upkeep", "Bullion", "Craft", "Anvil", "Oven", "Herb", "Forag", "Pick", "Outfit", "Suppl", "Shelf", "Hire", "Fitter", "Unload", "Restock", "Order", "Acquire", "Armour", "Seeker", "Inscri", "Scribe", "Quill", "Grimoire", "Mind", "Progress", "Stable", "Woodsman", "Ground", "Dig", "Chop", "Mine", "Harvest", "Yield", "Urges", "Meal", "Flask", "Brew", "Sew", "Glean", "Plunder", "Freedom", "Stroll", "Stipend", "Rounds", "Recipe", "Kit", "Bind"]
+            ["Will", "Appraisal", "Commons", "Market", "Courier", "Deliver", "Handover", "Want", "City", "Ledger", "Purse", "Shop", "Peddl", "Quarry", "Smith", "Tailor", "Fletch", "Alchem", "Cook", "Store", "Upkeep", "Bullion", "Craft", "Anvil", "Oven", "Herb", "Forag", "Pick", "Outfit", "Suppl", "Shelf", "Hire", "Fitter", "Unload", "Restock", "Order", "Acquire", "Armour", "Seeker", "Inscri", "Scribe", "Quill", "Grimoire", "Mind", "Progress", "Stable", "Woodsman", "Ground", "Dig", "Chop", "Mine", "Harvest", "Yield", "Urges", "Meal", "Flask", "Brew", "Sew", "Glean", "Plunder", "Freedom", "Stroll", "Stipend", "Rounds", "Recipe", "Kit", "Bind"]
         ),
         (
             "getting about, standing still, the ground, the fighting and the clock: the pathfinder's bill, stuck and looping bots, deaths and rescues, whether blows land, and what the loop costs",
@@ -39,8 +47,12 @@ public sealed class BotWatcher
         )
     ];
 
-    public static int Owner(string typeName)
+    public static int Owner(string typeName) => Owner(typeName, out _);
+
+    public static int Owner(string typeName, out int stem)
     {
+        stem = -1;
+
         if (string.IsNullOrEmpty(typeName))
         {
             return 0;
@@ -56,6 +68,8 @@ public sealed class BotWatcher
             {
                 if (bare.StartsWith(stems[i], StringComparison.OrdinalIgnoreCase))
                 {
+                    stem = i;
+
                     return c;
                 }
             }
@@ -69,7 +83,7 @@ public sealed class BotWatcher
         Name = name;
         Hue = hue;
         Rank = rank;
-        Charge = Charges[rank % Charges.Length].Charge;
+        OwnCharge = Charges[rank % Charges.Length].Charge;
     }
 
     public string Name { get; }
@@ -78,11 +92,58 @@ public sealed class BotWatcher
 
     public int Rank { get; }
 
-    public string Charge { get; }
+    public string OwnCharge { get; }
+
+    public string Charge
+    {
+        get
+        {
+            var keeper = BotVigil.Keeper;
+
+            if (keeper == null)
+            {
+                return OwnCharge;
+            }
+
+            if (ReferenceEquals(keeper, this))
+            {
+                return $"the danger zones alone, standing in one after another until their accuracy holds (its own charge, {OwnCharge}, is carried by the others meanwhile)";
+            }
+
+            return !Organiser && BotVigil.Heirs().Contains(this)
+                ? $"{OwnCharge}; and, while {keeper.Name} keeps the zones, {keeper.OwnCharge}"
+                : OwnCharge;
+        }
+    }
 
     public bool Organiser { get; init; }
 
-    public bool Watches(string typeName) => Owner(typeName) == Rank % Charges.Length;
+    public bool Watches(string typeName) => Owns(typeName) || Borrows(typeName);
+
+    public bool Owns(string typeName) => !BotVigil.IsKeeper(this) && Owner(typeName) == Rank % Charges.Length;
+
+    public bool Borrows(string typeName)
+    {
+        var keeper = BotVigil.Keeper;
+
+        if (keeper == null || ReferenceEquals(keeper, this))
+        {
+            return false;
+        }
+
+        var owner = Owner(typeName, out var stem);
+        var theirs = keeper.Rank % Charges.Length;
+
+        if (owner != theirs || theirs == Rank % Charges.Length)
+        {
+            return false;
+        }
+
+        var heirs = BotVigil.Heirs();
+        var at = heirs.IndexOf(this);
+
+        return at >= 0 && Math.Max(0, stem) % heirs.Count == at;
+    }
 
     public BotDebugger Body { get; set; }
 
@@ -107,6 +168,58 @@ public sealed class BotWatcher
     public List<string> Found { get; } = [];
 
     public long ReportedTick { get; set; }
+
+    public string Beside { get; set; }
+
+    public string Asking { get; private set; }
+
+    public DateTime AskingSince { get; private set; }
+
+    public DateTime? ThoughtAt { get; private set; }
+
+    public string ThoughtKind { get; private set; }
+
+    public string Question { get; private set; }
+
+    public string Thought { get; private set; }
+
+    public string Answer { get; private set; }
+
+    public string About { get; private set; }
+
+    public double Sure { get; private set; } = -1;
+
+    public List<BotDebuggerLine> Feed { get; } = [];
+
+    public static int FeedKeep { get; set; } = 12;
+
+    public void Ask(string what)
+    {
+        Asking = what;
+        AskingSince = DateTime.Now;
+    }
+
+    public void Think(string kind, string question, string thought, string answer, string about, double sure = -1)
+    {
+        Asking = null;
+        ThoughtAt = DateTime.Now;
+        ThoughtKind = kind;
+        Question = question;
+        Thought = thought;
+        Answer = answer;
+        About = string.IsNullOrWhiteSpace(about) || about == "-" ? null : about;
+        Sure = sure;
+    }
+
+    public void Heard(string line)
+    {
+        Feed.Add(new BotDebuggerLine(DateTime.Now, line));
+
+        while (Feed.Count > Math.Max(1, FeedKeep))
+        {
+            Feed.RemoveAt(0);
+        }
+    }
 
     public string Describe() =>
         Body is not { Deleted: false }

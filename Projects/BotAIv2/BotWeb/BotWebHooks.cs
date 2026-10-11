@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
@@ -14,6 +15,45 @@ public sealed record BotMindsReport(
     long LastMs
 );
 
+/// <summary>One line a debugger wrote into its own log, as it wrote it, for the live window's feed.</summary>
+public sealed record BotDebuggerLine(DateTime At, string Text);
+
+/// <summary>
+/// One watcher of the debugger squad as the live window shows it (02.10.2026): where it stands and what it is doing there,
+/// what it last thought and what the model it asked answered, what it is waiting on, and the last lines it wrote. Every string
+/// is one the debugger's own log already prints, built by the minds assembly on the game loop.
+/// </summary>
+public sealed record BotDebuggerReport(
+    string Name,
+    int Hue,
+    string Charge,
+    bool Organiser,
+    string Map,
+    int X,
+    int Y,
+    bool Shown,
+    string Doing,
+    string DoingWhat,
+    string Subject,
+    DateTime? ThoughtAt,
+    string ThoughtKind,
+    string Question,
+    string Thought,
+    string Answer,
+    string About,
+    double Sure,
+    string Asking,
+    DateTime? AskingSince,
+    long Asked,
+    long Findings,
+    long Quiet,
+    long Reflections,
+    long Labels,
+    long Echoes,
+    long Hops,
+    IReadOnlyList<BotDebuggerLine> Feed
+);
+
 /// <summary>
 /// Where the assemblies that depend on this one hang what the dashboard shows about them.
 ///
@@ -23,4 +63,6 @@ public sealed record BotMindsReport(
 public static class BotWebHooks
 {
     public static Func<BotMindsReport> Minds { get; set; }
+
+    public static Func<IReadOnlyList<BotDebuggerReport>> Debuggers { get; set; }
 }

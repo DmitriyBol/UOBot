@@ -249,6 +249,38 @@ public static class BotFeud
         }
     }
 
+    public static long Warned { get; private set; }
+
+    public static bool Warn(Guild ours, BotMobile whom)
+    {
+        if (!Running || ours?.Name == null || whom is not { Deleted: false, Alive: true } || whom.Guild is not Guild theirs
+            || BotWar.Of(ours.Name, theirs.Name) == null)
+        {
+            return false;
+        }
+
+        var now = Core.TickCount;
+
+        if (!_threats.ContainsKey(ours.Name))
+        {
+            Threatened++;
+            _unanswered = now == 0 ? 1 : now;
+
+            for (var m = 0; ours.Members != null && m < ours.Members.Count; m++)
+            {
+                if (ours.Members[m] is IBotWilful { Resolve: { } resolve })
+                {
+                    resolve.Due = true;
+                }
+            }
+        }
+
+        _threats[ours.Name] = (whom, now);
+        Warned++;
+
+        return true;
+    }
+
     public static void Stood()
     {
         Defended++;
@@ -267,7 +299,7 @@ public static class BotFeud
 
     private static long _unanswered;
 
-    public static int CompanySize { get; set; } = 15;
+    public static int CompanySize { get; set; } = 20;
 
     public static long Companies { get; private set; }
 
@@ -757,6 +789,11 @@ public static class BotFeud
         }
 
         if (!BotRegard.AtWar(ours, theirs))
+        {
+            return false;
+        }
+
+        if (BotDuel.Duelling(ours) || BotDuel.Duelling(theirs))
         {
             return false;
         }

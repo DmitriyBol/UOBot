@@ -61,12 +61,27 @@ public sealed class BotZoneSettings
     public double SimplifyTiles { get; init; }
 
     public int SmoothPasses { get; init; }
+
+    public int JoinGap { get; init; } = 8;
+
+    public int ZoneMostTiles { get; init; } = 192;
+
+    public int StrayBeyond { get; init; } = 16;
+
+    public int ObservedSlack { get; init; } = 8;
+
+    public int ReachBeyond { get; init; }
+
+    public int WanderMostCells { get; init; }
 }
 
 /// <summary>A creature kind as the build sees it: plain values, no type and no creature.</summary>
 public readonly record struct BotZoneKindIn(
-    string Name, double Power, bool Aggressive, bool Caster, int Perception, bool Water, bool Rooted
-);
+    string Name, double Power, bool Aggressive, bool Caster, int Perception, bool Water, bool Rooted, bool Swims, int Strike = 0
+)
+{
+    public bool WaterAt(bool wet) => Water || Swims && wet;
+}
 
 /// <summary>One haunt as the build sees it.</summary>
 public sealed class BotZoneHauntIn
@@ -85,6 +100,8 @@ public sealed class BotZoneHauntIn
 
     public bool InTown { get; init; }
 
+    public bool Wet { get; init; }
+
     public int[] Kinds { get; init; } = [];
 
     public double[] Expected { get; init; } = [];
@@ -97,13 +114,26 @@ public sealed class BotZoneHauntIn
 
     public int ObservedRange { get; init; }
 
+    public int Reach { get; init; } = -1;
+
     public DateTime LastAwake { get; init; }
 }
 
-/// <summary>One living creature where it stands now, with its own traits (an instance may differ from its kind).</summary>
+/// <summary>
+/// One living creature where it stands now, with its own traits (an instance may differ from its kind). <see cref="Event"/>: the
+/// index of the event it belongs to, or -1. <see cref="TrailFrom"/> and <see cref="TrailCount"/>: its recent places in
+/// <see cref="BotZoneInput.Trail"/>, newest first (08.10.2026).
+/// </summary>
 public readonly record struct BotZoneLiveIn(
-    int X, int Y, int Kind, int Haunt, bool Awake, float Power, bool Aggressive, bool Caster, int Perception, bool Water, bool Rooted
+    int X, int Y, int Kind, int Haunt, bool Awake, float Power, bool Aggressive, bool Caster, int Perception, bool Water, bool Rooted,
+    int Strike = 0, int Event = -1, int TrailFrom = 0, int TrailCount = 0
 );
+
+/// <summary>
+/// An event's creatures as one temporary zone (08.10.2026): what it is, its field (a point and the leash round it), painted while
+/// any of them lives. See <see cref="BotZones"/>' gather.
+/// </summary>
+public readonly record struct BotZoneEventIn(string Label, int X, int Y, int Radius);
 
 /// <summary>A named place: a town (a point) or a dungeon (a box).</summary>
 public readonly record struct BotZonePlaceIn(string Name, int X1, int Y1, int X2, int Y2);
@@ -128,6 +158,10 @@ public sealed class BotZoneInput
 
     public BotZoneLiveIn[] Live { get; init; } = [];
 
+    public int[] Trail { get; init; } = [];
+
+    public BotZoneEventIn[] Events { get; init; } = [];
+
     public int[] Observed { get; init; } = [];
 
     public float[] ObservedWeight { get; init; } = [];
@@ -143,6 +177,10 @@ public sealed class BotZoneInput
     public BotZoneState Previous { get; init; }
 
     public ushort[] Buffer { get; init; }
+
+    public ushort[] FightBuffer { get; init; }
+
+    public byte[] Guarded { get; init; }
 
     public DateTime At { get; init; }
 

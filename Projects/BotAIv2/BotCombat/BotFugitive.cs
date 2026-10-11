@@ -37,6 +37,27 @@ public sealed class BotFugitive : IBotProposer
 
     public static long Calmed { get; private set; }
 
+    public static int CorneredRestMs { get; set; } = 20000;
+
+    public static long CorneredRested { get; private set; }
+
+    private static readonly Dictionary<Serial, long> _corneredAt = [];
+
+    public static void CorneredRun(Mobile body)
+    {
+        if (body == null)
+        {
+            return;
+        }
+
+        if (_corneredAt.Count > 1024)
+        {
+            _corneredAt.Clear();
+        }
+
+        _corneredAt[body.Serial] = Core.TickCount;
+    }
+
     public static int MostRepeats { get; set; } = 2;
 
     public static int RepeatMs { get; set; } = 120000;
@@ -69,6 +90,10 @@ public sealed class BotFugitive : IBotProposer
 
     public static double EarlyBar { get; set; } = 1.5;
 
+    public static double PoisonedHealth { get; set; } = 0.9;
+
+    public static long PoisonedEarly { get; private set; }
+
     public static long StoodToCasters { get; private set; }
 
     public static long Early { get; private set; }
@@ -96,19 +121,38 @@ public sealed class BotFugitive : IBotProposer
 
         var left = BotThreat.Power(body) * ((double)body.Hits / body.HitsMax);
 
-        if (_early && body.Hits >= body.HitsMax * EarlyHealth)
+        var poisoned = body.Poisoned;
+
+        var withdrawing = BotSquad.Withdrawing(body);
+        var contact = false;
+
+        var forewarned = _early && bot.Squad == null && bot.Resolve?.Deed?.Foe == null && BotLadder.Forewarned(bot.Resolve);
+
+        var losing = _early && BotTreadmill.Losing(body);
+
+        if (_early && !losing && body.Hits >= body.HitsMax * (poisoned ? PoisonedHealth : EarlyHealth))
         {
-            return null;
+            if (!withdrawing && !forewarned && !AtContact(bot, body, threat))
+            {
+                return null;
+            }
+
+            contact = !forewarned;
         }
 
-        if (threat <= left * (_early ? EarlyBar : Bearable))
+        if (_early && poisoned && body.Hits >= body.HitsMax * EarlyHealth)
+        {
+            PoisonedEarly++;
+        }
+
+        if (!withdrawing && threat <= left * (_early && !losing ? EarlyBar : Bearable))
         {
             return null;
         }
 
         var ours = BotThreat.OurPower(body, BotBolt.Watch) - BotThreat.Power(body) + left;
 
-        if (ours > left && threat <= ours * BotThreat.Tolerance)
+        if (!withdrawing && ours > left && threat <= ours * BotThreat.Tolerance)
         {
             Companied++;
 
@@ -131,6 +175,13 @@ public sealed class BotFugitive : IBotProposer
             return null;
         }
 
+        if (CorneredRestMs > 0 && _corneredAt.TryGetValue(body.Serial, out var corneredTick) && now - corneredTick < CorneredRestMs)
+        {
+            CorneredRested++;
+
+            return null;
+        }
+
         if (_cleared.TryGetValue(body.Serial, out var clearedTick) && Core.TickCount - clearedTick < CalmMs
             && (bot.Resolve == null || bot.Resolve.HurtTick - clearedTick <= 0))
         {
@@ -139,7 +190,27 @@ public sealed class BotFugitive : IBotProposer
             return null;
         }
 
-        if (BotBolt.Retreat(map, body, BotThreat.Strongest(body, BotBolt.Watch)) == Point3D.Zero)
+        var strongest = BotThreat.Strongest(body, BotBolt.Watch);
+
+        if (bot.Squad == null && BotHaven.Choose(body, strongest, out var haven, out var town, out var tiles))
+        {
+            return new BotBolt(map, body.Location, haven, town, tiles)
+            {
+                Began = () =>
+                {
+                    Running(body, threat, left, strongest, _early, town, contact, withdrawing, forewarned);
+                    Offered(contact, withdrawing, forewarned);
+                    Ran(body, Core.TickCount);
+
+                    if (losing)
+                    {
+                        BotTreadmill.FlightsAfterLosing++;
+                    }
+                }
+            };
+        }
+
+        if (BotBolt.Retreat(map, body, strongest) == Point3D.Zero)
         {
             Cornered++;
 
@@ -148,18 +219,112 @@ public sealed class BotFugitive : IBotProposer
             return null;
         }
 
-        Running(body, threat, left, BotThreat.Strongest(body, BotBolt.Watch), _early);
+        return new BotBolt(map, body.Location)
+        {
+            Began = () =>
+            {
+                Running(body, threat, left, strongest, _early, null, contact, withdrawing, forewarned);
+                Offered(contact, withdrawing, forewarned);
+                Ran(body, Core.TickCount);
 
-        if (_early)
+                if (losing)
+                {
+                    BotTreadmill.FlightsAfterLosing++;
+                }
+            }
+        };
+    }
+
+    public static long Forewarned { get; private set; }
+
+    public static bool Calm(Mobile body, BotResolve resolve) =>
+        body != null && _cleared.TryGetValue(body.Serial, out var cleared) && Core.TickCount - cleared < CalmMs
+        && (resolve == null || resolve.HurtTick - cleared <= 0);
+
+    public static double ContactOdds { get; set; } = 3.0;
+
+    public static long Contacted { get; private set; }
+
+    public static long Withdrawn { get; private set; }
+
+    private void Offered(bool contact, bool withdrawing, bool forewarned = false)
+    {
+        if (forewarned)
+        {
+            Forewarned++;
+        }
+        else if (withdrawing)
+        {
+            Withdrawn++;
+        }
+        else if (contact)
+        {
+            Contacted++;
+        }
+        else if (_early)
         {
             Early++;
         }
+    }
 
+    private static bool AtContact(IBotWilful bot, Mobile body, double threat) =>
+        ContactOdds > 0.0 && bot.Resolve?.Deed?.Foe == null && threat >= ContactOdds * Math.Max(1.0, BotThreat.OurPower(body, BotBolt.Watch));
+
+    private static void Ran(Mobile body, long now)
+    {
         _runs[body.Serial] = _runs.TryGetValue(body.Serial, out var ran) && now - ran.First < RepeatMs
             ? (ran.First, ran.Count + 1)
             : (now, 1);
+    }
 
-        return new BotBolt(map, body.Location);
+    public static long Outrun { get; private set; }
+
+    public static BotDeed ToTown(IBotWilful bot, Mobile body, BaseCreature foe)
+    {
+        var map = body?.Map;
+
+        if (bot == null || map == null || map == Map.Internal || !body.Alive || foe == null || bot.Squad != null)
+        {
+            return null;
+        }
+
+        if (bot.Resolve?.Deed is BotBolt)
+        {
+            return null;
+        }
+
+        if (foe is { AI: AIType.AI_Mage })
+        {
+            StoodToCasters++;
+
+            return null;
+        }
+
+        var now = Core.TickCount;
+
+        if (_runs.TryGetValue(body.Serial, out var runs) && now - runs.First < RepeatMs && runs.Count >= MostRepeats)
+        {
+            Winded++;
+
+            return null;
+        }
+
+        if (!BotHaven.Choose(body, foe, out var haven, out var town, out var tiles))
+        {
+            return null;
+        }
+
+        var left = BotThreat.Power(body) * (body.HitsMax > 0 ? (double)body.Hits / body.HitsMax : 1.0);
+
+        return new BotBolt(map, body.Location, haven, town, tiles)
+        {
+            Began = () =>
+            {
+                Running(body, BotThreat.ThreatPower(body, BotBolt.Watch), left, foe, false, town);
+                Ran(body, Core.TickCount);
+                Outrun++;
+            }
+        };
     }
 
     private static void Trapped(Mobile body)
@@ -187,7 +352,10 @@ public sealed class BotFugitive : IBotProposer
 
     public static long FromMelee { get; private set; }
 
-    private static void Running(Mobile body, double threat, double left, Mobile foe, bool early)
+    private static void Running(
+        Mobile body, double threat, double left, Mobile foe, bool early, string town, bool contact = false, bool withdrawing = false,
+        bool forewarned = false
+    )
     {
         var kind = foe is BaseCreature { AI: AIType.AI_Mage } ? "a caster"
             : foe is BaseCreature { AI: AIType.AI_Archer } ? "an archer"
@@ -210,9 +378,10 @@ public sealed class BotFugitive : IBotProposer
         var ours = BotThreat.OurPower(body, BotBolt.Watch) - BotThreat.Power(body);
 
         logger.Information(
-            "{Name} runs{Early} from ({X}, {Y}) at {Hits} of {Pool} health: {Threat:F0} of hostile against the {Left:F0} it has left ({Ours:F0} of ours near), from {Foe} ({Kind}, {Off} tiles off); stamina {Stam} of {StamMax}{Mounted}",
+            "{Name} runs{Early}{Town} from ({X}, {Y}) at {Hits} of {Pool} health: {Threat:F0} of hostile against the {Left:F0} it has left ({Ours:F0} of ours near), from {Foe} ({Kind}, {Off} tiles off); stamina {Stam} of {StamMax}{Mounted}{Contact}",
             body.Name,
             early ? " early" : "",
+            town == null ? "" : $" for {town}",
             body.X,
             body.Y,
             body.Hits,
@@ -225,7 +394,10 @@ public sealed class BotFugitive : IBotProposer
             off,
             body.Stam,
             body.StamMax,
-            body.Mounted ? ", mounted" : ""
+            body.Mounted ? ", mounted" : "",
+            forewarned ? "; seen coming, before its first blow"
+            : withdrawing ? "; its company withdrew from it"
+            : contact ? $"; at the first blows, the opposition past {ContactOdds:F1} times what it and ours near bring" : ""
         );
     }
 
@@ -238,6 +410,6 @@ public sealed class BotFugitive : IBotProposer
     }
 
     public static string Describe() =>
-        $"flights from {FromCasters} casters, {FromArchers} archers and {FromMelee} hand to hand, {StoodToCasters} not offered because the worst of it was a caster (fought to the end); {Early} flights offered early to a bot plainly outmatched (under {EarlyHealth:P0} of its health, the opposition past {EarlyBar:F1} times what it had left), {Cornered} bots losing with nowhere to run, {Calmed} flights not offered to a bot that had just got clear and had not been hit since, {Companied} not offered because the company round the bot could take it, {Winded} not offered to a bot that had run {MostRepeats} times in {RepeatMs / 60000} minutes and stands instead, "
+        $"flights from {FromCasters} casters, {FromArchers} archers and {FromMelee} hand to hand, {StoodToCasters} not offered because the worst of it was a caster (fought to the end); {Early} flights offered early to a bot plainly outmatched (under {EarlyHealth:P0} of its health, the opposition past {EarlyBar:F1} times what it had left; {PoisonedEarly} looks taken for a poisoned bot above that gate, under {PoisonedHealth:P0}), {Contacted} at the first blows above that gate, the opposition past {ContactOdds:F1} times what the bot and ours near bring and the bot in no fight of its own choosing, {Withdrawn} to a bot whose company had just withdrawn from what was on it, {Outrun} runs for a town offered by the defender to a bot that could not win where it stood, {Cornered} bots losing with nowhere to run, {Calmed} flights not offered to a bot that had just got clear and had not been hit since, {Companied} not offered because the company round the bot could take it, {Winded} not offered to a bot that had run {MostRepeats} times in {RepeatMs / 60000} minutes and stands instead, every run counted when its flight was taken and not when it was offered, {Forewarned} flights taken before the first blow from something seen coming, "
         + $"{BotBolt.Tended} bandages and bottles taken on the run, {BotBolt.Bent} flights turned another way for a refused road, {BotBolt.Vetoed} retreats refused by the look ahead before anybody walked";
 }

@@ -56,6 +56,13 @@ public sealed class BotMiner : IBotProposer
 
         BotGround.Survey(map, body.Location);
 
+        if (BotGround.Sweeping(map, body.Location))
+        {
+            Awaiting++;
+
+            return null;
+        }
+
         if (BotGround.Fire(bot, body.Location) == Point3D.Zero)
         {
             Missing(ref _saidNoFire, "fire", body, map);
@@ -105,6 +112,8 @@ public sealed class BotMiner : IBotProposer
 
     public static long Burdened { get; private set; }
 
+    public static long Awaiting { get; private set; }
+
     private static void Missing(ref bool said, string what, Mobile body, Map map)
     {
         if (said)
@@ -126,6 +135,7 @@ public sealed class BotMiner : IBotProposer
     public static void Forget()
     {
         Burdened = 0;
+        Awaiting = 0;
         _saidNoFire = false;
         _saidNoCounter = false;
     }

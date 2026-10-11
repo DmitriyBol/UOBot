@@ -335,6 +335,19 @@ public static class BotSeat
         logger.Information("The seat of {Guild} follows its hall to {X},{Y}", guild, at.X, at.Y);
     }
 
+    public static void Shift(string guild, Point3D at, string why)
+    {
+        if (string.IsNullOrEmpty(guild))
+        {
+            return;
+        }
+
+        _overrides[guild] = at;
+        _moved.Remove(guild);
+
+        logger.Warning("The seat of {Guild} moves to {X},{Y}: {Why}", guild, at.X, at.Y, why);
+    }
+
     public static BotTowns.Town Choose(string guild, Map map)
     {
         if (BotGuildHouses.Running && BotGuildHouses.Started)
@@ -409,6 +422,13 @@ public static class BotSeat
 
             if (TooNear(guild, at, out _, out _))
             {
+                continue;
+            }
+
+            if (BotBounds.Foreign(guild, map, at, out _))
+            {
+                BotBounds.SeatRefused();
+
                 continue;
             }
 
@@ -540,6 +560,18 @@ public static class BotSeat
         Abroad = 0;
         AtHome = 0;
         _moved.Clear();
+    }
+
+    public static void Drop(string guild)
+    {
+        if (string.IsNullOrEmpty(guild))
+        {
+            return;
+        }
+
+        _overrides.Remove(guild);
+        _configured.Remove(guild);
+        _moved.Remove(guild);
     }
 
     public static int Wipe()

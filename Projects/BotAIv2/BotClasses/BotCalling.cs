@@ -201,7 +201,61 @@ public static class BotCalling
             line.Append(")");
         }
 
+        line.Append(Crafters());
+
         return line.ToString();
+    }
+
+    private static readonly string[] _making = ["forge", "sew", "tinker", "fletch", "bowyer", "weave", "brew"];
+
+    private static readonly string[] _digging = ["mine", "prospect"];
+
+    private static string Crafters()
+    {
+        double total = 0.0, making = 0.0, digging = 0.0;
+        Dictionary<string, double> trades = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (name, book) in _books)
+        {
+            if (!string.Equals(name, "Crafter", StringComparison.OrdinalIgnoreCase) && !string.Equals(name, "Architect", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            total += book.Own + book.Anybody + book.Other;
+
+            for (var i = 0; i < _making.Length; i++)
+            {
+                if (book.Kinds.TryGetValue(_making[i], out var spent))
+                {
+                    making += spent;
+                    trades[_making[i]] = trades.GetValueOrDefault(_making[i]) + spent;
+                }
+            }
+
+            for (var i = 0; i < _digging.Length; i++)
+            {
+                digging += book.Kinds.GetValueOrDefault(_digging[i]);
+            }
+        }
+
+        if (total <= 0.0)
+        {
+            return "";
+        }
+
+        List<string> by = [];
+
+        for (var i = 0; i < _making.Length; i++)
+        {
+            if (trades.TryGetValue(_making[i], out var spent) && spent > 0.0)
+            {
+                by.Add($"{_making[i]} {spent:F0}");
+            }
+        }
+
+        return $"; crafters (Crafter, Architect) {total:F0} min: making things {making:F0} min ({100.0 * making / total:F1}%: {(by.Count == 0 ? "none" : string.Join(", ", by))}), digging {digging:F0} min ({100.0 * digging / total:F1}%); "
+               + BotCraftFirst.Describe();
     }
 
     public static void Forget() => _books.Clear();

@@ -153,27 +153,28 @@ public static class BotMindSight
                 that have not eaten — those numbers are counted at the moment you read them, and every one of
                 them is a thing only you can fix. A bot with an empty slot is a bot that dies sooner; an
                 archer with no arrows is a bow being carried for nothing. Nobody has ordered these. Make them
-                anyway, put them on a stall, and the island pays you for them.
+                anyway, sell them at the shop by Britain's bank, and the island pays you for them.
 
                 Third, your skill, if it is what is stopping you. Skill counts as earnings on this shard, so
                 an hour spent getting better is paid work, not a detour. Make the dearest thing you are
                 allowed to attempt — your bench lists them — until the number moves. Do not practise a skill
                 that is already at its target; it earns you nothing more.
 
-                Fourth, material. You carry a pickaxe, an axe and the skill to use both, and the stalls list
-                what everything costs. Buy it if it is on a stall and you can afford it; dig or cut it if it
-                is not, or if buying costs more than the finished thing is worth. Ore, wood, leather and
-                cloth all reach you either way.
+                Fourth, material. You carry a pickaxe, an axe and the skill to use both, and the shops by the
+                bank list what everything costs. Buy it there if you can afford it, or ask for it aloud and a
+                carrier will bring it; dig or cut it if nobody has it, or if buying costs more than the
+                finished thing is worth. Ore, wood, leather and cloth all reach you either way.
 
                 Fifth, selling. A stack of ingots in your pack is worth nothing to anybody. The same ingots
-                on a stall, or turned into what somebody asked for, are the island getting richer, and that
-                is what you are judged on. Put spare material where the others can buy it.
+                sold at the shop by the bank, carried to whoever asked, or turned into what somebody asked
+                for, are the island getting richer, and that is what you are judged on. Everything is sold
+                hand to hand.
 
                 THREE RULES THAT OVERRIDE ALL OF THAT.
 
-                Do not make what has already failed to sell. Your own stalls tell you what has been cut in
-                price and still sold nothing. That is the island answering you in money, and it is worth more
-                than any forecast you can make.
+                Do not make what has already failed to sell. Your own goods tell you what you still hold that
+                nobody is asking for. That is the island answering you in money, and it is worth more than any
+                forecast you can make.
 
                 Do not stand at a bench another crafter is already at. You are shown what the other three are
                 holding right now. Four of you on one trade is three of you wasted, and the wants nobody can
@@ -579,7 +580,7 @@ public static class BotMindSight
             string best = null;
             var bestOffer = 0;
 
-            var wants = BotAuction.Wants;
+            var wants = BotMarket.Wants;
 
             for (var i = 0; i < wants.Count; i++)
             {
@@ -616,22 +617,16 @@ public static class BotMindSight
                 line.Append($", dearest reachable {best} at {bestOffer}gp");
             }
 
-            var stalls = BotAuction.Listings;
-            var kinds = 0;
+            var lots = BotShopkeep.Lots();
+            var kinds = lots.Count;
             var cheapest = int.MaxValue;
 
-            for (var i = 0; i < stalls.Count; i++)
+            for (var i = 0; i < lots.Count; i++)
             {
-                if (stalls[i] == null)
-                {
-                    continue;
-                }
-
-                kinds++;
-                cheapest = Math.Min(cheapest, stalls[i].Price);
+                cheapest = Math.Min(cheapest, lots[i].Ask);
             }
 
-            line.Append($"; stalls: {kinds} listings from {(kinds == 0 ? 0 : cheapest)}gp");
+            line.Append($"; shops by the bank: {kinds} lots from {(kinds == 0 ? 0 : cheapest)}gp");
 
             var minds = BotMinds.All;
             var others = 0;
@@ -722,21 +717,19 @@ public static class BotMindSight
             return 0;
         }
 
-        var listings = BotAuction.Listings;
+        var lots = BotShopkeep.Lots();
         var best = 0;
 
-        for (var i = 0; i < listings.Count; i++)
+        for (var i = 0; i < lots.Count; i++)
         {
-            var listing = listings[i];
-
-            if (listing?.Label == null || listing.Kind?.Name != material)
+            if (lots[i].Kind?.Name != material)
             {
                 continue;
             }
 
-            if (best == 0 || listing.Price < best)
+            if (best == 0 || lots[i].Ask < best)
             {
-                best = listing.Price;
+                best = lots[i].Ask;
             }
         }
 
@@ -871,13 +864,13 @@ public static class BotMindSight
 
         sb.AppendLine("\nTHE BOARD: WHAT THE ISLAND HAS PAID FOR AND CANNOT GET");
 
-        var wants = BotAuction.Wants;
+        var wants = BotMarket.Wants;
         var shown = 0;
         var unmakeable = 0;
 
         mind.Orders.Clear();
 
-        var seen = new Dictionary<(string Label, int Offer), (int Wanted, int Orders, int Escrow, int Filled, int Raises, Type Kind)>();
+        var seen = new Dictionary<(string Label, int Offer), (int Wanted, int Orders, int Coming, int Filled, int Raises, Type Kind)>();
 
         for (var i = 0; i < wants.Count; i++)
         {
@@ -899,11 +892,11 @@ public static class BotMindSight
 
             if (seen.TryGetValue(key, out var had))
             {
-                seen[key] = (had.Wanted + want.Amount, had.Orders + 1, had.Escrow + want.Escrow, had.Filled + want.Filled, Math.Max(had.Raises, want.Raises), had.Kind);
+                seen[key] = (had.Wanted + want.Amount, had.Orders + 1, had.Coming + want.Coming, had.Filled + want.Filled, Math.Max(had.Raises, want.Raises), had.Kind);
             }
             else
             {
-                seen[key] = (want.Amount, 1, want.Escrow, want.Filled, want.Raises, want.Kind);
+                seen[key] = (want.Amount, 1, want.Coming, want.Filled, want.Raises, want.Kind);
             }
         }
 
@@ -937,9 +930,9 @@ public static class BotMindSight
 
             sb.Append(" at ");
             sb.Append(offer);
-            sb.Append("gp each, ");
-            sb.Append(row.Escrow);
-            sb.Append("gp already lodged");
+            sb.Append("gp each, paid by hand when it is brought, ");
+            sb.Append(row.Coming);
+            sb.Append(" on their way already");
 
             if (row.Orders > 1)
             {
@@ -1077,34 +1070,24 @@ public static class BotMindSight
             return;
         }
 
-        sb.AppendLine("\nWHAT IS FOR SALE ON THE STALLS, AND WHAT IT COSTS");
+        sb.AppendLine("\nWHAT IS FOR SALE AT THE SHOPS BY BRITAIN'S BANK, AND WHAT IT COSTS");
         sb.AppendLine("You pay from your pack, and whatever it is short of is taken from your bank account automatically. Both purses spend.");
 
-        var listings = BotAuction.Listings;
+        var lots = BotShopkeep.Lots();
         var seen = new Dictionary<string, (int Count, int Cheapest)>();
 
-        for (var i = 0; i < listings.Count; i++)
+        for (var i = 0; i < lots.Count; i++)
         {
-            var listing = listings[i];
+            var label = BotMarket.Spaced(lots[i].Kind.Name);
 
-            if (listing?.Label == null)
-            {
-                continue;
-            }
-
-            if (seen.TryGetValue(listing.Label, out var had))
-            {
-                seen[listing.Label] = (had.Count + 1, Math.Min(had.Cheapest, listing.Price));
-            }
-            else
-            {
-                seen[listing.Label] = (1, listing.Price);
-            }
+            seen[label] = seen.TryGetValue(label, out var had)
+                ? (had.Count + 1, Math.Min(had.Cheapest, lots[i].Ask))
+                : (1, lots[i].Ask);
         }
 
         if (seen.Count == 0)
         {
-            sb.AppendLine("Nothing at all is on sale. Whatever you need, you will have to go and get it yourself.");
+            sb.AppendLine("Nothing at all is on sale at the shops. Whatever you need, you will have to get yourself or ask for aloud.");
 
             return;
         }
@@ -1124,7 +1107,7 @@ public static class BotMindSight
             sb.Append(label);
             sb.Append(": ");
             sb.Append(what.Count);
-            sb.Append(what.Count == 1 ? " stall, from " : " stalls, from ");
+            sb.Append(what.Count == 1 ? " shop, from " : " shops, from ");
             sb.Append(what.Cheapest);
             sb.AppendLine("gp.");
         }
@@ -1133,7 +1116,7 @@ public static class BotMindSight
         {
             sb.Append("(and ");
             sb.Append(seen.Count - listed);
-            sb.AppendLine(" other kinds of thing on other stalls.)");
+            sb.AppendLine(" other kinds of thing at other shops.)");
         }
     }
 
@@ -1242,74 +1225,27 @@ public static class BotMindSight
             return;
         }
 
-        var listings = BotAuction.Listings;
+        var stock = BotShopkeep.Look(body);
 
-        var mine = 0;
-        var sold = 0;
-        var earned = 0;
-        var stale = 0;
-        string worst = null;
-        var worstCuts = 0;
+        sb.AppendLine("\nYOUR OWN GOODS TO SELL");
 
-        for (var i = 0; i < listings.Count; i++)
+        if (stock.Units == 0)
         {
-            var listing = listings[i];
-
-            if (listing?.Seller != body)
-            {
-                continue;
-            }
-
-            mine++;
-            sold += listing.Sold;
-            earned += listing.Earned;
-
-            if (listing.Sold == 0 && listing.Cuts > 0)
-            {
-                stale++;
-
-                if (listing.Cuts > worstCuts)
-                {
-                    worstCuts = listing.Cuts;
-                    worst = listing.Label;
-                }
-            }
-        }
-
-        sb.AppendLine("\nYOUR OWN STALLS");
-
-        if (mine == 0)
-        {
-            sb.AppendLine("You have nothing on the market. Nothing you have made is earning while you do something else.");
+            sb.AppendLine("You hold nothing to sell. Nothing you have made is waiting for a buyer.");
 
             return;
         }
 
-        sb.Append("You are holding ");
-        sb.Append(mine);
-        sb.Append(mine == 1 ? " stall. " : " stalls. ");
-        sb.Append(sold);
-        sb.Append(" things sold off them for ");
-        sb.Append(earned);
-        sb.AppendLine("gp all told.");
-
-        if (stale > 0)
-        {
-            sb.Append(stale);
-            sb.Append(stale == 1 ? " stall has" : " stalls have");
-            sb.Append(" had the price cut and still sold nothing");
-
-            if (worst != null)
-            {
-                sb.Append(" - worst of them ");
-                sb.Append(worst);
-                sb.Append(", cut ");
-                sb.Append(worstCuts);
-                sb.Append(worstCuts == 1 ? " time" : " times");
-            }
-
-            sb.AppendLine(". Nobody wants more of that; make something else.");
-        }
+        sb.Append("You hold ");
+        sb.Append(stock.Units);
+        sb.Append(" things of ");
+        sb.Append(stock.Kinds);
+        sb.Append(stock.Kinds == 1 ? " kind" : " kinds");
+        sb.Append(" worth ");
+        sb.Append(stock.Worth);
+        sb.Append("gp at your prices, ");
+        sb.Append(stock.Demanded);
+        sb.AppendLine("gp of it what the island is short of or somebody has asked for. Sell it at the shop by Britain's bank or carry it to whoever asked; make what is asked for, not more of what is not.");
     }
 
     private static void Past(ref ValueStringBuilder sb, BotMind mind)
@@ -1458,6 +1394,7 @@ public static class BotMindSight
             "Bullion" => "Bullion — buy metal from a shopkeeper instead of spending eight minutes digging it.",
             "Upkeep" => "Upkeep — post an order on the market for a replacement of something you are wearing out.",
             "Armoury" => "Armoury — buy a few attack scrolls to open a fight with or to break away from one.",
+            "Lifeline" => "Lifeline — carry a resurrection scroll to raise one of your company where it falls.",
             "Rescuer" => "Rescuer — go to the aid of one of your own people who is being set upon.",
             "Undertaker" => "Undertaker — go back for your own corpse and recover what you were carrying.",
             "Porter" => "Porter — carry goods to where they were asked for.",

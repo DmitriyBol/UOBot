@@ -85,6 +85,62 @@ public static class BotFormation
 
     private static readonly List<IBotSquadMember> _peers = [];
 
+    private static int File(BotSquad squad, IBotSquadMember member, BotRole role)
+    {
+        if (!ReferenceEquals(_filedFor, squad) || _filedAt != squad.Roster)
+        {
+            Refile(squad);
+        }
+
+        if (_files.TryGetValue(member, out var filed) && filed.Role == role)
+        {
+            return filed.File;
+        }
+
+        Refile(squad);
+
+        return _files.TryGetValue(member, out filed) && filed.Role == role ? filed.File : -1;
+    }
+
+    private static void Refile(BotSquad squad)
+    {
+        _filedFor = squad;
+        _filedAt = squad.Roster;
+        _files.Clear();
+
+        var members = squad.Members;
+
+        foreach (var rank in Ranks)
+        {
+            _peers.Clear();
+
+            for (var i = 0; i < members.Count; i++)
+            {
+                if (members[i]?.Self != null && RoleOf(members[i]) == rank)
+                {
+                    _peers.Add(members[i]);
+                }
+            }
+
+            _peers.Sort(static (a, b) => a.Self.Serial.Value.CompareTo(b.Self.Serial.Value));
+
+            for (var i = 0; i < _peers.Count; i++)
+            {
+                _files[_peers[i]] = (rank, i);
+            }
+        }
+
+        _peers.Clear();
+    }
+
+    private static readonly BotRole[] Ranks = Enum.GetValues<BotRole>();
+
+    private static readonly Dictionary<IBotSquadMember, (BotRole Role, int File)> _files = [];
+
+    private static BotSquad _filedFor;
+
+    private static int _filedAt;
+
     public static Point3D StationFor(BotSquad squad, IBotSquadMember member)
     {
         if (squad == null || member?.Self == null)
@@ -102,28 +158,14 @@ public static class BotFormation
         var anchor = squad.Anchor;
         var role = RoleOf(member);
 
-        _peers.Clear();
-
-        var members = squad.Members;
-
-        for (var i = 0; i < members.Count; i++)
-        {
-            if (RoleOf(members[i]) == role)
-            {
-                _peers.Add(members[i]);
-            }
-        }
-
-        _peers.Sort(static (a, b) => a.Self.Serial.Value.CompareTo(b.Self.Serial.Value));
-
-        var file = _peers.IndexOf(member);
+        var file = File(squad, member, role);
 
         if (file < 0)
         {
             return Point3D.Zero;
         }
 
-        if (squad.Stance == BotSquadStance.Fighting && squad.Focus is { Deleted: false, Alive: true })
+        if (squad.Stance == BotSquadStance.Fighting && !squad.Mustering && squad.Focus is { Deleted: false, Alive: true })
         {
             return PressStation(map, squad, member, role, file);
         }
@@ -200,7 +242,8 @@ public static class BotFormation
 
     private static bool Stand(Map map, int x, int y, Point3D near, out Point3D spot)
     {
-        if (BotStep.Ground(map, x, y, near.Z, PressReach, out var z) && Sighted(map, x, y, z, near))
+        if (BotStep.Ground(map, x, y, near.Z, PressReach, out var z) && Sighted(map, x, y, z, near)
+            && BotReachMap.Class(map, x, y, z) is not (BotReachClass.Water or BotReachClass.Blocked))
         {
             spot = new Point3D(x, y, z);
 
