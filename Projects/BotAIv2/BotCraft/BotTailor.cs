@@ -4,21 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers the needle to anybody carrying a sewing kit.
-///
-/// <para>
-/// <b>The tool decides, as it does with the pickaxe.</b> A crafter is born with a kit; anybody who buys one
-/// is a tailor while they hold it. No list of permitted classes, so adding a class cannot silently exclude
-/// it.
-/// </para>
-///
-/// <para>
-/// The precondition belongs here rather than in the work: without a shop selling cloth the chain would end
-/// with a bot standing in a shop it cannot buy from, and the ledger would learn that <em>sewing</em> is
-/// worthless for a reason that has nothing to do with sewing.
-/// </para>
-/// </summary>
 public sealed class BotTailor : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTailor));
@@ -74,6 +59,7 @@ public sealed class BotTailor : IBotProposer
 
         if (BotThread.System == null)
         {
+
             if (!_saidNoSystem)
             {
                 _saidNoSystem = true;
@@ -155,6 +141,7 @@ public sealed class BotTailor : IBotProposer
 
     private static BotDeed Leatherwork(IBotWilful bot, Mobile body)
     {
+
         if (BotThread.Amount(body, typeof(Leather)) < BotSew.Bolt)
         {
             BotMarket.FromBank(bot, typeof(Leather), BotSew.Bolt);
@@ -244,6 +231,7 @@ public sealed class BotTailor : IBotProposer
 
             if (carried < need)
             {
+
                 starved = true;
                 want.Passed(BotPass.Material);
 

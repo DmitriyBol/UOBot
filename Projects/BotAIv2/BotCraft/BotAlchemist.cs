@@ -4,22 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers the mortar to anybody carrying one, and offers the board's orders first.
-///
-/// <para>
-/// <b>Every gate here is a skipped candidate and never a failed errand.</b> The same rule the fletcher's
-/// proposer states at length, and for the same reason: a brewer with no herbs is passed over, not sent out
-/// to discover that at the mortar. This shard has paid for the other arrangement twice.
-/// </para>
-///
-/// <para>
-/// <b>Herbs are checked before glass, because they are the half nobody hands back.</b> Glass is five gold a
-/// hundred on the alchemist's shelf and comes back off every potion anybody drinks, so a brewer short of
-/// bottles is a brewer with a short errand. A brewer short of reagents is waiting on a gatherer, and
-/// telling those two apart is what makes the counters below worth reading.
-/// </para>
-/// </summary>
 public sealed class BotAlchemist : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAlchemist));
@@ -103,6 +87,7 @@ public sealed class BotAlchemist : IBotProposer
 
         if (recipe == null)
         {
+
             var funded = Funded(bot, body, map);
 
             if (funded != null)
@@ -162,10 +147,12 @@ public sealed class BotAlchemist : IBotProposer
 
     private BotDeed Glassware(IBotWilful bot, Mobile body, Map map)
     {
+
         var potion = BotFlask.Likeliest(bot, body);
 
         if (potion == null)
         {
+
             if (BotFlask.AtCap(bot, body))
             {
                 AtCap++;

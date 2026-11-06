@@ -4,19 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-spells.json</c> is allowed to say. Everything optional.
-///
-/// <para>
-/// What is not here, and could not be: which spells exist, what they are made of, how hard they are to write,
-/// and what a spell is worth. The first three are the shard's own inscription system and a file able to
-/// disagree with it would be a file able to send a scribe swinging at something it cannot make. The fourth is
-/// not a number in this project at all — a spell has no price, because filling a book is what happens to a
-/// scribe who gets good at writing rather than something it buys.
-/// </para>
-/// </summary>
 public sealed class BotSpellsSettings
 {
+
     public double? Margin { get; set; }
 
     public double? Markup { get; set; }
@@ -40,7 +30,6 @@ public sealed class BotSpellsSettings
     public double? SeekMinutes { get; set; }
 }
 
-/// <summary>Reads the spells file and moves the numbers it names.</summary>
 public static class BotSpellsConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSpellsConfig));

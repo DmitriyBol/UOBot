@@ -6,30 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Dividing what a squad took.
-///
-/// <para>
-/// <b>Evenly by worth, not by count.</b> The first version dealt items round-robin and called it fair enough
-/// that nobody had grounds to complain — but one bot came away with a katana and another with a rotten skull,
-/// and the gold went to whoever opened the corpse, in one pile. Two piles of "one item each" are not two
-/// equal shares.
-/// </para>
-///
-/// <para>
-/// So: gold is cut by amount, and every other item goes to whoever has received the least worth so far,
-/// heaviest item first. That last detail is what makes it work — handing out the valuable things first lets
-/// the small ones even up the difference, and handing them out last cannot.
-/// </para>
-///
-/// <para>
-/// <b>Settled on the spot, and the dead get nothing.</b> The first version held the corpse untouched until
-/// every fallen member had been resurrected, with the survivors standing over it — and standing still is what
-/// killed six bots in a ring around a lich. A share-out that waits is a state in which the squad is not going
-/// anywhere, and this design has no such states. It is a real loss to whoever died winning the fight, and it
-/// is the cheaper of the two losses.
-/// </para>
-/// </summary>
 public static class BotSpoils
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSpoils));

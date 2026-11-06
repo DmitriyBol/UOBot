@@ -4,18 +4,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A rune-mage buying blank runes where the engine sells them — a mage's shop, at fifteen gold — with its guild's money when
-/// its own will not stretch to it.
-///
-/// <para>
-/// <b>The blank is the currency of the whole mechanism.</b> A mark spends one, and so does every copy the library lends
-/// (<see cref="BotRuneLibrary"/>), so a guild whose mages carry none marks nothing and spreads nothing. The purchase is
-/// funded as a delve's supplies are (<see cref="BotProvision.Fund"/>): the mage's own purse, then the guild's chest, then
-/// its guildmates. The runes bought are the mage's own — kept through death, weightless, never sold — or the unloading
-/// would put them back on the market on the walk home.
-/// </para>
-/// </summary>
 public sealed class BotRuneBuy : BotDeed
 {
     public const string Trade = "blanks";
@@ -126,9 +114,9 @@ public sealed class BotRuneBuy : BotDeed
     }
 }
 
-/// <summary>Offers a rune-mage short of blanks a trip to the nearest shop that sells them. See <see cref="BotRuneBuy"/>.</summary>
 public sealed class BotRuneBuyer : IBotProposer
 {
+
     public static int RestMs { get; set; } = 600000;
 
     public static long Asked { get; private set; }

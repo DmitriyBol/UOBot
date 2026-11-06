@@ -4,43 +4,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Doing an errand off the board: killing what it names, bringing what it asks, or standing where it points.
-///
-/// <para>
-/// The errand is taken in <see cref="Taken"/>, not when it is offered — an offer is not an errand — and let go in
-/// <see cref="Drop"/> if it is not done, so the board can give it to somebody else. A kill errand wraps the hunting
-/// deed (<see cref="BotSlay"/>) one creature at a time and credits a kill when the creature the taker set on is
-/// dead afterwards, whoever landed the last blow. A gather errand is only ever offered to a bot already carrying
-/// the goods (see <see cref="BotQuester"/>), so here it is a walk and a handing over.
-/// </para>
-///
-/// <para>
-/// <b>Seen through, because a promise to the board is not an opportunity.</b> On build 94, in its first fifteen minutes
-/// (20:41–20:55 on 16.09.2026), the two errands the door posted were taken seven times and let go six: four times "outbid"
-/// — by a hunt at 205, 161 and 173 a minute, by a prowl at 40 — once "interrupted by rescue", and the kill errand once more
-/// at seven minutes for an acquire. Each letting go put the errand back on the board for the next bot to walk the same
-/// first two minutes of. Steadfast (DECISIONS A11): held against ordinary offers for its own reckoning, put down rather
-/// than dropped for what will not wait, and taken up again after.
-/// </para>
-///
-/// <para>
-/// <b>Claimed at what it pays, and learned as a share of that.</b> The claim was a flat sixty a minute whatever the
-/// reward, and the island corrected it by what errands had paid — which was nothing, because they were all let go before
-/// the reward — so the same errand was taken at 49, then 23, 13 and 9 a minute within a quarter of an hour, and lost to
-/// ever poorer offers. An errand's reward is held by the board from the moment of posting: the claim is that reward over
-/// the minutes it is reckoned to take, walk and work (<see cref="Claim"/>, the same number the proposer ranks errands
-/// by), and what the island learns is how much of such claims is actually earned (<see cref="BotDeed.Posted"/>). The
-/// trade is named <c>errand</c> from build 95; what was learned under <c>quest</c> was learned of a flat claim.
-/// </para>
-///
-/// <para>
-/// <b>A kill anywhere is a kill where the creature is kept.</b> The proposer sends the taker to the nearest lair the
-/// island's spawners keep (<see cref="BotLairs"/>); a taker that stands at a place for <see cref="BotQuests.EmptyMs"/>
-/// seeing nothing of the creature gives the place up — for the next lair, up to <see cref="BotQuests.MostLairs"/>, or for
-/// good at a place the errand itself named.
-/// </para>
-/// </summary>
 public sealed class BotQuestDeed : BotDeed
 {
     public const string Trade = "errand";
@@ -257,6 +220,7 @@ public sealed class BotQuestDeed : BotDeed
 
         if (!body.InRange(_place, arrive))
         {
+
             if (!_arrived)
             {
                 _emptyTick = now;

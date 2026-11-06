@@ -3,35 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// How a squad stands on ground that has nothing left on it: broken into small knots, spread out, covering
-/// the place instead of standing in it.
-///
-/// <para>
-/// <b>What it fixes.</b> A party sent to a hunting ground is sent to <em>one coordinate</em>, so it arrives
-/// as a heap. Every bot in the heap sees the same eight tiles as every other, which means all but one of them
-/// are contributing nothing — and the corner of the ground where the spawner is quietly refilling is watched
-/// by nobody at all. Spawn timers on this shard run five to ten minutes, so a heap on an emptied graveyard is
-/// a heap doing nothing for five minutes at a time. Spread over the same ground they cover it, and whatever
-/// comes up comes up next to somebody.
-/// </para>
-///
-/// <para>
-/// <b>Why it is safe to spread out, which is the whole question.</b> Because being attacked is an event that
-/// reaches the whole squad: one member hit sets the squad's focus and moves the anchor onto them, and every
-/// station is derived from the anchor — so the knots re-form on the trouble without anybody calling for help
-/// or deciding to answer. Spreading out is only a mistake in a world where nobody can hear a cry.
-/// </para>
-///
-/// <para>
-/// <b>Knots rather than singletons.</b> A bot alone in a corner meets a spectre alone, and a spectre is twice
-/// a lone bot: 53 health times nine damage plus thirty-one of magery. Two or three together are a party that
-/// survives long enough for the rest to arrive. That is why the unit of scouting is a pair or a trio and not
-/// a person.
-/// </para>
-/// </summary>
 public static class BotScatter
 {
+
     public static int KnotSize { get; set; } = 3;
 
     public static int Spread { get; set; } = 24;

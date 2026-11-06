@@ -3,24 +3,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a free bot the chance to go to somebody's aid.
-///
-/// <para>
-/// <b>The half of "we are a company" that no amount of formation could supply.</b> A squad already carries
-/// its own to trouble: the anchor moves onto whoever was hit and every station is derived from it, so the
-/// rest are walking before anything is decided. That works beautifully and only for bots who are already in
-/// the same squad — which, on a population that spends its day scattered across three hundred tiles at
-/// separate trades, is almost nobody. Fourteen of fifteen bots could watch the fifteenth die four screens
-/// away and none of them would ever be asked the question.
-/// </para>
-///
-/// <para>
-/// It is offered rather than ordered, on the <c>Free</c> rung like every other kind of work, and it is priced
-/// so that it wins against digging and loses to nothing much. What makes it actually interrupt a trip to the
-/// forge is <see cref="BotDeed.Pressing"/> — see <see cref="BotRescue"/>.
-/// </para>
-/// </summary>
 public sealed class BotRescuer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRescuer));
@@ -32,6 +14,8 @@ public sealed class BotRescuer : IBotProposer
     private static bool _said;
 
     public static long Outmatched { get; private set; }
+
+    public static long PassedCrowded { get; private set; }
 
     public string Name => "Rescuer";
 
@@ -71,8 +55,10 @@ public sealed class BotRescuer : IBotProposer
             return null;
         }
 
-        if (BotQuarry.Crowded(foe))
+        if (BotQuarry.Crowded(foe) && !BotCry.IsDire(friend))
         {
+            PassedCrowded++;
+
             return null;
         }
 
@@ -113,29 +99,15 @@ public sealed class BotRescuer : IBotProposer
     public static void Forget()
     {
         _said = false;
+        Outmatched = 0;
+        PassedCrowded = 0;
         BotDefender.Forget();
     }
 }
 
-/// <summary>
-/// Hitting back, for a bot that something is presently hitting.
-///
-/// <para>
-/// <b>On the <c>Hunted</c> rung, which had nothing on it at all.</b> The rung exists to say that a bot has no
-/// business shopping for work while something is chewing on it, and <c>BotWill</c> has been complaining into
-/// the log that nobody proposes anything for it — so the bot simply held whatever it was doing. For a warrior
-/// that hardly shows: the engine's own reflex swings back. For a healer it is the whole problem, because a
-/// healer's work is to stand still over somebody, it has no combatant of its own, and it will do that until
-/// it dies with a staff in its hands it never once raised.
-/// </para>
-///
-/// <para>
-/// It sits below <c>Failing</c> in the ladder, so a bot that is badly hurt still runs rather than turning to
-/// fight. Fight back while you can afford to; run when you cannot.
-/// </para>
-/// </summary>
 public sealed class BotDefender : IBotProposer
 {
+
     public static int Reach { get; set; } = 12;
 
     public BotDefender(bool last = false) => _last = last;
@@ -152,7 +124,7 @@ public sealed class BotDefender : IBotProposer
 
     public static long StoodOn { get; set; }
 
-    private static BotDeed Stand(IBotWilful bot, Mobile body, BaseCreature foe)
+    private static BotDeed Stand(IBotWilful bot, Mobile body, BaseCreature foe, bool last)
     {
         if (!Stands || body.HitsMax <= 0 || foe == null)
         {
@@ -166,14 +138,29 @@ public sealed class BotDefender : IBotProposer
             return null;
         }
 
-        if (!body.InRange(foe.Location, StandReach) && foe.AI is not (AIType.AI_Mage or AIType.AI_Archer))
+        var onTop = body.InRange(foe.Location, StandReach);
+
+        if (last && !onTop && foe.AI is not (AIType.AI_Mage or AIType.AI_Archer))
         {
             return null;
         }
 
-        if (BotFugitive.Calm(body, bot.Resolve) || BotQuarry.Shunned(foe) || BotQuarry.Crowded(foe)
-            || BotThreat.Decide(body, BotMobile.NoticeRange) == BotStand.Outmatched)
+        if (BotFugitive.Calm(body, bot.Resolve))
         {
+            return null;
+        }
+
+        if (!onTop && BotQuarry.Shunned(foe))
+        {
+            StoodShunned++;
+
+            return null;
+        }
+
+        if (BotHaven.Guarded(body.Map, body.Location))
+        {
+            StoodTown++;
+
             return null;
         }
 
@@ -182,9 +169,39 @@ public sealed class BotDefender : IBotProposer
         return new BotRescue(new BotSlay(foe, trains) { ToTheEnd = true }, body, foe, own: true);
     }
 
+    public static long StoodTaken { get; private set; }
+
+    public static long StoodCaster { get; private set; }
+
+    public static long StoodHealthy { get; private set; }
+
+    public static long StoodDied { get; set; }
+
+    public static long StoodTown { get; private set; }
+
+    public static long StoodShunned { get; private set; }
+
+    public static long StoodOnOdds { get; set; }
+
+    public static void Stood(Mobile body, Mobile foe)
+    {
+        StoodTaken++;
+
+        if (BotSquad.Caster(foe))
+        {
+            StoodCaster++;
+        }
+
+        if (body is { HitsMax: > 0 } && body.Hits >= body.HitsMax * BotTraits.FleeAt(body, false))
+        {
+            StoodHealthy++;
+        }
+    }
+
     public static string DescribeStands() =>
         $"{StoodOn} fights carried on under {BotSlay.FleeAt:P0} of the bot's health by a bot with what was killing it on top of it and no flight on offer, "
-        + $"{UnderOwnShare} looks at a bot struck between {BotSlay.FleeAt:P0} and its own flight share by its nature answered as under the floor rather than with a fight that gives itself up";
+        + $"{UnderOwnShare} looks at a bot struck between {BotSlay.FleeAt:P0} and its own flight share by its nature answered as under the floor rather than with a fight that gives itself up; "
+        + $"{StoodTaken} stands taken for want of a flight by a bot refused the fight for the odds ({StoodCaster} against a caster, {StoodHealthy} above the bot's own flight share, {StoodOnOdds} that the odds would have ended on the fight's first beat, {StoodDied} died in them), {StoodTown} not taken on guarded ground (the guards called instead), {StoodShunned} not taken for a thing no road reaches that was not on top of the bot{(Stands ? "" : " (off)")}";
 
     public static long UnderOwnShare { get; private set; }
 
@@ -209,6 +226,14 @@ public sealed class BotDefender : IBotProposer
         Assailed = 0;
         Below = 0;
         ToTown = 0;
+        StoodOn = 0;
+        StoodTaken = 0;
+        StoodCaster = 0;
+        StoodHealthy = 0;
+        StoodDied = 0;
+        StoodTown = 0;
+        StoodShunned = 0;
+        StoodOnOdds = 0;
     }
 
     public BotDeed Propose(IBotWilful bot)
@@ -233,7 +258,7 @@ public sealed class BotDefender : IBotProposer
                 return null;
             }
 
-            return Stand(bot, body, on);
+            return Stand(bot, body, on, last: true);
         }
 
         var assailant = BotOutlaw.Assailant(body, Reach);
@@ -293,7 +318,7 @@ public sealed class BotDefender : IBotProposer
         {
             BotCry.Raise(body, foe, dire: true);
 
-            return Stand(bot, body, foe);
+            return Stand(bot, body, foe, last: false);
         }
 
         if (BotQuarry.Crowded(foe) || BotQuarry.Shunned(foe))
@@ -316,7 +341,7 @@ public sealed class BotDefender : IBotProposer
                 return run;
             }
 
-            return null;
+            return Stand(bot, body, foe, last: false);
         }
 
         BotCry.Raise(body, foe);

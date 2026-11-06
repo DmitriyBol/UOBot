@@ -10,40 +10,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// An autonomous inhabitant of the shard. <b>The object all seven other subsystems were written against
-/// and waiting for.</b>
-///
-/// <para>
-/// <b>It derives from <see cref="PlayerMobile"/> rather than <c>BaseCreature</c>, and that single choice is
-/// what makes this project's measure of work possible.</b> Every player system applies without being
-/// reimplemented: use-based skill gain, fame and karma, banking, criminal flags, a lootable corpse. Skill
-/// gain is the point — the whole decision layer values work by the skill it produces, and skill here is the
-/// engine raising a number after its own check, not us deciding a number should go up. On a creature there
-/// would be nothing to measure and the metric would have to be invented.
-/// </para>
-///
-/// <para>
-/// The cost is that nothing drives it: <see cref="PlayerMobile"/> has no think loop. <see cref="BotBeat"/>
-/// supplies one, and <see cref="Beat"/> below is the whole of what a bot does per turn — three calls, in an
-/// order that matters.
-/// </para>
-///
-/// <para>
-/// <b>Nothing here holds a <c>NetState</c>.</b> The engine tolerates that, and one consequence is load
-/// bearing: <see cref="Mobile.Move"/> skips its movement throttle when the net state is null, so a bot's
-/// pace is set purely by how often it is beaten. Content that assumes a connected client is the standing
-/// hazard of this approach, and the reason the population starts small.
-/// </para>
-///
-/// <para>
-/// <b>Saved bots are not reused.</b> The world save will contain these — they are Mobiles like any other —
-/// so the population is purged and rebuilt on every world load. See
-/// <see cref="BotPopulation.PurgeSaved"/> for why that is the honest choice rather than laziness: half the
-/// state a bot needs lives in objects that would have to be rebuilt anyway, and a kit handed out twice is a
-/// bot with two of everything.
-/// </para>
-/// </summary>
 public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMobile));
@@ -181,6 +147,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
     {
         get
         {
+
             if (Class is { Grieves: true })
             {
                 return Grief();
@@ -487,6 +454,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         if (!BotMend.Swallow(this, bottle))
         {
+
             if (Stow() && BotMend.Swallow(this, bottle))
             {
                 Drank++;
@@ -673,7 +641,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         if (fails || Hits >= hurtAt && after < hurtAt)
         {
-            BotSurgeon.Call(this);
+            BotSurgeon.Call(this, fails);
         }
     }
 
@@ -688,6 +656,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         if (from == null || from == this || Deleted || !Alive || willKill)
         {
+
             BotReflex.Damaged(this, amount, null, willKill);
 
             if (!Deleted && Alive && !willKill)
@@ -950,6 +919,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
         }
         else
         {
+
             BotPeril.Fell(Map, Location);
 
             BotQuad.Fell(Map, Location, Class is BotBaron ? BotQuad.BaronWorth : BotQuad.DeathWorth);
@@ -1254,6 +1224,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
             if (klass.Seasoned)
             {
+
                 Skills[skill].Base = Math.Clamp(target * klass.Seasoning, 0.0, target);
 
                 continue;
@@ -1588,6 +1559,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         if (!EquipItem(better))
         {
+
             EquipItem(held);
 
             return;
@@ -1847,6 +1819,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         for (var i = 0; i < carried.Count; i++)
         {
+
             if (carried[i] is not BaseWeapon weapon || weapon is BaseRanged == melee || !Suits(weapon))
             {
                 continue;
@@ -1976,6 +1949,7 @@ public class BotMobile : PlayerMobile, IBotWilful, IBotAside
 
         if (version < 1)
         {
+
             return;
         }
 

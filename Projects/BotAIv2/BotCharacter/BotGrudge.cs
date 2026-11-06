@@ -6,17 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Seeking out a personal enemy to have it out: a walk to the one this bot counts an enemy (<see cref="BotTies.DuelAt"/>),
-/// ended by a challenge to a duel when it is reached. Unpaid work on the Free rung, priced at <see cref="Worth"/> a minute and
-/// leaned by the bot's nature (a vindictive bot ×1.15, a forgiving one ×0.85), so only a bot with little better to do goes.
-///
-/// <para>
-/// <b>The walk ends by queueing the challenge, never by making it.</b> A duel presses a brawl on both bots, and pressing work
-/// on the bot whose own deed is being advanced would settle that deed from inside its own step; so the meeting is handed to
-/// <see cref="BotGrudges"/>, whose clock makes the challenge within <c>BotCharacterModule.TickMs</c>.
-/// </para>
-/// </summary>
 public sealed class BotGrudge : BotDeed
 {
     public const string Trade = "grudge";
@@ -98,7 +87,6 @@ public sealed class BotGrudge : BotDeed
     }
 }
 
-/// <summary>Offers a bot the seeking out of its worst enemy, when it has one in the world and both are free to fight.</summary>
 public sealed class BotGrudgeProposer : IBotProposer
 {
     public string Name => "Grudge";
@@ -108,25 +96,6 @@ public sealed class BotGrudgeProposer : IBotProposer
     public BotDeed Propose(IBotWilful bot) => BotGrudges.Propose(bot);
 }
 
-/// <summary>
-/// The duels of personal feuds: who may challenge whom, the challenge, and the end of it.
-///
-/// <para>
-/// <b>Patrick's idea of 07.10.2026: "the one who killed you in a war is a personal enemy you seek out for a duel".</b> A bot
-/// may challenge another it counts at <see cref="BotTies.DuelAt"/> or worse when the two meet — sought out
-/// (<see cref="BotGrudge"/>) or met by chance, looked for on <see cref="LookEveryMs"/> among the pairs at enmity — and only when
-/// both are free: in the world, alive, at <see cref="FitAt"/> of their health, in no company, on no committed work, not
-/// duelling, not traders (neutral), not outlaws or jailed, not in a guarded town, no creature menacing either, and their
-/// guilds not at war (a war is fought by the war's own rules, not by duels). A refusal is counted by its reason and puts the
-/// pair on a short rest (<see cref="RefusedRestMs"/>); a challenge puts it on a long one (<see cref="PairEveryMs"/>).
-/// </para>
-///
-/// <para>
-/// <b>Nobody dies for a grudge.</b> The duel is <see cref="BotDuel"/>'s: yielded at its share of health, called at its clock,
-/// and the two cannot be reported as criminals for it. When it is decided the feud is settled: each thinks
-/// <see cref="BotTies.Settled"/> better of the other, the winner and the loser each remember it, and both say so.
-/// </para>
-/// </summary>
 public static class BotGrudges
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGrudges));
@@ -450,6 +419,7 @@ public static class BotGrudges
 
             if (winner == null)
             {
+
                 if (!BotDuel.InBout(bout.A) && !BotDuel.InBout(bout.B))
                 {
                     winner = bout.A is { Deleted: false, Alive: true } ? bout.A : bout.B;

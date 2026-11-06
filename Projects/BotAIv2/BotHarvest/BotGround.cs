@@ -10,7 +10,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One remembered patch of workable rock, and what is in it.</summary>
 public readonly struct BotSeam
 {
     public BotSeam(Map map, Point3D where, string ore, double required)
@@ -34,32 +33,6 @@ public readonly struct BotSeam
     public override string ToString() => $"{Ore} at {Where}";
 }
 
-/// <summary>
-/// What the population knows about the ground: where the rock is, where metal can be melted, and where
-/// money and goods can be put away.
-///
-/// <para>
-/// <b>Found by one bounded sweep, kept for everybody.</b> A bot standing in a town cannot see a mine and a
-/// bot standing in a mine cannot see a forge, so knowledge of places cannot come from looking around: it
-/// has to be swept for once and remembered. The first version reached the same conclusion the expensive
-/// way — every workshop on this shard is part of the map rather than an object in it, so no spatial query
-/// finds one, and a smith could only discover a forge by standing within two tiles of a forge it had no
-/// reason to walk to. It never happened, all night.
-/// </para>
-///
-/// <para>
-/// <b>Swept where bots actually are, rather than around a list of towns.</b> The first version swept
-/// vendor clusters and missed the only town that mattered: Britain's cluster centre is the average of its
-/// shopkeepers' spawn points, which lands inside a wall 246 tiles from the smithy, so it recorded eight
-/// forges on four facets and <em>none</em> on Felucca, where the whole population lived. A bot asking
-/// where it may work triggers the sweep around itself, which cannot miss the place bots are.
-/// </para>
-///
-/// <para>
-/// This is not a persistent map and is not written to disk. It is rebuilt when the world is, because
-/// everything in it is a fact about a world that has just been replaced.
-/// </para>
-/// </summary>
 public static class BotGround
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGround));
@@ -78,6 +51,7 @@ public static class BotGround
     {
         if (map == null || map == Map.Internal || Lode == Point3D.Zero)
         {
+
             logger.Error(
                 "The lode at ({X}, {Y}) could not be prospected: there is no facet to sweep it on, so no ore outside the walls has been recorded",
                 Lode.X,
@@ -233,6 +207,7 @@ public static class BotGround
 
         if (_surveyed.Count >= MaxSurveys)
         {
+
             if (!_saidCapped)
             {
                 _saidCapped = true;
@@ -455,6 +430,7 @@ public static class BotGround
     {
         if (_seams.Count >= MaxSeams)
         {
+
             if (!_saidFullOfSeams)
             {
                 _saidFullOfSeams = true;

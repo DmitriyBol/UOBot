@@ -4,39 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who decides the guild can afford a hall, and offers to go and raise one.
-///
-/// <para>
-/// <b>Any member may go and raise it, and the guild's own claim is what stops two of them doing it.</b>
-/// This was written leader-only at first, on the reasoning that one bot cannot race itself — and it was a
-/// veto wearing a preference's clothes. The Crown could pay for a hall from its first minute and never
-/// bought one: its leader is the Captain, the Captain joins a company, and a bot on the <c>Bound</c> rung
-/// has its auction switched off entirely. Six minutes of a running shard with 32 bots busy, 17 bound and
-/// none free went by with the money in hand and nobody able to be offered the work. A guild of two whose
-/// leader is in a company is a guild that can never build anything.
-/// </para>
-///
-/// <para>
-/// So the offer goes to whoever of the guild is choosing work, and the claim below keeps it to one at a
-/// time: a claim expires by the clock rather than by an event, because the bot holding it may die, drop
-/// the errand or be taken into a company, and none of those three sends anybody a message.
-/// </para>
-///
-/// <para>
-/// <b>What it can afford is asked here rather than in the work.</b> An undertaking that says it needs five
-/// thousand gold makes its bot feel destitute — <c>BotDeed.Outlay</c> is what poverty is measured against —
-/// and the money is not the bot's anyway. So the affordability test lives on this side of the offer, where
-/// it costs the bot nothing to fail.
-/// </para>
-///
-/// <para>
-/// The plot search is throttled because it is the expensive half: every candidate is a full
-/// <c>HousePlacement.Check</c>, and this is asked on the beat of every free leader on the shard.
-/// </para>
-/// </summary>
 public sealed class BotSteward : IBotProposer
 {
+
     public static int LookMs { get; set; } = 2000;
 
     public static double LookAt { get; set; } = 0.5;

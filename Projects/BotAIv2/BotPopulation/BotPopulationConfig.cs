@@ -5,18 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-population.json</c> is allowed to say.
-///
-/// <para>
-/// <b>The one config file in this project that ships with real values rather than empty ones.</b> Everywhere
-/// else absent means "keep the number the code chose", which is harmless. Here an absent class mix means no
-/// bots exist at all — so the starter file is written with a small working population in it, and the first
-/// boot produces a shard with somebody on it rather than a shard with a question.
-/// </para>
-/// </summary>
 public sealed class BotPopulationSettings
 {
+
     public string Map { get; set; }
 
     public int[] Home { get; set; }
@@ -50,11 +41,25 @@ public sealed class BotPopulationSettings
     public double? InnBuffShare { get; set; }
 
     public BotGrowthSettings Growth { get; set; }
+
+    public BotUnloadSettings Unload { get; set; }
 }
 
-/// <summary>What <c>bot-population.json</c> may say under <c>Growth</c>. See <see cref="BotGrowth"/>.</summary>
+public sealed class BotUnloadSettings
+{
+
+    public int? StuckFails { get; set; }
+
+    public int? StuckWindowMs { get; set; }
+
+    public int? JoinMs { get; set; }
+
+    public bool? Releases { get; set; }
+}
+
 public sealed class BotGrowthSettings
 {
+
     public bool? Running { get; set; }
 
     public int? EveryMinutes { get; set; }
@@ -70,7 +75,6 @@ public sealed class BotGrowthSettings
     public int? LeastToWant { get; set; }
 }
 
-/// <summary>Reads the population file, or writes a working one.</summary>
 public static class BotPopulationConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPopulationConfig));
@@ -114,6 +118,7 @@ public static class BotPopulationConfig
 
     private static void Apply(BotPopulationSettings settings)
     {
+
         Map map = null;
 
         if (!string.IsNullOrWhiteSpace(settings.Map) && !Map.TryParse(settings.Map, null, out map))
@@ -123,6 +128,7 @@ public static class BotPopulationConfig
 
         if (map == null || map == Map.Internal)
         {
+
             if (!string.IsNullOrWhiteSpace(settings.Map))
             {
                 logger.Error("There is no facet called {Map}; the population falls back to Felucca", settings.Map);
@@ -167,6 +173,26 @@ public static class BotPopulationConfig
                 BotGrowth.BurstBy = c.BurstBy ?? BotGrowth.BurstBy;
                 BotGrowth.LeastToWant = c.LeastToWant ?? BotGrowth.LeastToWant;
             }
+        }
+
+        {
+            var c = settings.Unload;
+
+            if (c != null)
+            {
+                BotUnload.StuckFails = c.StuckFails ?? BotUnload.StuckFails;
+                BotUnload.StuckWindowMs = c.StuckWindowMs ?? BotUnload.StuckWindowMs;
+                BotUnload.JoinMs = c.JoinMs ?? BotUnload.JoinMs;
+                BotUnload.Releases = c.Releases ?? BotUnload.Releases;
+            }
+
+            logger.Information(
+                "The porter: {Fails} stand-still passes no lighter in {Window} minutes set a bot aside until its weight changes; piles lying apart joined every {Join}s for a heavy bot; kept things let go when they alone are over the ceiling: {Releases}",
+                BotUnload.StuckFails,
+                BotUnload.StuckWindowMs / 60000.0,
+                BotUnload.JoinMs / 1000,
+                BotUnload.Releases
+            );
         }
 
         Mix = Offices(settings.Classes is { Count: > 0 } ? settings.Classes : StarterMix());

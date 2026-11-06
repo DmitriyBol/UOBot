@@ -4,32 +4,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The keeper going to ground at the hideout while a price stands on its head.
-///
-/// <para>
-/// <b>Patrick's rule of 17.09.2026 made the keeper worth 5000gp, and the island took him up on it.</b> A fence seen in
-/// the company of thieves becomes a criminal and taking it is worth five thousand — the largest price on this shard by
-/// a factor of five — so every hunter on the island goes for it the moment the Baron hears. On 18.09.2026 that came to
-/// three catches in a four-hour session, all of them the fence, which is seventy-eight per cent of that session spent
-/// in a cell by the one member of the band whose whole purpose is to mind its business. A keeper that is never at
-/// large keeps nothing.
-/// </para>
-///
-/// <para>
-/// <b>So it does what a criminal with a price on its head does: it disappears until the price lapses.</b> Not hidden —
-/// a Sage or an Architect has no Hiding worth the name, which is why <c>BotLieLow</c> is the thieves' answer and not
-/// this one — but <em>away</em>: the hideout is chosen at two hundred and fifty to five hundred road steps from
-/// anywhere anybody lives, patrols are raised within <c>BotOutlaw.Reach</c> of a murder, and nothing walks that far
-/// looking for one bot. The price still stands and is still worth taking; a raid on the hideout still finds it there.
-/// The keeper simply stops walking past the people who would collect.
-/// </para>
-///
-/// <para>
-/// The wait ends by itself when <c>BotOutlaw.WantedMs</c> runs out, which is what makes this work rather than a bot
-/// parked for ever: half an hour of keeping the band's chest instead of an hour in a cell.
-/// </para>
-/// </summary>
 public sealed class BotHoleUp : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHoleUp));

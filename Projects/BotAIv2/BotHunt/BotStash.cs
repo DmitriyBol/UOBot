@@ -5,22 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Carrying the takings to the band's chest at the hideout.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026, night.</b> "They must keep what they have taken somewhere, since the towns are shut
-/// to them and a catch takes everything off them." A thief's coin used to ride in its pack until a patrol took it: the
-/// towns are barred to a red (build 111b), the counters are all in towns, and so a robbery's whole profit was a wager on
-/// never being caught. Now a member with more than <see cref="Least"/> in its pack walks it out to the chest by the fire
-/// and puts down everything it is not carrying for itself.
-/// </para>
-///
-/// <para>
-/// Unpaid and claimed at <see cref="Prior"/>, like the band's other work: it earns the thief nothing at the moment it
-/// happens, and the auction would price a walk of three hundred tiles with no wage at the bottom of every list.
-/// </para>
-/// </summary>
 public sealed class BotStash : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStash));
@@ -136,6 +120,7 @@ public sealed class BotStash : BotDeed
             }
             else
             {
+
                 body.AddToBackpack(new Gold(spare));
             }
         }
@@ -169,6 +154,7 @@ public sealed class BotStash : BotDeed
 
         if (BotFence.Is(body) && BotFence.Wants() is { Count: > 0 } asked)
         {
+
             var owed = BotFence.Spare(body as BotMobile, asked);
             List<(Item Stack, int Give)> parcels = [];
 

@@ -6,34 +6,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Whether the guild's counter is short of something its members keep running out of, and who is going to
-/// fetch it.
-///
-/// <para>
-/// The fourth of the estate's officers and the same shape as the other three — any member may go, one at a
-/// time per guild, and what the guild can afford is asked here rather than inside the errand. The order that
-/// falls out of the costs is a hall, then the benches its trade needs, then a shopkeeper, then something for
-/// the shopkeeper to sell; nothing enforces it, and nothing needs to.
-/// </para>
-///
-/// <para>
-/// <b>It stocks what has actually been asked for.</b> <see cref="BotShopper"/> writes down every shortage it
-/// meets, so this reads a measurement rather than a list: whatever the population has most often reached for
-/// and not found is what the guild's shelf gets. That is the difference between a store cupboard and a
-/// warehouse of things nobody wanted, which is what the first sketch of this would have built — the ignored
-/// stalls, by construction the goods the whole island has already refused.
-/// </para>
-///
-/// <para>
-/// <b>And it must never become a second faucet.</b> Nothing here sells to a shopkeeper; it only buys, at the
-/// shelf price, exactly as a member would have. So the errand is gold-neutral against the alternative and
-/// the only thing it changes is how far somebody walks. See <c>BotPeddle</c>, which is the shard's one
-/// faucet and stays that way.
-/// </para>
-/// </summary>
 public sealed class BotSupplier : IBotProposer
 {
+
     public static int ClaimMs { get; set; } = 240000;
 
     public static int Shelf { get; set; } = 60;

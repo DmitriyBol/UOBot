@@ -4,14 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-shops.json</c> is allowed to say. Everything optional.
-///
-/// No prices here either: what a shopkeeper charges is the shard's own business, scalars and all, and this
-/// file only says how far a bot will walk and how empty a supply has to get.
-/// </summary>
 public sealed class BotShopsSettings
 {
+
     public int? Reach { get; set; }
 
     public int? CounterReach { get; set; }
@@ -39,7 +34,6 @@ public sealed class BotShopsSettings
     public int? CapitalReach { get; set; }
 }
 
-/// <summary>Reads the shops file and moves the numbers it names.</summary>
 public static class BotShopsConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotShopsConfig));

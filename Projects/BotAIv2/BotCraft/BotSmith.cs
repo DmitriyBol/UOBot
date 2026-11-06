@@ -4,24 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot with a hammer and some metal a turn at an anvil, and offers it the board's orders first.
-///
-/// <para>
-/// <b>Orders before speculation, and the reason is arithmetic rather than politeness.</b> Something on the
-/// board has money already down against it — <see cref="BotMarket.Ask"/> takes the payment when the want is
-/// raised — so filling one is a sale that has already happened. Making something on spec is making something
-/// that might sell. The auction is told the difference through <see cref="BotForge.Expects"/> and settles it
-/// the same way it settles everything else, so a smith with nothing on the board still smiths.
-/// </para>
-///
-/// <para>
-/// <b>What it will not do is take an order it cannot fill.</b> A recipe beyond the bot's skill, or one
-/// needing a material it has not got, is refused here rather than discovered at the anvil — because a taken
-/// order that fails is a bot's coin held in escrow for nothing while the bot that paid it goes on fighting
-/// with a broken sword.
-/// </para>
-/// </summary>
 public sealed class BotSmith : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSmith));
@@ -110,6 +92,7 @@ public sealed class BotSmith : IBotProposer
 
         if (BotAnvil.System == null)
         {
+
             if (!_saidNoSystem)
             {
                 _saidNoSystem = true;

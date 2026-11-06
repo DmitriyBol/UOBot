@@ -4,18 +4,6 @@ using System.IO;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>
-/// The remembered roads of one map kept on disk between boots, beside the graph's own file (<see cref="NavGraphFile"/>), so
-/// that a restart forgets nothing the shard has walked (<see cref="NavRouteMemory"/>).
-///
-/// <para>
-/// <b>Written and read off the game loop.</b> What is written is a list of arrays that never change once a road is made
-/// (<see cref="NavRouteMemory.Records"/>), taken on the loop and written by a worker; a file is read by a worker into the
-/// same form and laid into the memory on the loop (<see cref="NavRouteMemory.Adopt"/>). Nothing in the file is trusted: a
-/// road is proved against the graph by its clusters' signatures the first time it is used, and the map files it was drawn
-/// from are fingerprinted as the graph's are — a file of other map files is not read at all.
-/// </para>
-/// </summary>
 public static class NavRouteFile
 {
     private const uint Magic = 0x5256414E;

@@ -2,25 +2,6 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Going to a meeting for one's guild: its envoy walking to the other guild's town or to its own town's hall, or its answerer
-/// walking to where the envoy has come — and standing there until the word is given.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point 4: the envoy is any bot of the guild; a guild of one sends its founder.</b> So the
-/// errand is offered to every member (<see cref="BotHerald"/>) and the first to take it holds it (<see cref="Taken"/>, never
-/// at the offer — DECISIONS A7), renewing its hold on every beat; a member that dies, rests or is taken off it lets the
-/// meeting look for another, and one that could not get there is not asked again (<see cref="BotParley.Let"/>).
-/// </para>
-///
-/// <para>
-/// <b>Honest endings, because this is counted in the finished share.</b> Finished when the word was given at the meeting it
-/// went to; failed when the meeting lapsed, when the road beat it, or when somebody else went in its place. It is unpaid —
-/// a guild's business, like the reeve's company — and steadfast, held against better-paid work for the walk and the meeting
-/// (<see cref="HoldsFor"/>), put down for a flight or a rescue and taken up again after. It stands still on purpose once it
-/// is there (<see cref="Still"/>), so the stall watch does not take it off a hearing.
-/// </para>
-/// </summary>
 public sealed class BotEnvoy : BotDeed
 {
     public const string Trade = "envoy";

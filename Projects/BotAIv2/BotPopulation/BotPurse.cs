@@ -5,29 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot keeps in its pocket, and what it puts away the moment it is standing somewhere it can.
-///
-/// <para>
-/// <b>Carrying a fortune is two costs, and a bot had no way of noticing either.</b> Coin weighs — a thousand
-/// pieces is twenty stones against a mage's ceiling of a hundred and twenty-seven — and coin is not bound, so
-/// every piece of it drops into the corpse when something finally wins. A hunter that has been paid by forty
-/// skeletons was walking around wearing its whole career.
-/// </para>
-///
-/// <para>
-/// <b>Banked as a side effect rather than as an errand, and that is deliberate.</b> Everything a bot chooses
-/// is weighed in takings per minute, and moving coin from a pocket to an account produces nothing by that
-/// measure — purse and account are both counted as wealth, so the trip would score zero and never be chosen,
-/// however sensible it is. What it is instead is something a bot does while it happens to be at a counter,
-/// which it already is several times an hour: the shops, the forge and the bank are the same few streets.
-/// </para>
-///
-/// <para>
-/// The float is what it keeps for its own errands — cloth, paper, herbs, bandages, a replacement blade — so
-/// banking never leaves a bot unable to afford the work it was about to do.
-/// </para>
-/// </summary>
 public static class BotPurse
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPurse));

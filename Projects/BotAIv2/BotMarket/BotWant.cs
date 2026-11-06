@@ -4,36 +4,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One bot's spoken want: what it wants, how many, and what it says it will pay for one. Said aloud in the trade chat and
-/// nothing more.
-///
-/// <para>
-/// <b>Nothing is held, and that is the whole difference from the want it replaces (01.10.2026, Patrick's order of 30.09).</b>
-/// The auction's want took the buyer's gold into escrow the moment it was posted and paid a supplier out of it from wherever
-/// the supplier stood; the goods then waited in the market until the buyer's own beat fetched them. "Every order and every
-/// purchase is hand to hand" leaves neither half of that standing. The gold stays in the buyer's pack and account until a
-/// supplier is standing beside it with the goods (<see cref="BotHandover.Exchange"/>), and the goods stay in the supplier's
-/// pack until then. So a want is a sentence with a price in it, and the only guarantee it needs is that the buyer could pay
-/// when it said it — <see cref="BotMarket.Ask"/> asks the purse, and the market's beat drops a want whose buyer can no longer
-/// pay for one.
-/// </para>
-///
-/// <para>
-/// <b>What is on its way is counted, so two carriers do not walk to one cook for the same five ribs.</b> A courier that takes
-/// the delivery reserves the units it carries (<see cref="Reserve"/>); what is still open to another carrier is
-/// <see cref="Payable"/>. The reservation goes with the delivery's end, however it ends.
-/// </para>
-///
-/// <para>
-/// The price moves the way the auction's want moved it: dearer when nobody answers for <see cref="BotMarket.RaiseMs"/>,
-/// cheaper when answered again inside <see cref="BotMarket.BriskMs"/>, within ×<see cref="BotMarket.LeastMultiple"/> to
-/// ×<see cref="BotMarket.MostMultiple"/> of what it opened at — and, since 03.10.2026, never past that multiple of what the
-/// cheapest shopkeeper asks for one (<see cref="Shelf"/>, <see cref="Highest"/>).
-/// </para>
-/// </summary>
 public sealed class BotWant
 {
+
     private readonly List<(IBotWilful Courier, int Units, int Price)> _coming = [];
 
     private readonly List<BotLine> _lines = [];
@@ -487,6 +460,7 @@ public sealed class BotWant
 
             if (courier?.Self is not { Deleted: false, Alive: true } || held == null || !held.Carries(this) || held.Stale)
             {
+
                 if (held is BotDeliver { Away: true } && held.Carries(this) && courier?.Self is { Deleted: false, Alive: true })
                 {
                     _away.Add((courier, _coming[i].Units));
@@ -532,6 +506,7 @@ public sealed class BotWant
 
     public int Stepped(double step, double mostMultiple)
     {
+
         var ceiling = Highest(mostMultiple);
 
         var offering = Math.Max(Offer + 1, (int)(Offer * (1.0 + step)));

@@ -6,44 +6,6 @@ using Server.Spells.Eighth;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// <b>A company raises its own where they fell, with what this era gives it to raise them with (02.10.2026, Patrick: "It is not
-/// right that bots dying in dungeons cannot loot themselves. Either the bot must run back to loot itself, or the group should
-/// carry resurrection scrolls for such cases").</b>
-///
-/// <para>
-/// Measured before (01.10 11:32 – 02.10 11:35, builds 386–389): 2,062 deaths, 47 of them underground (10 doing a company's
-/// work, 37 alone), and not one of those corpses gone back for; the only raising on the shard was the delve's, three to a party,
-/// which raises with nothing — no scroll, no spell, no caster, ten seconds and up — and no party went down at all after the wipe.
-/// Meanwhile 980 deaths fell doing a company's work (36,897gp of pocket and 12,803gp of supplies on the corpses), and every one of
-/// those bots was carried home a minute later and its pack left where it lay.
-/// </para>
-///
-/// <para>
-/// <b>The means are the engine's and nothing else (UOR, read in <c>Projects/UOContent</c>):</b> the Resurrection spell, eighth
-/// circle, cast from a scroll by a caster whose Magery the engine rolls between 50 and 90 for it (<c>MagerySpell.GetCastSkills</c>,
-/// the scroll two circles easier) or from the book between 70 and 110 with bloodmoss, garlic and ginseng; fifty mana either way;
-/// the scroll and the mana spent only when the cast takes, the herbs on every try (<c>Spell.CheckSequence</c>). A bandage
-/// wound by a healer of 80 Healing and 80 Anatomy, at (Healing − 68) / 50 (<c>BandageContext.EndHeal</c>), five seconds longer
-/// than a heal. Ankhs and the healers of the towns are where the ordinary revival already happens. Nothing else in this era
-/// raises a body: no Gift of Life, no Sacrifice, no Necromancy.
-/// </para>
-///
-/// <para>
-/// <b>The one thing the engine cannot do for a bot is answer.</b> Both means end in <c>ResurrectGump</c> sent to the ghost, and
-/// a bot has no client to press "accept" on it: the gump goes to a null connection and is gone. So the spell is cast and aimed
-/// through the engine (<c>BotMend.Begin</c>/<c>Aim</c>'s idiom) and its taking is read off what the engine spends — the scroll
-/// gone, or fifty mana — and the ghost's answer is <see cref="Mobile.Resurrect"/>, called here, which is exactly what the gump
-/// calls. The bandage's own roll lives inside the engine's timer and spends nothing that could be read, so it is rolled here by
-/// the engine's own formula, with the engine's skill gains. And the ghost manifests (war mode) when its raiser stands beside it,
-/// because a living mobile cannot see a ghost that has not (<c>Mobile.CanSee</c>) — which is how a player is raised too.
-/// </para>
-///
-/// <para>
-/// Raised with the engine's ten hits and no mana rather than the bot's own full rising (<see cref="EngineHealth"/>), and its own
-/// corpse gone through at once (<see cref="BotReclaim.Strip"/>). Then it is pressed back into its company.
-/// </para>
-/// </summary>
 public static class BotRaise
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRaise));
@@ -304,6 +266,7 @@ public static class BotRaise
 
     public static bool Holding(BotMobile ghost)
     {
+
         if (BotInfirmaries.Holding(ghost))
         {
             return true;
@@ -318,6 +281,7 @@ public static class BotRaise
 
         if (pending.Company is not { Disbanded: false } || pending.Fell != ghost.FellTick || now - pending.Fell >= HoldMs)
         {
+
             if (pending.Company is { Disbanded: true } && pending.Fell == ghost.FellTick)
             {
                 NoteUnraised(Unraised.Broken);
@@ -610,14 +574,6 @@ public static class BotRaise
     }
 }
 
-/// <summary>
-/// <b>The scroll a company's caster carries for the one of it that falls (02.10.2026).</b> Offers a bot that reads a resurrection
-/// scroll well enough to be worth it (<see cref="BotRaise.Reads"/>: one chance in ten a try, fifty mana) one to keep in its pack,
-/// bought the way every scroll above the third circle is bought on this shard — off one of ours that has one at its shop by the bank,
-/// or asked for aloud at the market's price, for a scribe to write and bring (<see cref="BotAcquire"/>). No shopkeeper of this era
-/// sells the eighth circle. Never with the last of the purse (<see cref="BotRaise.StockReserve"/>), and kept, not sold, at the
-/// counter (<c>BotUnload.Keeps</c>).
-/// </summary>
 public sealed class BotLifeline : IBotProposer
 {
     public string Name => "Lifeline";

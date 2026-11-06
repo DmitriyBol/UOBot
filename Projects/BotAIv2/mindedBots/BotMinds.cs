@@ -7,30 +7,11 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>What is kept between sessions: one bot's name and the rules it has written for itself.</summary>
 public sealed class BotMindMemory
 {
     public Dictionary<string, List<string>> Lessons { get; set; } = [];
 }
 
-/// <summary>
-/// The minds, the bodies they belong to, and the beat they think on.
-///
-/// <para>
-/// <b>Named, and the naming is what makes learning possible at all.</b> Bots do not survive a restart — the
-/// population deletes whatever came back from the world save and raises a fresh set — so anything keyed to a
-/// body is gone every morning. A mind's rules are keyed to a name instead, and the bodies are renamed on the
-/// way in so that the name is the same one tomorrow. Without that, a thinking bot starts every session
-/// knowing nothing, and "it learns" is a claim nothing can support.
-/// </para>
-///
-/// <para>
-/// <b>It claims bodies rather than making them.</b> Raising more bots would be a second population with its
-/// own outfitting, spawning and revival, all of it a copy of code that already works. The four here are four
-/// of the ones the shard already raises: everything about them is ordinary except that something is thinking
-/// about what they should do next.
-/// </para>
-/// </summary>
 public static class BotMinds
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMinds));
@@ -239,6 +220,7 @@ public static class BotMinds
 
         for (var i = 0; i < offered.Count; i++)
         {
+
             if (Listed(trades, offered[i]) && !live.Contains(offered[i]))
             {
                 live.Add(offered[i]);
@@ -283,6 +265,7 @@ public static class BotMinds
 
         if (work == null)
         {
+
             mind.Discard();
 
             return null;

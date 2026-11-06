@@ -5,37 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Where the shard is dangerous, learned from the only two facts that actually say so: where bots are being
-/// hit, and where they are dying.
-///
-/// <para>
-/// <b>Everything else about danger on this shard is a private opinion, and that is why this exists.</b>
-/// <see cref="BotLedger"/> already remembers that a piece of work went badly in a place — but it lives on
-/// one bot, it is keyed by trade as well as by ground, and it is a record of <em>disappointment</em> rather
-/// than of harm. Fifteen bots each learning separately that the same field kills people is fifteen bots
-/// learning it fifteen times, none of them able to tell anybody, and a captain deciding where to take a
-/// company has to read a fact about the island rather than a mood of its own. So this is deliberately
-/// shard-wide, deliberately not keyed by trade, and deliberately fed from the two hooks that cannot lie:
-/// <c>OnDamage</c> and <c>OnDeath</c>.
-/// </para>
-///
-/// <para>
-/// <b>A frequency, never a total, and the difference decides everything the captain does.</b> A tally that
-/// only rises names the graveyard for ever, because the graveyard has always been the worst place on the
-/// map and always will be — which is a fact about history and not about tonight. What is wanted is where
-/// blood is being spilt <em>lately</em>, so every reading decays towards nothing on its own clock: a square
-/// that has gone quiet for an hour stops being the answer without anybody having to clear it, and a square
-/// that has just killed two bots outranks one that killed ten yesterday.
-/// </para>
-///
-/// <para>
-/// <b>Squares rather than points, because a patrol cannot stand on a coordinate.</b> Harm arrives at exact
-/// tiles and is useless at that resolution — thirty single blows scattered over a wood are one dangerous
-/// wood, and a map keyed by tile would report thirty places each worth nothing. <see cref="Side"/> is the
-/// one number that decides what "a place" means here.
-/// </para>
-/// </summary>
 public static class BotPeril
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPeril));
@@ -133,6 +102,7 @@ public static class BotPeril
 
         if (!_squares.TryGetValue(key, out var square))
         {
+
             if (_squares.Count >= MostSquares)
             {
                 Forget(now);
@@ -281,6 +251,7 @@ public static class BotPeril
 
             foreach (var (key, square) in _squares)
             {
+
                 if (square.Map != map || square.Deaths <= 0 || _passed.Contains(key))
                 {
                     continue;

@@ -6,23 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Buy cloth, make something of it, sell it hand to hand. The crafter's chain, and the first work in this
-/// project that <b>creates</b> rather than extracts.
-///
-/// <para>
-/// <b>It depends on nobody.</b> A crafter does not have to wait for a miner: cloth is on a shelf in town, and
-/// what comes off the needle is worth more than what went into it — in skill certainly, in coin if the market
-/// agrees. That is the answer to the question this chain was written for: what does a producer do on a shard
-/// where nothing has been produced yet.
-/// </para>
-///
-/// <para>
-/// <b>Attempts are not output.</b> Crafting runs on the engine's own timer and fails often at the edge of a
-/// skill, so what is counted is what is in the pack afterwards. The first version reported attempts and its
-/// tally claimed forty-four things made by a smith that had produced nothing in three minutes.
-/// </para>
-/// </summary>
 public sealed class BotSew : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSew));
@@ -164,6 +147,7 @@ public sealed class BotSew : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+
         if (_shop == null)
         {
             return false;
@@ -214,6 +198,7 @@ public sealed class BotSew : BotDeed
 
     private BotDoing Shopping(IBotWilful bot, Mobile body)
     {
+
         if (BotThread.Amount(body, _stuff) >= _need)
         {
             _leg = Leg.Work;
@@ -240,11 +225,13 @@ public sealed class BotSew : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
+
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for {_stuff.Name}");
         }
 
         if (BotShops.Buy(bot, _shop, _stuff, _take, out var refused) <= 0)
         {
+
             var next = BotShops.Next(bot, _shop, _stuff, ref _repicks);
 
             if (next != null)
@@ -275,6 +262,7 @@ public sealed class BotSew : BotDeed
 
         if (_recipe == null)
         {
+
             _recipe = _order == null
                 ? BotThread.Choose(body, _stuff)
                 : BotThread.Recipe(body, _stuff, _order.Kind);
@@ -298,6 +286,7 @@ public sealed class BotSew : BotDeed
 
         if (have > _had)
         {
+
             have += BotCraftwork.Bonus(body, _kind);
 
             _pieces += have - _had;
@@ -381,6 +370,7 @@ public sealed class BotSew : BotDeed
     {
         if (_pieces <= 0)
         {
+
             return BotDoing.Done($"{_swings} attempts, nothing came of it");
         }
 

@@ -2,18 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Saying aloud what the bot wants and what it will pay: a want on the market, spoken in the trade chat.
-///
-/// <para>
-/// <b>Ordering only, and it holds no gold any more (01.10.2026).</b> An order used to put its money down in escrow on the
-/// auction's board and wait for a supplier to fill it from anywhere, the goods then fetched by a reflex. Since Patrick's order of
-/// 30.09 every order is hand to hand: this says the want (<see cref="BotMarket.Ask"/>), the buyer keeps its gold, and the thing
-/// arrives with a carrier who walks it over and is paid at the meeting (<see cref="BotDeliver"/>), or the buyer walks to a shop
-/// that holds it (<see cref="BotPatron"/>). The buyer must be able to pay what it asks for when it asks — the market refuses
-/// a want the purse could not honour.
-/// </para>
-/// </summary>
 public sealed class BotOrder : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOrder));
@@ -89,6 +77,7 @@ public sealed class BotOrder : BotDeed
 
         if (_posted)
         {
+
             return BotDoing.Done($"{_kind.Name} is asked for");
         }
 

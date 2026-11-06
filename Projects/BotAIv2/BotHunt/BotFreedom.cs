@@ -4,38 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Getting a prisoner out of a camp and home again.
-///
-/// <para>
-/// <b>Ordered by Patrick on 08.09.2026, and the engine does almost all of it.</b> Every one of this era's
-/// camps — orc, brigand, ratman, lizardman — puts a <c>Noble</c> or a <c>SeekerOfAdventure</c> in the
-/// middle of it with <c>IsPrisoner</c> set and <c>CantWalk</c> true, and has them yell for help whenever a
-/// player walks past. Freeing one is not a lockpick or a key: it is
-/// <c>BaseEscortable.AcceptEscorter</c>, which clears <c>CantWalk</c>, makes the bot its master and sets
-/// it following. From then on the prisoner walks itself, and when it stands inside its destination region
-/// the engine pays 500 to 1000 gold into the escorter's pack, awards ten fame and four hundred points of
-/// Compassion, and deletes itself.
-/// </para>
-///
-/// <para>
-/// <b>So the whole of the work here is the walking, and the whole of the risk is the distance.</b> The
-/// destination is a random town or dungeon region on Felucca, which on this map can be four hundred tiles
-/// off — further than any road this shard will search for. A bot that accepts an escort it cannot complete
-/// has taken a prisoner out of a cage to die of neglect in a field, so the distance is checked before the
-/// offer is made and never after, and it is checked against the same number every other walk is:
-/// <see cref="BotHunter.Walkable"/>.
-/// </para>
-///
-/// <para>
-/// <b>One at a time, and the engine enforces it.</b> <c>EscortDelay</c> is five minutes between escorts for
-/// any one <c>PlayerMobile</c>, and bots are PlayerMobiles, so a population that all rushed the same camp
-/// would simply be refused. Counted rather than avoided: <see cref="Refused"/> reading high next to a
-/// healthy <see cref="Freed"/> is the population wanting more of this work than the rules allow.
-/// </para>
-/// </summary>
 public sealed class BotFreedom : BotDeed
 {
+
     public const string Trade = "liberate";
 
     public static double Prior { get; set; } = 220.0;
@@ -232,6 +203,7 @@ public sealed class BotFreedom : BotDeed
 
         if (_prisoner.GetEscorter() != body)
         {
+
             if (_prisoner.GetDestination() == null)
             {
                 Release(body, _prisoner);
@@ -369,14 +341,6 @@ public sealed class BotFreedom : BotDeed
         + $"{Refused} refused by the engine, {TooFar} passed over for living further than {Roam} tiles from {Town}";
 }
 
-/// <summary>
-/// Offers a bot the job of walking a prisoner home.
-///
-/// <para>
-/// Rationed to once a minute per bot like every other spatial sweep on this shard, and offered to anybody:
-/// a prisoner does not care what trade its escort practises, and the walk is the work.
-/// </para>
-/// </summary>
 public sealed class BotLiberator : IBotProposer
 {
     public string Name => "Liberator";

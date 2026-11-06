@@ -4,27 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Pirates: The Shadow waits on the quay for a colony's loaded ship and boards it as it comes in.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "it can be lost in war or to pirates: The Shadow at sea intercepts loaded ships (sea ambushes are honest:
-/// a loaded ship does not turn)."</b> And the order's own simplification: the ambush at the quay on arrival, outside the guards.
-/// A run home with goods aboard (<see cref="BotColonyRun"/>) is watched while it sails; when it is within
-/// <see cref="LayAheadMs"/> of the quay it makes for, that quay lies where no town's guards act, and two or three of The Shadow
-/// stand on that land within <see cref="PartyReach"/> and are a match for the captain and the hands aboard, the band is laid on
-/// the quay. The ship holds its course — it does not turn — and lands into them.
-/// </para>
-///
-/// <para>
-/// <b>The ambush is the highway's own</b> (<see cref="BotHighway.Lay"/>): the band pressed with <see cref="BotLieInWait"/>, the
-/// strike, the robbery fought by <see cref="BotBrawl"/>, the captain's choice at a quarter (<see cref="BotQuarter"/>), the goods
-/// taken marked hot for the fence, the withdrawal when the field turns, the report. What this adds is the sea: the choice of the
-/// ship and the moment, and the crew. As the captain steps ashore with a band lying in wait, its hands form a company round it
-/// (<see cref="BotSquads.Form"/>), and the company fights by the companies' rules (company16): a blow on a member turns the
-/// company on whoever struck it, and it pulls back on results.
-/// </para>
-/// </summary>
 public static class BotPiracy
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPiracy));

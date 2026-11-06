@@ -5,33 +5,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Newcomers: a couple of novices raised every two hours, so the island has old hands and beginners at once.
-///
-/// <para>
-/// <b>Patrick's order of the night of 24.09.2026: the limit is eighty now; add a couple of bots every two hours, so
-/// the growth is steady and the game has both novices and veterans.</b> A newcomer is an ordinary bot of an ordinary
-/// class, raised with a name nobody on the island has worn — neither a bot in the world, nor one resting, nor one whose
-/// learning <see cref="BotProgress"/> still remembers — so it really does start as a novice; the guilds take it in the
-/// way they take anybody without one.
-/// </para>
-///
-/// <para>
-/// <b>Written down, because configuration is the authority on who exists.</b> <see cref="BotPopulation.Reclaim"/>
-/// deletes whatever the configured mix does not ask for, so a newcomer the mix did not know about would be deleted at
-/// the next boot. What was added is kept by class in <see cref="BotGrowthStore"/> and laid over the configured mix at
-/// every boot (<see cref="Mix"/>), with the time of the last arrival, so a restart neither loses the newcomers nor
-/// restarts the two-hour clock.
-/// </para>
-///
-/// <para>
-/// Classes are drawn in proportion to the configured mix, leaving out the offices — a second Baron is not a newcomer, it
-/// is a constitutional crisis. <b>An office is a fact of the class since 07.10.2026</b> (<see cref="BotClass.Office"/>: the
-/// Captain, the Baron, the Architect, the Sage, one each at any population, Patrick's rule): the draw never takes one,
-/// <see cref="Mix"/> never lays a newcomer over one, and a critical post or a guild's gap never asks for one that is held.
-/// Build 425 had it as "a class the mix counts at 1", which a stale file undid and which no branch ever actually tested.
-/// </para>
-/// </summary>
 public static class BotGrowth
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGrowth));

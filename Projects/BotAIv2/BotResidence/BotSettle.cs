@@ -6,41 +6,10 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Which towns a bot can live in, and which one it settles in.
-///
-/// <para>
-/// <b>A town is fit to live in when everything a bot does at home can be done there.</b> The walk from it to the rest of the
-/// island must exist (a road in the book, <see cref="BotRoadbook"/>), and in it a bot must be able to put its coin away and
-/// buy its kit: a bank and at least <see cref="LeastShops"/> shopkeepers. Counted off the town's own region, once, when the
-/// towns are first read. The bank matters most, and it is measured rather than assumed: The Needle lives at Cove, which the
-/// spawn files give five shopkeepers, two healers and no bank, and on 29.09.2026 three of its bots died on the eight
-/// hundred tiles to Britain in one hour, each walking there to buy a pair of scissors (build 301). The home town is fit by
-/// definition — it is where the population was built to live.
-/// </para>
-///
-/// <para>
-/// <b>The choice is weighed, not dealt.</b> Each fit town wants a share of the population — the home town
-/// <see cref="HomeShare"/>, the others the rest in equal parts — and a town is weighed by its share over one plus
-/// <see cref="SpreadWeight"/> times how full of it it already is: an empty town weighs its whole share, one at its share a
-/// quarter of it, one at twice its share a seventh. So the towns fill towards their shares and none is ever closed, and a
-/// bot on its way to a town is counted there, so a hundred choices made in one second do not all see the same empty town.
-/// A town where the bot's guildmates live weighs more by <see cref="GuildPull"/>: a company or a delve is raised from
-/// whoever of the guild stands near, and a guild spread evenly over six towns raises neither.
-/// </para>
-///
-/// <para>
-/// <b>A bot that has to walk there is measured against the road, as a traveller is</b> (<see cref="BotTraveller.Odds"/>): the
-/// worst the road's ground asks (<see cref="BotRoadbook.Asks"/>) times one and a half against the bot's strength. On the
-/// evening of 29.09.2026, 952 of 2667 asks to travel found the bot too weak for every road left. A newborn does not walk: it is
-/// born in its town, and its leash (<c>BotPopulation.Leash</c>, three hundred tiles for a novice) keeps its work round it.
-/// </para>
-/// </summary>
 public static class BotSettle
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSettle));
 
-    /// <summary>What a town has in it for a bot, counted once off its region.</summary>
     public sealed class Amenities
     {
         public int Shops;

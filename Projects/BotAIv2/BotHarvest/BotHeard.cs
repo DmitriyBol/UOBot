@@ -4,44 +4,12 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What the harvest system last said to each bot, and which of its sentences mean what.
-///
-/// <para>
-/// <b>Patrick's order of 09.09.2026: a vein counts as worked out when the bot <em>sees</em> the message that
-/// there is nothing in it.</b> Everything before this inferred it — a run of quiet swings, or the engine's
-/// bank read from the side — and inference was wrong about two write-offs in three. The engine has been
-/// saying it plainly the whole time: <c>NoResourcesMessage</c>, "There is no metal here to mine." The
-/// sentence simply had nowhere to land, because a bot has no <c>NetState</c> and
-/// <c>Mobile.SendLocalizedMessage</c> writes straight to one without being virtual.
-/// </para>
-///
-/// <para>
-/// So the engine now raises <c>HarvestDefinition.Said</c> before it sends — see
-/// <c>engine-patches/HarvestDefinition-said.patch</c> — and this listens. It is the whole difference between
-/// a miner that knows why its swing was quiet and one that has to guess: the same system distinguishes six
-/// cases and we could read none of them.
-/// </para>
-///
-/// <list type="table">
-/// <item><term>no resources</term><description>the vein is worked out. This is the one Patrick asked for.</description></item>
-/// <item><term>double harvest</term><description>somebody else took the last of it first — same conclusion.</description></item>
-/// <item><term>fail</term><description>a missed roll. The rock is fine; swing again.</description></item>
-/// <item><term>out of range</term><description>the bot moved between the swing and its resolution.</description></item>
-/// <item><term>pack full</term><description>the ore was taken out of the bank and destroyed. Go and unload.</description></item>
-/// <item><term>tool broke</term><description>no pickaxe; the errand is over.</description></item>
-/// </list>
-///
-/// <para>
-/// Kept as one row per bot rather than a queue, because only the last thing said matters and a queue would be
-/// a table that grows for the life of the shard. Rows are dropped when a bot is.
-/// </para>
-/// </summary>
 public static class BotHeard
 {
-    /// <summary>What the harvest system said, in the only terms it uses.</summary>
+
     public enum Word
     {
+
         Nothing,
 
         Empty,

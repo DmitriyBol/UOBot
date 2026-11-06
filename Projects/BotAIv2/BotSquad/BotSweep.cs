@@ -3,35 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A company called together for a place rather than for a creature, and kept together until the place stops
-/// killing people.
-///
-/// <para>
-/// <b>This is the shard's second reason for a group to exist, and it is a different reason.</b>
-/// <see cref="BotBand"/> musters against one thing that is too big for one bot: it forms when the thing is
-/// in sight, it ends when the thing is dead, and everybody goes back to their own business — which is
-/// exactly right, and is why the squads that ran all day were over in a minute or two. A patrol has no
-/// quarry at all. It is dispatched to a square that has been hurting people, and its work is finished when
-/// the square is quiet, which is a condition that cannot be met by killing any particular thing.
-/// </para>
-///
-/// <para>
-/// <b>Almost none of the marching is written here, and that is the point of putting it on a squad.</b> The
-/// company follows its leader by arithmetic — <c>BotSquad.Station</c> re-forms whenever the anchor drifts,
-/// and the stance falls out of whether the leader is walking: on the road they hold formation, and the
-/// moment the captain stops in the middle of the square they scatter into scouting knots and cover it. Being
-/// hit anywhere in that spread pulls the whole company onto the attacker through <c>BotSquads.Note</c>. So
-/// "sweep a wood" needed no sweeping code: it needed somewhere to stand and a reason not to go home.
-/// </para>
-///
-/// <para>
-/// <b>The reason not to go home is the one piece of the squad this had to change.</b> A company disbands
-/// after five quiet minutes, which is the right rule for a muster and the wrong one for a patrol — the whole
-/// value of standing in a dangerous wood is being there before anything happens. See
-/// <see cref="BotSquad.Charged"/>.
-/// </para>
-/// </summary>
 public sealed class BotSweep : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSweep));
@@ -184,6 +155,7 @@ public sealed class BotSweep : BotDeed
 
     private BotDoing Calling(IBotSquadMember member, Mobile body)
     {
+
         var asked = BotPatrol.Asks(_map, _square);
         var strength = BotQuad.Strength(body);
 
@@ -290,6 +262,7 @@ public sealed class BotSweep : BotDeed
 
     private BotDoing March(BotSquad squad, Mobile body, long now)
     {
+
         if (squad.Stance == BotSquadStance.Fighting && squad.Focus is { Deleted: false, Alive: true } foe)
         {
             if (!_stoodTo)
@@ -342,6 +315,7 @@ public sealed class BotSweep : BotDeed
 
             if (late != null && now - _gatherTick < GatherMs)
             {
+
                 return Holding(squad, $"gathering the company before the march on ({_square.X}, {_square.Y}): {late.Self?.Name ?? "a member"} is {off} tiles off");
             }
 
@@ -406,6 +380,7 @@ public sealed class BotSweep : BotDeed
 
             if ((behind <= MarchLost || BotSquad.Coming(straggler, behind)) && now - _holdTick < MarchHoldMs)
             {
+
                 return Holding(squad, $"holding for {straggler.Self?.Name ?? "a member"}, {behind} tiles behind, on the way to ({_square.X}, {_square.Y})");
             }
 
@@ -539,6 +514,7 @@ public sealed class BotSweep : BotDeed
 
         if (fighting && squad.Focus is { Deleted: false, Alive: true } focus)
         {
+
             if (!ReferenceEquals(focus, _focus))
             {
                 _focus = focus;
@@ -599,6 +575,7 @@ public sealed class BotSweep : BotDeed
 
     private BotDoing Finish(BotSquad squad, string why)
     {
+
         BotPeril.Swept(_map, _square);
 
         if (squad != null)
@@ -634,6 +611,7 @@ public sealed class BotSweep : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
+
         _passage?.Abort("the patrol was let go");
         _passage = null;
 

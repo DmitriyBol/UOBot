@@ -4,20 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-harvest.json</c> is allowed to say. Everything optional; absent means the
-/// number the code chose.
-///
-/// <para>
-/// What is deliberately <b>not</b> here: which tiles are ore, what a vein contains, how much a swing
-/// yields, and how many ingots a pile of ore becomes. Those are the engine's, and a configuration file able
-/// to disagree with the engine about them is a file able to send a population to dig a beach — which the
-/// first version did, all night, because two of its tests said sand was workable and the engine did not
-/// agree.
-/// </para>
-/// </summary>
 public sealed class BotHarvestSettings
 {
+
     public int? SweepReach { get; set; }
 
     public int? SweepStride { get; set; }
@@ -61,7 +50,6 @@ public sealed class BotHarvestSettings
     public int? MaxSpent { get; set; }
 }
 
-/// <summary>Reads the harvest file and moves the numbers it names.</summary>
 public static class BotHarvestConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHarvestConfig));

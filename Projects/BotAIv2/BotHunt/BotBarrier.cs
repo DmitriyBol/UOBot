@@ -3,30 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Where walks have stopped getting any nearer, and which way they were heading, so the hunt stops throwing darts past
-/// those places.
-///
-/// <para>
-/// <b>The ground between a bot and its dart is what refuses, and nothing remembered the ground between.</b> A prowl
-/// that stops closing baulks its destination square (see <c>BotQuad.Baulk</c>), but the next dart lands on a fresh
-/// square beyond the same river, and a note about a place is no answer to a sample over an area. On build 42 "got no
-/// nearer" was the largest failure group on the shard, 99 in 45 minutes. Asked through the door, five of the six latest
-/// destinations answered Partial with plans ending at the same few places west of Britain — (1161, 1345), (1088, 1628)
-/// and (1229, 1247) — and build 43's instrument put the bots' own stopping tiles on exactly those places: three at
-/// (1160, 1340), four at (1090, 1640), four more at (1390–1410, 1730–1740) with their destinations to the east.
-/// </para>
-///
-/// <para>
-/// So what is kept is the stop and the heading, not the destination. A candidate is passed over when the straight line
-/// to it runs close by a place where walks heading roughly the same way have stopped at least <see cref="Enough"/> times
-/// lately, and the candidate lies well beyond that place. More than one stop, because one walk can be held up by a
-/// fight or a crowd; forgotten after <see cref="KeepMs"/>, because a note nothing can disprove must not last for ever;
-/// lost at a restart, like the shard's other notes about ground.
-/// </para>
-/// </summary>
 public static class BotBarrier
 {
+
     public static bool Running { get; set; } = false;
 
     public static int Near { get; set; } = 16;

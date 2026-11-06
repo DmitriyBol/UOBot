@@ -2,30 +2,6 @@
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Deciding as a module: reads its numbers, turns itself on, and says what the population will be judging
-/// work by.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, and not because starting needs the map — it does not. It is because only
-/// the world phase is rewound when the world is replaced, and what this module accumulates is a count of
-/// what a <em>population</em> is doing. A Settings-phase module's <see cref="Reset"/> is never called, so
-/// the census would carry the undertakings of bots that no longer exist into the next world, and a count
-/// that is never released does not look wrong: it looks like a busier shard.
-/// </para>
-///
-/// <para>
-/// Requires <c>Classes</c> — what a bot is for is a fact about its class, and an appraisal made against
-/// nine classes that failed to load would be an appraisal of nothing.
-/// </para>
-///
-/// <para>
-/// Its switch earns its keep more than any other in this assembly. Turned off, everything else still runs —
-/// squads form up, journeys walk, combat answers when hit — and nothing chooses anything, which separates
-/// "the brain is wrong" from "the brain is covering for something else". In the first version those two
-/// questions had the same symptom and the answer took an evening of watching a live shard.
-/// </para>
-/// </summary>
 public sealed class BotWillModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWillModule));

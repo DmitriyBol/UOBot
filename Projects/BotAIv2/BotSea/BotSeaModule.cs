@@ -7,9 +7,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-sea.json</c>. A missing key keeps the code's value.</summary>
 public sealed class BotSeaSettings
 {
+
     public bool? Running { get; set; }
 
     public double? Share { get; set; }
@@ -41,11 +41,6 @@ public sealed class BotSeaSettings
     public bool? Piracy { get; set; }
 }
 
-/// <summary>
-/// The sea as a module: charts the water, finds the docks, draws the lanes, offers the way home from an island, and keeps
-/// the helm's clock. Patrick's point 7 of 29.09.2026. See <see cref="BotSeaChart"/>, <see cref="BotDocks"/>,
-/// <see cref="BotSeaLanes"/>, <see cref="BotHelm"/>, <see cref="BotVoyage"/> and <see cref="BotSea"/>.
-/// </summary>
 public sealed class BotSeaModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeaModule));
@@ -159,7 +154,6 @@ public sealed class BotSeaModule : BotModule
         BotSea.Forget();
     }
 
-    /// <summary>The chart, then a town's dock a tick, then the courses; once they are drawn, the ships found at boot and the order by hand.</summary>
     private sealed class SurveyTimer : Timer
     {
         private int _faults;
@@ -202,6 +196,7 @@ public sealed class BotSeaModule : BotModule
             }
             catch (Exception e)
             {
+
                 logger.Error(e, "Sea: the survey threw ({Faults} so far); it is tried again next tick", ++_faults);
 
                 if (_faults >= 10)

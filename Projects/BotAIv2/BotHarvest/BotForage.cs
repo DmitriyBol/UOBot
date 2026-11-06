@@ -5,31 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Picking up the reagents the world leaves lying about, and putting them on the board.
-///
-/// <para>
-/// <b>Free money the population has been walking past since the day it was raised.</b> The world spawns
-/// nightshade, sulphurous ash, garlic and the rest on the ground and refills them on their own clock; every
-/// bot on this shard has stepped over them for a fortnight. It is the cheapest income there is — no fight,
-/// no tool, no material, no skill — and unlike a vein or a shopkeeper it costs nobody anything to take.
-/// </para>
-///
-/// <para>
-/// <b>Asked of the engine as a family, not written out as a list of eight herbs.</b> Everything the world
-/// calls a reagent derives from <c>BaseReagent</c>, so one type check covers all of them and covers any that
-/// are ever added — which is the same reason the armoury reads the craft systems instead of keeping a table
-/// of hauberks. A list of names here would be right today and quietly wrong the first time somebody adds a
-/// herb.
-/// </para>
-///
-/// <para>
-/// <b>And it ends on the board rather than in a pocket.</b> Two of these are worth pennies to the bot that
-/// picked them up and a great deal to the mage two fields away who cannot cast without them — this shard's
-/// scribes and casters buy reagents constantly. A gathering errand that ended at the backpack would be a bot
-/// hoarding somebody else's spellbook.
-/// </para>
-/// </summary>
 public sealed class BotForage : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotForage));
@@ -163,6 +138,7 @@ public sealed class BotForage : BotDeed
 
         if (!body.InRange(lying.GetWorldLocation(), Touch))
         {
+
             var at = lying.GetWorldLocation();
             var away = Math.Max(Math.Abs(body.X - at.X), Math.Abs(body.Y - at.Y));
 
@@ -226,6 +202,7 @@ public sealed class BotForage : BotDeed
 
     private BotDoing Finish(IBotWilful bot, Mobile body, string why)
     {
+
         if (_gathered == 0 && _piles > 0)
         {
             return BotDoing.Failed($"{why}, after giving up {_piles} pile(s) nobody could get to");
@@ -289,16 +266,6 @@ public sealed class BotForage : BotDeed
     }
 }
 
-/// <summary>
-/// Offers any bot the reagents lying within sight of it.
-///
-/// <para>
-/// <b>Offered to everybody, because stooping is not a trade.</b> Mining wants a pickaxe, forging wants an
-/// anvil, and scribing wants a book — this wants a free hand, so restricting it to one class would be
-/// inventing a guild for picking things up. The auction settles whether it is worth a given bot's minute,
-/// which is exactly the sort of question it exists to answer.
-/// </para>
-/// </summary>
 public sealed class BotForager : IBotProposer
 {
     public string Name => "Forager";

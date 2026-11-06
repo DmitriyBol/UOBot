@@ -3,25 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A murdered bot's body found: the finder searches for the killer with Detect Hidden, calls out, and tells the Baron.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026: a bot that finds a body tries to find the killer with its detecting skill and tells
-/// the Baron.</b> Every murder leaves a scene here (<see cref="BotOutlaw.Murdered"/>). On every <see cref="SweepMs"/> the
-/// nearest law-abiding bot within <see cref="FindWithin"/> of an unreported body finds it: it searches around itself with
-/// Detect Hidden (<see cref="BotShadow.Search"/>) — with none of the skill that reaches no tile at all, and it is how the
-/// skill is learned — and names the killer if the search brought it out of hiding or the killer stands in plain sight within
-/// <see cref="BotLawful.Sight"/>. A named killer is made known to the Baron (<see cref="BotOutlaw.Tell"/>), who raises
-/// patrols only against murderers he knows of and can see (<see cref="BotOutlaw.AtLarge"/>); an unnamed one is a murder by an
-/// unknown hand, told and counted. A body nobody comes to in <see cref="SceneMs"/> is counted too.
-/// </para>
-///
-/// <para>
-/// It also presses a robber that has just gone through a body into lying low (<see cref="BotLieLow"/>), a sweep after the
-/// robbery ends, because a deed cannot press its own bot while it is finishing.
-/// </para>
-/// </summary>
 public static class BotInquest
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotInquest));

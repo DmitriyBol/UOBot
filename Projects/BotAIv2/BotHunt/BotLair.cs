@@ -4,25 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The Shadow's camp at its hideout: a fire at the middle of it and a chest beside the fire that only the band opens.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026, night.</b> "They must keep what they have taken somewhere, since the towns are shut
-/// to them and a catch takes everything off them. Bandit camps: say a campfire for the middle of it and a chest that
-/// only bandits reach. If somebody comes near the camp and there are bandits in it, they go into stealth." Before this
-/// the hideout was a point on the map and nothing else: the members rose there and practised there, and a robbery's
-/// takings rode in the robber's pack until a patrol took them.
-/// </para>
-///
-/// <para>
-/// <b>Two engine items, no new class.</b> The fire is a bare <c>Item</c> with the campfire's own graphic rather than
-/// <c>Campfire</c>, which is the camping skill's: that one skips serialization and puts itself out on a timer, so a
-/// hideout built of it would be dark and gone at the next boot. The chest is a <c>WoodenChest</c> made immovable. What
-/// keeps the island's hands out of it is not a lock — <c>BotPlunder</c> has counted locks and walked through them since
-/// 08.09.2026 — but that every path to a chest on this shard asks here first.
-/// </para>
-/// </summary>
 public static class BotLair
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLair));
@@ -227,6 +208,7 @@ public static class BotLair
 
         foreach (var m in map.GetMobilesInRange<Mobile>(here, HideWithin))
         {
+
             if (m is { Deleted: false, Alive: true } && !m.Hidden && !BotUnderworld.Member(m))
             {
                 seen = true;
@@ -244,6 +226,7 @@ public static class BotLair
 
         foreach (var m in map.GetMobilesInRange<BotMobile>(here, HideWithin))
         {
+
             if (m is { Deleted: false, Alive: true, Hidden: false, Combatant: null } member && BotUnderworld.Member(member)
                 && member.Resolve?.Deed is not (BotBrawl or BotRob or BotManhunt)
                 && BotShadow.Ready(member) && BotShadow.Hide(member))

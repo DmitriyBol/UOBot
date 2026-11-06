@@ -4,32 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The population's clock. One timer for everybody, and each bot due on its own schedule.
-///
-/// <para>
-/// <b>The pace is the movement subsystem's own number, not a knob here, and that is the fix for the one
-/// defect the first version's ticker had.</b> There, the period was <c>interval × phases</c> — two numbers
-/// in a config file whose product nobody checked — and it shipped at 800ms against a walking step of 400ms.
-/// The bots were not stuck and nothing in the log looked wrong; they simply moved at half a pedestrian's
-/// pace for the entire session, because a bot cannot step more often than it is asked to. Here a bot's next
-/// turn is set from <see cref="BotWalk.StepDelayMs"/> when it takes one, so the beat cannot be slower than a
-/// step by construction. There is no product to get wrong.
-/// </para>
-///
-/// <para>
-/// The timer's own interval is therefore only the resolution: how finely due times can be honoured. It is
-/// far shorter than a step, so what it costs is one pass over the population per tick — a hundred and fifty
-/// comparisons — and what it buys is that nobody is ever late by more than that interval.
-/// </para>
-///
-/// <para>
-/// <b>Spread comes from the due times, not from phases.</b> Bots are seeded staggered across one step's
-/// worth of turns when they are born, so the work of a step lands evenly across ticks instead of all of it
-/// landing on one. That is what phases were for; done this way it needs no configuration and cannot be set
-/// to a value that throttles movement.
-/// </para>
-/// </summary>
 public static class BotBeat
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBeat));
@@ -314,6 +288,7 @@ public static class BotBeat
 
             if (bot.Scheduled && now - bot.DueTick < 0)
             {
+
                 if (bot.Urgent)
                 {
                     bot.Urgent = false;
@@ -369,6 +344,7 @@ public static class BotBeat
             }
             catch (Exception e)
             {
+
                 Faults++;
 
                 logger.Error(e, "{Name} threw on its turn; the rest of the population carries on", bot.Name);

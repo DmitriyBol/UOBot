@@ -4,23 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A healer with nobody to mend going to where our fighters are.
-///
-/// <para>
-/// <b>Every piece of a healer's work is reactive, and a healer standing where nothing happens gets none of it.</b>
-/// Mending wants somebody hurt within reach, a hire wants a fighter going afield within a hundred tiles, standing by
-/// wants a fight within sixty, and the herbs come round once in half an hour. At 07:1x on 16.09.2026 six of the eleven
-/// healers held "nothing" — Gwendra at (1418, 1812), three hundred tiles from the nearest fight, "47 proposers asked,
-/// not one of them had anything to offer". This is the walk that puts a healer where the other offers can find it:
-/// to the nearest of ours that is out fighting, and then it stops, and the attendant and the surgeon take over.
-/// </para>
-///
-/// <para>
-/// Unpaid and cheap, so it never outbids a hire or a patient and is only ever taken when there is nothing else — which
-/// is exactly the state it is for.
-/// </para>
-/// </summary>
 public sealed class BotHouseCall : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHouseCall));
@@ -164,12 +147,9 @@ public sealed class BotHouseCall : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a healer with nothing to do the walk to the nearest of ours that is out fighting — further off than the
-/// attendant looks, because inside that reach the attendant itself has an offer. Every gate is counted.
-/// </summary>
 public sealed class BotHouseCalls : IBotProposer
 {
+
     public static bool Running { get; set; } = true;
 
     public static int Range { get; set; } = 800;

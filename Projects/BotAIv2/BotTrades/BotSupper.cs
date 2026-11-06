@@ -3,16 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Supper at a tavern: the walk to the cook, a meal bought hand to hand and eaten, and a few minutes at the table resting and
-/// talking — the fireside's evening, indoors and fed (07.10.2026, trades17).
-///
-/// <para>
-/// <b>Not about money</b> (<see cref="BotDeed.Unpaid"/>): the guest pays for its meal and is paid nothing, so the auction prices it
-/// at its claim and <see cref="BotSupperer"/> asks every reason it would fail before it offers it — a tavern in reach with a seat,
-/// a welcome, the price and a purse that keeps <see cref="BotTaverns.GuestKeeps"/> after it.
-/// </para>
-/// </summary>
 public sealed class BotSup : BotDeed
 {
     public const string Trade = "supper";
@@ -162,12 +152,6 @@ public sealed class BotSup : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a free bot that is tiring, bored, hurt or has nothing to eat a seat at the nearest open tavern (07.10.2026, trades17).
-/// A walk of the open taverns — at most <see cref="BotTaverns.MostOpen"/> — and no spatial query; a bot is not asked again for
-/// <see cref="EveryMs"/> after it went to one. Priced as the fireside is (<c>BotCamp.Claim</c>), a little above it because supper
-/// is waiting, and more for a wound.
-/// </summary>
 public sealed class BotSupperer : IBotProposer
 {
     public string Name => "Tavern guest";

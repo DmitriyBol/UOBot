@@ -7,36 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The towns' councils: in each town the guild with the best standing collects the town's taxes for a tenth of them, the next
-/// captains its guard for the town's wage, and a guild the post-holders cannot abide pays more at the town's counters.
-///
-/// <para>
-/// <b>Patrick's order of 07.10.2026, night: "a town council: the guilds with the best standing in a town get a post (tax
-/// collector, captain of the guard) and an income from it; a tax on an outcast guild".</b> The standing is the one the towns
-/// already keep (<c>BotBurgh</c>): what the town's shops charge the guild, moved half a percent by every task done or failed
-/// and raised by every seizure. Every <see cref="TermMs"/> the posts are given again: in each town, among the guilds that have
-/// done <see cref="LeastDone"/> of its tasks or more and are not put out of it, the cheapest (then the most tasks done) is its
-/// <b>tax collector</b> and the next its <b>captain of the guard</b>.
-/// </para>
-///
-/// <para>
-/// <b>The money is the town's own.</b> The island has one treasury (<c>BotCity</c>), and what it is taxed — ground, houses,
-/// outlaws' fines, the outcasts' surcharge — is the towns' tax income. At the end of each term the treasury's tax take over the
-/// term is shared evenly among the towns that have a collector, and each collector's chest is paid <see cref="TaxShare"/> of
-/// its town's share out of the purse (<c>BotCity.Escrow</c> and <c>Disbursed</c>: the purse goes down by what the chest goes
-/// up by; an empty purse pays nothing, counted). The captain's members are offered the town's guard for a wage of
-/// <see cref="Wage"/>gp a watch, held from the same purse when the watch is taken, up to <see cref="WageBudget"/>gp a town a
-/// term (<see cref="BotGuardDuty"/>).
-/// </para>
-///
-/// <para>
-/// <b>Outcasts.</b> A guild put out of a town (<c>BotBurgh.Bars</c>), or thought <see cref="OutcastRegard"/> of or worse by
-/// either of the town's post-holders, pays <see cref="OutcastFactor"/> times at the town's counters — on top of its standing,
-/// through the same factor every counter reads (<c>BotBurgh.Factor</c>) — and that part of the bill goes into the treasury
-/// as tax (<see cref="Taxed"/>) rather than out of the world.
-/// </para>
-/// </summary>
 public static class BotCouncil
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCouncil));
@@ -65,7 +35,6 @@ public static class BotCouncil
 
     public static int Reach { get; set; } = 250;
 
-    /// <summary>One town's council for this term.</summary>
     private sealed class Seat
     {
         public string Town;

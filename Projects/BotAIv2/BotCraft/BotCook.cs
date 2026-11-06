@@ -2,21 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a turn at the skillet to anybody carrying one and some meat.
-///
-/// <para>
-/// <b>The tool decides who cooks, not the class name</b> — the same rule the smith and the miner keep, and
-/// for the same reason: a bot that picks up a skillet tomorrow is a cook tomorrow, and a list of permitted
-/// archetypes is a list that has to be edited every time a class is added.
-/// </para>
-///
-/// <para>
-/// <b>Every gate apart, with the denominator, and no bucket called "other".</b> Written that way from the
-/// first line this time: three gates went in without counters on the night of 04-05.09.2026 and every one of
-/// them made a summary line lie about a mechanism nobody could then see.
-/// </para>
-/// </summary>
 public sealed class BotCook : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCook));
@@ -83,6 +68,7 @@ public sealed class BotCook : IBotProposer
 
         if (recipe?.ItemType == null)
         {
+
             Unskilled++;
 
             return null;

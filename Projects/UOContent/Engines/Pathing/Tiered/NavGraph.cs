@@ -3,33 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>
-/// The first level of the navigation graph of one map — the abstract graph of hierarchical A* (Botea, Müller and
-/// Schaeffer, 2004).
-///
-/// <para>
-/// <b>Clusters are 16×16 tiles</b>, the size of a map sector and of a step-cache chunk. Wherever a body can step
-/// straight across the edge between two clusters, each maximal run of such steps (per pair of surfaces, so a bridge and
-/// the road under it are separate) is an entrance: one gate in its middle when the run is at most
-/// <see cref="LongEntrance"/> long, two at its ends when it is longer. A gate is a pair of nodes, one on each side, and
-/// the step between them is a directed edge each way it can be taken — a drop the engine allows is not always a climb it
-/// allows back. Inside each cluster a flood from every node (<see cref="NavWindow.Flood"/>) gives the cost to each of the
-/// cluster's other nodes, and those are the cluster's edges.
-/// </para>
-///
-/// <para>
-/// <b>Built a cluster at a time</b>, nearest the prioritized place first (<see cref="Prioritize"/>, <see cref="Slice"/>),
-/// so the graph is useful round home within seconds of a boot and complete later. A cluster whose ground changes (a
-/// house raised or taken down) is torn down with its four edges and built again (<see cref="MarkDirty"/>); its
-/// neighbours are re-joined. Node ids are stable while their node exists, so the rest of the graph never needs touching.
-/// </para>
-///
-/// <para>
-/// <b>Components.</b> Once built, a union-find over the edges gives every node a component (<see cref="Component"/>):
-/// two places whose clusters' nodes share no component are not connected on the ground, which a planner can say without
-/// searching. Treated as undirected, which can only call too much connected, never too little.
-/// </para>
-/// </summary>
 public sealed class NavGraph
 {
     public const int Side = NavWindow.ClusterSide;
@@ -801,6 +774,7 @@ public sealed class NavGraph
                 InterCost = cluster.InterCost.ToArray(),
                 East = cluster.East?.ToArray(),
                 South = cluster.South?.ToArray(),
+
                 Start = cluster.Start,
                 To = cluster.To,
                 Cost = cluster.Cost
@@ -1001,7 +975,6 @@ public sealed class NavGraph
         + $"{Probes} cells probed";
 }
 
-/// <summary>One cluster's nodes, its gates' pairs on its east and south edges, and its edges.</summary>
 internal sealed class NavCluster
 {
     public readonly List<int> Nodes = [];

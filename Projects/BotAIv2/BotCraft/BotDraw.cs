@@ -2,25 +2,9 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A crafter's walk to its own bank box for the material of an order it passed over, before it goes digging for more.
-///
-/// <para>
-/// <b>Patrick, 03.10.2026: "a crafter makes the order first, then goes to mine" (flow9's proposal 4).</b> The porter puts a
-/// crafter's ingots, leather and feathers in its bank box once its pack holds its keep (<c>BotUnload</c>), and every trade took
-/// them back out only when the bot happened to stand at a bank (<see cref="BotMarket.FromBank"/>). A smith on build 396 that
-/// passed a chain order over for want of iron walked to a seam for twenty more ("42 ingots away and 0 kept for somebody's
-/// want") with a box of its own iron in Britain, 6,746 times "passed one over for want of iron" in eight hours. This walks to the
-/// nearest bank and takes what the order lacks; the craft's own look then takes the order. Offered by <see cref="BotCraftFirst"/>.
-/// </para>
-///
-/// <para>
-/// A purchase-shaped errand: it makes nothing and costs nothing, so it is unpaid and claimed at <see cref="BotCraftFirst.DrawClaim"/>,
-/// the same reasoning as the spare tool's trip (<c>BotRestock.Spare</c>): the one errand that comes before the next job.
-/// </para>
-/// </summary>
 public sealed class BotDraw : BotDeed
 {
+
     public const string Trade = "draw";
 
     public static int Near { get; set; } = 4;

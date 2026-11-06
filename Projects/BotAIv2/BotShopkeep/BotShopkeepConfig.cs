@@ -4,17 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-botshops.json</c> is allowed to say. Everything optional; an empty file keeps the code's numbers.
-///
-/// <para>
-/// <b>PascalCase, and it is not a style question.</b> The deserialiser matches these names as written, so a key in lower case
-/// is not an error and not a warning — it is a value silently left at its default. The boot line the module writes is the only
-/// proof of what the shops are running with.
-/// </para>
-/// </summary>
 public sealed class BotShopkeepSettings
 {
+
     public bool? Running { get; set; }
 
     public double? ShiftMinutes { get; set; }
@@ -54,7 +46,6 @@ public sealed class BotShopkeepSettings
     public int? SayEveryMs { get; set; }
 }
 
-/// <summary>Reads the shops' file and moves the numbers it names; writes an empty starter file when there is none.</summary>
 public static class BotShopkeepConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotShopkeepConfig));

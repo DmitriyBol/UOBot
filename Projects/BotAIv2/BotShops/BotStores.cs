@@ -5,54 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A crafter short of the raw material of its trade, putting the order to the population.
-///
-/// <para>
-/// <b>Two materials, and they are the two that no counter on this island sells at any price.</b> A feather
-/// exists because somebody killed a bird; a hide exists because somebody killed a beast. Everything else a
-/// crafter eats — cloth, logs, blank scrolls, reagents — is on a shelf, so a bot short of those has an
-/// errand rather than a problem. Metal is the third of this kind and has had its own since 24.08.2026; see
-/// <see cref="BotBullion"/>, which this is deliberately a copy of. The smith's question is <em>which</em>
-/// metal and needs a file of its own; these two only ask whether.
-/// </para>
-///
-/// <para>
-/// <b>Without this the arrow chain has no seed and cannot start at all.</b> The links were all built and
-/// every one of them was waiting on the one before it: a fletcher will not work without feathers, a hunter
-/// values a bird only when the board is asking for what it carries — <see cref="BotQuarry.Sought"/> — and
-/// the board only ever asked for arrows when nobody sold one, which is never, because every bowyer in
-/// Britain keeps a stack. So the chain was a ring: 84 fletchers passed over for want of feathers in eleven
-/// minutes, 194 woodcutters told nobody was asking, and in seven hours of logs the word "feather" does not
-/// appear once. A crafter that can say "I need feathers" out loud is the cut in that ring.
-/// </para>
-///
-/// <para>
-/// <b>On the beat and not in the auction, and that is the difference between working and not.</b> Written
-/// first as a proposer, it made the offer 62 times in six minutes and was chosen none of them: an order is
-/// half a minute of paperwork worth perhaps twenty gold a minute, and it stood against a tailor's own bench
-/// at three hundred and forty. That is the auction being right — Calla should sew — and it is also the
-/// reason the trade she is sewing for can never be supplied. The same lesson is written out in
-/// <see cref="BotUpkeep"/> about collecting goods already paid for, and in <see cref="BotOrder"/> in as many
-/// words: <em>an errand that costs nothing and takes no time cannot win an auction against work that pays,
-/// and it never did.</em> This lives on the population's beat for that reason.
-/// </para>
-///
-/// <para>
-/// <b>Logs were left out on purpose and the measurement took it back.</b> The reasoning was that a carpenter
-/// sells them, so a fletcher short of wood has a shopping trip rather than a problem. It was wrong about this
-/// island: once the feathers began arriving, 94 of 138 fletchers were passed over at 11:31 on 04.09.2026 with
-/// "could not find wood" — <c>BotShops.Nearest(bot, typeof(Log))</c> answering null, because no carpenter
-/// stands within any of their reach. So wood is the third thing nobody sells here, and it is asked for the
-/// same way. It also opens the one trade on the shard that has never done a day's work: 323 woodcutters in
-/// the same half hour, every one of them told that nobody was asking for wood or arrows.
-/// </para>
-///
-/// <para>
-/// Feathers first and wood second, for a fletcher that carries both gates. A fletcher with wood and no
-/// feathers has nothing to make; a fletcher with feathers and no wood is one errand from working.
-/// </para>
-/// </summary>
 public static class BotStores
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStores));
@@ -263,6 +215,7 @@ public static class BotStores
 
     private static bool Ask(IBotWilful bot, Mobile body, Type kind)
     {
+
         Asked++;
 
         if ((body.Backpack?.GetAmount(kind) ?? 0) >= Enough)
@@ -370,6 +323,7 @@ public static class BotStores
 
         if (BotMarket.Ask(bot, kind, units, offer) == null)
         {
+
             Standing++;
 
             return false;
@@ -402,6 +356,7 @@ public static class BotStores
 
         if (BotFletching.Kit(body) != null)
         {
+
             into[count++] = typeof(Feather);
 
             if (BotFletching.Logs(body) + BotFletching.Shafts(body) < Enough)

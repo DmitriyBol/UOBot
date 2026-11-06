@@ -3,34 +3,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Falling in with the guild's war company and fighting with it, as a company, until the company is done.
-///
-/// <para>
-/// <b>Patrick's order of 13.09.2026, the fifth of the evening: when one guild attacks another, a company
-/// forms and there is a real battle.</b> Until this a war was a hundred duels: every member offered a
-/// quarrel of its own, walked at its own enemy and fought alone, and the squad — the formation, the medics
-/// behind it, the casters, the share-out — existed only against monsters. The squad's fighting code never
-/// cared what it fought: it sets a combatant and asks the engine whether the blow is lawful, and in a war
-/// it is. What it lacked was a way to be formed for a war.
-/// </para>
-///
-/// <para>
-/// <b>This errand is the way.</b> The first member to answer a call or a threat forms the guild's war
-/// company and points it at the enemy (<c>BotFeud.Rally</c>); every member after it is handed this, walks
-/// to the company and joins it; and from then on the company's own beat does the fighting — station,
-/// formation, blow, bandage, spell — while this errand does nothing but stand in the ranks. It runs
-/// <c>Alongside</c> the company like a hunt's enlistment does, and it ends when the company does.
-/// </para>
-///
-/// <para>
-/// <b>Not the enlistment errand, though it is nearly one.</b> <c>BotEnlist</c> refuses a company of one,
-/// which is right for a hunt and wrong for the bot that just formed the company: the founder would be
-/// refused its own company in the same second. This one holds as long as the company holds.
-/// </para>
-/// </summary>
 public sealed class BotRally : BotDeed
 {
+
     public const string Trade = "rally";
 
     public static double Prior { get; set; } = 400.0;
@@ -78,6 +53,8 @@ public sealed class BotRally : BotDeed
     public override string Kind => Trade;
 
     public override bool Summons => true;
+
+    public override bool Keeps => true;
 
     public override Map Map => _map;
 
@@ -148,6 +125,7 @@ public sealed class BotRally : BotDeed
 
             if (BotFeud.Mustering(_company))
             {
+
             }
             else if (_company.Focus is { Deleted: false, Alive: true } held && !ReferenceEquals(held, _enemy))
             {
@@ -221,6 +199,7 @@ public sealed class BotRally : BotDeed
 
         if (!body.InRange(anchor, BotSquad.PressReach))
         {
+
             if (!_waved && BotFeud.Out(_company) && !body.InRange(anchor, BotFeud.Straggle))
             {
                 var at = BotFeud.MusterAt(_company);

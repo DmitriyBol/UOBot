@@ -9,53 +9,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The zone watch: how often the danger map is right, counted both ways and in two parts over a rolling window, and the end of
-/// the watching once both parts are right often enough.
-///
-/// <para>
-/// <b>Patrick's order of 07.10.2026, evening: "if the debuggers are useful, we don't remove them; one debugger goes wholly onto
-/// the zones, its other duties are shared out, we keep a counter of the zones' accuracy. As soon as zone accuracy is 99 percent
-/// — we stop watching the zones and give the passed duties back."</b> The keeper is <see cref="BotZoneTour.Keeper"/>; this
-/// class is the counter and the clock that ends its posting.
-/// </para>
-///
-/// <para>
-/// <b>Deaths</b> (<see cref="Died"/>), one check a death. Only a bot killed by a creature that attacks on sight counts — the
-/// killer the engine credits is a <see cref="BaseCreature"/> nobody controls or summoned, not townsfolk, whose fight mode attacks
-/// first; a bot's, a guard's, a pet's kill, a passive animal the bot set upon, or nothing named is no evidence and is counted
-/// apart. Where it fell is read off the map published at that moment: clear ground (no patrol, no fringe; a hunting ground's
-/// own level is clear too) counts against; hostile or deadly patrol counts for; a fringe counts for only while the zone it
-/// borders has living attackers in that build, and apart otherwise — a fringe round an empty camp warned of nothing, and
-/// painting more fringe must not buy agreement (reviews of 07.10.2026).
-/// </para>
-///
-/// <para>
-/// <b>Visits</b> (<see cref="Visited"/>), one vote a zone. Every tour stop held its whole <see cref="BotZoneTour.HoldMs"/>, by
-/// the keeper or anyone, looks for a living attacker in the zone's own patrol cells. Hostile or deadly with one: agrees. Hostile
-/// or deadly with none: against if every spawner feeding it is full (the creatures exist and are not where the map says),
-/// apart as <em>respawning</em> if any is below its count (hunted out and refilling: painting it hostile is right, and the
-/// hold proves nothing). Clear (a hunting ground; only the keeper stands in those) with an attacker: against; with none:
-/// agrees. A zone's latest verdict replaces its earlier one, so the visit part is "zones whose latest verdict in the window
-/// agrees, over zones with a verdict in the window", and re-checking a zone never adds weight to it.
-/// </para>
-///
-/// <para>
-/// <b>The end, and no automatic return.</b> Each part is judged on its own sample (<see cref="AccuracyMinDeaths"/> deaths,
-/// <see cref="AccuracyMinZones"/> zones); the watch ends only when both are at <see cref="AccuracyTarget"/> or better for
-/// <see cref="AccuracyHoldMinutes"/>. Then the tour stops for every debugger, the keeper's duties go back to it, and deaths go
-/// on being counted. Afterwards the deaths alone, over <see cref="AlarmWindowHours"/> with <see cref="AlarmMinDeaths"/>, under
-/// <see cref="ResumeBelow"/> for <see cref="ResumeAfterMinutes"/> raise an alarm in <c>alerts.ndjson</c> and do nothing else:
-/// <c>do zonewatch on</c> restarts it, by hand. The deaths and the zones' verdicts are printed beside the painted patrol and
-/// fringe, so a map that grows its painted ground to agree is seen to.
-/// </para>
-///
-/// <para>
-/// <b>Kept in <c>Data/</c>, not in <c>Saves/</c></b> (which is moved to a backup at every save), as <see cref="BotZoneMemory"/>
-/// keeps the observations: the deaths, each zone's latest verdict and the watch's own state, read and written off the loop and
-/// written once more at shutdown or a crash. A file that cannot be read is moved aside to <c>.bad</c> and said at warning.
-/// </para>
-/// </summary>
 public static class BotZoneWatch
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotZoneWatch));
@@ -339,6 +292,7 @@ public static class BotZoneWatch
 
                 if (refillMinutes > 0 && now - since < grace)
                 {
+
                     VisitsRespawning++;
                     _excusedAt[key] = now;
 
@@ -723,6 +677,7 @@ public static class BotZoneWatch
                 }
                 catch (Exception e)
                 {
+
                     var moved = false;
 
                     try
@@ -732,6 +687,7 @@ public static class BotZoneWatch
                     }
                     catch
                     {
+
                     }
 
                     Core.LoopContext.Post(
@@ -850,6 +806,7 @@ public static class BotZoneWatch
 
         if (!_byHand)
         {
+
             var down = Math.Max(0, Now() - read.SavedAt);
 
             On = read.On;
@@ -988,6 +945,7 @@ public static class BotZoneWatch
                     Core.LoopContext.Post(
                         () =>
                         {
+
                             _writing = false;
                             logger.Warning("Zones: {File} could not be written: {Message}", File, e.Message);
                         }

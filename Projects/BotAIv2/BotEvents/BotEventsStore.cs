@@ -6,13 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps what the events owe across a restart, so that no coin is made or lost by one (07.10.2026). Written with the world save:
-/// what an invasion and a caravan hold of the city's purse, the invasion's creatures, the fair's day and turn and its lottery
-/// tickets, and the rumoured chest. Read back, nothing is resumed but the rumour and the fair's calendar: the held coin goes back to
-/// the purse, the creatures are taken off the island, and every ticket is handed back to its holder — at the module's start, once
-/// the world and the city's purse are read (<see cref="Apply"/>).
-/// </summary>
 public sealed class BotEventsStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEventsStore));

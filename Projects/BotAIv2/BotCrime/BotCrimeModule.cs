@@ -5,7 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-crime.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotCrimeSettings
 {
     public bool? Running { get; set; }
@@ -71,12 +70,6 @@ public sealed class BotCrimeSettings
     public int? HuntersPer { get; set; }
 }
 
-/// <summary>
-/// The underworld's trades and the town's law, as a module: reads its numbers, offers the four pieces of work — the cutpurse's
-/// turn in a crowd, a bandit's place in an ambush, the fence's trade and the bounty — and says at boot what it will do. Its
-/// clock is the outlaws' own (<c>BotOutlaw</c>'s, once a second), and its counters are written at the end of the
-/// <c>Underworld:</c> line. See <see cref="BotCrime"/>.
-/// </summary>
 public sealed class BotCrimeModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCrimeModule));

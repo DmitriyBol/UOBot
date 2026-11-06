@@ -3,18 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>
-/// One cluster of the navigation graph with the ring of cells round it, probed lazily from the terrain: each cell's
-/// standable surfaces (its strata — a floor over a street, a bridge over a road are separate places) and, per surface,
-/// the raw step mask and the height each step lands at.
-///
-/// <para>
-/// <b>The step rule is the strict one a player walks by:</b> a diagonal needs both of its flanking straight steps open
-/// from the same surface, and a step is taken only onto a surface of the next cell within <see cref="MatchTolerance"/> of
-/// where the engine says it lands. The graph, the planners' insertion searches and the tests all step through
-/// <see cref="Step"/>, so they cannot disagree about what is walkable.
-/// </para>
-/// </summary>
 public sealed class NavWindow
 {
     public const int ClusterSide = 16;
@@ -264,6 +252,7 @@ public sealed class NavWindow
                 }
                 else
                 {
+
                     tx = cx - _dx[d];
                     ty = cy - _dy[d];
                     ts = -1;

@@ -7,68 +7,6 @@ using System.Text.Json;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Turns what is known about the haunts, the living creatures, the observed patrols and the deaths into zones: which cells are
-/// patrol, which are aggro fringe, what each zone holds, how strong it is against a bot, and its outline.
-///
-/// <para>
-/// <b>Pure: it reads only its input and writes only its own scratch and the one back buffer it was handed.</b> That is what lets
-/// <see cref="BotZones"/> run it off the loop when the machine has the cores for it (CLAUDE.md rules 3 and 10): nothing in here
-/// touches a map, a mobile, a timer or a static the loop writes. The scratch arrays are static because one build runs at a
-/// time — <see cref="BotZones"/> never starts a second before the first has published.
-/// </para>
-///
-/// <para>
-/// <b>Three layers, never merged across.</b> Land patrol of creatures that attack on sight (declared discs until observation
-/// wins, the living where they stand, the cells seen patrolled awake); the sea's (creatures that cannot leave the water, only
-/// where they are); and the passive animals' (hunting grounds), painted only where no attacker's patrol is. A sea serpent's
-/// water never joins an orc camp on the beach into one zone, and a sea spawner that declares a walking range of 175 tiles
-/// paints nothing: only its living creatures do.
-/// </para>
-///
-/// <para>
-/// <b>A zone is a camp of spawners, not a connected patch of paint (02.10.2026, build 389).</b> Until 388 a zone was every
-/// cell of one layer joined eight ways, and the paint joined: 1,651 spawners' discs of up to 64 tiles, the cells where their
-/// creatures were seen awake (with a cell's margin each way, a twelve-tile stripe along every chase a bot led across the
-/// island) and the discs round the living fused into zone 25, "W of Trinsic", 1,224 × 1,920 tiles with 80 spawners, 1,198
-/// creatures and Trinsic's own bank inside its outline, charged everywhere at the fight of its worst corner (22,935, ×20 a
-/// bot); the roads went round the peninsula. Patrick, 02.10 00:20: "one of your zones has grown over half of Britain ... the
-/// zone is information both for caution and for fighting and hunting." Now the land's attackers are grouped by their
-/// spawners (<see cref="Group"/>): two spawners are one zone when their discs touch within
-/// <see cref="BotZoneSettings.JoinGap"/> tiles and the zone they make stays within <see cref="BotZoneSettings.ZoneMostTiles"/>
-/// across, nearest pairs first, so a fort of six spawners is one zone and a chain of camps along a road is a chain of zones.
-/// Each zone paints only its own: its spawners' discs, the living of those spawners that are within range of home, and the
-/// observed cells its spawners' ranges (plus <see cref="BotZoneSettings.ObservedSlack"/>) cover. A creature farther from home
-/// than that (a chase, a lure) or with no spawner is a <em>wanderer</em>: a zone of its own where it stands
-/// (<see cref="BotZone.Stray"/>), real danger and no patrol. An observed cell no spawner's range covers is a chase, and paints
-/// nothing. Guarded ground is never painted: the guards kill what attacks there.
-/// </para>
-///
-/// <para>
-/// <b>Where the deaths said the map was wrong (08.10.2026, deaths30).</b> Of 21 deaths on clear ground, 14 began inside a camp's
-/// painted aggro and ended 15–250 tiles out, the pursuer still on the bot; three were by wanderers whose paint lagged behind
-/// them, one by an invasion wave, three by casters past a fringe of their sight. So a camp's patrol may grow past its declared
-/// range to how far its creatures are really seen from home calm (<see cref="BotZoneHauntIn.Reach"/>, a high percentile, at most
-/// <see cref="BotZoneSettings.ReachBeyond"/> past the declaration) — in the direction they were seen, not as a wider disc: past
-/// the declaration a camp claims the observed cells out to its reach, and the cells are where its creatures walked. The grouping
-/// into camps still goes by the declaration, so the zones and their numbers stand. A caster's or an archer's fringe is the larger
-/// of its sight and its blow's reach (it picks a target only within its sight); a wanderer is painted
-/// along where it walked in the last minutes (<see cref="BotZoneInput.Trail"/>, at most
-/// <see cref="BotZoneSettings.WanderMostCells"/> cells); and an event's creatures are a zone of their own while they live
-/// (<see cref="BotZoneInput.Events"/>). Guarded ground stays unpainted: town guards are the answer there, not the map.
-/// </para>
-///
-/// <para>
-/// <b>Strength is what can come at once, not the worst alone — and at a place, not over a peninsula.</b> The analysts' reading of
-/// 3474 deaths on 29–30.09 found 78 companies of three to six strong bots killed by a single weak kind — snakes, zombies,
-/// skeletons — in ground reckoned clear: the worst creature nearby was weak, and there were many of it. So a zone's threat is
-/// taken round every living attacker in it: that one and all others within <see cref="BotZoneSettings.ConvergeTiles"/> of it,
-/// the strongest in full and the rest at <see cref="BotThreat.Secondary"/>, and the zone's threat is the worst such place in
-/// it — the hunter's question of the whole zone. The walker's question of one node is answered by the fight raster
-/// (<see cref="BotZoneState.Fight"/>): the same convergence taken round every <em>cell</em>, over all the living wherever
-/// their zone is, floored by what the cell's own spawners promise at one place when they are full.
-/// </para>
-/// </summary>
 public static class BotZoneBuild
 {
     private const byte Land = 1;
@@ -690,6 +628,7 @@ public static class BotZoneBuild
             }
             else if (!c.Aggressive && !c.Water)
             {
+
                 number = At(c.X, c.Y, Land, comps, w, h);
 
                 if (number == 0)
@@ -1075,6 +1014,7 @@ public static class BotZoneBuild
     {
         if (!force && _guarded != null && bit != Sea && bit != SeaGroup && _guarded[i] != 0)
         {
+
             if (_owner[i] != -1)
             {
                 if (_mark[i] == 0 && _owner[i] == 0)
@@ -1777,6 +1717,7 @@ public static class BotZoneBuild
         }
         else
         {
+
             comp.Empty = true;
             comp.Total = declaredTotal;
             comp.Worst = declaredWorst;
@@ -2015,6 +1956,7 @@ public static class BotZoneBuild
 
         if (previous?.Zones != null && previous.Width == w)
         {
+
             Dictionary<int, int> overlap = [];
             byte[] families = [Land, Sea, Passive];
 
@@ -2319,6 +2261,7 @@ public static class BotZoneBuild
 
     private static string Compass(int dx, int dy)
     {
+
         var angle = Math.Atan2(-dy, dx) * 180.0 / Math.PI;
         var sector = (int)Math.Round((angle + 360.0) % 360.0 / 45.0) % 8;
 

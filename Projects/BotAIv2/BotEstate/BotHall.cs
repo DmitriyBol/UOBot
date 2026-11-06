@@ -5,25 +5,9 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Raising the guild's hall: walk to the plot, call the levy, put the house up.
-///
-/// <para>
-/// <b>The engine's own order of business, kept exactly.</b> <c>HousePlacementTool</c> checks the ground,
-/// builds the house, takes the money and only then moves it into the world — and deletes it again if the
-/// payment fails. Every step of that ordering is there to make sure a house and the coin for it cannot both
-/// exist, and this follows it rather than inventing a shorter version.
-/// </para>
-///
-/// <para>
-/// <b>The money is the guild's, not the bot's.</b> That is why <see cref="Outlay"/> is nothing: it is the
-/// number the decision layer measures a bot's own poverty against, and a buyer made to feel five thousand
-/// gold short would refuse every errand on the shard until it stopped. What can be afforded is the
-/// proposer's question, asked of <see cref="BotEstate.Fund"/>, and it is asked before the offer is made.
-/// </para>
-/// </summary>
 public sealed class BotHall : BotDeed
 {
+
     public const string Trade = "hall";
 
     public static double Prior { get; set; } = 400.0;
@@ -111,6 +95,7 @@ public sealed class BotHall : BotDeed
 
         if (result != HousePlacementResult.Valid)
         {
+
             BotPlot.Spend();
             BotEstate.Lost();
 

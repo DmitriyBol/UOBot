@@ -4,34 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The ground round a guild's hall, and what belonging to a guild does to work done on it.
-///
-/// <para>
-/// <b>Stage three of Patrick's order of 08.09.2026.</b> A hall makes land: every tile within
-/// <see cref="Reach"/> of it is that guild's, its members work there by preference, and everybody else works
-/// there at a discount. Nothing is fenced off — see below — so the island stays one place that anybody can
-/// cross.
-/// </para>
-///
-/// <para>
-/// <b>A preference and never a veto, which is the rule this project has paid for most often.</b> Four guilds
-/// each claiming ninety tiles is an island where every square belongs to somebody; if belonging meant
-/// refusing, the population would stop working. So the claim is a multiplier with a floor, in exactly the
-/// shape <c>BotGuilds.Kinship</c> and <c>BotAppraisal</c>'s other factors have: a bot on another guild's
-/// ground still digs, still sews, still fights — it simply prefers the same work at home. The measure that
-/// says this has gone wrong is the completion band falling while evictions rise.
-/// </para>
-///
-/// <para>
-/// <b>The claim is computed from the halls rather than kept.</b> A hall is destroyed, adopted or raised
-/// while the shard is up, and a stored map of who owns what would be a second copy of that going stale — the
-/// defect this project names most often. Five halls and a distance check is a loop of five, asked in the
-/// appraisal's hot path a few thousand times a second, which is nothing.
-/// </para>
-/// </summary>
 public static class BotLand
 {
+
     public static bool Running { get; set; } = true;
 
     public static int Reach { get; set; } = 40;

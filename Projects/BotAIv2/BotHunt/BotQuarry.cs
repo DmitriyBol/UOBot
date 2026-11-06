@@ -6,32 +6,9 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Finding something worth fighting, and finding what it left behind.
-///
-/// <para>
-/// <b>Every judgement here is already written.</b> <c>BotThreat</c> knows what fighting power is (how long a
-/// thing lasts multiplied by how hard it hits), what counts as hostile, and what our side comes to including
-/// whoever happens to be standing nearby. This file adds one question to that: of the things I could beat,
-/// which is the biggest. Nothing about combat is re-decided.
-/// </para>
-///
-/// <para>
-/// <b>The biggest I can beat, not the nearest.</b> Distance is already priced by the appraisal's nearness
-/// factor, so a hunter that preferred the closest rat would be paid twice for being lazy. And the whole shape
-/// of the first version's death loop was fighting things it could not beat, so the test is the same tolerance
-/// the flight decision uses — it must lose by the same arithmetic it would flee by.
-/// </para>
-///
-/// <para>
-/// <b>No memory of where the monsters are.</b> Unlike a vein or a shop, a creature walks and respawns, so a
-/// remembered one is a lie within a minute. The sweep is fresh every time and that is the cost of this
-/// proposer; which patches of ground pay is remembered instead, by the ledger, which is the right place for a
-/// fact about ground.
-/// </para>
-/// </summary>
 public static class BotQuarry
 {
+
     public static int Reach { get; set; } = 30;
 
     public static int Notice { get; set; } = 12;
@@ -463,6 +440,7 @@ public static class BotQuarry
         var worth = 0.0;
 
         var hides = Demanded(typeof(Hides)) || BotCharter.Wants(hunter, "hides");
+
         var feathers = Demanded(typeof(Feather)) || Demanded(typeof(Arrow)) || BotCharter.Wants(hunter, "feathers") || BotFletcher.Starved;
         var wool = Demanded(typeof(Wool)) || BotCharter.Wants(hunter, "wool");
         var meat = BotCharter.Wants(hunter, "meat");
@@ -856,9 +834,9 @@ public static class BotQuarry
 
     public static BaseCreature Company(Mobile bot, int range, out CompanyRefusal why) => Company(bot, range, 0.0, out why);
 
-    /// <summary>Why no company could be called, when none could. See <see cref="Company"/>.</summary>
     public enum CompanyRefusal
     {
+
         None,
 
         Alone,

@@ -7,48 +7,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guilds' houses in the towns: which guild lives in which empty building, the door it put into the doorway and the sign
-/// it hung beside it, and the one price — Britain's.
-///
-/// <para>
-/// <b>Patrick's idea of 29.09.2026, evening: "one or two guilds may settle in each of the other towns, but only in an empty
-/// and suitable building; when a guild settles there, a door is put in and a sign is hung on the wall. There may be guilds in
-/// Britain, but settling there costs 10,000 gold; that counts as the guild's home. They still have to raise a hall and take
-/// ground."</b> Until now a guild's seat was a bare point: set by hand, in the file, where its hall stood, or — for a guild
-/// founded after the morning of 29.09 — a random spot within forty tiles of another town's middle (<c>BotSeat.Choose</c>).
-/// Now it is a building the survey found empty (<see cref="BotHouseSurvey"/>): the guild's seat is the building's heart,
-/// its members are born and rise there and live in its town, and the hall and the claims still have to be earned the old way.
-/// </para>
-///
-/// <para>
-/// <b>One notion of home, not two.</b> Nothing here answers "where does this bot live"; it answers "where is this guild
-/// seated", and three existing questions ask it: <c>BotSeat.Of</c> (the seat the hall is looked for from and carried to),
-/// <c>BotSeat.Home</c> (where a member is born, rises and walks home to — the house before the hall) and
-/// <c>BotRelocate.Forced</c> (the town a member lives in — Britain too, when the house is there).
-/// </para>
-///
-/// <para>
-/// <b>Who goes where.</b> Each guild wishes once, kept across restarts: abroad (by <c>BotSeat.AbroadShare</c>, the order of
-/// 29.09.2026 that some guilds settle by other towns) or at home in Britain. A guild already seated at a bare point by
-/// another town wishes abroad. Abroad, a guild takes the free building nearest the town's bank in the town with the fewest
-/// guild houses, among the towns the gates join to home that are fit to live in (<c>BotSettle</c>: a road, a bank, shops),
-/// at most <see cref="MostPerTown"/> a town, for <see cref="TownPrice"/> (nothing, by default: the building stood empty). In
-/// Britain a guild waits for its hall (<see cref="BritainAfterHall"/>), then saves <see cref="BritainPrice"/>, which is levied
-/// off its chest and members like a hall (<c>BotEstate.Levy</c>) and paid to the city's treasury (<c>BotCity.Tax</c>), so
-/// the coin goes round rather than out of the world. A guild with no house and no seat lives as it did: at the population's
-/// home, its hall looked for from there.
-/// </para>
-///
-/// <para>
-/// <b>The world is the record of what stands; the store is the record of whose.</b> The doors and signs are items and the
-/// world save keeps them; <see cref="BotGuildHouseStore"/> keeps which guild holds which building (by the tile of its first
-/// door) and each guild's wish. At every boot the survey is read, every house is found again and its door and sign put back
-/// if the world lost them, and a door or sign of ours standing in a doorway nobody holds is taken down. A guild gone from
-/// the roll for <see cref="GoneLooks"/> looks in a row leaves its house: the door and sign come down and the building is
-/// empty again.
-/// </para>
-/// </summary>
 public static class BotGuildHouses
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuildHouses));
@@ -77,7 +35,6 @@ public static class BotGuildHouses
 
     public static int Spread { get; set; } = 3;
 
-    /// <summary>What one guild holds: the building, where its seat is, and what it paid.</summary>
     public sealed class Holding
     {
         public string Guild;
@@ -673,6 +630,7 @@ public static class BotGuildHouses
 
         for (var i = 0; i < found.Count; i++)
         {
+
             if (BotBounds.Foreign(guild.Name, BotPopulation.Home, found[i].Heart, out _))
             {
                 BotBounds.HouseRefused();
@@ -697,6 +655,7 @@ public static class BotGuildHouses
 
             for (var j = 0; j < doors.Length; j++)
             {
+
                 if (!map.CanFit(doors[j].X, doors[j].Y, doors[j].Z, 16, false, false))
                 {
                     Blocked++;
@@ -780,6 +739,7 @@ public static class BotGuildHouses
         }
         else if (map != null)
         {
+
             var gone = new List<Item>();
 
             foreach (var door in map.GetItemsInRange<BotGuildDoor>(held.Key, 3))

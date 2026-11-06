@@ -6,48 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Which rooms of a dungeon can actually be walked between, found by walking between them.
-///
-/// <para>
-/// <b>Patrick's order of 11.09.2026: send Argus down and have him map the passable ground, because the bots
-/// are supposed to be able to get round obstacles.</b> They are, and they do — the planner routes round a
-/// wall perfectly well. What it cannot do is route to somewhere with no route at all, and a dungeon is full
-/// of those: a cavern is a handful of separate caves that share a name, and two rooms fifteen tiles apart
-/// can have solid rock between them. The party was being sent to a room, refused, sent to another, refused,
-/// and the only thing that ended it was a counter running out.
-/// </para>
-///
-/// <para>
-/// <b>So this is a connectivity map, and it is measured rather than reasoned about.</b> Each room is probed
-/// against one representative of each hall already found, with the shard's own path search — the same one
-/// the bots use, with the same rules about diagonals and items and doors — and joins the first hall that
-/// answers yes, or starts a hall of its own. What comes out is, per dungeon, the groups of rooms that are
-/// mutually reachable. The party then only ever picks a room out of the hall it is standing in.
-/// </para>
-///
-/// <para>
-/// <b>Why not a flood fill of my own.</b> Because the expansion rule is delicate — the planner's own notes
-/// call getting the diagonal flank rule half-right the most expensive mistake in the first version's
-/// pathfinder, and the item half of it is what this world is built out of. A second copy of that logic
-/// would be a second thing to get wrong, and it would answer a slightly different question than the one the
-/// bots will actually ask. One search per pair is more expensive and it is the real answer.
-/// </para>
-///
-/// <para>
-/// <b>One probe at a time, on Argus's own beat.</b> This is heavy work that needs the world, so by the
-/// shard's rule it is chunked across ticks rather than threaded: a search every <see cref="EveryMs"/>, each
-/// bounded by <see cref="CeilingMs"/>. A dungeon of eighty rooms in three halls costs a couple of hundred
-/// searches, which is a few minutes of a watcher who has nothing else to do with those milliseconds.
-/// </para>
-///
-/// <para>
-/// <b>And written down, because it is a fact about the map rather than about the population.</b> The ore
-/// survey is rebuilt every start and that is right — veins run out. Rock does not move. The finished map
-/// goes into <c>Configuration/bot-dungeon-halls.json</c> and is read back at boot, so the survey happens
-/// once ever rather than once a restart.
-/// </para>
-/// </summary>
 public static class BotHalls
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHalls));
@@ -82,7 +40,6 @@ public static class BotHalls
 
     public static Action<string> Noted { get; set; }
 
-    /// <summary>One group of rooms that can all be walked between.</summary>
     public sealed class Hall
     {
         public Point3D Rep;
@@ -487,6 +444,7 @@ public static class BotHalls
         {
             return JsonConfig.Deserialize<HallsFile>(Path.Combine(Core.BaseDirectory, ConfigPath));
         }
+
         catch (Exception)
         {
             return null;

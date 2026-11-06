@@ -7,32 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The city's treasury: the one purse on the shard that mints coin, and everything the city does is paid from it.
-///
-/// <para>
-/// <b>A lever with a budget is a lever a model may hold.</b> Until 16.09.2026 the city was one button on the
-/// administrator's dashboard — buy ten lots from afar, paid for out of nothing, without limit — and for that reason it
-/// could be given to nobody else. Patrick's order: whatever the city can do must be in Argus's and the debuggers'
-/// hands. So the city has a purse. It fills at <see cref="MintPerHour"/> up to <see cref="Cap"/> and never faster,
-/// every purchase comes out of it, and a purchase it cannot pay for is refused and counted. A watcher that buys
-/// everything on the market at three in the morning has spent the treasury, not printed one.
-/// </para>
-///
-/// <para>
-/// <b>Two ways the city spends.</b> A buy takes whole lots from the bots' shops standing open by the bank, and pays what was
-/// asked. A standing order names a thing, an amount and a price, and the clock takes that thing from any open shop whenever it
-/// is on show at or under the price — the outside demand a producer sees as goods that sell as fast as they are made. Both are
-/// booked as sales, so the shops learn from them like from any other.
-/// </para>
-///
-/// <para>
-/// <b>At the shops, never off stalls (01.10.2026, the auction removed on Patrick's order of 30.09).</b> The city used to buy off
-/// the placeless stalls from wherever it was; now it buys only where a keeper is standing at its pitch with the goods
-/// (<see cref="BotShopkeep.CityBuy"/>): the town's own buyer at the market, as a shopkeeper buys over its counter. The goods
-/// leave the world as they always did — bought by somewhere that is not here — and the keeper is paid in coin into its pack.
-/// </para>
-/// </summary>
 public static class BotCity
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCity));
@@ -204,7 +178,6 @@ public static class BotCity
 
     private static readonly List<Order> _wants = [];
 
-    /// <summary>A bounty on ground: paid, split evenly, to the company that clears the square it is in.</summary>
     private sealed class Prize
     {
         public Map Map;
@@ -218,7 +191,6 @@ public static class BotCity
         public long SetTick;
     }
 
-    /// <summary>A bounty on a red's head: paid to whoever catches it.</summary>
     private sealed class Price
     {
         public Serial Who;
@@ -1288,6 +1260,7 @@ public static class BotCity
 
             if (red is not { Deleted: false })
             {
+
                 var again = Named(_heads[i].Name);
 
                 if (again != null)

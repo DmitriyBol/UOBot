@@ -5,34 +5,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A healer standing by one of ours who is fighting, close enough to bind a wound the moment there is one.
-///
-/// <para>
-/// <b>What a healer does while nobody is hurt yet.</b> Measured on the morning of 14.09.2026: healers spent 26% of
-/// their working minutes looking for a fight and 5% in one, against 10% on their own trade. A medic that goes
-/// looking for fights is a fifth fighter with a green staff, and one that stays at home is a healer nobody can reach.
-/// The mending itself was never missing — <c>BotSurgeon</c> offers a wound to whoever can see it — what was missing
-/// was a healer anywhere near the wounds. Games that ship a support role give it a place beside somebody rather than a
-/// quarry of its own: Horizon Zero Dawn's herds hand out roles, Halo's squads hand out styles. This is the same shape
-/// without an order in it: the healer weighs standing by a hunter against everything else it could do.
-/// </para>
-///
-/// <para>
-/// <b>Put down for the wound, taken up again after it.</b> Steadfast, so a salve — a summons — pauses this instead of
-/// ending it, and when the wound is bound the healer walks back to its fighter. A support role is a string of
-/// interruptions, and that is exactly the case the pause was built for: each wound must not be a new decision about
-/// where to be.
-/// </para>
-///
-/// <para>
-/// Paid nothing by itself — the skill arrives through the mending it makes possible and is booked there — so it is
-/// unpaid, and its proposer is its only gate: a healer, fit, with cloth or a heal and the herbs for it, a fighter of
-/// ours actually engaged within reach, and nobody else already standing by that fighter.
-/// </para>
-/// </summary>
 public sealed class BotAccompany : BotDeed
 {
+
     public const string Trade = "escort";
 
     public static double Prior { get; set; } = 45.0;
@@ -376,18 +351,9 @@ public sealed class BotAccompany : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a healer the nearest fighter of ours who is in a fight and has nobody standing by it.
-///
-/// <para>
-/// <b>Healers only, and counted only for healers.</b> Every other bot is turned away in one comparison and is not
-/// tallied, because a tally of seventy refusals a review per healer would bury the eleven questions that mean
-/// something. The rest of the gates are the errand's own reasons for ending, asked first so that the offer is never
-/// an errand that fails on its first beat.
-/// </para>
-/// </summary>
 public sealed class BotAttendant : IBotProposer
 {
+
     public static int Reach { get; set; } = 60;
 
     public static long Asked { get; private set; }

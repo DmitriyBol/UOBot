@@ -4,7 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>A way by sea between two docks: its course, how long it is, and how often it has been sailed.</summary>
 public sealed class BotSeaLane
 {
     public BotDock A;
@@ -67,24 +66,6 @@ public sealed class BotSeaLane
     public override string ToString() => $"{A.Name}–{B.Name}";
 }
 
-/// <summary>
-/// The ways by sea between the docks that no road joins, drawn at boot a slice at a time, and which towns the population
-/// can therefore sail to from home.
-///
-/// <para>
-/// <b>Only where no road goes.</b> A pair of docks the gates already join (<see cref="BotGates.Joined"/>) is walked, as it
-/// was before; a lane is drawn for every other pair, so an island is joined to every mainland dock and to every other
-/// island. Measured on map0 with the same rules (29.09.2026, Python): all 78 pairs of thirteen docks joined by the open sea,
-/// Britain to Moonglow 3,814 tiles, to Jhelom 3,405, to Skara Brae 5,568 — round the south of the continent, which is why
-/// a bot sets out from the dock that makes the whole trip shortest, walk and voyage together (<see cref="BotSea.Plan"/>),
-/// and Yew's is 1,653 from Skara Brae's.
-/// </para>
-///
-/// <para>
-/// <b>A town becomes reachable by sea</b> (<c>BotTowns.Town.BySea</c>) when its dock has a lane to a dock that home can be
-/// walked to: it is offered to travellers, and the ground round it is the population's to work (<c>BotTowns.Within</c>).
-/// </para>
-/// </summary>
 public static class BotSeaLanes
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeaLanes));

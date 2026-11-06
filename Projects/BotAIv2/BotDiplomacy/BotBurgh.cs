@@ -7,38 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Each guild's standing in each town: what the town's shops charge it, the task the town has set it, how many it has failed in
-/// a row, and whether it has been put out of the town.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point 3.</b> "Guilds deal with the town: the debugger is summoned, and gives the guild a
-/// unique task. Each success lowers the town's prices for that guild by half a percent; each failure raises them by half a
-/// percent. Three failed tasks in a row — the guild is put out of the town and may settle there again only after a couple of
-/// days." Each guild sends an envoy to every town it lives in — its seat's, and any where <see cref="LeastResidents"/> of its
-/// members live — once in <see cref="EveryMs"/> while it has no task there (<see cref="Look"/>); the envoy walks to the town's
-/// hall and the town's voice sets the task (<see cref="BotTownTask"/>); the task is checked once a look until it is done or
-/// its time is up.
-/// </para>
-///
-/// <para>
-/// <b>The price is paid at the counter, and no gold is made by it.</b> Every purchase a bot makes from a shopkeeper goes through
-/// <c>BotShops.Buy</c> and the shopkeeper's own <c>OnBuyItems</c>, which takes the engine's price. For a guild in good standing
-/// the difference is handed back into the buyer's account out of what it has just paid (<see cref="Settle"/>): a rebate is
-/// never more than a share of that one purchase, so every purchase still takes coin out of the world, only less of it. For a
-/// guild in poor standing the difference is taken from its pack or account on top, and the affordability of the purchase is
-/// judged at the dearer price before anything is bought. The factor lives between <see cref="Least"/> and <see cref="Most"/>.
-/// <c>BotShops.Price</c> — what bots expect to pay when they weigh work — is left at the shelf's price: a few percent either
-/// way is not worth a second price for one fact.
-/// </para>
-///
-/// <para>
-/// <b>Put out of a town</b> means its members may not live there (<c>BotSettle.Choose</c> passes the town over for them,
-/// <c>BotRelocate</c> moves those who do, and a guild seated by the town is seated by another — <see cref="Reseat"/>), until
-/// <see cref="ExileHours"/> of the wall clock have passed, as the order asked. Its members may still walk through and buy there,
-/// at the price its record has earned.
-/// </para>
-/// </summary>
 public static class BotBurgh
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBurgh));
@@ -65,7 +33,6 @@ public static class BotBurgh
 
     public static int RequestEveryMs { get; set; } = 1200000;
 
-    /// <summary>One guild in one town.</summary>
     public sealed class Standing
     {
         public string Guild;
@@ -496,6 +463,7 @@ public static class BotBurgh
 
     public static double Factor(Mobile buyer, BaseVendor vendor)
     {
+
         var fair = BotFair.Counter(buyer, vendor) * BotStewardship.Levy(buyer, vendor);
 
         fair *= BotRelics.Counter(buyer, vendor);
@@ -686,6 +654,7 @@ public static class BotBurgh
 
         foreach (var st in _standing.Values)
         {
+
             if (st.Task == null && st.Done + st.Failed == 0 && !st.Exiled && Math.Abs(st.Factor - 1.0) <= 0.0001)
             {
                 continue;

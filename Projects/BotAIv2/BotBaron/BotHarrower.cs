@@ -3,35 +3,6 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers the Baron the ground that has killed the most people, and five bots to take there.
-///
-/// <para>
-/// <b>It reads a different column of the same table the captain reads, and the difference is the whole
-/// point.</b> <see cref="BotPatrol"/> asks <c>BotPeril.Worst</c> — a decaying frequency, which answers
-/// "where is blood being spilt lately" and is exactly right for deciding where a company should be standing
-/// before anything happens. This asks <c>BotPeril.Deadliest</c>, a count that does not fade, which answers
-/// "where has it already gone wrong". A square can be top of one list and absent from the other, and both
-/// lists are correct.
-/// </para>
-///
-/// <para>
-/// <b>Every refusal is named, and there is no bucket called "other".</b> A harrowing needs a Baron, a
-/// Baron who is not already leading one, one who is fit to walk into it, ground with the dead on it and a
-/// way through to that ground. When none is happening, which of those five was missing is the only
-/// question worth being able to answer — an unnamed nought is the failure this shard has paid for more
-/// than any other.
-/// </para>
-///
-/// <para>
-/// <b>It does not count volunteers, and it used to.</b> The offer was refused outright unless five free
-/// bots were standing within forty tiles at the instant it was weighed, which is arithmetic about one
-/// second of a working population and produced a Baron who never left town. Raising a company is the
-/// errand's own business now — he goes to the square and calls for five minutes; see
-/// <see cref="BotHarrow.MusterMs"/>. A muster that comes to nothing is counted there, by name, where it
-/// actually happened.
-/// </para>
-/// </summary>
 public sealed class BotHarrower : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHarrower));
@@ -246,6 +217,7 @@ public sealed class BotHarrower : IBotProposer
 
     private static bool Reachable(Map map, Point3D from, Point3D square)
     {
+
         if (BotRoads.Covers(map, square.X, square.Y))
         {
             if (BotRoads.FromHome(map, square.X, square.Y) < 0)

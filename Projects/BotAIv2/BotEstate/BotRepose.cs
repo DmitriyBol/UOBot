@@ -5,18 +5,9 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bored bot with a house of its own the walk home, to pass some time there. See <see cref="BotRepose"/> and
-/// <see cref="BotAbode"/>.
-///
-/// <para>
-/// Bored is the population's own word for it — <c>BotUrges.Boredom</c>, the half of <c>BotMobile.Mood</c> that grows when
-/// nothing comes of the day — and home is only offered when it is within <see cref="Reach"/> and the last visit was more
-/// than <see cref="AgainMs"/> ago, so a house is somewhere a bot goes back to, not somewhere it lives instead of working.
-/// </para>
-/// </summary>
 public sealed class BotReposer : IBotProposer
 {
+
     public static double Bored { get; set; } = 0.4;
 
     public static int Reach { get; set; } = 400;
@@ -107,17 +98,6 @@ public sealed class BotReposer : IBotProposer
     }
 }
 
-/// <summary>
-/// A bot at home: walks in, puts its spare armour away in the chest, and spends a few minutes there while its boredom
-/// falls — its mood rises (<c>BotMobile.Mood</c>). See <see cref="BotAbode"/>.
-///
-/// <para>
-/// <b>What goes in the chest is what the bot owns and does not wear</b>: armour, shields and clothes in the pack that are not
-/// bound to it (the binding is its kit for life, <c>BotBinding</c>). Weapons stay — a pickaxe and a hatchet are weapons to
-/// the engine and tools to a bot — and so does everything a bot works or heals with. Put straight into the chest, not dropped
-/// on it: the engine refuses a lockdown whose item is still inside a pack (<c>BaseHouse.LockDown</c>).
-/// </para>
-/// </summary>
 public sealed class BotRepose : BotDeed
 {
     public const string Trade = "home";

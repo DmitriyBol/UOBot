@@ -4,26 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The training field: where it is, who is standing on it, where each of them stands, and what an hour of
-/// being shouted at is actually worth.
-///
-/// <para>
-/// <b>One session at a time, held by one captain, and everybody else derives their place from it.</b> This
-/// is the squad's own rule applied to a different problem: the shared facts are the ground, the roster and
-/// the order the roster is in, and every student's station falls out of those three identically for
-/// everybody who asks. Nobody is told where to stand. Two students cannot be given the same tile, a student
-/// that dies and is replaced does not orphan an assignment, and there is no message anywhere.
-/// </para>
-///
-/// <para>
-/// <b>The teaching is a rate, not an event, and that is what makes the captain's walking matter.</b> A
-/// lesson that granted its points on arrival would be a shop that sells skill, and the captain pacing the
-/// ranks would be scenery. Points are handed out per beat, to whoever the captain is near <em>at that
-/// beat</em> — so a student at the far corner of the block genuinely learns less than the one he is standing
-/// over, and he genuinely has to walk to fix it. See <see cref="Teach"/>.
-/// </para>
-/// </summary>
 public static class BotSchool
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSchool));
@@ -65,6 +45,7 @@ public static class BotSchool
     public static bool Rested(BotMobile student) =>
         student == null
         || !_taught.TryGetValue(student.Serial, out var when)
+
         || Core.TickCount - when >= RestMs;
 
     public static void Learned(BotMobile student)
@@ -503,6 +484,7 @@ public static class BotSchool
     public static string Describe() =>
         Sessions == 0
             ? "no class has ever been held"
+
             : $"{Sessions} classes held at ({Ground.X}, {Ground.Y}), {Empty} of them with nobody; {Taught} lessons paid for at {Fees}gp against {BotScout.Wages}gp paid back out in wages, {Points:F1} points handed out over {Beats} beats that taught something ({Nothing} found nothing left to teach, {Levelled} found the student level with the master, {Shouted} taught out of earshot)"
               + (Master is { Deleted: false } ? $"; {Master.Name} is on the field now with {_students.Count}" : "; the field is empty");
 

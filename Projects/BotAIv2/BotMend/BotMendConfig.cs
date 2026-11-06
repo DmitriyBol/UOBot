@@ -4,17 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-mend.json</c> is allowed to say. Everything optional.
-///
-/// <para>
-/// What is not here: how much a heal heals, what it costs in mana, how long a bandage takes. All of that is the
-/// engine's, and a file able to disagree with it would be a file able to promise a bot a rescue that does not
-/// arrive.
-/// </para>
-/// </summary>
 public sealed class BotMendSettings
 {
+
     public double? Hurt { get; set; }
 
     public double? Mended { get; set; }
@@ -28,6 +20,8 @@ public sealed class BotMendSettings
     public double? Urgency { get; set; }
 
     public int? Watch { get; set; }
+
+    public bool? SurgeonPresses { get; set; }
 
     public int? TryMs { get; set; }
 
@@ -53,12 +47,15 @@ public sealed class BotMendSettings
 
     public int? FleeTownNear { get; set; }
 
+    public int? FleeFootStepMs { get; set; }
+
+    public int? FleeMountStepMs { get; set; }
+
     public int? FleeTownMs { get; set; }
 
     public bool? FleeHoldsSwing { get; set; }
 }
 
-/// <summary>Reads the mending file and moves the numbers it names.</summary>
 public static class BotMendConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMendConfig));
@@ -95,6 +92,7 @@ public static class BotMendConfig
         BotSalve.WorkMinutes = settings.WorkMinutes ?? BotSalve.WorkMinutes;
 
         BotSurgeon.Reach = settings.Watch ?? BotSurgeon.Reach;
+        BotSurgeon.Presses = settings.SurgeonPresses ?? BotSurgeon.Presses;
 
         BotBolt.Watch = settings.FleeWatch ?? BotBolt.Watch;
         BotBolt.Bound = settings.FleeBound ?? BotBolt.Bound;
@@ -107,6 +105,8 @@ public static class BotMendConfig
         BotHaven.Reach = settings.FleeTownReach ?? BotHaven.Reach;
         BotHaven.MostSeconds = settings.FleeTownSeconds ?? BotHaven.MostSeconds;
         BotHaven.NearTiles = settings.FleeTownNear ?? BotHaven.NearTiles;
+        BotHaven.FootStepMs = settings.FleeFootStepMs ?? BotHaven.FootStepMs;
+        BotHaven.MountStepMs = settings.FleeMountStepMs ?? BotHaven.MountStepMs;
         BotBolt.HavenMs = settings.FleeTownMs ?? BotBolt.HavenMs;
         BotBolt.HoldsSwing = settings.FleeHoldsSwing ?? BotBolt.HoldsSwing;
     }

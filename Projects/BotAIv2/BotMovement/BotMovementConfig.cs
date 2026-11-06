@@ -5,17 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-movement.json</c> is allowed to say. Everything optional; absent means the
-/// number the code chose.
-///
-/// Only genuine knobs are here. The rules — a step climbs two units, a person is sixteen tall, a diagonal
-/// needs both flanks, a floor is found within eight of the terrain — are <b>not</b> configurable, and that
-/// is deliberate. They are not preferences, they are what the engine does, and a config file able to
-/// disagree with the engine is a config file able to recreate every stuck bot the first version had.
-/// </summary>
 public sealed class BotMovementSettings
 {
+
     public double? CeilingMs { get; set; }
 
     public double? FloorMs { get; set; }
@@ -37,6 +29,8 @@ public sealed class BotMovementSettings
     public int? MaxEmptyPlans { get; set; }
 
     public int? MaxPlansWithoutCloser { get; set; }
+
+    public bool? KeepUp { get; set; }
 
     public int? DangerAvoidMs { get; set; }
 
@@ -109,7 +103,6 @@ public sealed class BotMovementSettings
     public bool? SightStanding { get; set; }
 }
 
-/// <summary>One rectangle of ground the population may not choose, as a configuration file writes it.</summary>
 public sealed class BotBarSettings
 {
     public int? X1 { get; set; }
@@ -123,7 +116,6 @@ public sealed class BotBarSettings
     public string Why { get; set; }
 }
 
-/// <summary>Reads the movement file and moves the numbers it names.</summary>
 public static class BotMovementConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMovementConfig));
@@ -158,6 +150,7 @@ public static class BotMovementConfig
         BotJourney.StallAttempts = settings.StallAttempts ?? BotJourney.StallAttempts;
         BotJourney.MaxEmptyPlans = settings.MaxEmptyPlans ?? BotJourney.MaxEmptyPlans;
         BotJourney.MaxPlansWithoutCloser = settings.MaxPlansWithoutCloser ?? BotJourney.MaxPlansWithoutCloser;
+        BotJourney.KeepUp = settings.KeepUp ?? BotJourney.KeepUp;
         BotJourney.DangerAvoidMs = settings.DangerAvoidMs ?? BotJourney.DangerAvoidMs;
         BotPath.EnclosureCells = settings.EnclosureCells ?? BotPath.EnclosureCells;
         BotPath.EnclosureCeilingMs = settings.EnclosureCeilingMs ?? BotPath.EnclosureCeilingMs;

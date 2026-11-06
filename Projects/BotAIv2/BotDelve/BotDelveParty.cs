@@ -5,51 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Five bots underground: what they have taken, whose it is, how many of them may still be put back on
-/// their feet, and the promise that every one of them comes home.
-///
-/// <para>
-/// <b>Patrick's order of 11.09.2026 is four rules, and they pull against each other in a way worth being
-/// explicit about.</b> Gold is divided at the end, half to the leader and the rest evenly between the other
-/// four; a bot that dies with no resurrection left goes back to the world and <i>keeps what it had already
-/// accumulated, unchanged</i>; and only those still alive go on accumulating. The first rule alone would be
-/// one division at the end, which cannot express the second: at the end there is no record of what anybody
-/// had accumulated, because nothing accumulated anything.
-/// </para>
-///
-/// <para>
-/// <b>So the pot is kept as it fills.</b> Every beat, whatever a member has picked up since the last one is
-/// swept into the pot and credited there and then — half to the leader, the rest evenly between the others
-/// still down there. A bot sent home at nine minutes keeps the credit of the first nine minutes exactly as
-/// it stood, and the four who fought on divide the last eleven between them. At the end each member is
-/// handed its own credit in coin. Read across a whole delve with nobody lost, this is precisely the
-/// fifty-fifty split of the first rule; read across one with a loss, it is the second and third.
-/// </para>
-///
-/// <para>
-/// <b>Sweeping is also what keeps the money safe.</b> A bot that dies drops its pack on its corpse, and a
-/// corpse on the floor of Destard is gold out of the world. What the party has already taken is in the pot,
-/// which is a number rather than an item, and nothing underground can kill a number.
-/// </para>
-///
-/// <para>
-/// <b>Three resurrections to a party, and the fourth death is the way out.</b> Raised where they fell,
-/// because a delver carried home is a delver who has left; the ordinary revival — a minute face down and
-/// then home to Britain — is exactly what should happen to the fourth, and it happens by this class doing
-/// nothing at all. See <c>BotPopulation.Revive</c>, which asks here first.
-/// </para>
-///
-/// <para>
-/// <b>And the one promise that matters more than any of it: everybody comes up.</b> A bot left in a dungeon
-/// is a bot with no road home — the block has no walkable connection to the island — so it would stand
-/// there failing errands until the world was reloaded. Every party is on a list here, the list is walked on
-/// the delve's own beat, and anything that has outlived its delve by <see cref="GraceMs"/> is lifted out
-/// whatever state the errand got itself into. The count of those is printed: a backstop that starts doing
-/// the ordinary work is a backstop that has become the design, and this project has watched that happen
-/// twice.
-/// </para>
-/// </summary>
 public sealed class BotDelveParty
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDelveParty));
@@ -256,6 +211,7 @@ public sealed class BotDelveParty
 
         if (Left <= 0)
         {
+
             share.Down = false;
             Lost++;
 
@@ -296,6 +252,7 @@ public sealed class BotDelveParty
 
         if (Core.TickCount - (bot.FellTick + RaiseMs) < 0)
         {
+
             return true;
         }
 
@@ -313,6 +270,7 @@ public sealed class BotDelveParty
 
         if (!bot.Alive)
         {
+
             share.Down = false;
 
             return false;
@@ -333,13 +291,13 @@ public sealed class BotDelveParty
         return true;
     }
 
-    public void Settle(string why) => Settle(why, true);
+    public int Settle(string why) => Settle(why, true);
 
-    public void Settle(string why, bool lift)
+    public int Settle(string why, bool lift)
     {
         if (Ended)
         {
-            return;
+            return 0;
         }
 
         Ended = true;
@@ -348,6 +306,7 @@ public sealed class BotDelveParty
         Sweep();
 
         var handed = 0;
+        var surfaced = 0;
 
         for (var i = 0; i < _shares.Count; i++)
         {
@@ -368,6 +327,7 @@ public sealed class BotDelveParty
             if (lift && (share.Down || (_deep != null && _deep.Holds(body.Location))))
             {
                 Surface(body);
+                surfaced++;
             }
 
             if (lift)
@@ -390,6 +350,8 @@ public sealed class BotDelveParty
         {
             _parties.Remove(this);
         }
+
+        return surfaced;
     }
 
     public int Lift()

@@ -7,52 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who each bot belongs to, and what that belonging is worth.
-///
-/// <para>
-/// <b>Ordered by Patrick on 08.09.2026: something that makes them pull together.</b> A guild on this shard
-/// is not decoration — the engine already treats guildmates as <c>Notoriety.Ally</c>, so it is the one
-/// standing statement the world itself understands about which bots are on the same side.
-/// </para>
-///
-/// <para>
-/// <b>Rewritten the same night, and the rewrite is the interesting half.</b> The first version sorted the
-/// population by trade: every fighter into one guild, every maker into another. That is a caste system
-/// rather than a society, and it produced exactly what a caste system produces — the Blade held thirty-five
-/// of forty-nine bots and the Needle held one. Patrick's rules replace it:
-/// </para>
-///
-/// <list type="bullet">
-/// <item>a guild is formed only if it will have at least <see cref="Least"/> members;</item>
-/// <item>at least one of them must be able to make things — see <see cref="Makers"/>;</item>
-/// <item>no guild may hold more than <see cref="Most"/>.</item>
-/// </list>
-///
-/// <para>
-/// <b>What those three rules make is a band rather than a class.</b> Every guild ends up with fighters, a
-/// healer or two and a maker of its own, because the roster is dealt out by role rather than by trade. That
-/// is a social circle: a group small enough that everybody in it is somebody you keep meeting, and mixed
-/// enough that it can look after itself. It is also the unit the rest of this project's plans need — a
-/// guild that owns a hall, quarrels with its neighbours and equips its own can only be a mixed band.
-/// </para>
-///
-/// <para>
-/// <b>And it is a preference, never a condition.</b> That distinction is the one this project has paid for
-/// most often — a rule that reads "only with my own" is a veto, and a veto here would split the population
-/// into groups that cannot help each other, which is the same defect as a muster that could find nobody. So
-/// guild membership multiplies what help is worth; it never refuses it. See <see cref="Kinship"/>.
-/// </para>
-///
-/// <para>
-/// <b>Patrick's order of 21.09.2026: anybody may found a guild.</b> Until then a guild existed only if the
-/// boot's muster dealt one out around a crafter, and the only door in afterwards was a leader's mind taking
-/// somebody on — and the minds were switched off on 18.09, so a bot outside a guild stayed outside for ever.
-/// Founding is now something a bot does while the shard runs: see <see cref="Gather"/>. The rule of five and
-/// the ceiling of fifteen stand; the rule that one of the five must be a maker is the one that was lifted,
-/// and with it the guild's fixed point moved from its maker to its <see cref="Head"/>.
-/// </para>
-/// </summary>
 public static class BotGuilds
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuilds));
@@ -171,6 +125,7 @@ public static class BotGuilds
 
     public static bool Outside(BotMobile bot)
     {
+
         if (BotUnderworld.Outlawed(bot))
         {
             return true;
@@ -904,6 +859,7 @@ public static class BotGuilds
         }
         else
         {
+
             guild.Leader = leader;
 
             for (var i = guild.Members.Count - 1; i >= 0; i--)
@@ -1135,6 +1091,7 @@ public static class BotGuilds
 
         for (var i = 0; i < members.Count; i++)
         {
+
             if (members[i] is not BotMobile { Deleted: false, Alive: true } bot || IsHead(bot))
             {
                 continue;
@@ -1898,6 +1855,7 @@ public static class BotGuilds
 
     private static void Found(Guild parent, List<(BotMobile Bot, int Why, int Far)> leavers, (string Name, string Abbrev) named, long now)
     {
+
         Dictionary<string, int> towns = [];
         BotTowns.Town town = null;
         var most = 0;
@@ -2540,6 +2498,7 @@ public static class BotGuilds
 
         if (got < need)
         {
+
             if (got > 0)
             {
                 Banker.Deposit(member, got);

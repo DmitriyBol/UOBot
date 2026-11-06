@@ -6,25 +6,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guild's chest: what the guild's ground earns, and what it pays for before any member's pack is asked.
-///
-/// <para>
-/// <b>A claim was a cost and never an income.</b> A guild levied its members for a square, held it, and got
-/// nothing back but a pin on the map and a war when somebody else wanted it; the ground was hunted by everybody
-/// and paid the holder nothing. Patrick's fourth Quad idea of 16.09.2026, taken that evening: hunting on ground a
-/// guild holds pays the holder a tithe, and the chest pays the guild's next claim or hall before any member's pack
-/// is asked (<see cref="BotEstate.Levy"/>). The reeve (<see cref="BotReeve"/>) is the other half of the same
-/// idea — the guild's own company for the guild's own ground.
-/// </para>
-///
-/// <para>
-/// Only coin that actually arrived in a pack is tithed (<see cref="BotTakings.Coin"/>), only from work that braves
-/// the ground (<see cref="BotDeed.Braves"/>: hunts, prowls, bands, harrows, plunder), and only when the pack still
-/// has it; otherwise nothing is taken and nothing is owed. The holder's own members pay the same tithe — into their
-/// own chest. Kept across restarts by <see cref="BotChestStore"/>; wiped with the claims on a reset.
-/// </para>
-/// </summary>
 public static class BotChest
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotChest));

@@ -4,39 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Counts the errors the shard is printing, by reading the tail of its own session log.
-///
-/// <para>
-/// <b>Why the shard reads its own log rather than being told.</b> Errors here go through Serilog, configured
-/// once in <c>Projects/Logger</c> with a single console sink, and this fork's first rule is that the engine
-/// is not modified — so there is no seam to subscribe to. Every error every subsystem raises, and every one
-/// the engine itself raises, is nonetheless already written to one file. Reading it is the only way to have
-/// them all without touching what is not ours.
-/// </para>
-///
-/// <para>
-/// <b>What is taken from it is a number, never a retelling.</b> The channel gets "26 errors in the last
-/// minute" plus one specimen line, not a copy of the log — the log is already the place to read errors, and
-/// an alarm channel that reprints it would be a second, slower copy of the thing it is supposed to point at.
-/// The rule this shard learned the hard way is to listen to the shard's own sentences rather than to a
-/// re-derivation of them, and a count of a line the shard wrote is the smallest possible re-derivation.
-/// </para>
-///
-/// <para>
-/// <b>The level sits outside the bracket: <c>[19:57:35 ERR]</c>.</b> A pattern of <c>[ERR</c> matches nothing
-/// and reports a clean run for ever — which it did, for a whole evening, through twenty-six real errors. The
-/// needle here is <c>" ERR]"</c>, with the space, and it is a constant rather than a setting for that reason.
-/// </para>
-///
-/// <para>
-/// <b>Two honest limits, both named in what it reports.</b> The file is written through a redirect and
-/// arrives in buffers, so a count for "the last minute" can be a minute or so behind the world — fine for
-/// noticing, useless for timing. And reading starts at the end of the file: errors already in it when the
-/// shard came up belong to a previous life, and counting them at the first tick would open every session
-/// with an alarm about the last one.
-/// </para>
-/// </summary>
 public static class BotTail
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTail));
@@ -119,10 +86,12 @@ public static class BotTail
 
         try
         {
+
             using var file = new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
             if (file.Length < _at)
             {
+
                 _at = 0;
             }
 

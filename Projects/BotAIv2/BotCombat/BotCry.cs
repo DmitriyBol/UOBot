@@ -1,37 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Logging;
 using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Somebody of ours is being killed and has said so out loud.
-///
-/// <para>
-/// <b>This is the one thing in the project that is genuinely a message.</b> Everything else a company does is
-/// arithmetic every member repeats for itself — stations, patches, shares — precisely so that nothing has to
-/// be sent, received or kept in step. A cry cannot be arithmetic: what makes it urgent is that it happened at
-/// a moment, to one bot, and nobody else can derive it from where they are standing. The squad's own note
-/// allows exactly two such events, and names this as one of them.
-/// </para>
-///
-/// <para>
-/// <b>It is a fact, not a summons.</b> Nothing here sends a bot anywhere. A cry is posted, it expires on its
-/// own, and whoever is free enough to care picks it up through the ordinary auction as a piece of work worth
-/// more than digging — see <see cref="BotRescuer"/>. That matters because the first version's help system was
-/// an order: a bot posted a call, the call found nobody able, it disbanded in the same tick, and the bot
-/// posted it again dozens of times over. An offer that nobody takes is silence; an order that nobody can obey
-/// is a loop.
-/// </para>
-/// </summary>
 public static class BotCry
 {
+
     public static int HoldsMs { get; set; } = 20000;
 
     public static int Carries { get; set; } = 60;
 
-    private static readonly Dictionary<Serial, (Mobile Who, Mobile What, long Tick)> _cries = [];
+    private static readonly Dictionary<Serial, (Mobile Who, Mobile What, long Tick, bool Dire)> _cries = [];
 
     public static long Raised { get; private set; }
 
@@ -44,20 +25,37 @@ public static class BotCry
             return;
         }
 
-        if (!_cries.ContainsKey(who.Serial))
+        var stood = _cries.TryGetValue(who.Serial, out var old);
+
+        if (!stood)
         {
             Raised++;
         }
 
-        _cries[who.Serial] = (who, what, Core.TickCount);
+        dire = dire || who is BotMobile { HitsMax: > 0 } hurt && hurt.Hits < hurt.HitsMax * DireAt
+                    || stood && old.Dire && Core.TickCount - old.Tick < HoldsMs;
+
+        _cries[who.Serial] = (who, what, Core.TickCount, dire);
 
         BotReflex.Cried(who, what);
 
-        if (Summons && who is BotMobile crier && (dire || crier.HitsMax > 0 && crier.Hits < crier.HitsMax * DireAt))
+        if (!Summons || who is not BotMobile crier)
         {
-            Ask(crier);
+            return;
+        }
+
+        if (dire)
+        {
+            Ask(crier, true);
+        }
+        else if (NearCalls)
+        {
+            Ask(crier, false);
         }
     }
+
+    public static bool IsDire(Mobile who) =>
+        who != null && _cries.TryGetValue(who.Serial, out var cry) && cry.Dire && Core.TickCount - cry.Tick < HoldsMs;
 
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCry));
 
@@ -107,6 +105,8 @@ public static class BotCry
         public int Rounds;
         public int Sent;
         public bool Pending;
+
+        public bool Dire;
     }
 
     private static readonly Dictionary<Serial, Calling> _callings = [];
@@ -119,7 +119,7 @@ public static class BotCry
 
     private static readonly List<BotMobile> _chosen = [];
 
-    private static void Ask(BotMobile crier)
+    private static void Ask(BotMobile crier, bool dire)
     {
         var now = Core.TickCount;
 
@@ -129,8 +129,21 @@ public static class BotCry
         }
         else if (!calling.Pending && calling.Rounds > 0 && now - calling.Tick >= HoldsMs + RecallMs)
         {
+
             calling.Rounds = 0;
             calling.Sent = 0;
+            calling.Dire = false;
+        }
+
+        if (dire && !calling.Dire)
+        {
+            calling.Dire = true;
+
+            if (!calling.Pending)
+            {
+                calling.Rounds = 0;
+                calling.Sent = 0;
+            }
         }
 
         if (calling.Pending || calling.Sent > 0 || calling.Rounds >= MostRounds || calling.Rounds > 0 && now - calling.Tick < RecallMs)
@@ -174,7 +187,7 @@ public static class BotCry
 
             try
             {
-                calling.Sent += Summon(who, foe, calling.Rounds == 1, now);
+                calling.Sent += calling.Dire ? Summon(who, foe, calling.Rounds == 1, now) : Nearby(who, foe, calling.Rounds == 1, now);
             }
             catch (Exception e)
             {
@@ -346,7 +359,7 @@ public static class BotCry
             return 0;
         }
 
-        var ours = BotThreat.OurPower(who, BotMobile.NoticeRange);
+        var ours = BotThreat.OurPower(who, BotMobile.NoticeRange, foe);
         var need = threat / Math.Max(0.1, BotThreat.Tolerance) - ours;
 
         _chosen.Clear();
@@ -387,19 +400,15 @@ public static class BotCry
             brought += band.Able();
         }
 
-        if (_chosen.Count == 0 && !bring && spare != null)
+        var spared = 0;
+
+        if (!bring && brought < need && spare != null)
         {
-            var spared = spare.Spare(who, foe, now);
-
-            if (spared > 0)
-            {
-                Callings++;
-
-                return spared;
-            }
+            spared = spare.Spare(who, foe, now, need - brought, out var sparedPower);
+            brought += sparedPower;
         }
 
-        if (_chosen.Count == 0 && !bring)
+        if (_chosen.Count == 0 && !bring && spared == 0)
         {
             Filed(first, 4);
 
@@ -413,7 +422,7 @@ public static class BotCry
             return 0;
         }
 
-        var sent = 0;
+        var sent = spared;
 
         if (bring)
         {
@@ -455,6 +464,221 @@ public static class BotCry
         return sent;
     }
 
+    public static bool NearCalls { get; set; } = true;
+
+    public static int NearReach { get; set; } = 40;
+
+    public static double NearOdds { get; set; } = 0.25;
+
+    public static int MostNear { get; set; } = 1;
+
+    public static long NearCries { get; private set; }
+
+    public static long NearCallings { get; private set; }
+
+    public static long NearCalled { get; private set; }
+
+    public static long NearNobody { get; private set; }
+
+    public static long NearTrivial { get; private set; }
+
+    public static long NearCompanied { get; private set; }
+
+    public static long NearBelow { get; private set; }
+
+    public static long NearShunned { get; private set; }
+
+    public static long NearOutlaw { get; private set; }
+
+    public static long NearFromFight { get; private set; }
+
+    public static long NearNoReturn { get; private set; }
+
+    private static readonly long[] _nearWhy = new long[14];
+
+    private static int Nearby(BotMobile who, BaseCreature foe, bool first, long now)
+    {
+        var map = who.Map;
+
+        if (map == null || map == Map.Internal || foe.Map != map)
+        {
+            return 0;
+        }
+
+        if (first)
+        {
+            NearCries++;
+        }
+
+        if (BotOutlaw.Outlaw(who) || BotOutlaw.Jailed(who) || who.Murderer)
+        {
+            if (first)
+            {
+                NearOutlaw++;
+            }
+
+            return 0;
+        }
+
+        if (who.Squad != null)
+        {
+            if (first)
+            {
+                NearCompanied++;
+            }
+
+            return 0;
+        }
+
+        if (BotDungeon.Under(foe.Location))
+        {
+            if (first)
+            {
+                NearBelow++;
+            }
+
+            return 0;
+        }
+
+        if (BotQuarry.Shunned(foe))
+        {
+            if (first)
+            {
+                NearShunned++;
+            }
+
+            return 0;
+        }
+
+        var threat = BotThreat.ThreatAt(who, foe.Location, BotMobile.NoticeRange);
+        var own = BotThreat.Power(who);
+
+        if (threat < NearOdds * own)
+        {
+            if (first)
+            {
+                NearTrivial++;
+            }
+
+            return 0;
+        }
+
+        _near.Clear();
+
+        foreach (var m in map.GetMobilesInRange<BotMobile>(who.Location, NearReach))
+        {
+            if (m == who || m.Deleted || !m.Alive)
+            {
+                continue;
+            }
+
+            var why = Unfree(m, who, now, tally: false, dire: false);
+
+            if (why != 0)
+            {
+                if (first)
+                {
+                    _nearWhy[why]++;
+                }
+
+                continue;
+            }
+
+            var off = Math.Max(Math.Abs(m.X - who.X), Math.Abs(m.Y - who.Y));
+            var at = _near.Count;
+
+            while (at > 0 && _near[at - 1].Off > off)
+            {
+                at--;
+            }
+
+            if (at >= MostNear)
+            {
+                continue;
+            }
+
+            _near.Insert(at, (m, off));
+
+            if (_near.Count > MostNear)
+            {
+                _near.RemoveAt(_near.Count - 1);
+            }
+        }
+
+        var sent = 0;
+
+        for (var i = 0; i < _near.Count; i++)
+        {
+            var m = _near[i].Who;
+
+            if (BotThreat.Decide(m, BotMobile.NoticeRange) == BotStand.Outmatched)
+            {
+                if (first)
+                {
+                    _nearWhy[WhyFighting]++;
+                }
+
+                continue;
+            }
+
+            var trains = m.Bond?.Weapon?.Skill ?? SkillName.Wrestling;
+            var rescue = new BotRescue(new BotSlay(foe, trains), who, foe, own: false, rescuer: m);
+
+            var held = m.Resolve?.Deed;
+
+            if (BotWill.Press(m, rescue, $"called to {who.Name} near by against {foe.Name}, {_near[i].Off} tiles off, the thing {threat:F0} against the crier's {own:F0}", StackCalls))
+            {
+                _helped[m.Serial] = now;
+                NearCalled++;
+                sent++;
+
+                if (held?.Foe != null)
+                {
+                    NearFromFight++;
+                }
+
+                if (held != null && !held.Resumes)
+                {
+                    NearNoReturn++;
+                }
+
+                BotTies.Answered(m, who);
+            }
+        }
+
+        if (sent == 0)
+        {
+            if (first)
+            {
+                NearNobody++;
+            }
+
+            return 0;
+        }
+
+        if (first)
+        {
+            NearCallings++;
+        }
+
+        return sent;
+    }
+
+    private static string DescribeNearWhy()
+    {
+        var say = "";
+
+        for (var i = 1; i < _nearWhy.Length; i++)
+        {
+            if (_nearWhy[i] > 0)
+            {
+                say += $"{(say.Length > 0 ? ", " : "")}{_nearWhy[i]} {Whys[i]}";
+            }
+        }
+
+        return say.Length == 0 ? "none" : say;
+    }
+
     public static bool Healers { get; set; } = true;
 
     public static bool Companies { get; set; } = true;
@@ -493,6 +717,7 @@ public static class BotCry
 
     private static bool Brings(BotSquad squad, BotMobile m, BotMobile who, BaseCreature foe, double threat)
     {
+
         if (squad.Disbanded || _bandsSeen.Contains(squad))
         {
             return false;
@@ -624,7 +849,7 @@ public static class BotCry
         }
     }
 
-    private static int Unfree(BotMobile m, BotMobile who, long now)
+    private static int Unfree(BotMobile m, BotMobile who, long now, bool tally = true, bool dire = true)
     {
         if (m.Squad != null)
         {
@@ -641,23 +866,37 @@ public static class BotCry
             return WhyUnfit;
         }
 
-        if (m.Resolve is not { } resolve || BotLadder.Hunted(resolve))
+        if (m.Resolve is not { } resolve)
         {
             return WhyFighting;
         }
 
         var deed = resolve.Deed;
 
+        if (BotLadder.Hunted(resolve) && (dire || !Trivial(m, deed?.Foe)))
+        {
+            return WhyFighting;
+        }
+
         if (deed != null)
         {
-            if (deed.Foe != null || deed is BotBolt || deed is BotSalve || deed is BotBrawl || deed is BotAccompany)
+            if (deed is BotBolt || deed is BotSalve || deed is BotBrawl || deed is BotAccompany)
+            {
+                return WhyFighting;
+            }
+
+            if (deed.Foe != null && (dire || !Trivial(m, deed.Foe)))
             {
                 return WhyFighting;
             }
 
             if (deed.Committed)
             {
-                _committed[deed.Kind] = _committed.GetValueOrDefault(deed.Kind) + 1;
+
+                if (tally)
+                {
+                    _committed[deed.Kind] = _committed.GetValueOrDefault(deed.Kind) + 1;
+                }
 
                 if (!(CommittedReach > 0 && (deed is BotChat || deed is BotEnvoy || deed is BotStandGuard) && m.InRange(who.Location, CommittedReach)))
                 {
@@ -665,7 +904,7 @@ public static class BotCry
                 }
             }
 
-            if (!deed.Resumes)
+            if (!deed.Resumes && dire)
             {
                 return WhyNoReturn;
             }
@@ -704,6 +943,9 @@ public static class BotCry
         return BotLadder.Novice(m) ? WhyNovice : 0;
     }
 
+    private static bool Trivial(BotMobile m, Mobile foe) =>
+        foe is { Deleted: false, Alive: true } && BotThreat.Power(foe) < NearOdds * BotThreat.Power(m);
+
     private static string DescribeWhy()
     {
         var say = "";
@@ -722,7 +964,8 @@ public static class BotCry
     public static string DescribeCalls() =>
         $"{Dire} cries turned dire (the crier under {DireAt:P0} of its health, or refused its fight for the odds): {Callings} called {Called} of ours to a rescue at once (work in hand put down, never dropped), "
         + $"{DireCompany} were a member's whose company already had the thing for its enemy, {DireNobody} had nobody free, fit and friendly within {BotRescuer.Reach} tiles (bots near a dire cry not free, by why: {DescribeWhy()}), {CompaniesBrought} had a company brought by its leader (companies near not brought, by why: {DescribeBands()}), {DireCriminal} wore the engine's criminal flag and were helped all the same, committed work near a dire cry by kind: {DescribeCommitted()}; {BotSquad.DescribeSpares()}, {HealersCalled} healers pressed to a hurt crier's mending, {DireBeyond} were beyond what those near could have brought together, "
-        + $"{DireBelow} underground, {DireShunned} about a creature no road reaches, {DireOutlaw} from a criminal or a murderer; a free bot's own look passed over {PassedHostile} criers of a guild hostile to it and {PassedOutlaw} outlaws (red, wanted or jailed), and did not pass over {PassedCriminal} wearing the engine's criminal flag";
+        + $"{DireBelow} underground, {DireShunned} about a creature no road reaches, {DireOutlaw} from a criminal or a murderer; a free bot's own look passed over {PassedHostile} criers of a guild hostile to it and {PassedOutlaw} outlaws (red, wanted or jailed), {BotRescuer.PassedCrowded} steady criers for the crowd note on the thing, and did not pass over {PassedCriminal} wearing the engine's criminal flag; "
+        + $"{NearCries} steady cries (the crier whole and able): {NearCallings} called {NearCalled} of ours within {NearReach} tiles at once ({NearFromFight} of them out of a fight of their own that was no danger, {NearNoReturn} off work not taken up again), {NearNobody} had nobody free there (bots near not free, by why: {DescribeNearWhy()}), {NearTrivial} were about a thing under {NearOdds:P0} of the crier's own strength, {NearCompanied} from a member of a company, {NearBelow} underground, {NearShunned} about a creature no road reaches, {NearOutlaw} from a criminal or a murderer{(NearCalls ? "" : " (off)")}";
 
     public static bool Crying(Mobile who) =>
         who != null && _cries.TryGetValue(who.Serial, out var cry) && Core.TickCount - cry.Tick < HoldsMs;
@@ -750,7 +993,7 @@ public static class BotCry
 
         foreach (var (serial, cry) in _cries)
         {
-            var (who, what, tick) = cry;
+            var (who, what, tick, _) = cry;
 
             if (Core.TickCount - tick >= HoldsMs
                 || who is not { Deleted: false, Alive: true }
@@ -824,7 +1067,7 @@ public static class BotCry
         ReactionMs += Core.TickCount - cry.Tick;
         Reactions++;
 
-        _cries[who.Serial] = (cry.Who, cry.What, long.MinValue / 2);
+        _cries[who.Serial] = (cry.Who, cry.What, long.MinValue / 2, cry.Dire);
     }
 
     public static string Describe() =>
@@ -846,7 +1089,19 @@ public static class BotCry
         _tended.Clear();
         System.Array.Clear(_why);
         System.Array.Clear(_whyBand);
+        System.Array.Clear(_nearWhy);
         _committed.Clear();
+        NearCries = 0;
+        NearCallings = 0;
+        NearCalled = 0;
+        NearNobody = 0;
+        NearTrivial = 0;
+        NearCompanied = 0;
+        NearBelow = 0;
+        NearShunned = 0;
+        NearOutlaw = 0;
+        NearFromFight = 0;
+        NearNoReturn = 0;
         _sparesSeen.Clear();
         _bandsSeen.Clear();
         DireCriminal = 0;

@@ -7,22 +7,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Setting on one of our own for what is in its pack: kill it, go through the corpse, and go red for it.
-///
-/// <para>
-/// <b>Patrick's order of 15.09.2026, and the rarest thought on the shard.</b> The fight is <see cref="BotBrawl"/>'s;
-/// what is here is the two ends of it — the victim chosen for its purse and its solitude, and the corpse gone through
-/// for coin — and the one consequence that makes it a crime rather than a hunt: the robber is red for an hour, by
-/// <see cref="BotOutlaw"/>, from the moment the victim falls, whether or not it ever reaches the corpse.
-/// </para>
-///
-/// <para>
-/// A robber that finds itself losing gives up rather than dies for a purse; a victim that runs is let go. The trade
-/// pays what it took, so a ledger will learn what robbery is worth — and a population in which that number is high
-/// is a population carrying too much coin about, which is a fact worth having.
-/// </para>
-/// </summary>
 public sealed class BotRob : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRob));
@@ -293,6 +277,7 @@ public sealed class BotRob : BotDeed
             }
             else
             {
+
                 if (_unseen)
                 {
                     var stun = BotAmbush.Strike(body, _victim, _backstab);
@@ -312,6 +297,7 @@ public sealed class BotRob : BotDeed
 
         if (_leg == Leg.Fight)
         {
+
             if (!_quartered && (BotQuarter.Beaten(_victim) || _held > 0 && Core.TickCount >= _held))
             {
                 _quartered = true;
@@ -627,6 +613,7 @@ public sealed class BotRob : BotDeed
 
         if (!body.Hidden)
         {
+
             if (_hidOnce && (away <= StrikeWithin || _hideFailures >= HideTries))
             {
                 Spotted++;
@@ -699,6 +686,7 @@ public sealed class BotRob : BotDeed
 
         if (body.AllowedStealthSteps <= 0)
         {
+
             BotShadow.Quiet(body);
             doing = BotDoing.Work($"moving quietly towards {_victim.Name}");
 
@@ -765,20 +753,6 @@ public sealed class BotRob : BotDeed
     }
 }
 
-/// <summary>
-/// Puts, very rarely, the thought of robbing somebody into a fighter's head: once every <see cref="EveryMs"/> a fighter
-/// rolls, and with <see cref="Chance"/> it looks for a victim — alone, outside any town, with coin in its pack and
-/// weaker than itself — and is pressed into the robbery on the spot. Nearly every answer is nothing, and every gate is
-/// counted.
-///
-/// <para>
-/// <b>Pressed, not offered, and the first hour of build 70 is why.</b> As a proposer this marked two victims and won
-/// nothing: the thought came up once, went into the auction at 400 over three minutes against a hunt at 459, lost,
-/// and was gone — a mark is not kept, and the next roll was ten minutes off. A temptation is not an opportunity to be
-/// weighed against a seam; it is what the bot does next, which is what <see cref="BotWill.Press"/> is for. The rarity
-/// stays in <see cref="Chance"/>, where Patrick put it.
-/// </para>
-/// </summary>
 public static class BotRobber
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRobber));

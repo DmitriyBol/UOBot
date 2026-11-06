@@ -3,32 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The law-abiding set on a murderer they can take between them.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026: law-abiding bots fight murderers when they can take them.</b> Until then a red
-/// was hunted only by the Baron's patrol (<see cref="BotManhunt"/>), raised when the Baron happened to choose it, and
-/// hit back at by whoever it set on (<c>BotDefender</c>); everybody else walked past. Elspeth murdered Joss beside the
-/// home at 19:21:47 on build 110, prowled red for nine minutes, and nothing but the guards of Britain ever went for her.
-/// </para>
-///
-/// <para>
-/// Every <see cref="SweepMs"/> each red outside a guarded town is looked at. The law-abiding within <see cref="Sight"/>
-/// of it are taken strongest first until their strength together, with whoever is fighting it already, comes to
-/// <see cref="Margin"/> times the red's (<see cref="BotThreat.Power"/>), at most <see cref="MostHands"/> of them, and
-/// then they are pressed against it. If they would not come to that between them nobody is pressed — "if they can take
-/// it" — and that is counted and said. The fight is the patrol's (<see cref="BotBrawl.Manhunt"/>): a red that falls to
-/// it is caught and goes to a cell (<see cref="BotOutlaw.Fell"/>), and it ends when the red is down, in a cell, or no
-/// longer red.
-/// </para>
-///
-/// <para>
-/// Law-abiding means not red and not in a cell, fit (<see cref="BotHunter.FitAt"/>), its own master (free or at its own
-/// work: a company's bot follows its company, a hurt or hunted one has enough on its hands), in no fight already, not a
-/// healer — healers stand by the ones who go — and not the Baron, whose patrol is its own.
-/// </para>
-/// </summary>
 public static class BotLawful
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLawful));
@@ -230,6 +204,7 @@ public static class BotLawful
 
     private static bool Lawful(BotMobile other)
     {
+
         if (BotUnderworld.Member(other))
         {
             return false;

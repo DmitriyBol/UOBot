@@ -4,39 +4,9 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// <b>The road goes round the danger (29.09.2026, Patrick's second answer of the morning).</b> "Guilds have the right to
-/// stay in other towns; if the road is dangerous, through the bog for instance, they can go by the north where the road
-/// is not so dangerous." The tiered planner routed by distance alone, so The Needle's bots walked from Cove to Britain
-/// through the plague bog every time, and the delve's march went past the orc fort. This is the hook the planners ask
-/// at every node (<c>NavigationService.Danger</c>): a node on a quadrant the map reads as bloodied (<c>BotQuad.Muscle</c>)
-/// costs <see cref="BloodCost"/> tiles more, one inside barred or quarantined ground <see cref="BarredCost"/> more, so a
-/// detour up to that many tiles is taken before the blood is crossed. The knowledge is the same the samplers and the
-/// travellers already read; this is the walk reading it too.
-///
-/// <para>
-/// <b>Priced for the walker, not for the median bot (01.10.2026, build 388; Patrick's plan v2, point 5: "bots know how to
-/// go round the zones, with a margin or without, to pass without trouble").</b> On build 386, 71 % of 701 deaths fell inside
-/// a deadly zone and 124 of 139 prowl deaths more than a hundred tiles from the prowl's target: the road killed, not the
-/// goal. The zones' price on a node was read against the median bot (<c>BotZone.VsBot</c>), the same for a novice alone
-/// and for a company of eight, and the goal's ground was the only ground any proposer weighed. Now the walk sets who is
-/// walking before a route is asked (<see cref="For"/>): a zone's fight is read against that walker's own strength — its
-/// company's when it is in one — so a weak bot pays the fringe and keeps the margin while a company whose strength the
-/// fight does not reach <see cref="DeadlyVsWalker"/> times is charged the hostile price and may cut through; and the
-/// straight road to far work is weighed before the work is offered (<see cref="Road"/>), by the record of deaths along it
-/// and by the patrols it crosses. Costs stay bounded: no node costs more than <see cref="BarredCost"/> tiles, and a node
-/// the reach map says no walk from home reaches is refused outright (<see cref="NavCost.Unaffordable"/>, which the planners
-/// decline to relax) rather than priced — Patrick's plan v2, point 6.
-/// </para>
-///
-/// <para>
-/// <b>And where the straight line refuses, the road the planner would draw is judged instead (06.10.2026, road15).</b> The
-/// line refused 88 % of all far roads on build 400 for squares nobody would walk through. See <see cref="Judge"/> in
-/// <c>BotDangerRoute.cs</c>.
-/// </para>
-/// </summary>
 public static partial class BotDanger
 {
+
     public static bool Running { get; set; } = true;
 
     public static int BloodCost { get; set; } = 60;

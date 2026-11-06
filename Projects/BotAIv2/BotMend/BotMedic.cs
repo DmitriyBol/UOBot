@@ -2,25 +2,6 @@
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot the chance to look after itself, and it is the only thing on the rung that says so.
-///
-/// <para>
-/// <b>This fills the rung the ladder has always had and never had anything on.</b> <c>Failing</c> exists
-/// because a bot whose health is going does not weigh options — but with no proposer answering it, the brain's
-/// only available answer was to hold on to whatever the bot was already doing. That was harmless while nothing
-/// on the shard fought. The day hunting arrived it became "go back to the skeleton", and the first version
-/// spent a night proving where that ends: four hundred and forty-three deaths, a hundred and four of them one
-/// bot getting up in the same tile every half minute.
-/// </para>
-///
-/// <para>
-/// <b>Above everything, including helping anybody else.</b> That ordering is a measured defect, not taste: the
-/// first version put the call for help above failing health, so a bot on its last few points announced a
-/// company it could not join, found nobody able to come, and posted the same call again — dozens of times over.
-/// Flight and self-repair outrank the social.
-/// </para>
-/// </summary>
 public sealed class BotMedic : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMedic));

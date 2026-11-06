@@ -8,33 +8,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The live window's picture (Patrick, 02.10.2026: "can the picture be shown straight from the game?"): what stands where
-/// round a watched bot, in the client's own terms, for the page to draw with the client's own pictures.
-///
-/// <para>
-/// <b>Two parts, sent at two speeds.</b> The ground and what is built on it — the land tile and its height, every static and
-/// every piece of a house or a boat — changes only when the bot walks off the square it was cut for or a multi comes, goes
-/// or moves; it is cut on the loop then, kept as one string, and the page fetches it from <c>/api/live/scene</c> when the
-/// frame's <c>pic.scene</c> number moves on. What moves — the mobiles with their bodies, hues, facing, war mode, mount and
-/// worn items, and the items on the ground — rides in every frame, once a second.
-/// </para>
-///
-/// <para>
-/// <b>Compact.</b> The land is three bytes a tile (the id and the height) and a static is seven (where in the square, the
-/// id, the height, the hue), both base64: about 12 kB for open country and 40 kB for a town, a few times a minute for a
-/// walking bot. A mobile is a few numbers, its worn items one flat array.
-/// </para>
-///
-/// <para>
-/// <b>Cheap on the loop, and bounded.</b> The map blocks are the tile matrix's own, read once and kept by the matrix; at
-/// most <see cref="SceneBlockBudget"/> blocks are read for the first time in one beat across all watched bots, and a square
-/// that could not be finished is finished in the next beats. The pictures themselves are never decoded here: see
-/// <see cref="BotWebArt"/>.
-/// </para>
-/// </summary>
 public static partial class BotWebLive
 {
+
     public static int PictureRadius { get; set; } = 18;
 
     public static int PictureSlack { get; set; } = 6;
@@ -209,6 +185,7 @@ public static partial class BotWebLive
             }
             else if (item.Amount > 1)
             {
+
                 if (id is 0x0EEA or 0x0EED or 0x0EF0)
                 {
                     id += item.Amount > 5 ? 2 : 1;

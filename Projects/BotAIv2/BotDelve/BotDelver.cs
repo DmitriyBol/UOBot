@@ -5,37 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers the maker of a guild a dungeon its band could actually come back out of.
-///
-/// <para>
-/// <b>Only a guild's maker, by order.</b> A delve is called by the head of a band, which on this shard is
-/// the crafter every guild is founded on and the one bot in it with a mind. It is the same office that
-/// charges the band with a trade and decides who is in it — see <c>BotCharter</c> and <c>BotRoster</c> —
-/// and a delve is the third thing that office can do.
-/// </para>
-///
-/// <para>
-/// <b>Which dungeon is a measurement, not a preference.</b> Patrick's order names the reason in one line:
-/// a demon is plainly not a harpy. Every dungeon has been measured — see <see cref="BotDungeon"/>, which
-/// builds one of each creature its spawners name and reads its strength off the engine — and what this
-/// does with those numbers is pick the richest one whose <i>worst</i> inhabitant the party can still
-/// answer. The worst rather than the average, because a party is killed by the strongest thing it meets
-/// and not by the mean of what lives there.
-/// </para>
-///
-/// <para>
-/// <b>And the strength is the party's, not the leader's.</b> Asked of the bodies that would actually be
-/// called up — the fighters standing within reach of the muster, best first, as many as would go down —
-/// because a leader is a crafter and a crafter's own strength says nothing about what its band can take.
-/// </para>
-///
-/// <para>
-/// <b>Every refusal has a name.</b> A delve needs a maker, one not already leading a company, one fit to
-/// walk into a cave, a surveyed dungeon and a band strong enough for one. Which of those was missing is
-/// the only question worth being able to answer on an evening when nobody went anywhere.
-/// </para>
-/// </summary>
 public sealed class BotDelver : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDelver));
@@ -155,6 +124,7 @@ public sealed class BotDelver : IBotProposer
             }
             else if (Deepest(alone: false, full: true) != null)
             {
+
                 Crowded++;
             }
             else
@@ -191,9 +161,18 @@ public sealed class BotDelver : IBotProposer
 
         var round = muster == Point3D.Zero ? body.Location : muster;
 
-        if (Raisable(map, body, round, BotDelve.Reach, out var lines) + 1 < least)
+        var bodies = Raisable(map, body, round, BotDelve.Reach, deep, out var lines, out var all);
+
+        if (bodies < least)
         {
-            Unraisable++;
+            if (all >= least)
+            {
+                ShortOfFloor++;
+            }
+            else
+            {
+                Unraisable++;
+            }
 
             return null;
         }
@@ -229,16 +208,26 @@ public sealed class BotDelver : IBotProposer
 
     public static long Answering { get; private set; }
 
-    private static int Raisable(Map map, Mobile leader, Point3D round, int reach, out int lines)
+    public static long ShortOfFloor { get; private set; }
+
+    private static int Raisable(Map map, Mobile leader, Point3D round, int reach, BotDungeon.Deep deep, out int lines, out int all)
     {
-        var count = 0;
+        var strong = 0;
+        var weak = 0;
         lines = 0;
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(round, reach))
         {
             if (mobile != leader && mobile is BotMobile other && Eligible(other) && !BotRegard.Hostile(leader, other))
             {
-                count++;
+                if (BotDelve.Weak(other, deep))
+                {
+                    weak++;
+                }
+                else
+                {
+                    strong++;
+                }
 
                 if (other.Class?.Role == BotRole.Melee)
                 {
@@ -247,7 +236,18 @@ public sealed class BotDelver : IBotProposer
             }
         }
 
-        return count;
+        if (BotDelve.Weak(leader, deep))
+        {
+            weak++;
+        }
+        else
+        {
+            strong++;
+        }
+
+        all = strong + weak;
+
+        return strong + Math.Min(weak, BotDelve.WeakSeats(BotDelve.Least(map, deep)));
     }
 
     private static int Lines(Map map, Mobile leader, Point3D round, int reach)
@@ -373,6 +373,7 @@ public sealed class BotDelver : IBotProposer
 
     private static double Strength(BotDungeon.Deep deep, bool formula = false)
     {
+
         if (deep == Easiest())
         {
             formula = true;
@@ -841,7 +842,7 @@ public sealed class BotDelver : IBotProposer
             ? $"no guild member has ever been offered a delve ({NotALeader} answers went to bots in no guild)"
             : $"{Asked} times a guild member was asked: {Offered} were offered a dungeon and {Taken} took one, {Held} were already leading a company, "
             + $"{Unfit} were too hurt, {Unsupplied} lacked their supplies, {Resting} came too soon after a call that failed, {TooSoon} too soon after their band's last delve, "
-            + $"{Unsurveyed} found nothing surveyed, {Crowded} found every dungeon they could survive already full, {Unraisable} could not raise the party's floor within the call's reach of its muster, {Lineless} could raise nobody there to hold a line, {Answering} left to a call already gathering near them, "
+            + $"{Unsurveyed} found nothing surveyed, {Crowded} found every dungeon they could survive already full, {Unraisable} could not raise the party's floor within the call's reach of its muster, {ShortOfFloor} could raise bodies enough there but too few holding the dungeon's floor, {Lineless} could raise nobody there to hold a line, {Answering} left to a call already gathering near them, "
             + $"{Outmatched} found nothing their band could come back out of at ×{Odds:F2} the worst of it (the nearest came to {_nearest:P0} of it: {_nearestSaid}); "
             + $"judged by the proving ground: {Lifted} offers went deeper than the old formula would have sent them, {Lowered} less deep, "
             + $"{HeldBack} bands kept on the island that the formula would have sent down, {Rechosen} parties sent elsewhere once raised, "
@@ -871,6 +872,10 @@ public sealed class BotDelver : IBotProposer
         Weakest = 0;
         Unproven = 0;
         Uncompanied = 0;
+        Unraisable = 0;
+        ShortOfFloor = 0;
+        Lineless = 0;
+        Answering = 0;
         _compared = 0;
         _band.Clear();
         _last.Clear();

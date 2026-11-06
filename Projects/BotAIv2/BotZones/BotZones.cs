@@ -12,46 +12,8 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The dashboard's copy of the zones: the JSON and the tag a browser may send back to be told nothing changed.</summary>
 public sealed record BotZonePage(string Json, string ETag);
 
-/// <summary>
-/// The danger and safety zones of the bots' home map: where creatures that attack on sight patrol, how far their sight
-/// reaches, how strong they are against a bot, and where only passive animals live. The answer the planners, the hunt and the
-/// dashboard read.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026, evening:</b> walk the world with Argus and the other debuggers, mark every mob zone on the
-/// map with how many live there and how strong they are; put the zones on the dashboard as separate areas that live in
-/// memory, update, have smoothed corners and grow more precise; where no mobs are, bots may route safe paths through; where
-/// mobs are and their patrol or aggro could touch someone, mark the ground potentially dangerous — "maximum precision, it
-/// drives safe paths and the quality of the hunting".
-/// </para>
-///
-/// <para>
-/// <b>How the precision grows.</b> At boot every spawner is a declared haunt: a disc of its walking range round it
-/// (<see cref="BotHaunts"/>). The sweep (<see cref="BotZoneScan"/>) passes every living creature every few seconds and records
-/// where attackers are seen <em>awake</em> (<see cref="BotZoneRaster"/>); when a haunt has been watched awake long enough
-/// (<see cref="BotHaunt.Confidence"/> at <see cref="ObservedWins"/>) its declared disc shrinks to the farthest its creatures
-/// were seen from home and the observed patrol draws the rest. The ground only wakes where a client or a bot is (<see cref="BotWake"/>), so the debuggers walk the
-/// least-watched zones and wake them (<see cref="BotZoneTour"/>). Bot deaths are counted in the zone they fall in, and a zone
-/// that keeps killing is read one level deadlier than its arithmetic (<see cref="DeathsPromote"/>).
-/// </para>
-///
-/// <para>
-/// <b>Cost.</b> On the loop: a strip of the spawner survey a beat, the sweep within <see cref="BotZoneScan.BudgetMs"/> a beat,
-/// the tour once a second, and a gather of plain values every <see cref="RefreshMs"/>; every one of them is measured and
-/// printed in the <c>Zones:</c> line. The build — painting, labelling, fringes, outlines and the zones' JSON — is pure
-/// arithmetic on that gathered copy (<see cref="BotZoneBuild"/>) and runs off the loop when the machine has
-/// <see cref="OffLoopCores"/> cores, published through the one volatile reference <see cref="State"/> (CLAUDE.md rules 3, 10).
-/// </para>
-///
-/// <para>
-/// <b>The queries are one array read.</b> <see cref="LevelAt(Map, int, int)"/> is asked per node by a path planner, millions of
-/// times: it reads the published state once, indexes the raster by <c>(y &gt;&gt; 2) * width + (x &gt;&gt; 2)</c>, and at most
-/// reads one zone out of an array. Nothing in it allocates, locks or walks anything.
-/// </para>
-/// </summary>
 public static class BotZones
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotZones));
@@ -483,6 +445,7 @@ public static class BotZones
             }
             else
             {
+
                 _seen = null;
                 _state = null;
                 _building = false;
@@ -594,6 +557,7 @@ public static class BotZones
                 {
                     try
                     {
+
                         _state = BotZoneBuild.Build(input);
                     }
                     catch (Exception e)

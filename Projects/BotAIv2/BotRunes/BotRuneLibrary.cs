@@ -6,26 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guild's rune library: a runebook in the hall's chest, or in the pack of the guild's keeper where there is no hall,
-/// written from what the guild knows (<see cref="BotRuneShelf"/>), and the copies it lends to the guild's rune-mages.
-///
-/// <para>
-/// <b>The library is the guild's record; the runes that travel are the mages' own.</b> A rune in a chest two hundred tiles
-/// away takes nobody anywhere, so the pathfinder that marks a place keeps the rune in its own book
-/// (<see cref="BotRunes.Satchel"/>) and the knowledge goes to the library at once, where Patrick can open the chest and
-/// read every place the guild has stood. A rune-mage standing at the library — within <see cref="Reach"/> of the chest,
-/// or of the keeper — is lent a copy of every rune its own book lacks, and <b>each copy costs it a blank rune</b>. Copying
-/// a rune is not an engine operation; the blank is the engine's price of a rune, so what a library holds spreads through
-/// the guild at the price of the blanks, and a guild with no blanks spreads nothing (<see cref="BotRuneBuyer"/>).
-/// </para>
-///
-/// <para>
-/// <b>The book outlives the body that carried it.</b> A hall's chest is saved with the world and its book with it; a
-/// keeper's pack is not, since the population is raised afresh at every boot. A library missing from where it belongs is
-/// written again from the shelf, as the keeper's knowledge was never in the book in the first place.
-/// </para>
-/// </summary>
 public static class BotRuneLibrary
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRuneLibrary));

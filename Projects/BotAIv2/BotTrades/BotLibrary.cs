@@ -6,7 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One library while it is open: the scribe keeping it, its guild, where it stands, its spare scrolls and what it has sold.</summary>
 public sealed class BotLibrary
 {
     public BotLibrary(BotMobile keeper, Guild guild, Map map, Point3D stand)
@@ -45,20 +44,6 @@ public sealed class BotLibrary
     public string Name => $"{Keeper?.Name}'s library at {Guild?.Name}'s hall";
 }
 
-/// <summary>
-/// The libraries: a guild's scribe keeping a shift by its guild's seat, selling the scrolls it wrote to the casters of its guild and
-/// its allies whose books are short of them, at the market's price (07.10.2026, life18b).
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "a scribe-librarian (sells scrolls by the guild stone)"; that morning: "we do it".</b> What exists: scribes
-/// wrote 5,880 practice scrolls in the nine hours of build 416 and keep the spare ones in their boxes; casters short of a spell took
-/// 1,397 errands for one, 686 of them a want said aloud and waited on (<c>BotAcquire</c>, <c>BotSeeker</c>). The library puts the two
-/// together where the guild lives: the scribe brings its spare scrolls of the kinds its guild's and allies' casters lack, and a caster
-/// short of one within <see cref="ReaderReach"/> buys it there, hand to hand (<see cref="BotHandover.Exchange"/>), and writes it into its
-/// book at once; a want it had standing for it is withdrawn and its money freed. Nothing is minted: the scroll was the scribe's, the
-/// coin was the caster's.
-/// </para>
-/// </summary>
 public static class BotLibraries
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLibraries));
@@ -596,10 +581,6 @@ public static class BotLibraries
     }
 }
 
-/// <summary>
-/// A scribe's shift keeping its guild's library: its spare scrolls out of the bank box, the walk to the seat, the scrolls sold to whoever
-/// the auction sends, and the shelf shut when the shift or the scrolls run out (07.10.2026, life18b). The tavern's shape; measured as coin.
-/// </summary>
 public sealed class BotKeepLibrary : BotDeed
 {
     public const string Trade = "library";
@@ -731,6 +712,7 @@ public sealed class BotKeepLibrary : BotDeed
 
     private BotDoing Opening(IBotWilful bot, BotMobile body, long now)
     {
+
         if (!_fetched && _bank != Point3D.Zero && body.FindBankNoCreate() is { } box && box.Items.Count > 0)
         {
             if (!BotMarket.AtBank(body))
@@ -825,10 +807,6 @@ public sealed class BotKeepLibrary : BotDeed
     public override void Drop(IBotWilful bot) => Shut(Core.TickCount, "the shift was given up", false);
 }
 
-/// <summary>
-/// Offers a guild's scribe — Inscription <see cref="BotLibraries.LeastInscribe"/> and up — the shift at its guild's library when it holds
-/// spare scrolls its guild's or allies' casters lack and the guild has none open (07.10.2026, life18b). Every gate counted.
-/// </summary>
 public sealed class BotLibrarian : IBotProposer
 {
     public string Name => "Librarian";
@@ -973,11 +951,6 @@ public sealed class BotLibrarian : IBotProposer
     }
 }
 
-/// <summary>
-/// A caster's walk to its guild's or an ally's library for the scroll its book needs next: bought hand to hand at the market's price and
-/// written into the book there and then (07.10.2026, life18b). Unpaid: the auction prices it at its claim, and <see cref="BotReader"/>
-/// asks every reason it would fail first.
-/// </summary>
 public sealed class BotReadAt : BotDeed
 {
     public const string Trade = "library visit";
@@ -1113,10 +1086,6 @@ public sealed class BotReadAt : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a caster whose book is short of a spell the scroll at the nearest open library of its guild or an ally that holds it (07.10.2026,
-/// life18b): before a far walk to a counter, or while a want for it stands unanswered. Every gate counted.
-/// </summary>
 public sealed class BotReader : IBotProposer
 {
     public string Name => "Reader";

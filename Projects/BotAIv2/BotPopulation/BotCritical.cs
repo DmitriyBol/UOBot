@@ -5,32 +5,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The posts the island is never left without: a floor of each kept in the world at every hour, whoever is past their hours.
-///
-/// <para>
-/// <b>Patrick's order of 02.10.2026, with the prime time:</b> "only make sure the world is never left without critically
-/// important bots." A post is a class by name — the healers, the crafters, the gatherers, the mages for scrolls and reagents,
-/// the traders, the Captains and the Baron — or a trade a producer holds by its best skill: a smith, a tailor and a fletcher
-/// among the crafters, a miner and a woodsman among the gatherers (<see cref="Trade"/>). Every bot fills its class's post and,
-/// if it is a producer, one trade's. The floors are one number per post, configured in <c>bot-rest.json</c> under
-/// <c>Critical.Floors</c>; a post with no floor named is not critical.
-/// </para>
-///
-/// <para>
-/// <b>Three gates, all in the rest clock.</b> A bot past its hours whose post would fall under its floor if it left plays on
-/// and is counted (<see cref="Holds"/>), as the island's own floor keeps bots on. A post under its floor — a restart that found
-/// its smiths resting, a call's bots gone back to bed — brings its own back from rest, soonest due first, up to
-/// <see cref="EarlyMinutes"/> into the rest, which by default is the whole of one. And a post with fewer on the whole island,
-/// resting counted, than its floor gets the next newcomer in its class (<see cref="Wanting"/>, read by <c>BotGrowth</c>): the
-/// class, not the trade, because which trade a crafter is born to is drawn by its name (<c>BotBirth</c>).
-/// </para>
-///
-/// <para>
-/// The traders keep their own rule beside this — no more than <c>BotTrading.RestShare</c> of them resting at once (build 388) —
-/// and the floor here is the count under which that share may never fall.
-/// </para>
-/// </summary>
 public static class BotCritical
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCritical));

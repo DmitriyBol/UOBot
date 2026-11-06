@@ -1,22 +1,5 @@
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bow, and a beast beside it.
-///
-/// <para>
-/// <b>Patrick's third addition of the night of 29.09.2026: "the bots have knowledge of taming domestic and wild animals,
-/// and the animals help them in a fight."</b> The tamer is the class that knows most of it: Animal Taming to bring a wolf
-/// or a bear to heel, Animal Lore to know what it is looking at, Veterinary to bind the beast's wounds, and a bow to fight
-/// beside it from a distance. Every other class that lists Animal Taming among its targets tames what its skill allows —
-/// a dog, a horse — and the same errand serves them (<c>BotTame</c>).
-/// </para>
-///
-/// <para>
-/// <b>Ranged by role, because that is what a tamer is in a fight.</b> The beast closes and holds; the tamer shoots. The
-/// class's own strength is measured like everybody's (<c>BotThreat.Power</c>) and does not count its beast, so a tamer
-/// alone is offered what an archer is offered; the beast is what makes it come back.
-/// </para>
-/// </summary>
 public sealed class BotTamer : BotClass
 {
     public override string Name => "Tamer";

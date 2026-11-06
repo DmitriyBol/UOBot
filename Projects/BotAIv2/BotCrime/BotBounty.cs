@@ -4,19 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a free fighter of any guild a head on a town's wanted list, priced at the bounty.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "a wanted list: the town sets a bounty on a head, bounty hunters from any guild, trial and jail when
-/// caught".</b> The hunt is the manhunt the shard already has (<see cref="BotBrawl.Manhunt"/>): close, fight, and stop when the
-/// quarry is down, caught or no longer wanted. A wanted thief beaten to a quarter yields and is taken alive
-/// (<see cref="BotCrime.Yield"/>); a kill is a catch all the same (<c>BotOutlaw.Fell</c> reads <see cref="BotCrime.Hunts"/>), and
-/// either way the bounty is paid out of the town's purse to whoever took it (<see cref="BotCrime.Caught"/>). A hunter must be
-/// <see cref="Odds"/> times as strong as its quarry, as fit as a company's choosing rule wants, and no more than
-/// <see cref="HuntersPer"/> hunt one head at once. Traders are neutral and take no part; neither does anybody of The Shadow.
-/// </para>
-/// </summary>
 public sealed class BotBountyBoard : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBountyBoard));
@@ -203,7 +190,6 @@ public sealed class BotBountyBoard : IBotProposer
     }
 }
 
-/// <summary>A bounty hunter after one head on a town's wanted list. See <see cref="BotBountyBoard"/>.</summary>
 public sealed class BotBountyHunt : BotDeed
 {
     public const string Trade = "bounty";

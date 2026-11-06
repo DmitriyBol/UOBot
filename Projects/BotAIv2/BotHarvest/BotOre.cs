@@ -7,17 +7,6 @@ using Server.Targeting;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Ore: what is in a hill, whether this bot can get it out, how it is dug, and what it becomes.
-///
-/// <para>
-/// <b>The work is the engine's, not ours.</b> Digging goes through the shard's own
-/// <see cref="HarvestSystem"/> — the same call a player's double-click makes — so the swing, the skill
-/// check, the yield and the seam running dry are the real ones. A bot mining is a miner, not a bot being
-/// credited with ore. That also makes the thing this project measures real: skill gain here is the
-/// engine raising a number, not us deciding a number should go up.
-/// </para>
-/// </summary>
 public static class BotOre
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOre));
@@ -603,6 +592,7 @@ public static class BotOre
             {
                 for (var dy = -radius; dy <= radius; dy++)
                 {
+
                     if (Math.Abs(dx) != radius && Math.Abs(dy) != radius)
                     {
                         continue;

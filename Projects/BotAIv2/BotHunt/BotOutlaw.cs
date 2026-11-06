@@ -6,30 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who has murdered lately, who is in a cell for it, and the clock that lets both go.
-///
-/// <para>
-/// <b>Patrick's order of 15.09.2026: a bot may set on another bot and rob it.</b> To rob it has to kill, and the killer
-/// goes red; it is red for an hour, friendly to other reds and an enemy to everybody else; the Baron may raise a patrol
-/// against it instead of hunting, and a red the Baron's patrol kills is caught and put in a cell at the bottom of the
-/// map, one bot to a cell. The thought of robbing is a very rare one.
-/// </para>
-///
-/// <para>
-/// <b>Red is the engine's own word.</b> A killer's <c>Kills</c> is set to the engine's murderer threshold, so its name
-/// turns red by the engine's notoriety, the guards of any town treat it as the engine treats reds, and the count here
-/// only decides when the hour is up. Nothing is invented about what red means; what is added is the hour, the cell,
-/// and the reading of "red" by the population's own rules — the robber's choice of victim, the Baron's patrol, and
-/// the town the red keeps out of.
-/// </para>
-///
-/// <para>
-/// <b>The cells are the engine's jail.</b> The same ten points <c>JailSystem</c> uses, inside the jail region where
-/// nothing may be harmed and nobody may travel out; a bot put there holds a sentence, which is a piece of work that
-/// does nothing until the clock lets it go, and then it is lifted back to its guild's seat with a clean name.
-/// </para>
-/// </summary>
 public static class BotOutlaw
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOutlaw));
@@ -70,6 +46,12 @@ public static class BotOutlaw
     public static bool TakesCorpse { get; set; } = true;
 
     public static bool TakesBond { get; set; } = true;
+
+    public static bool KeepsWeapons { get; set; } = true;
+
+    public static long WeaponsKept { get; private set; }
+
+    public static long AmmunitionKept { get; private set; }
 
     public static long Seized { get; private set; }
 
@@ -530,6 +512,7 @@ public static class BotOutlaw
 
             for (var i = 0; i < company.Count; i++)
             {
+
                 if (company[i]?.Self is { Deleted: false, Alive: true } member && member.Map == fallen.Map
                     && member.InRange(fallen.Location, BloodReach))
                 {
@@ -558,17 +541,19 @@ public static class BotOutlaw
             return;
         }
 
+        var arms = Arms(bot, TakesCorpse && !bot.Alive ? bot.Remains : null);
+
         var took = 0;
-        var coins = bot.Backpack is { } pack ? Empty(pack, ref took) : 0;
+        var coins = bot.Backpack is { } pack ? Empty(pack, arms, ref took) : 0;
 
         if (TakesCorpse && bot.Remains is { Deleted: false } corpse)
         {
-            coins += Empty(corpse, ref took);
+            coins += Empty(corpse, arms, ref took);
             bot.Remains = null;
             SeizedCorpse++;
         }
 
-        var kit = TakesBond ? BotBinding.Forfeit(bot, bot.Bond) : 0;
+        var kit = TakesBond ? BotBinding.Forfeit(bot, bot.Bond, KeepsWeapons ? arms : null) : 0;
 
         if (kit > 0)
         {
@@ -595,16 +580,91 @@ public static class BotOutlaw
         Seized++;
 
         logger.Information(
-            "{Name} was stripped at the cell door: {Gold}gp off the body, {Fine}gp out of its bank, {Things} things and {Kit} of its own kit forfeit",
+            "{Name} was stripped at the cell door: {Gold}gp off the body, {Fine}gp out of its bank, {Things} things and {Kit} of its own kit forfeit; {Arms} weapons and quivers left to it",
             bot.Name,
             coins,
             fine,
             took,
-            kit
+            kit,
+            arms.Count
         );
     }
 
-    private static int Empty(Container box, ref int took)
+    private static HashSet<Item> Arms(BotMobile bot, Corpse corpse)
+    {
+        HashSet<Item> arms = [];
+
+        if (!KeepsWeapons || bot.Backpack is not { } pack)
+        {
+            return arms;
+        }
+
+        for (var i = 0; i < bot.Items.Count; i++)
+        {
+            if (bot.Items[i] is BaseWeapon { Deleted: false } held)
+            {
+                arms.Add(held);
+            }
+        }
+
+        if (corpse is { Deleted: false, EquipItems: { } equipped })
+        {
+            for (var i = 0; i < equipped.Count; i++)
+            {
+                if (equipped[i] is BaseWeapon { Deleted: false } weapon && weapon.IsChildOf(corpse))
+                {
+                    arms.Add(weapon);
+                }
+            }
+        }
+
+        foreach (var weapon in pack.FindItemsByType<BaseWeapon>())
+        {
+            if (BotBinding.IsBound(weapon, bot.Bond))
+            {
+                arms.Add(weapon);
+            }
+        }
+
+        if (corpse is { Deleted: false })
+        {
+            foreach (var weapon in corpse.FindItemsByType<BaseWeapon>())
+            {
+                if (BotBinding.IsBound(weapon, bot.Bond))
+                {
+                    arms.Add(weapon);
+                }
+            }
+        }
+
+        foreach (var weapon in arms)
+        {
+            if (weapon.Parent != bot && weapon.Parent != pack)
+            {
+                pack.DropItem(weapon);
+            }
+        }
+
+        WeaponsKept += arms.Count;
+
+        if (bot.Bond is { } bond && bond.Ammunition.Count > 0)
+        {
+            BotBinding.TrimAmmunition(bot, bond, corpse);
+
+            for (var i = 0; i < pack.Items.Count; i++)
+            {
+                if (pack.Items[i] is { Deleted: false } stack && bond.Ammunition.ContainsKey(stack.GetType()))
+                {
+                    arms.Add(stack);
+                    AmmunitionKept += stack.Amount;
+                }
+            }
+        }
+
+        return arms;
+    }
+
+    private static int Empty(Container box, HashSet<Item> spared, ref int took)
     {
         var coins = box.GetAmount(typeof(Gold));
 
@@ -617,7 +677,7 @@ public static class BotOutlaw
 
         for (var i = 0; i < box.Items.Count; i++)
         {
-            if (box.Items[i] is { Deleted: false } item)
+            if (box.Items[i] is { Deleted: false } item && !spared.Contains(item))
             {
                 forfeit.Add(item);
             }
@@ -661,6 +721,30 @@ public static class BotOutlaw
         return posse;
     }
 
+    public static string ReturnWeapons()
+    {
+        var bots = BotPopulation.Bots;
+        List<string> names = [];
+        var handed = 0;
+
+        for (var i = 0; i < bots.Count; i++)
+        {
+            var given = BotBinding.Reissue(bots[i]);
+
+            if (given > 0)
+            {
+                handed += given;
+                names.Add(bots[i].Name);
+            }
+        }
+
+        logger.Information("{Count} weapons handed back to {Bots} bots a catch had left bare", handed, names.Count);
+
+        return handed == 0
+            ? "nobody was missing the weapon it was born to."
+            : $"{handed} weapons handed back to {names.Count} bots: {string.Join(", ", names)}. Rearm puts them in the hand within {BotMobile.DressEveryMs / 1000}s.";
+    }
+
     public static bool Free(Mobile m)
     {
         if (m == null || !_records.TryGetValue(m.Serial, out var r) || r.Cell < 0)
@@ -698,6 +782,7 @@ public static class BotOutlaw
 
         r.Cell = cell;
         r.Wanted = false;
+
         r.JailedUntil = Core.TickCount + BotCrime.Term(bot, JailMs);
         r.CaughtBy = by?.Name;
         Caught++;
@@ -937,10 +1022,12 @@ public static class BotOutlaw
 
             if (bot is not { Deleted: false })
             {
+
                 var again = Named(r.Name);
 
                 if (again == null)
                 {
+
                     if (BotPopulation.Count > 0)
                     {
                         (gone ??= []).Add(serial);
@@ -983,6 +1070,7 @@ public static class BotOutlaw
             }
             else if (r.Wanted && bot.Alive && !bot.Criminal)
             {
+
                 bot.Criminal = true;
             }
 
@@ -1043,6 +1131,7 @@ public static class BotOutlaw
         Released++;
 
         var map = BotPopulation.Home ?? Map.Felucca;
+
         var home = BotPopulation.HomeOf(bot);
 
         if (bot.Alive)
@@ -1059,7 +1148,7 @@ public static class BotOutlaw
     public static string Describe() =>
         !Running
             ? "nobody robs, nobody is red and nobody is jailed"
-            : $"{Murders} murders, {Robbed}gp robbed, {Caught} murderers caught by a patrol and {Released} let out, {Redeemed} went unpunished until the hour ran out, {Unavenged} were killed by something that was no patrol, {BaronsOwn} were the Baron's own kill and paid nobody, {Seized} catches stripped {SeizedGold}gp off the body, {SeizedBank}gp out of the bank and {SeizedThings} things into the treasury, {SeizedCorpse} corpses emptied where they lay and {Stripped} kits forfeit, {Shared} prices of blood split between a company; "
+            : $"{Murders} murders, {Robbed}gp robbed, {Caught} murderers caught by a patrol and {Released} let out, {Redeemed} went unpunished until the hour ran out, {Unavenged} were killed by something that was no patrol, {BaronsOwn} were the Baron's own kill and paid nobody, {Seized} catches stripped {SeizedGold}gp off the body, {SeizedBank}gp out of the bank and {SeizedThings} things into the treasury, {SeizedCorpse} corpses emptied where they lay and {Stripped} kits forfeit, {WeaponsKept} weapons and {AmmunitionKept} rounds left to the caught, {Shared} prices of blood split between a company; "
               + $"{RedCount()} red now and {JailedCount()} in cells of {Cells.Length}; {Told} made known to the Baron, {WantedPosted} made wanted; {Kept} errands kept a red out of a guarded town and {Routed} off a road through one, {Detoured} red roads drawn round the towns and {Stopped} red steps refused at a ward's edge; {Overfull} catches found every cell taken; {Rebound} records moved onto a bot's new body after a boot";
 
     public static void Forget()
@@ -1078,6 +1167,8 @@ public static class BotOutlaw
         SeizedBank = 0;
         SeizedCorpse = 0;
         Stripped = 0;
+        WeaponsKept = 0;
+        AmmunitionKept = 0;
         Shared = 0;
         Kept = 0;
         Routed = 0;
@@ -1098,6 +1189,7 @@ public static class BotOutlaw
 
         protected override void OnTick()
         {
+
             BotRobber.Beat(Core.TickCount);
             BotLawful.Beat(Core.TickCount);
             BotInquest.Beat(Core.TickCount);
@@ -1111,10 +1203,6 @@ public static class BotOutlaw
     }
 }
 
-/// <summary>
-/// Sitting in a cell: a piece of work that does nothing until the clock lets the bot go. Pressed by
-/// <see cref="BotOutlaw"/>, and the only thing a jailed bot holds.
-/// </summary>
 public sealed class BotSentence : BotDeed
 {
     public const string Trade = "sentence";
@@ -1177,10 +1265,6 @@ public sealed class BotSentence : BotDeed
     }
 }
 
-/// <summary>
-/// The Baron's patrol against a murderer: the Baron goes after the red, and presses the nearest few fit fighters into a
-/// posse against the same one. A red the posse kills is caught — see <see cref="BotOutlaw.Fell"/>.
-/// </summary>
 public sealed class BotManhunt : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotManhunt));

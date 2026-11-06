@@ -7,12 +7,6 @@ using Xunit.Abstractions;
 
 namespace Server.Tests.Pathfinding.Tiered;
 
-/// <summary>
-/// The danger hook (<see cref="NavigationService.Danger"/>) hung the shard's loop twice on 29.09.2026 inside
-/// <c>StrategicPlanner.Corridor</c>, the unwind of a route's parent chain. These routes cross a river by a far ford with a
-/// heavily penalised band in the way, many times, each on a clock: a route that does not come back is the hang. It sets
-/// the static hook, so it runs alone (see TieredNavigationSequential).
-/// </summary>
 [Collection("Tiered navigation, one at a time")]
 public class DangerHookTests
 {
@@ -98,6 +92,7 @@ public class DangerHookTests
 
         for (var i = 0; i < 40; i++)
         {
+
             var sx = random.Next(2, 60);
             var sy = random.Next(2, 60);
             var gx = random.Next(70, 126);
@@ -127,6 +122,7 @@ public class DangerHookTests
 
         try
         {
+
             NavigationService.Danger = penalty == 0 ? null : (x, _) => x is >= 300 and <= 450 ? penalty : 0;
 
             for (var i = 0; i < 120; i++)
@@ -143,6 +139,7 @@ public class DangerHookTests
 
                 if (i % 3 == 0)
                 {
+
                     came = Within(() => medium.Route(graph, sx, sy, 0, gx, gy, 0, points), 10000, out status);
                     Assert.True(came, $"medium route {i} with a penalty of {penalty} did not come back");
                 }

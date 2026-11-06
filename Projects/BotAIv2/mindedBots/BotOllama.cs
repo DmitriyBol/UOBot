@@ -9,32 +9,6 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The only thing in this assembly that talks to the model, and the only thing that leaves the game thread.
-///
-/// <para>
-/// <b>Off the loop going out, back onto it coming in.</b> A warm answer takes seconds and a cold one takes
-/// half a minute; the shard's whole world runs on one thread and a second of it is a second in which nothing
-/// in the world moves. So the request goes to a background task with <c>ConfigureAwait(false)</c> — which is
-/// what keeps the continuation off the loop rather than merely hoping — and the answer is handed back with
-/// <see cref="Core.LoopContext"/><c>.Post</c>, which is the only sanctioned way in. Nothing here touches a
-/// mobile, an item or a map: it takes a string and gives back a string.
-/// </para>
-///
-/// <para>
-/// <b>The schema is not optional.</b> Asked for JSON in words, the model glues a paragraph in front of it
-/// about one answer in twenty — measured, on the first version of this — and a parser that copes with that
-/// is a parser that will one day cope with something worse. Ollama's <c>format</c> takes a JSON schema and
-/// constrains the sampler itself, so malformed output stops being a case that has to be handled.
-/// </para>
-///
-/// <para>
-/// <b>Timing is by the wall clock and by nothing else.</b> Ollama reports <c>eval_count</c> and
-/// <c>eval_duration</c>, and thinking tokens appear in neither: a call measured at 2.6 seconds by its own
-/// metrics took nineteen. What matters here is how long the answer was not available, so that is what is
-/// measured.
-/// </para>
-/// </summary>
 public static class BotOllama
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOllama));
@@ -161,6 +135,7 @@ public static class BotOllama
         }
         catch (Exception e)
         {
+
             logger.Warning("Could not reach the model at {Endpoint}: {Message}", Endpoint, e.Message);
         }
 
@@ -226,8 +201,10 @@ public static class BotOllama
                 return string.IsNullOrWhiteSpace(text) ? null : text;
             }
         }
+
         catch (Exception)
         {
+
         }
 
         return null;

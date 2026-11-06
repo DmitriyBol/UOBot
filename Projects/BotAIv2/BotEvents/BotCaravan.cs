@@ -4,10 +4,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a trader near a posted caravan's source the lead (07.10.2026): a trader of the neutral class, fit, in the world, within
-/// <see cref="BotCaravans.Reach"/> of the source's counter, able to pay for the goods out of what it may spend, with a way there.
-/// </summary>
 public sealed class BotCaravanCall : IBotProposer
 {
     public string Name => "Caravan";
@@ -48,11 +44,6 @@ public sealed class BotCaravanCall : IBotProposer
     }
 }
 
-/// <summary>
-/// Leading a caravan: to the source's counter, the goods bought with the trader's own coin, a wait for the guards, the road to the
-/// town that posted it, and the town's pay on arrival (<see cref="BotCaravans.Deliver"/>). Held through ordinary offers like any
-/// work a bot sees through.
-/// </summary>
 public sealed class BotCaravan : BotDeed
 {
     public const string Trade = "caravan";
@@ -164,6 +155,8 @@ public sealed class BotCaravan : BotDeed
             return BotDoing.Done($"delivered the caravan to {_run.To.Name} for {_paid}gp");
         }
 
+        BotCaravans.WaitForGuards(_run, body);
+
         return BotDoing.Walk(_run.Source.Map, _run.To.Square, BotArrival.Within(BotCaravans.ArriveReach), $"leading the caravan to {_run.To.Name}");
     }
 
@@ -176,10 +169,6 @@ public sealed class BotCaravan : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a fighter near a caravan's trader a guard's place (07.10.2026): while the trader buys or waits, until
-/// <see cref="BotCaravans.MostGuards"/> are hired; a fighter in no company, within <see cref="BotCaravans.GuardReach"/> of the trader.
-/// </summary>
 public sealed class BotGuardCall : IBotProposer
 {
     public string Name => "Guard";
@@ -209,12 +198,6 @@ public sealed class BotGuardCall : IBotProposer
     }
 }
 
-/// <summary>
-/// Guarding a caravan: walking with its trader and setting on whatever attacks it — one creature at a time, the shard's own fight
-/// (<see cref="BotSlay"/>) — when the guards between them bring <see cref="BotCaravans.GuardOdds"/> times what it is reckoned at.
-/// Paid by the town on arrival, if still near the trader then; a guard that falls <see cref="BotCaravans.Behind"/> tiles back for
-/// <see cref="BotCaravans.BehindMs"/> has left the caravan.
-/// </summary>
 public sealed class BotGuard : BotDeed
 {
     public const string Trade = "guard";
@@ -345,7 +328,8 @@ public sealed class BotGuard : BotDeed
 
         if (!body.InRange(leader.Location, slack))
         {
-            return BotDoing.Walk(leader.Map, leader, BotArrival.Within(slack), $"guarding {leader.Name}'s caravan to {_run.To.Name}");
+
+            return BotDoing.WalkAfter(leader.Map, leader, BotArrival.Within(slack), $"guarding {leader.Name}'s caravan to {_run.To.Name}");
         }
 
         return BotDoing.Work($"guarding {leader.Name}'s caravan to {_run.To.Name}");

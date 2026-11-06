@@ -13,23 +13,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The whole shard as one JSON document, rebuilt on the game loop every couple of seconds and handed to the
-/// web server as a string.
-///
-/// <para>
-/// <b>Built here, served there.</b> Everything the page shows is read from the world in one pass on the
-/// loop, written once, and then given away; the server never touches a bot. That is the same division as
-/// the summary lines in the log — the loop writes, everybody else reads — and it is why a browser left
-/// open all night costs the population nothing.
-/// </para>
-///
-/// <para>
-/// <b>Every number here is one the log already prints.</b> The page adds no counters of its own; it reads
-/// the same statics the five-minute summary reads, so a figure on the page and a figure in the log can never
-/// disagree about the shard.
-/// </para>
-/// </summary>
 public static class BotWebSnapshot
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWebSnapshot));
@@ -297,6 +280,10 @@ public static class BotWebSnapshot
 
             WriteAbodes(w);
 
+            BotDay.Write(w);
+
+            BotStory.Web(w);
+
             BotZoneWatch.Web(w);
 
             WriteBarred(w);
@@ -508,8 +495,10 @@ public static class BotWebSnapshot
             w.WriteNumber("mood", Math.Round(bot.Mood, 3));
             w.WriteNumber("purse", bot.Backpack?.GetAmount(typeof(Gold)) ?? 0);
             w.WriteNumber("bank", Banker.GetBalance(bot));
+
             w.WriteNumber("over", BotUnload.OverUnits(bot));
             w.WriteNumber("boxItems", bot.FindBankNoCreate()?.TotalItems ?? 0);
+
             w.WriteBoolean("boxFull", BotSurplus.BoxFull(bot));
             w.WriteString("rank", bot.BotRank ?? "");
             w.WriteString("level", Level(bot.BotRank));
@@ -517,6 +506,7 @@ public static class BotWebSnapshot
             w.WriteNumber("kills", bot.Kills);
 
             BotCharacterWeb.Write(w, bot);
+            BotDay.WriteBot(w, bot);
 
             WriteSkills(w, bot);
 
@@ -611,6 +601,7 @@ public static class BotWebSnapshot
         }
         else
         {
+
             var plan = journey.Plan;
             var from = Math.Max(0, plan.Count - journey.Remaining);
 
@@ -695,6 +686,7 @@ public static class BotWebSnapshot
         w.WriteNumber("dropped", BotWill.Dropped);
         w.WriteNumber("died", BotWill.Deaths);
         w.WriteNumber("share", ended <= 0 ? 0.0 : Math.Round((double)BotWill.Finished / ended, 4));
+
         var endedAll = ended + BotWill.Deaths;
         w.WriteNumber("shareWithDeaths", endedAll <= 0 ? 0.0 : Math.Round((double)BotWill.Finished / endedAll, 4));
         w.WriteNumber("target", 0.95);
@@ -703,6 +695,7 @@ public static class BotWebSnapshot
 
         foreach (var (kind, taken, finished, failed, dropped, died) in BotWill.Tallies())
         {
+
             var ends = finished + failed + dropped + died;
 
             w.WriteStartObject();
@@ -728,6 +721,7 @@ public static class BotWebSnapshot
         w.WriteNumber("reached", BotPath.Reached);
         w.WriteNumber("partial", BotPath.PartialRuns);
         w.WriteNumber("refused", BotPath.SealedRuns);
+
         w.WriteNumber("share", BotWalk.WalkerSearches <= 0 ? 0.0 : Math.Round((double)BotWalk.WalkerReached / BotWalk.WalkerSearches, 4));
         w.WriteNumber("walkerSearches", BotWalk.WalkerSearches);
         w.WriteNumber("walkerReached", BotWalk.WalkerReached);
@@ -804,6 +798,7 @@ public static class BotWebSnapshot
         }
         catch
         {
+
         }
 
         if (graph == null)
@@ -1133,6 +1128,7 @@ public static class BotWebSnapshot
                 w.WriteNumber("residents", BotResidence.Residents(town));
 
                 BotCharters.Write(w, town.Name);
+
                 BotStewardship.Write(w, town);
                 w.WriteEndObject();
             }
@@ -1226,6 +1222,7 @@ public static class BotWebSnapshot
         }
         catch
         {
+
         }
 
         if (report == null)

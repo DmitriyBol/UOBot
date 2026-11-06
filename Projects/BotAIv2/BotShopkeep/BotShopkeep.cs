@@ -10,35 +10,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Bots' own shops: a bot with goods to spare stands beside the bank of the town it lives in, calls out what it sells, and
-/// the bots that are short of those goods walk over and buy them out of its pack. Patrick's order of 29.09.2026, evening.
-///
-/// <para>
-/// <b>Why a shop and not a stall.</b> The auction was placeless: a stall held its goods out of the world and anybody anywhere
-/// bought from it without taking a step, so nothing about it could be seen and a town was not a place trade happened. A shop
-/// is the other way round. The goods stay in the keeper's own pack and bank box, where the engine keeps them and the save keeps
-/// them; a customer walks to the keeper and the goods move pack to pack at the till, paid for in coin that moves pack to pack
-/// (<see cref="Serve"/>). <b>Since 01.10.2026 it is the market</b> (Patrick's order of 30.09: the auction removed, all trade in
-/// Britain, guild traders at home, every purchase hand to hand): the stalls are gone, and a shop by Britain's bank — or a guild
-/// member's by its guild's own town's — is where one bot sells to another that comes to it.
-/// </para>
-///
-/// <para>
-/// <b>A shop wins where it is better and nowhere else.</b> A bot short of a supply (<c>BotShopper</c>) weighs a shop against a
-/// shopkeeper on price <em>and</em> the walk (<see cref="Beats"/>): the keeper's ask plus the minutes of walking to it, priced
-/// at what the shard reckons a shopping minute is worth (<see cref="WalkGold"/>, which follows <c>BotRestock.Prior</c>),
-/// against the shopkeeper's price plus the walk to the shopkeeper. A want is weighed the same way against its own offer
-/// (<see cref="BotPatron"/>). Ties go to the shop: coin paid to a bot stays in the population.
-/// </para>
-///
-/// <para>
-/// <b>Prices start where the island already is and move by the market's own steps.</b> A keeper opens a kind under what the
-/// nearest shopkeeper asks for it, or at what the market reckons it worth when that is less (<see cref="Opening"/>). A kind
-/// that sells again inside <c>BotMarket.BriskMs</c> goes up by <c>BotMarket.RaiseStep</c>; a kind nobody bought during a whole
-/// shift comes down by <c>BotMarket.CutStep</c>, both inside ×0.25…×4 of the opening ask.
-/// </para>
-/// </summary>
 public static class BotShopkeep
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotShopkeep));
@@ -776,7 +747,6 @@ public static class BotShopkeep
         return here >= PerBank;
     }
 
-    /// <summary>A pitch a keeper has taken the shift for and is walking to.</summary>
     private sealed class Hold
     {
         public Mobile Keeper;
@@ -1121,7 +1091,6 @@ public static class BotShopkeep
         front.Restock(_units, _asks, demanded);
     }
 
-    /// <summary>What one bot has to sell, reckoned for the proposer and kept for <see cref="LookMs"/>.</summary>
     public readonly record struct BotStock(int Units, int Kinds, int Worth, int Demanded);
 
     private static readonly Dictionary<Serial, (BotStock Stock, long Tick)> _looks = [];
@@ -1161,7 +1130,6 @@ public static class BotShopkeep
         return stock;
     }
 
-    /// <summary>One kind's price in one keeper's shop, and what it has learned from selling it.</summary>
     private sealed class Price
     {
         public int Anchor;
@@ -1208,6 +1176,7 @@ public static class BotShopkeep
 
         if (shelf > 0)
         {
+
             var open = Math.Min(BotMarket.Worth(kind, shelf), (int)Math.Round(shelf * ShelfShare));
 
             return open >= BotMarket.FloorFor(kind) ? open : 0;
@@ -1543,6 +1512,7 @@ public static class BotShopkeep
 
         if (body.Map != keeper.Map || !body.InRange(keeper.Location, ServeReach))
         {
+
             return BotDoing.Walk(front.Map, keeper, BotArrival.Within(ServeReach), $"to {keeper.Name}'s shop in {front.Town} for {kind.Name}");
         }
 
@@ -1735,6 +1705,7 @@ public static class BotShopkeep
         var units = Math.Min(wanted, available);
 
         var against = forWant ? kind : null;
+
         var purse = (int)Math.Min(BotYield.Wealth(body), (long)BotYield.Spendable(body) + (forWant ? BotMarket.ReservedFor(body, kind) : 0));
 
         if (purse < price)

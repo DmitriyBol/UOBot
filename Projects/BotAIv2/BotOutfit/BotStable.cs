@@ -5,44 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Buying a horse, and calling it up.
-///
-/// <para>
-/// <b>Why a miner and not a warrior.</b> A gatherer's whole day is the walk: out to the rock, back to the
-/// forge, back out again, with a pack heavy enough that stamina is the thing it actually runs out of. It is
-/// the one trade on this shard whose takings are limited by distance rather than by skill or by what it
-/// meets — which is exactly the bot a horse is worth five hundred gold to. Everything else here is written
-/// so that the next class to be given one needs no code at all: see <see cref="BotClass.Rides"/>.
-/// </para>
-///
-/// <para>
-/// <b>Not an errand, and it was one for an hour.</b> Buying a horse was written as a piece of work with a
-/// price on it, and a piece of work is measured: every ending, including being outbid halfway, writes what
-/// it came to per minute into the bot's ledger. What this comes to per minute is <em>nought</em> — always,
-/// even when it succeeds, because it does not earn five hundred gold, it spends it. So the forecast decayed
-/// towards <c>prior × 2 / (2 + tries)</c> and the errand poisoned itself: Bryn took it at 115 a minute on
-/// 27.08.2026, was outbid by his own copper seam half a minute later, and thereafter it was offered to him
-/// at 51, then 36, then 33, against mining at 260. It could never win again.
-/// </para>
-///
-/// <para>
-/// A number that is both a forecast and a bid, on a thing the measure cannot see: the horse pays back inside
-/// every <em>other</em> errand the bot ever runs, and there is nowhere in takings-per-minute to say that.
-/// This project already has the answer written down, in <c>BotPurse</c>, about the identical shape — moving
-/// coin to a bank "produces nothing by that measure, so the trip would score zero and never be chosen,
-/// however sensible it is. What it is instead is something a bot does <em>while it happens to be at a
-/// counter</em>." A horse is bought the same way: on the beat, out of trips the bot was making anyway.
-/// </para>
-///
-/// <para>
-/// <b>The five hundred gold is destroyed, and that is worth saying out loud.</b> This shard has one faucet —
-/// a monster's purse — and everything else moves coin about rather than making or unmaking it. A stablemaster
-/// is an ordinary shopkeeper as far as the world is concerned, so paying one is a sink, and a sink is the
-/// half of an economy this population has almost none of. It is the same shape as the crown's stipend read
-/// backwards, and it is the direction that needs no argument.
-/// </para>
-/// </summary>
 public static class BotStable
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStable));
@@ -98,6 +60,7 @@ public static class BotStable
 
         if (fromBank > 0 && !Banker.Withdraw(bot, fromBank))
         {
+
             if (fromPack > 0)
             {
                 pack.DropItem(new Gold(fromPack));

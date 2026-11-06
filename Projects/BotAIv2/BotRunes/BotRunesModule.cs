@@ -5,9 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What <c>Configuration/bot-runes.json</c> is allowed to say. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotRunesSettings
 {
+
     public bool? Running { get; set; }
 
     public double? LeastMagery { get; set; }
@@ -31,11 +31,6 @@ public sealed class BotRunesSettings
     public double? CrossSeconds { get; set; }
 }
 
-/// <summary>
-/// Runes as a module: reads its numbers and the guilds' knowledge, offers the mark and the blanks, and looks at the guilds'
-/// libraries on its own clock. The recall and the company's gate are asked by the walks that go far, not offered. See
-/// <see cref="BotRunes"/> — Patrick's order of 29.09.2026, point 7.
-/// </summary>
 public sealed class BotRunesModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRunesModule));

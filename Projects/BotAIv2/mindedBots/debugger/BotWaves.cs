@@ -7,30 +7,6 @@ using Server.Regions;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// Something to fight, when the watcher has called a hunt and the island has nothing to offer.
-///
-/// <para>
-/// <b>Patrick's order of 08.09.2026, and the shape of it is the whole design: waves that grow.</b> One weak
-/// thing, then two, then three, then a strong one with two weak, and so on to two strong and five weak. Not
-/// a horde dropped on the population at once — a shard where the answer to a revel is nine bots dead in a
-/// field has taught them nothing and cost an evening of skills — and not one lone rat either, which is a
-/// revel nobody notices.
-/// </para>
-///
-/// <para>
-/// <b>It spawns only when there is genuinely nothing to fight.</b> The island has its own spawns and they
-/// are the right ones to use; this exists for the case the log has been shouting about since the first
-/// evening — "nothing within 50 tiles of the bots is worth fighting, so no gold will enter the world". A
-/// revel for hunting declared into an empty field is a price rise on nothing at all.
-/// </para>
-///
-/// <para>
-/// <b>Everything it makes, it takes away.</b> The wave is remembered by reference, the next one waits for
-/// the last to be dead, and when the revel ends whatever is still standing is deleted. A shard that
-/// accumulates ettins because a watcher had an idea an hour ago is a shard nobody can measure.
-/// </para>
-/// </summary>
 public static class BotWaves
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWaves));
@@ -93,6 +69,7 @@ public static class BotWaves
     {
         if (!BotRevel.Running || !Running || !IsHunt(BotRevel.Kind))
         {
+
             Stand();
 
             return;
@@ -135,6 +112,7 @@ public static class BotWaves
 
         if (weak + strong == 0)
         {
+
             return;
         }
 
@@ -185,6 +163,7 @@ public static class BotWaves
     {
         foreach (var creature in map.GetMobilesInRange<BaseCreature>(middle, Reach))
         {
+
             if (creature is { Deleted: false, Alive: true, Controlled: false, Summoned: false } &&
                 creature.Karma < 0)
             {

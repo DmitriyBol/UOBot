@@ -5,25 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Going back for what death took. The bot own corpse, and nobody else.
-///
-/// <para>
-/// <b>Only the weapon and the book are bound; everything else is lying where the bot fell.</b> The kit was
-/// deliberately narrowed to that — tools wear out and are bought again, coin is meant to move — which makes
-/// dying cost a hammer, a pickaxe, a sewing kit, the bandages, the herbs and whatever was in the purse. One
-/// warrior-archer died holding four hundred gold and the ledger recorded it plainly: <c>-400 coin</c>. All of
-/// it was still there, twenty tiles away, and nothing in the population had any reason to go and get it.
-/// </para>
-///
-/// <para>
-/// So this is not a new mechanic so much as the missing half of an old one. The corpse is remembered on the
-/// bot at the moment of death — no sweeping the world for it — and it stops being remembered the moment it is
-/// emptied, decays, or turns out to hold nothing.
-/// </para>
-/// </summary>
 public sealed class BotReclaim : BotDeed
 {
+
     public const string Trade = "reclaim";
 
     public static double Prior { get; set; } = 20.0;
@@ -94,6 +78,7 @@ public sealed class BotReclaim : BotDeed
 
         if (_corpse == null || _corpse.Deleted || _corpse.Map != _map)
         {
+
             Forget(bot);
 
             return BotDoing.Done("there was nothing left of it");
@@ -180,15 +165,6 @@ public sealed class BotReclaim : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a bot the trip back to its own corpse, and only its own.
-///
-/// <para>
-/// On the ordinary rung, competing on the same arithmetic as everything else, which is right: a pickaxe and
-/// four hundred gold lying in a field is worth going for, and a corpse holding a handful of bandages is not
-/// worth a walk across Britain. The ledger settles which is which from what actually comes back.
-/// </para>
-/// </summary>
 public sealed class BotUndertaker : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotUndertaker));
@@ -224,6 +200,7 @@ public sealed class BotUndertaker : IBotProposer
 
         if (!BotPopulation.Within(body.Map, corpse.Location))
         {
+
             if (Deep && Below(corpse.Location))
             {
                 DeepNoWay++;

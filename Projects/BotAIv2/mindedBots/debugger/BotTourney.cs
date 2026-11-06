@@ -7,64 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The championship: every hour Argus's herald calls the strongest of the ranks to a ring, sets them against each other one
-/// pair at a time for the right to challenge the champion, and the one left standing meets the champion for the title.
-///
-/// <para>
-/// <b>Patrick's order of 15.09.2026.</b> Thirty entrants, one against one, the winner goes on; the champion's name
-/// turns yellow and it is handed a weapon or a piece of armour fit for its class. Held by the calendar, and by hand
-/// through the door (<c>do tourney</c>) whenever somebody wants to see one.
-/// </para>
-///
-/// <para>
-/// <b>Patrick, 02.10.2026: "I have never once seen a fight for the champion's title; it seems to me this mechanic is
-/// completely broken."</b> It had no such fight to show. Every hour was a fresh knockout and the champion one more entrant,
-/// seeded by power like anybody: of the 14 championships between the wipe of 01.10.2026 11:32 and build 389, not one ended
-/// with the champion meeting a challenger. The champion entered only 6 of the 13 that followed a crown — the other seven it
-/// was with a company or resting — and lost before any final in all six. Six of the fourteen finals were never fought at all:
-/// one finalist "with a company" forfeited, and twice the bot crowned was the one with the company ("Miriel is with a company
-/// and forfeits; Miriel goes on", crowned at 07:27), because a pair with both sides busy sent the busy one on. The record of who held the
-/// title was a file under <c>Saves/</c>, which every world save moves into the backups, so each of the five boots since the
-/// wipe began "champion nobody" with the hour's clock restarted. And nothing was said where a player could hear it: the
-/// session log, and one local line over the winner's head at the ring.
-/// </para>
-///
-/// <para>
-/// <b>So now: the ranks fight for the shot, the champion defends, the title changes hands in the ring.</b> The champion is
-/// kept out of the bracket. When one challenger is left, the title bout is called: champion against challenger, in the ring,
-/// announced in the world channel before and after. With the title vacant the bracket's final is the title bout. A champion
-/// who cannot come — resting, with a company, down a dungeon, dead — is waited for <see cref="TitleWaitMs"/>; still away, it
-/// is stripped and the challenger crowned, and a challenger who cannot come leaves the champion the title. Every outcome has
-/// its own counter in the summary. The record — the champion, when its reign began, its defences, when the last was held —
-/// is kept by the world save (<see cref="BotTourneyStore"/>), so a deploy no longer forgets the champion.
-/// </para>
-///
-/// <para>
-/// <b>Driven from the watcher's own beat, one pair at a time, and nothing here holds the game loop.</b> Each beat
-/// looks at one thing: whether the next pair should be called, whether the pair in the ring has been decided, whether the
-/// pause between fights is over, or whether the champion and its challenger are both free for the title bout. The duel itself
-/// is <see cref="BotDuel"/> — the pair, the rule, and the two brawls pressed on the fighters — and the fighters' own bodies do
-/// the fighting. Argus's part is the summons, the healing, the bracket and the prize: exactly a referee's.
-/// </para>
-///
-/// <para>
-/// <b>Only the pair in the ring is summoned.</b> The other entrants go on with their day and are lifted to the ring
-/// when their turn comes, so the shard is not stood still for half an hour with thirty bots in a field; a loser walks
-/// home from the ring like anybody sent anywhere. Bots in a company are not called — a company owns where its members
-/// stand — and neither is anybody with a class paid nothing, which is the Baron. The ring is chosen among the towns each
-/// championship (<see cref="BotVenues"/>), weighted by where the entrants are.
-/// </para>
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "Still NOT ONCE have I seen a championship where a champion is chosen in battle", and then: "a minimum of 50
-/// participants, 25 sparrings, and only once A DAY".</b> By default the championship is now held at the round arenas east of Papua
-/// (<see cref="Arena"/>, the other half of this class in <c>BotTourneyArena.cs</c>): once a real day, at least
-/// <see cref="MinEntrants"/> free bots, ported there in batches, a batch's pairs fought at once one pair to a ring, the referee shown at
-/// the main ring. What follows in this file is the hourly town-ring knockout, kept behind the dial, and the parts both share: the
-/// title, the prize, the record.
-/// </para>
-/// </summary>
 public static partial class BotTourney
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTourney));
@@ -232,6 +174,7 @@ public static partial class BotTourney
 
     public static void Save(IGenericWriter writer)
     {
+
         writer.WriteEncodedInt(2);
         writer.Write(_held.ToUniversalTime().Ticks);
         writer.Write(Champion ?? "");
@@ -309,6 +252,8 @@ public static partial class BotTourney
         {
             who.Add(holder);
         }
+
+        // At the fair while one is open (07.10.2026, events17): "a tournament before Argus" in the fair's town, when its square
 
         Venue = (BotFair.TownName is { } fair ? BotVenues.InTown(BotVenues.Use.Ring, BotPopulation.Home ?? Map.Felucca, fair) : null)
                 ?? BotVenues.Choose(BotVenues.Use.Ring, BotPopulation.Home ?? Map.Felucca, who);
@@ -448,6 +393,7 @@ public static partial class BotTourney
         switch (_stage)
         {
             case Stage.Idle:
+
                 if (now - _turnedTick >= 60000 && Due(DateTime.Now))
                 {
                     var before = Called;
@@ -540,6 +486,7 @@ public static partial class BotTourney
 
     private static void Call(long now)
     {
+
         _round.RemoveAll(m => m is not { Deleted: false, Alive: true });
         _next.RemoveAll(m => m is not { Deleted: false, Alive: true });
 
@@ -909,6 +856,7 @@ public static partial class BotTourney
 
         if (winner == null)
         {
+
             if (!BotDuel.InBout(_a) && !BotDuel.InBout(_b))
             {
                 winner = _a is { Deleted: false, Alive: true } ? _a : _b;
@@ -949,6 +897,11 @@ public static partial class BotTourney
                     _reignSince
                 );
 
+                if (!(ArenaOn && _forced))
+                {
+                    BotStory.Defended(winner.Name, loser?.Name, _reignDefences);
+                }
+
                 Finish($"{Billing(winner)} defends the title against {loser?.Name} — {_reignDefences} {(_reignDefences == 1 ? "defence" : "defences")} now.", false);
                 winner.Say($"The title stays with me, {loser?.Name}.");
 
@@ -968,6 +921,7 @@ public static partial class BotTourney
 
         if (title)
         {
+
             _vacantFought = true;
             BotVenues.Release();
         }
@@ -982,6 +936,7 @@ public static partial class BotTourney
 
     private static void Crown(BotMobile winner, string how, string line)
     {
+
         if (ArenaOn && _forced && !string.IsNullOrEmpty(Champion))
         {
             _stage = Stage.Idle;
@@ -1022,6 +977,16 @@ public static partial class BotTourney
         );
 
         BotVenues.Announce(test ? $"{line} (A test bout: no prize.)" : line);
+
+        if (!test)
+        {
+            BotStory.Crowned(winner, how);
+        }
+        else
+        {
+
+            BotStory.TestCrowned(winner);
+        }
 
         winner?.Say($"I am the champion of this island, and my name is {winner.Name}!");
     }
@@ -1727,17 +1692,6 @@ public static partial class BotTourney
     }
 }
 
-/// <summary>
-/// Keeps the championship's record in the world save: when the last one was held, who holds the title, since when and with how
-/// many defences, and the last places the watchers held their events (<see cref="BotVenues"/>).
-///
-/// <para>
-/// <b>A file of its own under <c>Saves/</c> is not kept.</b> The record was <c>Saves/BotTourney/tourney.txt</c>, written at each
-/// crown; every world save moves the whole folder into the backups, so each boot found no file, the champion was nobody and the
-/// hour began again — five boots between the wipe of 01.10.2026 and build 389, and Kael (crowned 19:21) and Cirdan (09:50) each lost a
-/// title nobody had taken from them. A persistence is written into the save itself, as the other records of this shard are.
-/// </para>
-/// </summary>
 public sealed class BotTourneyStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTourneyStore));

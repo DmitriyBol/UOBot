@@ -3,28 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A thief that has thought of robbery and found nobody to rob, going to where the work is and waiting there.
-///
-/// <para>
-/// <b>The thought had nowhere to go, and that is the whole of why this island has no robberies.</b> On 18.09.2026 the
-/// roll read "193 rolls for the thought of robbery at 2.0% every 10 min, 7 came up, 4 sent to practise hiding first,
-/// <b>3 found nobody alone with 50gp outside a town</b>, 0 pressed into a robbery". Every one of the three was a
-/// thief able to rob: one of them, Pell, was standing in the middle of Britain when the thought came, and the other
-/// two were alone in the wilds where they hunt. A temptation that comes once in ten minutes and dies on the spot
-/// because of where the bot happened to be standing is a temptation that never happens at all — and the rarity is
-/// Patrick's number, deliberately set (see <c>BotRob.Chance</c>), so the answer cannot be to make it commoner.
-/// </para>
-///
-/// <para>
-/// <b>So the thief does what a robber does: it goes to the road and waits.</b> The island already knows where its
-/// people are — <c>BotCommons</c> keeps what pays where, measured by the population itself, and those places are
-/// exactly where lone bots with coin in their packs go all day. The nearest one outside a town and beyond
-/// <c>BotRob.FromTown</c> of a ward is where it lies in wait, hidden, for <see cref="WaitMs"/>; the first mark that
-/// comes within reach is set on through the ordinary machinery, and if none comes the thought lapses as it would have
-/// anyway.
-/// </para>
-/// </summary>
 public sealed class BotWaylay : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWaylay));

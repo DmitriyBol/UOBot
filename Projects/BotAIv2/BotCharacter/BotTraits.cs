@@ -5,7 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The ten natures a bot can have, in five opposed pairs. A bot has two or three, never both of one pair.</summary>
 [Flags]
 public enum BotTrait
 {
@@ -22,44 +21,6 @@ public enum BotTrait
     Solitary = 512
 }
 
-/// <summary>
-/// A bot's nature: two or three traits drawn at birth from five opposed pairs, each one a single multiplier in the auction on
-/// the work it touches, and the veteran's title.
-///
-/// <para>
-/// <b>Patrick's idea of 07.10.2026, approved for the night: "each bot gets 2–3 traits at birth (greedy/generous,
-/// cautious/reckless, homebody/wanderer, vindictive) that really shift its auction of work".</b> A trait is a price, never an
-/// order, in the shape the guild's charter and the watcher's revels already are: <see cref="Nature"/> multiplies the score
-/// after the root (as the calling and the toll do), so ×1.15 is ×1.15 and not its fifth root, and the take line says it:
-/// "; × 1.15 for its nature (greedy)". Greedy prices trading, peddling, keeping a shop, hauling and plunder up and a rescue,
-/// an escort, a house call or a lesson down; generous the reverse. Cautious prices delves, sweeps, raids and harrows down, and
-/// reckless up. A homebody prices a long walk (past <see cref="FarTiles"/>, or travel, a voyage, a prowl, a venture, a scout, a
-/// prospect) down and a wanderer up. Vindictive prices a grudge (<see cref="BotGrudge"/>) or a manhunt up and forgiving down.
-/// Sociable prices a fire, a chat, a meeting and a company up and solitary down.
-/// </para>
-///
-/// <para>
-/// <b>The population's totals must not swing.</b> Each pair is up by <see cref="Lean"/> on one side and down by the same on the
-/// other, so with the sides drawn evenly the mean multiplier on any trade across the island is one; the boot line prints the
-/// distribution and the mean the drawn population actually gives each group of work. The whole product is held inside
-/// [<see cref="Least"/>, <see cref="Most"/>].
-/// </para>
-///
-/// <para>
-/// <b>Cautious and reckless also change two numbers in the fight itself, and never past Patrick's hard limits.</b> A cautious
-/// bot alone takes on quarry only to ×<see cref="CautiousDaring"/> of the standing daring (<c>BotQuarry.Daring</c>) and gives a
-/// losing fight up at ×<see cref="CautiousFlee"/> of the standing flight share (<c>BotSlay.FleeAt</c>); a reckless one at
-/// ×<see cref="RecklessDaring"/> and ×<see cref="RecklessFlee"/>. The daring never goes past the flight rule's tolerance
-/// (<c>BotThreat.Tolerance</c>: a bot does not walk to something it would run from) and the flight share never below
-/// <see cref="FleeFloor"/>; casters are fought to the end as before, because that rule is the slayer's and is untouched.
-/// </para>
-///
-/// <para>
-/// Drawn from the bot's name (a stable hash, not .NET's per-process one), so the first boot after this build gives every
-/// living bot the same nature it will have on every boot after; and kept by <see cref="BotCharacterStore"/>, so a dial change
-/// to the drawing never rewrites who anybody already is.
-/// </para>
-/// </summary>
 public static class BotTraits
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTraits));

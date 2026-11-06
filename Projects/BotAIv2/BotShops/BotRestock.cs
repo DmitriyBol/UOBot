@@ -4,25 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Going to a shop and buying what the bot has run out of.
-///
-/// <para>
-/// <b>Maintenance is the one kind of work a takings-per-minute measure prices badly, and this is how it is
-/// handled honestly.</b> Buying creates no wealth: coin becomes goods. So the takings are declared as what
-/// was paid — <see cref="Made"/> equals the bill — which makes the trip come out at roughly nothing per
-/// minute rather than at a loss. It is therefore never <em>punished</em> and never preferred over work that
-/// actually produces something, which is exactly the right place for an errand to the shops.
-/// </para>
-///
-/// <para>
-/// The one number that does real work here is <see cref="Outlay"/>: it is what the decision layer measures
-/// need against, so a bot that cannot afford its own bandages is a bot that feels short of money — and stops
-/// feeling short the moment it can.
-/// </para>
-/// </summary>
 public sealed class BotRestock : BotDeed
 {
+
     public const string Trade = "restock";
 
     public static double Prior { get; set; } = 12.0;
@@ -114,6 +98,7 @@ public sealed class BotRestock : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+
         if (_merchant != null)
         {
             bot?.Resolve?.Ledger?.Beware(BotShops.ShopKind, _merchant.Map, _merchant.Location);
@@ -213,6 +198,7 @@ public sealed class BotRestock : BotDeed
 
             if (lot == null)
             {
+
                 var next = BotShops.Nearest(bot, _wanted);
 
                 if (next != null)
@@ -255,6 +241,7 @@ public sealed class BotRestock : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
+
             if (BotRecall.Instead(bot, _shop.Map, _shop.Location, BotShops.CounterReach, _shop.Name, ref _recall) is { } cast)
             {
                 return cast;
@@ -267,6 +254,7 @@ public sealed class BotRestock : BotDeed
 
         if (_bought <= 0)
         {
+
             var next = BotShops.Next(bot, _shop, _wanted, ref _repicks);
 
             if (next != null)

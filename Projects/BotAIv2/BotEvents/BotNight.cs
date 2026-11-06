@@ -3,20 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The night (07.10.2026, Patrick's fourth idea: "roads are more dangerous at night, night deliveries pay more"). Between
-/// <see cref="From"/> and <see cref="To"/> of the shard's own clock — the engine's <c>Clock.GetTime</c>, five real seconds to a
-/// game minute, so a game day is two real hours and its night forty minutes — the danger the walk prices on a road is
-/// <see cref="Danger"/> times what it is by day (<c>BotDanger.Cost</c> on every node, <c>BotDanger.Road</c> on the straight line
-/// before far work is offered), and carriage pays <see cref="Pay"/> times as much: a trader's carriage on a haul
-/// (<c>BotTrading.Quote</c>, never above the buyer's own ceiling) and a caravan's premium and guards' wage (<see cref="BotCaravans"/>).
-///
-/// <para>
-/// <b>Read where the population lives.</b> The engine's hour depends on the longitude (<c>x / 16</c> game minutes), so Britain and
-/// Moonglow do not agree about midnight by forty game minutes. One hour for the whole island is read at the population's home
-/// (<see cref="BotPopulation.Where"/>) once a beat; a road is not dearer at one end than at the other.
-/// </para>
-/// </summary>
 public static class BotNight
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotNight));

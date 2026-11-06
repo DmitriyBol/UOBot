@@ -6,40 +6,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// How long a bot plays before it is tired, and the rest it takes before it plays again.
-///
-/// <para>
-/// <b>Patrick's order of the night of 24.09.2026: bots have their own stamina for the game.</b> One is fresh for five
-/// hours, another plays three, another ten — from the worker who plays after his shift to the player who never
-/// stops — and then they tire, leave the world, rest for five to eight hours and come back. Everybody tires at a
-/// different time, so the island is never empty.
-/// </para>
-///
-/// <para>
-/// <b>A tired bot finishes what it is doing, and only then goes.</b> Tiredness takes nothing away: it closes the
-/// auction, so the bot is offered nothing new (<see cref="BotWill"/>), and the bot leaves the first time it is free —
-/// nothing in hand, in no company, not in a fight, not underground, not in a cell, not in a duel. A bot still not free
-/// <see cref="GraceMs"/> after it tired is let go of its work and its company and leaves anyway; a fight, a dungeon and
-/// a cell are waited out, because nobody walks out of those.
-/// </para>
-///
-/// <para>
-/// <b>Leaving is logging out, the engine's own way.</b> The body goes to <c>Map.Internal</c> with its place written to
-/// <c>LogoutLocation</c> — exactly where the engine parks a player with no connection — and its slot in the population
-/// becomes a hole (<see cref="BotPopulation.Park"/>), so nothing that walks the population can see it or offer it
-/// anything: not the auction, not the companies, not the guilds' muster, not the watchers. It comes back where it left,
-/// or at home when that ground no longer takes a body.
-/// </para>
-///
-/// <para>
-/// How long a bot plays is a fact about the bot rather than a roll each session: its kind is dealt once, from a deck
-/// holding the kinds in their exact shares (<see cref="Deal"/>), and kept, so a keen player stays keen across restarts
-/// and the log can say which kind each one is. How long it rests is rolled every time.
-/// Play counts only while the bot is in the world and the shard is up; rest counts on the wall clock, shard or no shard,
-/// because a player's evening does not stop when the server does. Both are kept in <see cref="BotRestStore"/>.
-/// </para>
-/// </summary>
 public static class BotRest
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRest));
@@ -76,7 +42,7 @@ public static class BotRest
 
     public static long Early { get; private set; }
 
-    private static readonly List<(BotMobile Bot, Record Record, double Over)> _due = [];
+    private static readonly List<(BotMobile Bot, Record Record, double Over, bool AtBed)> _due = [];
 
     private static int _heldByFloor;
 
@@ -131,6 +97,7 @@ public static class BotRest
 
     internal sealed class Record
     {
+
         public int Kind = -1;
 
         public double Hours;
@@ -158,6 +125,50 @@ public static class BotRest
         public int Paid;
 
         public DateTime BuffUntil;
+
+        public bool AtBed;
+
+        public bool HeldAtBed;
+    }
+
+    internal static BotBedPlace BedOf(Record record) =>
+        record?.Inn == null ? BotBedPlace.Ground
+        : record.Inn == "its own house" ? BotBedPlace.Home
+        : record.Inn.StartsWith(BotCamp.FirePrefix, StringComparison.Ordinal) ? BotBedPlace.Field
+        : BotBedPlace.Inn;
+
+    public static void Sleepers(out int home, out int inn, out int field, out int ground)
+    {
+        home = 0;
+        inn = 0;
+        field = 0;
+        ground = 0;
+
+        var away = BotPopulation.Away;
+
+        for (var i = 0; i < away.Count; i++)
+        {
+            if (away[i] is not { Deleted: false } bot || !_records.TryGetValue(bot.Name ?? "", out var record) || record.RestUntil == default)
+            {
+                continue;
+            }
+
+            switch (BedOf(record))
+            {
+                case BotBedPlace.Home:
+                    home++;
+                    break;
+                case BotBedPlace.Inn:
+                    inn++;
+                    break;
+                case BotBedPlace.Field:
+                    field++;
+                    break;
+                default:
+                    ground++;
+                    break;
+            }
+        }
     }
 
     private static readonly Dictionary<string, Record> _records = new(StringComparer.OrdinalIgnoreCase);
@@ -492,10 +503,18 @@ public static class BotRest
 
             var over = record.PlayedMinutes - record.Hours * 60;
 
-            if (over < 0)
+            var atBed = BotDay.AtBed(bot, record.Hours > 0 ? record.PlayedMinutes / (record.Hours * 60) : 0.0, out _);
+
+            if (!atBed)
+            {
+                record.HeldAtBed = false;
+            }
+
+            if (over < 0 && !atBed && !(bot.Tired && record.AtBed))
             {
                 bot.Tired = false;
                 record.TiredTick = 0;
+                record.AtBed = false;
                 continue;
             }
 
@@ -505,7 +524,7 @@ public static class BotRest
             }
             else
             {
-                _due.Add((bot, record, over));
+                _due.Add((bot, record, over, atBed));
             }
         }
 
@@ -526,15 +545,22 @@ public static class BotRest
 
         var tiredNow = 0;
 
-        _due.Sort((a, b) => b.Over.CompareTo(a.Over));
+        _due.Sort((a, b) => a.AtBed != b.AtBed ? b.AtBed.CompareTo(a.AtBed) : b.Over.CompareTo(a.Over));
 
         for (var i = 0; i < _due.Count; i++)
         {
-            var (bot, record, _) = _due[i];
+            var (bot, record, over, atBed) = _due[i];
 
             if (allowance <= 0)
             {
                 _heldByFloor++;
+
+                if (atBed && !record.HeldAtBed)
+                {
+                    record.HeldAtBed = true;
+                    BotDay.HeldPastBed++;
+                }
+
                 continue;
             }
 
@@ -585,14 +611,27 @@ public static class BotRest
             bot.Tired = true;
             record.TiredTick = tick;
             record.HeldTick = 0;
+            record.AtBed = atBed && over < 0;
+            record.HeldAtBed = false;
             BotCritical.Tired(bot);
 
+            if (atBed)
+            {
+                BotDay.ToBedOnTime++;
+
+                if (over < 0)
+                {
+                    BotDay.ToBedEarly++;
+                }
+            }
+
             logger.Information(
-                "{Name} the {Class}, {Kind}, is tired after {Played:0.0}h of play and takes on nothing new; it leaves when it is free",
+                "{Name} the {Class}, {Kind}, is tired after {Played:0.0}h of play{Bed} and takes on nothing new; it leaves when it is free",
                 bot.Name,
                 bot.Class?.Name,
                 KindName(record),
-                record.PlayedMinutes / 60.0
+                record.PlayedMinutes / 60.0,
+                atBed ? (over < 0 ? " - its bedtime, before its hours" : " - its bedtime") : ""
             );
         }
 
@@ -617,6 +656,7 @@ public static class BotRest
 
             if (held == null)
             {
+
                 if (BotCamp.Beds(bot))
                 {
                     Leave(bot, record, null);
@@ -625,6 +665,12 @@ public static class BotRest
 
                 if (BotRepose.HomeToRest(bot))
                 {
+                    continue;
+                }
+
+                if (BotDay.PrefersField(bot) && BotCamp.ToFire(bot, fieldFirst: true))
+                {
+                    BotDay.FieldFirst++;
                     continue;
                 }
 
@@ -676,25 +722,30 @@ public static class BotRest
 
             if (present < floor)
             {
-                List<(BotMobile Bot, Record Record)> soon = [];
+                List<(BotMobile Bot, Record Record, bool Awake)> soon = [];
 
                 for (var i = 0; i < away.Count; i++)
                 {
                     if (away[i] is { Deleted: false } bot && _records.TryGetValue(bot.Name ?? "", out var record)
                         && record.RestUntil != default && (record.RestUntil - now).TotalMinutes <= window)
                     {
-                        soon.Add((bot, record));
+                        soon.Add((bot, record, BotDay.Awake(bot)));
                     }
                 }
 
-                soon.Sort((a, b) => a.Record.RestUntil.CompareTo(b.Record.RestUntil));
+                soon.Sort((a, b) => a.Awake != b.Awake ? b.Awake.CompareTo(a.Awake) : a.Record.RestUntil.CompareTo(b.Record.RestUntil));
 
                 var came = 0;
 
                 for (var i = 0; i < soon.Count && present < floor && came < most; i++)
                 {
-                    var (bot, record) = soon[i];
+                    var (bot, record, awake) = soon[i];
                     var early = (record.RestUntil - now).TotalMinutes;
+
+                    if (awake)
+                    {
+                        BotDay.WokeOnTime++;
+                    }
 
                     if (scheduled && early > EarlyMinutes)
                     {
@@ -862,6 +913,7 @@ public static class BotRest
     {
         if (letGoOf != null)
         {
+
             if (bot.Squad is { } company)
             {
                 if (ReferenceEquals(company.Leader, bot))
@@ -905,6 +957,8 @@ public static class BotRest
 
         record.PlayedMinutes = 0;
         record.TiredTick = 0;
+        record.AtBed = false;
+        record.HeldAtBed = false;
         record.Sessions++;
         record.LeftAt = Core.Now;
         record.RestUntil = Core.Now + TimeSpan.FromHours(rest);
@@ -977,6 +1031,8 @@ public static class BotRest
             record.RestUntil = default;
             record.PlayedMinutes = 0;
             record.TiredTick = 0;
+            record.AtBed = false;
+            record.HeldAtBed = false;
         }
 
         bot.Tired = false;
@@ -998,10 +1054,12 @@ public static class BotRest
 
         if (record is { Paid: > 0, Inn: not null } && call == null && rested > 0.0)
         {
+
             BotInns.Rested(bot, rested * BotTaverns.SupperFactor(record.Inn), out var until);
             record.BuffUntil = until;
             buff = $", rested well at {record.Inn}: regenerating until {until.ToLocalTime():HH:mm}";
         }
+
         else if (call == null && rested > 0.0 && BotCamp.Rested(bot, record?.Inn, rested, out var fireUntil))
         {
             record.BuffUntil = fireUntil;

@@ -6,30 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who on the island can write which circle, what a scroll no shelf sells may be asked for, which scribe is writing which want,
-/// and the scribes' counts for the <c>Needs:</c> line.
-///
-/// <para>
-/// <b>Measured before it (03.10.2026, build 395, Patrick: "the focus of tonight's work is 99 % fulfilment of Needs").</b> Scroll
-/// lines failed in every session of 02.10: Greater Heal 0 met of 5, 4 and 2 lines, Lightning 0 of 9, Harm 1 of 6. The failure
-/// named was "passed over: trader found nowhere to have it" (Lightning: passed over 1252 times, 1089 of them for that), which is
-/// true and says nothing: no shelf sells a circle above the third, so only a bot scribe can answer one, and the scribes did not
-/// write — "took on inscribe" 0 times in 85 minutes at 15:26, 0 in 60 at 16:51, once at 17:54. Meanwhile the wants climbed:
-/// each new Greater Heal want opened at the dearest one standing (63, 82, 142gp) and raised four times over that, so Cirdan's
-/// reached 326gp for a scroll whose paper and herbs cost 17gp, and at 03:12:25 on 03.10 its want for Raw Ribs stood down because
-/// "329gp will not pay for one at 5gp".
-/// </para>
-///
-/// <para>
-/// <b>What a scroll may be asked for is what writing it costs here, and a fifth on top</b> (<see cref="Ceiling"/>): the paper and
-/// herbs of one attempt at the island's lowest counter prices, over the success chance of the best scribe on the island who can
-/// write the circle, with <see cref="BotQuill.Markup"/> — never below the shop step the want opens at. Raising past it buys
-/// nothing: a scribe takes a paid scroll before practice whatever the price (<see cref="BotQuill.Plan"/>), so a louder offer only
-/// holds more of the buyer's money away from its other lines. A circle nobody on the island can write is said once in the log and
-/// its wants are held at the price they open at.
-/// </para>
-/// </summary>
 public static class BotScribes
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotScribes));

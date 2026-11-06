@@ -3,30 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Moving house: the walk to the town a bot is going to live in, and the moment it lives there.
-///
-/// <para>
-/// <b>The road is the traveller's own (<see cref="BotTravel"/>), held inside rather than copied.</b> The walk is drawn a leg
-/// at a time over the graph, through a cave mouth when one is on the way; arriving walks the road in the book and tells the
-/// guild what it read on the danger map, exactly as a journey for its own sake does. So a move is also a journey in the
-/// travel line's counts, and the traveller's clock is stamped, so the bot is not offered a sightseeing trip the moment it
-/// has unpacked.
-/// </para>
-///
-/// <para>
-/// <b>It lives there from the moment it sets out</b> (<see cref="Taken"/>), not from the moment it arrives. A bot that dies
-/// on the road rises in its new town rather than walking the road twice; one that gives up on the road has its walk home
-/// lead there. And the offer itself changes nothing: a bot that never takes the move lives where it did (DECISIONS C9).
-/// </para>
-///
-/// <para>
-/// <b>Unpaid, and priced like the walk home.</b> It is worth <see cref="Prior"/> a minute — above a journey's eight and the
-/// walk home's five, below any trade — so it is what a bot does when nothing else is worth doing; and like the walk home it
-/// declares the walk as the work, since the auction weighs an offer by the share of its time spent working and a move is
-/// nothing but the walk.
-/// </para>
-/// </summary>
 public sealed class BotResettle : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotResettle));

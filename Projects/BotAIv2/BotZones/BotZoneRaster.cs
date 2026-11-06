@@ -3,23 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Where attacking creatures have actually been seen awake: one number per cell of four tiles, fading with time.
-///
-/// <para>
-/// <b>Awake sightings only.</b> A creature on sleeping ground stands where the spawner put it and never moves (see
-/// <see cref="BotWake"/>), so its position is a fact about now and nothing about where it goes; counting it would paint the
-/// spawn points and call that a patrol. The living creatures' positions reach the build separately, from the register.
-/// </para>
-///
-/// <para>
-/// <b>Fading, and slowly.</b> A sighting weighs one, halved every <see cref="HalfLifeMinutes"/>. The decay is lazy — a cell is
-/// brought up to date only when it is touched or read — so a raster of 1.8 million cells costs nothing for the ones nobody
-/// has seen anything in. The cells ever touched are kept in a list so a build can collect them without walking the map.
-/// </para>
-/// </summary>
 public static class BotZoneRaster
 {
+
     public static int HalfLifeMinutes { get; set; } = 360;
 
     public static float MostWeight { get; set; } = 64f;

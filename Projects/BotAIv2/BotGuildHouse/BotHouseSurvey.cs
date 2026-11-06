@@ -11,56 +11,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The empty buildings of the towns: walls round a floor, a roof over it, a doorway with no door in it — read once from the
-/// map's own statics, the way the engine's door generator reads them, and kept on disk.
-///
-/// <para>
-/// <b>Patrick's idea of 29.09.2026, evening: "one or two guilds may settle in each of the other towns, but only in an empty
-/// and suitable building; when a guild settles there, a door is put in and a sign hung on the wall."</b> A building in a UO
-/// town is not an object anywhere — it is statics on the map, and its doors and shop signs are items the world was decorated
-/// with. So a building has to be found the way the engine itself finds one: <c>DoorGenerator</c> (the <c>[DoorGen</c>
-/// command) recognises a doorway as a west door-frame static with an east one two or three tiles along the same row, or a
-/// north frame with a south one two or three tiles down the same column, and puts a door (or a linked pair) between them.
-/// This survey reads the same frames with the same public tests (<c>DoorGenerator.IsWestFrame</c> and the rest) and asks,
-/// for each doorway, what lies on its two sides.
-/// </para>
-///
-/// <para>
-/// <b>A side is a room when a flood from it stops by itself.</b> The flood walks the floor with the planner's own step model
-/// (<see cref="BotStep.Mask"/>, land and statics), four ways, inside a band of a storey round the doorway's height, and treats
-/// every doorway it knows as shut; a side that runs past <see cref="MaxArea"/> tiles is the street. A doorway with a room on
-/// one side and the street on the other is a way in; one with rooms on both sides joins them into one building. A building
-/// is kept when its floor is at least <see cref="MinArea"/> and at most <see cref="MaxArea"/> tiles, at least
-/// <see cref="RoofShare"/> of it is under a roof or an upper floor, it has at most <see cref="MostEntrances"/> ways in, and
-/// no forge, anvil, oven or hearth stands in its statics — those are workshops the bots already use
-/// (<c>BotGround</c>). What the world has put in it since — a door, a spawner, a shopkeeper living there, a house, an inn's
-/// region — is asked every boot and before every settling by <see cref="Occupied"/>, because the world changes and the map
-/// files do not.
-/// </para>
-///
-/// <para>
-/// <b>Why a floor of sixty-four tiles.</b> The small one-room cottages every town is built of have a floor of 42 to 49 tiles
-/// (7 by 7 walls, measured from the client's own map on 29.09.2026); they are 40 of Britain's 97 buildings with a way out,
-/// 10 of Minoc's 26, 19 of Yew's 56 and 46 of Nujel'm's 63, and they are private homes by the world's design. Sixty-four —
-/// eight by eight — is the first size past them: the two-room houses and the halls of 90 to 350 tiles, room for a guild of
-/// five to fifteen to be born and rise in (<c>BotGuildHouses.Spread</c> puts a body down within three tiles of the heart)
-/// without spilling into the street. This survey, run on 29.09.2026 through the engine itself against the client's
-/// Felucca files with the world decorated and the spawn files' spawners laid down (a scratch test host, not the shard),
-/// kept 287 buildings of 64 to 400 tiles and found free, after the live checks: 20 in Britain, 2 in Minoc, 9 in Trinsic,
-/// 4 in Vesper, 19 in Yew and none in Cove — 127 had a spawner in them (a shop, a bank, a healer), 30 a hearth or forge
-/// set down as an item, 18 a door already, and 23 lay in an inn's rooms. 1.7 seconds of the loop in 204 slices, the
-/// worst 29ms. The boot line says what the shard itself finds.
-/// </para>
-///
-/// <para>
-/// <b>Read once, kept on disk, sliced on the loop.</b> Scanning every tile of eighteen town regions for frames and flooding
-/// both sides of some thousand doorways is a few seconds of the loop, so it runs a slice of <see cref="SliceMs"/> a tick
-/// and writes what it found to <see cref="CachePath"/> under <c>Distribution</c>, keyed by the engine's fingerprint of the
-/// map files (<c>TileMatrix.MapFilesFingerprint</c>) and the numbers above — as <c>BotSeaChart</c> does. Never under
-/// <c>Saves</c>, which the engine moves into <c>Backups</c> at every save.
-/// </para>
-/// </summary>
 public static class BotHouseSurvey
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHouseSurvey));
@@ -87,7 +37,6 @@ public static class BotHouseSurvey
 
     private const int Above = 12;
 
-    /// <summary>A way in: the doorway's one or two door tiles at the frame's height, which way its frames run, and the street outside.</summary>
     public sealed class Entrance
     {
         public Point3D[] Doors;
@@ -101,7 +50,6 @@ public static class BotHouseSurvey
         public int OutY;
     }
 
-    /// <summary>One building the survey found and kept.</summary>
     public sealed class Building
     {
         public int Id;
@@ -150,7 +98,6 @@ public static class BotHouseSurvey
         public override string ToString() => $"{Town} ({Door.X}, {Door.Y}): {Area} tiles, {Entrances.Length} way{(Entrances.Length == 1 ? "" : "s")} in";
     }
 
-    /// <summary>What the survey counted in one town, for the boot line.</summary>
     public sealed class Tally
     {
         public int Doorways;
@@ -295,6 +242,7 @@ public static class BotHouseSurvey
         }
         catch (Exception e)
         {
+
             logger.Error(e, "Guild houses: the survey of the towns failed at stage {Stage}; no guild will be housed this boot", _stage);
             Ready = true;
             Drop();
@@ -494,6 +442,7 @@ public static class BotHouseSurvey
             }
             else if (a >= 0 && b >= 0)
             {
+
                 Union(a, b);
             }
 

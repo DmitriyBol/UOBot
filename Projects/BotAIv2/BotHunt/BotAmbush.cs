@@ -4,32 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The blow struck out of hiding: three swings' worth in one, and the victim stunned where it stands.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026, night.</b> "A bandit striking from ambush (out of stealth) stuns the bot and deals
-/// three times the damage, an archer all but one-shots another bot. A hand blow stuns for three seconds, an arrow for
-/// one." Until this, a robbery that had stalked its mark for a minute and come out of hiding beside it opened with an
-/// ordinary swing, and the whole of the stalk bought nothing but surprise the engine does not model.
-/// </para>
-///
-/// <para>
-/// <b>Five seconds for both, by his order of the evening of 18.09.2026</b>, after a day in which the hold decided
-/// every robbery on the island: three times a crossbow is 51 against 63 to 68 hit points, four fifths and not a kill,
-/// and a mark left standing after one second outran a bowman to a ward every time. Seven robberies that day, seven
-/// endings that read "the victim reached the town". The blow is still worth three; what changed is how long the mark
-/// is held for the second one. See <c>BotQuarter</c> for what it does when it comes to.
-/// </para>
-///
-/// <para>
-/// The blow is the weapon's own (<c>BaseWeapon.ComputeDamage</c>, the same reckoning a real swing uses, tactics,
-/// strength and anatomy included) taken <see cref="Times"/> over, and the stun is the engine's own
-/// <c>Mobile.Paralyze</c>, which has its own expiry. Nothing here is a new rule of combat: it is the shard's own swing,
-/// thrice, and the engine's own hold. The arrow holds for a shorter while because its advantage is the damage — an
-/// archer that opens from hiding at fourteen tiles will usually not need a second.
-/// </para>
-/// </summary>
 public static class BotAmbush
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAmbush));

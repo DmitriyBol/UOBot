@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>How a route came out.</summary>
 public enum NavStatus
 {
+
     Ok,
 
     Direct,
@@ -19,20 +19,9 @@ public enum NavStatus
     Unplaced
 }
 
-/// <summary>
-/// The medium tier: hierarchical A* over the first level of the navigation graph.
-///
-/// <para>
-/// The start and the goal are joined to their clusters' nodes by a flood inside each cluster (<see cref="NavWindow"/>),
-/// forward from the start and backward to the goal; when the start's flood reaches the goal the answer is
-/// <see cref="NavStatus.Direct"/>. Otherwise an A* over the nodes, estimated by <see cref="NavCost.Estimate"/> (never more
-/// than the truth, every step costing at least a step), and ties broken towards the larger cost so far, which is the
-/// node nearer the goal. What comes back is one point a cluster: of each gate's two nodes the far one, since the near
-/// one is a single step before it.
-/// </para>
-/// </summary>
 public sealed class HierarchicalPlanner
 {
+
     public int MaxExpansions { get; set; } = 20000;
 
     public int TieBreak { get; set; } = 1000;
@@ -552,6 +541,7 @@ public sealed class HierarchicalPlanner
 
         for (var node = _parent[g]; node >= 0 && node != s; node = _parent[node])
         {
+
             if (++steps > graph.Capacity + 2)
             {
                 Cycles++;

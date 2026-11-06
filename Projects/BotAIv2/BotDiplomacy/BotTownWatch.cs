@@ -4,21 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// <b>A guard a town set is worked, not waited for (30.09.2026, build 339).</b>
-///
-/// <para>
-/// The towns of build 332 set a guild a task and counted its progress, and nothing on the shard offered the work: a guard
-/// task stood at 7 of 90 member-minutes for twenty minutes on 336 and a clearing at "0 minutes stood in it" while their
-/// clocks ran down to failure (`night-r13-social.md`) — three failures in six hours and the guild would have been put out of
-/// its own town. A member of a guild with a guard standing in a town within <see cref="Reach"/> tiles is offered a watch: it
-/// walks inside the walls (<c>BotTowns.Town.Bounds</c>, where <c>BotTownTask</c> counts the minutes) and stands there for
-/// <see cref="BotStandGuard.StandMs"/>. At most <see cref="MostAtOnce"/> of a guild at once. A clearing is left to the
-/// companies — the town sets the worst ground near it, and a lone watchman sent there is a death — and a supply to the trades.
-/// </para>
-/// </summary>
 public sealed class BotTownWatch : IBotProposer
 {
+
     public static int Reach { get; set; } = 250;
 
     public static int MostAtOnce { get; set; } = 3;
@@ -82,7 +70,6 @@ public sealed class BotTownWatch : IBotProposer
         $"{Asked} looks at a town's guard for a member: {Offered} watches offered, {Full} passed over with {MostAtOnce} of the guild already on watch; {BotStandGuard.Stood} watches stood their time, {BotStandGuard.Ended} ended when the task did";
 }
 
-/// <summary>A member standing watch inside a town's walls for its guild's guard. See <see cref="BotTownWatch"/>.</summary>
 public sealed class BotStandGuard : BotDeed
 {
     public const string Trade = "watch";

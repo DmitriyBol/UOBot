@@ -6,12 +6,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot is built of, as far as a fight is concerned: enough to say whether a measurement made last hour still
-/// describes it. See <see cref="BotProving.Fresh"/>.
-/// </summary>
 public readonly record struct BotBuild(int Skills, int Stats, int Armour, string Weapon, int Damage)
 {
+
     private static readonly SkillName[] Fighting =
     [
         SkillName.Swords, SkillName.Macing, SkillName.Fencing, SkillName.Archery, SkillName.Wrestling,
@@ -86,37 +83,6 @@ public readonly record struct BotBuild(int Skills, int Stats, int Armour, string
     public override string ToString() => $"{Skills} in the fighting skills, {Stats} of stats, armour {Armour}, {Weapon} ({Damage})";
 }
 
-/// <summary>
-/// One fight on the proving ground: a bot's double against one creature, refereed to the end and read.
-///
-/// <para>
-/// <b>Patrick's order of 26.09.2026: "the bots dress, train and grow stronger, and nobody goes past the Orc Caves. I want
-/// Argus to spawn a copy of the bot and a creature in Green Acres and judge the bot's strength — counting only the weapon
-/// and the hit points is not enough; the skills, the weapon's properties and everything else must count."</b> The number
-/// the shard judged every fight by was <c>BotThreat.Power</c> — health times the weapon's average hit, plus half the
-/// Magery — which cannot see armour, hit chance, swing speed, a bandage, a bottle or a poisoned blade. The only
-/// measurement that sees all of them at once is the fight itself, so this holds one.
-/// </para>
-///
-/// <para>
-/// <b>The double fights the way the bot does, with the bot's own hands.</b> The swinging is the engine's (Combatant and
-/// Warmode start its timer on the weapon's own delay); the spells are <see cref="BotStrike"/>'s ladder, thrown and aimed as
-/// <c>BotSlay</c> throws them; the bandage, the bottle and the healing spell are <see cref="BotMend"/>'s, at the same
-/// shares of health the population reaches for them. What it does not do is decide: it never flees, never goes home to
-/// bank, never takes a better offer. It stands and fights until one of them is down, which is the question.
-/// </para>
-///
-/// <para>
-/// <b>What is read, and why it is one number.</b> A fight is two rates racing: how fast the bot takes the creature apart,
-/// and how fast the creature takes the bot apart net of what the bot heals. The ratio of the two is R — how many of these
-/// creatures the bot's health would pay for, one after another: <c>R = (share of the creature killed) × HitsMax / (damage
-/// taken − health given back)</c>. A win for thirty net damage on a hundred hit points is R 3.3; a death with the creature at
-/// 60% is R 0.4. R is measured against a creature whose strength on the shard's old scale is known
-/// (<see cref="BotDungeon.Might"/>), so R × that is the bot's strength on the same scale — the one every dungeon's worst
-/// inhabitant is already ranked by — with everything the formula could not see folded in by the fight itself. A caster's
-/// mana is the other half of its health, and for one it is read the same way (<see cref="BotProving"/>).
-/// </para>
-/// </summary>
 public sealed class BotTrial
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTrial));

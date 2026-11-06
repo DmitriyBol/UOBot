@@ -3,7 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What a score was made of. Built for the winner and the runner-up only, and only for the log.</summary>
 public readonly struct BotWeigh
 {
     public BotWeigh(
@@ -21,9 +20,13 @@ public readonly struct BotWeigh
         double calling = 1.0,
         double toll = 1.0,
         double nature = 1.0,
-        BotTrait natureBit = BotTrait.None
+        BotTrait natureBit = BotTrait.None,
+        double day = 1.0,
+        string dayWhy = null
     )
     {
+        Day = day;
+        DayWhy = dayWhy;
         Estimate = estimate;
         Nearness = nearness;
         Novelty = novelty;
@@ -69,11 +72,16 @@ public readonly struct BotWeigh
 
     public BotTrait NatureBit { get; }
 
+    public double Day { get; }
+
+    public string DayWhy { get; }
+
     public double Score { get; }
 
     public string Describe()
     {
-        var bend = Estimate > 0.0 && Calling > 0.0 && Toll > 0.0 && Nature > 0.0 ? Score / (Estimate * Calling * Toll * Nature) : 0.0;
+
+        var bend = Estimate > 0.0 && Calling > 0.0 && Toll > 0.0 && Nature > 0.0 && Day > 0.0 ? Score / (Estimate * Calling * Toll * Nature * Day) : 0.0;
 
         var extra = "";
 
@@ -92,6 +100,11 @@ public readonly struct BotWeigh
         if (Nature != 1.0)
         {
             called += $"; × {Nature:F2} for its nature ({BotTraits.Words(NatureBit)})";
+        }
+
+        if (Day != 1.0)
+        {
+            called += $"; × {Day:F2} for {DayWhy ?? "the hour"}";
         }
 
         return $"{Score:F0}/min = {Estimate:F0} × {bend:F2}, that being the {Nth(BotAppraisal.Root)} root of "
@@ -115,26 +128,9 @@ public readonly struct BotWeigh
     public override string ToString() => Describe();
 }
 
-/// <summary>
-/// What a piece of work is worth to this bot, right now. One number, in gold-equivalent per minute, so that
-/// every want on the shard competes in the same unit.
-///
-/// <para>
-/// <b>The estimate does the work and the considerations only bend it.</b> That is the opposite way round
-/// from the first version, where a goal's attraction was a sum of hand-tuned weights and the actual takings
-/// were never measured at all — so nobody could say whether mining was better than hunting, including the
-/// bots, and the answer was whatever the weights said it was.
-/// </para>
-///
-/// <para>
-/// <b>Multiplied, then rooted.</b> Multiplying normalised factors drives every score towards zero as
-/// factors are added, so a sixth consideration would quietly make the whole population less decisive; the
-/// geometric mean is the standard compensation for it, and it means adding a consideration changes the
-/// ordering without changing the scale. Any factor of zero is a veto and stops the sum early.
-/// </para>
-/// </summary>
 public static class BotAppraisal
 {
+
     public static long Unpaid { get; private set; }
 
     private static readonly HashSet<string> _unpaidKinds = [];
@@ -174,6 +170,7 @@ public static class BotAppraisal
 
     internal static void Becalm(BotResolve resolve, Point3D at, int setOut, int nearest)
     {
+
         if (resolve == null || setOut < BecalmedFar || setOut - nearest >= BecalmedGain && nearest < BecalmedFar)
         {
             return;
@@ -361,6 +358,7 @@ public static class BotAppraisal
 
         if (estimate <= 0.0)
         {
+
             if (deed.Unpaid)
             {
                 Unpaid++;
@@ -369,6 +367,7 @@ public static class BotAppraisal
             }
             else if (deed.Kind == BotProwl.Trade && resolve.Urges.BarrenMinutes(Core.TickCount) >= RestlessAfter)
             {
+
                 Restless++;
 
                 estimate = 0.01;
@@ -431,9 +430,11 @@ public static class BotAppraisal
 
         var nature = BotTraits.Nature(body, deed, out var natureBit);
 
-        var score = estimate * Math.Pow(product, 1.0 / Math.Max(1, Root)) * calling * toll * nature;
+        var day = BotDay.Factor(body, deed, out var dayWhy);
 
-        weigh = new BotWeigh(estimate, nearness, novelty, room, caution, purse, score, stopped, revel, charter, ground, calling, toll, nature, natureBit);
+        var score = estimate * Math.Pow(product, 1.0 / Math.Max(1, Root)) * calling * toll * nature * day;
+
+        weigh = new BotWeigh(estimate, nearness, novelty, room, caution, purse, score, stopped, revel, charter, ground, calling, toll, nature, natureBit, day, dayWhy);
 
         return score;
     }

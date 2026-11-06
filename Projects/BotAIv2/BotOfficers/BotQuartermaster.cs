@@ -7,30 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The quartermaster's work: a shift at the guild's store, the kits it issues, the surplus it takes in, the wants it posts for
-/// the guild and the surplus it sells.
-///
-/// <para>
-/// <b>A shift like a shop's.</b> The quartermaster walks to the store (<see cref="BotGuildStore.At"/>) and keeps it open for
-/// <see cref="ShiftMinutes"/>, then rests <see cref="RestMs"/>; it is offered a shift sooner when members are waiting for a kit.
-/// While it is open: a member standing within <see cref="Counter"/> tiles with capped surplus over its allowance hands it in
-/// (<see cref="BotGuildStore.Hand"/>); a member short of its kit and poor or new walks in and draws what it lacks
-/// (<see cref="BotKitDraw"/>, <see cref="BotGuildStore.Issue"/>) — a debt; the goods the guild bought are put away and the
-/// quartermaster is paid back by the chest at the want's price; once a shift it posts a want for the kind the store is shortest
-/// of, puts one lot of surplus on the hall's merchant and carries the merchant's takings into the chest.
-/// </para>
-///
-/// <para>
-/// <b>The guild's wants are the chest's purchases, said by the quartermaster.</b> The market takes a want only from a bot that can
-/// pay it (<see cref="BotMarket.Ask"/>), so the quartermaster asks in its own name, pays the carrier from its own purse like any
-/// buyer, and the chest pays it back unit for unit at the want's price when the goods go into the store — never before, never for
-/// goods it did not get. A want is posted only when the chest holds the whole bill. What the store aims to hold of a kind is half
-/// what the members' kits ask (<see cref="TargetShare"/>), twice that while the guild is at war or its chest saves for a war
-/// (<see cref="WarFactor"/>, "what to buy for a war by the chest's purpose"). Its lines are the guild's procurement, counted apart
-/// from the members' own Needs lines (<c>BotLines.IsProcurement</c>).
-/// </para>
-/// </summary>
 public sealed class BotQuartermaster : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotQuartermaster));
@@ -342,6 +318,7 @@ public sealed class BotQuartermaster : IBotProposer
             {
                 if (_in)
                 {
+
                     _in = false;
                 }
 
@@ -518,6 +495,7 @@ public sealed class BotQuartermaster : IBotProposer
 
                 if (spare < Math.Max(1, lot.Amount))
                 {
+
                     if (Mobile.LiftItemDupe(lot, spare) == null)
                     {
                         continue;
@@ -708,6 +686,7 @@ public sealed class BotQuartermaster : IBotProposer
 
         if (units > 0)
         {
+
             var spent = Math.Max(0, (order.Want?.Paid ?? units * order.Price) - order.PaidBack);
             var owed = (int)Math.Min(spent, (long)spent * units / Math.Max(1, arrived));
 
@@ -815,10 +794,6 @@ public sealed class BotQuartermaster : IBotProposer
     }
 }
 
-/// <summary>
-/// A member short of its kit, poor or new, walks to its guild's open store and draws what it lacks: a debt to the chest
-/// (<see cref="BotGuildStore.Issue"/>). Offered only while the store is open and within <see cref="Reach"/>.
-/// </summary>
 public sealed class BotKitDraw : IBotProposer
 {
     public string Name => "KitDraw";

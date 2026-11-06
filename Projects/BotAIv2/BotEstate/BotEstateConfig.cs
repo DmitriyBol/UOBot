@@ -5,16 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-estate.json</c> is allowed to say. Everything optional.
-///
-/// <para>
-/// What is not here: where a house may stand. That is the engine's — <c>HousePlacement.Check</c> — and a
-/// file able to disagree with it would be a file able to promise a guild a hall that cannot be built.
-/// </para>
-/// </summary>
 public sealed class BotEstateSettings
 {
+
     public bool? Running { get; set; }
 
     public int? Price { get; set; }
@@ -50,6 +43,12 @@ public sealed class BotEstateSettings
     public double? Expects { get; set; }
 
     public bool? Fittings { get; set; }
+
+    public bool? AbodeFurnish { get; set; }
+
+    public int? FurnishBedPrice { get; set; }
+
+    public double? FurnishEveryHours { get; set; }
 
     public int? ShelfDepth { get; set; }
 
@@ -156,6 +155,10 @@ public static class BotEstateConfig
         BotHall.Prior = settings.Expects ?? BotHall.Prior;
 
         BotFittings.Running = settings.Fittings ?? BotFittings.Running;
+
+        BotFurnish.Running = settings.AbodeFurnish ?? BotFurnish.Running;
+        BotFurnish.BedPrice = settings.FurnishBedPrice ?? BotFurnish.BedPrice;
+        BotFurnish.EveryHours = settings.FurnishEveryHours ?? BotFurnish.EveryHours;
 
         BotSupplier.Shelf = settings.ShelfDepth ?? BotSupplier.Shelf;
         BotSupplier.Batch = settings.ShelfBatch ?? BotSupplier.Batch;

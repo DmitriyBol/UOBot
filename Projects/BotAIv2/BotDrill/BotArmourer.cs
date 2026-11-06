@@ -4,36 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Puts an order on the board for the best piece of armour this bot is not wearing.
-///
-/// <para>
-/// <b>Nobody on this shard wore armour, and nothing had ever noticed.</b> <c>BotOutfit</c> hands out a
-/// shirt, a pair of trousers, boots and a weapon; there is no armour anywhere in the kit, so every bot on the
-/// island fought skeletons in its shirtsleeves from the day the population was first raised. That was never
-/// a fault in the outfitter — armour is meant to be made and bought, which is the whole point of having
-/// smiths and tailors — but the demand side of it did not exist, so the smiths had nothing anybody wanted and
-/// the bots had nothing on. Half the machinery was already written and idle: <c>Rearm</c> puts on any
-/// <c>BaseArmor</c> it finds in a pack, <c>BotUpkeep</c> reads armour durability and reorders a worn piece,
-/// and <c>BotClass.NeedsMeditation</c> was documented as "refuses armour that would stop it meditating" with
-/// nothing in the world for it to refuse.
-/// </para>
-///
-/// <para>
-/// <b>What to want is asked rather than listed.</b> The first version of this file carried five hard-coded
-/// ringmail types and gave a mage the same answer as a brawler. <see cref="BotHarness"/> reads the shard's
-/// own craft systems instead, ranks by <em>harm stopped over a piece's life, per gold</em>, and lets each
-/// bot spend in proportion to how often something has actually been hitting it. Those two together are what
-/// send plate to the warrior in the graveyard and nothing at all to the miner.
-/// </para>
-///
-/// <para>
-/// <b>And it only ever wants what somebody can actually make.</b> A want nobody can fill is worse than an
-/// empty board: it reads as demand, it holds escrow, and it teaches every seeker that orders are not worth
-/// walking to. The best crafter alive is asked before an order is raised, so "nobody is good enough yet" is a
-/// refusal with a name on it rather than a mystery on the market.
-/// </para>
-/// </summary>
 public sealed class BotArmourer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotArmourer));
@@ -124,6 +94,7 @@ public sealed class BotArmourer : IBotProposer
 
         if (wealth - offer <= Keeps(offer))
         {
+
             var owing = offer + Keeps(offer) - wealth;
 
             if (BotGuilds.Stand(wearer, owing))
@@ -173,6 +144,7 @@ public sealed class BotArmourer : IBotProposer
 
             if (best == null)
             {
+
                 unmakeable |= BotHarness.Best(wearer, where, null, purse) != null;
 
                 continue;

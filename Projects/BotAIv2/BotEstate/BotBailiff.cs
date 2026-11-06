@@ -4,26 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Whether anybody is standing on this guild's land who should not be, and who is going to say so.
-///
-/// <para>
-/// <b>Rare by construction rather than by a dial.</b> Three things have to be true at once before this ever
-/// offers anything: the bot is on its own guild's land, somebody of another guild is on it too and within
-/// sight, and the guild already thinks poorly enough of theirs to bother. Without the third condition an
-/// island of five guilds would spend its afternoon telling each other to move along, which is not a
-/// population, it is a queue.
-/// </para>
-///
-/// <para>
-/// <b>And it is one bot at a time per trespasser, not per guild.</b> The other three officers claim their
-/// guild because their errand is the guild's — one hall, one shopkeeper. This errand is about a person, and
-/// two members telling the same stranger to move along is the shard shouting. See <c>BotOffice</c> for the
-/// pattern and why the claim is short.
-/// </para>
-/// </summary>
 public sealed class BotBailiff : IBotProposer
 {
+
     public static int ClaimMs { get; set; } = 60000;
 
     public static double Minding { get; set; } = -3.0;
@@ -150,6 +133,7 @@ public sealed class BotBailiff : IBotProposer
 
         if (worst == null)
         {
+
             if (anybody)
             {
                 Tolerated++;

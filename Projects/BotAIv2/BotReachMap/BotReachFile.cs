@@ -4,24 +4,6 @@ using System.IO.Compression;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The reach map's clusters kept on disk between boots, so a restart reads a few megabytes on a worker instead of drawing
-/// every tile of the map again on the loop.
-///
-/// <para>
-/// <b>Keyed by the map files, checked by the world (01.10.2026).</b> The file carries the engine's fingerprint of the map's own
-/// files (<c>TileMatrix.MapFilesFingerprint</c>) and is refused when the client's map changes. What the map files cannot say —
-/// a house raised, a decoration moved — each cluster carries as its <see cref="BotReachCluster.Signature"/>, and a boot draws
-/// again only the clusters whose houses and items no longer match. Under <c>Data/</c>, never under <c>Saves/</c>: the saves folder
-/// is moved into the backups at every save.
-/// </para>
-///
-/// <para>
-/// Layout (little-endian, the whole of it deflated): magic, format, map id, fingerprint, width, height, clusters across and
-/// down; then per cluster a flag byte (drawn, housed, one class for all its tiles, layers, shore), its signature, its tiles
-/// (one byte when all alike), its regions and standing tiles, its layers, its shore bits and its links.
-/// </para>
-/// </summary>
 public static class BotReachFile
 {
     private const uint Magic = 0x31484352;

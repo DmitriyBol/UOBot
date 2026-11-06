@@ -6,30 +6,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who won a war, and the debt the loser owes because of it: its hall goes outside the winner's yard.
-///
-/// <para>
-/// <b>Patrick's order of 10.09.2026: the losers of a war must move their house further from the winner's,
-/// out of his zone of influence.</b> Until this, a war ended the way it began — as a number crossing a
-/// threshold — and left the island exactly as it found it. Nothing on the map ever recorded that anything
-/// had happened, so a war was an expensive way of producing corpses.
-/// </para>
-///
-/// <para>
-/// <b>Won on blood and nothing else.</b> Trespasses, defiances and border drift are what <em>start</em> a
-/// war; who won it is who killed more of the other, counted only while the two were actually at war. That
-/// is the one measure both sides can be said to have taken part in, and it is a fact rather than a
-/// preference — a guild that declared war and then hid in Britain has not won anything.
-/// </para>
-///
-/// <para>
-/// <b>A drawn war moves nobody, and that is its own outcome rather than a failure.</b> Equal blood, or none
-/// at all, means the island learned that these two cannot hurt each other, and pushing somebody's hall
-/// across the map for that would be arbitrary. Counted apart in <see cref="Drawn"/>, because a shard where
-/// every war is drawn and a shard where no war is fought look the same from the estate's line.
-/// </para>
-/// </summary>
 public static class BotExile
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotExile));
@@ -117,6 +93,7 @@ public static class BotExile
 
         if (BaseGuild.FindByName(winner) is not Guild won || BotEstate.Hall(won) is not { Deleted: false } hall)
         {
+
             _owed.Remove(guild.Name);
 
             return null;

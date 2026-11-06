@@ -16,33 +16,6 @@ using Server.Spells;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The live window (Patrick, 02.10.2026: "a window that shows in real time what is happening in the game and with a bot,
-/// say once a second"): a frame for each bot somebody is looking at, and a page for the debugger squad, both built on the
-/// game loop once a second and handed to the listener as strings.
-///
-/// <para>
-/// <b>Built only for what somebody asked about in the last ten seconds, and for at most four bots.</b> Asking for a frame
-/// is what marks a bot as watched; a page closed or switched to another tab stops asking, and ten seconds later nothing is
-/// built for it. With nobody watching the clock costs one tick comparison and two reads, nothing is allocated, and the
-/// event hook is taken off <see cref="BotEvents"/>.
-/// </para>
-///
-/// <para>
-/// <b>The same two rules as the rest of the folder.</b> The listener reads nothing from the world: a frame is a string the
-/// loop wrote. Every figure in it is one the snapshot, the log or the event stream already prints — the bot's own numbers,
-/// the engine's own notoriety, <see cref="BotThreat.Menacing"/> and <see cref="BotRegard.Hostile"/> for who is hostile, the
-/// radar colours the map picture is drawn from. The session-log lines are read off the file by a task on the thread pool,
-/// which never touches the world, and handed to the loop under the lock.
-/// </para>
-///
-/// <para>
-/// <b>Around the bot only.</b> The mobiles and items come from the map's own range queries round the bot
-/// (<c>GetMobilesInRange</c>, <c>GetItemsInRange</c>); the terrain from the tile matrix in eight-by-eight blocks that are kept
-/// once read, so a bot walking along a road costs the new blocks at its edge and nothing else, and at most
-/// <see cref="TerrainBudget"/> tiles are read in one second whatever happens.
-/// </para>
-/// </summary>
 public static partial class BotWebLive
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWebLive));
@@ -230,6 +203,7 @@ public static partial class BotWebLive
 
     public static string Debuggers()
     {
+
         if (!Enabled)
         {
             return "{\"at\":null,\"debuggers\":null,\"note\":\"the live window is off: bot-web.json says Live is false\"}";
@@ -300,6 +274,7 @@ public static partial class BotWebLive
         }
         catch (Exception e)
         {
+
             if (_throws++ % 60 == 0)
             {
                 logger.Error(e, "The live window threw; the page keeps the last frame");
@@ -1260,6 +1235,7 @@ public static partial class BotWebLive
         }
         catch
         {
+
         }
         finally
         {
@@ -1332,6 +1308,7 @@ public static partial class BotWebLive
         }
         catch
         {
+
         }
 
         _debuggers = BotJson.Object(

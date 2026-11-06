@@ -8,9 +8,9 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What a squad is doing. Three states, and none of them is "stand and wait".</summary>
 public enum BotSquadStance
 {
+
     Marching,
 
     Scouting,
@@ -18,35 +18,9 @@ public enum BotSquadStance
     Fighting
 }
 
-/// <summary>
-/// A standing company of bots: a leader, a few followers, a formation and a share-out.
-///
-/// <para>
-/// <b>One kind of group, not two.</b> The first version had a <em>warband</em> — spontaneous, formed the
-/// moment a bot met something it could not take alone — and separately a <em>band</em> raised once a minute
-/// by the system, exactly five strong, a medic compulsory, aimed at a square of the map. Both were called
-/// "the group", including in the documentation, and the two answered different questions with different
-/// lifetimes. This is one thing: it forms, it lives, it walks, it scouts, it fights, it splits what it took,
-/// and it goes on.
-/// </para>
-///
-/// <para>
-/// <b>No state here may be "stand and wait", and that is a rule paid for in bodies.</b> The first version's
-/// mustering and loot-settling states both opened by setting <c>Warmode = false</c> and standing still — and
-/// a rally point was almost always inside assembly range, so "go and assemble" degenerated into "stand and
-/// look at the enemy". A lich strikes from eight tiles and never closes, so not one rung of the survival
-/// ladder ever fired: six bots waited politely in a ring while it killed them one at a time. Every state
-/// below is a state in which the bot is going somewhere.
-/// </para>
-///
-/// <para>
-/// <b>The collective mind is arithmetic, not messages.</b> Stations, scouting patches and shares are all
-/// derived by every member from the same facts in the same order. What passes between bots is only what is
-/// genuinely an event: <em>I am being attacked</em>, and <em>get off this tile</em>.
-/// </para>
-/// </summary>
 public sealed partial class BotSquad
 {
+
     public static long Sundered { get; private set; }
 
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSquad));
@@ -298,6 +272,7 @@ public sealed partial class BotSquad
     {
         get
         {
+
             if (Mustering)
             {
                 return _rally;
@@ -320,6 +295,7 @@ public sealed partial class BotSquad
     {
         get
         {
+
             if (Mustering && Focus is { Deleted: false })
             {
                 var towards = Unit(_rally, Focus.Location);
@@ -412,6 +388,7 @@ public sealed partial class BotSquad
 
         if (ReferenceEquals(Focus, focus))
         {
+
             Contact = contact ?? Contact;
 
             return;
@@ -426,6 +403,7 @@ public sealed partial class BotSquad
 
         if (Mustering)
         {
+
             MusterStruck++;
             Mustering = false;
         }
@@ -582,6 +560,7 @@ public sealed partial class BotSquad
 
     internal void Fell(Mobile killer)
     {
+
         Lost(killer);
 
         if (killer is not BaseCreature { Controlled: false, Summoned: false } creature)
@@ -602,20 +581,9 @@ public sealed partial class BotSquad
         }
     }
 
-    /// <summary>
-    /// What stops this member landing a blow on the focus from exactly where it stands, if anything.
-    ///
-    /// <para>
-    /// <b>One rule, asked from the three places that were each answering it their own way.</b> The press set
-    /// a combatant on anybody inside twelve tiles, the break-off line counted anybody inside its own ring,
-    /// and the stationing asked neither — so a company could report itself fully engaged while not one arrow
-    /// left it. Every one of the four refusals below is the engine's, taken from the engine, and each has a
-    /// different cure: distance wants a walk, a broken line wants another tile, a refusal wants nothing at
-    /// all, and stillness wants to be left alone.
-    /// </para>
-    /// </summary>
     private enum BotBlow
     {
+
         Far,
 
         Blind,
@@ -1318,6 +1286,7 @@ public sealed partial class BotSquad
 
         if (ours <= 0.0 || threat <= ours * WithdrawOdds)
         {
+
             if (ours > 0.0 && alone > ours * WithdrawOdds && worstAlone != null && !ReferenceEquals(_stoodTo, worstAlone))
             {
                 _stoodTo = worstAlone;
@@ -1774,6 +1743,7 @@ public sealed partial class BotSquad
 
     private bool Support(IBotSquadMember member, Mobile body)
     {
+
         if (body is BotMobile { Resolve.Deed: BotBolt or BotSalve })
         {
             return false;
@@ -2137,6 +2107,7 @@ public sealed partial class BotSquad
 
     private bool Mend(Mobile body, double below)
     {
+
         if (body.Target != null || body.Spell != null)
         {
             return true;
@@ -2265,6 +2236,7 @@ public sealed partial class BotSquad
 
         if (spell < 0)
         {
+
             Dry++;
 
             return;
@@ -2278,6 +2250,7 @@ public sealed partial class BotSquad
 
     private bool Quiet()
     {
+
         if (Charged)
         {
             _quiet = false;
@@ -2374,6 +2347,7 @@ public sealed partial class BotSquad
 
     private void Release()
     {
+
         if (Charged)
         {
             _resting = false;
@@ -2494,6 +2468,7 @@ public sealed partial class BotSquad
 
         if (focus is not { Deleted: false, Alive: true })
         {
+
             Spoils(focus);
 
             Kills++;
@@ -2823,6 +2798,7 @@ public sealed partial class BotSquad
 
     private bool Stranded(IBotSquadMember member, BotJourney journey)
     {
+
         if (Stance != BotSquadStance.Fighting || Mustering || Focus is not { Deleted: false, Alive: true })
         {
             return false;

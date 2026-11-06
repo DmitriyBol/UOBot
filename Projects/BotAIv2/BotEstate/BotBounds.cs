@@ -6,40 +6,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Ground another guild holds, and what may not be put on it.
-///
-/// <para>
-/// <b>Patrick, 06.10.2026 ~10:00: "The Ash has put its residence on The Wolf's lands: how could that happen? It is
-/// forbidden."</b> It happened at 01:16:38 that night. The steward's plot search (<c>BotPlot</c>) asked whether a candidate
-/// was another guild's ground of its centre tile alone; The Ash's hall went up at 1470,1412, in a square nobody held, and its
-/// seven-by-seven walls and its steps (x 1467–1473, y 1409–1416) stood three columns deep in The Wolf's square at 1440,1410
-/// and one row deep in its square at 1440,1380, held since before 04.10 22:50. Raising it wrote the hall's square into the
-/// claims as The Ash's (<c>BotClaim.Seat</c>), which would have overwritten another guild's holding without a word had the
-/// centre been on one; and the seat followed the hall there. Nothing ever looked again when ground round a standing hall
-/// changed hands: The Wolf took the square north of it at 07:21:28 and the hall stood on The Wolf's ground on two sides.
-/// </para>
-///
-/// <para>
-/// <b>The rule.</b> A guild building — a first hall, a bigger one, an outpost, a hall carried anywhere — stands wholly on
-/// ground its guild will hold: the square of its centre must be open or the guild's own, and every other square under its
-/// walls and steps must be the guild's own (<see cref="Covers"/>, strict). A seat, a guild's town house and a bare seat
-/// are points, and the point must not be another guild's (<see cref="Foreign"/>). A bot's own house may not stand on another
-/// guild's ground unless the two guilds are allied (lenient, allies welcome). A hall's yard never swallows a square another
-/// guild holds (<c>BotClaim.Seat</c>), and a claim on held ground is only ever the seizure, which is a war
-/// (<c>BotSeizure</c>). Held ground is what <see cref="BotLand.Holder"/> answers: claimed squares, halls' squares and
-/// outposts' squares.
-/// </para>
-///
-/// <para>
-/// <b>And when ground changes hands, the look that was missing.</b> Every <see cref="LookMs"/> each standing hall is asked
-/// whether any square under it is now another guild's; one that is owes a move, which the remover carries to the nearest
-/// ground of its own or open ground (<c>BotRemover</c>, the errand that carries a hall to its seat), and the seat follows
-/// the hall. A bare seat on another guild's ground is moved to the nearest point that is not, within <see cref="SeatReach"/>;
-/// a guild's town house on it is left (<c>BotGuildHouses.Leave</c>, the path a seat set at the door takes) and the guild
-/// settles again in a building that is not. Nothing within reach: the hall stands and waits, counted every look, said once.
-/// </para>
-/// </summary>
 public static class BotBounds
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBounds));
@@ -50,7 +16,6 @@ public static class BotBounds
 
     public static int SeatReach { get; set; } = 90;
 
-    /// <summary>Why a building may not stand where it was asked to.</summary>
     public enum Breach
     {
         None,
@@ -60,7 +25,6 @@ public static class BotBounds
         Straddling
     }
 
-    /// <summary>Placements refused at the moment of building, by what was being built.</summary>
     public enum Placing
     {
         Hall,
@@ -96,15 +60,6 @@ public static class BotBounds
 
     public static int AbodesAbroad { get; private set; }
 
-    /// <summary>
-    /// A hall's move off another guild's ground, step by step (06.10.2026, build 410). <b>The first cut carried The Ash 112 tiles away
-    /// and dropped its square.</b> Its hall at 1470,1412 stood in its own square with only its west and north walls on The Wolf's;
-    /// the remover asked <c>BotPlot.Find</c>, whose spiral begins <c>BotPlot.Near</c> (14) tiles out and whose engine check counts
-    /// the standing hall as an obstacle, so the shift of a few tiles that would have fitted was never put to anything: 256 offers
-    /// found nothing in 17 minutes, the next found 1522,1300, and the square, no longer reaching the hall, fell (10:39:39).
-    /// Now: a shift inside the hall's own square with the standing hall's tiles free (<c>BotShift</c>), then the guild's other
-    /// squares near it; then open ground within <see cref="OpenReach"/>; then the hall stands, its foreign part giving it nothing.
-    /// </summary>
     private sealed class Owing
     {
         public string Whose;

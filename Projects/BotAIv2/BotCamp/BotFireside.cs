@@ -3,22 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Sitting at somebody else's fire: a walk over, a seat on the ring round the hearth, facing the flame, a greeting, and a
-/// few minutes of listening and talking — or, for a tired bot, a night's sleep there.
-///
-/// <para>
-/// <b>A seat is spoken for when the walk is taken, not when it is offered.</b> Every idle bot near a fire is asked in the
-/// same second after a fire is lit, and a proposer that held a seat for each of them would fill the ring with bots that
-/// went elsewhere (<c>BotDeed.Taken</c>, C9 in DECISIONS). The seat is held in <see cref="Taken"/>; a bot that arrives to a
-/// ring filled meanwhile takes the next free seat or gives up.
-/// </para>
-///
-/// <para>
-/// <b>A guest has its own evening, shorter than the keeper's.</b> <see cref="GuestMinutes"/>, spread either way, so bots
-/// come and go round one fire instead of all rising together; a guest who has become the keeper stays until the fire is out.
-/// </para>
-/// </summary>
 public sealed class BotFireside : BotDeed
 {
     public const string Trade = "fireside";
@@ -191,6 +175,7 @@ public sealed class BotFireside : BotDeed
 
         if (_sat && fromHearth > 3)
         {
+
             _sat = false;
             _near = false;
         }
@@ -312,13 +297,9 @@ public sealed class BotFireside : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a free bot a seat at the nearest lit fire within <c>BotCamp.JoinReach</c>. A walk of the fire list — at most
-/// <c>BotCamp.MostFires</c> entries — and no spatial query; a bot is not asked again for <see cref="EveryMs"/> after it
-/// went to one, whatever came of it.
-/// </summary>
 public sealed class BotBeckon : IBotProposer
 {
+
     public static int EveryMs { get; set; } = 1200000;
 
     public static long Asked { get; private set; }
@@ -351,6 +332,7 @@ public sealed class BotBeckon : IBotProposer
 
     public BotDeed Propose(IBotWilful bot)
     {
+
         if (!BotCamp.Running || BotCamp.Fires.Count == 0)
         {
             return null;

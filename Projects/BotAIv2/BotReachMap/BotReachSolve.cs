@@ -4,9 +4,9 @@ using System.Diagnostics;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What one tile of the map is to a walker. See <see cref="BotReachMap"/>.</summary>
 public enum BotReachClass : byte
 {
+
     Unknown = 0,
 
     Open = 1,
@@ -20,13 +20,10 @@ public enum BotReachClass : byte
     Blocked = 5
 }
 
-/// <summary>One land no walk from home reaches, for the page and the door.</summary>
 public readonly record struct BotReachLand(int Root, int Tiles, int X, int Y, bool Coastal);
 
-/// <summary>A way the solve is told of that the ground does not show: a teleporter or a moongate, from the tile stepped on to where the body is put down.</summary>
 public readonly record struct BotReachGate(Point3D From, Point3D To);
 
-/// <summary>What a solve is handed on the loop: the clusters as drawn, the gates and home. Nothing in it is game state.</summary>
 public sealed class BotReachSolveInput
 {
     public Map Map;
@@ -50,22 +47,9 @@ public sealed class BotReachSolveInput
     public int Version;
 }
 
-/// <summary>
-/// The second half of the reach map: the clusters' regions joined into the whole map, and each tile named by what a walker
-/// from home can do with it. Pure arithmetic over the clusters (<see cref="BotReachCluster"/>), which are never changed once
-/// made — so it runs on a worker thread when the machine has the cores, and hands back an immutable
-/// <see cref="BotReachSnapshot"/> through one volatile reference (CLAUDE.md rules 3 and 10).
-///
-/// <para>
-/// <b>Reachable means reachable from home, in the direction of travel (01.10.2026).</b> Home is where the population lives
-/// (<see cref="BotPopulation.Where"/>); the search runs along every step the way it can be taken — a ledge dropped off is ground
-/// the walk reaches, the ledge above it is not — and through every gate from the tile stepped on to where the body is put down.
-/// A tile a walk from home reaches is <see cref="BotReachClass.Open"/>; everything reachable from an open tile is open too, so a
-/// walker standing on open ground can be refused anything that is not, without a search.
-/// </para>
-/// </summary>
 public static class BotReachSolve
 {
+
     public static int LargestKept { get; set; } = 32;
 
     public static BotReachSnapshot Run(BotReachSolveInput input)

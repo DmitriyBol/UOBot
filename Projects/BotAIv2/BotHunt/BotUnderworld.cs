@@ -8,33 +8,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The island's criminal record, and The Shadow: the sixth guild, of thieves and brigands, founded by murderers.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026, evening:</b> the most skilled and cunning murderers may found their own guild of
-/// thieves and brigands, no more than five, whose thoughts and work are robbery, hiding, blackmail and killing; and the price
-/// of it is prison and pursuit. His choices when asked: it is founded when two bots have killed from hiding, its master is
-/// the better at hiding, and the master takes in other killers up to five; it has a secret hideout far outside the towns,
-/// where its members rise and hide, and which the Baron raids once a caught thief gives it away (build 114, with the
-/// blackmail); it is The Shadow [SHD].
-/// </para>
-///
-/// <para>
-/// <b>Not one of <see cref="BotGuilds"/>' guilds, and that is deliberate.</b> Those are dealt out round the crafters at every
-/// boot, fifteen at most and five at least, led by their maker, and a guild with nothing to show loses a member a minute to
-/// <c>BotGuilds.Review</c>; a band of five murderers with no hall and no crafter would be emptied by the machinery meant to
-/// keep a trade guild honest. So The Shadow is an engine guild kept here: made at founding, re-made at every boot after the
-/// muster from the names this keeps (<see cref="BotUnderworldStore"/>), its members taken out of whatever guild the muster
-/// dealt them. The engine's guild is what makes them allies to each other and keeps a robber off its brother
-/// (<c>BotRobber.Prey</c>).
-/// </para>
-///
-/// <para>
-/// <b>The record is kept by name</b>, because the population is raised afresh at every boot: murders, how many of them struck
-/// from hiding, robberies carried through, times caught. Nothing else on the shard remembered a murder past its red hour.
-/// </para>
-/// </summary>
 public static class BotUnderworld
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotUnderworld));
@@ -79,7 +52,6 @@ public static class BotUnderworld
 
     public static int MemberPracticeEveryMs { get; set; } = 900000;
 
-    /// <summary>One bot's record.</summary>
     public sealed class Sheet
     {
         public string Name;
@@ -212,7 +184,6 @@ public static class BotUnderworld
 
     public static Sheet Of(string name) => name != null && _sheets.TryGetValue(name, out var sheet) ? sheet : null;
 
-    /// <summary>One bandit as the dashboard shows it: what is proved against it, what it is worth, and where it stands.</summary>
     public readonly record struct Wanted(
         string Name,
         string Trade,
@@ -558,6 +529,7 @@ public static class BotUnderworld
         }
         else if (BotLair.Fire == null && !BotLair.Rebind(BotPopulation.Home, _hideout))
         {
+
             BotLair.Pitch(BotPopulation.Home, _hideout);
         }
 
@@ -827,6 +799,7 @@ public static class BotUnderworld
 
     private static void TryRecruit()
     {
+
         if (Thieves >= MostMembers || Named(_members.Count > 0 ? _members[0] : null) is not { Alive: true } master)
         {
             return;

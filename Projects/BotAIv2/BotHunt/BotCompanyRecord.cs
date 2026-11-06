@@ -5,63 +5,9 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a kind costs a company, learned from companies' own fights against it, apart from what it costs the island as a whole
-/// (<see cref="BotQuarry.Price"/>, which stays the lone bot's price).
-///
-/// <para>
-/// <b>Patrick, 03.10.2026 ~12:40</b>, asked whether a company should price a kind apart from lone bots, since companies of ten
-/// and more had put a Reaper down 14 times in 17 while the island's price (×4.8) kept every company off it: "if they kill it, let
-/// them gather — what matters is that they level up, and the higher the level, the higher the chance to kill later." The level
-/// is already in the scale a company is weighed by: <c>BotThreat.Power</c> grows with the weapon skill a bot lands its blows by
-/// and the health its strength gives it, and a company is the sum of its members' (<c>BotSquad.Able</c>). So the record is kept
-/// on that scale — every fight at the odds the company took it on at, its strength over the creature's — and a company that has
-/// grown is weighed against companies as strong as it has become.
-/// </para>
-///
-/// <para>
-/// <b>Measured on build 396 (04:29–12:47, 210 bots, <c>agents/reaper13-tools/</c>):</b> companies took a Reaper on 153 times
-/// and put it down 103 times — companies of ten and more 20 times in 23, of five to nine 56 in 79, of two to four 27 in 48. Of
-/// the deaths of ours to Reapers, 106 were lone bots (no lone bot killed one) and 104 in companies; but of the 85 enlisted
-/// members among them only 20 fell in the company's own fight against a Reaper (and a few more within two minutes of it, the
-/// field's next one), while 56 fell as the company fought something else beside a Reaper it had not taken on and 9 as it fought
-/// nothing. The island's record prices them all against the kind's kills, so a company of thirteen at twice a Reaper's strength
-/// was reckoned at 47,000 and turned away from the one fight that would have ended the casting. The same split holds for every
-/// killer of enlisted members: in the company's own fight, giant serpent 7 of 49, giant spider 1 of 57, troll 0 of 30.
-/// </para>
-///
-/// <para>
-/// <b>What is recorded:</b> a company's kill (<c>BotSquad.Judge</c>, "it is down") at the odds it took the creature on at; a
-/// member's death to a wild creature of a kind the company was fighting, or had fought within <see cref="FightMs"/>, at the odds
-/// it took that kind on at over the killer's strength (<c>BotSquad.Fell</c>, from <c>BotKept.Fell</c>). Companies of two or more
-/// only. A death in a company to a kind it was not fighting is the island's record alone (<see cref="Elsewhere"/>): it says
-/// something about walking beside the kind, which is the walk's business, and nothing about taking it on. Both are weighed by
-/// the island's own half-life (<see cref="BotQuarry.RiskHalfMs"/>).
-/// </para>
-///
-/// <para>
-/// <b>How a kind is priced for a company</b> (<see cref="Price"/>): the island's price is the ceiling; the record can only lower
-/// it, and only for a company at least as strong, relative to the kind, as companies that have beaten it. A company at odds
-/// <c>r</c> asks of the record the kills by companies no stronger than it (<c>K</c>, at least <see cref="Vouch"/> of them) and
-/// the deaths in the fights of companies up to <see cref="Margin"/> times stronger (<c>D</c>: a company somewhat stronger than
-/// one that lost is not thereby safe), puts them through the island's own formula (<see cref="BotQuarry.Formula"/>: nothing
-/// under <see cref="BotQuarry.RiskLeast"/> deaths, a quarter of a death per kill fair) and is let in when its odds carry that
-/// price at the company's yardstick (<c>BotSquad.WithdrawOdds</c>). The lowest odds let in, times the yardstick, is the kind's
-/// company price; a company below it is priced out exactly where companies like it have lost, or where none like it has won.
-/// A kind no company has put down <see cref="Vouch"/> times keeps the island's price.
-/// </para>
-///
-/// <para>
-/// <b>Replayed on 396 after 05:19</b> (strengths from the members' powers on 395, the median otherwise; <c>replay_company_price.py</c>):
-/// of 6219 company engagements the island's price would have kept companies off 582; the company record lets 178 of them in —
-/// 101 Reapers, 29 gargoyles, 23 giant serpents, 13 wisps — of which 99 went down with 21 deaths of ours counted in them, and
-/// keeps 404 off (151 down, 16 deaths). The Reaper's company price sat at ×1.0–1.5 (odds 0.67–1.0 let in) against the island's
-/// ×3.4–5.7; the giant serpent's at ×2.5–4.2 against ×3.6–6.1; the air elemental stayed at the island's ×8, no company having
-/// put enough of them down.
-/// </para>
-/// </summary>
 public static class BotCompanyRecord
 {
+
     public static bool Prices { get; set; } = true;
 
     public static double Vouch { get; set; } = 3.0;

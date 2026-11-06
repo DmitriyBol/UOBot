@@ -7,35 +7,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Fires in the woods: who has lit one, who sits round it, and what an hour beside one is worth to a tired bot.
-///
-/// <para>
-/// <b>Patrick's point 6 of 29.09.2026: "More wandering, more chance meetings, more talk. Add socialisation: some bots
-/// may light a campfire in the woods and others join them; this counts as rest. Let them stand and chat with each
-/// other."</b> Until now a bot met another only in a company, a war or a queue at a counter, and said something only
-/// when work began or ended. A fire is the one place on the island a bot goes to be with others rather than to get
-/// something, and it is the engine's own: the kindling is the camping skill's <c>Kindling</c>, lit by its own
-/// double-click and roll, and what burns is the engine's <c>Campfire</c>, which puts itself out after a hundred seconds
-/// unless somebody feeds it (<see cref="TryLight"/>).
-/// </para>
-///
-/// <para>
-/// <b>Rest by a fire is rest at the inn's rate.</b> <see cref="BotRest"/> counts play only while a bot is in the world,
-/// and gives a whole session back for a rest of five to eight hours; a bot sitting at a lit fire has its play counted
-/// backwards at that same rate (<see cref="Played"/>), so ten minutes at a fire give back about eight of the evening
-/// (<see cref="RestShare"/>). And a tired bot that has sat at a fire for the thirty seconds the engine takes to call a
-/// camp secure (<see cref="SecureMs"/>, <c>Campfire.OnTick</c>) goes offline there, as it would at an inn: unpaid, so
-/// no cheer, and a regeneration buff for <see cref="FireBuffShare"/> of its rest, half the paid bed's (<see cref="Rested"/>).
-/// Patrick's rule of the morning — "offline only at an inn or one's own house" — gains this third place and no fourth.
-/// </para>
-///
-/// <para>
-/// <b>The fire list is not saved.</b> The engine's campfire skips serialization and burns out in a hundred seconds, so a
-/// restart finds no fire to go back to; a bot that went offline by one has the fire's name in its rest record
-/// (<c>BotRestStore</c>), which is all that has to survive.
-/// </para>
-/// </summary>
 public static class BotCamp
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCamp));
@@ -124,7 +95,6 @@ public static class BotCamp
 
     public static double GivenBack { get; private set; }
 
-    /// <summary>Where a place lies, for the question "may a fire be lit here".</summary>
     public enum Land
     {
         Wild,
@@ -135,7 +105,6 @@ public static class BotCamp
         Bloodied
     }
 
-    /// <summary>One seat round a fire: where it is, who holds it, and what they have done there.</summary>
     public sealed class Place
     {
         public Point3D Spot;
@@ -151,7 +120,6 @@ public static class BotCamp
         public long SatTick;
     }
 
-    /// <summary>One fire: where, whose, the seats round it, and the engine's flame burning on it now.</summary>
     public sealed class Fire
     {
         public Fire(BotMobile keeper, Map map, Point3D centre, List<Point3D> seats, long now)
@@ -226,7 +194,7 @@ public static class BotCamp
 
         public Mobile LastSpeaker { get; internal set; }
 
-        public (Mobile Who, Mobile To, string Occasion) Owed { get; internal set; }
+        public (Mobile Who, Mobile To, string Occasion, string About) Owed { get; internal set; }
 
         public bool Burning => Flame is { Deleted: false } && Flame.Status != CampfireStatus.Off;
 
@@ -314,7 +282,6 @@ public static class BotCamp
         public override string ToString() => $"{Name} at ({Centre.X}, {Centre.Y})";
     }
 
-    /// <summary>Where a bot last sat at a fire, and for how long: what the rest clock and the leaving ask.</summary>
     private sealed class Sitting
     {
         public Fire Fire;
@@ -463,7 +430,6 @@ public static class BotCamp
         return n;
     }
 
-    /// <summary>Why no seat was found, for the proposer's buckets.</summary>
     public enum Refusal
     {
         None,
@@ -708,6 +674,7 @@ public static class BotCamp
 
         if (!stick.Deleted)
         {
+
             Fumbles++;
 
             return true;
@@ -980,6 +947,7 @@ public static class BotCamp
 
     private static void Keep(Fire fire, long now)
     {
+
         for (var i = 0; i < fire.Places.Length; i++)
         {
             var place = fire.Places[i];
@@ -1167,7 +1135,7 @@ public static class BotCamp
                && sitting.Fire.Map == bot.Map && bot.InRange(sitting.Fire.Centre, Campfire.SecureRange);
     }
 
-    public static bool ToFire(BotMobile bot)
+    public static bool ToFire(BotMobile bot, bool fieldFirst = false)
     {
         if (!Running || !SleepByFire || bot is not { Deleted: false, Alive: true } || bot.Map == null || bot.Map == Map.Internal)
         {
@@ -1204,7 +1172,14 @@ public static class BotCamp
 
         if (deed == null)
         {
-            NoFireToSleepBy++;
+            if (fieldFirst)
+            {
+                BotDay.FieldFirstMissed++;
+            }
+            else
+            {
+                NoFireToSleepBy++;
+            }
 
             return false;
         }

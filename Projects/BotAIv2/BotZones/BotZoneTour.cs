@@ -5,52 +5,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The debuggers' walk round the zones: each goes to the least-watched zone, wakes the ground round it the way a client would,
-/// holds it awake long enough for the patrol to move, and goes on.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026: "walk the world with Argus and the other debuggers, look at all the mob zones".</b> The
-/// world sleeps where no client is (<see cref="BotWake"/>): a creature nobody is near stands where it was spawned, so the only
-/// way to learn a patrol a bot has never been near is to wake the ground there and watch. That is what the stop does:
-/// <c>Sector.Activate</c> on the sectors round the zone — the five by five a client wakes, widened to the zone's own box up to
-/// <see cref="MostSectors"/> — and a pass of the zone's box every <see cref="FocusMs"/> while it holds
-/// (<see cref="BotZoneScan.Focus"/>), for <see cref="HoldMs"/>.
-/// </para>
-///
-/// <para>
-/// <b>Which zone next: the least watched, and the nearest among equals.</b> Zones are ranked by the seconds their ground has
-/// been seen awake, in buckets of <see cref="Bucket"/> seconds, and within a bucket by distance from the walker — so a walker
-/// sweeps a region of never-watched zones before crossing the map, and a zone the bots walk through every hour (already awake
-/// by <see cref="BotWake"/>) waits for last. A round ends when every zone has been stood in once; the next begins at once.
-/// Resumable: the awake seconds and the stops are kept across a restart (<see cref="BotZoneMemory"/>), so a new session picks
-/// up with the zones the last one had not reached.
-/// </para>
-///
-/// <para>
-/// <b>It never disturbs the bots' own waking.</b> A sector is put back to sleep only if the tour woke it, no bot needs it
-/// (<see cref="BotWake.Needed"/>) and no client is near; and <see cref="BotWake"/> in turn leaves alone a sector the tour holds
-/// (<see cref="Holds"/>).
-/// </para>
-///
-/// <para>
-/// <b>The walkers are the debugger's, reached through two hooks.</b> The debugger lives in the minds' assembly, which references
-/// this one and never the reverse; it fills <see cref="Walkers"/> (the watchers free to walk: a body, not witnessing a meeting,
-/// not charting the dungeons) and <see cref="Move"/> (its own teleport) when it starts. With no debugger the tour stands still
-/// and says so.
-/// </para>
-///
-/// <para>
-/// <b>One of them is the zone keeper while the zone watch runs (07.10.2026, Patrick: "one debugger goes wholly onto the
-/// zones").</b> <see cref="Keeper"/> names it and <see cref="KeeperHook"/> says whether the squad has given it up to the zones;
-/// it walks first, without a pause between stops, and chooses by what the accuracy counter most needs: a zone with no verdict in
-/// the window first, then one whose last visit disagreed, then the oldest verdict. Every full hold by anybody is a check for
-/// <see cref="BotZoneWatch"/>: a living attacker in the zone's own patrol, or none, against the level the zone is painted. The
-/// tour walks only while the watch is on; when the watch ends it stops for every debugger.
-/// </para>
-/// </summary>
 public static class BotZoneTour
 {
+
     public static bool Running { get; set; } = true;
 
     public static int TickMs { get; set; } = 1000;
@@ -193,6 +150,7 @@ public static class BotZoneTour
         _map = map;
 
         var state = BotZones.State;
+
         var walkers = Running && BotZoneWatch.On ? Walkers?.Invoke() : null;
 
         _walking.Clear();
@@ -306,6 +264,7 @@ public static class BotZoneTour
 
         if (zone == null && Total > 0 && Visited >= Total)
         {
+
             Round++;
             _visited.Clear();
             Visited = 0;
@@ -326,6 +285,7 @@ public static class BotZoneTour
 
         if (!Move(body, map, at) && (body.Map != map || body.Location != at))
         {
+
             Refused++;
             _visited.Add(zone.Id);
             _refused[zone.Id] = now;

@@ -5,39 +5,6 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One task a town sets a guild, and the catalogue of the kinds it may set: each one something the shard can check by itself.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point 3: the town gives the guild a unique task; each success lowers the town's prices for
-/// that guild by half a percent, each failure raises them by as much.</b> A task the code cannot check is a task whose success
-/// is whatever the model says it was, so the catalogue holds only what is measured:
-/// </para>
-///
-/// <list type="bullet">
-/// <item><b>clear</b> — the worst square within reach of the town's hall that reads unsafe, and that the guild's might can face,
-/// is to read at least <see cref="ClearGain"/> better (up to neutral) by the deadline, with the guild's own members having stood
-/// in it for <see cref="ClearPresence"/> minutes between them. Read off <c>BotQuad</c>, which every kill, crossing and death
-/// already writes.</item>
-/// <item><b>guard</b> — the guild's members are to spend <see cref="GuardMinutes"/> minutes between them inside the town's
-/// walls. Counted once a look, member by member.</item>
-/// <item><b>supply</b> — the guild's members are to put <see cref="SupplyUnits"/> of a material the market wants onto the bots'
-/// own market: sold over a shop's till by the bank or handed over at a carrier's meeting. Counted where the goods go out
-/// (<c>BotShopkeep.Serve</c> and <c>BotHandover.Exchange</c>; the auction's stalls and fills until 01.10.2026), never where they are
-/// made.</item>
-/// </list>
-///
-/// <para>
-/// <b>A task is a price, not a command</b>, as every order on this shard is (<c>BotCharter</c>): the town charges the guild
-/// with it — a muster at the square or the hall, or a request on the guild's board for the material — and the members' own
-/// auctions decide whether they go. A task nobody took up fails at its deadline, and that is a fact about the guild.
-/// </para>
-///
-/// <para>
-/// <b>Unique</b>: a square or a material another guild is already working for the same town is not offered again while that
-/// task stands.
-/// </para>
-/// </summary>
 public sealed class BotTownTask
 {
     public enum Kinds

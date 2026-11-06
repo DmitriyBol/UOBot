@@ -4,22 +4,6 @@ using System.IO;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>
-/// A navigation graph kept on disk between boots, so a restart does not draw the whole map again.
-///
-/// <para>
-/// <b>Written and read off the game loop, and never touching the world there.</b> The graph is the shard's own data, not
-/// game state: a copy of its arrays is taken on the loop (<see cref="NavGraph.Snapshot"/>), written by a worker thread, and
-/// a file is read by a worker thread into the same form and handed back to the loop (<see cref="NavGraph.Restore"/>).
-/// The map files the graph was drawn from are fingerprinted as the step cache's own bake is
-/// (<see cref="Cache.StepCacheFile.ComputeFingerprint"/>), on the loop; a file drawn from other map files is not read.
-/// </para>
-///
-/// <para>
-/// <b>Houses change between boots.</b> The file lists the clusters that had a house in or beside them when it was
-/// written; on reading, those and the clusters beside any house standing now are torn down and drawn again.
-/// </para>
-/// </summary>
 public static class NavGraphFile
 {
     private const uint Magic = 0x4E415647;
@@ -219,7 +203,6 @@ public static class NavGraphFile
     }
 }
 
-/// <summary>A navigation graph's arrays, copied out of it on the loop for a worker thread to write, or read back from a file.</summary>
 public sealed class NavGraphSnapshot
 {
     public ulong Fingerprint;

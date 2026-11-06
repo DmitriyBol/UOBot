@@ -7,7 +7,6 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>A decoded picture: ARGB pixels, its size, and the point inside it that stands on the tile.</summary>
 public sealed class BotSprite
 {
     public int Width;
@@ -21,7 +20,6 @@ public sealed class BotSprite
     public uint[] Pixels;
 }
 
-/// <summary>How the client lays out a body's actions: the five kinds of <c>mobtypes.txt</c>.</summary>
 public enum BotAnimType : byte
 {
     Monster,
@@ -32,27 +30,9 @@ public enum BotAnimType : byte
     Unknown
 }
 
-/// <summary>
-/// The client's own files, read the way the client reads them, for the live window's picture (02.10.2026: "can the
-/// picture be shown straight from the game?").
-///
-/// <para>
-/// <b>Files, never the world.</b> Everything here is a file in the client folder the server already knows
-/// (<see cref="Core.FindDataFile"/>): the art, the land textures, the hues, tiledata, and the animations in both their
-/// forms, the old <c>anim*.idx/mul</c> pairs and the newer <c>AnimationFrame*.uop</c> packages. It is opened once, the
-/// first time the listener asks for a picture, and read with positional reads that are safe from any thread, so the
-/// listener's threads may decode side by side and the game loop never waits on any of it.
-/// </para>
-///
-/// <para>
-/// <b>The client's rules, not ours.</b> Which body is drawn from which file follows <c>mobtypes.txt</c>,
-/// <c>Bodyconv.def</c>, <c>Body.def</c> and <c>AnimationSequence.uop</c>; which action a standing body shows follows the
-/// client's own choice for that kind of body; which directions are mirrored follows the client's five-direction files. The
-/// reference was the open-source ClassicUO loaders, read for the formats and not copied.
-/// </para>
-/// </summary>
 public sealed class BotArtFiles : IDisposable
 {
+
     public static Func<string, string> Locate { get; set; } = name => Core.FindDataFile(name, false);
 
     private static readonly object _openLock = new();
@@ -418,6 +398,7 @@ public sealed class BotArtFiles : IDisposable
 
     private static ushort[][] ReadHues(string path)
     {
+
         var bytes = File.ReadAllBytes(path);
         var blocks = bytes.Length / 708;
         var hues = new ushort[blocks * 8][];
@@ -543,6 +524,7 @@ public sealed class BotArtFiles : IDisposable
 
     private void ReadBodyConv(string path)
     {
+
         foreach (var parts in DefLines(path))
         {
             if (parts.Length < 2 || !Int(parts[0], out var body))
@@ -562,6 +544,7 @@ public sealed class BotArtFiles : IDisposable
 
     private void ReadBodyDef(string path)
     {
+
         foreach (var raw in path == null ? [] : File.ReadLines(path))
         {
             var line = raw;
@@ -594,6 +577,7 @@ public sealed class BotArtFiles : IDisposable
 
     private void ReadEquipConv(string path)
     {
+
         foreach (var parts in DefLines(path))
         {
             if (parts.Length >= 3 && Int(parts[0], out var body) && Int(parts[1], out var worn) && Int(parts[2], out var drawn))
@@ -606,6 +590,7 @@ public sealed class BotArtFiles : IDisposable
 
     private void ReadSequences(string path)
     {
+
         using var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
 
         foreach (var (_, entry) in ReadUop(path))
@@ -821,9 +806,9 @@ public sealed class BotArtFiles : IDisposable
         return new BotSprite { Width = width, Height = height, AnchorX = width / 2, AnchorY = height, Pixels = pixels };
     }
 
-    /// <summary>What a body is drawn as: from which file, under which number, laid out how.</summary>
     public readonly struct AnimSource
     {
+
         public readonly int File;
 
         public readonly int Body;
@@ -1053,6 +1038,7 @@ public sealed class BotArtFiles : IDisposable
 
     public static int FileDirection(int dir, out bool mirror)
     {
+
         switch (dir & 7)
         {
             case 0:
@@ -1090,7 +1076,6 @@ public sealed class BotArtFiles : IDisposable
         }
     }
 
-    /// <summary>What the body is doing, as the page asks for it; turned into a group by the body's own kind.</summary>
     public enum Pose
     {
         Stand,

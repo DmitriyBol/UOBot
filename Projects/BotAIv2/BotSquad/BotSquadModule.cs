@@ -2,20 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Squads as a module: reads its numbers, starts the squads' own beat, and clears the board on a world reload.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, because a station is a point on the map and there is no map before the world
-/// loads. Requires <c>Classes</c> — a formation is an ordering of roles, and a role is a fact about a class.
-/// </para>
-///
-/// <para>
-/// Its switch is worth having for the same reason movement's is. Half the first version's investigations were
-/// the question "is this the group system or is the group system covering for something else", and the honest
-/// answer took an evening of watching. Turned off, every bot acts alone and everything else runs.
-/// </para>
-/// </summary>
 public sealed class BotSquadModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSquadModule));
@@ -88,6 +74,7 @@ public sealed class BotSquadModule : BotModule
 
         BotSquads.Stop();
         BotSquads.Reset();
+        BotSquad.ForgetSpares();
     }
 
     public static string Summarise() => $"{BotSquads.Describe()}; {BotEnlister.Describe()}; {BotPatrol.Describe()}";

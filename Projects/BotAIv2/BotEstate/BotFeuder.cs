@@ -5,24 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a member of a guild at war somebody of the enemy to fight.
-///
-/// <para>
-/// <b>The call comes first and the sighting second, and that order is the whole of "call your
-/// guildmates".</b> A member asks what its guild is already on before it asks what it can see: if the guild
-/// has a call standing and the enemy is within <c>BotFeud.Answer</c>, that is who it goes to, wherever it
-/// happens to be looking. Only a bot whose guild is on nobody starts a quarrel of its own, and starting one
-/// raises the call the others will answer. Without that ordering five members find five different enemies
-/// and a war is five duels.
-/// </para>
-///
-/// <para>
-/// <b>Only classes that fight.</b> A tailor sent at an armed warrior is a tailor killed for nothing, and
-/// the population pays for the resurrection and the lost afternoon. The class's own roll says whether it
-/// carries a weapon; that is the same question <c>BotHarrow</c> asks of a company, asked here of one bot.
-/// </para>
-/// </summary>
 public sealed class BotFeuder : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFeuder));
@@ -232,6 +214,7 @@ public sealed class BotFeuder : IBotProposer
 
         if (enemy == null)
         {
+
             if (sheltered)
             {
                 Sheltered++;

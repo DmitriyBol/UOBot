@@ -1,21 +1,8 @@
 ﻿namespace Server.BotAI.V2;
 
-/// <summary>
-/// What the watcher has announced, in a shape this assembly can read.
-///
-/// <para>
-/// <b>A seam, for the same reason <see cref="BotAppraisal.Revelry"/> is one.</b> Argus lives in the minds
-/// assembly, which references this one and must never be referenced back — so the dashboard cannot ask him
-/// anything. He posts here instead, and the window reads a notice rather than a subsystem.
-/// </para>
-///
-/// <para>
-/// Everything on it is a copy taken at the moment it was asked for. A notice that held live references would
-/// be a window showing a revel that ended while somebody was reading it.
-/// </para>
-/// </summary>
 public sealed class BotNotice
 {
+
     public bool Running { get; init; }
 
     public string Kind { get; init; }
@@ -77,16 +64,9 @@ public sealed class BotNotice
     public string Ledger { get; init; }
 }
 
-/// <summary>
-/// Where the watcher pins its notices, and the dashboard reads them.
-///
-/// <para>
-/// Null until the minds assembly is running, which is the honest state of a shard with no watcher on it:
-/// the tab then says so rather than showing an empty table that could equally mean "nothing declared".
-/// </para>
-/// </summary>
 public static class BotCrier
 {
+
     public static System.Func<BotNotice> Posted { get; set; }
 
     public static BotNotice Read() => Posted?.Invoke();

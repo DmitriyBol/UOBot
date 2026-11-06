@@ -3,26 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a captain the nearest ground nobody has ever stood in.
-///
-/// <para>
-/// <b>Nearest rather than worst, which is the opposite of how every other errand on this shard picks its
-/// destination.</b> A patrol goes where it is most dangerous and a great hunt goes where it is most dire,
-/// because both are answers to "where is the trouble". This is an answer to "what do we not know", and
-/// unknown ground is all equally unknown — there is nothing to rank it by. So the tiebreak is the walk:
-/// the map fills outwards from where the population actually lives, which is also the order in which the
-/// knowledge is worth having.
-/// </para>
-///
-/// <para>
-/// <b>And the candidates are ground the population has been <em>near</em>, never a search of the island.</b>
-/// The quadrant table only holds squares something has happened in or beside, so the unknown squares this
-/// can offer are the fringe of what is known — the ring just past the frontier. That keeps the question
-/// cheap, keeps parties from being sent across the map, and means the frontier advances a ring at a time
-/// under its own steam.
-/// </para>
-/// </summary>
 public sealed class BotScoutmaster : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotScoutmaster));
@@ -164,6 +144,7 @@ public sealed class BotScoutmaster : IBotProposer
 
     private static bool Reachable(Map map, Point3D from, Point3D at)
     {
+
         if (BotReach.Ask(map, from, at, BotArrival.Within(BotQuad.Side / 3)) != BotReachVerdict.Sealed)
         {
             return true;

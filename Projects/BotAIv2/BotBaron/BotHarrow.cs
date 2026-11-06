@@ -9,35 +9,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Six bots taken to ground that has killed people, and kept there until it has been emptied or the
-/// afternoon is gone.
-///
-/// <para>
-/// <b>This is the shard's third reason for a company, and it is not a bigger patrol.</b> A muster forms
-/// against one creature and ends when that creature is dead. A patrol — see <see cref="BotSweep"/> — is sent
-/// to a square that reads dangerous <em>lately</em> and finishes when the reading falls, which is a
-/// statement about frequency and can be satisfied by the trouble simply wandering off. A harrowing is
-/// answerable to neither: it goes where people have actually died, it is finished by a count of corpses or
-/// by a clock, and when it ends the square comes off the board altogether. Nothing else on this shard clears
-/// anything — everything else knocks a number down and lets it climb back.
-/// </para>
-///
-/// <para>
-/// <b>Everything alive inside the box, and the exclusions are the interesting half.</b> Not "hostile", which
-/// is what every other fight on the shard asks: hostility is a notoriety judgement and it lets a field of
-/// harmless things stand between a company and the thing it came for. Bots are excluded structurally rather
-/// than by a rule — they are players as far as the engine is concerned and this only ever looks at
-/// creatures — and guarded ground is excluded outright, so a chase that leads into a town ends at the gate.
-/// </para>
-///
-/// <para>
-/// <b>It is worth what it hands to the five who came.</b> The Baron takes no share, so measured the ordinary
-/// way — coin in his own pack — this work pays nothing and the ledger would have learned, correctly by its
-/// own arithmetic, that leading companies into deadly ground is worthless. See <see cref="BotSquad.Won"/>:
-/// the company keeps the figure, and this reads it.
-/// </para>
-/// </summary>
 public sealed class BotHarrow : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHarrow));
@@ -422,6 +393,7 @@ public sealed class BotHarrow : BotDeed
 
         if (!ReferenceEquals(squad, _squad))
         {
+
             _squad = squad;
             _won = squad.Won;
         }
@@ -435,6 +407,7 @@ public sealed class BotHarrow : BotDeed
 
         if (_clearing)
         {
+
             var least = Math.Min(Math.Max(Least, _wanted), BotSquad.MaxSize);
 
             var need = _asked * ClearFit;
@@ -652,6 +625,7 @@ public sealed class BotHarrow : BotDeed
 
             if (now - _musteredTick < MusterMs)
             {
+
                 return body.InRange(_muster, Station)
                     ? BotDoing.Work($"calling for grandmasters at ({_muster.X}, {_muster.Y}): {ready} of {Grandmasters} fit")
                     : BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"calling for grandmasters at ({_muster.X}, {_muster.Y})");
@@ -726,6 +700,7 @@ public sealed class BotHarrow : BotDeed
 
         if (_called < 2)
         {
+
             if (_marched > 0)
             {
                 BotQuad.LostCompany(_map, _square, _marched);
@@ -788,6 +763,7 @@ public sealed class BotHarrow : BotDeed
 
         if (squad.Stance == BotSquadStance.Fighting && squad.Focus is { Deleted: false, Alive: true } fighting)
         {
+
             if (!ReferenceEquals(fighting, _fighting))
             {
                 _fighting = fighting;
@@ -841,6 +817,7 @@ public sealed class BotHarrow : BotDeed
 
     private Point3D Rally(Mobile body)
     {
+
         if (_guild != null)
         {
             var door = BotFeud.MusterPoint(_guild, body);
@@ -886,6 +863,7 @@ public sealed class BotHarrow : BotDeed
 
         if (_guild != null)
         {
+
             var members = _guild.Members;
 
             for (var i = 0; i < members?.Count; i++)
@@ -964,6 +942,7 @@ public sealed class BotHarrow : BotDeed
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(muster, Reach))
         {
+
             if (mobile != caller && mobile is BotMobile other && Callable(other, count: false) && Reaches(map, other.Location, muster, count: false)
                 && (caller == null || !BotRegard.Hostile(caller, other)))
             {
@@ -1394,6 +1373,7 @@ public sealed class BotHarrow : BotDeed
 
         if (cleared)
         {
+
             BotPeril.Cleared(_map, _square, Side / 2);
 
             var quad = BotQuad.Known(_map, _square);

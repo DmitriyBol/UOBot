@@ -7,31 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Beating iron into something, at a forge, and handing it to whoever asked for it.
-///
-/// <para>
-/// <b>The trade that was missing, and its absence is why ore went nowhere.</b> Mining has worked for days:
-/// dig, smelt, carry the metal to a counter. What happened to the metal after that was nothing at all —
-/// ingots went into bank boxes and onto stalls, and no bot on the shard could turn one into a thing. The
-/// crafter class has carried a smith's hammer since it was written, and the comment beside it says in as
-/// many words what a smith without work becomes: <em>a bot with an opinion about metal</em>. This is the
-/// work.
-/// </para>
-///
-/// <para>
-/// <b>An order off the board comes first, and that is the whole point of building it now.</b>
-/// <see cref="BotUpkeep"/> puts a bot's worn-out sword on the board with the money already down, and until
-/// this existed there was nobody who could fill it — the order would stand until it timed out and the coin
-/// would come back. A smith that reads the board turns "somebody needs a blade" into a blade, which is the
-/// one loop this economy has never closed.
-/// </para>
-///
-/// <para>
-/// Three stages, and the third is the one the first version always forgot: go to a forge, beat the metal,
-/// <em>hand the thing over</em>. A hauberk in the maker's own backpack has helped nobody.
-/// </para>
-/// </summary>
 public sealed class BotForge : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotForge));
@@ -163,6 +138,7 @@ public sealed class BotForge : BotDeed
 
     private BotDoing Walking(IBotWilful bot, Mobile body)
     {
+
         if (BotAnvil.AtASmithy(body))
         {
             _leg = Leg.Work;
@@ -222,6 +198,7 @@ public sealed class BotForge : BotDeed
 
         if (tool == null)
         {
+
             return _made > 0
                 ? BotDoing.Done($"the hammer wore out after {_made} made")
                 : BotDoing.Failed("no hammer");
@@ -331,6 +308,7 @@ public sealed class BotForge : BotDeed
 
     private BotDoing Handing(IBotWilful bot, Mobile body)
     {
+
         var goods = BotAnvil.Gather(body, _kind);
 
         goods.RemoveAll(item => BotBinding.IsBound(item, bot?.Bond));

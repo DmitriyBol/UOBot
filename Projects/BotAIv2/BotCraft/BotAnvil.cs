@@ -6,22 +6,9 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What the smith's trade knows that no other trade does: its system, its skill, its hammer, its metal, and
-/// the one thing about blacksmithing that is genuinely different — it cannot be done just anywhere.
-///
-/// <para>
-/// <b>A smith needs a forge and an anvil, both, within reach.</b> That is the engine's rule and it is
-/// checked by the engine — <c>DefBlacksmithy.CheckAnvilAndForge</c> — so a bot standing next to an anvil in a
-/// field can swing a hammer all day and produce a message about needing a forge that nobody reads. The good
-/// news is that this shard already solved the location half for another reason entirely: <c>BotGround</c>
-/// only writes a forge into its list if there is an anvil within a few tiles of it, because the miner needs
-/// the same pair to smelt ore. So "where can I smith" is a question that was already being answered, by the
-/// people who needed it for something else.
-/// </para>
-/// </summary>
 public static class BotAnvil
 {
+
     public static CraftSystem System => DefBlacksmithy.CraftSystem;
 
     public const SkillName Skill = SkillName.Blacksmith;

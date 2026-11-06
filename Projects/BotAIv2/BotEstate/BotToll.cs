@@ -7,9 +7,9 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>How a guild charges strangers for hunting its land.</summary>
 public enum BotTollWay
 {
+
     None,
 
     Posted,
@@ -17,33 +17,6 @@ public enum BotTollWay
     Patrolled
 }
 
-/// <summary>
-/// The toll on hunting a guild's land: which way each guild charges, who has been told, and what a stranger pays.
-///
-/// <para>
-/// <b>Patrick's order of 26.09.2026, the first of the night:</b> "guilds may demand payment for hunting on their
-/// territories — either by setting a percentage that is collected, or by actively patrolling, pointing out that the land
-/// belongs to the guild and that the hunter's income will be taxed." Both are here, and a guild uses one or the other:
-/// a guild with <see cref="PatrolFighters"/> fighters in the world patrols (<see cref="BotTollman"/> walks up to a stranger
-/// hunting its land and says so, and a stranger told pays <see cref="PatrolRate"/>); a smaller guild posts its toll
-/// (<see cref="PostedRate"/> of every stranger's hunting coin, told or not).
-/// </para>
-///
-/// <para>
-/// <b>Who pays.</b> A stranger: a bot of another guild or of none. Not the guild's own (they pay their dues into the same
-/// chest at the old tithe, <see cref="BotChest.Rate"/>), not an ally, not an enemy — a guild at war settles with blood,
-/// not coin — and not The Shadow, which pays nobody. Coin only, only coin still in the pack, only from work that braves
-/// the ground (<see cref="BotChest.Tithe"/>), and a company's shares too (<c>BotSpoils</c>).
-/// </para>
-///
-/// <para>
-/// <b>What it does to the hunter is a price, not a wall.</b> The appraisal weighs hunting on tolled land at what is left
-/// after the toll (<see cref="Factor"/>), outside the fifth root so it bites as a toll does, and never below
-/// <c>1 − PatrolRate</c>. A hunter told once goes elsewhere if elsewhere pays better, and pays if it stays. Every toll paid
-/// sours the payer's guild a little on the taker's and warms the taker's on the payer's (<see cref="Grudge"/>,
-/// <see cref="Thanks"/>): a toll is how a quarrel over ground starts, and a quarrel is how the war the land costs starts.
-/// </para>
-/// </summary>
 public static class BotToll
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotToll));
@@ -141,6 +114,7 @@ public static class BotToll
 
         if (theirs != null)
         {
+
             if (BotWar.Of(holder, theirs) != null || BotUnderworld.Band(payer.Guild as Guild))
             {
                 return 0.0;
@@ -214,6 +188,7 @@ public static class BotToll
 
     private static bool Exempted(string holder, Mobile payer)
     {
+
         if (BotTrading.Neutral(payer))
         {
             BotTrading.Waive();

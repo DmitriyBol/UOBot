@@ -7,27 +7,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The events of the world (07.10.2026, Patrick's five ideas approved at 00:10: "let's build them tonight, and keep watching the
-/// key numbers"): an invasion out of a dungeon onto a town's road, a fair once a day, caravans between the towns, the night, and an
-/// hourly rumour. This class is what the five share: the switch, the clock that turns them, the voice that announces them, the
-/// one way coin is handed to a bot, and the <c>Events:</c> line.
-///
-/// <para>
-/// <b>Nothing here mints.</b> An invasion's reward and a caravan's pay are held out of the city's own purse the moment they are
-/// posted (<see cref="BotCity.Escrow"/>) and paid out of that hold or handed back; a lottery is tickets in and the same coin out
-/// to one winner; a rumour's chest is filled from the crown's purse (the revels' own, through <see cref="CrownTake"/>) and goes
-/// back there if nobody finds it; the fair's lower prices are less coin destroyed at an NPC's counter, not coin made. Every coin
-/// that moves is counted on the <c>Events:</c> line, and a restart hands back whatever was held (<see cref="BotEventsStore"/>).
-/// </para>
-///
-/// <para>
-/// <b>The minds' assembly speaks for the towns.</b> Argus's herald announces through <see cref="Herald"/>, the championship is
-/// held at the fair by <c>BotTourney</c> reading <see cref="BotFair.TownName"/>, and the crown's purse is reached through
-/// <see cref="CrownTake"/> and <see cref="CrownGive"/>. All three are filled from <c>mindedBots/debugger/BotEventsArgus</c>; with
-/// the debugger off, the announcements still go to the world channel and the log, and rumours are not spread.
-/// </para>
-/// </summary>
 public static class BotSeasons
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeasons));

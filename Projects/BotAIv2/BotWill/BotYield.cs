@@ -5,9 +5,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>How a piece of work ended. Four endings, and each is treated differently on purpose.</summary>
 public enum BotEnding
 {
+
     Done,
 
     Failed,
@@ -17,7 +17,6 @@ public enum BotEnding
     Died
 }
 
-/// <summary>Where a bot stood when it took work on. Everything the takings are measured against.</summary>
 public readonly struct BotStake
 {
     public BotStake(long tick, double skill, int wealth, int made, long aside)
@@ -40,7 +39,6 @@ public readonly struct BotStake
     public long Aside { get; }
 }
 
-/// <summary>What a finished piece of work came to.</summary>
 public readonly struct BotTakings
 {
     public BotTakings(double minutes, double worth, double perMinute, double skill, int coin, int made, int toll = 0)
@@ -72,30 +70,9 @@ public readonly struct BotTakings
         $"{Worth:F0} in {Minutes:F1} min ({PerMinute:F0}/min): {Coin} coin, {Made} made, {Skill:F1} skill{(Toll > 0 ? $", {Toll} toll" : "")}";
 }
 
-/// <summary>
-/// What a piece of work was worth. One currency, and the exchange rate between the two things this
-/// population is for.
-///
-/// <para>
-/// <b>Points are given for change, never for state.</b> Having money is worth nothing; putting money in the
-/// bank is worth what was put in. Having skill is worth nothing; gaining a tenth of a point is worth a
-/// tenth of <see cref="GoldPerSkillPoint"/>. That is not a stylistic preference — it is the one condition
-/// under which added-on rewards provably cannot change what the best behaviour is (Ng, Harada and Russell,
-/// 1999: a shaping term has to be a difference of a potential), and the classic result of ignoring it is an
-/// agent that discovers standing still in the right place scores well.
-/// </para>
-///
-/// <para>
-/// <b>Death has to be made expensive here, because the rest of this project made it cheap.</b> A bot's kit
-/// is bound: it survives death, it is restored on resurrection, and it is not merchandise. That is right
-/// for the kit and it leaves dying almost free — so if takings were skill and coin alone, the best way for
-/// a young fighter to gain skill would be to attack something far too strong, over and over, dying every
-/// time. So dying costs <see cref="DeathMinutes"/> of the divisor and marks the place, which is the honest
-/// version of the same fact: what death actually costs a bot is the walk back.
-/// </para>
-/// </summary>
 public static class BotYield
 {
+
     public static double GoldPerSkillPoint { get; set; } = 500.0;
 
     public static double DeathMinutes { get; set; } = 3.0;

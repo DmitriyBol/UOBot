@@ -4,24 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Making a tool out of iron, wherever the bot is standing, and handing it to whoever asked for it or to the
-/// market.
-///
-/// <para>
-/// <b>No place.</b> Tinkering wants no forge, no anvil and no fire — the tinker's tools work in a pack in the
-/// road — so this is the one iron trade with no walk in it, which is also why a tinker never fails "no anvil
-/// the engine will accept". The shape is the forge's otherwise: count the pack before the next swing, stop
-/// when the batch is made, the swings are spent or the iron is gone, and hand over.
-/// </para>
-///
-/// <para>
-/// <b>A tool the bot itself uses is kept back.</b> The output is gathered by kind, and the bot's own pickaxe
-/// is of that kind. Bound things are left out, and for a tool the class is issued one is left in the pack
-/// whatever its binding, because selling one's own pickaxe to make room for the ones just made is the kind of
-/// thing this project has done before.
-/// </para>
-/// </summary>
 public sealed class BotTinker : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTinker));

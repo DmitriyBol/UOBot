@@ -6,37 +6,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Bots answering each other's moods: what a bot in earshot does about a neighbour saying it is hurt, tired, grieving,
-/// poor, lonely, bored or proud (01.10.2026, build 387; Patrick's point 4 of the night plan: "bots actively talk to each
-/// other, read each other's mood from the phrases, and depending on the mood other bots offer company or help; not across
-/// hostile guilds").
-///
-/// <para>
-/// <b>Read from what was said, never from the speaker's insides.</b> The voice tags every mood line with one word
-/// (<see cref="BotMoods"/>) and hands the tag, the line and whoever was in earshot to <see cref="Heard"/>. Nothing here
-/// asks the speaker how it feels; the answer is to the tag. The deed that carries the help out does look at the world —
-/// a bandage is wound only on a wound — because that is the deed's own business.
-/// </para>
-///
-/// <para>
-/// <b>Words at once, help through the auction.</b> Every answer is a line said a few seconds later. When the listener can
-/// also do something — bind the wound, lay a fire, call the nearest quarry a hunt for two, fall in with the speaker's
-/// company — the deed is written against the listener as an invitation and handed to the auction by <see cref="BotFellow"/>
-/// at its next review, where it is weighed against whatever the listener holds. A seam that pays is kept; an idle bot
-/// goes. The one call that is not an auction is a company's: a listener already in a company asks the speaker in through
-/// the company's own door (<c>BotSquads.Enrol</c>), which takes only a bot whose work resumes and is the door every
-/// company has used since 01.10.2026. Nothing is handed out: a poor bot is pointed at a hunt, never given coin.
-/// </para>
-///
-/// <para>
-/// <b>Cheap by construction.</b> A mood line is said once in fifteen minutes per bot, and the one spatial query it costs
-/// is the voice's own, made to find an audience. Hearing is a loop over that short list; the proposer is a dictionary
-/// read; the replies are a list walked once a second. Each listener answers at most once in <see cref="AnswerEveryMs"/>,
-/// each pair once in <see cref="PairEveryMs"/>, and at most <see cref="MostListeners"/> answer one line, so the chat
-/// cannot flood whatever the population does.
-/// </para>
-/// </summary>
 public static class BotSocial
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSocial));
@@ -272,6 +241,7 @@ public static class BotSocial
 
     private static void Nearest(BotMobile speaker, BotMobile near)
     {
+
         var distance = BotTies.SocialRank(speaker, near, speaker.GetDistanceToSqrt(near));
         var at = _picked.Count;
 
@@ -371,6 +341,7 @@ public static class BotSocial
 
                     break;
                 }
+
             case BotMoods.Grieving:
             case BotMoods.Lonely:
             case BotMoods.Bored:

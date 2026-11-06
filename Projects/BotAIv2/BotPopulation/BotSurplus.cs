@@ -5,29 +5,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bot's bank box kept in order, and where the surplus of its capped kinds went: the box, a shopkeeper, another bot, the ground,
-/// or nowhere because the box had no place for it (06.10.2026, box16).
-///
-/// <para>
-/// <b>Fifty of 210 bank boxes were full, and they were full of ingot stacks lying apart.</b> A miner's trip put its bars in the
-/// box with the engine's <c>DropItem</c> (<c>BotDig.Store</c>), which neither joins an existing stack nor asks the box's hundred
-/// and twenty-five: every trip a new stack of every metal. At 05:36 on 06.10.2026 thirty-five Gatherers' boxes held 132 to 558
-/// things each (Valindra 558, Durgan 499, Malachi 388), and the full boxes' places were Bronze 2044, Copper 1927, Dull Copper
-/// 1916, Shadow Iron 1720, Gold 1636, Agapite 941: ten thousand places, where one stack a metal a box would take under three
-/// hundred (2,452 trips "putting the metal away" in the 3.5 hours of build 405, each a new stack a metal). A full box refuses
-/// every lot that does not join a stack, so the porter (<see cref="BotUnload.Sellable(IBotWilful, Mobile)"/>) counted nothing worth a trip and
-/// the surplus draughts and bandages rode in the pack: Malachi took no unload in three and a half hours with 66 units over.
-/// </para>
-///
-/// <para>
-/// <see cref="Tidy"/> joins the stacks of one kind lying apart in a box, as a player does by dropping one pile on another:
-/// nothing made, nothing lost, the engine's own <c>StackWith</c>. <see cref="Join"/> is the miner's way in now: onto a stack
-/// of its kind first, a new place only for a metal the box has none of.
-/// </para>
-/// </summary>
 public static class BotSurplus
 {
+
     public static int TidyMs { get; set; } = 600000;
 
     public static long Tidied { get; private set; }

@@ -2,17 +2,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One meeting: two guilds, or a guild and a town, a place, an envoy, a host, a witness, what was said and what came of it.
-///
-/// <para>
-/// <b>A meeting is a thing with a place and a clock, not a function call.</b> Until 29.09.2026 a war was declared the instant
-/// an opinion crossed a number; this object is the time between the crossing and the war — the walk to the other guild's
-/// town, the wait for somebody to answer, the hearing and the word — and every stage of it is a field somebody can read on the
-/// page and in the log. It is kept in memory only: a restart ends every meeting in flight, and the grievance that called it
-/// calls it again at its next drift (<c>BotRegard.Drift</c>).
-/// </para>
-/// </summary>
 public sealed class BotHearing
 {
     public int Id { get; init; }
@@ -101,9 +90,9 @@ public sealed class BotHearing
         + (Ending != null ? $" — {Ending}" : "");
 }
 
-/// <summary>What a meeting is about, which decides who walks, who waits, and what the duke may answer.</summary>
 public enum BotTopic
 {
+
     Grievance,
 
     Safety,
@@ -115,9 +104,9 @@ public enum BotTopic
     Town
 }
 
-/// <summary>Where a meeting has got to.</summary>
 public enum BotHearingStage
 {
+
     Called,
 
     Walking,
@@ -133,9 +122,9 @@ public enum BotHearingStage
     Over
 }
 
-/// <summary>What the duke — or the town — answered: one outcome out of those allowed, and the words said for it.</summary>
 public sealed class BotVerdict
 {
+
     public string Outcome { get; init; }
 
     public string Speech { get; init; }
@@ -145,7 +134,6 @@ public sealed class BotVerdict
     public string Report { get; init; }
 }
 
-/// <summary>Who says a line of a meeting.</summary>
 public enum BotSpeaker
 {
     Witness,

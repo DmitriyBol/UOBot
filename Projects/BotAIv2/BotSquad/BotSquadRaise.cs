@@ -7,21 +7,6 @@ using Server.Targeting;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// <b>The company's half of raising its fallen (02.10.2026).</b> What raises and how is <see cref="BotRaise"/>'s; this is who goes,
-/// when, and how the company holds still for it.
-///
-/// <para>
-/// A member that dies leaves the roster in the same second (<c>BotMobile.OnDeath</c> → <c>BotSquads.Leave</c> → <see cref="Detach"/>),
-/// so the company keeps its fallen apart, on <see cref="_fallen"/>, for <see cref="BotRaise.HoldMs"/>. On every beat it looks for the
-/// member best able to raise each of them — the engine's chance on one try, and the nearer at equal odds — within
-/// <see cref="BotRaise.Reach"/>; the leader as much as anybody, because in a company of two the survivor is the leader. That member's
-/// walk is written into the same slot a station is (<see cref="BotJourney.Rebase(Map, Point3D, BotArrival, string)"/>), its own
-/// work is not advanced while it is at the body (<c>BotWill.Advance</c>), and the company hands it no station, no target and no
-/// patient until the body is up or it is given up on: forty seconds, twenty tries, or flight. While the company's enemy stands within
-/// <see cref="BotRaise.ClearReach"/> of the body the raising waits, and the revival is held for it.
-/// </para>
-/// </summary>
 public sealed partial class BotSquad
 {
     private sealed class FallenOne
@@ -161,6 +146,7 @@ public sealed partial class BotSquad
             }
             else
             {
+
                 spell.Disturb(DisturbType.Hurt);
             }
         }
@@ -221,6 +207,7 @@ public sealed partial class BotSquad
 
         if (down.Raiser == null && !Choose(down, now))
         {
+
             if (!down.EverAble && now - down.Fell >= BotRaise.JudgeMs)
             {
                 why = BotRaise.Unraised.NobodyAble;
@@ -373,6 +360,7 @@ public sealed partial class BotSquad
 
         if (down.Wound == 0 && raiser.Spell == null && FightNear(down))
         {
+
             down.Claimed = now;
 
             return false;
@@ -406,11 +394,13 @@ public sealed partial class BotSquad
 
         if (raiser.Spell != null)
         {
+
             return false;
         }
 
         if (raiser.Target is { } foreign)
         {
+
             foreign.Cancel(raiser, TargetCancelType.Canceled);
 
             return false;
@@ -440,6 +430,7 @@ public sealed partial class BotSquad
         }
         else
         {
+
             down.Tries++;
         }
 

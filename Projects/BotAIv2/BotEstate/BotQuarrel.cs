@@ -4,32 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Closing with a member of a guild yours is at war with, and fighting them.
-///
-/// <para>
-/// <b>The one errand on this shard that strikes another bot, and it exists because Patrick asked why the
-/// bailiff's sentence had no second half.</b> <c>BotEvict</c> says "this is the land of The Crown, move
-/// along" and its own note says a blow is what a war is for — and there was no war, and nothing that struck
-/// one. This is that half: a licence held by <see cref="BotFeud.Quarrel"/>, and never by this errand's own
-/// opinion of anybody.
-/// </para>
-///
-/// <para>
-/// <b>The fighting is the engine's, exactly as it is for a hunt.</b> Setting <c>Combatant</c> starts the
-/// server's own swing timer; everything about hit chance, damage, the weapon's speed and the disturbing of a
-/// bandage is the engine's business. This errand only closes the distance, sets the combatant, renews the
-/// guild's call so mates keep coming, and knows when it is over.
-/// </para>
-///
-/// <para>
-/// <b>It ends on a fall and never on a corpse.</b> A bot that dies is resurrected by the population and its
-/// pack goes with it — looting a guildmate's corpse is a separate order and is not assumed here. So the
-/// ending is "they are down", and what happens to the fallen belongs to whoever wrote the resurrection.
-/// </para>
-/// </summary>
 public sealed class BotQuarrel : BotDeed
 {
+
     public const string Trade = "quarrel";
 
     public static double Prior { get; set; } = 400.0;
@@ -172,6 +149,7 @@ public sealed class BotQuarrel : BotDeed
 
         if (!body.InRange(_them.Location, Reach))
         {
+
             return BotDoing.Walk(_them.Map, _them, BotArrival.Within(Reach), $"at {_them.Name} of the enemy");
         }
 

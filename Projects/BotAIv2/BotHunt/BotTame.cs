@@ -6,30 +6,6 @@ using Server.SkillHandlers;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The beasts a bot has tamed: kept beside it, set on whatever it fights, and fed.
-///
-/// <para>
-/// <b>Patrick's third addition of the night of 29.09.2026: "the bots have knowledge of taming domestic and wild animals,
-/// and the animals help them in a fight."</b> The engine already knows everything about a tamed creature — it follows
-/// its master, it attacks what it is told to, it forgets a master that never feeds it — and a player drives that with
-/// four words: "all follow me", "all kill". This is those words, said by the bot's beat.
-/// </para>
-///
-/// <para>
-/// <b>The list is the bot's, and it is found again rather than saved.</b> A tamed creature is saved by the engine with
-/// its master; at the first beat after a boot the bot looks round itself for creatures that answer to it
-/// (<see cref="Adopt"/>), and from then on the list is kept as beasts are tamed and die. A horse is not a beast here —
-/// the stable's business — nor anything summoned.
-/// </para>
-///
-/// <para>
-/// <b>Fed by a word, not by meat.</b> The engine's loyalty falls on its own clock and a beast at nought goes wild. A
-/// tamer with meat in its pack would feed it; a tamer without would lose it in an hour, which the shard's population
-/// cannot afford to watch. So every <see cref="FeedMs"/> a bot's beasts are made loyal again — the ration is counted
-/// (<see cref="Fed"/>), and what it costs is nothing, which is the one lie in this file.
-/// </para>
-/// </summary>
 public static class BotPets
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPets));
@@ -187,15 +163,6 @@ public static class BotPets
     }
 }
 
-/// <summary>
-/// Bringing one beast to heel: walk up, try, try again, and the engine's own arithmetic decides.
-///
-/// <para>
-/// The roll is the engine's — <c>CheckTargetSkill</c> on Animal Taming against the creature's own difficulty, the same
-/// window a player gets (see <c>SkillHandlers.AnimalTaming</c>) — so the skill trains as a player's would, and what a
-/// bot can tame is exactly what its skill says. A beast that has had owners before is harder, as it is for a player.
-/// </para>
-/// </summary>
 public sealed class BotTame : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTame));
@@ -353,9 +320,9 @@ public sealed class BotTame : BotDeed
     }
 }
 
-/// <summary>Offers a bot whose class knows taming the nearest beast its skill allows, while it keeps fewer than <see cref="BotPets.Most"/>.</summary>
 public sealed class BotTamerProposer : IBotProposer
 {
+
     public static int Reach { get; set; } = 14;
 
     public static double LeastSkill { get; set; } = 20.0;

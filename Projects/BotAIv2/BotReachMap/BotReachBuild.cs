@@ -7,27 +7,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The ground the reach map is surveyed from: the navigation graph's own probe (<see cref="StepProbe"/>: land, statics and the
-/// houses standing on it), with two differences, both measured against what a bot's walker does.
-///
-/// <para>
-/// <b>Boats are left out (01.10.2026).</b> A ship is a multi, and a multi's deck is a standing surface to the probe; a map drawn
-/// with the ships in it would carry little islands of "land" across the harbours that sail away a minute later, and the water
-/// under them would read as ground — the one place Patrick's rule says must stay water ("on the water a boat lifts the
-/// unreachability"). Houses are kept: a guild hall's walls are ground for as long as it stands, and a change to one is announced
-/// (<see cref="NavigationService.GroundChangedHook"/>).
-/// </para>
-///
-/// <para>
-/// <b>Immovable items stand in the way (01.10.2026).</b> The world is decorated with items — the graveyard's railing, the
-/// shops' counters, the forges and looms of a hall — and the walker refuses a step into any of them (<see cref="BotStep.BlockedByItems"/>),
-/// while the graph never sees them. A standing height an immovable, impassable item fills is taken away here, so a railing is
-/// a wall on this map as it is to the walker. Doors, teleporters and moongates are not in the way, as they are not to the
-/// walker. What an item covers is written into the cluster's <see cref="BotReachCluster.Signature"/>, so a boot notices a
-/// decoration moved since the map was drawn and draws that cluster again.
-/// </para>
-/// </summary>
 public sealed class BotReachTerrain : INavTerrain
 {
     private const int Side = NavWindow.Side;
@@ -245,21 +224,9 @@ public sealed class BotReachTerrain : INavTerrain
     }
 }
 
-/// <summary>
-/// One cluster of the reach map as the survey left it: which standing place of each of its 256 tiles belongs to which of its
-/// own regions, and how its regions are joined to each other and to the regions of the four clusters east, south, south-east
-/// and south-west of it. Never changed once made — a cluster drawn again is a new one — so a snapshot built from these can be
-/// read from any thread.
-///
-/// <para>
-/// <b>A region</b> is the ground inside the cluster a body can walk round in both directions without leaving it: steps that go
-/// both ways join, a step one way only (a drop off a ledge) is a <see cref="Links">link</see> from one region to another. That
-/// keeps "a ledge you can drop off and never climb" out of the ground below it when the solve asks what can be walked
-/// <em>to</em> from home.
-/// </para>
-/// </summary>
 public sealed class BotReachCluster
 {
+
     public const byte Blocked = 0xFF;
 
     public const byte Water = 0xFE;
@@ -451,16 +418,6 @@ public sealed class BotReachCluster
     }
 }
 
-/// <summary>
-/// Draws one cluster of the reach map from the ground (<see cref="BotReachTerrain"/>) through the navigation graph's own window
-/// (<see cref="NavWindow"/>), so the two cannot disagree about a step. On the game loop only: it reads the map's tiles.
-///
-/// <para>
-/// <b>Clusters are drawn from the south-east corner of the map backwards (01.10.2026).</b> A cluster's links reach into its
-/// east, south, south-east and south-west neighbours (every pair of touching clusters is joined by exactly one of the two), and
-/// those are drawn before it, so a link names the neighbour's region at once and the solve has nothing left to match up.
-/// </para>
-/// </summary>
 public sealed class BotReachBuilder
 {
     private const int Cells = NavWindow.ClusterSide * NavWindow.ClusterSide;

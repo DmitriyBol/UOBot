@@ -2,26 +2,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Going to somebody's aid, or hitting back at whatever is hitting you.
-///
-/// <para>
-/// <b>It is a hunt with a different name and a different price, and both differences are the point.</b> The
-/// fighting itself is <see cref="BotSlay"/>'s — closing at the right distance for the weapon, giving ground
-/// when something gets too near, the flight rule, the caps on a fight that is going nowhere, the corpse
-/// afterwards. Writing a second one of those would be writing a second set of the same bugs. What this adds
-/// is that the work is worth dropping other work for, and that it is filed under its own name so the ledger
-/// never averages "went to help Orin" together with "went to kill a rat".
-/// </para>
-///
-/// <para>
-/// <b>Pressing, which almost nothing is.</b> The dwell exists so bots finish what they start, and it is right
-/// nearly always — a vein is still there in half a minute. A bot being eaten is not: half a minute is the
-/// whole of the event. This is the case the pressing flag was written for.
-/// </para>
-/// </summary>
 public sealed class BotRescue : BotDeed
 {
+
     public const string Trade = "rescue";
 
     public static double Prior { get; set; } = 200.0;
@@ -128,6 +111,14 @@ public sealed class BotRescue : BotDeed
     private bool _told;
 
     private int _lowest = int.MaxValue;
+
+    public override void Taken(IBotWilful bot)
+    {
+        if (_own && ToTheEnd)
+        {
+            BotDefender.Stood(bot?.Self, _foe);
+        }
+    }
 
     public override void Drop(IBotWilful bot)
     {

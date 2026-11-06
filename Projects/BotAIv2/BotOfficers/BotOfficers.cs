@@ -7,7 +7,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The three posts a guild's head gives out: the store, the stand by the bank, and the road.</summary>
 public enum BotOfficerPost
 {
     Quartermaster,
@@ -15,29 +14,6 @@ public enum BotOfficerPost
     Scout
 }
 
-/// <summary>
-/// A guild's officers: who holds which post, how they are chosen, and what the guild hears of them.
-///
-/// <para>
-/// <b>Patrick's approval of 07.10.2026 (night 17, "a livelier world"): three officers appointed by the head, each with real
-/// actions and its own log signature.</b> The quartermaster keeps the guild's store at the hall (<see cref="BotGuildStore"/>,
-/// <see cref="BotQuartermaster"/>), the herald keeps a recruiting stand by the bank, reads the guild's news and challenges a rival
-/// to a bout (<see cref="BotHeraldStand"/>, <see cref="BotGuildBout"/>), and the scout walks the dangerous ground by a plan, reaches
-/// rumoured chests first and shadows another guild's company (<see cref="BotGuildScout"/>).
-/// </para>
-///
-/// <para>
-/// <b>The head appoints, by a rule anybody can read.</b> Every <see cref="TermMs"/> of running time (six hours) the head reviews
-/// each post and gives it to the member who fits it best — a quartermaster from the makers, a herald from whoever has the most
-/// renown, a scout from the shooters and the strong — a veteran first among equals (<see cref="BotTraits.Veteran"/>). A post
-/// whose holder died for good, left, or became the head is filled at once. The holder keeps it unless the best fits a fifth
-/// better (<see cref="Margin"/>), so a post does not change hands on noise. Nobody holds two posts and the head holds none.
-/// </para>
-///
-/// <para>
-/// <b>Kept across restarts</b> by <see cref="BotOfficersStore"/>: the holders by name with the age of their appointment.
-/// </para>
-/// </summary>
 public static class BotOfficers
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOfficers));
@@ -254,6 +230,7 @@ public static class BotOfficers
 
             if (bot.Guild is Guild g && g.Name != null && (!_firstSeen.TryGetValue(bot.Serial, out var seen) || seen.Guild != g.Name))
             {
+
                 _firstSeen[bot.Serial] = (g.Name, _seenOnce ? now : long.MinValue);
             }
         }
@@ -291,6 +268,7 @@ public static class BotOfficers
 
         if (post?.Holder == null)
         {
+
             if (post != null && now - post.Reviewed < EmptyRetryMs)
             {
                 return;
@@ -300,6 +278,7 @@ public static class BotOfficers
         }
         else if (holder == null)
         {
+
             if (BotRest.Records.ContainsKey(post.Holder))
             {
                 return;
@@ -370,6 +349,7 @@ public static class BotOfficers
 
     private static void Set(Guild guild, BotOfficerPost office, BotMobile bot, BotMobile head, string cause, long now, double fit)
     {
+
         for (var i = 0; i < Offices.Length; i++)
         {
             if (Offices[i] != office && _posts.TryGetValue((guild.Name, Offices[i]), out var other) && other.Holder == bot.Name)

@@ -4,12 +4,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One guild's colony on an island: the square it landed on, the store its colonists fill, who is on its land and since
-/// when, and what its ship has carried home. See <see cref="BotColonies"/>.
-/// </summary>
 public sealed class BotColony
 {
+
     public string Guild;
 
     public string Island;

@@ -35,8 +35,6 @@ END = "<!--SECTION2:END-->"
 
 ROOT = "(root)"
 
-# Reading order: the way in, the clock, the decision, then everything a decision reaches for, then the
-# subsystems that watch rather than act.
 ORDER = [
     ROOT, "BotModules", "BotPopulation", "BotWill", "BotMovement", "BotClasses", "BotOutfit",
     "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotMarket", "BotShopkeep", "BotSpells",
@@ -44,7 +42,6 @@ ORDER = [
     "BotDashboard", "BotAlarm", "BotVoice", "BotSocial", "BotWeb", "mindedBots", "mindedBots/debugger",
 ]
 
-# folder -> (title, what it is, [traps])
 BLOCKS = {
     ROOT: (
         "the way in",
@@ -415,6 +412,27 @@ BLOCKS = {
          "seconds puts it where the registry says. Never delete a `BotRelicItem` by hand without `do relic <name> ; hide`.",
          "A restart hides a relic that was in a lair and takes its warden away; every other relic stays where it was."],
     ),
+    "BotStory": (
+        "each bot's story and the island's Chronicle",
+        "PLAN-life A3, 13.10.2026. Every bot has a book of notes (`BotStoryBook`), written from two places: the event stream "
+        "as each event is posted (`BotEvents.Heard` → `BotStory.Heard`: offices, elections, relics, crime's turning points, "
+        "residences, halls and the guild services opened) and a slow walk over the population that notices what no event says "
+        "(a guild joined or left, a rank risen, a house bought, the champion's yellow, the veteran's title). `BotStoryWriter` "
+        "turns a book, the biography's three tales and the strongest ties into chapters by stage — youth, apprenticeship, the "
+        "guild, deeds, friends and foes, home, family, old age — one dated sentence a fact; that template is always the story. "
+        "When the minds assembly is loaded, `BotStoryVoice` asks the model to retell one chapter or one closed day, at most "
+        "`VoicePerHour` an hour, once for each set of facts (kept against their hash in the save), and the answer is thrown "
+        "away if it names anybody or any number the facts do not. `BotChronicle` keeps a page a day of the wars, guilds, "
+        "champions, relics, elections, the duke's words and the towns' news. The page reads both through volatile snapshots "
+        "(`/api/story?bot=`, `/api/chronicle`, the Story tab).",
+        ["The model's HTTP call is the only thing off the loop, inside `BotOllama`; the answer comes back through "
+         "`Core.LoopContext.Post` and is checked and stored on the loop. Nothing on a listener thread touches a book: it "
+         "reads the shelf and posts the name it was asked for.",
+         "A book is keyed by name, like a life. The first two minutes after a start (`SettleMs`) are taken as where a bot "
+         "stands, not as news — ranks are worked out and houses adopted a few seconds after the reclaim, and without the "
+         "settle every restart wrote \"became an Expert Tailor\" for the whole population.",
+         "`do reset` empties the store through `BotStory.Wipe` and seals the stories until the restart."],
+    ),
     "BotQuad": (
         "the island as squares",
         "The map cut into squares thirty tiles across, each carrying one number: how safe the population has "
@@ -471,6 +489,22 @@ BLOCKS = {
          "`Society:` counts what was heard by mood, offered by kind, accepted, finished, lapsed, and refused for hostility; "
          "`Voice:` counts moods said to somebody against moods said to nobody."],
     ),
+    "BotDay": (
+        "the daily cycle",
+        "A clock of six named parts of the day on local time (`BotDay`: dawn from 05, morning 07, noon 12, afternoon 14, "
+        "evening 18, night 22, each a dial in `bot-day.json`), a timetable per bot drawn once from its name, class and nature "
+        "and kept in its own store (`BotTimetable`: wake and bed hours, meal hours, an evening habit — tavern, fireside, home, "
+        "prowl — night owls who live the day ten hours later, and where it sleeps without a house), and the hour as one more "
+        "multiplier outside the auction's root beside the calling, the toll and the nature (`BotDay.Factor`: the evening's "
+        "tavern and fireside, the night's fire and the night's trades, the dawn's market, ×0.67–×1.5 held in ×0.5–×2). The "
+        "rest clock's queue to tire is put bedtime-first and its queue back wake-hour-first. PLAN-life A1, the week of "
+        "12.10.2026; measured on the `Day:` line and under `day` in `/api/state`.",
+        ["A factor without a floor is a veto: a markdown is never applied to a broke bot's paid work (`Floored` counts them), "
+         "and the whole factor is held in `Least`–`Most`, never nought.",
+         "The prime time's bands and shares are Patrick's and untouched: the cycle chooses *who* rests, never how many. "
+         "`BotRest.Look` asks `AtBed` for the order and the early candidates; the allowance arithmetic is the same.",
+         "The part of the day is read into a static on the module's two-second clock; the auction never reads the wall clock."],
+    ),
     "BotWeb": (
         "the shard as a page",
         "The whole population as one JSON document on `127.0.0.1:2599`, rebuilt on the game loop every two "
@@ -512,8 +546,6 @@ BLOCKS = {
     ),
 }
 
-# folder -> the summary lines it writes into. Verified against a live log rather than derived, because a
-# clause can reach a line through two levels of Describe().
 LINES = {
     "BotPopulation": ["Getting about:", "The market:", "What we know:", "Money:"],
     "BotWill": ["What we know:"],
@@ -542,6 +574,7 @@ LINES = {
     "BotQuest": ["Quests:"],
     "BotQuad": ["The captain:"],
     "mindedBots": ["Minds:"],
+    "BotStory": ["Stories:"],
 }
 
 TYPE_SUMMARY = re.compile(
@@ -550,11 +583,9 @@ TYPE_SUMMARY = re.compile(
     re.S,
 )
 
-
 def read(path):
     with open(path, "rb") as handle:
         return handle.read().decode("utf-8-sig", errors="replace")
-
 
 def purpose(text):
     found = TYPE_SUMMARY.search(text)
@@ -569,13 +600,9 @@ def purpose(text):
 
     return (sentence.group(1) if sentence else body[:160]).strip()
 
-
 DIAL = re.compile(r"public static ([\w<>?\[\]]+) (\w+) \{ get; set; \} = ([^;]{1,60});")
 
-# A configuration file can only reach a dial through a line like `BotMarket.StaleMs = settings.StaleMs ??`
-# in that subsystem's *Config.cs. Anything not on the left of one of those needs a rebuild to change.
 SETTABLE = re.compile(r"(\w+)\.(\w+)\s*=\s*(?:settings|cfg|c)\.(\w+)\s*\?\?")
-
 
 def collect():
     """Everything the blocks are built out of, read once per file."""
@@ -601,8 +628,10 @@ def collect():
             for dial in DIAL.finditer(text):
                 here["dials"].append((stem, dial.group(2), " ".join(dial.group(3).split())))
 
+            found = re.search(r"Configuration/(bot-[a-z-]+\.json)", text)
+
             for reach in SETTABLE.finditer(text):
-                here["settable"][(reach.group(1), reach.group(2))] = reach.group(3)
+                here["settable"][(reach.group(1), reach.group(2))] = (reach.group(3), found.group(1) if found else None)
 
             if re.search(r"class\s+%s\s*:\s*[^{\n]*BotModule" % re.escape(stem), text):
                 here["module"] = stem
@@ -610,10 +639,9 @@ def collect():
             if re.search(r"class\s+%s\s*:\s*[^{\n]*BotDeed" % re.escape(stem), text):
                 here["deeds"].add(stem)
 
-            found = re.search(r"Configuration/(bot-[a-z-]+\.json)", text)
-
-            if found and not here["config"]:
+            if found and (not here["config"] or stem.endswith("Config") and not here.get("owned")):
                 here["config"] = found.group(1)
+                here["owned"] = here.get("owned") or stem.endswith("Config")
 
             if re.search(r"class\s+%s\s*:\s*[^{\n]*IBotProposer" % re.escape(stem), text):
                 offers = re.search(r'public string Name\s*=>\s*"([^"]+)"', text)
@@ -622,7 +650,6 @@ def collect():
                     (stem, offers.group(1) if offers else stem, rung.group(1) if rung else "?", text)
                 )
 
-    # A proposer's deeds are whatever it constructs that is a deed anywhere in the assembly.
     every = set().union(*(f["deeds"] for f in folders.values())) if folders else set()
 
     for here in folders.values():
@@ -632,7 +659,6 @@ def collect():
         ]
 
     return folders
-
 
 def block(folder, data):
     title, says, traps = BLOCKS.get(folder, ("", "", []))
@@ -686,7 +712,6 @@ def block(folder, data):
 
     return out
 
-
 def dials(folders, order):
     """DIALS.md: every tunable in the assembly, its default, and whether a config file can reach it."""
     out = [
@@ -701,6 +726,11 @@ def dials(folders, order):
         "changed without a rebuild.",
     ]
 
+    everywhere = {}
+
+    for data in folders.values():
+        everywhere.update(data["settable"])
+
     for folder in order:
         if folder not in folders or not folders[folder]["dials"]:
             continue
@@ -713,18 +743,17 @@ def dials(folders, order):
         out.append("|---|---|---|---|")
 
         for owner, field, value in sorted(here["dials"]):
-            key = here["settable"].get((owner, field))
+            key, source = here["settable"].get((owner, field)) or everywhere.get((owner, field), (None, None))
+            where = " in `%s`" % source if source and source != here["config"] else ""
             out.append("| `%s` | `%s` | `%s` | %s |" % (
-                owner, field, value, "`%s`" % key if key else "*code only*"))
+                owner, field, value, "`%s`%s" % (key, where) if key else "*code only*"))
 
     with open("DIALS.md", "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(out) + "\n")
 
     return sum(len(f["dials"]) for f in folders.values()), sum(len(f["settable"]) for f in folders.values())
 
-
 ROW = re.compile(r"^\| `([A-Za-z0-9_]+\.cs)` \|")
-
 
 def drift():
     """Subsystem READMEs whose file table no longer matches the folder. Reported, never rewritten."""
@@ -739,7 +768,6 @@ def drift():
         with open(path, encoding="utf-8") as handle:
             lines = handle.read().split("\n")
 
-        # The first contiguous run of file rows is the "What is in it" table; later tables are other things.
         first = last = None
 
         for i, line in enumerate(lines):
@@ -763,7 +791,6 @@ def drift():
             out.append((folder, sorted(actual - listed), sorted(listed - actual)))
 
     return out
-
 
 def main():
     folders = collect()
@@ -813,7 +840,6 @@ def main():
             parts.append("lists absent " + ", ".join(ghosts))
 
         print("%s/README.md has drifted: %s" % (folder, "; ".join(parts)))
-
 
 if __name__ == "__main__":
     main()

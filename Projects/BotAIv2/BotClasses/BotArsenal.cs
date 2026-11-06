@@ -4,20 +4,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The weapons of the era, named once, each beside the skill that swings it.
-///
-/// Exists so that "which blades may a bot be born with" has exactly one answer. The classes below
-/// differ in how far they train a weapon, not in which weapons exist, and a pool repeated in nine
-/// files is nine places to forget when a weapon family turns out to be weak.
-///
-/// Restricted to what the population has actually been seen carrying rather than to everything the
-/// engine defines: a list of every weapon in the game would be a list mostly of items no bot has ever
-/// held, and the differences between a katana and a broadsword are small mechanically and considerable
-/// to watch, which is the entire reason for offering a choice.
-/// </summary>
 public static class BotArsenal
 {
+
     public const int SpellHeal = 3;
 
     public const int SpellMagicArrow = 4;

@@ -3,12 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The voices as a module: reads the file, opens the speech log, and hooks the occasions.
-///
-/// After the population and the will, because every occasion here is one of theirs. The mood clock runs on
-/// its own timer, once every few seconds over the roster, and each bot decides for itself whether it is due.
-/// </summary>
 public sealed class BotVoiceModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotVoiceModule));

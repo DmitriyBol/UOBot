@@ -8,24 +8,6 @@ using Server.Targets;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Making camp: kindling in hand, a hearth picked on wild ground, the engine's flame struck on it, and a seat by it kept
-/// until the evening is over.
-///
-/// <para>
-/// <b>Kindling comes the engine's three ways, in the order a player in the woods would reach for them.</b> Out of the pack
-/// first — bought at a provisioner for two gold a stick (<see cref="BotCamper"/> offers the trip when a fire-lighter in
-/// town has none). Then made from logs, one log a stick, with a fletcher's kit (<c>DefBowFletching</c>, the recipe with no
-/// skill to it). Then cut off a tree with a knife or a sword — the engine's own use of a blade on a trunk
-/// (<c>BladedItemTarget</c>), five of the tree's wood for one stick. Nothing is conjured.
-/// </para>
-///
-/// <para>
-/// <b>Striking is the engine's roll and it is honest about a beginner.</b> <c>Kindling</c> rolls Camping between nought and
-/// a hundred, so a bot that has never made camp fumbles for half a minute or so, gaining a little with every strike, before
-/// the first flame; the strike gives up after <see cref="MostFumbles"/>. The fumbles are counted (<c>BotCamp.Fumbles</c>).
-/// </para>
-/// </summary>
 public sealed class BotKindle : BotDeed
 {
     public const string Trade = "camp";
@@ -412,6 +394,7 @@ public sealed class BotKindle : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+
         if (_stage == Gathering && _tree != null)
         {
             _shunned.Add((_tree.X, _tree.Y));
@@ -572,19 +555,9 @@ public sealed class BotKindle : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a fire-lighter a camp where it stands, when it is tired or bored or has had nothing to do; and, in town with no
-/// kindling, a trip to a provisioner for some.
-///
-/// <para>
-/// <b>Every reason a camp fails is asked before it is offered, because it is unpaid work.</b> An unpaid deed is priced at
-/// its claim and the ledger never learns it is failing (MAP §4, "taking the price off a piece of work takes its brake off
-/// too"), so the ground, the kindling, the skill and anything hostile nearby are all asked here, and a bot that has made
-/// camp is not offered another for <see cref="EveryMs"/> whatever came of it.
-/// </para>
-/// </summary>
 public sealed class BotCamper : IBotProposer
 {
+
     public static int EveryMs { get; set; } = 2700000;
 
     public static int LookMs { get; set; } = 20000;

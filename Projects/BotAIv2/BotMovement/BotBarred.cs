@@ -7,51 +7,12 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Ground the population is never to want, however attractive whatever is standing on it.
-///
-/// <para>
-/// <b>Patrick's order of 11.09.2026, and the difference between this and <see cref="BotRefused"/> is the
-/// whole reason it is a second class.</b> The refusal ledger is a measurement: somebody tried, somebody
-/// failed, and the square rests for a while and is cleared the moment anybody arrives in it. That is right
-/// for ground whose reachability is a question. It is wrong for ground whose reachability is settled —
-/// a walled pocket with no door — because the ledger keeps letting the question be asked again, and each
-/// re-ask costs a path search, an errand and the minutes the bot spent walking at it.
-/// </para>
-///
-/// <para>
-/// <b>The evidence this was written from.</b> A cooking hearth stands at (2161, 1354) inside a pocket east
-/// of Britain that nothing can walk into. In one nine-hour session it took 70 of the shard's 2460 walk
-/// failures on its own, every one of them a cook who took the job, walked at it for minutes and gave up;
-/// the rest of the pocket — a fleeing bot choosing (2208, 1379) as a refuge, a healer hunting something
-/// shut in at (2163, 1384) — took 60 more. The shard had already <i>learned</i> the shape of it:
-/// <c>BotReach</c> logged "a pocket of 527 tiles has been walked to its edges" and "a pocket of 25 tiles",
-/// and it went on choosing destinations inside them, because knowing a journey will be refused is not the
-/// same as not wanting to go.
-/// </para>
-///
-/// <para>
-/// <b>So this is a fact stated rather than learned, and it belongs in the choice.</b> It is asked by
-/// <see cref="BotRefused.Refusing"/>, which every sampler that picks a place already calls before it picks,
-/// so a barred square is never on any shortlist: not a hearth, not a vein, not a refuge, not a corpse. It
-/// never expires and arriving does not clear it — those are both properties of a measurement, and this is
-/// not one. The only thing that lifts it is somebody editing <c>bot-movement.json</c>.
-/// </para>
-///
-/// <para>
-/// <b>Kept honest by its own counter.</b> A gate with no bucket either breaks somebody else's denominator
-/// or files its refusals under somebody else's name — this project's most repeated instrumentation defect —
-/// so what this turns away is counted here, by square, and printed beside the ledger's own numbers rather
-/// than inside them.
-/// </para>
-/// </summary>
 public static class BotBarred
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBarred));
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>One piece of ground nobody may want, and why it is on the list.</summary>
     public sealed class Bar
     {
         public Bar(int x1, int y1, int x2, int y2, string why)
@@ -121,13 +82,6 @@ public static class BotBarred
         public bool Dire;
     }
 
-    /// <summary>
-    /// <b>A standing quarantine as a clearing sees it (03.10.2026, build next).</b> Patrick's order of 02.10.2026, item 4: companies
-    /// go to the squares where others died and clear them. Its box, why and how often it was closed, whether the plague or a killer
-    /// of <see cref="QuarantinePower"/> closed it (<see cref="Dire"/>: never a clearing's), and the strongest thing recorded killing
-    /// in it at its kind's company price now (<c>BotCompanyRecord.Price</c>, since 03.10.2026; the island's price before) — the
-    /// figure a company withdraws by (<c>BotSquad.Reckon</c>).
-    /// </summary>
     public readonly struct Closure
     {
         public Closure(int x1, int y1, int x2, int y2, string why, int deaths, bool dire, double worst, string worstKind, double worstRaw)
@@ -177,6 +131,7 @@ public static class BotBarred
 
         foreach (var (type, power) in q.Killers)
         {
+
             var priced = power * BotCompanyRecord.Price(type);
 
             if (priced > worst)

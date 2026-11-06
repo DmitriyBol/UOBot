@@ -3,27 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What sweeps of each square of the island paid lately: how many sweeps walked it, how many fights they found in it, and what
-/// the hunts those finds led to came to. The price a prowl is offered at (<see cref="BotProwl.Expects"/>) is read from here.
-///
-/// <para>
-/// <b>A prowl was offered at a flat eight a minute, and it won the auction for being nothing.</b> Patrick, 06.10.2026 ~10:00:
-/// 82 % of the 14 000 prowls a day end "nothing here" and count as finished work; "ideally, when they go on a prowl they are
-/// given several quadrants to clear; if they walked them and found nobody, that is fine, that is a success." On build 400
-/// (06.10, 06:12–09:42) 2709 prowls were taken, 1761 of the 2669 that ended said "nothing here" (a median of 0.6 minutes),
-/// and 274 of them were taken over a real offer. The walk itself pays nothing and never will; what it is worth is what the
-/// fights it finds pay, and that is a fact about the squares it walks — so it is measured per square, from the sweeps that
-/// walked them, and a square that sweeps keep finding empty prices its sweeps down towards nothing.
-/// </para>
-///
-/// <para>
-/// Faded by <see cref="HalfLifeMs"/>: a square cleared an hour ago fills again from its spawner, and a square that paid this
-/// morning may be empty now. Not saved: a restart is a fresh look, and the first hour refills it.
-/// </para>
-/// </summary>
 public static class BotSweepRecord
 {
+
     public static int HalfLifeMs { get; set; } = 3600000;
 
     public static double SquarePrior { get; set; } = 1.0;

@@ -4,43 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Places the population could not get to, remembered for everybody and forgotten again when somebody
-/// proves otherwise.
-///
-/// <para>
-/// <b>Why this exists, in the numbers that produced it.</b> Over the night of 07–08.09.2026 the shard spent
-/// two thirds of every piece of work it started on errands that ended in "no way through": 20968 failures
-/// out of 29666 undertakings in one session, 5103 of 5568 failures in another. Five destinations alone
-/// accounted for 232 of them; herb gathering failed 2940 times out of 2990; a single scout errand failed 374
-/// times out of 383. Each of those failures paid for a full path search first — 43139 searches, 1.6 billion
-/// tiles, 588 seconds of the game loop in under two hours.
-/// </para>
-///
-/// <para>
-/// <b>And none of it was written down anywhere a chooser could read.</b> The shard already had three records
-/// about ground and not one of them fit: <see cref="BotReach"/> learns pockets, but only ones small enough
-/// to walk the edges of — a patch of grass across water is part of the mainland, the probe returns TooBig,
-/// and nothing is filed (five pockets learned in four hours). <see cref="BotQuad"/>'s baulks are shaped like
-/// quadrants, thirty tiles across, and until this same night only the hunt read them. And
-/// <see cref="BotLedger"/>'s caution is per-bot, so forty-nine bots each discover the same wall separately.
-/// </para>
-///
-/// <para>
-/// <b>What this is instead: the destination itself, shared, and disprovable.</b> One entry per
-/// <see cref="Grain"/>-sized square of ground, holding how many times somebody gave up trying to reach it
-/// and when. The rest doubles with each refusal up to a ceiling, so a place that turned one bot away on a
-/// bad afternoon is tried again in minutes, while a rooftop that has turned away nine is left alone for
-/// hours. <b>And arriving anywhere clears it</b> — which is the property the baulk map lacked, and the
-/// reason its marks grew to cover a quarter of the island in ninety minutes with nothing able to take one
-/// back.
-/// </para>
-///
-/// <para>
-/// It says nothing about what work is worth. That is the ledger's business, and the night's other repair
-/// was to stop a refused road from speaking on that subject at all.
-/// </para>
-/// </summary>
 public static class BotRefused
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRefused));
@@ -106,6 +69,7 @@ public static class BotRefused
 
     public static bool Refusing(Map map, Point3D where)
     {
+
         if (BotBarred.Barred(map, where))
         {
             return true;

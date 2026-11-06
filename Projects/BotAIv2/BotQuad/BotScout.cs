@@ -6,26 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A captain taking a paid party out to ground nobody has ever stood in.
-///
-/// <para>
-/// <b>This is the one errand on the shard whose product is knowledge rather than goods.</b> Everything else
-/// a bot does ends in coin, in a made thing or in a dead monster; this ends in a square on the map changing
-/// from "never stood in" to a reading. The population cannot hunt where it has not been, cannot be sent
-/// where nothing is known, and — because <see cref="BotQuad"/> credits ground for being walked — cannot even
-/// tell safe ground from unvisited ground without somebody going and looking.
-/// </para>
-///
-/// <para>
-/// <b>Paid, and paid out of the captain's own pocket, by order.</b> Fifty gold split between whoever comes.
-/// It is a small sum on purpose: scouting is not meant to compete with hunting on takings, it is meant to be
-/// worth doing when nothing better is going. What the money really buys is a reason for the other bots to
-/// come at all — the auction weighs every want in gold a minute, and an unpaid walk into the unknown scores
-/// exactly nothing against a hunt. The captain is kept from ruining himself by a floor on his own purse: see
-/// <see cref="Solvent"/>.
-/// </para>
-/// </summary>
 public sealed class BotScout : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotScout));
@@ -344,6 +324,7 @@ public sealed class BotScout : BotDeed
 
         if (fromBank > 0 && !Banker.Withdraw(captain, fromBank))
         {
+
             if (fromPack > 0)
             {
                 pack.DropItem(new Gold(fromPack));
@@ -519,6 +500,7 @@ public sealed class BotScout : BotDeed
 
     private void Disband(IBotSquadMember member)
     {
+
         if (_kin)
         {
             _squad = null;

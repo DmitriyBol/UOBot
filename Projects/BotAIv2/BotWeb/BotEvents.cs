@@ -8,7 +8,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One thing that happened to one bot, as the dashboard and the event log see it.</summary>
 public sealed class BotEvent
 {
     public long Seq { get; init; }
@@ -36,7 +35,6 @@ public sealed class BotEvent
     public string Json { get; init; }
 }
 
-/// <summary>One search that did not reach its goal, kept apart from the general stream so the paths page can add them up.</summary>
 public readonly record struct BotPathRecord(
     DateTime At,
     string Bot,
@@ -53,24 +51,8 @@ public readonly record struct BotPathRecord(
     bool Flight
 );
 
-/// <summary>One line of the alarm channel, kept for the dashboard's header.</summary>
 public readonly record struct BotAlarmRecord(DateTime At, string State, string Kind, string Say, long N, long Of, string Window);
 
-/// <summary>
-/// The population's event stream: everything worth telling a person about, in order, with a sequence number.
-///
-/// <para>
-/// <b>Three readers, one writer.</b> The game loop posts; the web server reads by sequence number, the SSE
-/// streams are fed a copy, and <c>logs/bot-events.ndjson</c> keeps the record across restarts. Nothing here
-/// touches the world, so the readers can run on any thread under the one lock.
-/// </para>
-///
-/// <para>
-/// <b>Why this and not the session log.</b> The log says everything, in prose, for grep. A dashboard needs
-/// the same facts as fields — which bot, where, what kind — without parsing sentences that change when the
-/// sentence is improved. The log stays the record of reasoning; this is the record of events.
-/// </para>
-/// </summary>
 public static class BotEvents
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEvents));
@@ -108,6 +90,8 @@ public static class BotEvents
     public static string Path { get; private set; }
 
     public static Action<BotEvent> Live { get; set; }
+
+    public static Action<BotEvent> Heard { get; set; }
 
     public static long Seq
     {
@@ -160,6 +144,7 @@ public static class BotEvents
             }
             catch
             {
+
             }
 
             _file = null;
@@ -255,6 +240,7 @@ public static class BotEvents
             }
             catch
             {
+
             }
         }
 
@@ -266,6 +252,19 @@ public static class BotEvents
             }
             catch
             {
+
+            }
+        }
+
+        if (Heard is { } heard)
+        {
+            try
+            {
+                heard(e);
+            }
+            catch
+            {
+
             }
         }
 
@@ -492,7 +491,6 @@ public static class BotEvents
         $"{Seq} events posted, {Written} written to {(Path == null ? "nowhere" : "bot-events.ndjson")}, {Swallowed} swallowed, {Streams} live streams";
 }
 
-/// <summary>The one way JSON is written in this folder: a writer over a buffer, and the text out of it.</summary>
 public static class BotJson
 {
     private static readonly JsonWriterOptions Options = new() { Indented = false, SkipValidation = false };

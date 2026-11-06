@@ -6,35 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot ought to be wearing, worked out from what this shard can actually make and what it costs.
-///
-/// <para>
-/// <b>The catalogue is asked of the engine, never written down here.</b> A table of armour types with their
-/// protection and their price would be right on the day it was typed and wrong the first time anybody edits
-/// an armour definition or a recipe — and wrong <em>silently</em>, which is the expensive kind. So this
-/// walks the craft systems the shard already runs, keeps every recipe whose product is a piece of armour,
-/// builds exactly one of each, reads its numbers off the object, and throws it away. Everything below is a
-/// fact the engine gave up: protection, the agility it costs, the strength it wants, whether a caster can
-/// meditate in it, and how much material one takes.
-/// </para>
-///
-/// <para>
-/// <b>Only what can be made, because a want nobody can fill is worse than no want.</b> Coming from the
-/// recipes rather than from the item types means a piece is on this list if and only if some bot on this
-/// island could in principle forge or sew it — and the skill it needs comes along with it, so "nobody is
-/// good enough yet" is a fact the board can be told rather than a mystery on it.
-/// </para>
-///
-/// <para>
-/// <b>And the answer is harm stopped per gold — over the piece's whole life, not per blow.</b> Ranked on
-/// armour rating alone every bot wants plate, and twenty bots saving for plate is twenty bots not buying
-/// arrows. Ranked on rating per gold, which is what this did first, everybody buys leather — and that is
-/// wrong for precisely the bots that need armour most, because a piece is not bought by the point, it is
-/// bought by the afternoon. Plate carries more rating <em>and</em> more durability, so it stops nearly three
-/// times the harm a leather tunic does before either is scrap. Both numbers are the engine's own.
-/// </para>
-/// </summary>
 public static class BotHarness
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHarness));
@@ -51,7 +22,6 @@ public static class BotHarness
 
     public static int LeastCost { get; set; } = 10;
 
-    /// <summary>One kind of armour, as the engine describes it.</summary>
     public sealed class Piece
     {
         public Type Kind { get; init; }
@@ -152,6 +122,7 @@ public static class BotHarness
 
         if (!_surveyed)
         {
+
             logger.Warning("No armour could be surveyed yet: the craft systems may not be built. Trying again in {Wait}ms", RetryMs);
 
             return;
@@ -222,6 +193,7 @@ public static class BotHarness
             }
             finally
             {
+
                 made.Delete();
             }
         }
@@ -351,6 +323,7 @@ public static class BotHarness
 
     public static Piece Best(BotMobile bot, Layer where, Func<SkillName, double> skill, int purse)
     {
+
         if (!_surveyed && Core.TickCount - _surveyedTick >= RetryMs)
         {
             Survey();

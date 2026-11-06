@@ -3,31 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Places a carrier's walk found no way to, shared by every carrier: a cell of <see cref="Grain"/> tiles that answered "no way"
-/// <see cref="Strikes"/> times is struck for <see cref="RestMs"/>, so no third carrier walks there and no meeting is called there
-/// (06.10.2026, deliver16).
-///
-/// <para>
-/// <b>Measured on build 407 (an-deliver16).</b> 45 of the 86 deliveries that failed "no way through" were to one row of Britain
-/// (x 1280–1440, y 1540–1555, z 20): 160 of 323 on 04.10, 42 of 92 on 405. Every one is a meeting place
-/// (<c>BotRendezvous</c>): "Farrin is 60 tiles from Orsik … calls the meeting at (1326, 1549), guarded ground", then "Farrin has
-/// dropped (1326, 1549, 20) because it planned 31 roads to one place in 18s without getting anywhere", and five carriers in a row
-/// for Orsik's one rib between 07:30 and 07:42. The place is <c>BotHaven.Nearest</c>'s first guarded tile on the line to the
-/// town: standable, not refused by the reach map, and not reached by the planner. The carrier's ledger kept the refusal
-/// (<c>Beware</c>), and the ledger is the carrier's own; and 55 of 143 "no way"/"could not get nearer" failures went to a buyer
-/// that had failed the same way within 30 minutes.
-/// </para>
-///
-/// <para>
-/// <b>What reads it.</b> <c>BotHaven.Edge</c> passes a struck tile by, so the haven (the meeting place, and a runner's town) is
-/// the next guarded tile further in; <c>BotRendezvous</c> calls no meeting on a struck place (they walk towards each other); the
-/// courier passes a buyer standing in a struck cell over (<see cref="BotPass.Sealed"/>, counted apart). A hand-over in a cell
-/// clears it: the way exists.
-/// </para>
-/// </summary>
 public static class BotWayless
 {
+
     public static bool Running { get; set; } = true;
 
     public static int Grain { get; set; } = 8;

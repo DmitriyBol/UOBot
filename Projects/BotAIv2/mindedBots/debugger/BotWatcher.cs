@@ -4,33 +4,9 @@ using Server.BotAI.V2;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// One watcher of the squad: a name, a robe, a body, a charge, and what it has said.
-///
-/// <para>
-/// <b>Patrick's order of 13.09.2026: Argus gets two helpers with the same powers, the same permissions and
-/// the same thinking model; the squad divides the watching between them, looks, checks and shares what it
-/// finds.</b> Until this the debugger was one static body with one opinion, and everything it did not think
-/// of was not thought of. Three watchers with three charges is three chances to notice, and a finding one
-/// of them makes is put in front of the other two at their next look.
-/// </para>
-///
-/// <para>
-/// <b>The charge is a list of subsystem stems, and it decides two things and no more:</b> which of the
-/// shard's own summary lines a watcher is quoted, and which bots it goes to stand beside first. The
-/// measurements are the same for all three — one pass over the population, taken once — and the model is
-/// the same; what differs is what each is told to look at, which is what a division of labour is.
-/// </para>
-///
-/// <para>
-/// <b>A charge can be lent (07.10.2026).</b> While the zone keeper (<see cref="BotVigil.Keeper"/>) is wholly on the zones, its
-/// charge is carried by the other watchers who diagnose (<see cref="BotVigil.Heirs"/>): each is told the keeper's topics beside
-/// its own, and the keeper's subsystem lines are dealt between them stem by stem. Nothing in <see cref="Charges"/> changes; the
-/// loan is read from the watch's state each time, so it ends the moment the watch does.
-/// </para>
-/// </summary>
 public sealed class BotWatcher
 {
+
     public static readonly (string Charge, string[] Stems)[] Charges =
     [
         (

@@ -5,57 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A restock of a supply some bot near holds over its own keep, asked of the island at the counter's price before the walk.
-///
-/// <para>
-/// <b>Patrick, 03.10.2026, night: "the focus is 99 % fulfilment of Needs; we have to bring the economy to life."</b> Measured by
-/// the analyst on build 395 (<c>flow9.md</c>, 210 bots): five consumable families were 64 % of the gold bots paid to shopkeepers
-/// and 9 % of the gold on the bots' board; the shopper named 5,155 restock errands in 40 minutes, 90.9 % to a counter, 7.4 % to
-/// a bot's shop and 1.7 % to a want. On the same log (03:08–04:19) the restocks bought 1,580 cloth (3,703gp), 1,406 arrows
-/// (3,438gp), 404 bandages (2,333gp), 70 pickaxes (1,588gp) and 856 reagents (3,288gp) over a counter, while herb pickers came
-/// back with their herbs "kept to sell", fletchers kept arrows and tinkers kept tools. The two roads that already asked the
-/// island first did not reach them: the far ask (<c>BotShopper.AskFarMinutes</c>) needs a four-minute walk and a thing the
-/// smith, tailor, alchemist, fletcher or scribe makes, so no cloth, bandage, reagent or tool; the pile ask
-/// (<c>BotShopper.PileMs</c>) needs an island-wide glut and leaves out arrows and bolts. Lines for goods a bot already held
-/// were met 97.5 % of the time; carriers took a want for leather or feathers — goods hunters carry — at a median of half a
-/// minute, 81 to 100 % of them inside three.
-/// </para>
-///
-/// <para>
-/// <b>What this does.</b> Before the walk to a counter for cloth or bandages, a reagent, arrows or bolts, or a tool, the
-/// shopper asks here whether a bot within a carrier's reach (<see cref="BotCourier.Reach"/>, on the same land) holds that
-/// kind over what it keeps for itself (<see cref="BotUnload.Keeps"/>) — read off the population every <see cref="HoldersMs"/>,
-/// the way the carrier itself reads a pack, less what other buyers near already ask for. Only then is a want said
-/// (<see cref="BotMarket.Ask"/>) at the price the counter would charge this bot (<c>BotBurgh.Dear</c> included) for no more
-/// than the largest single holder holds, so one carrier can meet it; and the bot goes on with its work and its other supplies
-/// (<see cref="Parked"/>: the shopper passes the waiting supply over and looks at the next). A carrier who takes it walks it
-/// over (<see cref="BotCourier"/>, <see cref="BotDeliver"/>) and is paid at the meeting; nothing here pays anybody. If nobody
-/// has taken it at <see cref="WaitMs"/>, the want is taken back by the existing road (<see cref="BotMarket.Withdrawn"/>,
-/// <see cref="BotWithdraw.Walked"/>) and the bot walks to the counter as it would have. A carrier already bringing it is always
-/// waited for: taking the want back would fail the carrier's walk, and the bot's other supplies are not held back meanwhile.
-/// </para>
-///
-/// <para>
-/// <b>The Needs share.</b> Nothing about what counts changes. A line taken back inside its first ten minutes is kept out by the
-/// rule build 391 wrote (<see cref="BotLines.GraceMs"/>), and every take-back here is that road, swept on a clock
-/// (<see cref="SweepMs"/>) rather than at the buyer's next look, so a buyer who died, rested or joined a company is not left
-/// holding a want past its tenth minute. A take-back past it — a carrier who took the walk and gave up late — is a failed line,
-/// and is counted here as well (<c>past their line's first 10 min</c>).
-/// </para>
-///
-/// <para>
-/// <b>Never for an urgent need</b> (<see cref="Urgent"/>): a bot under <see cref="HurtShare"/> of its health, one in a fight
-/// (struck lately, or with a foe set), one out of any supply it fights or mends with — bandages, a bottle its class carries, its
-/// own arrows, a reagent its key spell burns: the "no bottle at death's door" of <c>BotMobile.Gasp</c> — a medic below the
-/// threshold of bandages the doors ask (<see cref="BotProvision.Floor"/>), and a bot below its entry threshold
-/// (<see cref="BotProvision.Short"/>: "below the entry threshold, supplies are the errand that wins", so companies and delves do
-/// not wait on it). Those walk as before. Nor while the bot already has a restock in hand or put down (it is on the walk), for
-/// the band's order, the bot's own weapon, a potion (alchemy's own question), or a bot whose purse cannot carry the compulsory
-/// part of the restock (<c>BotShopper.ByPurse</c>): that bot walks, and its guild pays below the threshold as it always has. The
-/// want's money is reserved like any other (build 391), so who can afford what does not change.
-/// </para>
-/// </summary>
 public static class BotAskFirst
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAskFirst));

@@ -5,32 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bot eating a cooked meal: what it does to the bot, and for how long.
-///
-/// <para>
-/// <b>Patrick's order of 05.09.2026 — cooking lifts a bot's mood and quickens what it recovers.</b> Both
-/// halves land here rather than in the cooking, because the cook is not the one who benefits: a trade whose
-/// reward went to whoever made the thing would be a trade with no reason to sell any. The cook is paid in
-/// coin like every other crafter on this island; the meal is paid for by whoever eats it.
-/// </para>
-///
-/// <para>
-/// <b>Regeneration is reached through the engine's own hooks, and this era leaves two of the three
-/// empty.</b> <c>Mobile.HitsRegenRateHandler</c>, <c>StamRegenRateHandler</c> and
-/// <c>ManaRegenRateHandler</c> are static entry points that content fills in; <c>RegenRates.Configure</c>
-/// fills the mana one always and the other two <em>only under AOS</em>, and this shard is Renaissance. So
-/// health and stamina were running at the flat defaults with nothing consulted at all, and mana had one
-/// handler. Whatever was there is kept and called: this wraps rather than replaces, so a meal is the only
-/// thing that changes and every mobile that has not eaten gets exactly the rate it got before.
-/// </para>
-///
-/// <para>
-/// <b>Ten minutes, by order, and kept per bot rather than on the item.</b> An effect written onto the food
-/// would have to survive being sold, dropped, looted and re-listed; an effect written against the eater is a
-/// stamp and a lookup, and it dies with the bot the way every other fact about a bot does.
-/// </para>
-/// </summary>
 public static class BotMeal
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMeal));

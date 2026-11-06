@@ -5,26 +5,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Shifting a hall off another guild's held ground onto the guild's own: within its own square first, then onto the guild's
-/// other squares near it, with the standing hall's own tiles counted as free.
-///
-/// <para>
-/// <b>06.10.2026, build 410.</b> The first carry (<c>BotRemove</c>, off mode) asked <c>BotPlot.Find</c>, which never offers ground
-/// nearer than <c>BotPlot.Near</c> to where it looks from and puts every candidate to the engine with the standing hall still up
-/// — the engine refuses any plot touching another house or its yard. So the shift of three tiles east that would have brought
-/// The Ash's walls wholly into its own square was never tried, and the hall went 112 tiles away and lost the square.
-/// </para>
-///
-/// <para>
-/// <b>Down first, then asked, and put back if nothing fits.</b> The engine cannot be asked about a plot while the hall stands on
-/// half of it, so the bot walks to the hall, the hall comes down (its merchant taken off the roll first, as in a carry), the
-/// candidates (<c>BotBounds.Shifts</c>, nearest first, our own tests already passed) are put to the engine up to
-/// <c>BotBounds.ShiftChecks</c>, and the first it takes gets the hall. If none: the hall goes up again exactly where it stood —
-/// ground it stood on a moment ago — and the next step is open ground. Either way the hall is furnished afresh, as after any carry;
-/// nothing is paid.
-/// </para>
-/// </summary>
 public sealed class BotShift : BotDeed
 {
     public const string Trade = "shift";

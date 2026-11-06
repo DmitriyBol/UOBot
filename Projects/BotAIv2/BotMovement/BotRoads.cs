@@ -6,45 +6,6 @@ using CalcMoves = Server.Movement.Movement;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// How far each piece of ground around the population's home lies from it by road, rather than in a straight line.
-///
-/// <para>
-/// <b>A dart knew only the straight line, and the straight line lies about ground behind a river.</b> The hunt throws
-/// its darts at ground within five hundred tiles of the asker as the crow flies, and on 15.09.2026 the ground north-west
-/// of the banks west of Britain — x below 1140, y between 1050 and 1420 — took one arriving prowl in 44 sessions against
-/// some 450 failed ones on that day alone. Asked through the door, the pathfinder found no road into it from the banks at
-/// (1161, 1345) and (1242, 1239) at five times its ceiling, and a road of 520 tiles from reachable ground in the
-/// south-west at (1006, 1641): the way in runs round by the south, about 1,100 tiles from Britain for a place 440 tiles
-/// off. No search the shard pays for walks away from its goal for that long, so every such dart ended at a bank.
-/// </para>
-///
-/// <para>
-/// <b>Notes about failed places could not stand in for it.</b> Replayed over 14–15.09, reading the quadrant baulk in the
-/// darts would have caught 130 of 1,889 prowl failures and turned away 228 walks that arrived or found a fight; a note of
-/// failures without arrivals at 30, 60 or 90 tiles did no better. A sample over an area needs a fact about the area.
-/// </para>
-///
-/// <para>
-/// <b>What it is.</b> One flood from home, breadth first, stepping exactly as the planner and the far-side look step — the
-/// engine's step masks, both flanks of a diagonal clear, no item standing where the step lands — inside a square of
-/// <see cref="Reach"/> tiles each way. Each tile keeps the steps of the shortest road to it from home. Heights are kept
-/// apart the way the search keeps them, so a floor above a street is its own place.
-/// </para>
-///
-/// <para>
-/// <b>What it can say about a bot standing somewhere else.</b> A walk is not the same both ways — the world allows drops
-/// it will not allow back up — so from another start this proves one thing: the road from there to a place is at least
-/// the road from home to the place less the road from home to the start. That is the case it was built for. Bots live
-/// around home, and the ground that fails them is ground whose road from home runs far past its straight line.
-/// </para>
-///
-/// <para>
-/// <b>Paid once per world load, on the game loop, in slices.</b> The map is game state, so no thread may read it; a
-/// slice of at most <see cref="SliceMs"/> every <see cref="SliceEveryMs"/> keeps the loop's share small, and until the
-/// flood is finished every answer is "unknown" and nothing reading it changes behaviour.
-/// </para>
-/// </summary>
 public static class BotRoads
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRoads));

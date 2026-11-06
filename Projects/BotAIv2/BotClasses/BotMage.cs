@@ -2,44 +2,6 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A spellbook, a blue staff, and no metal.
-///
-/// <para>
-/// <b>The staff is in the hands because the book never needed to be.</b> A spellbook has only ever had
-/// to be carried, not held — so the first version's mage spent its life with its weapon slot occupied
-/// by the one item that gained nothing from being there, waving a book at skeletons. The staff costs it
-/// nothing it was using and pays back the one thing a caster actually runs out of.
-/// </para>
-///
-/// <para>
-/// <b>No plate, and the restriction is real rather than flavour.</b> Meditation is this class's main
-/// supply of mana and the engine refuses it in metal. That is also the whole of the difference between
-/// this class and the warrior-mage: one keeps meditation and gives up armour, the other keeps armour
-/// and is handed mana instead.
-/// </para>
-///
-/// <para>
-/// Brewing is not its privilege — anybody with the skill and the reagents may brew, and may brew
-/// whatever they like. What this class has is the disposition: Alchemy in what it wants, reagents in
-/// its pack from birth, and a reason to be near both.
-/// </para>
-///
-/// <para>
-/// <b>Inscribe at eighty, and it is what this class does for a living.</b> Without it a mage has no work
-/// at all — no pickaxe, no sewing kit, and therefore nothing any proposer can offer it but a trip to a
-/// shop, which by design pays nothing. With it the mage has the one trade on this shard whose output no
-/// shopkeeper sells: the engine's mage vendors stock the first three circles and stop, so every scroll
-/// from the fourth circle up exists only because somebody wrote it.
-/// </para>
-///
-/// <para>
-/// Eighty rather than the seventy-five the eighth circle asks for, because the engine gives a nil chance
-/// at exactly the minimum: at seventy-five the top circle is not hard, it is impossible. At eighty it is
-/// a one-in-ten attempt that burns the blank and the reagents nine times out of ten — which is what makes
-/// an eighth-circle scroll worth what somebody will pay for it.
-/// </para>
-/// </summary>
 public sealed class BotMage : BotClass
 {
     public override string Name => "Mage";
@@ -95,6 +57,7 @@ public sealed class BotMage : BotClass
 
         Kit = new BotKit
         {
+
             Armour = [typeof(Robe)],
             Staff = true,
             Reagents = 30,

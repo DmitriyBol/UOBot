@@ -5,46 +5,9 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// <b>The company fights on the strength that is on the field, not on the map (06.10.2026, company16).</b>
-///
-/// <para>
-/// Measured over 429 company deaths on builds 405–409 (`an-enlist16.md`): 89 % fell in fights priced under the company's
-/// strength over 1.5 — fights the company "should" have won — and 75 % to a killer priced under the dead bot alone. The dead bot
-/// had no other member within 12 tiles in 36 % of them and stood more than 40 tiles from its leader in 43 %; <see cref="Able"/>
-/// summed every living member on the map, so a company of twelve spread over a hundred tiles engaged a reaper on the strength
-/// of twelve and met it with two. The median death came 18 s after the engagement, 42 % inside 15 s; 35 % of deaths followed
-/// another in the same company inside a minute, and only 20 companies withdrew in four builds against 233 that lost somebody:
-/// companies were wiped, not withdrawn (company 364 lost seven in 67 s to a reaper reckoned at 0.3 of its sum). Deaths per
-/// fight rose from 0.013 at R/A under 0.15 to 0.29 at R/A 1.0–1.5, the worst band, which held 4 % of the fights, 27 % of the
-/// deaths and 10 % of the company gold. Casters killed 60 %; 42 % of deaths were to something other than the company's enemy.
-/// </para>
-///
-/// <para>
-/// Four rules, each behind a dial and counted on the Companies line:
-/// <list type="number">
-/// <item><b>The choice gate is stricter than the withdrawal gate.</b> A company chooses, joins a cry to, or is raised at a creature
-/// only up to <see cref="ChooseOdds"/> (1.0) times what it brings (<see cref="Beyond"/>); the withdrawal stays at
-/// <see cref="WithdrawOdds"/> (1.5), and the protection of a member and the enlistment into a fight already on are judged at the
-/// withdrawal's odds, because they are defence, not choice.</item>
-/// <item><b>A chosen fight musters at the enemy first.</b> When the company chooses a fight with less than <see cref="MusterShare"/>
-/// of its strength within <see cref="FieldReach"/> of the enemy, it forms up at a rally <see cref="MusterOff"/> tiles short of it —
-/// the leader and every member stationed there, nobody pressed — until that share has come up or <see cref="MusterMs"/> is out; then
-/// it engages with what is on the field, or lets the creature go if what came up is not enough at <see cref="ChooseOdds"/>. A blow on
-/// a member ends the muster at once.</item>
-/// <item><b>A company that bleeds pulls back.</b> At the <see cref="BleedDeaths"/>th death inside <see cref="BleedMs"/> the company
-/// lets its enemy go, shuns it and the killer for <see cref="WithdrawShunMs"/> (casters too: this is the company's results, not the
-/// odds), stands its members' flight (<see cref="Withdrawing"/>) and holds together on its leader for <see cref="BleedRestMs"/> with
-/// no fight of its own choosing. A delve's party comes up on it (<c>BotDelve</c>).</item>
-/// <item><b>The thing killing a member is fought by whoever can reach it.</b> A member within <see cref="PressReach"/> of an attacker
-/// that has one of ours under <see cref="DyingShare"/> for its combatant turns on that attacker instead of the company's enemy
-/// (<see cref="Peel"/>), whatever the attacker's price; the company's enemy itself prefers a caster that is attacking it
-/// (<see cref="CastersFirst"/>, in <see cref="Strongest"/>).</item>
-/// </list>
-/// </para>
-/// </summary>
 public sealed partial class BotSquad
 {
+
     public static double ChooseOdds { get; set; } = 1.0;
 
     public static double ChoiceOdds => ChooseOdds > 0.0 && ChooseOdds < WithdrawOdds ? ChooseOdds : WithdrawOdds;

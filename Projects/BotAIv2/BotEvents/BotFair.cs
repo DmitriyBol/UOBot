@@ -5,26 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The fair (07.10.2026, Patrick's second idea: "a fair in a town once a day: lower prices, traders and crafters come, a tournament
-/// before Argus, a lottery"). Once every <see cref="EveryMs"/>, in the next town of the turn that has <see cref="LeastShops"/>
-/// shopkeepers, announced <see cref="AheadMs"/> before it opens and open for <see cref="LastsMs"/>.
-///
-/// <list type="bullet">
-/// <item><b>Prices.</b> A bot buying at an NPC's counter in the fair's town pays <see cref="Discount"/> of the shelf: the town's
-/// standing factor (<c>BotBurgh.Factor</c>) is multiplied by it, and the rebate is settled the way a town's kindness always is
-/// (<c>BotBurgh.Settle</c>): less coin destroyed at an NPC's counter, none made.</item>
-/// <item><b>A reason to come.</b> Traders and crafters within <see cref="Reach"/> are offered the walk to the fair
-/// (<see cref="BotFairgoer"/>), priced at what fairs have paid — the ledger keeps <c>fair</c> as a trade of its own, and
-/// <see cref="Prior"/> is only the guess before the first one.</item>
-/// <item><b>The championship.</b> Called at the fair's opening if its hour allows (<see cref="BotSeasons.CallTourney"/>), and any
-/// championship called while the fair is open stands in the fair's town (<c>BotTourney</c> reads <see cref="TownName"/>).</item>
-/// <item><b>The lottery.</b> A ticket is <see cref="Ticket"/>gp, one to a bot: bought by every fairgoer on arrival and by any bot
-/// standing in the town with <see cref="LotteryLeast"/> to spare. The whole pot goes to one ticket drawn at the close. Zero-sum:
-/// tickets are charged (<c>BotMarket.Charge</c>, which destroys the coin) and the pot is paid into the winner's account; a restart
-/// before the draw hands every ticket back (<see cref="BotEventsStore"/>).</item>
-/// </list>
-/// </summary>
 public static class BotFair
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFair));
@@ -252,6 +232,7 @@ public static class BotFair
 
     private static void Announce(long now)
     {
+
         var town = Asked != null && BotTowns.Find(Asked) is { FromHome: true } asked && Shops(asked) >= LeastShops ? asked : Next();
 
         Asked = null;

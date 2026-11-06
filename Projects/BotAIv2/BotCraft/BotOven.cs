@@ -5,45 +5,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Cooking: what a meal is made of, and who can make one.
-///
-/// <para>
-/// <b>The island was already producing the whole of the raw side and throwing it away.</b> Every hunt ends
-/// in a carcass and every carcass carves into meat, so raw ribs, bird and lamb were the commonest things on
-/// the market — and the commonest thing on it that nobody wanted. The peddler's own figures on 05.09.2026:
-/// six trips carrying ribs earned thirty-six gold between them, and twenty of the thirty stalls that session
-/// were a bot walking meat across the island to a butcher for two gold a piece. A trade that turns that into
-/// something a bot actually wants is the shortest chain on this shard: one ingredient, one swing, no fire.
-/// </para>
-///
-/// <para>
-/// <b>A fire, and the rule is not where it was first looked for.</b> <c>DefCooking.CanCraft</c> asks for the
-/// tool and nothing else, and that was read as "a cook needs no place at all". It is not: every one of the
-/// five recipes below carries <c>SetNeedHeat(index, true)</c>, and the heat is checked per recipe rather
-/// than by the system. The cost of getting that wrong was measured on 05.09.2026 — a cook stood in a field
-/// swinging a skillet at three lamb legs, eight swings a round, four rounds, nothing cooked and not one line
-/// in the log, because <c>CraftItem.Craft</c> answers a refusal by sending the message to a player's screen
-/// and a bot has no screen. A gate that is real, silent, and in a different file from the one that documents
-/// it is the shape this project keeps paying for.
-/// </para>
-///
-/// <para>
-/// <b>Heat is wider than a forge, which is why the cook does not queue behind the smith.</b> The engine
-/// counts ovens, fireplaces, campfires, firepits, heating stands, braziers and forges alike. See
-/// <c>BotGround.Hearths</c>, which is that whole family, against <c>BotGround.Fires</c>, which is the four
-/// forge-and-anvil workshops a smith needs.
-/// </para>
-///
-/// <para>
-/// <b>One resource a recipe, so this is a caller of <see cref="BotCraftwork"/> rather than another
-/// <c>BotFlask</c>.</b> Alchemy needed its own file because every draught wants a reagent and a bottle;
-/// cooked bird wants a raw bird. See <c>BotCraftwork.Simple</c>, which refuses anything more complicated and
-/// says why.
-/// </para>
-/// </summary>
 public static class BotOven
 {
+
     public static CraftSystem System => DefCooking.CraftSystem;
 
     public static SkillName Skill => SkillName.Cooking;

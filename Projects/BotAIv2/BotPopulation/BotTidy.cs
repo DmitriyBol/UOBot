@@ -4,38 +4,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot carries and wears, kept in order: an unidentified thing is identified — off a corpse, in the pack or worn — and
-/// the robe the engine dresses a risen body in is taken off.
-///
-/// <para>
-/// <b>Item Identification at a hundred, and nothing ever used it.</b> Patrick's order of 08.09.2026 gave every bot the skill
-/// at a hundred (<see cref="BotMobile.Common"/>) so that a population that loots could tell what it had picked up; nothing on
-/// the shard ever asked for the skill, so a magic sword off a corpse was "an unidentified longsword" in the pack, on the
-/// stall and on a guild's counter for ever. Patrick, 16.09.2026, 23:1x: a bot holding an unidentified thing identifies it.
-/// With the check the engine's skill makes on its target (<see cref="ItemIdentification"/>):
-/// <c>CheckTargetSkill(ItemID, item, 0, 100)</c>, which at a hundred cannot fail, and the flag it sets.
-/// </para>
-///
-/// <para>
-/// <b>At the corpse, because the pack is only where loot passes through.</b> Build 98 used the skill the way a player
-/// does — use it, then point the target it raises at the thing — on whatever lay in the pack every five seconds, and
-/// counted nothing in its first quarter of an hour: <c>BotSlay.Rifle</c> listed everything it lifted on the auction in the
-/// same breath, and a listing took the thing out of the world (until 01.10.2026). So a thing is appraised as it comes
-/// off the corpse, and the look on the beat covers what is worn as well as what is carried — a magic
-/// blade bought off a stall goes straight into the hand (<c>BotMobile.Rearm</c>). The check without the skill's own
-/// target: no bandage's or spell's cursor is taken, and a corpse with three magic things has all three appraised rather
-/// than one a second.
-/// </para>
-///
-/// <para>
-/// <b>The death robe.</b> <c>PlayerMobile.Resurrect</c> dresses every body that rises in a grey robe, and nothing a bot does
-/// ever took it off, so the population wore them after every death. Patrick, the same evening: throw them away, sell them to
-/// a shopkeeper or cut them into bandages — "they look ugly". The engine lets no scissors near a death robe and no
-/// shopkeeper buys a newbied thing, so a bot carrying scissors cuts it into <see cref="RobeBandages"/> bandages — a rule of
-/// this shard, not of the engine — and any other throws it away.
-/// </para>
-/// </summary>
 public static class BotTidy
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTidy));

@@ -5,24 +5,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Sewing: what can be made out of cloth, and the swing that makes it.
-///
-/// <para>
-/// <b>Everything goes through the shard's own <see cref="CraftSystem"/></b> — the same call a player's craft
-/// window makes. The skill check, the failure, the material burnt on a bad attempt and the item that appears
-/// are all the engine's, which is what makes the gain real: a tailor here trains Tailoring by tailoring,
-/// not by being credited.
-/// </para>
-///
-/// <para>
-/// <b>Tailoring is the trade to start a crafter on because it needs no place.</b> Smithing wants a forge and
-/// an anvil, so a smith without a workshop is a bot with an opinion about metal; a sewing kit works wherever
-/// the bot is standing. That is the whole reason the first crafting chain is cloth and not ore.
-/// </para>
-/// </summary>
 public static class BotThread
 {
+
     public static double Margin { get; set; } = 5.0;
 
     public static CraftSystem System => DefTailoring.CraftSystem;

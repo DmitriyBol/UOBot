@@ -4,25 +4,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot the chance to call a company against something it must otherwise walk past.
-///
-/// <para>
-/// <b>It answers the question the hunter is not allowed to ask.</b> <see cref="BotHunter"/> judges a quarry
-/// against what one bot can do alone, because a claim sends exactly one bot — and that is right, and it was
-/// paid for in five deaths in nine minutes when the sum counted company that never came. The cost of being
-/// right about it is a population that spends its evenings on rats while everything worth killing stands in
-/// the next field. This is the other half: not "can I take that", but "could we".
-/// </para>
-///
-/// <para>
-/// <b>Nothing is announced and nobody is asked.</b> The bots who come are simply put in the company by the
-/// one that called it, in the same beat, which is what the squad's own note means by the collective mind
-/// being arithmetic rather than messages. The first version's alternative is on record — a bot posted a
-/// call for help, the call found nobody able, it disbanded in the same tick, and the bot posted it again,
-/// dozens of times over.
-/// </para>
-/// </summary>
 public sealed class BotMuster : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMuster));
@@ -112,6 +93,7 @@ public sealed class BotMuster : IBotProposer
 
         if (alive > 0 && BotSquads.Bound >= alive * MostBound)
         {
+
             if (!BotTraits.Veteran(body))
             {
                 Enough++;
@@ -245,6 +227,7 @@ public sealed class BotMuster : IBotProposer
             if (mobile is IBotAlly { AbleToFight: true } && (mobile is not IBotWilful wilful || BotSquads.Pressable(wilful))
                 && !BotTrading.Neutral(mobile))
             {
+
                 if (BotRegard.Hostile(body, mobile))
                 {
                     HostileNear++;

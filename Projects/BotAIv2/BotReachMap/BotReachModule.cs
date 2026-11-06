@@ -5,12 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-reach.json</c> may say. Everything optional; an empty file keeps the code's numbers. PascalCase:
-/// a key in lower case is silently a default, and the boot line is the proof of what took.
-/// </summary>
 public sealed class BotReachSettings
 {
+
     public bool? Enabled { get; set; }
 
     public double? SliceMs { get; set; }
@@ -40,10 +37,6 @@ public sealed class BotReachSettings
     public bool? CheckCarry { get; set; }
 }
 
-/// <summary>
-/// The reach map as a module: the numbers read, the map started on the population's home map, and one <c>Reach:</c> line every
-/// five minutes with every counter it keeps.
-/// </summary>
 public sealed class BotReachModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotReachModule));

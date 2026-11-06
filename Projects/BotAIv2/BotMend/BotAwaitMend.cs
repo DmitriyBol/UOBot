@@ -2,20 +2,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// <b>A hurt bot a healer is walking to stops and waits for it (29.09.2026, build 321; Patrick's order of the morning: "full
-/// mutual aid").</b>
-///
-/// <para>
-/// A mending of another was the one errand whose goal walked away from it. Of the fifteen mendings on build 318, five ended
-/// "could not get nearer to Nerys at (1439, 1365)", "to Keyleth", "to Norna": the patient was about its own work, walking
-/// at the healer's own pace, and the walk that follows a moving body gives up after so many plans without getting nearer.
-/// The healer was right to go and the patient was right to walk; nobody told the patient. Now the healer asks, once per
-/// mending: a patient that is free — out of any fight, holding nothing it may not put down — is pressed to wait where it
-/// stands, its work put down to be taken up again, and ends the wait when it is whole, when the healer has gone elsewhere,
-/// when something comes at it, or after <see cref="MostMs"/>.
-/// </para>
-/// </summary>
 public sealed class BotAwaitMend : BotDeed
 {
     public const string Trade = "await";

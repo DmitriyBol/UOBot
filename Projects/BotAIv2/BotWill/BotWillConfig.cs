@@ -4,24 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-will.json</c> is allowed to say. Everything optional; absent means the number
-/// the code chose.
-///
-/// <para>
-/// Its own file, like every other subsystem's. In the first version every knob on the shard lived in one
-/// <c>bots.json</c>, so changing how readily a bot changes its mind was an edit to the file that also sets
-/// the size of the population, and a typo in either half put the whole thing out.
-/// </para>
-///
-/// <para>
-/// <b>The one to look at first is <see cref="GoldPerSkillPoint"/>.</b> It is the exchange rate between the
-/// two things this population is for, and every comparison between a smith's afternoon and a miner's goes
-/// through it. Nothing else here changes behaviour as much.
-/// </para>
-/// </summary>
 public sealed class BotWillSettings
 {
+
     public double? GoldPerSkillPoint { get; set; }
 
     public double? DeathMinutes { get; set; }
@@ -41,6 +26,10 @@ public sealed class BotWillSettings
     public int? DwellCapMs { get; set; }
 
     public int? AsideCapMs { get; set; }
+
+    public bool? Keep { get; set; }
+
+    public int? KeptCapMs { get; set; }
 
     public double? SwitchMargin { get; set; }
 
@@ -113,7 +102,6 @@ public sealed class BotWillSettings
     public double? GroundCompany { get; set; }
 }
 
-/// <summary>Reads the decision file and moves the numbers it names.</summary>
 public static class BotWillConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWillConfig));
@@ -148,6 +136,8 @@ public static class BotWillConfig
         BotWill.DwellMs = settings.DwellMs ?? BotWill.DwellMs;
         BotWill.DwellCapMs = settings.DwellCapMs ?? BotWill.DwellCapMs;
         BotWill.AsideCapMs = settings.AsideCapMs ?? BotWill.AsideCapMs;
+        BotWill.Keep = settings.Keep ?? BotWill.Keep;
+        BotWill.KeptCapMs = settings.KeptCapMs ?? BotWill.KeptCapMs;
         BotWill.SwitchMargin = settings.SwitchMargin ?? BotWill.SwitchMargin;
         BotWill.CommitStretch = settings.CommitStretch ?? BotWill.CommitStretch;
         BotWill.CommitCapMs = settings.CommitCapMs ?? BotWill.CommitCapMs;

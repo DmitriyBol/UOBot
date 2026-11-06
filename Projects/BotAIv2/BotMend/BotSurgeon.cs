@@ -3,39 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers whoever can mend the worst-hurt bot within sight — <b>itself included</b> — as ordinary work.
-///
-/// <para>
-/// <b>Counting itself among the patients is what closes the gap in the ladder.</b> A bot drops onto
-/// <c>Failing</c> at thirty-five per cent and looks after itself above all else; above that it is on the
-/// ordinary rung, and without this it would carry on working at half health with nothing in the world offering
-/// to patch it up. Now the same question — who here is worst off — answers both cases, and the <em>ladder</em>
-/// keeps the ordering rather than a rule in this file: at thirty per cent nobody asks this proposer anything,
-/// because the bot is already somewhere more urgent.
-/// </para>
-///
-/// <para>
-/// That ordering is a measured defect, not taste. The first version put the call for help <em>above</em>
-/// failing health, so a bot on its last few points announced a company it could not join, found nobody able,
-/// and posted the same call again dozens of times over. Looking after somebody else must never outrank looking
-/// after yourself, and here it cannot.
-/// </para>
-///
-/// <para>
-/// <b>Spell or cloth, and the ability decides rather than the name.</b> A heal is two seconds and mana that
-/// comes back on its own; a bandage is nine or ten and a thing that had to be bought — so a caster is simply
-/// better at this, which is a fact about the two mechanics and not a rule about classes. A warrior with
-/// bandages and sixty Healing patching up a miner is exactly as welcome.
-/// </para>
-///
-/// <para>
-/// <b>The patient has to be genuinely hurt.</b> That is the anti-exploit and it has to be here rather than in
-/// the undertaking, because "cast heal on a healthy friend for ever" is the training dummy with a friend in
-/// it — the exact shape the whole ledger is built to refuse. The engine says as much about cloth by itself; for
-/// a spell this is the only place it gets said.
-/// </para>
-/// </summary>
 public sealed class BotSurgeon : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSurgeon));
@@ -58,7 +25,7 @@ public sealed class BotSurgeon : IBotProposer
 
     public static long CalledNobody { get; private set; }
 
-    public static void Call(BotMobile patient)
+    public static void Call(BotMobile patient, bool failing = false)
     {
         var map = patient?.Map;
 
@@ -91,6 +58,7 @@ public sealed class BotSurgeon : IBotProposer
 
             if (m.Squad != null)
             {
+
                 if (BotSquad.Nurses && m.Squad != patient.Squad && m.Class?.Role == BotRole.Medic
                     && m.Squad.Focus is not { Deleted: false, Alive: true } && !m.Squad.OnTheMarch
                     && Math.Abs(m.Z - patient.Z) < Upstairs && !BotRegard.Hostile(m, patient)
@@ -178,8 +146,25 @@ public sealed class BotSurgeon : IBotProposer
 
         Called++;
 
+        if (Presses && failing && best.Resolve is { } free
+            && (free.Deed == null || free.Deed.Resumes && (free.Paused == null || BotCry.StackCalls && free.Under == null)))
+        {
+            var trains = BotMend.Spell(best, patient) >= 0 ? SkillName.Magery : SkillName.Healing;
+
+            if (BotWill.Press(best, new BotSalve(patient, map, onSelf: false, trains), $"called to {patient.Name} under its failing line as its nearest healer, {nearest} tiles off", BotCry.StackCalls))
+            {
+                Pressed++;
+
+                return;
+            }
+        }
+
         BotWill.Alert(best);
     }
+
+    public static bool Presses { get; set; } = true;
+
+    public static long Pressed { get; private set; }
 
     public static long CalledNurse { get; private set; }
 
@@ -198,7 +183,7 @@ public sealed class BotSurgeon : IBotProposer
     public static long WhyNoMeans { get; private set; }
 
     public static string Describe2() =>
-        $"{Called} bots that became patients had the nearest of ours able to mend within {Reach} tiles look up at once, {CalledCompany} were members whose company was asked to answer at once, {CalledNurse} were brought to the medics of a company near with no enemy, {CalledNobody} lone ones had nobody free and able there ({CalledAlone} of them nobody of ours at all; bots near passed over: {WhyCompany} in a company, {WhyFighting} in a fight, failing or leaving, {WhyBusy} mending already or on work that may not be left, {WhyApart} on another floor or hostile, {WhyNoMeans} with neither a heal nor cloth)";
+        $"{Called} bots that became patients had the nearest of ours able to mend within {Reach} tiles look up at once ({Pressed} of them under the failing line pressed to it, their work put down{(Presses ? "" : "; off")}), {CalledCompany} were members whose company was asked to answer at once, {CalledNurse} were brought to the medics of a company near with no enemy, {CalledNobody} lone ones had nobody free and able there ({CalledAlone} of them nobody of ours at all; bots near passed over: {WhyCompany} in a company, {WhyFighting} in a fight, failing or leaving, {WhyBusy} mending already or on work that may not be left, {WhyApart} on another floor or hostile, {WhyNoMeans} with neither a heal nor cloth)";
 
     public string Name => "Surgeon";
 
@@ -256,6 +241,7 @@ public sealed class BotSurgeon : IBotProposer
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(bot.Location, Reach))
         {
+
             if (mobile == bot || mobile is not IBotAlly || !BotMend.Wants(mobile) || BotMend.OutOfReach(mobile))
             {
                 continue;
@@ -306,7 +292,9 @@ public sealed class BotSurgeon : IBotProposer
     {
         _said = false;
         Moving = 0;
+        Floors = 0;
         Called = 0;
+        Pressed = 0;
         CalledNobody = 0;
         CalledCompany = 0;
         CalledNurse = 0;

@@ -4,41 +4,10 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who should move house, and why: first sight, a guild seated abroad, a poor living, or dying where it lives.
-///
-/// <para>
-/// <b>Once a minute, over the whole population, and nothing here walks or searches.</b> It reads a record, a purse, a
-/// share of a trade and a list of deaths per bot — a hundred bots is a few hundred field reads — and at most it marks a
-/// bot with a town it may move to. The move itself is work the bot takes when it has nothing better (<see cref="BotMover"/>,
-/// <see cref="BotResettle"/>), and the residence changes when the bot takes it, never here: an offer is not an errand
-/// (DECISIONS C9).
-/// </para>
-///
-/// <list type="bullet">
-/// <item><b>First sight.</b> A bot with no record — every bot on the first boot of this build — is filed where home was
-/// until now (its guild's seat, else the population's home) and then chooses among the fit towns it can walk to
-/// (<see cref="BotSettle.Choose"/>); a choice other than where it lives is marked as a move. This is the choice Patrick's
-/// order is about, made once per bot.</item>
-/// <item><b>A guild seated abroad.</b> Its members live by it, at once, as they always did (<c>BotSeat.Home</c>): the
-/// guild chose, and the walk home or the next rising takes them there.</item>
-/// <item><b>A poor living.</b> A bot judged over <see cref="StretchHours"/> in one town that neither earned
-/// <see cref="PoorGold"/> nor learned <see cref="PoorProgress"/> of its trade there.</item>
-/// <item><b>Dying where it lives.</b> <see cref="DeathsToMove"/> deaths within <see cref="DeathHours"/> inside its own
-/// leash of home.</item>
-/// </list>
-///
-/// <para>
-/// <b>A reason to move is a chance, not an order</b> (<see cref="MoveOdds"/>), and never within
-/// <see cref="MoveEveryHours"/> of the last settling: a bad hour in one town must not empty it into the next, which is the
-/// herding DECISIONS C11 records four times.
-/// </para>
-/// </summary>
 public static class BotRelocate
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRelocate));
 
-    /// <summary>Why a move was marked.</summary>
     public enum Cause
     {
         Settling,

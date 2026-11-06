@@ -9,24 +9,6 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The marshal of events: the fourth of Argus's watchers, who organises rather than diagnoses.
-///
-/// <para>
-/// <b>Patrick's order of 16.09.2026, evening:</b> the guilds' masters are ordinary bots; the events — camps,
-/// tournaments, errands, orders — are the business of one thinking bot in Argus's squad. Every
-/// <see cref="EveryMs"/> it is shown the population's numbers, the board of errands, the treasury, the tournament
-/// and the revels' ledger, and asked for one event or none: a revel (one trade worth ×3 for twelve minutes with a
-/// prize), a camp (a revel with an orc camp raised where it says), a tournament, an errand on the board (kill,
-/// gather or scout, paid from the treasury), a standing order, a bounty on a square, a price on a head, or a fair.
-/// </para>
-///
-/// <para>
-/// <b>It invents no mechanism.</b> Every one of these is a verb the door already had, so what the marshal does is
-/// what a hand at the keyboard could do, on a clock, with a reason written to the watchers' log. While it stands the
-/// revels are its business too, and Argus goes back to watching.
-/// </para>
-/// </summary>
 public static class BotMarshal
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMarshal));
@@ -133,6 +115,7 @@ public static class BotMarshal
 
                             if (creatures.Count > 0)
                             {
+
                                 new Shape(w, "errand").Words("kind", ["kill"]).Words("name", creatures)
                                     .Number("number", 1, BotQuests.MostAmount).Number("pay", 1, pays).Close();
                             }
@@ -194,20 +177,6 @@ public static class BotMarshal
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    /// <summary>
-    /// One event's shape in the form, its fields written and required in alphabetical order.
-    ///
-    /// <para>
-    /// <b>Alphabetical because that is the order the model is held to.</b> Asked with thinking on, Ollama 0.34 sorts a
-    /// schema's properties by name before the answer is constrained (a Go map is written out sorted): deepseek-r1:14b,
-    /// asked on 17.09.2026 for "a standing order for 10 Leather", answered <c>{"event": "errand", "gold": …, "kind":
-    /// "scout", …}</c> and then a bounty — every shape whose first field sorted before "event" ("amount", in the kill, the
-    /// gather and the order) was closed to an answer that began with "event", so build 102's form left Hermes the scout, the
-    /// bounty and the events with no amount. Its answers at 11:25, 11:49 and 12:00 were scouts whose reasons were
-    /// standing orders. The names are chosen so the sorted order is the answer's order — event, kind, name, number, pay,
-    /// say, why, x, y — and a qwen3 asked without thinking, which keeps the written order, is given the same.
-    /// </para>
-    /// </summary>
     private sealed class Shape
     {
         private readonly Utf8JsonWriter _w;
@@ -583,6 +552,7 @@ public static class BotMarshal
                 }
 
             case "fair":
+
                 if (BotCity.Purse < BotCity.FairFloor)
                 {
                     Refused++;
@@ -668,7 +638,6 @@ public static class BotMarshal
     }
 }
 
-/// <summary>What the marshal answered. A record of its own, for the same reason <see cref="BotRevelPlan"/> is one.</summary>
 public sealed class BotMarshalPlan
 {
     public string Event { get; init; }

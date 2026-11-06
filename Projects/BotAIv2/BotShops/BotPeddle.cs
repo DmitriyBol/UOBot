@@ -5,39 +5,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Taking what the population would not buy to somebody who will. The shard's only faucet.
-///
-/// <para>
-/// <b>Every other coin in this world is a coin that already existed.</b> Trade between bots moves gold about;
-/// a shopkeeper's purse creates it. Until this undertaking existed there was no gold at all — bots are born
-/// with none and nothing minted any — so every piece of work that cost money to start failed on its first
-/// beat and only digging, which costs nothing, could happen at all.
-/// </para>
-///
-/// <para>
-/// <b>The condition for coming here is the whole design.</b> A shopkeeper is not where goods go; it is where goods go
-/// <em>when the population is not asking for them</em>: nobody has said a want for the kind, and nobody has been short of it
-/// lately (<see cref="BotShopkeep.Demanded"/>). Under the auction that was a stall that had stood unsold for ten minutes; since
-/// the stalls went (01.10.2026) it is read straight off the wants and the shortages, and the goods come out of the pack or, at a
-/// bank, out of the bot's own bank box (<see cref="BotMarket.FromBank"/>), where the porter put what it did not keep.
-/// </para>
-///
-/// <para>
-/// It matters that this is narrow. The first version pointed every bot at this faucet and lost 110,900 gold
-/// in a night in the other direction: 67k mined against 156k spent over counters, a population of 116 traders
-/// to 14 fighters, and a median purse of 57 against a poverty line of 800. Selling to a shopkeeper has to be
-/// what a bot does with what nobody wanted, not what a bot does.
-/// </para>
-///
-/// <para>
-/// And it is deliberately <b>the wrong way to make a living</b>, which the numbers already say without being
-/// told to: a blacksmith pays 4 for an iron ingot and a bot asks 6; a tailor pays 6 for a shirt and a bot
-/// asks 12. The counter is the floor under the market, not a competitor to it.
-/// </para>
-/// </summary>
 public sealed class BotPeddle : BotDeed
 {
+
     public const string Trade = "peddle";
 
     public static double WorkMinutes { get; set; } = 3.0;
@@ -162,6 +132,7 @@ public sealed class BotPeddle : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
+
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} with {_label}");
         }
 
@@ -178,6 +149,7 @@ public sealed class BotPeddle : BotDeed
 
         if (_earned <= 0)
         {
+
             return BotDoing.Failed("the shopkeeper would not buy it after all");
         }
 

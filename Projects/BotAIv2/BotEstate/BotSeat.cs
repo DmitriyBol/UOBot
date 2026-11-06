@@ -6,35 +6,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Where each guild lives: the point its hall is raised near, its members are born at and rise again at,
-/// and the place "home" means to them.
-///
-/// <para>
-/// <b>Patrick's order of 13.09.2026: the bots all live by the graveyard; he wants them south, east and
-/// west as well, and one guild moved to the south.</b> The reason they were all there is arithmetic, not
-/// preference. The population has one home, 1440,1470, and every bot that dies is put back on its feet
-/// there — 3,597 times in the twelve hours before this was written, every one of them onto the same
-/// patch. The plot search spirals outward from that same point and Britain's town and the graveyard's
-/// belt shut off everything south and west of it, so the four halls went up in the one strip of ground
-/// left, sixty tiles north, with their yards on top of each other. Every hall touching every other is
-/// what the border drift was written to sour, and it did: that strip is where the wars came from.
-/// </para>
-///
-/// <para>
-/// <b>A seat is one point per guild and everything else follows from it.</b> The plot search starts at
-/// the seat; a member is born and revived beside the guild's hall, or at the seat until it has one; the
-/// homeward walk goes there; and a hall standing further than <see cref="Settled"/> from its seat is
-/// carried to it by the same errand that carries a beaten guild out of the winner's yard. So "move a
-/// guild south" is one line in <c>bot-estate.json</c> or one word to Argus, and the guild does the rest.
-/// </para>
-///
-/// <para>
-/// <b>Configured, overridden by hand, and the hand's word is kept across restarts.</b> The file is the
-/// design; the store is what somebody said at the keyboard on a live shard, which would otherwise be lost
-/// at the next start and have to be said again. The store only ever holds overrides.
-/// </para>
-/// </summary>
 public static class BotSeat
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeat));
@@ -236,6 +207,7 @@ public static class BotSeat
 
         if (BotEstate.Hall(guild) is { Deleted: false } hall && hall.Map == BotPopulation.Home)
         {
+
             if (!bot.Alive && BotOutpost.Nearer(guild, hall, bot) is var post && post != Point3D.Zero)
             {
                 return post;
@@ -350,6 +322,7 @@ public static class BotSeat
 
     public static BotTowns.Town Choose(string guild, Map map)
     {
+
         if (BotGuildHouses.Running && BotGuildHouses.Started)
         {
             BotGuildHouses.Founded(guild);
@@ -585,9 +558,6 @@ public static class BotSeat
     }
 }
 
-/// <summary>
-/// Keeps the seats that were set by hand across restarts. Only those: the file is read every start.
-/// </summary>
 public sealed class BotSeatStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeatStore));

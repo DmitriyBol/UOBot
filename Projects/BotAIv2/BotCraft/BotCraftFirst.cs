@@ -4,37 +4,6 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A crafter takes the work asked of it before it goes mining: an order's piece, a delivery to a want, its own trade's material
-/// for one, or that material out of its own bank box. Mining stays its work when nothing is asked.
-///
-/// <para>
-/// <b>Patrick, 03.10.2026: "proposal 4 — a crafter makes the order first, then goes to mine. Do it."</b> Measured on build 396
-/// (04:19–12:47, 210 bots, 18 crafters): crafters spent 404 of their 911 finished minutes an hour mining (44 %) and 65 crafting
-/// (7 %); mining brought them 8gp an hour in coin and their ingots peddled 333gp of their 5,212gp an hour, while deliveries
-/// brought 1,926 and peddled goods 1,885. Of their 1,281 mining takes, 441 came while a line stood open for a kind that crafter
-/// had made that session (LeatherCap 153, PlateGorget 136, LeatherBustierArms 110, LeatherSkirt 107 takes …). The auction never
-/// preferred mining to an order a crafter could make — a forge or a needle for an order opens at hundreds a minute — but it
-/// preferred mining to everything around one: the runner-up of a crafter's mining take was a restock of its own trade's
-/// material 111 times (feathers 73, leather 30, logs, cloth), a delivery of its own pieces to a buyer 25 times, and its smiths
-/// passed an order over for want of iron 6,746 times while their own ingots lay in their bank boxes.
-/// </para>
-///
-/// <para>
-/// <b>An order, not a price (<see cref="BotWill"/>'s auction).</b> Restocks are priced to lose on purpose and a delivery is
-/// priced by its walk; raising either to beat a dig would lift them over every hunt on the island too. So the auction keeps its
-/// prices and, for a crafter (not a gatherer, whose living mining is), a winning dig or prospect gives way to the best work asked
-/// of it that is worth anything at all (<see cref="Asked"/>); nothing else changes, and a crafter with nothing asked digs as
-/// before. Work already in hand is not taken away: the next choice after the trip is the crafter's. Counted by what took the
-/// dig's place (<see cref="Describe"/>, in <c>Roles:</c>).
-/// </para>
-///
-/// <para>
-/// <b>And its own material first (<see cref="Propose"/>).</b> A crafter that passed an order over for want of material
-/// (<see cref="Short"/>: the smith's metal, the tailor's leather, the fletcher's feathers) and holds it in its own bank box is
-/// offered the walk to the nearest bank to take it out (<see cref="BotDraw"/>).
-/// </para>
-/// </summary>
 public sealed class BotCraftFirst : IBotProposer
 {
     public string Name => "CraftFirst";

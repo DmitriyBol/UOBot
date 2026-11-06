@@ -6,25 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A walk into the woods that comes back with herbs.
-///
-/// <para>
-/// <b>The only thing on this shard that makes a reagent.</b> In this era herbs are shop goods and no skill
-/// picks them, so every reagent in the world arrived across a counter — and a shard whose shopkeepers do not
-/// stock sulphurous ash is a shard where casting ends, quietly, with one line at boot to say so. That is not
-/// a hypothetical: it is in the logs. A sage who can walk out and gather is the population's own answer, and
-/// the rationing is the whole of what keeps it an answer rather than a tap — see
-/// <see cref="BotClass.HerbIntervalMs"/>.
-/// </para>
-///
-/// <para>
-/// <b>What it brings back is not chosen.</b> A gatherer that returned exactly what was short would be a
-/// vending machine with a walk attached, and the shortage would stop being a fact the market has to solve.
-/// It comes back with what the woods had: a random few kinds, a random amount of each. What is surplus goes
-/// on the board like anything else, and what is still missing is still missing.
-/// </para>
-/// </summary>
 public sealed class BotHerbs : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHerbs));
@@ -303,6 +284,7 @@ public sealed class BotHerbs : BotDeed
 
         for (var i = 0; i < Kinds.Length; i++)
         {
+
             var held = BotShopkeep.Showing(Kinds[i]);
 
             if (held > least)
@@ -338,16 +320,9 @@ public sealed class BotHerbs : BotDeed
     }
 }
 
-/// <summary>
-/// Offers the woods to whoever may walk into them, which on this shard is one bot.
-///
-/// <para>
-/// Refuses more often than it offers and every refusal is named, for the reason the patrol's proposer states
-/// at length: an unnamed nought is the failure mode this shard has paid for more than any other.
-/// </para>
-/// </summary>
 public sealed class BotHerbalist : IBotProposer
 {
+
     public static int Range { get; set; } = 200;
 
     public static int Samples { get; set; } = 6;
@@ -414,6 +389,7 @@ public sealed class BotHerbalist : IBotProposer
 
     private static Point3D Wood(Mobile body, Map map, BotLedger ledger)
     {
+
         var home = BotPopulation.HomeOf(body);
         var roam = Math.Min(Range, BotPopulation.Leash(body));
 

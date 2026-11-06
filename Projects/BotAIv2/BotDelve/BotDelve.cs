@@ -8,47 +8,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A party taken down a dungeon by a member of its guild — two for every creature of the dungeon's worst room, five at the
-/// fewest — and kept there for twenty minutes or twenty corpses.
-///
-/// <para>
-/// <b>Patrick's order of 11.09.2026.</b> A guild's leader calls a delve, five go down — a fighter, the
-/// leader, and three more of whatever answers — they run the tunnels and fight everything that moves, and
-/// what they take is divided at the end: half to the leader and the rest evenly between the other four. It
-/// is the first thing on this shard that a guild does together for its own sake rather than for a hall or
-/// a piece of ground.
-/// </para>
-///
-/// <para>
-/// <b>They are put down there rather than walking, and that is a fact about the map rather than a
-/// convenience.</b> The dungeon block is cut into its own quarter of the world from x 5120 eastward and has
-/// no walkable connection to the island at all — the engine's way in is a teleporter on an entrance, and a
-/// bot asked to walk to one is asked for a road that does not exist. This shard has measured what that
-/// costs: two and a half thousand walk failures in a session, a third of them at three destinations nothing
-/// could reach. So the descent is the door, the way up is the same door, and <see cref="BotDelveParty"/>
-/// holds the promise that everybody who went down comes back up.
-/// </para>
-///
-/// <para>
-/// <b>The muster is the Baron's, because his is the one on this shard that has been made to work.</b> A
-/// call stands in a place while the population walks past it and whoever is free falls in; nobody is asked
-/// in advance, because a population that is working well has no volunteers standing about in it. What is
-/// different here is who is called first: this guild's own members, before anybody else, which is what
-/// makes a delve a thing a band does rather than a thing five strangers do.
-/// </para>
-///
-/// <para>
-/// <b>One fighter is a condition and the other three are not.</b> A party of a crafter and four healers is
-/// a party that will spend twenty minutes bandaging each other, so the line is required; past that, the
-/// order says "three others who answer" and this takes them in the order they answer.
-/// </para>
-///
-/// <para>
-/// <b>Five became the fewest, not the number (30.09.2026, build 359; Patrick: "a multiple above the mobs in the dungeon").</b>
-/// A party calls two for every creature of its dungeon's worst room and goes down only outnumbering it. See <see cref="PartyFor"/>.
-/// </para>
-/// </summary>
 public sealed class BotDelve : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDelve));
@@ -116,7 +75,7 @@ public sealed class BotDelve : BotDeed
                 var want = Math.Min(Math.Max(Company, room.Count * Math.Max(1, BotProving.PartyMultiple)), Math.Max(Company, BotDelver.HeadsPerParty));
                 var least = Math.Min(want, Math.Max(Fewest, room.Count + 1));
 
-                say.Append($"{name} {want} against {room.Count} ({least} at the fewest)");
+                say.Append($"{name} {want} against {room.Count} ({least} at the fewest, {least - WeakSeats(least)} of them over the floor)");
             }
 
             return say.ToString();
@@ -128,6 +87,68 @@ public sealed class BotDelve : BotDeed
     }
 
     public static int Fighters { get; set; } = 1;
+
+    public static double WeakFloor { get; set; } = 0.4;
+
+    public static double WeakShare { get; set; } = 0.34;
+
+    public static bool LiftWhenBled { get; set; } = true;
+
+    public static bool Weak(Mobile who, BotDungeon.Deep deep) =>
+        who is { Deleted: false } && who is not BotMobile { Class.Role: BotRole.Medic } && deep is { Worst: > 0.0 }
+        && BotThreat.Power(who) < deep.Worst * WeakFloor;
+
+    public static int WeakSeats(int bodies) => (int)(Math.Max(0, bodies) * WeakShare);
+
+    private int WeakIn(BotSquad squad)
+    {
+        var weak = 0;
+        var members = squad.Members;
+
+        for (var i = 0; i < members.Count; i++)
+        {
+            if (members[i]?.Self is { Deleted: false, Alive: true } self && self.Map == _map && Weak(self, _deep))
+            {
+                weak++;
+            }
+        }
+
+        return weak;
+    }
+
+    public static long PassedWeak { get; private set; }
+
+    public static long Trimmed { get; private set; }
+
+    public static long ShortOfFloor { get; private set; }
+
+    public static long WeakAtMouth { get; private set; }
+
+    public static long BledLifted { get; private set; }
+
+    public static long LeaderlessLifted { get; private set; }
+
+    public static long UnderQuarantine { get; private set; }
+
+    private static bool Quarantined(Map map, BotDungeon.Deep deep)
+    {
+        if (map == null || deep == null)
+        {
+            return false;
+        }
+
+        var rooms = deep.Rooms;
+
+        for (var i = 0; i < rooms.Count; i++)
+        {
+            if (BotBarred.Holds(map, rooms[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public static int Fewest { get; set; } = 3;
 
@@ -252,7 +273,7 @@ public sealed class BotDelve : BotDeed
 
     public static int MaxStrays { get; set; } = 2;
 
-    public static double Prior { get; set; } = 260.0;
+    public static double Prior { get; set; } = 120.0;
 
     public static double WorkMinutes { get; set; } = 25.0;
 
@@ -455,6 +476,7 @@ public sealed class BotDelve : BotDeed
 
         if (journey != null && journey.HoldsRoadTo(target))
         {
+
             away = Math.Max(0, journey.RoadLeft(body.Location, target) - Math.Max(Math.Abs(next.X - target.X), Math.Abs(next.Y - target.Y)));
             next = new Point3D(next.X, next.Y, next.Z + 1);
         }
@@ -750,6 +772,7 @@ public sealed class BotDelve : BotDeed
 
         if (straggler?.Self is { } crossing && OtherLand(body.Location, crossing.Location, behind))
         {
+
             if (_returning)
             {
                 _crossTick = 0;
@@ -765,6 +788,7 @@ public sealed class BotDelve : BotDeed
 
             if (now - _crossTick < MouthHoldMs)
             {
+
                 return Holding(member, $"holding at the mouth of {_deep.Name} for {crossing.Name} to come through");
             }
 
@@ -788,6 +812,7 @@ public sealed class BotDelve : BotDeed
 
             if ((behind <= MarchLost || BotSquad.Coming(straggler, behind)) && now - _holdTick < HoldMs)
             {
+
                 return Holding(member, $"holding for {straggler.Self?.Name ?? "a member"}, {behind} tiles behind, on the way {(_returning ? "back from" : "to")} {_deep.Name}");
             }
 
@@ -917,6 +942,18 @@ public sealed class BotDelve : BotDeed
             return true;
         }
 
+        var weak = WeakIn(squad);
+        var seats = WeakSeats(living);
+
+        if (weak > seats)
+        {
+            WeakAtMouth++;
+
+            why = $"{weak} of the {living} standing are under {_deep.Name}'s floor of {_deep.Worst * WeakFloor:F0}, more than the {seats} seats a party of {living} keeps for them";
+
+            return true;
+        }
+
         worth = BotDelver.Worth(squad, body, _deep);
 
         if (_setOut > 0.0 && worth < _setOut * GoOnShare && worth < _deep.Worst * BotDelver.Odds)
@@ -952,6 +989,7 @@ public sealed class BotDelve : BotDeed
 
         if (_returning)
         {
+
             return BotDoing.Work($"turning back from {_deep.Name}: {_why}");
         }
 
@@ -1025,14 +1063,19 @@ public sealed class BotDelve : BotDeed
         Marches++;
         Heads += Living(squad);
 
+        if (Quarantined(_map, _deep))
+        {
+            UnderQuarantine++;
+        }
+
         Adopt(squad);
 
         logger.Information(
             "{Name} has led its company of {Living} into {Deep} by its mouth ({Count} down so far) after {Minutes:F1} minutes' march: {Quota} of them to kill or {Cap} minutes, {Raisings} raisings between them",
             body.Name,
             Living(squad),
-            _count,
             _deep.Name,
+            _count,
             (now - _marchTick) / 60000.0,
             Quota,
             CapMs / 60000,
@@ -1162,6 +1205,7 @@ public sealed class BotDelve : BotDeed
 
         if (walking)
         {
+
             squad.OnTheMarch = true;
 
             return BotDoing.Walk(_map, _muster, BotArrival.Within(Station), $"to the muster at ({_muster.X}, {_muster.Y})");
@@ -1198,6 +1242,7 @@ public sealed class BotDelve : BotDeed
 
         if ((_here < _want || line < Fighters) && now - _musteredTick < MusterMs)
         {
+
             return _here >= _want
                 ? BotDoing.Work($"calling for a fighter at ({_muster.X}, {_muster.Y})")
                 : BotDoing.Work($"calling at ({_muster.X}, {_muster.Y}): {_here} of {_want} gathered");
@@ -1205,6 +1250,7 @@ public sealed class BotDelve : BotDeed
 
         if (line < Fighters)
         {
+
             var away = Line(squad) > line;
 
             Lineless++;
@@ -1249,6 +1295,7 @@ public sealed class BotDelve : BotDeed
 
     private BotDoing Descend(IBotSquadMember leader, BotSquad squad, Mobile body)
     {
+
         for (var i = squad.Members.Count - 1; i >= 0; i--)
         {
             var member = squad.Members[i];
@@ -1283,15 +1330,45 @@ public sealed class BotDelve : BotDeed
             Size();
         }
 
+        var stood = squad.Count;
+        var weak = WeakIn(squad);
+
+        var seats = WeakSeats(stood);
+
+        for (var i = squad.Members.Count - 1; i >= 0 && weak > seats; i--)
+        {
+            var member = squad.Members[i];
+
+            if (ReferenceEquals(member, squad.Leader) || member?.Self is not { Deleted: false, Alive: true } self || !Weak(self, _deep))
+            {
+                continue;
+            }
+
+            BotSquads.Leave(member);
+            Trimmed++;
+            weak--;
+        }
+
         if (squad.Count < _least)
         {
-            Undermanned++;
+
+            if (stood >= _least)
+            {
+                ShortOfFloor++;
+            }
+            else
+            {
+                Undermanned++;
+            }
+
             Rest(body);
             BotSquads.Leave(leader);
             _squad = null;
 
             return BotDoing.Failed(
-                $"only {squad.Count} stood at the muster for {_deep.Name}, fewer than the {_least} that outnumber its worst room"
+                stood >= _least
+                    ? $"only {squad.Count} of the {stood} that stood at the muster for {_deep.Name} hold its floor of {_deep.Worst * WeakFloor:F0} or a seat kept for the weak, fewer than the {_least} that outnumber its worst room"
+                    : $"only {squad.Count} stood at the muster for {_deep.Name}, fewer than the {_least} that outnumber its worst room"
             );
         }
 
@@ -1390,6 +1467,11 @@ public sealed class BotDelve : BotDeed
         Marches++;
         Heads += went;
 
+        if (Quarantined(_map, _deep))
+        {
+            UnderQuarantine++;
+        }
+
         logger.Information(
             "{Name} has taken {Count} into {Deep} at ({X}, {Y}): {Quota} of them to kill or {Minutes} minutes, {Raisings} raisings between them",
             body.Name,
@@ -1471,6 +1553,15 @@ public sealed class BotDelve : BotDeed
         {
             BledOut++;
 
+            if (LiftWhenBled)
+            {
+                var lifted = Finish($"the party lost {BotSquad.BleedDeaths} inside a minute in {_deep.Name} at {_kills} down; it is lifted out", null);
+
+                BledLifted += _surfaced;
+
+                return lifted;
+            }
+
             return Finish($"the party lost {BotSquad.BleedDeaths} inside a minute in {_deep.Name} at {_kills} down; it comes up", body);
         }
 
@@ -1550,6 +1641,7 @@ public sealed class BotDelve : BotDeed
 
         if (body != null && BotHalls.Ready(_deep))
         {
+
             var standing = BotHalls.Holding(_deep, body.Location);
 
             if (standing != null)
@@ -1594,11 +1686,13 @@ public sealed class BotDelve : BotDeed
             return BotDoing.Work($"leaving {_deep.Name} by its mouth: {why}");
         }
 
-        _party?.Settle(why);
+        _surfaced = _party?.Settle(why) ?? 0;
         Release(_squad);
 
         return BotDoing.Done($"{why} — {_count} of us, {pot}gp between them");
     }
+
+    private int _surfaced;
 
     public static long Undersized { get; private set; }
 
@@ -1702,6 +1796,7 @@ public sealed class BotDelve : BotDeed
 
     private Point3D Rally(Mobile body)
     {
+
         var where = BotPopulation.HomeOf(body);
 
         if (where == Point3D.Zero)
@@ -1765,12 +1860,12 @@ public sealed class BotDelve : BotDeed
 
     public static long Hostiles { get; private set; }
 
-    private readonly int[] _passed = new int[9];
+    private readonly int[] _passed = new int[10];
 
     private static readonly string[] _passedFor =
     [
         "in a company already", "unable to fight", "producers", "not holding a line and beyond reach", "down a dungeon",
-        "answering to a company or class", "without supplies", "of a hostile guild", "no bot"
+        "answering to a company or class", "without supplies", "of a hostile guild", "under the floor with the weak seats taken", "no bot"
     ];
 
     private string PassedOver()
@@ -1899,6 +1994,14 @@ public sealed class BotDelve : BotDeed
 
             if (other.Squad != null || role != null && other.Class?.Role != role)
             {
+                continue;
+            }
+
+            if (Weak(other, _deep) && WeakIn(squad) >= WeakSeats(squad.Count + 1))
+            {
+                PassedWeak++;
+                _passed[8]++;
+
                 continue;
             }
 
@@ -2069,6 +2172,7 @@ public sealed class BotDelve : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+
         if (_leaving && !_lifted && _party != null)
         {
             _lifted = true;
@@ -2150,7 +2254,13 @@ public sealed class BotDelve : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
+
         var fell = bot?.Self is { Deleted: false, Alive: false };
+
+        if (fell && _party is { Ended: true })
+        {
+            LeaderlessLifted += _party.Lift();
+        }
 
         _party?.Settle(fell ? "whoever was leading it fell" : "the errand was let go");
 
@@ -2191,8 +2301,9 @@ public sealed class BotDelve : BotDeed
             : $"{Calls} delves called and {Called} bots called up ({LeviedEarly} levies made while the leader walked to its muster; {LinesFar} of them line-holders called from beyond {Reach} tiles for a company that had none; {Hostiles} passed over for a guild hostile to the leader's; {MusterMoved} musters moved off a home with no floor or on dangerous ground), {Marches} parties went down with {Heads} bots between them ({Undersized} of them short of what they called, with enough to outnumber the worst room; {Walked} marched to a cave mouth ({MusteredForward} musters set forward on the road, {Pressed} levied bots put their errand down for it, {Ungathered} let go at the descent for not standing at the muster, {Held} holds for stragglers, {LeftBehind} left behind, {Stood} fights stood to on the road with the leader, {MarchRefused} roads refused on the march; {WentOn} counted at the mouth and went in, {TurnedBack} turned back together and {BroughtBack} of those reached the muster), {Carried} were put down by hand, {Unreached} never reached the mouth in {MarchMs / 60000} minutes ({KeptMarching} marches kept going past it for still closing on their next gate, up to {MarchMs * MarchCapTimes / 60000} minutes; {Deserted} members struck off a march for holding something other than their place in it; members across a gate read as {GateApart} tiles behind or more; {MoonLed} leaders and {BotEnlist.MoonFollowed} members put through a moongate on the road); {WalkedOut} walked out by the mouth, {LeftBelow} leaders gave up the walk out, {LiftedAtRefusal} parties lifted out at once when the walk out was refused ({LiftedBodies} bodies)); {Undermanned} could not raise "
             + $"enough to outnumber their dungeon's worst room in {MusterMs / 60000} minutes and {Lineless} could raise nobody to hold a line ({LineAway} of them with one called who never reached the muster); "
             + $"a party calls {BotProving.PartyMultiple} for each creature of its dungeon's worst room, {Company} at the fewest and {Math.Max(Company, MostParty)} at the most: {Sizes()}; "
-            + $"{Emptied} came out on {Quota} corpses, {Timedout} on the {CapMs / 60000} minutes, {Broken} because too few were left, {BledOut} because the company lost {BotSquad.BleedDeaths} inside a minute, {Leaderless} because whoever led them was no longer down there "
-            + $"and {Walled} because the walls would not let them past ({Bends} refused roads shrugged off, {Shifted} musters moved to the caller's own tile, {Strayed} leaders fetched back out of the world); "
+            + $"{Emptied} came out on {Quota} corpses, {Timedout} on the {CapMs / 60000} minutes, {Broken} because too few were left, {BledOut} because the company lost {BotSquad.BleedDeaths} inside a minute ({BledLifted} bodies lifted out at once for it{(LiftWhenBled ? "" : ", off")}), {Leaderless} because whoever led them was no longer down there "
+            + $"and {Walled} because the walls would not let them past ({Bends} refused roads shrugged off, {Shifted} musters moved to the caller's own tile, {Strayed} leaders fetched back out of the world; {LeaderlessLifted} bodies lifted out of a settled party whose leader fell on the walk out); "
+            + $"the floor: a party of n keeps {WeakShare:P0} of its seats (n × share, rounded down) for bodies under {WeakFloor:P0} of its dungeon's worst, the leader counted and medics never, so it goes down with at least the fewest less those seats over the floor — {PassedWeak} passed over at the levy with the seats of the party they would make taken, {Trimmed} let go at the descent beyond the seats of the party that stood, {ShortOfFloor} descents not made for too few holding the floor, {WeakAtMouth} parties turned back at a count for the same; {UnderQuarantine} descents made under a standing quarantine of the dungeon (counted, not refused); "
             + $"{Killed} things killed down there; {BotHalls.Describe()}; {BotDelveParty.Describe()}";
 
     public static void Forget()
@@ -2232,6 +2343,13 @@ public sealed class BotDelve : BotDeed
         LinesFar = 0;
         LineAway = 0;
         Heads = 0;
+        PassedWeak = 0;
+        Trimmed = 0;
+        ShortOfFloor = 0;
+        WeakAtMouth = 0;
+        BledLifted = 0;
+        LeaderlessLifted = 0;
+        UnderQuarantine = 0;
         _resting.Clear();
         _called0.Clear();
         _worstRooms.Clear();

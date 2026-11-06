@@ -6,25 +6,9 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Dig, melt, put away. One undertaking with three stages, and the second and third are the point of it.
-///
-/// <para>
-/// <b>Ore is worth nothing to anybody.</b> No counter buys it, no bot wants it, and a miner that comes home
-/// with a pack full of rock has produced exactly nothing — which is what the first version's miners did all
-/// night, because their goal ended at the vein. So the work is not "mine": it is <em>mine, carry it to a
-/// fire, and put the metal where it is safe</em>, and it is not finished until the last of those has
-/// happened.
-/// </para>
-///
-/// <para>
-/// <b>Its stages are its own business.</b> The decision layer asks what to do now and is told a place, or
-/// "work here", or that it is over; it never learns what ore is. That is the whole reason adding a trade to
-/// this shard does not touch <c>BotWill/</c>.
-/// </para>
-/// </summary>
 public sealed class BotDig : BotDeed
 {
+
     public const string Trade = "mine";
 
     public static double Prior { get; set; } = 45.0;
@@ -100,6 +84,7 @@ public sealed class BotDig : BotDeed
 
     private static Point3D Stand(Map map, Point3D point, int most, Point3D toward, out int ring, bool level = false)
     {
+
         if (level)
         {
             var chosen = Point3D.Zero;
@@ -378,6 +363,7 @@ public sealed class BotDig : BotDeed
 
         if (tool == null)
         {
+
             if (carried >= BotOre.WorthSmelting)
             {
                 _leg = Leg.Fire;
@@ -390,6 +376,7 @@ public sealed class BotDig : BotDeed
 
         if (_tile == null && !body.InRange(_seam.Where, BotOre.Reach))
         {
+
             if (!BotGround.Free(body, _seam.Where))
             {
                 var other = _repicks < RepickLimit ? BotGround.Seam(bot, _seam.Where) : default;
@@ -438,8 +425,10 @@ public sealed class BotDig : BotDeed
                 _nearest = gap;
                 _stalled = 0;
             }
-            else if (++_stalled >= TrekLimit)
+
+            else if (body is not BotMobile { Journey.Held: true } && ++_stalled >= TrekLimit)
             {
+
                 BotAppraisal.Becalm(bot.Resolve, body.Location, _setOut, _nearest);
 
                 if (gap > StrikeWithin)
@@ -479,6 +468,7 @@ public sealed class BotDig : BotDeed
 
         if (_tile == null && _spent.Count < MaxSpent)
         {
+
             _tile = BotOre.Find(body, out _system, _spent, _seam.Where, BotOre.Reach);
 
             if (_tile == null && !body.InRange(_seam.Where, 2))
@@ -494,6 +484,7 @@ public sealed class BotDig : BotDeed
 
         if (_tile == null || _system == null)
         {
+
             if (carried >= BotOre.WorthSmelting)
             {
                 _leg = Leg.Fire;
@@ -503,6 +494,7 @@ public sealed class BotDig : BotDeed
 
             if (_spent.Count > 0)
             {
+
                 if (_spent.Count >= MaxSpent)
                 {
                     Allowanced++;
@@ -510,6 +502,7 @@ public sealed class BotDig : BotDeed
 
                 if (_ranDry >= _missed)
                 {
+
                     BotGround.Drained(_seam.Where);
 
                     return Made > 0
@@ -547,6 +540,7 @@ public sealed class BotDig : BotDeed
 
         if (!body.InRange(at, BotOre.SwingReach))
         {
+
             if (_standRock != at)
             {
                 _standRock = at;
@@ -573,6 +567,7 @@ public sealed class BotDig : BotDeed
 
             if (++_walled >= WalledLimit)
             {
+
                 var struck = BotGround.Barren(_seam.Where);
 
                 if (struck)
@@ -600,6 +595,7 @@ public sealed class BotDig : BotDeed
             case BotHeard.Word.Empty:
             case BotHeard.Word.Taken:
                 {
+
                     BotHeard.Clear(body);
                     Drained++;
                     _ranDry++;
@@ -612,6 +608,7 @@ public sealed class BotDig : BotDeed
 
             case BotHeard.Word.Full:
                 {
+
                     BotHeard.Clear(body);
                     Laden++;
                     _dry = 0;
@@ -622,6 +619,7 @@ public sealed class BotDig : BotDeed
 
             case BotHeard.Word.Adrift:
                 {
+
                     BotHeard.Clear(body);
                     Adrift++;
                     _dry = _dry > 0 ? _dry - 1 : 0;
@@ -691,6 +689,7 @@ public sealed class BotDig : BotDeed
         }
         else if (_swung && ++_dry >= patience)
         {
+
             if (BotOre.Left(_map, at.X, at.Y) > 0)
             {
                 Fumbled++;
@@ -741,6 +740,7 @@ public sealed class BotDig : BotDeed
 
     private BotDoing Melting(Mobile body)
     {
+
         if (BotOre.Carried(body) < BotOre.WorthSmelting)
         {
             _leg = Leg.Counter;
@@ -750,6 +750,7 @@ public sealed class BotDig : BotDeed
 
         if (BotOre.Carried(body) <= 0)
         {
+
             _leg = Leg.Counter;
 
             return default;
@@ -775,6 +776,7 @@ public sealed class BotDig : BotDeed
 
         if (_closer ? !body.InRange(_fire, 1) : !body.InRange(_fire, BotOre.FireReach))
         {
+
             return _closer
                 ? BotDoing.Walk(_map, _fire, BotArrival.Beside, "closer to the fire")
                 : BotDoing.Walk(_map, _fire, BotArrival.Within(BotOre.FireReach), "to a fire");
@@ -823,6 +825,7 @@ public sealed class BotDig : BotDeed
 
         if (made <= 0)
         {
+
             _raw = 0;
 
             _leg = Leg.Counter;
@@ -904,6 +907,7 @@ public sealed class BotDig : BotDeed
 
         if (!body.InRange(_counter, CounterReach))
         {
+
             return BotDoing.Walk(_map, _counter, BotArrival.Within(CounterReach), "to a counter");
         }
 
@@ -960,6 +964,7 @@ public sealed class BotDig : BotDeed
 
         if (_leg == Leg.Fire)
         {
+
             bot?.Resolve?.Ledger?.Beware(BotGround.FireKind, _map, _fire);
 
             var fire = BotGround.Fire(bot, body?.Location ?? _seam.Where, _fire);

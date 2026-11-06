@@ -6,23 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bow out of seven logs, and a crossbow out of seven more: the last weapon on this shard nobody made.
-///
-/// <para>
-/// <b>Patrick's sixth point of the night of 29.09.2026: "make the economy self-sufficient."</b> The craft page said it
-/// plainly since 28.09: arrows are fletched, blades forged, armour sewn, tools tinkered — and every bow is bought over a
-/// counter. <c>DefBowFletching</c> has had the recipe all along: a bow at Fletching 30–70 from seven logs, a crossbow at
-/// 60–100, both with the fletcher's tools every crafter is born with. The wood is the island's own (<c>BotChop</c>), so
-/// the whole of the archers' kit is now made here.
-/// </para>
-///
-/// <para>
-/// <b>Demand is read off the board and the stalls, as the tinker reads it.</b> An order for a bow is filled first; a bow
-/// is made on speculation only while the stalls hold fewer than <see cref="BotBowyer.LeastOnMarket"/> — a maker with no
-/// reader of demand fills the stalls with bows (C12).
-/// </para>
-/// </summary>
 public sealed class BotBowmake : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBowmake));
@@ -251,7 +234,6 @@ public sealed class BotBowmake : BotDeed
     }
 }
 
-/// <summary>Offers a bot with fletcher's tools, the skill and the logs a bow the board wants or the stalls are short of.</summary>
 public sealed class BotBowyer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBowyer));

@@ -4,26 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// What <c>Configuration/bot-debugger.json</c> is allowed to say. Everything optional; an empty file means
-/// "keep the numbers the code chose", which is what is written on the first boot.
-///
-/// <para>
-/// <b>PascalCase, and it is not a style question on this shard.</b> The deserialiser matches these names as
-/// written, so a key in lower case is not an error and not a warning — it is a value silently left at its
-/// default, and a configuration file that appears to have been read is worse than one that fails to load.
-/// </para>
-///
-/// <para>
-/// <b>Its own file rather than a section of the minds'.</b> The two are switched on and off separately and
-/// tuned for opposite reasons: the minds are tuned for how often a bot may change its mind, the debugger for
-/// how much of one graphics card a watcher may spend. A single file would mean editing the thinking bots'
-/// cadence to change how often the debugger writes a paragraph, which is exactly the mistake the whole
-/// project's one-file-per-subsystem rule exists to prevent.
-/// </para>
-/// </summary>
 public sealed class BotDebugSettings
 {
+
     public string Name { get; set; }
 
     public string Model { get; set; }
@@ -73,7 +56,6 @@ public sealed class BotDebugSettings
     public int? StartHourLocal { get; set; }
 }
 
-/// <summary>Reads the debugger's file and moves the numbers it names.</summary>
 public static class BotDebugConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDebugConfig));

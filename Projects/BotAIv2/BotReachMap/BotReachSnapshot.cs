@@ -2,17 +2,6 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The reach map as one solve left it: a class for every tile, and for a tile whose standing places differ (a bridge over a
-/// road, a roof over a room) the class of each with its height. Immutable: made on a worker, published through
-/// <see cref="BotReachMap"/>'s one volatile reference, read by the loop's walkers and the dashboard's threads alike.
-///
-/// <para>
-/// <b>A byte a tile, shared where a cluster is all one thing.</b> 7168 × 4096 tiles of Felucca are 29 million bytes if every
-/// cluster had its own array; the open sea, the solid rock and the open fields are clusters of one class, and those all point at
-/// one array per class, so the snapshot holds only the clusters with a border in them.
-/// </para>
-/// </summary>
 public sealed class BotReachSnapshot
 {
     public BotReachSnapshot(

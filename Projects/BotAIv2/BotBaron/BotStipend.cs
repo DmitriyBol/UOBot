@@ -6,33 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The one purse on this shard that is not earned, and the argument for allowing exactly one.
-///
-/// <para>
-/// <b>Gold enters this world in one place and that rule is load-bearing.</b> A monster's pocket is the only
-/// faucet; everything else — the market, the crafters, the levy the Architect takes — moves coin about
-/// rather than making it, and that is deliberate, because the first version drained its own faucet by
-/// 110,900 in a night by letting bots sell loot to shopkeepers. Anything that mints is therefore a second
-/// faucet however it is dressed, and the honest thing is to say so rather than to hide it inside a trade.
-/// </para>
-///
-/// <para>
-/// <b>This one is allowed because it buys nothing that competes.</b> The Baron takes no share of what his
-/// company kills — see <c>BotSpoils</c> — sells nothing, banks nothing he was given by anybody, and spends
-/// it on bandages and a handful of scrolls. The coin does not enter the economy as pressure on prices; it
-/// leaves it at the first shopkeeper he passes, which is a <em>sink</em>. Netted over an evening this is
-/// closer to a drain than a tap. What it actually buys is the thing it was ordered to buy: a bot who can be
-/// relied upon to walk into ground that has killed people without first having to be solvent.
-/// </para>
-///
-/// <para>
-/// <b>The pocket is not minted, it is drawn.</b> Only the bank is ever topped up. What he carries comes out
-/// of what he already has, wherever he is standing — no counter, no errand, no trip — because a stipend that
-/// needed a walk to the bank would be a wage with extra steps, and this bot is precisely the one who must
-/// never be standing in a queue while a square is killing people.
-/// </para>
-/// </summary>
 public static class BotStipend
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStipend));

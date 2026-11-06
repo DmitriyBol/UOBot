@@ -2,21 +2,6 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The green staff. Spends its mana on other people, and is equipped accordingly.
-///
-/// Its staff gives back twice what a mage's does, and the reason is the difference between the two
-/// jobs rather than generosity: a mage that runs dry has stopped fighting, and a healer that runs dry
-/// has stopped being the reason anybody else is still standing. It gets the better staff on the same
-/// argument that gives a smith the better hammer.
-///
-/// It brews faster than everybody else — seven minutes against ten — and that is its only advantage
-/// at the mortar. Brewing itself is open to anyone with the skill and the reagents; what the healer has
-/// is the shorter wait and the reason to care.
-///
-/// Like the mage it refuses metal, and for the same mechanical reason: meditation is where most of its
-/// mana comes from and the engine will not allow it in plate.
-/// </summary>
 public sealed class BotHealer : BotClass
 {
     public override string Name => "Healer";
@@ -75,6 +60,7 @@ public sealed class BotHealer : BotClass
 
         Kit = new BotKit
         {
+
             Armour = [typeof(Robe)],
             Staff = true,
             Reagents = 30,

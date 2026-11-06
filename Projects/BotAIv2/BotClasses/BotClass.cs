@@ -3,30 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot is: its build, what it is born owning, what it may carry, and the one thing it can do
-/// that nobody else can.
-///
-/// <para>
-/// <b>Data and limits, never behaviour.</b> A class does not decide anything. Deciding lives in
-/// <c>BotWill/</c>, and it reads classes the way it reads the map — as facts about the world. This is
-/// the boundary the first version did not have: talents there were wired straight into whichever
-/// subsystem noticed them first, so the mage's staff grew its own timer inside the magic code, and
-/// there was no place to look up what a mage <em>was</em>. Nine files and one contract replace that.
-/// </para>
-///
-/// <para>
-/// <b>Two kinds of member, and the split is deliberate.</b> Identity — name, role, main skill — is
-/// abstract and unchangeable: it is what the class <em>is</em>, and a configuration file that could
-/// rename a healer into a smith would be a configuration file that can break every muster on the
-/// shard. Everything else is a settable property carrying the class's own default, so
-/// <c>bots.json</c> can move any number without a rebuild. That matters more here than it looks:
-/// this shard is built on a different machine from the one it is designed on, so a number that needs
-/// a compiler to change is a number that needs a person to change.
-/// </para>
-/// </summary>
 public abstract class BotClass
 {
+
     public const int ManaTrickleIntervalMs = 4000;
 
     public const int DefaultBrewIntervalMs = 600000;

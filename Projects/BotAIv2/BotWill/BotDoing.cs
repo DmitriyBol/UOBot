@@ -1,8 +1,8 @@
 namespace Server.BotAI.V2;
 
-/// <summary>What an undertaking wants of the bot at this moment. Four answers and no fifth.</summary>
 public enum BotDoingKind
 {
+
     None,
 
     Walk,
@@ -14,19 +14,9 @@ public enum BotDoingKind
     Failed
 }
 
-/// <summary>
-/// One instruction from an undertaking to the decision layer.
-///
-/// <para>
-/// A struct with named constructors rather than four methods on <see cref="BotDeed"/>, so that an
-/// undertaking's whole conversation with the brain is one return value. What the brain does with each is
-/// fixed and short: walk becomes the bottom of the journey, work becomes nothing at all, and the other two
-/// end the undertaking.
-/// </para>
-/// </summary>
 public readonly struct BotDoing
 {
-    private BotDoing(BotDoingKind kind, Map map, Point3D where, Mobile follow, BotArrival arrival, string note)
+    private BotDoing(BotDoingKind kind, Map map, Point3D where, Mobile follow, BotArrival arrival, string note, bool keepsUp = false)
     {
         Kind = kind;
         Map = map;
@@ -34,6 +24,7 @@ public readonly struct BotDoing
         Follow = follow;
         Arrival = arrival;
         Note = note;
+        KeepsUp = keepsUp;
     }
 
     public BotDoingKind Kind { get; }
@@ -48,11 +39,16 @@ public readonly struct BotDoing
 
     public string Note { get; }
 
+    public bool KeepsUp { get; }
+
     public static BotDoing Walk(Map map, Point3D where, BotArrival arrival, string note) =>
         new(BotDoingKind.Walk, map, where, null, arrival, note);
 
     public static BotDoing Walk(Map map, Mobile follow, BotArrival arrival, string note) =>
         new(BotDoingKind.Walk, map, Point3D.Zero, follow, arrival, note);
+
+    public static BotDoing WalkAfter(Map map, Mobile follow, BotArrival arrival, string note) =>
+        new(BotDoingKind.Walk, map, Point3D.Zero, follow, arrival, note, true);
 
     public static BotDoing Work(string note) =>
         new(BotDoingKind.Work, null, Point3D.Zero, null, BotArrival.Beside, note);
@@ -68,7 +64,8 @@ public readonly struct BotDoing
         && Map == other.Map
         && Where == other.Where
         && ReferenceEquals(Follow, other.Follow)
-        && Arrival.Tiles == other.Arrival.Tiles;
+        && Arrival.Tiles == other.Arrival.Tiles
+        && KeepsUp == other.KeepsUp;
 
     public override string ToString() =>
         Kind switch

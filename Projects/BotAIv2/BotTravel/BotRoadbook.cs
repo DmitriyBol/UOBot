@@ -8,30 +8,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The roads between the towns: how long each is, how dangerous the ground along it reads, and how often the population
-/// has walked it.
-///
-/// <para>
-/// <b>The road is the navigation graph's, and the knowledge is the population's.</b> A road from one town to another is
-/// drawn by the long tier (<see cref="NavigationService.Route"/>), square to square, a pair a slice on the module's
-/// clock; its length is the steps along its waypoints. That much is a fact about the map, and since 29.09.2026 it is kept
-/// in the store with the walks and only ever shortened (<see cref="Offer"/>): the boot's draw and every traveller's walk are
-/// offered against it, and the shorter wins.
-/// What the population knows is the rest: how many times somebody walked the road (<see cref="Road.Walked"/>), which is
-/// what makes a road "built" — a traveller prefers a road nobody has walked, and the dashboard draws a road once somebody
-/// has — and what the ground along it reads on the quadrant map, which is the same map every bot reads
-/// (<see cref="BotQuad.Safety"/>), averaged along the waypoints when asked. The walks are kept in
-/// <c>Saves/BotRoadbook</c>, so what the island has learned of its roads outlives a restart and is wiped with the rest.
-/// </para>
-///
-/// <para>
-/// <b>What "the ways round" are.</b> The long tier is the way round: it routes over the whole graph and finds the bridge
-/// a thousand steps off, and the walker follows it a leg at a time (BotJourney). A road's danger is shared aloud by the
-/// traveller that walked it, to its guild (BotTravel) — the sharing Patrick asked for — and it is written nowhere else,
-/// because the danger map is one map already.
-/// </para>
-/// </summary>
 public static class BotRoadbook
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRoadbook));
@@ -213,10 +189,12 @@ public static class BotRoadbook
                     }
                 case NavStatus.Pending:
                     {
+
                         return true;
                     }
                 default:
                     {
+
                         road.Asked = true;
                         road.Steps = road.Steps > 0 ? road.Steps : -1;
                         NoWay++;
@@ -315,6 +293,7 @@ public static class BotRoadbook
 
         if (track is { Count: > 1 } && a != null && b != null)
         {
+
             _offered.Clear();
             _offered.Add(a.Square);
 
@@ -570,7 +549,6 @@ public static class BotRoadbook
     }
 }
 
-/// <summary>The walks along the roads and the roads themselves, kept between boots. Shape 2 (1: walks only). See <see cref="BotRoadbook"/>.</summary>
 public sealed class BotRoadbookStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRoadbookStore));

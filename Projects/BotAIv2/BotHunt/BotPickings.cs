@@ -3,31 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Going through something this bot killed without meaning to.
-///
-/// <para>
-/// <b>It exists because self-defence became a reflex and left bodies nobody owned.</b> Until then the only
-/// way a creature died was that some bot had taken on a fight, and the last leg of that undertaking is
-/// emptying the corpse — so every kill had somebody whose errand ended over the body. Making a bot hit back
-/// in its damage hook fixed a mage standing still for twenty seconds and quietly created this: a bot now
-/// kills whatever walks up to it while doing something else entirely, and what it leaves has no errand
-/// attached. A sage killed a harpy and walked away from it, which is what sent anybody looking.
-/// </para>
-///
-/// <para>
-/// <b>Only its own kills, and only what the engine agrees it may take.</b> A corpse names its killer, so
-/// there is no judgement here about whose it is — the engine already knows, and going through somebody
-/// else's is a criminal act it will refuse anyway. This is not a scavenger that follows the population
-/// around picking up after it; it is the missing end of a fight the bot did not choose.
-/// </para>
-///
-/// <para>
-/// It reuses <c>BotSlay.Rifle</c> and <c>BotSlay.Skin</c> rather than repeating them. What goes in a pack,
-/// what stays on the corpse when the pack is full, what is listed and at what price — all of that is one
-/// rule, and a second copy of it would disagree with the first inside a week.
-/// </para>
-/// </summary>
 public sealed class BotPickings : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPickings));
@@ -138,6 +113,7 @@ public sealed class BotPickings : BotDeed
 
         if (taken == 0 && coins == 0 && _hides == 0)
         {
+
             Barren++;
 
             _corpse.Looters?.Add(body);
@@ -157,14 +133,6 @@ public sealed class BotPickings : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a bot the body of something it killed and has not been through.
-///
-/// <para>
-/// Refuses far more often than it offers and every refusal is named, for the reason the patrol's proposer
-/// states at length: an unnamed nought is the failure this shard has paid for more than any other.
-/// </para>
-/// </summary>
 public sealed class BotPicker : IBotProposer
 {
     public static long Asked { get; private set; }

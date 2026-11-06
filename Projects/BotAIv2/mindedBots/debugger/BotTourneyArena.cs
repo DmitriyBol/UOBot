@@ -8,57 +8,9 @@ using Server.Regions;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The day's championship at the round arenas east of Papua: the other half of <see cref="BotTourney"/>.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026, ~21:35: "Still NOT ONCE have I seen a championship where a champion is chosen in battle. On the map at
-/// about 6562 3165 there are round arenas — hold the skirmishes there. You port 2–3 groups, one group fights, the others get
-/// ready, and so on."</b> And ten minutes later: "the championship can be held with a minimum of 50 participants, 25 sparrings, and
-/// only once A DAY — human days, not game days." The hourly 1v1 knockout ran 37 championships on 06–07.10 and 22 title bouts, in
-/// town rings nobody stood at, and 374 of its calls hit an entrant "with a company": the bracket ran an hour while the entrants went
-/// on with their day, and companies took them out of it.
-/// </para>
-///
-/// <para>
-/// <b>The arenas are found, not typed.</b> At (6563, 3168) on Felucca's far east the map's own statics hold a lattice of twelve round
-/// rings, each a closed double wall of stone (z −20 and 0) about 52 tiles across round a stone floor at z −20, in void the engine
-/// calls impassable, with no region on them and no way in on foot. <see cref="ArenaLoad"/> reads the statics round
-/// <see cref="ArenaAnchor"/> at the vigil's start, keeps every closed ring whose floor a body fits on, and logs each one's middle,
-/// radius, floor and inside tiles; the ring holding the anchor is the main ring, where the referee stands and the title is fought.
-/// </para>
-///
-/// <para>
-/// <b>Once a real day, by the wall clock, and only with enough.</b> The calendar holds it from <see cref="StartHourLocal"/> local time
-/// on a day none has been held, and tries again every <see cref="RetryMs"/> until midnight if it could not start; the day it was held
-/// is a UTC instant in the world save (<see cref="BotTourneyStore"/>, shape 2), so a restart or a save does not hold it twice. It is
-/// held only when at least <see cref="MinEntrants"/> free bots qualify — alive, on the map, in no company or party, in no duel, in no
-/// cell, no murderer, not the Baron, not the champion — strongest first by <c>BotThreat.Power</c> (fighters, then crafters when
-/// fighters alone are short, <see cref="Crafters"/>), up to <see cref="ArenaEntrants"/>. By hand, <c>do arena</c> holds the day's if it
-/// has not been held, and <c>do arena force</c> holds one anyway for a test, logged as forced and not spending the day's.
-/// </para>
-///
-/// <para>
-/// <b>Batches, one pair to a ring.</b> Three minutes after the call (<see cref="NoticeMs"/>, announced in the world channel) round
-/// one's pairs — seed against seed from the far end, the strongest with a bye when the field is odd — are split into batches of as
-/// many pairs as there are fighting rings. Up to <see cref="PortedBatches"/> batches are on the arenas at once: one fighting, the
-/// others waiting in rings of their own (outside a ring is void, so a waiting place is a ring), where they stand held by
-/// <see cref="BotArenaWait"/> — their own kit, their own bandages, nothing handed out — while the referee heals each pair before its
-/// bout as it always has. Every move is a moongate's flash at both ends. A bout is <see cref="BotDuel"/>'s: nobody dies, a fighter
-/// at <c>BotDuel.YieldAt</c> of its hits yields, the clock decides by the share left. A winner goes to the winners' ring for the next
-/// round; a loser is sent back to where it was ported from and takes up its work again. The last one standing challenges the champion
-/// in the main ring (the existing title bout, <c>Title</c>), or is crowned to a vacant title by the final.
-/// </para>
-///
-/// <para>
-/// <b>Nobody forfeits for a company.</b> Only free bots are drawn; an entrant found busy when its batch is ported is replaced by the
-/// strongest free bot of the reserve (<see cref="Replaced"/>), and from the port to the end of its part an entrant is held: the duel's
-/// record answers "duelling" for it (<see cref="BotDuel.Held"/>), and the one door into a company (<c>BotSquads.Join</c>) and the one
-/// test of a war's quarrel (<c>BotFeud.Quarrel</c>) refuse a duellist.
-/// </para>
-/// </summary>
 public static partial class BotTourney
 {
+
     public static bool Arena { get; set; } = true;
 
     public static int MinEntrants { get; set; } = 50;
@@ -167,7 +119,6 @@ public static partial class BotTourney
 
     private static ArenaStage _arenaStage = ArenaStage.Idle;
 
-    /// <summary>One ring of the arenas: its middle at floor height, how far its wall stands from it, and how many tiles a body fits inside.</summary>
     private sealed class ArenaRing
     {
         public Point3D Centre;
@@ -576,6 +527,7 @@ public static partial class BotTourney
 
         if (_rings.Count == 1)
         {
+
             _fightRings.Add(_rings[0]);
             _pens.Add(_rings[0]);
 
@@ -774,6 +726,7 @@ public static partial class BotTourney
         return $"the championship is called at {ArenaName}{(force ? " (forced: a test, today's is not spent and no prize is paid)" : "")}: {field.Count} entrants ({crafters} crafters), {field[0].Name} the strongest at {BotThreat.Power(field[0]):F0}; the first batch is ported in {NoticeMs / 60000} minutes; {referee ?? "no watcher"} referees at the main ring ({main.Centre.X}, {main.Centre.Y}). Watch the log for \"Tourney:\".";
     }
 
+    /// <summary>"The Wolf (12), The Anchor (9) and 4 without a guild": who the field comes from, for the herald.</summary>
     private static string Guilds(List<BotMobile> field)
     {
         Dictionary<string, int> count = new(StringComparer.Ordinal);
@@ -815,6 +768,10 @@ public static partial class BotTourney
         };
     }
 
+    /// <summary>
+    /// Why this one cannot be drawn or ported now, or null when it is free: dead, resting, with a company or a party, in a duel, in a
+    /// cell, a murderer, the Baron, the champion.
+    /// </summary>
     private static string ArenaAway(BotMobile bot)
     {
         if (bot is not { Deleted: false } || bot.Class is not { } klass)
@@ -851,6 +808,8 @@ public static partial class BotTourney
         {
             return "in another duel";
         }
+
+        // The review's list (07.10.2026, arena27): a tired bot owes itself a rest the hold would keep it from, a trader is neutral in
 
         if (bot.Tired)
         {
@@ -940,6 +899,7 @@ public static partial class BotTourney
 
     private static void ArenaBeat(long now)
     {
+
         var tooLong = now - _arenaBegan >= WatchdogMs;
 
         if (ArenaOn && (tooLong || _arenaStage == ArenaStage.Title && _stage is not (Stage.Title or Stage.Fighting or Stage.Idle)))
@@ -1054,6 +1014,7 @@ public static partial class BotTourney
 
         if (entrants.Count % 2 == 1)
         {
+
             var at = entrants.FindIndex(m => !_byes.Contains(m.Serial));
             var bye = entrants[at < 0 ? 0 : at];
 
@@ -1097,6 +1058,7 @@ public static partial class BotTourney
 
         for (var b = 0; b < count; b++)
         {
+
             var size = pairs.Count / count + (b < pairs.Count % count ? 1 : 0);
             var start = 0;
 
@@ -1126,6 +1088,7 @@ public static partial class BotTourney
 
     private static void PortAhead()
     {
+
         var waiting = Math.Min(Math.Max(1, _pens.Count - 1), Math.Max(1, PortedBatches - 1));
 
         while (_portedAhead < Math.Min(_batches.Count, waiting))
@@ -1477,6 +1440,7 @@ public static partial class BotTourney
 
             if (how == "nofight")
             {
+
                 logger.Information(
                     "Tourney: no fight between {Winner} and {Loser} at {Arena} in round {Round}: {Tried}, and the two still could not reach each other after {Seconds}s; {Goes} goes on by the rule of the clock, not on hits{Title}",
                     winner.Name,
@@ -1772,6 +1736,7 @@ public static partial class BotTourney
 
     private static void Wait(BotMobile bot)
     {
+
         if (bot is not { Deleted: false, Alive: true } || bot.Resolve?.Deed is BotArenaWait or BotBrawl or BotSalve)
         {
             return;
@@ -1924,6 +1889,7 @@ public static partial class BotTourney
 
             if (!bot.Alive)
             {
+
                 if (!BotDuel.InBout(bot))
                 {
                     Raise(bot);
@@ -2101,17 +2067,6 @@ public static partial class BotTourney
     private static int Share(Mobile m) => m is { Alive: true, HitsMax: > 0 } ? m.Hits * 100 / m.HitsMax : 0;
 }
 
-/// <summary>
-/// An entrant held at the arenas between its bouts: it stands where the referee put it and does nothing else, until the championship
-/// lets it go (07.10.2026, arena27).
-///
-/// <para>
-/// <b>Like a sentence (<c>BotSentence</c>), and for the same reason.</b> The rings are sealed by void; any errand the auction chose
-/// there would be a walk nobody can make. So it is committed, still and pressed from outside; it pays nothing and is no work, so it is
-/// kept out of the finished share. It is steadfast, so a bout or a call to bind a wound puts it down rather than throws it away, and
-/// it is taken up again after. Its end is the hold's end: <see cref="BotTourney.Holding"/>.
-/// </para>
-/// </summary>
 public sealed class BotArenaWait : BotDeed
 {
     public const string Trade = "arena";

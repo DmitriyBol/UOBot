@@ -5,7 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One band of the prime time schedule as the file writes it: from an hour, to an hour, the share of the island in the world.</summary>
 public sealed class BotPrimeBandSettings
 {
     public int? From { get; set; }
@@ -15,9 +14,9 @@ public sealed class BotPrimeBandSettings
     public double? Share { get; set; }
 }
 
-/// <summary>What <c>bot-rest.json</c> may say under <c>PrimeTime</c>. See <see cref="BotPrime"/>.</summary>
 public sealed class BotPrimeTimeSettings
 {
+
     public bool? Running { get; set; }
 
     public int? RampMinutes { get; set; }
@@ -29,9 +28,9 @@ public sealed class BotPrimeTimeSettings
     public List<BotPrimeBandSettings> Bands { get; set; }
 }
 
-/// <summary>What <c>bot-rest.json</c> may say under <c>Critical</c>. See <see cref="BotCritical"/>.</summary>
 public sealed class BotCriticalSettings
 {
+
     public bool? Running { get; set; }
 
     public int? EarlyMinutes { get; set; }
@@ -39,12 +38,9 @@ public sealed class BotCriticalSettings
     public Dictionary<string, int> Floors { get; set; }
 }
 
-/// <summary>
-/// What <c>Configuration/bot-rest.json</c> is allowed to say: the rest clock's own dials, which had no file until
-/// 02.10.2026, the prime time schedule and the critical floors.
-/// </summary>
 public sealed class BotRestSettings
 {
+
     public bool? Running { get; set; }
 
     public int? LookMs { get; set; }
@@ -76,7 +72,6 @@ public sealed class BotRestSettings
     public BotCriticalSettings Critical { get; set; }
 }
 
-/// <summary>Reads the rest file, or writes one with the schedule and the floors in it.</summary>
 public static class BotRestConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRestConfig));

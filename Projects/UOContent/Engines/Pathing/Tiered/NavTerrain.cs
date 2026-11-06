@@ -3,11 +3,6 @@ using Server.Engines.Pathing.Cache;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>
-/// The ground the navigation graph is baked from: where a body can stand in a cell, and where it can step from there.
-/// An interface so the graph and its planners can be tested on small synthetic grids; the live one is
-/// <see cref="MapNavTerrain"/>.
-/// </summary>
 public interface INavTerrain
 {
     int Width { get; }
@@ -19,10 +14,6 @@ public interface INavTerrain
     StepMask Step(int x, int y, sbyte z);
 }
 
-/// <summary>
-/// The live ground of one map: the engine's static step probe, and its multi-aware form in any 16-tile sector a house
-/// or a boat touches (with the ring round it, since a step from outside can land on a multi's edge).
-/// </summary>
 public sealed class MapNavTerrain : INavTerrain
 {
     private readonly Map _map;

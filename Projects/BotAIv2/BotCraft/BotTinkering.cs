@@ -5,26 +5,6 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a tinker needs to know: the craft system, the tool, and which of the things it can make are the
-/// tools the rest of the population wears out.
-///
-/// <para>
-/// <b>The trade that closes the loop on tools.</b> Every other trade on this shard makes its goods from what
-/// the island produces — ore, hides, logs, herbs, meat — and buys one thing over a counter that no bot ever
-/// made: the tool in its hand. A pickaxe, a hatchet, a smith's hammer, a sewing kit, a skillet, a mortar, a
-/// pen: all iron, all in <c>DefTinkering</c>, all bought from an NPC until 28.09.2026. A tinker makes them
-/// from the smelter's ingots and puts them on the market, where the restock already looks first
-/// (<c>BotShopper</c>), so the counter becomes the fallback rather than the source.
-/// </para>
-///
-/// <para>
-/// <b>Only the tools, and only the ones somebody uses.</b> Tinkering makes clocks, sextants, jewellery and
-/// cutlery too. None of that has a buyer here, and a maker with no reader of demand fills the stalls with
-/// goblets — the shape <c>DECISIONS</c> calls C12. The list below is the tools the classes are issued and
-/// restock, in the order the population wears them out.
-/// </para>
-/// </summary>
 public static class BotTinkering
 {
     public const SkillName Skill = SkillName.Tinkering;

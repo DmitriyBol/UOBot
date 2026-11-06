@@ -3,34 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What this bot has learned about what pays. One number per kind of work per patch of ground, measured
-/// rather than configured.
-///
-/// <para>
-/// <b>This is the whole of learning in this project, and it is arithmetic.</b> A piece of work finishes, its
-/// takings are divided by the minutes it took, and the figure is folded into what was already known about
-/// that kind of work in that place. Next time, that is the estimate. No model, no training, nothing to
-/// serialise, and it recovers on its own when the world changes — a mined-out patch stops paying and its
-/// figure falls with it.
-/// </para>
-///
-/// <para>
-/// <b>It is also where punishment lives, and why there is no punishment mechanism.</b> The first version
-/// punished by prohibition: a bot judged stuck had its errand cancelled and was barred from trading for five
-/// minutes — which, because standing at a counter reads as being stuck, punished it for trading. Here a
-/// failure is a low number in the row for that work in that place, so the bot stops choosing it, and tries
-/// again later when the row has faded. Nothing is ever forbidden.
-/// </para>
-///
-/// <para>
-/// <b>Per bot, not per population</b>, like the first version's record of the squares a bot kept returning
-/// to. That a hundred bots have exhausted a field says nothing about whether this one has seen it, and what
-/// is being modelled is one bot's own experience.
-/// </para>
-/// </summary>
 public sealed class BotLedger
 {
+
     public static int BandSize { get; set; } = 64;
 
     public static int MaxPlaces { get; set; } = 48;
@@ -122,6 +97,7 @@ public sealed class BotLedger
 
         if (!_tallies.TryGetValue(Key(kind, map, where), out var tally) || tally.Settled == 0)
         {
+
             return BotCommons.Expect(kind, map, where, prior);
         }
 
@@ -228,6 +204,7 @@ public sealed class BotLedger
 
             foreach (var (key, tally) in _tallies)
             {
+
                 if (found && tally.TouchedTick - oldest >= 0)
                 {
                     continue;

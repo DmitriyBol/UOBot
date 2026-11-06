@@ -7,43 +7,9 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guild's own counter: finding the merchant in the hall, putting goods on it, buying off it, and
-/// carrying its takings back to the guild.
-///
-/// <para>
-/// <b>Why a shop in the hall is worth anything at all, when the bots already have a market.</b> The bots' own
-/// shops by the bank (<see cref="BotShopkeep"/>) are kept by a bot standing there for a shift; what a keeper cannot
-/// do is stand there for ever: it belongs to a bot, and this population is rebuilt at every restart. A merchant in a hall is saved with the house, so what is left on
-/// its shelf outlives the bots that put it there — and Patrick can walk in and buy it.
-/// </para>
-///
-/// <para>
-/// <b>And the errand it removes is a real one.</b> Reagents, bandages, tools and bottles are bought from
-/// shopkeepers in Britain, and that walk is where three percent of the population's time was going. One
-/// member fetching a batch for the hall spares every other member the journey. The gold still leaves the
-/// world at the town counter — it is the same purchase — but it leaves once instead of nine times, and
-/// nobody crosses the island for a bandage.
-/// </para>
-///
-/// <para>
-/// <b>Everything here goes through the engine's own bookkeeping rather than round it.</b> Dropping into the
-/// merchant's pack makes <c>PlayerVendor.OnSubItemAdded</c> open a lot at 999gp, and the price on that lot
-/// is public, so a shelf can be stocked without a patch and without a gump. Buying repeats, line for line,
-/// what the buy gump's OK button does: pocket first then bank, the goods into the buyer's pack, the price
-/// into the shopkeeper's purse. Anything cheaper than that would be minting.
-/// </para>
-///
-/// <para>
-/// <b>The shopkeeper has to be paid or it dies.</b> In this era the engine charges a vendor
-/// <c>20 + (shelf value - 500) / 500</c> every UO day, which is two real hours, and destroys it the first
-/// time the bill is larger than its purse — a hired merchant is 1,252gp of the guild's money walking away
-/// while nobody is looking. It is seeded with 1,000gp by the engine, so an empty one lives about four days;
-/// a well-stocked one much less. See <see cref="Wage"/>, which is why the supply errand tops it up.
-/// </para>
-/// </summary>
 public static class BotShelf
 {
+
     public static int Reach => BotShops.CounterReach;
 
     public static double Markup { get; set; } = 1.0;
@@ -175,6 +141,7 @@ public static class BotShelf
         }
 
         var kind = goods.GetType();
+
         var owner = merchant.Owner is { Deleted: false } held ? held : merchant;
 
         var standing = Lot(merchant, kind);

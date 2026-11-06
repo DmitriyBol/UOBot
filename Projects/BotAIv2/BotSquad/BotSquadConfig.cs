@@ -4,16 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-squad.json</c> may say. Everything optional.
-///
-/// Numbers only. The rules are not configurable and should not be: that blades stand in front of casters, that
-/// a fight is judged by whether the target's health is falling, that nobody stands still — those are not
-/// preferences, they are what four separate defects taught, and a file able to disagree with them is a file
-/// able to reinstate them.
-/// </summary>
 public sealed class BotSquadSettings
 {
+
     public int? MaxSize { get; set; }
 
     public int? SlowestBlowMs { get; set; }
@@ -51,9 +44,20 @@ public sealed class BotSquadSettings
     public double? ClearExpects { get; set; }
 
     public int? ClearRoadWidth { get; set; }
+
+    public bool? Spares { get; set; }
+
+    public double? SpareShare { get; set; }
+
+    public int? SpareReach { get; set; }
+
+    public int? MostSpared { get; set; }
+
+    public int? SpareMs { get; set; }
+
+    public double? SpareDyingShare { get; set; }
 }
 
-/// <summary>Reads the squad file and moves the numbers it names.</summary>
 public static class BotSquadConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSquadConfig));
@@ -97,5 +101,12 @@ public static class BotSquadConfig
         BotClearer.RoadWidth = settings.ClearRoadWidth ?? BotClearer.RoadWidth;
         BotHarrow.ClearFit = settings.ClearFit ?? BotHarrow.ClearFit;
         BotHarrow.ClearPrior = settings.ClearExpects ?? BotHarrow.ClearPrior;
+
+        BotSquad.Spares = settings.Spares ?? BotSquad.Spares;
+        BotSquad.SpareShare = settings.SpareShare ?? BotSquad.SpareShare;
+        BotSquad.SpareReach = settings.SpareReach ?? BotSquad.SpareReach;
+        BotSquad.MostSpared = settings.MostSpared ?? BotSquad.MostSpared;
+        BotSquad.SpareMs = settings.SpareMs ?? BotSquad.SpareMs;
+        BotSquad.SpareDyingShare = settings.SpareDyingShare ?? BotSquad.SpareDyingShare;
     }
 }

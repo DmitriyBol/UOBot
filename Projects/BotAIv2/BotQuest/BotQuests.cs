@@ -8,33 +8,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The board of errands: what the watchers and the door ask of the population, for a price.
-///
-/// <para>
-/// <b>Every mechanism the city had was an errand without a board.</b> A bounty on a square, a price on a head, a
-/// standing order, a house call: each is "somebody wants this done and pays for it", each with its own list, its
-/// own verb and its own taker. Patrick's order of 16.09.2026, evening: one board, with the power to post on it
-/// given to the door (Argus and the debuggers) and to the marshal of events among them, paid from the city's
-/// treasury; and any bot fit for the errand may take it (<see cref="BotQuester"/>) and is paid on the spot when it
-/// is done. The guilds' masters do not post: Patrick took that back the same evening — they are ordinary bots.
-/// </para>
-///
-/// <para>
-/// Three kinds to begin with — kill so many of a creature near a place, bring so many of a thing to a place, scout a
-/// place — because each maps onto work the population already knows how to do (<see cref="BotSlay"/>, a walk with a
-/// pack, a walk). The reward is taken from the treasury the moment the errand is posted and held by the board, so
-/// nothing is posted that cannot be paid, and a lapsed or withdrawn errand gives the money back. The engine's own
-/// quests (Uzeraan, the Witch's apprentice, the Solen) are not here yet; when they are, they will be a further source
-/// of errands on this board, not a second board.
-/// </para>
-///
-/// <para>
-/// Kept across restarts by <see cref="BotQuestStore"/>; a taker is not kept, so a restart puts every errand back on the
-/// board with its count. "An offer is not an errand": an errand is taken in the deed's <c>Taken</c>, never in the
-/// proposer, and a taken errand with no progress in <see cref="HoldMs"/> goes back on the board.
-/// </para>
-/// </summary>
 public static class BotQuests
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotQuests));
@@ -248,6 +221,7 @@ public static class BotQuests
         }
         else if (kind == BotQuestKind.Kill)
         {
+
             lairs = BotLairs.Count(map, type);
 
             if (lairs == 0)

@@ -6,23 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A trader's order book: a blue book in its pack, written by the trader and read by anybody who opens it.
-///
-/// <para>
-/// <b>Plan v2 of 01.10.2026, point 3: "give them a fun feature — write the orders into a book, and strike them out when
-/// delivered" (build 385).</b> The cover counts the orders written, delivered and struck; one page each for the orders open
-/// now — for whom, what, how many, at what, when and where it was taken, where it is being bought; and below them the closed
-/// orders, newest first, each marked X with how it ended: delivered and for how much, or struck and why.
-/// </para>
-///
-/// <para>
-/// <b>An ordinary engine book</b>, a <see cref="BlueBook"/> that the trader writes and nobody else can: not writable, not
-/// movable, blessed so it stays with its trader through a death. A player or a GM who opens it reads it like any book; the
-/// pages are the book's own and are saved with it, so a restart keeps the history and strikes whatever was open ("the island
-/// slept"). Era-appropriate: the blue book is the classic one.
-/// </para>
-/// </summary>
 [SerializationGenerator(0, false)]
 public partial class BotOrderBook : BlueBook
 {
@@ -41,7 +24,6 @@ public partial class BotOrderBook : BlueBook
     }
 }
 
-/// <summary>One order in a trader's book: a want it took, the price agreed, and how it ended.</summary>
 public sealed class BotTradeOrder
 {
     public int Number { get; init; }
@@ -79,10 +61,6 @@ public sealed class BotTradeOrder
     public long DeadSince { get; set; }
 }
 
-/// <summary>
-/// The book's contents for one trader, held in memory and written into its <see cref="BotOrderBook"/> at every change. Read
-/// back from the book's own pages the first time a trader writes after a boot, so the counts and the history survive.
-/// </summary>
 public sealed class BotOrders
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOrders));
@@ -312,6 +290,7 @@ public sealed class BotOrders
 
             if (lines[0].StartsWith('#') && lines[0].EndsWith(" OPEN", StringComparison.Ordinal))
             {
+
                 var number = lines[0][1..^5].Trim();
                 var buyer = lines.Length > 1 ? lines[1].Replace("for ", "") : "somebody";
                 var what = lines.Length > 2 ? lines[2] : "";

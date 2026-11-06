@@ -2,24 +2,6 @@
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a mining trip to anybody carrying a pick.
-///
-/// <para>
-/// <b>The preconditions live here rather than in the undertaking, and that is the whole point of a
-/// proposer.</b> Without a fire on record the chain would end with a bot holding a pack of rock, and the
-/// ledger would file that failure against the <em>seam</em> — so the bot would slowly learn that a
-/// perfectly good mine was worthless, for a reason that had nothing to do with the mine. Something that
-/// cannot be finished is not offered.
-/// </para>
-///
-/// <para>
-/// <b>The tool decides who mines, not the class name.</b> A gatherer is born with a pickaxe, bound and
-/// weightless; anybody who buys or loots one is a miner while it holds it. The first version asked which
-/// archetypes were permitted to work the land, which meant a list that had to be edited every time a class
-/// was added — and adding a class silently excluded it.
-/// </para>
-/// </summary>
 public sealed class BotMiner : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMiner));

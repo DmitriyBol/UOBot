@@ -3,25 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Everything one bot has resolved, feels and has learned. Lives on the bot, like its journey and its bond.
-///
-/// <para>
-/// <b>All of it in one object, and that is the point.</b> In the first version a bot's state was thirty-two
-/// dictionaries keyed by serial in thirty-two files: each needed its own reset, each leaked when the
-/// population was torn down, and the question "what is this bot up to" was answered by reading a file per
-/// possible answer. A deleted bot takes this with it, and there is nowhere else to look.
-/// </para>
-///
-/// <para>
-/// Only <see cref="BotWill"/> writes to it. Everything here is readable by a gump, a command or a log line
-/// without asking permission, which is the other half of the same lesson: the first version's decisions
-/// were unobservable, so the question "why did the brain not take that plan" had no answer at all — and it
-/// turned out to be the question that mattered, because it had not taken 85 of 135 of them.
-/// </para>
-/// </summary>
 public sealed class BotResolve
 {
+
     public BotUrges Urges { get; } = new();
 
     public BotLedger Ledger { get; } = new();
@@ -148,18 +132,6 @@ public sealed class BotResolve
             : $"{Deed}, {Urges}, because {Because}";
 }
 
-/// <summary>
-/// Steadfast work put down for something that would not wait, and everything needed to take it up again as if
-/// the interruption had not been counted against it.
-///
-/// <para>
-/// <b>The takings are the part that has to be put right.</b> What a piece of work came to is measured as the
-/// difference between the bot now and the bot when it began, so a rescue that earned forty gold in the middle
-/// of a mining trip would otherwise be booked to the mine — and the minutes spent on it too, which would make
-/// the trip look slow. <see cref="Wealth"/> and <see cref="Skill"/> are the bot at the moment it put the work
-/// down; the stake is moved by whatever changed while it was away.
-/// </para>
-/// </summary>
 public sealed class BotPause
 {
     public BotDeed Deed { get; init; }
@@ -187,4 +159,10 @@ public sealed class BotPause
     public string For { get; init; }
 
     public bool Sheltered { get; init; }
+
+    public bool Kept { get; init; }
+
+    public bool Freed { get; set; }
+
+    public long FreedAt { get; set; }
 }

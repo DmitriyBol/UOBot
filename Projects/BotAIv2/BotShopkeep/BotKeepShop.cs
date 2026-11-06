@@ -2,35 +2,9 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A shift keeping shop: walk to a pitch beside the bank, open, call out what is for sale, serve whoever comes, and shut when the
-/// goods or the shift run out.
-///
-/// <para>
-/// <b>Standing still is the work, once the shop is open</b> (<see cref="BotDeed.Still"/>). The stall watch takes work off a bot
-/// that has neither moved nor changed its stage for four minutes, which is right for a walk into a wall and wrong for a keeper
-/// behind a counter; the shift's own clock (<see cref="BotShopkeep.ShiftMinutes"/>) ends it instead, as the drill field's roll
-/// ends a class. On the way to the bank it is a walk like any other and the watch keeps its eye on it.
-/// </para>
-///
-/// <para>
-/// <b>Held, from the first step, against the next thing on offer</b> (<see cref="BotDeed.Steadfast"/>). A shop is a promise to
-/// the bots already walking to it: a keeper that left its counter for a dig worth a little more would send every one of them
-/// on to a shopkeeper and teach them that the walk to a bot is not worth making. Put down, rather than dropped, for what will
-/// not wait — a flight, a friend in trouble — and the shop is shut while the keeper is away (<see cref="Paused"/>) and opened
-/// again when it is back on its pitch, the shift's clock counting only the minutes it was open.
-/// </para>
-///
-/// <para>
-/// <b>Honest endings.</b> Finished when the shift has run its course or the goods are gone, with what it sold and to how many in
-/// the note — a shift that sold nothing is still a shift kept, and says so, and the ledger reads the nought. Failed when the
-/// pitch cannot be reached, the bank will not take another shop, or the goods were gone before the shop could open. The takings
-/// are measured as coin (<see cref="Coin"/> one, <see cref="Made"/> nought): the goods were the keeper's before the shift and the
-/// coin is what the shift turned them into, which is the peddler's arithmetic.
-/// </para>
-/// </summary>
 public sealed class BotKeepShop : BotDeed
 {
+
     public const string Trade = "shopkeep";
 
     private readonly Map _map;
@@ -187,6 +161,7 @@ public sealed class BotKeepShop : BotDeed
     {
         if (body.Map != _map || !body.InRange(_stand, BotShopkeep.StandReach))
         {
+
             if (_walkSince == 0)
             {
                 _walkSince = now;
@@ -302,6 +277,7 @@ public sealed class BotKeepShop : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+
         if (_front != null && bot?.Self is BotMobile open && open.Map == _map)
         {
             var fits = BotShopkeep.StandsFit(open, _bank);

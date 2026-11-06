@@ -6,39 +6,6 @@ using CalcMoves = Server.Movement.Movement;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The coarse chart of the ground round home: squares of <see cref="Side"/> tiles, the ways across each square's edges, and
-/// which of those ways join inside the square — so that a walk longer than the planner can see is walked as a string of
-/// short ones.
-///
-/// <para>
-/// <b>Patrick's order of 26.09.2026: "maybe it is time to find another way of finding a path — if they are banging into a
-/// rock, build the way roughly over the squares that can be crossed; we have used your research for almost a month and the
-/// bots are still terribly dull."</b> The planner is one search from where the bot stands, paid for with a ceiling of 60 to
-/// 150 milliseconds, and a search with a ceiling cannot see a way round longer than its ceiling. The Lantern's hall at
-/// 1082,1402 is ninety tiles from the east bank at (1168, 1384) and about 1,170 steps from it by road, round by the south:
-/// its company was called at the hall's door three times between 14:05 and 14:14 that day and failed every time, "no way
-/// round it was found in 150ms". In the session before (13:16–14:05) the planner ran 72,294 searches for 562 seconds of the
-/// loop — a fifth of it — and 27,739 of them ended short, 11,141 no nearer than they began. Every fix of the month before
-/// was to the ceiling, the notes and the refusals; this is the method.
-/// </para>
-///
-/// <para>
-/// <b>What it is.</b> The two-level search of the literature (hierarchical A*): the ground is cut into squares; wherever a
-/// body can step across the edge between two squares, a run of such steps is a gate, with a node on each side of it; inside
-/// each square, a small flood from each node says which of the square's other nodes it reaches and in how many steps. A
-/// route is an A* over those nodes, from the square the bot stands in to the square it is going to, and what comes back is
-/// one point a square: each of them a short walk the planner finds at once. Whether a body can step from a tile, and where
-/// to, is what <see cref="BotRoads"/> learned drawing its own flood — the engine's step masks and both flanks of a
-/// diagonal — kept per tile (<c>BotRoads.Lend</c>), so the chart costs no look at the world of its own.
-/// </para>
-///
-/// <para>
-/// <b>What it does not know.</b> The ground as it was when the road map was drawn: a house raised since, an item standing
-/// in a gate. The planner walking each short leg steps round those as it always did, and a gate a leg could not pass is
-/// shunned for <see cref="ShunMs"/> (<see cref="Shun"/>).
-/// </para>
-/// </summary>
 public static class BotChart
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotChart));
@@ -142,6 +109,7 @@ public static class BotChart
 
     public static bool Slice()
     {
+
         if (Ready || _cellNodes == null)
         {
             return true;
@@ -648,6 +616,7 @@ public static class BotChart
 
         for (var i = 0; i < path.Count; i++)
         {
+
             if (i + 1 < path.Count && _cellOf[path[i]] != _cellOf[path[i + 1]])
             {
                 continue;

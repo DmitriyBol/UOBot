@@ -4,44 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Buyers down the dungeon block, and the ground they stood on, that a carrier's walk or a trader's haul from outside found no way
-/// to — remembered for every carrier and trader — and the walk out of the block that the island's walkers do not know
-/// (03.10.2026, build next).
-///
-/// <para>
-/// <b>Measured on live 396 (<c>session-2026-10-03_04-19.log</c>, 04:19–05:40, 210 bots; <c>haul11-tools/orders.py</c>).</b> 35 of
-/// the 224 orders traders wrote were struck "no way through to the buyer", and 18 of the 21 hauls that failed failed on it. 33 of
-/// the 35 touched the dungeon block (x ≥ <see cref="BotGates.Edge"/>): 19 written on the island for a buyer down there, 8 by a
-/// trader standing down there for a buyer on the island, 6 down there between its lands. Of the 38 orders that touched the
-/// block, 4 were handed over (11 %); of the 186 on the island, 149 (80 %). Seven traders in 26 minutes bought and walked for
-/// Edith, who stood in a pocket at (6139, 1432) the reach ledger had walked to its edges at 04:19:36 ("journeys in or out of it
-/// will be refused"); each bought first, walked, and learned it alone. The reach map calls that ground open — a gate leads in —
-/// and the gates join it, so neither question the haul already asks (<see cref="BotReach.Ask"/>, <see cref="BotGates.Joined"/>)
-/// could say no; and the trader's ledger (<c>Beware</c>) and the haul's shun are its own, so the next trader did not know.
-/// </para>
-///
-/// <para>
-/// <b>What is kept.</b> A walk or a haul that set out from outside the block and found no way to a buyer standing in it (a
-/// carrier's or a trader's <c>Bend</c>; not a walker that never moved, nor one already in the buyer's own dungeon, square or land)
-/// marks that buyer and the ground it stood on — its dungeon's box (<see cref="BotDungeon.Holding"/>), else a
-/// square of <see cref="Grain"/> tiles of the block — for <see cref="RestMs"/>, doubling with every failure there up to
-/// <see cref="MostRestMs"/>. While either rests, carriers and traders pass the want over ("no way through to the buyer",
-/// <see cref="BotPass.Sealed"/>): the want stands, for a bot that reaches it — a looker already standing in the buyer's own land
-/// down there is never refused — and for when its buyer comes up: a buyer back on the island is never refused, and its mark is
-/// dropped. Something handed over there by a walk that set out from outside
-/// the block (<see cref="Reached"/>) clears both: the way exists. Replayed against live 396's orders
-/// (<c>haul11-tools/simulate_unreached.py</c>), 15 of the 19 island-to-block orders struck "no way through" would not have been
-/// written, and one of the two handed over would have been lost (Galadrion's ribs to Adela, whose mark was twelve minutes old).
-/// </para>
-///
-/// <para>
-/// <b>And the way out.</b> A carrier or a trader standing in the dungeon block is offered only a walk inside its own land of the
-/// walkers' graph (<see cref="Shut"/>, <see cref="BotGates.LandOf"/>): 14 of the 16 orders written down there were struck "no way
-/// through", most by traders standing in Edith's pocket after following a buyer in — a gate leads walkers into it and no walk
-/// leads out (Norbert "has not moved or changed what it is doing for 4 minutes" there at 04:52).
-/// </para>
-/// </summary>
 public static class BotUnreached
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotUnreached));
@@ -218,6 +180,7 @@ public static class BotUnreached
 
     public static bool Shut(Map map, Point3D from, Point3D to)
     {
+
         if (!Running || map == null || map == Map.Internal || !Deep(from) || !BotGates.Ready)
         {
             return false;

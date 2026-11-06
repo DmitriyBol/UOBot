@@ -9,7 +9,6 @@ using Server.Targeting;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One infirmary while it is open: the healer keeping it, its guild, where it stands, who waits, and the body it went out to.</summary>
 public sealed class BotInfirmary
 {
     public BotInfirmary(BotMobile healer, Guild guild, Map map, Point3D stand)
@@ -61,22 +60,6 @@ public sealed class BotInfirmary
     public string Name => $"{Healer?.Name}'s infirmary of {Guild?.Name}";
 }
 
-/// <summary>
-/// The infirmaries: a guild's healer keeping one at the guild's seat for a shift, its wounded guildmates and allies coming to be
-/// bound or healed for a fee by the hit point, and its fallen raised where they fell for a fee below what a death costs — the
-/// healer going out to the body, as a company's raiser does (07.10.2026, trades17).
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "a healer with an infirmary (resurrection and healing for a fee by its guild)".</b> The value is real on
-/// both sides. A wounded bot with no bandage and no spell recovers a hit point every eleven seconds and is too hurt to hunt below
-/// <c>BotHunter.FitAt</c>; the infirmary binds it in a minute for <see cref="FeePerHit"/> a point. A bot that dies leaves some 186gp
-/// on and around its corpse (67 of coin, 119 of kit: an-money14 §3.2) and is carried home a minute later with the pack left
-/// where it lay; raised where it fell it strips its own corpse at once (<c>BotRaise.Rise</c>), and pays <see cref="RaiseFee"/> for
-/// it, a third of that. The means are the engine's (<c>BotRaise.Best</c>: the scroll, the book, the bandage of a master), spent only
-/// as the engine spends them; and the ordinary revival is held for the healer's walk at most <see cref="RaiseHoldMs"/> after the
-/// death (<see cref="Holding"/>, one hook in <c>BotRaise.Holding</c>).
-/// </para>
-/// </summary>
 public static class BotInfirmaries
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotInfirmaries));
@@ -855,6 +838,7 @@ public static class BotInfirmaries
 
             if (!_judging.TryGetValue(ghost.Serial, out var judging) || judging.Fell != ghost.FellTick)
             {
+
                 if (judging != null)
                 {
                     Tally(judging.Cause);
@@ -1150,6 +1134,7 @@ public static class BotInfirmaries
             }
             else
             {
+
                 var outcome = Call(guild, seat, ghost.Map, ghost, true, RaiseFee, now);
 
                 if (outcome == "called" || outcome == "already called")
@@ -1492,10 +1477,6 @@ public static class BotInfirmaries
     }
 }
 
-/// <summary>
-/// A healer's shift keeping its guild's infirmary: the walk to the seat, the patients bound or healed one at a time, a fallen
-/// guildmate gone out to and raised where it fell, and the shift's end (07.10.2026, trades17). Paid in fees, measured as coin.
-/// </summary>
 public sealed class BotKeepInfirmary : BotDeed
 {
     public const string Trade = "infirmary";
@@ -1990,6 +1971,7 @@ public sealed class BotKeepInfirmary : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+
         if (_infirmary?.Call != null)
         {
             BotInfirmaries.EndCall(_infirmary, true);
@@ -2027,10 +2009,6 @@ public sealed class BotKeepInfirmary : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a guild's healer — a bot that can bind with bandages or heal by spell — the shift at its guild's infirmary when the guild
-/// has none open (07.10.2026, trades17). Every gate counted.
-/// </summary>
 public sealed class BotInfirmarer : IBotProposer
 {
     public string Name => "Infirmarer";
@@ -2185,10 +2163,6 @@ public sealed class BotInfirmarer : IBotProposer
     }
 }
 
-/// <summary>
-/// A wounded bot's visit to its guild's infirmary: the walk, a place in the queue, the healer's work, the fee (07.10.2026,
-/// trades17). Unpaid, so priced at its claim; <see cref="BotPatienter"/> asks every reason it would fail first.
-/// </summary>
 public sealed class BotTend : BotDeed
 {
     public const string Trade = "infirmary visit";
@@ -2357,20 +2331,6 @@ public sealed class BotTend : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a wounded bot that cannot mend itself a visit to its guild's or an ally's open infirmary (07.10.2026, trades17; life19).
-///
-/// <para>
-/// <b>A bot that can bandage itself does; the infirmary is for those who cannot (life19).</b> On build 419 (2.3 h) 699 wounded looks sent
-/// nobody: 341 were in a fight, a company or a delve and 358 "could heal themselves", the test being one bandage in the pack or a heal ready.
-/// A bandage wound at 0–20 Healing heals at a tenth to a third of a try and cures no poison under 60 Healing and 60 Anatomy; such a bot
-/// cannot really mend itself. Now: a bot mends itself when it has a heal or cure spell ready, a potion for what ails it, or bandages and
-/// <see cref="SelfBindSkill"/> Healing (60/60 when poisoned); everybody else is a patient. Poison counts as a wound. With no infirmary of its
-/// guild's or an ally's open and its seat within <see cref="BotInfirmaries.PatientReach"/>, it raises its guild's want, which is what opens
-/// an on-demand shift (<see cref="BotInfirmaries.OnDemand"/>). Every look counted once by its first refusal, the means a self-mender has
-/// split, and an offer not taken counted by what the bot held instead.
-/// </para>
-/// </summary>
 public sealed class BotPatienter : IBotProposer
 {
     public string Name => "Patient";
@@ -2633,6 +2593,7 @@ public sealed class BotPatienter : IBotProposer
                 }
                 else
                 {
+
                     var seat = BotInfirmaries.Seat(guild);
 
                     if (seat != Point3D.Zero && Utility.InRange(seat, who.Location, BotInfirmaries.PatientReach) && BotGates.Joined(who.Map, who.Location, seat))

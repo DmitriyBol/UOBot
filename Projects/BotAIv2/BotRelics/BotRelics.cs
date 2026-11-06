@@ -9,7 +9,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>Where a relic is: nowhere yet, in a lair's chest, in a bot's pack, on a hall's floor, kept by a guild with no hall, or stolen.</summary>
 public enum BotRelicPlace : byte
 {
     Hidden,
@@ -20,9 +19,9 @@ public enum BotRelicPlace : byte
     Stolen
 }
 
-/// <summary>One relic in the registry: what it is, the item that is it, and whose it is since when.</summary>
 public sealed class BotRelic
 {
+
     public string Key;
 
     public string Name;
@@ -78,47 +77,6 @@ public sealed class BotRelic
         };
 }
 
-/// <summary>
-/// Relics and banners (07.10.2026, relics20; Patrick: "4–6 unique items: the Crown of Britannia (a chest behind a lair boss), each
-/// guild's banner (hangs in its hall), the Bell of Minoc, the Anchor of Trinsic. The holder gets something tangible and visible: −5 %
-/// prices in the relic's town, +appeal, the right to call the Great Fair. A relic can be stolen, taken in war, ransomed, returned.
-/// Biographies remember it; the herald tells it; the map pins the relic and its holder").
-///
-/// <para>
-/// <b>The registry.</b> Five town relics — the Crown of Britannia, the Bell of Minoc, the Anchor of Trinsic, the Lantern of Vesper and
-/// the Scales of Yew — and one banner per guild. Each is an engine item (<see cref="BotRelicItem"/>) the world save keeps; this class
-/// says whose it is, where, and since when, and is itself kept by <see cref="BotRelicStore"/>. A look every <see cref="SyncEveryMs"/>
-/// keeps the item where the registry says: a banner on its hall's floor, a relic in its carrier's pack, back in the hall when the
-/// hall moved; banners made for new guilds; ransoms asked and paid; the Great Fair called.
-/// </para>
-///
-/// <para>
-/// <b>What a relic gives its holder.</b> A town relic held by a guild (in its hall, kept, or carried by a member): its members pay
-/// <see cref="Discount"/> at that town's NPC counters (settled by <see cref="BotBurgh"/> like any town rebate — less coin destroyed at
-/// a counter, none made), the guild's appeal is <see cref="Appeal"/> higher, and once a day its holder calls the Great Fair in that
-/// town (<see cref="BotFair.CallGreat"/>: the fair with twice the rebate). Another guild's banner in the hall is a trophy: the same
-/// appeal. A guild's own banner gives nothing but the right to lose it.
-/// </para>
-///
-/// <para>
-/// <b>How a relic changes hands.</b> A town relic is put in a lair behind a warden by <see cref="BotRelicLair"/>; the company that
-/// clears it takes it, and its carrier walks it home (<see cref="BotRelicHomeward"/>). On the road a thief may take it from the pack
-/// (<see cref="BotRelicSnatch"/>); the fence then sells it back to the guild it was taken from for <see cref="RelicRansom"/> out of
-/// that guild's chest, or after <see cref="FenceWaitMs"/> to any guild that can pay; the coin goes to the thief. A relic in a hall is
-/// taken only by a war: the loser's banner — and with <see cref="WarTakesAll"/> every relic it holds — goes to the winner's hall at
-/// the war's end (<see cref="WarEnded"/>). The loser thinks <see cref="Grudge"/> worse of the winner (written in its book of
-/// grievances, so its envoy can state it) and may declare a war of revenge on the holder of its banner with no truce and no clock
-/// in the way (<see cref="Avenges"/>). It buys its banner back for <see cref="BannerRansom"/>, chest to chest, once
-/// <see cref="RansomAfterMs"/> have passed with no war between them; after <see cref="ReturnAfterMs"/> the holder sends it home
-/// unasked.
-/// </para>
-///
-/// <para>
-/// <b>Honest money.</b> Nothing here makes coin: a ransom and a fence's sale move coin from a chest to a chest or to the thief's
-/// account; the discount is a rebate on coin paid at an NPC; the warden's gold is the engine's own loot, a kill. No relic is sold to
-/// an NPC. Every move is counted on the <c>Relics:</c> line.
-/// </para>
-/// </summary>
 public static class BotRelics
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRelics));
@@ -522,6 +480,7 @@ public static class BotRelics
 
     internal static void Hand(BotRelic r, string guild, string former)
     {
+
         var home = r.Place == BotRelicPlace.Carried && r.Guild == guild;
 
         if (!home)

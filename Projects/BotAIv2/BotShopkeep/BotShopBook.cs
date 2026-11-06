@@ -4,27 +4,9 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The shops' book: what each town's bots bought from bots' shops and from shopkeepers, by kind, at what price, and what customers
-/// came for and found gone.
-///
-/// <para>
-/// <b>Kept for the merchant who does not exist yet.</b> Patrick's order of 29.09.2026 names the next step — a caste, and a guild of
-/// merchants, that buy what moves, store it, and carry it between towns. Such a bot needs to know three things per town and kind:
-/// what bots there pay a shopkeeper for it (the demand a bot could have met and did not — the <c>Counter</c> columns), what bots'
-/// shops there sold it for (the supply that exists and its price — the <c>Shop</c> columns), and where customers walked to a shop
-/// and found it gone (<c>Missed</c>). This writes all three from the moment the first shop opens, so the merchant, when it comes,
-/// starts from a measured book rather than a guess. Nothing reads it yet but the summary and the page.
-/// </para>
-///
-/// <para>
-/// In memory only, like every other tally of trade on this shard; bounded at <see cref="MostRows"/>, past which the rows touched
-/// longest ago are dropped.
-/// </para>
-/// </summary>
 public static class BotShopBook
 {
-    /// <summary>One town and one kind.</summary>
+
     public sealed class Row
     {
         public string Town;

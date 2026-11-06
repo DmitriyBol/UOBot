@@ -5,14 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps the towns' stewardships across restarts (07.10.2026, steward20): each town's steward guild and how long it has held
-/// it, its coffer (held out of the treasury, so read back it is counted as held again, <see cref="BotStewardship.Start"/>), its tax,
-/// the town's mood, its bars with their wall-clock ends, its last decrees and its last holiday, and which guilds were deposed
-/// where and how long ago. A coin held for a holiday not yet announced is kept as coffer. A shape this build cannot read is
-/// dropped whole, and then the coffers' coin stays where the treasury's save left it: out of the purse, counted nowhere; the
-/// shape is 1 and has never changed.
-/// </summary>
 public sealed class BotStewardStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStewardStore));
@@ -50,9 +42,9 @@ public sealed class BotStewardStore : GenericPersistence
     }
 }
 
-/// <summary>The store registered from outside <c>BotCore</c>, after it has read its own switch, as the events' is.</summary>
 public static class BotStewardCore
 {
+
     [CallPriority(45)]
     public static void Configure()
     {
@@ -65,7 +57,6 @@ public static class BotStewardCore
     }
 }
 
-/// <summary><c>Configuration/bot-steward.json</c>: every key optional, PascalCase; nothing written keeps the code's number.</summary>
 public sealed class BotStewardSettings
 {
     public bool? Running { get; set; }

@@ -5,38 +5,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Prime time: how much of the island is meant to be in the world at each hour of the day.
-///
-/// <para>
-/// <b>Patrick's order of 02.10.2026, in his words translated:</b> "Add a prime time for the bots: at night, from 00 to 08 in
-/// the morning, 100 % of the bots play; from 08 to 16, 75 %; from 16 to 24, 50 %. This is done so that we collect as much data
-/// as possible at night and focus on the improvement work during the day." Until this the island kept one floor the clock
-/// round (<see cref="BotRest.FloorShare"/>, a half) and whoever was past their hours above it left: 43 of 86 in the world through
-/// the afternoon of 01.10.2026, night and day alike.
-/// </para>
-///
-/// <para>
-/// <b>A schedule of bands, each a share of the island, and the share is the floor.</b> The rest clock (<c>BotRest.Look</c>)
-/// reads <see cref="Share"/> where it read the fixed half: under the target nobody past their hours leaves, and whoever is
-/// resting comes back, soonest due first, whatever rest it still owed; over it the ones past their hours go as they come free,
-/// longest over first, exactly as before. Rest and return follow one number, so the night fills and the day empties by the
-/// same rule.
-/// </para>
-///
-/// <para>
-/// <b>Gradual by construction.</b> The target does not jump at the hour: it moves from the old band's share to the new one over
-/// <see cref="RampMinutes"/>, so 200 bots at 100 % become 150 at 75 % at about two a minute rather than fifty in one look, and
-/// the night's return fills at the same pace. Behind that, <see cref="TirePerLook"/> and <see cref="ReturnPerLook"/> cap what
-/// any one look may do. Nothing here pulls a bot out of a fight, a company or a delve: a bot the target lets go only tires,
-/// and leaves when it is free, by the rest clock's own rules (<c>BotRest.Holds</c>).
-/// </para>
-///
-/// <para>
-/// Local server time, read off <c>Core.Now</c>. Off, the floor is <see cref="BotRest.FloorShare"/> round the clock, as on build
-/// 388. Configured in <c>bot-rest.json</c> under <c>PrimeTime</c>.
-/// </para>
-/// </summary>
 public static class BotPrime
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPrime));
@@ -49,9 +17,9 @@ public static class BotPrime
 
     public static int ReturnPerLook { get; set; } = 5;
 
-    /// <summary>One band of the day: from an hour, to an hour, and the share of the island to be in the world between them.</summary>
     public readonly record struct Band(int From, int To, double Share)
     {
+
         public bool Holds(double hour) => hour >= From && hour < To;
 
         public override string ToString() => $"{From:00}–{To:00} at {Share:P0}";
@@ -171,6 +139,7 @@ public static class BotPrime
 
             if (minutesIn < RampMinutes)
             {
+
                 var before = At((now.Value.From == 0 ? 24.0 : now.Value.From) - 1.0 / 3600.0);
 
                 if (before != null && before.Value.Share != share)

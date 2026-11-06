@@ -5,9 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-residence.json</c>. A missing key keeps the code's value.</summary>
 public sealed class BotResidenceSettings
 {
+
     public bool? Running { get; set; }
 
     public double? HomeShare { get; set; }
@@ -45,17 +45,6 @@ public sealed class BotResidenceSettings
     public string[] StayHome { get; set; }
 }
 
-/// <summary>
-/// Towns of residence, as a module: reads its file, hands the bots already in the world the towns their names carry, offers
-/// the move, and looks the population over on its own clock. Patrick's order of 29.09.2026, point 5. See
-/// <see cref="BotResidence"/>.
-///
-/// <para>
-/// <b>After the population and the travel</b>, because it files bots that exist, judges towns by roads the travel module
-/// draws, and walks a move by the traveller's own deed. Switched off (<c>bots.residence.enabled</c>, or <c>Running</c> in
-/// the file), every bot's home is its guild's seat or the population's, exactly as before.
-/// </para>
-/// </summary>
 public sealed class BotResidenceModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotResidenceModule));

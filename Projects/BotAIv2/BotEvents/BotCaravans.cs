@@ -5,30 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Caravans (07.10.2026, Patrick's third idea: "a town needs goods carried to another town, the caravan hires guards from the bots,
-/// it is attacked on the way"). Every <see cref="EveryMs"/> the shops are read for a kind the bots have lately found a shelf empty
-/// of (<c>BotShops.Dry</c>) that one town's shopkeeper is short of — under <see cref="LowShare"/> of its shelf — and another town's
-/// sells; that town posts the caravan and holds its pay out of the city's purse at once.
-///
-/// <para>
-/// <b>A trader leads; fighters guard it for a wage.</b> A trader near the source is offered the lead (<see cref="BotCaravan"/>): it
-/// buys the goods at the source's counter with its own coin, waits up to <see cref="GatherMs"/> for guards, and walks the road. The
-/// fighters near it are offered the guard (<see cref="BotGuard"/>), at most <see cref="MostGuards"/>: each follows the trader and
-/// sets on whatever attacks it, if the guards between them bring half again what the thing is reckoned at (company16's ×1.5). A
-/// trader is of the neutral class and raises no company (<c>BotSquads.Form</c> refuses it), so the guards walk with it rather than
-/// under it. The creatures of the road attack a caravan as they would anyone.
-/// </para>
-///
-/// <para>
-/// <b>Paid on arrival, from the hold.</b> At the destination the town takes the goods onto its shopkeeper's shelf, pays the trader
-/// what they cost and its premium (<see cref="Markup"/> over cost, at least <see cref="LeastPremium"/>), and pays each guard still
-/// within <see cref="PayReach"/> its <see cref="Wage"/>; at night both are <c>BotNight.Pay</c> times as much. The rest of the hold
-/// goes back. The town's price for that kind falls a notch (<see cref="Notch"/> for <see cref="NotchMs"/>) at its counters: what the
-/// caravan carried is on the shelf. A trader who dies, drops the work or runs past <see cref="CapMs"/> loses the caravan; the hold
-/// goes back and the goods stay where its own coin put them.
-/// </para>
-/// </summary>
 public static class BotCaravans
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCaravans));
@@ -80,6 +56,12 @@ public static class BotCaravans
     public static int Behind { get; set; } = 60;
 
     public static int BehindMs { get; set; } = 180000;
+
+    public static int GuardSpread { get; set; } = 8;
+
+    public static int GuardWaitMs { get; set; } = 90000;
+
+    public static int GuardWaitBeatMs { get; set; } = 1500;
 
     public static int LateMs { get; set; } = 300000;
 
@@ -143,6 +125,12 @@ public static class BotCaravans
 
     public static long GuardsDropped { get; private set; }
 
+    public static long GuardWaits { get; private set; }
+
+    public static long GuardWaitSpent { get; private set; }
+
+    public static long GuardWaitedMs { get; private set; }
+
     public static long GuardsOwed { get; private set; }
 
     public static long GuardsPaidLate { get; private set; }
@@ -157,7 +145,6 @@ public static class BotCaravans
 
     public static int WageNow => Math.Max(Wage, (int)Math.Ceiling(GuardRate * Trip));
 
-    /// <summary>A wage kept for a guard still on its way when its trader arrived.</summary>
     private sealed class Owed
     {
         public Run Run;
@@ -180,7 +167,6 @@ public static class BotCaravans
         Over
     }
 
-    /// <summary>One caravan: what, from where to where, the hold, the trader and its guards.</summary>
     public sealed class Run
     {
         public Type Kind;
@@ -222,6 +208,16 @@ public static class BotCaravans
         public long RoadTick;
 
         public string Ending;
+
+        public long WaitedMs;
+
+        public long WaitTick;
+
+        public bool Waiting;
+
+        public bool Waited;
+
+        public bool WaitSpent;
 
         public bool Over => Phase == Phase.Over;
 
@@ -697,6 +693,71 @@ public static class BotCaravans
         BotSeasons.Say(guard, "local", $"I'll guard your caravan to {run.To.Name}, {run.Leader?.Name}.");
     }
 
+    internal static bool WaitForGuards(Run run, Mobile leader)
+    {
+        if (GuardSpread <= 0 || run == null || run.WaitSpent || leader is not BotMobile bot || bot.Journey is not { Active: true } journey)
+        {
+            return false;
+        }
+
+        var straggler = false;
+
+        for (var i = 0; i < run.Guards.Count; i++)
+        {
+            if (run.Guards[i] is not { Deleted: false, Alive: true } guard || guard.Map != leader.Map)
+            {
+                continue;
+            }
+
+            var back = Math.Max(Math.Abs(guard.X - leader.X), Math.Abs(guard.Y - leader.Y));
+
+            if (back > GuardSpread && back <= Behind)
+            {
+                straggler = true;
+
+                break;
+            }
+        }
+
+        if (!straggler)
+        {
+            run.Waiting = false;
+
+            return false;
+        }
+
+        var now = Core.TickCount;
+
+        if (run.Waiting)
+        {
+            var stood = Math.Min(Math.Max(0L, now - run.WaitTick), 5000L);
+
+            run.WaitedMs += stood;
+            GuardWaitedMs += stood;
+        }
+        else if (!run.Waited)
+        {
+            run.Waited = true;
+            GuardWaits++;
+        }
+
+        run.Waiting = true;
+        run.WaitTick = now;
+
+        if (run.WaitedMs >= GuardWaitMs)
+        {
+            run.WaitSpent = true;
+            run.Waiting = false;
+            GuardWaitSpent++;
+
+            return false;
+        }
+
+        journey.Hold(GuardWaitBeatMs);
+
+        return true;
+    }
+
     internal static void Left(Run run, Mobile guard, bool behind)
     {
         if (!run.Guards.Remove(guard))
@@ -878,7 +939,7 @@ public static class BotCaravans
         !Running
             ? "off"
             : $"{Posted} posted ({NothingShort} looks found nothing short at one town and sold at another, {NoPurse} the purse could not hold the pay), {Untaken} untaken; {LeadOffered} leads offered, {Led} led, {Unbought} could not buy the goods; "
-              + $"{SetOut} set out ({Unguarded} with fewer than {LeastGuards} guards), {Arrived} arrived, {Lost} lost; {GuardOffered} guard posts offered, {GuardsHired} hired at {WageNow}gp now ({GuardRate:F0}gp a minute of a {Trip:F1}-minute trip), {GuardsPaid} paid ({GuardsPaidLate} on reaching the square behind the trader, {GuardsOwed} owed on arrival, {LateLapsed} lapsed), {GuardsBehind} fell behind, {GuardsDropped} put the post down, {Defended} times a guard set on what attacked its trader; "
+              + $"{SetOut} set out ({Unguarded} with fewer than {LeastGuards} guards), {Arrived} arrived, {Lost} lost; {GuardOffered} guard posts offered, {GuardsHired} hired at {WageNow}gp now ({GuardRate:F0}gp a minute of a {Trip:F1}-minute trip), {GuardsPaid} paid ({GuardsPaidLate} on reaching the square behind the trader, {GuardsOwed} owed on arrival, {LateLapsed} lapsed), {GuardsBehind} fell behind, {GuardsDropped} put the post down, {Defended} times a guard set on what attacked its trader; {GuardWaits} traders stood on the road for a guard more than {GuardSpread} tiles back ({GuardWaitedMs / 1000}s in all, {GuardWaitSpent} stood {GuardWaitMs / 1000}s and went on); "
               + $"{Carried} things carried, {GoodsCost}gp of goods bought by the traders, {Premiums}gp premiums and {Wages}gp wages paid ({NightRuns} at night's pay); {NotchPriced} counter prices at ×{Notch:F2} after a caravan, {_notches.Count} notches standing"
               + (_run is { Over: false } r ? $"; now: {r.Tell}, {r.Phase}, led by {r.Leader?.Name ?? "nobody yet"}, {r.Guards.Count} guards" : "");
 
@@ -891,6 +952,7 @@ public static class BotCaravans
         GuardsHired = GuardsPaid = GuardsBehind = Defended = Wages = Premiums = GoodsCost = Carried = NightRuns = NotchPriced = 0;
         LeadOffered = GuardOffered = 0;
         GuardsDropped = GuardsOwed = GuardsPaidLate = LateLapsed = 0;
+        GuardWaits = GuardWaitSpent = GuardWaitedMs = 0;
         _tripSum = 0;
         _trips = 0;
         _owed.Clear();

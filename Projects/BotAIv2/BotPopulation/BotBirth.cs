@@ -7,35 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A newborn's temperament: the same birth points as its class deals, leaned towards one skill of the class's own.
-///
-/// <para>
-/// <b>Patrick's point 7 of 01.10.2026:</b> "all the bots start at the same level now — add some randomness". Swordsmen with
-/// more Swordsmanship and fewer points in the rest, gatherers
-/// who love digging with more Mining, crafters with the most in Blacksmithy, Fletching and the other producing trades. Until
-/// this, <c>BotMobile.Learn</c> gave every bot of a class the same fifty, thirty and twenty and <c>LearnWeapon</c> the weapon at
-/// fifty, so a class was one bot many times over — and its crafters were born at Blacksmithy 30, thirty-five points under the
-/// first coloured metal the engine lets a smith work (dull copper, 65 on the base: <c>CraftItem</c> line 647). On build 384 the
-/// island dug 622 coloured ingots that no crafter could touch, and the live crafters stood at Blacksmithy 36 to 49 after a day.
-/// </para>
-///
-/// <para>
-/// <b>Nothing is added; the birth's own points move.</b> A leaning (<see cref="BotLeaning"/>, declared by the class) raises one
-/// skill to a value drawn inside its band; the points come out of the other skills the bot was born with, in proportion to what
-/// each can spare. A skill spares down to <see cref="KeepShare"/> of its birth value, or to the floor the leaning names for it,
-/// and the skill the class is judged by (<see cref="BotClass.MainSkill"/>) spares nothing unless the leaning names a floor for it
-/// — a healer's Healing, an archer's Archery and a mage's Magery are never lowered. Within a hundred per skill and the class's own
-/// target; the total is the class's own, far under the era's 700.
-/// </para>
-///
-/// <para>
-/// <b>Seeded by the bot's name and class, so a birth is reproducible.</b> FNV-1a over the two names into a SplitMix64 stream: the
-/// same name raised into the same class leans the same way on every shard and every run (the engine's <c>Utility.Random</c>
-/// would not, and <c>string.GetHashCode</c> is randomised per process). The seasoned classes are left as they are: they are born
-/// at their share of their targets for their offices' sake (<see cref="BotClass.Seasoned"/>).
-/// </para>
-/// </summary>
 public static class BotBirth
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBirth));
@@ -115,6 +86,7 @@ public static class BotBirth
 
         if (sig == null)
         {
+
             sig = new Dealt { Skill = signature, Plain = bot.Skills[signature].BaseFixedPoint, Target = 1000 };
             _dealt.Add(sig);
         }
@@ -461,7 +433,6 @@ public static class BotBirth
         return hash;
     }
 
-    /// <summary>SplitMix64: a small, fixed generator, so the same seed draws the same numbers on every build of .NET.</summary>
     private struct Draw
     {
         private ulong _state;

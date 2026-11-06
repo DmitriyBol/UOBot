@@ -4,24 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot with an axe a trip to the woods, and only when somebody wants the wood.
-///
-/// <para>
-/// <b>Gated on demand rather than on an empty pack, and that is the difference between a supply line and a
-/// woodpile.</b> Nothing on this island eats logs by itself: they exist to become shafts, and shafts exist
-/// to become arrows. So the question this proposer asks is not "am I short of wood" but "is anybody asking
-/// for wood, or for something made of it" — which is the board, and the board is where the archer's own
-/// want lands when the provisioner's twenty arrows are not enough.
-/// </para>
-///
-/// <para>
-/// That makes the whole of Patrick's chain one loop of reading and answering, with nobody told anything: an
-/// archer runs low and posts arrows; a fletcher reads arrows and finds it is short of wood; this reads the
-/// same board and sends somebody to a tree; the hunters read the feather want the fletcher raises and go
-/// looking for birds. Four trades, one board, no messages.
-/// </para>
-/// </summary>
 public sealed class BotWoodsman : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWoodsman));

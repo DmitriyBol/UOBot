@@ -4,23 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Two of ours set against each other on purpose, and the rule that says when it is over.
-///
-/// <para>
-/// <b>Patrick's order of 15.09.2026: Argus holds a championship between the strongest bots, one against one.</b>
-/// The engine lets one player strike another in Felucca, but it charges for it: the striker is flagged criminal,
-/// guards come, and the population's own reflexes read every blow as an attack. A duel is the one arrangement under
-/// which two bots may hit each other with none of that — the pair is written here, <c>BotMobile.IsHarmfulCriminal</c>
-/// reads it and answers no, and the two brawls pressed on them ask this class every beat whether the duel is done.
-/// </para>
-///
-/// <para>
-/// <b>Nobody dies for a title.</b> A duel is over when either duellist is down to <see cref="YieldAt"/> of its health,
-/// or the clock runs out, and the one with the larger share standing wins. The bodies are the shard's fighters and
-/// they have work to go back to; a championship that killed fifteen of them would be a plague beast with a trophy.
-/// </para>
-/// </summary>
 public static class BotDuel
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDuel));
@@ -64,6 +47,7 @@ public static class BotDuel
 
     public static bool Begin(BotMobile a, BotMobile b, SkillName trainsA, SkillName trainsB, bool stack = false)
     {
+
         if (a is not { Deleted: false, Alive: true } || b is not { Deleted: false, Alive: true } || a == b
             || InBout(a) || InBout(b))
         {
@@ -141,6 +125,7 @@ public static class BotDuel
 
     private static string Over(IBotWilful bot, BotBrawl brawl)
     {
+
         if (bot?.Self is not { } self || !_bouts.TryGetValue(self.Serial, out var bout))
         {
             return "the duel is over";

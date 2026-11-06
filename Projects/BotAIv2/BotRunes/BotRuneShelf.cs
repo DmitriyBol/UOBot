@@ -4,9 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One place a guild holds a rune for: what it is called, what kind of place, and where the rune puts a body down.</summary>
 public sealed class BotRunePlace
 {
+
     public string Name;
 
     public string Kind;
@@ -24,16 +24,6 @@ public sealed class BotRunePlace
     public override string ToString() => $"{Name} ({Spot.X}, {Spot.Y})";
 }
 
-/// <summary>
-/// What each guild holds runes for, kept across restarts: the guild's knowledge of the places its mages have stood.
-///
-/// <para>
-/// <b>The knowledge, not the runes.</b> A rune is an item in somebody's pack or in the library's book, and a restart
-/// raises the population afresh with empty packs; what a guild knows is kept here instead, by guild name, and the
-/// library's book is written from it (<see cref="BotRuneLibrary"/>) — the same thing <c>BotProgress</c> does for skills.
-/// A place is one per name: the seat marked again after the hall moved replaces the old seat.
-/// </para>
-/// </summary>
 public static class BotRuneShelf
 {
     private static readonly Dictionary<string, List<BotRunePlace>> _shelves = new(StringComparer.Ordinal);
@@ -280,7 +270,6 @@ public static class BotRuneShelf
     }
 }
 
-/// <summary>What each guild holds runes for, kept between boots. Shape 1. See <see cref="BotRuneShelf"/>.</summary>
 public sealed class BotRuneStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRuneStore));

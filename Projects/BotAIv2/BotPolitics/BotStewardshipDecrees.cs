@@ -6,21 +6,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The steward's decrees: what is lawful in a town now and what each costs (<see cref="Options"/>), the rule that picks one, the
-/// model's question, what each does (<see cref="Apply"/>), and Argus's two commands (<c>do steward</c>, <c>do decree</c>).
-///
-/// <para>
-/// <b>The rule, in its order:</b> the militia when an invasion of the town has stood five minutes with no company come; a tax
-/// cut when the regard has sunk three rounds running, by a point and a half, under a tax; a bounty raised on a head wanted in the town and at large for a
-/// quarter of an hour; a captain hired when the town has none, or one at war with or loathed by the steward's guild, or its
-/// wage budget is spent while heads are at large or an invasion stands; an outcast guild barred for a day (the council's outcast
-/// of the town, with none of its members living in it, not seated by it, and a captain to keep the line); a tax raised when the coffer is under twice the floor, the allowance has stopped or a decree was wanted and could not
-/// be paid; a caravan when the town's counters are short of a kind the bots found missing; a holiday when the regard is under
-/// 45 or the coffer rich; a tax cut when the coffer is rich. The model is shown every lawful decree, including tax steps the rule
-/// would not take, and may answer "none".
-/// </para>
-/// </summary>
 public static partial class BotStewardship
 {
     private sealed class Option

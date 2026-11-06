@@ -6,7 +6,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What keeps a ship off a berth. Only <see cref="Ship"/> goes away by itself.</summary>
 public enum BotBerthBlock
 {
     None,
@@ -22,37 +21,6 @@ public enum BotBerthBlock
     Item
 }
 
-/// <summary>
-/// The water of the population's map, charted once: which tiles a ship floats on, and which squares of eight a ship can
-/// sail anywhere in, whatever way it faces.
-///
-/// <para>
-/// <b>Patrick's point 7 of 29.09.2026: "teach the bots to travel by sea, on boats."</b> Eight of Felucca's eighteen towns
-/// cannot be walked to from home (the boot line of 29.09.2026: "Towns: 10 of 18 can be walked to from home") — Jhelom,
-/// Moonglow, Magincia, Nujel'm, Ocllo and Skara Brae are across water. A ship is the engine's own way over it, and a ship
-/// moves only where <c>BaseBoat.CanFit</c> lets it: every tile under its hull must be water at the ship's own height and
-/// carry nothing else at or above it. This chart asks exactly that question of every tile, with the engine's own tile
-/// numbers, so a course drawn over it is a course the engine will sail.
-/// </para>
-///
-/// <para>
-/// <b>A cell is one map block, and a cell is open when the ship fits anywhere in it, either way round.</b> The small ship
-/// reaches five tiles from its middle (multi 0x0 is 5 × 11), so a cell is open when its eight-by-eight and five tiles
-/// round it are all water: a ship whose middle is anywhere in the cell fits there facing any way, may turn there, and
-/// sails straight into any open neighbour — diagonally only when both cells beside the corner are open too. Measured on
-/// map0 (29.09.2026, a Python pass over the client files): 216,560 of the 327,680 cells are open, and 213,351 of them are
-/// one body, the open sea; the rest are harbours and inlets the chart leaves to the harbour pilot (<see cref="BotDocks"/>).
-/// </para>
-///
-/// <para>
-/// <b>Read once, kept on disk.</b> Reading every block of the map is a second of the loop the first time — sliced, never
-/// more than <see cref="SliceMs"/> a tick — and it leaves the engine's tile cache holding the whole map's land (about 70
-/// MB) until the next restart. So the masks are written to <see cref="CachePath"/>, keyed by the engine's fingerprint of the
-/// map files (<c>TileMatrix.MapFilesFingerprint</c>), and every later boot reads half a megabyte instead. Statics are read
-/// only for blocks with water land in them: a block of dry land cannot float a ship whatever stands on it, and reading the
-/// statics of every forest on the map would cost a further hundred megabytes for nothing.
-/// </para>
-/// </summary>
 public static class BotSeaChart
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeaChart));

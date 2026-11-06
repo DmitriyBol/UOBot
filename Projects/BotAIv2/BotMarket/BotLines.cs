@@ -7,33 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The Needs board counted by Patrick's measure: every line a bot asks for, whether it was met within its first hour, by whom,
-/// and, when it was not, why (02.10.2026, build 391; step 1 of the Needs plan, <c>needs-design.md</c> §5 and §8).
-///
-/// <para>
-/// <b>Nothing here decides anything.</b> The market calls in at the four places a line's life turns: a want said or topped up
-/// (<see cref="Open"/>, <see cref="Topped"/>), units handed over (<see cref="Filled"/>, the one choke point
-/// <see cref="BotMarket.Received(BotWant, int, int, Mobile, BotRoute)"/>), a want leaving the board (<see cref="Ended"/>) and the market's own beat
-/// (<see cref="Aged"/>). Until this, "met", "taken back" and "orphaned" were bare counters with no clock, and the baseline of
-/// 02.10 had to rebuild every line from the log by buyer and kind.
-/// </para>
-///
-/// <para>
-/// <b>How a line is settled, once.</b>
-/// <list type="bullet">
-/// <item><b>Met</b>: every unit handed to the buyer within <see cref="WindowMs"/> of the line opening, by one bot or jointly.</item>
-/// <item><b>Failed</b>: not met at its hour; or, after its first <see cref="GraceMs"/>, stood down because the buyer could not pay
-/// (Patrick, 02.10: "a buyer that can no longer pay after its 10th minute is a failure"), taken back by its buyer, or given up.
-/// The cause is named from what the want recorded: the buyer dead or out of the world, part handed, taken by a carrier and not
-/// brought, offered and nothing brought, passed over (the commonest reason), or nobody able looked.</item>
-/// <item><b>Kept out, and printed</b>: the buyer gone; taken back or unpaid inside its first ten minutes (the shopper's pile wait
-/// is three); the market switched off.</item>
-/// </list>
-/// A line met after its hour stays a failure and is counted again as met after the hour. A trader's want is procurement for
-/// another bot's line and is counted apart, outside the share, as <see cref="BotGlut"/> keeps it out of demand.
-/// </para>
-/// </summary>
 public static class BotLines
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLines));
@@ -359,6 +332,7 @@ public static class BotLines
                     }
                 case BotLineEnd.Withdrawn:
                     {
+
                         if (!line.Procurement && why == "had it another way" && HoldsOpen(want, line))
                         {
                             Settle(line, BotLineState.Met, (SelfCause, "met by the buyer itself"), now);
@@ -393,6 +367,7 @@ public static class BotLines
                     }
                 default:
                     {
+
                         Settle(line, BotLineState.Failed, (why, $"{why} after {age / 60000.0:F1} min"), now);
 
                         break;
@@ -954,7 +929,6 @@ public static class BotLines
     }
 }
 
-/// <summary>How a want left the board, for its lines. See <see cref="BotLines.Ended"/>.</summary>
 public enum BotLineEnd
 {
     Met,

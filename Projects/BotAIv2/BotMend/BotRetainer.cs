@@ -5,32 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A fighter with money hiring a healer to stand by it, and the wage that changes hands.
-///
-/// <para>
-/// <b>Patrick's order of 15.09.2026: the well-off fighters take healers into their service.</b> Standing by a
-/// fighter was unpaid work until now — a healer went to whoever was already fighting within sixty tiles, for
-/// nothing but the skill of the wounds it bound — and unpaid work is refused by nobody and learned by nobody. A hire
-/// is the same stint with coin in it: the fighter pays a wage out of its own pack for every minute the healer stands
-/// by, the healer's ledger learns what escorting is worth, and the fighter walks into its next fight with somebody
-/// behind it.
-/// </para>
-///
-/// <para>
-/// <b>Who hires is read off the fighter, not decided by it.</b> There is no errand on the fighter's side and no
-/// negotiation: a fighter that is out — hunting, prowling, in a company or already in a fight — and can afford it
-/// is hiring, and the nearest free healer that reads that fact takes the stint. The fighter never stops to think
-/// about it, because the fighter's decisions are about fights, and this is the healer's decision about where to be.
-/// </para>
-///
-/// <para>
-/// <b>Paid out of the pack, a minute at a time, and booked aside for the fighter.</b> The engine pays from the
-/// pack and so does this; a fighter whose pack runs dry ends the stint rather than running a debt. The wage is
-/// booked through <see cref="BotYield.Aside"/> so the fighter's own work — the hunt it was on — is not taught that
-/// hunting costs a healer's wage; the healer's side is the escort's own takings, which is the whole point.
-/// </para>
-/// </summary>
 public static class BotRetainer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRetainer));

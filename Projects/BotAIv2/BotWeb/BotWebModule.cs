@@ -3,15 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The web dashboard as a module: the event stream, the snapshot clock, the map picture and the listener.
-///
-/// <para>
-/// Last of the modules, and it reads only: it divides and lists numbers the others keep, so it wants them
-/// started. It is registered here rather than with the debugger because a shard watched by nobody should
-/// still be able to be looked at from a browser.
-/// </para>
-/// </summary>
 public sealed class BotWebModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWebModule));

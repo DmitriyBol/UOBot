@@ -4,24 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Every squad on the shard, and the four things that can happen to one: it forms, somebody joins, somebody
-/// leaves, it dies.
-///
-/// <para>
-/// <b>One way in.</b> <see cref="Join"/> is the only path into a squad, and the size cap is checked there and
-/// nowhere else. That is not tidiness — the first version checked its cap on the recruiting path only, so a
-/// bot that stumbled on the same target and called for help was added without any check at all, and companies
-/// with a stated maximum of five were found holding twelve.
-/// </para>
-///
-/// <para>
-/// <b>The squad's own beat, not the bots'.</b> Rosters, stances and stations change over seconds, not
-/// milliseconds, so this runs once a second on its own timer while the bots walk at their own pace. The work
-/// per beat is proportional to the number of squads, and the expensive part — working out a station, which
-/// ends in a path search — happens only when the anchor has actually moved.
-/// </para>
-/// </summary>
 public static class BotSquads
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSquads));
@@ -344,7 +326,7 @@ public static class BotSquads
 
     public static bool SpareCarriers { get; set; } = true;
 
-    public static bool Carrying(IBotWilful bot) => SpareCarriers && bot?.Resolve?.Deed is BotDeliver or BotHaul;
+    public static bool Carrying(IBotWilful bot) => SpareCarriers && bot?.Resolve?.Deed is BotDeliver or BotHaul or BotSupply { Bought: > 0 };
 
     public static long CarriersSpared { get; private set; }
 
@@ -402,6 +384,7 @@ public static class BotSquads
 
         if (squad.Focus is { Deleted: false, Alive: true } focus)
         {
+
             if (Protects && member.Self is { HitsMax: > 0 } hurt
                 && (hurt.Hits < hurt.HitsMax * BotCry.DireAt || BotLadder.Failing(hurt))
                 && (BotThreat.Power(attacker) >= BotThreat.Power(focus) * Switch || focus.Combatant is not IBotSquadMember { Squad: { } on } || !ReferenceEquals(on, squad))
@@ -735,6 +718,7 @@ public static class BotSquads
 
     private static void Dissolve(BotSquad squad, string why)
     {
+
         squad.Bury();
 
         var members = squad.Members;

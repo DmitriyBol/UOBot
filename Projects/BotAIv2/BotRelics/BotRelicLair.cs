@@ -7,29 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A town relic in a lair behind its warden (07.10.2026, relics20; Patrick: "the Crown of Britannia — a chest behind a lair boss").
-/// A rare rumour: every <see cref="EveryMs"/> (±<see cref="Jitter"/>), the first <see cref="FirstMs"/> after a boot, one hidden town
-/// relic is laid in a chest on open ground <see cref="Near"/>–<see cref="Far"/> tiles out of its own town (hostile ground first),
-/// and the town crier — Argus's herald when the debugger is on — spreads the word.
-///
-/// <para>
-/// <b>The first company that clears it takes it.</b> A free fighter within <see cref="Reach"/> is offered the call to raise a
-/// company and march (<see cref="BotRelicCall"/>, the shard's patrol <see cref="BotSweep"/> under the relic's name, every company
-/// rule holding). No warden stands until a company's captain is within <see cref="ArriveReach"/> of the chest: then one creature
-/// comes out, the dearest kind the company record prices at no more than <see cref="Odds"/> of what the company brings — no caster,
-/// nothing that waits to be struck — on a <see cref="Leash"/>-tile leash, named the warden of the relic. A company too weak for the
-/// least of them is sent away and the lair waits for a stronger one. When the warden falls, the relic goes into the pack of the
-/// captain of the company that felled it (or the killer, or any captain at the chest) and the lair is over; its carrier walks it
-/// home (<see cref="BotRelicHomeward"/>). A warden left alone for <see cref="GoneMs"/> goes back into the dark until the next
-/// company; a lair nobody clears in <see cref="LapseMs"/> is gone and the relic hidden again.
-/// </para>
-///
-/// <para>
-/// <b>Honest.</b> The chest holds the relic and nothing else; the warden's gold is the engine's own loot, a kill. A restart takes
-/// the warden off the island and hides the relic again (<see cref="BotRelicStore"/>).
-/// </para>
-/// </summary>
 public static class BotRelicLair
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRelicLair));
@@ -96,7 +73,6 @@ public static class BotRelicLair
 
     public static long Deaths { get; private set; }
 
-    /// <summary>One lair: the relic, the chest, the warden, the companies come for it.</summary>
     public sealed class Lair
     {
         public BotRelic Relic;
@@ -291,6 +267,7 @@ public static class BotRelicLair
 
         if (lair.Chest is not { Deleted: false } || lair.Relic.Place != BotRelicPlace.Lair)
         {
+
             End(lair, "the relic is no longer in the chest");
 
             return;
@@ -502,6 +479,7 @@ public static class BotRelicLair
         }
         catch
         {
+
         }
 
         if (probe == null)
@@ -764,11 +742,6 @@ public static class BotRelicLair
     }
 }
 
-/// <summary>
-/// Offers a free fighter near a relic's lair the call to raise a company and clear it (07.10.2026, relics20): one captain at a
-/// time, another after <see cref="BotRelicLair.CallRetryMs"/>, at most <see cref="BotRelicLair.MostCalls"/> a lair, by a road the
-/// walk's own question does not seal.
-/// </summary>
 public sealed class BotRelicCall : IBotProposer
 {
     public string Name => "Relic";
@@ -807,10 +780,6 @@ public sealed class BotRelicCall : IBotProposer
     }
 }
 
-/// <summary>
-/// A company raised for a relic: the shard's patrol (<see cref="BotSweep"/>) marched on the lair, so every company rule holds; ends
-/// when the lair is over, or when the company is sent away as too weak for its warden.
-/// </summary>
 public sealed class BotRelicQuest : BotDeed
 {
     public const string Trade = "relic";

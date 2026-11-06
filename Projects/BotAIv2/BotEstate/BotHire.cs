@@ -5,33 +5,9 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Hiring a merchant for the guild's hall: buy the contract in town, walk it home, and set the shopkeeper up.
-///
-/// <para>
-/// <b>Patrick's order of 09.09.2026, and he had the engine right.</b> A contract of employment is sold over a
-/// counter by bankers, barkeepers and innkeepers — <c>SBBanker</c>, <c>SBBarkeeper</c>, <c>SBInnKeeper</c> —
-/// at 1,252gp. So the price is the engine's own and not ours, which is the rule everywhere on this shard
-/// except the workbenches, where no engine price exists at all.
-/// </para>
-///
-/// <para>
-/// <b>The engine's own conditions are met rather than worked around.</b> <c>ContractOfEmployment</c> asks for
-/// four things — the contract in the pack, a house at the bot's feet, the bot a friend of it, and the house
-/// public — and a guild hall satisfies every one: our halls are public and make every member a co-owner,
-/// which <c>BaseHouse.IsFriend</c> accepts. The one thing this does differently from a player double-clicking
-/// the contract is that it walks the bot into the room first, because "a house at the bot's feet" means the
-/// bot has to be standing in it.
-/// </para>
-///
-/// <para>
-/// Who may use it is the hall's question and already answered: a merchant stands inside a guild hall, and
-/// <see cref="BotEstate.MayUse"/> refuses anything in there to anybody outside the guild — the same rule,
-/// word for word, as the one that keeps a forge private.
-/// </para>
-/// </summary>
 public sealed class BotHire : BotDeed
 {
+
     public const string Trade = "hire";
 
     public static double Prior { get; set; } = 300.0;
@@ -94,6 +70,7 @@ public sealed class BotHire : BotDeed
 
     private bool Closing(Mobile body, Point3D at)
     {
+
         var gap = System.Math.Max(System.Math.Abs(body.X - at.X), System.Math.Abs(body.Y - at.Y));
 
         if (body is BotMobile { Journey: { } journey })
@@ -113,6 +90,11 @@ public sealed class BotHire : BotDeed
             _nearest = gap;
             _stalled = 0;
 
+            return true;
+        }
+
+        if (body is BotMobile { Journey.Held: true })
+        {
             return true;
         }
 
@@ -202,6 +184,7 @@ public sealed class BotHire : BotDeed
 
             if (BotShops.Buy(bot, _shop, typeof(ContractOfEmployment), 1, out var refused) <= 0)
             {
+
                 if (Banker.Withdraw(body, got))
                 {
                     BotEstate.Refund(paid, body);

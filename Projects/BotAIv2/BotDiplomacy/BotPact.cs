@@ -5,41 +5,10 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What two guilds have agreed before a witness, and the three places on the shard that each agreement changes.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point 2: guilds agree "an alliance, orders, trade and safety for each other" the same
-/// way they declare war — at a meeting.</b> Each agreement here is kept small and made to change one real thing rather than
-/// named and left to be decorative:
-/// </para>
-///
-/// <list type="bullet">
-/// <item><b>Peace</b> (safety): neither may declare war on the other while it stands. Enforced by the war ledger's own truce
-/// (<c>BotWar.RestoreTruce</c>), which <c>BotWar.MayDeclare</c> already refuses on and counts — one rule, one place.</item>
-/// <item><b>Trade</b>: a member of one buys at the other's shops by the bank at <see cref="TradeDiscount"/> below the asking
-/// price, and sees that price when it weighs the shop (<c>BotShopkeep.PriceFor</c>, the one place a shop's price is read). The
-/// keeper is paid less by exactly what the buyer saves, so no coin is created: the terms move trade between the two, they do not
-/// mint it.</item>
-/// <item><b>Orders</b>: each side's carriers answer the other's wants before anybody else's of the same kind
-/// (<c>BotMarket.Demand</c>, <c>BotCourier</c>) — the price is the buyer's as ever; only who is served first changes.</item>
-/// </list>
-///
-/// <para>
-/// An alliance is the engine's own (<c>Guild.AddAlly</c>) and is kept by the engine; its consequences — allies join each
-/// other's wars and read as allies to notoriety — are <c>BotWar.Declare</c>'s and the engine's, and are not repeated here.
-/// </para>
-///
-/// <para>
-/// <b>Clocks are durations of the shard running</b>, saved as time left like the war ledger's truces
-/// (<see cref="BotDiplomacyStore"/>): an agreement of twelve hours is twelve hours of the shard up, not of the wall.
-/// </para>
-/// </summary>
 public static class BotPact
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPact));
 
-    /// <summary>The kinds of agreement a meeting can end in besides war and nothing.</summary>
     public enum Kind
     {
         Peace,
@@ -63,10 +32,6 @@ public static class BotPact
 
     public static long Favoured { get; private set; }
 
-    /// <summary>
-    /// One pair's agreements: when each kind runs out, and whether it was ever sworn. A flag rather than a tick of nought for
-    /// "never", because a tick can be anything on a host whose counter never resets (CLAUDE.md, rule 20).
-    /// </summary>
     private sealed class Terms
     {
         public readonly long[] Ends = new long[3];

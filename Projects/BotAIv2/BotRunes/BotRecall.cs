@@ -5,24 +5,6 @@ using Server.Spells.Fourth;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Recall instead of a long walk: the shortcut a far walk asks for before it walks.
-///
-/// <para>
-/// <b>Not a deed, and that is on purpose.</b> The walks that go far — a journey to a town (<see cref="BotTravel"/>), the walk
-/// home (<see cref="BotHomeward"/>), a restock at a counter (<see cref="BotRestock"/>) — are already the right work with the
-/// right price and the right ending; what changes is only how the bot gets there. So each holds one of these and asks it
-/// first (<see cref="Instead"/>): when the bot is a mage holding a rune near where it is going, and the engine would let it
-/// cast Recall, the answer is "stand still and cast" for a beat or two; when the recall has carried it, or cannot, the answer
-/// is null and the walk goes on as it always did, from wherever the bot now stands.
-/// </para>
-///
-/// <para>
-/// <b>A failed cast walks.</b> A fizzle is tried again after <see cref="BotRunes.RetryMs"/>, up to
-/// <see cref="BotRunes.Tries"/>; then the walk takes over and the recall is not asked again for this walk. A bot that could not
-/// cast at the start — short of mana, say — is asked again every <see cref="ReconsiderMs"/> while it is still far.
-/// </para>
-/// </summary>
 public sealed class BotRecall
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRecall));
@@ -94,6 +76,7 @@ public sealed class BotRecall
 
         if (now - _nextTick < 0)
         {
+
             return _retrying ? BotDoing.Work($"gathering itself to recall to {_entry?.Description} again") : null;
         }
 
@@ -135,6 +118,7 @@ public sealed class BotRecall
 
         if (away < BotRunes.Far)
         {
+
             _over = true;
 
             return false;

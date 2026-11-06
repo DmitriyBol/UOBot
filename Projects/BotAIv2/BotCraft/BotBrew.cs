@@ -6,22 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Brewing: buy the glass if it is short of it, work the mortar, and hand the bottles to whoever put the
-/// money down.
-///
-/// <para>
-/// <b>Two legs and no station.</b> A mortar and pestle works wherever the bot is standing, so the only
-/// walking here is to a counter for empty bottles. See <see cref="BotFlask"/> for why this trade exists.
-/// </para>
-///
-/// <para>
-/// <b>The reagent is never bought here, and that is the point of the chain.</b> A caster short of herbs has
-/// a shopping errand of its own, a gatherer walks into a wood for them and a hunter turns them up on the
-/// ground. What this leg buys is glass, which is five gold a hundred and never the reason a potion does not
-/// get made.
-/// </para>
-/// </summary>
 public sealed class BotBrew : BotDeed, IBotWantCarrier
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBrew));
@@ -229,11 +213,13 @@ public sealed class BotBrew : BotDeed, IBotWantCarrier
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
+
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for glass");
         }
 
         if (BotShops.Buy(bot, _shop, typeof(Bottle), _take, out var refused) <= 0)
         {
+
             var next = BotShops.Next(bot, _shop, typeof(Bottle), ref _repicks);
 
             if (next != null)
@@ -343,6 +329,7 @@ public sealed class BotBrew : BotDeed, IBotWantCarrier
 
         if (!_counting)
         {
+
             _counting = true;
             _had = BotFlask.Made(body, _potion);
         }
@@ -372,6 +359,7 @@ public sealed class BotBrew : BotDeed, IBotWantCarrier
 
         if (recipe == null)
         {
+
             return Finish(BotFlask.Bottles(body) <= 0 ? "no glass left to brew into" : "no herbs left to brew with");
         }
 
@@ -427,6 +415,7 @@ public sealed class BotBrew : BotDeed, IBotWantCarrier
 
     private BotDoing Selling(IBotWilful bot, Mobile body)
     {
+
         if (_funded && !_released)
         {
             _released = true;
@@ -456,6 +445,7 @@ public sealed class BotBrew : BotDeed, IBotWantCarrier
 
                 if (Mobile.LiftItemDupe(stack, held - keep) == null)
                 {
+
                     continue;
                 }
 

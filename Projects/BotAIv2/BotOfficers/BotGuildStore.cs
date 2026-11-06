@@ -9,36 +9,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guild's store at its hall: the members' consumables held in common, a kit issued from it as a debt, and the debts
-/// repaid from the member's next spoils.
-///
-/// <para>
-/// <b>Patrick's order (07.10.2026): "the guild store holds the members' goods" and "a kit issued is a debt".</b> Until this the
-/// only goods a guild had were on its merchant's shelf (pack14, box16). The store is small on purpose: one ledger per guild of
-/// the consumables a fight takes — bandages, draughts, reagents, arrows and bolts (<see cref="BotProvision.Consumable"/>) — kept
-/// at the guild's seat (its town house's heart, else its hall's door), at most <see cref="MostUnits"/> of a kind and
-/// <see cref="MostBottles"/> of a draught. Goods come in three ways and only three: the porter puts a member's capped surplus in
-/// when it stands within <see cref="TakeReach"/> of the store (<see cref="Take"/>, from <c>BotUnload.Store</c>), the quartermaster
-/// takes surplus from members standing at the store during its shift, and the guild's wants are bought by the quartermaster and
-/// paid back by the chest (<see cref="BotQuartermaster"/>). Nothing is made: a unit in is a lot taken out of a pack and deleted, a
-/// unit out is an item made of the same kind in a pack, and the counts on both sides are the same counts.
-/// </para>
-///
-/// <para>
-/// <b>A kit is a debt, never a gift.</b> A member short of its kit and either under <see cref="PoorBelow"/> or a newcomer draws
-/// what it lacks from the store (<see cref="Issue"/>); what it drew is worth the market's price for each unit, and that is owed to
-/// the guild's chest. The debt is collected like the moneylender's lien (<c>BotLoans</c>): every minute <see cref="LienShare"/> of
-/// every rise in the debtor's wealth goes to the chest until it is paid. A debt not paid in <see cref="DefaultHours"/> of the
-/// debtor's play is written off and the debtor draws no kit again; a debtor gone from the island or a guild closed writes it off
-/// too. All of it counted.
-/// </para>
-///
-/// <para>
-/// <b>The members' goods, so a gift counts as one.</b> What a member puts in is a gift to the guild at the market's price, and is
-/// written to its record as dues given (<see cref="BotElection.Gave"/>), which is what an election weighs gifts by.
-/// </para>
-/// </summary>
 public static class BotGuildStore
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuildStore));
@@ -398,6 +368,7 @@ public static class BotGuildStore
 
         foreach (var (kind, n) in Of(guild))
         {
+
             if (n > 0 && BotProvision.DoorFloor(member, kind) > pack.GetAmount(kind))
             {
                 return true;
@@ -425,6 +396,7 @@ public static class BotGuildStore
 
         foreach (var (kind, n) in store)
         {
+
             var lack = BotProvision.DoorFloor(member, kind) - pack.GetAmount(kind);
 
             if (n > 0 && lack > 0)

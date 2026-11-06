@@ -8,24 +8,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What the zones learned, kept across a restart: each haunt's awake seconds, sightings, observed range, tour stops and the calm
-/// sightings its reach is read from (08.10.2026), and the cells patrols were seen in.
-///
-/// <para>
-/// <b>Because the shard restarts more often than the tour finishes.</b> A round of the tour is a few hundred zones at a minute
-/// and a quarter each, shared by three or four walkers — hours — and the shard is redeployed about hourly. Without this every
-/// session would begin again from the declared discs and walk the same first zones. With it, a new session starts from
-/// everything the last one saw, and the tour goes on with the zones it had not reached.
-/// </para>
-///
-/// <para>
-/// <b>A plain file in <c>Data/</c>, not a save store.</b> The <c>Saves</c> folder is archived at every save, and a persistence
-/// that cannot read its own shape stops the shard on a console prompt nobody can answer (see <c>BotQuadStore</c>). A file that
-/// fails to read here is logged and ignored, and the zones start from the spawners, which is what they would do without it.
-/// The file is read and written off the loop; what the loop does is copy numbers in and out.
-/// </para>
-/// </summary>
 public static class BotZoneMemory
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotZoneMemory));
@@ -156,6 +138,7 @@ public static class BotZoneMemory
 
         foreach (var h in root.GetProperty("haunts").EnumerateArray())
         {
+
             var key = h[0].GetString() ?? "";
             float[] bins = null;
 
@@ -252,6 +235,7 @@ public static class BotZoneMemory
 
         if (read.Width == BotZoneRaster.Width)
         {
+
             var minutes = Math.Max(0, (DateTimeOffset.UtcNow.ToUnixTimeSeconds() - read.SavedAt) / 60.0);
             var fade = (float)Math.Pow(0.5, minutes / Math.Max(1, BotZoneRaster.HalfLifeMinutes));
 
@@ -410,6 +394,7 @@ public static class BotZoneMemory
                 w.WriteNumberValue(haunt.TouredAt);
                 if (haunt.Bins != null)
                 {
+
                     var last = haunt.Bins.Length - 1;
 
                     while (last >= 0 && haunt.Bins[last] < 0.005f)

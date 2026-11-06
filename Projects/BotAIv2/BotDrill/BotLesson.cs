@@ -3,25 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The captain's half of a class: take the field, wait for whoever comes, then pace the ranks for an hour
-/// saying things.
-///
-/// <para>
-/// <b>Nobody is summoned.</b> The captain opens the field and that is the whole of the invitation — students
-/// arrive because <see cref="BotStudent"/> offered them a lesson and their own auction preferred it to
-/// mining. A class with an empty field is a real outcome and is counted as one: it means nobody on the shard
-/// wanted teaching enough to pay for it, which is a fact about the population's priorities and not a fault
-/// in the captain.
-/// </para>
-///
-/// <para>
-/// <b>What the captain earns here is coin, and what the shard earns is a population that gets better at
-/// something other than by surviving it.</b> Every other point of skill on this island comes from use: a bot
-/// improves at swords by being in fights, which means the fastest learners are the ones taking the most
-/// risk, and a young warrior's road to competence runs through a graveyard. This is the other road.
-/// </para>
-/// </summary>
 public sealed class BotLesson : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLesson));
@@ -102,6 +83,7 @@ public sealed class BotLesson : BotDeed
 
         if (!body.InRange(BotSchool.Ground, BotSchool.Voice))
         {
+
             return BotDoing.Walk(_map, BotSchool.Ground, BotArrival.Within(BotSchool.Voice), "going to the training field");
         }
 
@@ -175,6 +157,7 @@ public sealed class BotLesson : BotDeed
 
         if (Core.TickCount - _beatTick < BotSchool.BeatMs)
         {
+
             return BotDoing.Work($"drilling {BotSchool.Students.Count}");
         }
 
@@ -257,6 +240,7 @@ public sealed class BotLesson : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
+
         if (bot?.Self is BotMobile body && ReferenceEquals(BotSchool.Master, body))
         {
             BotSchool.Close();

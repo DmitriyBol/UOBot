@@ -6,33 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Writes what the population knows about the island into the client's own world-map pins.
-///
-/// <para>
-/// <b>The one thing on this shard that a person reads without the server telling them anything.</b> Every
-/// other view of this project is a log line or a gump: both require somebody to go and look at the right
-/// place at the right moment. A pin sits on the world map inside the client the whole time, so "which parts
-/// of the island are dangerous" stops being a question anybody has to ask and becomes something they simply
-/// see while doing something else.
-/// </para>
-///
-/// <para>
-/// <b>The client reads this file once, when it opens its map.</b> Nothing here pushes anything to a running
-/// client: the file is rewritten on a slow clock and the map picks it up next time it is opened. That is a
-/// property of ClassicUO and not a choice made here, and it is why the clock is minutes rather than seconds
-/// — writing it faster would cost the same and change nothing anybody can see.
-/// </para>
-///
-/// <para>
-/// <b>Written from the loop rather than from a thread, and measured rather than assumed.</b> The threading
-/// rule in this repository says heavy external I/O belongs off the loop; this is a few tens of kilobytes
-/// written once every few minutes, which is not heavy, and a background writer would need its own snapshot
-/// of a table the loop is mutating. The cost of each write is logged — see <see cref="Spent"/> — so the
-/// assumption is checked by the shard itself rather than by me. If it ever stops being a fraction of a
-/// millisecond, that number is the argument for moving it.
-/// </para>
-/// </summary>
 public static class BotMarkers
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMarkers));
@@ -164,6 +137,7 @@ public static class BotMarkers
 
     private static string Label(BotQuad.Quad quad, double reading)
     {
+
         var text = new StringBuilder(24);
 
         text.Append(reading.ToString("F1", System.Globalization.CultureInfo.InvariantCulture));

@@ -6,27 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a trip to a counter with goods the population is not asking for: out of the bot's own bank box while it stands at a
-/// bank, or out of a crowded pack.
-///
-/// <para>
-/// <b>The island decides who comes here, and it decides with facts it was already keeping.</b> Under the auction the test was a
-/// stall that had never sold one in ten minutes. The stalls went on 01.10.2026 (Patrick's order of 30.09: the auction removed,
-/// every purchase hand to hand), and the same sentence — "nobody here wants this" — is now read where buyers say it: no bot has a
-/// want out for the kind (<see cref="BotMarket.Bespoke"/>) and, for a bot that keeps shop, none has been short of it lately
-/// (<see cref="BotShopkeep.Demanded"/>). What the island does ask for is left for a shop by the bank or a carrier; what it does
-/// not goes to a shopkeeper, the world's own shops, which stay. A fighter keeps no shop, so its goods the island is merely short
-/// of go over a counter too, where the bots short of them buy.
-/// </para>
-///
-/// <para>
-/// <b>And it can only ever offer what the bot itself put aside.</b> The bank box holds nothing but the porter's surplus
-/// (<c>BotUnload.Store</c>), and the pack is read against the bot's own keep list, so a bot's tools, herbs, paper and bandages
-/// are never candidates — the first version sold the same shopkeeper the same reagents four thousand times because nothing
-/// distinguished "goods" from "the things I need to do my job". The box is opened only at a bank, where a player opens it.
-/// </para>
-/// </summary>
 public sealed class BotPeddler : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPeddler));

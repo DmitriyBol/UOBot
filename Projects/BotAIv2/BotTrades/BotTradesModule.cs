@@ -6,10 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-trades.json</c> may say. Everything optional and PascalCase: a key in lower case is silently the code's
-/// default, and the <c>Trades:</c> boot line is the proof of what the establishments run with.
-/// </summary>
 public sealed class BotTradesSettings
 {
     public bool? Running { get; set; }
@@ -95,12 +91,16 @@ public sealed class BotTradesSettings
     public int? RagSafeSlack { get; set; }
 
     public int? RagmanPurse { get; set; }
+
+    public bool? DiceGames { get; set; }
+
+    public double? DiceChance { get; set; }
+
+    public int? DiceStakeMin { get; set; }
+
+    public int? DiceStakeMax { get; set; }
 }
 
-/// <summary>
-/// The establishments as a module: reads <c>bot-trades.json</c>, puts their words into the voice's bank, offers the cook's tavern,
-/// the guest's supper and the borrower's walk, and runs one clock — a line round each table, the lenders' call, the lien.
-/// </summary>
 public sealed class BotTradesModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTradesModule));
@@ -285,6 +285,10 @@ public sealed class BotTradesModule : BotModule
         BotRagmen.PostFar = settings.RagPostFar ?? BotRagmen.PostFar;
         BotRagmen.SafeSlack = settings.RagSafeSlack ?? BotRagmen.SafeSlack;
         BotRagmen.LeastPurse = settings.RagmanPurse ?? BotRagmen.LeastPurse;
+        BotDice.Running = settings.DiceGames ?? BotDice.Running;
+        BotDice.GameChance = settings.DiceChance ?? BotDice.GameChance;
+        BotDice.StakeMin = settings.DiceStakeMin ?? BotDice.StakeMin;
+        BotDice.StakeMax = settings.DiceStakeMax ?? BotDice.StakeMax;
     }
 
     public override void Reset()

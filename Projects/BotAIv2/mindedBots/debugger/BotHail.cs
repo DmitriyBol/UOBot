@@ -6,34 +6,10 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The debugger's ear, and the one door in the world through which a person can reach it.
-///
-/// <para>
-/// Say <c>Hey Argus, the smith is making nothing</c> anywhere on the shard and the line is written into the
-/// debugger's own log, answered on the spot, and put in front of the model on its next report — where it is
-/// told that this came from the person who runs the shard and is the first thing to account for.
-/// </para>
-///
-/// <para>
-/// <b>The wake phrase is built from the debugger's name rather than written down here.</b> The name is a
-/// configuration value; a trigger hard-written as "hey argus" would go on working after somebody renamed the
-/// bot in <c>bot-debugger.json</c>, and then stop working the first time they typed the new name — with no
-/// error anywhere, because a sentence nobody is listening for looks exactly like a sentence nobody said.
-/// </para>
-///
-/// <para>
-/// <b>Staff only, and that is not about trust.</b> The debugger is invisible to players by design; a
-/// population that could talk to it would be a population that knows it exists, and every answer it gave
-/// would be a message from nowhere. It also means a note in the log is always from somebody whose word is
-/// worth acting on, which is what makes the notes usable as instructions rather than as data.
-/// </para>
-/// </summary>
 public static class BotHail
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHail));
 
-    /// <summary>What a person said to the debugger, and whether the model has been shown it yet.</summary>
     public sealed class Note
     {
         public string Who { get; init; }
@@ -215,6 +191,7 @@ public static class BotHail
 
     public static string Recite()
     {
+
         var standing = Standing();
 
         if (_notes.Count == 0)

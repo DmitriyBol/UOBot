@@ -5,12 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-proving.json</c> may say. Everything optional; empty keeps the code's numbers. PascalCase: a
-/// key in lower case is silently a default (see BotDelveSettings).
-/// </summary>
 public sealed class BotProvingSettings
 {
+
     public bool? Enabled { get; set; }
 
     public bool? Judges { get; set; }
@@ -36,16 +33,6 @@ public sealed class BotProvingSettings
     public bool? WakeDeepsOnly { get; set; }
 }
 
-/// <summary>
-/// The proving ground as a module: the numbers read, the field swept of whatever a stop left on it, the referee's beat
-/// started, and one line every five minutes saying what the ground has measured.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, because the rings are places on the map and the ladder is read off the dungeons' spawners;
-/// it requires <c>Population</c>, whose bots are the ones copied, and <c>Delve</c>, whose dungeons are the ladder and whose
-/// choice is the thing the readings change.
-/// </para>
-/// </summary>
 public sealed class BotProvingModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotProvingModule));

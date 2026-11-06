@@ -4,10 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-market.json</c> may say: speeds and distances, never prices. Keys are PascalCase, like every other
-/// file of this project's — a lower-case key is silently ignored by the engine's reader.
-/// </summary>
 public sealed class BotMarketSettings
 {
     public bool? Running { get; set; }
@@ -69,6 +65,14 @@ public sealed class BotMarketSettings
     public int? MeetingSafeReach { get; set; }
 
     public double? MeetingExpects { get; set; }
+
+    public int? MeetingStandTiles { get; set; }
+
+    public int? MeetingStandMs { get; set; }
+
+    public int? MeetingStandMostMs { get; set; }
+
+    public int? DeliverLosingMs { get; set; }
 }
 
 public static class BotMarketConfig
@@ -126,5 +130,9 @@ public static class BotMarketConfig
         BotRendezvous.WaitMs = settings.MeetingWaitMs ?? BotRendezvous.WaitMs;
         BotRendezvous.SafeReach = settings.MeetingSafeReach ?? BotRendezvous.SafeReach;
         BotRendezvous.Prior = settings.MeetingExpects ?? BotRendezvous.Prior;
+        BotRendezvous.StandTiles = settings.MeetingStandTiles ?? BotRendezvous.StandTiles;
+        BotRendezvous.StandMs = settings.MeetingStandMs ?? BotRendezvous.StandMs;
+        BotRendezvous.StandMostMs = settings.MeetingStandMostMs ?? BotRendezvous.StandMostMs;
+        BotDeliver.LosingMs = settings.DeliverLosingMs ?? BotDeliver.LosingMs;
     }
 }

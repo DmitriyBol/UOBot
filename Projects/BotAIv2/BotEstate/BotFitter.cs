@@ -4,22 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who decides the guild can afford its next workbench, and sends somebody to fetch it.
-///
-/// <para>
-/// The same shape as <see cref="BotSteward"/>, one storey down: any member may go, one at a time per guild,
-/// and the affordability is asked here rather than inside the work — because the money is the guild's and a
-/// bot made to feel eight hundred gold short would refuse everything else on the shard until it stopped.
-/// </para>
-///
-/// <para>
-/// It is offered only where there is a hall to put the thing in, which makes it the first piece of work on
-/// this shard that exists <em>because</em> the population built something.
-/// </para>
-/// </summary>
 public sealed class BotFitter : IBotProposer
 {
+
     public static int ClaimMs { get; set; } = 120000;
 
     public static long Offered { get; private set; }

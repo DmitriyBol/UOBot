@@ -10,47 +10,6 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// Every tunable number in the bot assemblies, readable and settable while the shard is running.
-///
-/// <para>
-/// <b>It exists because the cost of a change was never the change.</b> A dial lives as a
-/// <c>public static</c> property, a configuration file moves it once at boot, and until now the only way to
-/// try a different value was to stop the shard, edit JSON, rebuild and start again. That throws away the ore
-/// map, the hearth list and every long window of measurement the debugger had accumulated — two or three
-/// hours before any question about exhaustion can be asked again. So the numbers that most wanted trying
-/// were the ones tried least, and an evening could afford about four experiments where it wanted forty.
-/// </para>
-///
-/// <para>
-/// <b>Nothing here is discovered from a list.</b> The dials are found by reflection over the assemblies
-/// themselves, exactly as <see cref="BotDebugSight"/> collects its <c>Describe()</c> lines and for the same
-/// reason: a hand-written list is correct on the day it is written and silently short by one subsystem
-/// afterwards. What the code has, this has.
-/// </para>
-///
-/// <para>
-/// <b>A change lasts until the shard stops, and the answer to every set says so.</b> This writes to the
-/// living object, never to <c>Configuration/bot-*.json</c> — a tool that edited the files would be a tool
-/// able to make a shard that boots differently from the one anybody tested, and a key spelled in the wrong
-/// case, ignored in silence, is already the most expensive trap in this configuration system. Keeping a
-/// value means writing it into the file by hand, and <c>dials changed</c> prints the list to copy from.
-/// </para>
-///
-/// <para>
-/// <b>The model cannot reach this.</b> <see cref="BotHand"/> is the bounded set of verbs the debugger's own
-/// mind may ask for, and no dial verb is in it. An observer that can move the thresholds it is judging
-/// against does not measure the shard, it negotiates with it — and its log would no longer explain what it
-/// saw. Dials move for a person at the keyboard, through the door, and for nobody else.
-/// </para>
-///
-/// <para>
-/// <b>Values are read lazily, and a dial's earlier value is kept the first time it is written.</b> Reading
-/// every property at boot would run the static constructor of every type in both assemblies for no reason
-/// beyond filling a table nobody has asked for. So <c>was</c> means "what it held before this door touched
-/// it", which is the only prior value <c>reset</c> can honestly restore.
-/// </para>
-/// </summary>
 public static class BotDials
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDials));
@@ -380,6 +339,7 @@ public static class BotDials
             }
             catch
             {
+
                 _broken = true;
             }
 

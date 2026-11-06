@@ -6,32 +6,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A voyage: a ship bought if the bot has none, a walk to the dock, the ship put in the water and boarded, the sea, and the
-/// walk from the far dock into the town — or home.
-///
-/// <para>
-/// <b>Patrick's point 7 of 29.09.2026: "teach the bots to travel by sea, on boats."</b> The journey (<see cref="BotTravel"/>)
-/// walks to a town a road reaches; this sails to one no road reaches, and it is offered the same way, by the traveller
-/// (<see cref="BotSea.Travel"/>), at the journey's price. The same deed takes a bot home from an island when there is
-/// nothing there worth doing (<see cref="BotSeafarer"/>), at the walk home's price and unpaid like it.
-/// </para>
-///
-/// <para>
-/// <b>The stages are the deed's; the sea is the helm's.</b> Buying, walking to the dock and boarding are asked on the bot's
-/// own beat. Once aboard, <see cref="BotHelm"/> sails the ship on its own clock and puts the bot ashore, and the deed only
-/// watches: work while the ship is at sea, a failure with the helm's reason if it was lost, and on landing a walk from the
-/// dock into the town. The deed is committed at sea — nothing but what will not wait takes the bot off it — and if it is
-/// taken off anyway the ship still sails and still lands it.
-/// </para>
-///
-/// <para>
-/// <b>What it is worth and where it is.</b> Its minutes are the voyage's, honestly: a lane's tiles at the helm's speed, and
-/// the appraisal's nearness (work against walk) then gives a voyage from a dock round the corner a fair hearing. Where it
-/// is moves with it: the dock it sets out from until it is aboard (the appraisal vetoes work on ground no gate joins to the
-/// bot, and the far town is exactly such ground), the town it is bound for from then on.
-/// </para>
-/// </summary>
 public sealed class BotVoyage : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotVoyage));

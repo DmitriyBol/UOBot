@@ -5,20 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Rumours (07.10.2026, Patrick's fifth idea: "once an hour Argus spreads a rumour of a treasure or a lair, the first to reach it
-/// takes it"). Every <see cref="EveryMs"/> a chest is put on open ground <see cref="Near"/>–<see cref="Far"/> tiles out of a town
-/// and filled with <see cref="ChestGold"/> taken from the crown's purse — the revels' own, filled by the guilds' tax, so the coin is
-/// moved and not made (<see cref="BotSeasons.CrownTake"/>). Argus's herald spreads the word with the bearing from the town.
-///
-/// <para>
-/// <b>A treasure or a lair.</b> A chest on ground the zones read hostile is a lair: only a bot that brings <see cref="LoneOdds"/>
-/// times the fight standing there — the lone bot's rule — is offered the walk. A chest on quiet ground is a treasure, and any bot
-/// with a safe road may go. At most <see cref="MostSeekers"/> go at once (<see cref="BotRumourSeek"/>): the first to stand at the
-/// chest takes the coin into its account and the chest is gone; whoever comes after finds nothing, and says so as a failure —
-/// which is why the seekers are few. Unfound after <see cref="LapseMs"/>, the chest goes and its coin returns to the crown.
-/// </para>
-/// </summary>
 public static class BotRumour
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRumour));
@@ -69,7 +55,6 @@ public static class BotRumour
 
     public static long GoldBack { get; private set; }
 
-    /// <summary>One rumour: the chest, where, what it holds, whether it is a lair, who seeks it.</summary>
     public sealed class Tale
     {
         public Container Chest;
@@ -275,6 +260,7 @@ public static class BotRumour
         }
         else
         {
+
             BotCity.Held(gold);
             BotCity.Refund(gold);
         }
@@ -413,11 +399,6 @@ public static class BotRumour
     }
 }
 
-/// <summary>
-/// Offers a bot the walk to a rumoured chest (07.10.2026): any bot for a treasure, a bot bringing <see cref="BotRumour.LoneOdds"/>
-/// times the fight for a lair; within <see cref="BotRumour.Reach"/>, while fewer than <see cref="BotRumour.MostSeekers"/> are on
-/// their way, by a road the walk's own question does not refuse.
-/// </summary>
 public sealed class BotRumourCall : IBotProposer
 {
     public string Name => "Rumour";
@@ -460,7 +441,6 @@ public sealed class BotRumourCall : IBotProposer
     }
 }
 
-/// <summary>Seeking a rumoured chest: the walk to it, and the coin if it is still there.</summary>
 public sealed class BotRumourSeek : BotDeed
 {
     public const string Trade = "rumour";

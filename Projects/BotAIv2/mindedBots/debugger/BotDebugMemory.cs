@@ -7,7 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>One thing the debugger has come to believe, and how many times it has come to believe it.</summary>
 public sealed class BotDebugBelief
 {
     public string Kind { get; set; }
@@ -31,7 +30,6 @@ public sealed class BotDebugBelief
     public bool Gone { get; set; }
 }
 
-/// <summary>Something a person said to the debugger. Kept until it is answered, and after.</summary>
 public sealed class BotDebugAsk
 {
     public string Who { get; set; }
@@ -43,7 +41,6 @@ public sealed class BotDebugAsk
     public bool Answered { get; set; }
 }
 
-/// <summary>What survives a restart.</summary>
 public sealed class BotDebugRecall
 {
     public int Sessions { get; set; }
@@ -55,31 +52,6 @@ public sealed class BotDebugRecall
     public List<BotDebugAsk> Notes { get; set; } = [];
 }
 
-/// <summary>
-/// The debugger's long memory: <c>Configuration/bot-debugger-memory.json</c>.
-///
-/// <para>
-/// <b>Without it every restart is the first evening.</b> The population is rebuilt from configuration on
-/// every world load and keeps nothing but names and skills, and until now the debugger kept even less — its
-/// findings, its conclusions and every question a person had asked it went with the process. That made it
-/// structurally incapable of the one thing that would make it worth having: saying "this is the ninth time I
-/// have found this, over four sessions". A watcher that cannot count how often it has been right about the
-/// same thing is a watcher whose confidence means nothing.
-/// </para>
-///
-/// <para>
-/// <b>Written the moment something is added rather than at shutdown, and that is not caution.</b> A shard is
-/// killed far more often than it is stopped — this one has been killed a dozen times today — and a memory
-/// that is flushed on a clean exit is a memory that is empty exactly when it is wanted.
-/// </para>
-///
-/// <para>
-/// <b>Beliefs are merged by what they say, never by when they were said.</b> A model asked the same question
-/// about the same defect writes it in different words every time; a check on the opening characters lets
-/// every one of them through and the file fills with one finding restated forty ways. Two thirds of the
-/// words in common is one belief twice — the same rule, and the same figure, the minds' own lessons use.
-/// </para>
-/// </summary>
 public static class BotDebugMemory
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDebugMemory));
@@ -112,6 +84,7 @@ public static class BotDebugMemory
         }
         catch (Exception e)
         {
+
             _recall = new BotDebugRecall();
 
             logger.Warning("The debugger's memory could not be read and it starts this session with none: {Message}", e.Message);

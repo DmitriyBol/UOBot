@@ -5,23 +5,15 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Something standing in the way that can be asked to move. Implemented by the bot.
-///
-/// The measurement that made this necessary: (1371, 1477, 10) is the gate to the Britain graveyard, and
-/// two bots parked on it accounted for seventy-seven refused steps in two minutes — twice, on two
-/// different days, with two different bots. A wandering monster moves on by itself; a bot at an auction or
-/// going through a corpse does not, and if it happens to be in a doorway then nobody gets through the
-/// doorway. The tile is the problem, not the bot, so the answer belongs to whoever is standing on it.
-/// </summary>
 public interface IBotAside
 {
+
     bool StepAsideFor(Mobile asker);
 }
 
-/// <summary>What one attempt at moving did.</summary>
 public enum BotWalkResult
 {
+
     Idle,
 
     Arrived,
@@ -47,23 +39,6 @@ public enum BotWalkResult
     Stalled
 }
 
-/// <summary>
-/// The moment a step is actually taken — where everything the planner deliberately ignores gets handled.
-///
-/// <para>
-/// The planner reasons about static ground only: land, statics, houses, boats. Creatures, dropped items
-/// and shut doors are not in it, because they move, and a planner that treats a skeleton in a doorway as a
-/// wall teaches itself that the doorway is one. This is where that debt is paid, once per step, with the
-/// engine as the final authority.
-/// </para>
-///
-/// <para>
-/// <b>The last line of defence lives here, and it is the one place in the whole design that trusts the
-/// engine over the plan.</b> If the plan will not walk and some step is nonetheless possible, take it. The
-/// engine is the only authority on whether a step is legal right now, and a bot that can get somewhere is
-/// worth more than a bot that is correct about being unable to get where it meant to go.
-/// </para>
-/// </summary>
 public static class BotWalk
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWalk));
@@ -211,6 +186,7 @@ public static class BotWalk
         StationReached = 0;
         ChasesGivenUp = 0;
         ChasesReached = 0;
+        BotJourney.ForgetKeptUp();
         ThrashMoved = 0;
         Holds = 0;
         _chase.Clear();
@@ -221,7 +197,7 @@ public static class BotWalk
     public static long LegEnded { get; private set; }
 
     public static string Describe() =>
-        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions, {Besides} plans one tile short taken as arriving, {Thrashed} walks ended for planning one place more than {ThrashPlans} times in {ThrashMs / 1000}s ({ThrashRefused} of the places written refused; {ThrashMoved} counts started again for a walker that had come {ThrashTiles} tiles on), {Holds} turns a walk was held where it stood by its work with the plan kept,{ChasesGivenUp} chases ended for planning more than {ChasePlans} roads after one target with none reaching it ({ChasesReached} counts cleared by a plan that reached), {Knots} stepped aside from somebody who would not; the whole ceiling was burned by: {Top(_burned)} ({Stationed} station searches held to {StationCeilingMs:F0}ms instead); {Escalated} searches at the stranded ceiling for a way round, {EscalationFound} found one and {EscalationFailed} ended the errand instead of nine more searches; {Legs} plans drawn to a leg of a route and {LegsFailed} legs that could not be walked ({LegEnded} plans stopped where the leg had already dropped the errand); routes drawn: {BotJourney.Routed} over the navigation graph, {BotJourney.Gated} to a gate into another land, {BotJourney.Charted} over the old chart where the graph was not drawn yet, {BotJourney.NoWay} with no way on the ground ({NoWay} plans the graph said had none{(TrustNoWay ? ", dropped" : ", planned straight instead")}), {BotJourney.MapRefused} never asked of the planner for no open ground at the target on the reach map; {BotGates.Unwedged} bodies standing where nothing stands set on the nearest floor ({BotGates.Unwedgeable} left where they were for want of one); errands lost as hopeless or without a way round, by kind: {Top(_lost)}";
+        $"{Steps} steps taken, {Refusals} refused by the engine, {Doors} doors opened, {Detours} tiles gone round, {Improvised} improvised, {GaveUp} journeys given up, {Dropped} destinations dropped as no good, {Boxed} steps where the engine refused all eight directions, {Besides} plans one tile short taken as arriving, {Thrashed} walks ended for planning one place more than {ThrashPlans} times in {ThrashMs / 1000}s ({ThrashRefused} of the places written refused; {ThrashMoved} counts started again for a walker that had come {ThrashTiles} tiles on), {Holds} turns a walk was held where it stood by its work with the plan kept,{ChasesGivenUp} chases ended for planning more than {ChasePlans} roads after one target with none reaching it ({ChasesReached} counts cleared by a plan that reached), {BotJourney.KeptUp} plans after somebody about its own business that reached it and started the closing count again ({BotJourney.KeptOn} walks the old count would have given up went on), {Knots} stepped aside from somebody who would not; the whole ceiling was burned by: {Top(_burned)} ({Stationed} station searches held to {StationCeilingMs:F0}ms instead); {Escalated} searches at the stranded ceiling for a way round, {EscalationFound} found one and {EscalationFailed} ended the errand instead of nine more searches; {Legs} plans drawn to a leg of a route and {LegsFailed} legs that could not be walked ({LegEnded} plans stopped where the leg had already dropped the errand); routes drawn: {BotJourney.Routed} over the navigation graph, {BotJourney.Gated} to a gate into another land, {BotJourney.Charted} over the old chart where the graph was not drawn yet, {BotJourney.NoWay} with no way on the ground ({NoWay} plans the graph said had none{(TrustNoWay ? ", dropped" : ", planned straight instead")}), {BotJourney.MapRefused} never asked of the planner for no open ground at the target on the reach map; {BotGates.Unwedged} bodies standing where nothing stands set on the nearest floor ({BotGates.Unwedgeable} left where they were for want of one); errands lost as hopeless or without a way round, by kind: {Top(_lost)}";
 
     public static int StepDelayMs(bool run) => run ? RunStepMs : WalkStepMs;
 
@@ -272,6 +248,7 @@ public static class BotWalk
 
         if (journey.Stalled())
         {
+
             var side = journey.Current?.Interruption == true;
 
             logger.Information(
@@ -343,6 +320,7 @@ public static class BotWalk
 
         if (!journey.TryNextTile(out var next))
         {
+
             return Improvise(bot, journey, next: bot.Location, run);
         }
 
@@ -380,6 +358,7 @@ public static class BotWalk
 
     private static bool Plan(Mobile bot, BotJourney journey, Map map)
     {
+
         if (journey.Current is { } moonErrand && moonErrand.Gate != Point3D.Zero && bot.X == moonErrand.Gate.X && bot.Y == moonErrand.Gate.Y
             && BotGates.Moon(moonErrand.Gate, moonErrand.GateTo) is { } moon && BotGates.Travel(bot, moon))
         {
@@ -504,6 +483,7 @@ public static class BotWalk
 
         if (outcome == BotPathOutcome.Sealed)
         {
+
             if (!BotReach.LastByMap && BotGates.Unwedge(bot))
             {
                 return true;
@@ -553,6 +533,7 @@ public static class BotWalk
 
         if (far == BotEnclosure.NoFooting)
         {
+
             BotFooting.Note(map, journey.Target);
 
             return Drop(bot, journey, "there is nowhere there to stand");
@@ -745,6 +726,7 @@ public static class BotWalk
         }
         else if (station)
         {
+
             StationSearches++;
             StationReached += reached ? 1 : 0;
         }
@@ -801,6 +783,7 @@ public static class BotWalk
 
         if (outcome == BotPathOutcome.Sealed)
         {
+
             LegsFailed++;
             journey.LegFailed(map, fair);
 
@@ -820,6 +803,7 @@ public static class BotWalk
 
     private static bool Drop(Mobile bot, BotJourney journey, string why, bool thrash = false)
     {
+
         if (thrash && journey.Target != Point3D.Zero && bot.Map != null && journey.Reason is not ("station" or "sweep"))
         {
             BotRefused.Refuse(bot.Map, journey.Target);
@@ -849,6 +833,7 @@ public static class BotWalk
 
     private static BotWalkResult Refused(Mobile bot, BotJourney journey, Map map, Point3D next, bool run)
     {
+
         if (bot.Spell != null)
         {
             return BotWalkResult.Casting;
@@ -863,6 +848,7 @@ public static class BotWalk
 
         if (AskAsideAt(bot, map, next, out var freed))
         {
+
             if (journey.NoteBlocked(next) >= PatienceWithOccupants)
             {
                 journey.AvoidTile(next);
@@ -895,6 +881,7 @@ public static class BotWalk
 
         for (var i = nothingTried ? 0 : 1; i < offsets.Length; i++)
         {
+
             var direction = (Direction)((heading + offsets[i] + 8) & 0x7) | (run ? Direction.Running : 0);
             var before = bot.Location;
 

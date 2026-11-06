@@ -3,27 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>
-/// The long tier: regions of <see cref="RegionClusters"/>×<see cref="RegionClusters"/> clusters (128 tiles) over the first
-/// level of the graph, and a corridor through them for the medium tier to search in.
-///
-/// <para>
-/// <b>Why a second level.</b> The medium tier's estimate is the straight line, and round a river the straight line lies:
-/// from the east bank to The Lantern's hall is 84 tiles straight and 1,381 steps by road, and an A* over the first level
-/// expanded 29,819 nodes to find it. Over regions the same detour is a few dozen nodes. The region's border nodes are the
-/// first-level nodes on its outer edge (a gate across a region's edge is always a gate across a cluster's); inside a
-/// region, a Dijkstra from each border node over the region's first-level edges gives its edges to the others.
-/// Regions are built when first needed, or ahead of time a slice at a time (<see cref="Prebuild"/>), and rebuilt when any
-/// of their clusters has changed since (<see cref="NavGraph.ClusterVersion"/>).
-/// </para>
-///
-/// <para>
-/// <b>What it answers.</b> An A* over the border nodes from the start's region to the goal's, estimated by the straight
-/// line (admissible: every step costs at least <see cref="NavCost.Step"/>). The regions it passes through, and the ring
-/// round them, are the corridor; the medium tier then finds the route in the corridor alone
-/// (<see cref="HierarchicalPlanner.Corridor"/>), which is where the thousands of nodes it expanded round the river were not.
-/// </para>
-/// </summary>
 public sealed class StrategicPlanner
 {
     public const int RegionClusters = 8;
@@ -365,6 +344,7 @@ public sealed class StrategicPlanner
             {
                 if (_startCost.TryGetValue(n, out var toHere))
                 {
+
                     Relax(graph, n, toHere, s, gx, gy);
                     RelaxGoal(g, toHere + c, n);
                 }
@@ -605,7 +585,6 @@ public sealed class StrategicPlanner
     }
 }
 
-/// <summary>One region's border nodes and the edges between them inside it.</summary>
 internal sealed class NavRegion
 {
     public int Version;

@@ -6,7 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary><c>Configuration/bot-charters.json</c>: every key optional, PascalCase; nothing written means the code's own number.</summary>
 public sealed class BotChartersSettings
 {
     public bool? Running { get; set; }
@@ -36,11 +35,6 @@ public sealed class BotChartersSettings
     public bool? SayLevy { get; set; }
 }
 
-/// <summary>
-/// Town charters as a module: reads its file, fills the voice's bank, and runs the clock — a look a minute (holders gone or put
-/// out, early auctions, the general auction every six hours) and the <c>Charters:</c> line every five minutes. World phase, after
-/// the towns, the chests, the towns' standing and the shops whose sales it levies.
-/// </summary>
 public sealed class BotChartersModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotChartersModule));
@@ -171,9 +165,9 @@ public sealed class BotChartersModule : BotModule
     }
 }
 
-/// <summary>The charters' way in: the module and the store registered from outside <c>BotCore</c>, after it has read its own switch.</summary>
 public static class BotChartersCore
 {
+
     [CallPriority(45)]
     public static void Configure()
     {
@@ -187,11 +181,6 @@ public static class BotChartersCore
     }
 }
 
-/// <summary>
-/// Keeps the charters across restarts: who holds which town's craft, for what, and what it has taken; the period's books the next
-/// auction bids by; the guilds barred from an early auction; and the clock, as running time to the next auction and into the
-/// period. A shape this build cannot read is dropped whole rather than guessed at: the towns auction afresh.
-/// </summary>
 public sealed class BotChartersStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotChartersStore));

@@ -6,55 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The nearest guarded town a beaten bot can realistically run to, and whether the guards there can do anything about
-/// what follows it.
-///
-/// <para>
-/// <b>Patrick's order of 02.10.2026: "if a bot is beaten on the road and understands it cannot win the fight, it must run
-/// to town, because the guards are supposed to kill hostile creatures that fight within the town limits."</b> What the
-/// engine actually does, read from <c>GuardedRegion</c> and <c>BaseGuard</c> in this era (UOR, <c>AllowReds</c> off):
-/// </para>
-///
-/// <para>
-/// A guard is spawned for a <em>guard candidate</em> only: a mobile that is <c>Criminal</c> or a murderer
-/// (<c>GuardedRegion.IsGuardCandidate</c>). In the stock engine nothing looks at whether a thing is a monster (see the shard rule below). A creature becomes criminal by
-/// harming an <em>innocent</em> (<c>Mobile.DoHarmful</c> → <c>IsHarmfulCriminal</c> → <c>Notoriety.Compute</c> answering
-/// <c>Innocent</c>), and a bot is innocent to a creature unless the bot has struck that creature within the last two minutes
-/// (<c>AggressorInfo.ExpireDelay</c>; <c>Notoriety.MobileNotoriety</c> answers <c>CanBeAttacked</c> through
-/// <c>CheckAggressor(source.Aggressors, target)</c>). So: a serpent that bites a bot which never swung at it is criminal on
-/// the first bite, for two minutes; a serpent that bites a bot which swung back is not criminal for that bite, and the
-/// region never puts it on its list. Once a criminal act happens with the victim inside a guarded region
-/// (<c>OnAggressed</c>) or the criminal inside it (<c>OnCriminalAction</c>), the region remembers the criminal for fifteen
-/// seconds; if a human NPC of the town stands within eight tiles, that NPC calls the guards at once ("fakeCall"); otherwise
-/// anybody saying a sentence with the <em>guards</em> keyword (0x0007) within fourteen tiles calls them
-/// (<c>GuardedRegion.OnSpeech</c> → <c>CallGuards</c>). A guard teleports to the candidate and kills it outright
-/// (<c>guards.instantKill</c>, true by default), leaving no corpse and no loot.
-/// </para>
-///
-/// <para>
-/// <b>The honest lever, then, is the one a player has: say "Guards!" standing in the town with the thing on you</b>
-/// (<c>Mobile.DoSpeech</c> with the keyword, which is exactly what a client sends), and <em>do not swing at it</em>, because
-/// the swing is what makes the guards blind to it for two minutes. Both are done by <see cref="BotBolt"/> on a run for a
-/// town; the swing is held by <c>BotMobile.OnDamage</c> (<see cref="BotBolt.HoldsSwing"/>). What this class decides is
-/// whether a town is a realistic escape at all: near enough for the time the run will take, the pursuer no faster than
-/// the runner unless the town is a few steps off, and no deadlier ground on the way (<see cref="BotDanger.Road"/>).
-/// </para>
-///
-/// <para>
-/// <b>Why the guards killed none of 78 pursuers (build 429, 07-08.10.2026), and the shard rule that answers it.</b> Two
-/// walls, both in the engine. First, a bot that swung once at the thing before it ran is never innocent to it again while
-/// the chase goes on: every bite the creature lands refreshes the bot's own entry in the creature's aggressors
-/// (<c>Mobile.AggressiveAction</c>, the loop over <c>aggressor.Aggressors</c>), so the two-minute expiry
-/// <see cref="BotBolt.HavenMs"/> waited for never came. 37 of 78 calls (93 of 141 by 01:35) were made so, Orophin's
-/// solen and Wilhelm's skeleton among them. Second, a creature made criminal by a bite on the road is not on the town's
-/// list (<c>CallGuards</c> takes only listed candidates, or reds standing inside), and only a fresh criminal bite in town
-/// lists it. And most deaths in town came after the run had ended (a plain flight that stopped inside the walls, a mend
-/// there: Wilhelm, Ysolde, Norbert), when nobody called at all. So <c>GuardedRegion.IsMenace</c> (a wild creature that
-/// attacks on sight, fighting a player) is a guard candidate whoever struck first, and <see cref="CallGuards"/> is called
-/// by every bot a creature strikes on guarded ground, not only by a runner.
-/// </para>
-/// </summary>
 public static class BotHaven
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHaven));
@@ -206,6 +157,7 @@ public static class BotHaven
 
             if (guarded)
             {
+
                 var inside = found != Point3D.Zero;
 
                 found = here;
@@ -218,6 +170,7 @@ public static class BotHaven
             }
             else if (found != Point3D.Zero)
             {
+
                 break;
             }
 
@@ -296,10 +249,14 @@ public static class BotHaven
         return true;
     }
 
+    public static int FootStepMs { get; set; } = 200;
+
+    public static int MountStepMs { get; set; } = 100;
+
     public static int StepMs(Mobile body)
     {
         var running = body is BotMobile { Running: true };
-        var step = body.Mounted ? BotSlay.MountStepMs : BotSlay.FootStepMs;
+        var step = body.Mounted ? MountStepMs : FootStepMs;
 
         return running ? step : step * 2;
     }
@@ -693,6 +650,7 @@ public static class BotHaven
             }
             else if (now - arrival.Tick >= WatchMs)
             {
+
                 Saved++;
                 _sweep.Add(body);
             }

@@ -3,31 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot with goods the island is asking for a shift keeping shop by Britain's bank — the market — or, for a guild's
-/// member, by its guild's own town's bank.
-///
-/// <para>
-/// <b>Asked of anybody, decided by what is in the pack and the bank box.</b> No class is a shopkeeper by birth: a hunter with
-/// forty reagents off corpses in the bank, a weaver with bandages cut from its own cloth, a smith with the pieces nobody ordered
-/// — each of them is a shop for as long as it holds what somebody is short of. The goods are counted the way the
-/// porter counts them (<see cref="BotShopkeep.Look"/>), priced the way a shop will price them, and the shift is offered only
-/// when what the island is actually asking for comes to <see cref="BotShopkeep.OpenWorth"/> or more: a shop of bones is not
-/// offered at all, and a shop that nobody wants anything from would be a bot standing at a bank for eight minutes.
-/// </para>
-///
-/// <para>
-/// <b>Priced at what such a shift sells, and corrected by what it sold.</b> The claim is the demanded stock times the share of
-/// it a shift is measured to sell (<see cref="BotShopkeep.Share"/>), over the shift's minutes; the ledger then corrects it by
-/// what this bot's shifts at this bank really took, so a keeper whose customers never come stops being offered the shift, and
-/// one whose bank is busy is offered it over the dig.
-/// </para>
-///
-/// <para>
-/// <b>An offer reserves nothing.</b> The pitch is chosen here so the walk to it is stable, but it is taken only when the keeper
-/// is standing on it and opens (<see cref="BotShopkeep.OpenShop"/>): an offer that loses the auction has spoken for nothing.
-/// </para>
-/// </summary>
 public sealed class BotShopkeeper : IBotProposer
 {
     public string Name => "Shopkeeper";

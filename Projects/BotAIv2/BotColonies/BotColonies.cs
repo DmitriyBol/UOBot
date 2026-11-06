@@ -11,36 +11,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guilds' colonies on the islands: who has one and where, the parties at the docks, the store each colony fills, and
-/// the line, the page and the door that say so.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "Ships stand idle. A guild fits out an expedition: the chest pays for the ship and stores, a party
-/// of 5–8 with a scout boards, sails to an island (Nujel'm, Magincia, Moonglow, Ocllo) and raises an outpost-colony: its own
-/// mine on untouched veins, a store, a trade route home on the same ship. A colony is guild ground by the claim rules."</b>
-/// </para>
-///
-/// <para>
-/// <b>The parts.</b> The expedition (<see cref="BotExpedition"/>) is the captain's: a ship it holds, adopts or buys through the
-/// shipwright as any ship is bought (<see cref="BotSea.Owns"/>, money15), the walk to the dock, the muster, the stores paid
-/// out of the chest, the voyage with the party aboard (<see cref="BotVoyage"/>'s company), and on the island the store set down
-/// and the square claimed by <see cref="BotClaim.Open"/> like any other square. The members sign on
-/// (<see cref="BotSignOn"/>), stand by the captain at the berth, ride, and stand on the square while it is claimed. On the
-/// island the colonists dig with the miner's own trip (<see cref="BotDig"/>), and the metal goes into the colony's store
-/// rather than their banks (<see cref="StoreOf"/>). The run home (<see cref="BotColonyRun"/>) loads the store, takes home the
-/// colonists whose shift is over, sells over the mainland's counters and pays the chest, the crew and itself. A relief
-/// (<see cref="BotExpedition"/> again, not founding) takes the ship and fresh hands back.
-/// </para>
-///
-/// <para>
-/// <b>Money.</b> The stores are paid out of the guild's chest into the city's purse (<see cref="BotCity.Tax"/>), nothing made
-/// or lost. A ship is bought only from a shipwright, from the captain's purse and the guild's (<see cref="BotProvision.Fund"/>),
-/// and only for an expedition, which pays: a colony's goods are sold. A ship adopted is one of the population's own, left at
-/// anchor with no owner; nothing is paid and nothing is made, and the key the harbour cuts for it is counted. The only new
-/// coin is what the mainland's shopkeepers pay for the goods.
-/// </para>
-/// </summary>
 public static class BotColonies
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotColonies));
@@ -1175,6 +1145,7 @@ public static class BotColonies
 
             if (colony.Store is not { Deleted: false })
             {
+
                 colony.Store = PlaceStore(colony);
                 colony.StoreSerial = colony.Store.Serial;
 
@@ -1434,6 +1405,8 @@ public static class BotColonies
         return sb.ToString();
     }
 
+    // ---- The store's file ----------------------------------------------------------------------------------------------------
+
     internal static IReadOnlyList<BotColony> ForSave() => _colonies;
 
     internal static void Restore(BotColony colony)
@@ -1444,6 +1417,20 @@ public static class BotColonies
         }
     }
 
+    /// <summary>
+    /// <b>Patrick's reset (07.10.2026, reset26): every colony given up, its store taken off the site, so the save writes the colonies
+    /// empty.</b> <see cref="Forget"/> keeps <see cref="_colonies"/> for a reload, and the reset of 20:56 that night left
+    /// <c>Saves/BotColonies</c> whole: the next boot would have found every old guild's colony again by its store's serial and set an
+    /// empty store down where it was missing — a colony of a guild that no longer exists, on ground nobody claims. This empties
+    /// exactly what <see cref="BotColonyStore"/> writes and deletes each store chest from the world, with the ore, bars and logs in
+    /// it; the passages, the sign-ons, the runs and the piracy go with <see cref="Forget"/>.
+    ///
+    /// <para>
+    /// <b>No coin is held here.</b> An expedition's stores were paid out of the guild's chest into the city's purse when it set
+    /// out (<c>BotCity.Tax</c>); a run's cargo was sold for coin paid at once to the chest and the hands. What a store chest holds
+    /// is ore, bars and logs, so taking it away moves no gold and leaves nothing counted anywhere. Returns the colonies given up.
+    /// </para>
+    /// </summary>
     public static int Wipe()
     {
         var gone = _colonies.Count;

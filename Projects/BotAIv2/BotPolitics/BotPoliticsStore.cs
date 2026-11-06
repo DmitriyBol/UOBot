@@ -2,13 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps the guilds' politics across restarts: each guild's office (its elected head, the votes, when, its run of lost wars) and
-/// every member's record it is elected by (kills of other guilds, wars won, dues given), what each chest was voted to save for,
-/// the towns' posts and how far into its term the council is, and the tributes standing with the refusals still remembered.
-/// Times are kept as running time elapsed, so a term or a tribute counts the shard's running time across a restart as it does
-/// within one. A shape this build cannot read is dropped whole rather than guessed at: the guilds simply vote again.
-/// </summary>
 public sealed class BotPoliticsStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPoliticsStore));

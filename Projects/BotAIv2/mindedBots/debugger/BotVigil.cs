@@ -7,34 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The debugger itself: the body, the watch it keeps, and the two questions it asks.
-///
-/// <para>
-/// <b>Three clocks, and they are three different questions rather than one question at three speeds.</b>
-/// Every couple of seconds it measures — that costs nothing and is the only thing here that produces facts.
-/// Every couple of minutes it asks the model what the worst thing in front of it is, cheaply and without
-/// thinking, because that question is mostly reading. Every quarter of an hour it asks the expensive
-/// thinking question: what do all of these have in common. Collapsing any two of them would either make the
-/// measurement as rare as the thinking or the thinking as constant as the measurement, and neither is worth
-/// having.
-/// </para>
-///
-/// <para>
-/// <b>It shares one slot with the three minds and does not get priority.</b> There is one graphics card and
-/// one model on it, and while a thinking call runs nothing else can be asked anything — measured at fifty-
-/// eight and ninety-nine seconds on this card. So the debugger asks only when the slot is free and never
-/// holds it on the frequent question. A watcher that starves the population it is watching would change the
-/// thing it is measuring, which is the one failure a watcher may not have.
-/// </para>
-///
-/// <para>
-/// <b>What it writes is a conjecture and the log says so.</b> Every entry carries the model's claim and,
-/// under it, the digest the claim was made from. Read on its own, a confident paragraph about a defect is
-/// indistinguishable from a true one; read beside the numbers, it can be checked in a minute. That is the
-/// whole reason this is worth running at all.
-/// </para>
-/// </summary>
 public static class BotVigil
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotVigil));
@@ -427,6 +399,7 @@ public static class BotVigil
         {
             if (Squad[i].Body is not { Deleted: false })
             {
+
                 Embody(Squad[i]);
             }
         }
@@ -621,6 +594,7 @@ public static class BotVigil
 
         if (pick == null)
         {
+
             List<BotWatch> sorted = [];
 
             foreach (var (_, watch) in _watch)
@@ -717,6 +691,7 @@ public static class BotVigil
 
         if (!BotRevel.Known(plan.Kind))
         {
+
             Lead?.Think("refused", RevelQuestion, $"a revel for {plan.Kind}, which is not work anybody takes; nothing declared", plan.Why, null);
             logger.Warning(
                 "The watcher wanted a revel for {Kind}, which is not work anybody takes; nothing is declared",
@@ -1923,6 +1898,7 @@ public static class BotVigil
     }
 
     private static string Verdict(int gold, int goods, int skill, int taken, bool unpaid) =>
+
         unpaid
             ? " — PAID NOTHING ON PURPOSE: a guild duty (a war, a claim, a hall, a hire). The shard does not judge"
               + " it on gold and neither should you; its GOLD is only what the bot happened to spend meanwhile."
@@ -1930,6 +1906,7 @@ public static class BotVigil
             : gold < 0 && (goods > 0 || skill > 0)
             ? " — A PURCHASE OR A CRAFT WORKING AS INTENDED: coin was turned into goods or skill. This row is not a drain."
             : gold <= 0 && goods <= 0 && skill <= 0 && taken >= 10
+
                 ? " — NOTHING GAINED IN ANY COLUMN over many takings. That is EITHER wasted time OR work whose"
                   + " job is to move value rather than make it (banking, carrying, posting an order, walking"
                   + " somewhere to be ready). These three columns cannot tell those apart — say which you"
@@ -1958,6 +1935,7 @@ public static class BotVigil
 
         for (var i = from; i < sorted.Count && rows.Count < Rows; i++)
         {
+
             rows.Add(sorted[i].Row(now));
         }
 

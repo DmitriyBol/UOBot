@@ -5,26 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A guild's company of doubles against a dungeon's worst room, on the proving ground: whether the band clears it, what it
-/// cost, and who fell.
-///
-/// <para>
-/// <b>The second branch of Patrick's order of 26.09.2026, and the one the first hour asked for.</b> One bot against one
-/// creature (<see cref="BotTrial"/>) says what a bot is worth against that creature; added up over a band it said three bands
-/// could take Wrong, and all three came back "whoever was leading it fell". A dungeon is not its worst creature one at a time:
-/// it is a room of them at once, several on one bot, spells from the back while the front swings. So this puts the band itself
-/// — its best <see cref="BotProving.PartySize"/> fighters, doubled — against the room the dungeon's spawners make worst (the
-/// spawner whose creatures add up to the most, up to <see cref="BotProving.MostFoes"/> of them), and reads whether it came
-/// out. The delve then sends a guild past the easiest dungeon only where its company has cleared such a room lately.
-/// </para>
-///
-/// <para>
-/// Each double fights with the same hands as in a single fight (<see cref="BotDriver"/>), set on the creature nearest it that
-/// still stands; the creatures choose for themselves, as they do underground. Nothing of the real bots is touched — a band
-/// can be tried while its members are down a dungeon — and nothing leaves the ring.
-/// </para>
-/// </summary>
 public sealed class BotRoomTrial
 {
     public BotRoomTrial(string guild, List<BotMobile> party, BotDungeon.Deep deep, List<string> room, int ring, Map map, Point3D middle)

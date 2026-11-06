@@ -4,9 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What the reach ledger can say about a journey before anybody searches for it.</summary>
 public enum BotReachVerdict
 {
+
     Unknown,
 
     Connected,
@@ -14,32 +14,6 @@ public enum BotReachVerdict
     Sealed
 }
 
-/// <summary>
-/// Which pockets of ground are closed, learned for nothing out of searches that failed.
-///
-/// <para>
-/// <b>The idea.</b> Proving that somewhere cannot be reached is the most expensive question a bot ever
-/// asks — the cheap searches run almost straight at their goal, while a refusal has to examine every tile
-/// the bot can reach before it can say no. But a search that runs out of <em>ground</em> has, by
-/// definition, just enumerated an entire connected pocket. So the expensive proof is paid <b>once per
-/// pocket for the life of the shard</b>, written down, and shared by everybody. A walled yard, a crypt,
-/// an island, somebody's back garden: each bills the population exactly once.
-/// </para>
-///
-/// <para>
-/// This is why there is no precomputation pass and no lattice. Felucca is 6144 × 4096 — twenty-five
-/// million tiles, about a minute of work at the measured cost per tile — and that is a bad price for a
-/// boot. It is also unnecessary: the questions worth refusing for free are "behind that railing" and
-/// "across that water", and both are pockets. The mainland never becomes one, and should not.
-/// </para>
-///
-/// <para>
-/// <b>What makes a pocket trustworthy.</b> Only a search whose open set emptied <em>without ever being
-/// clipped by its own search box</em> may record one. A search bounded by a box that ran out of tiles
-/// inside the box has learned nothing about the world — and recording that would seal off half a
-/// continent. See <see cref="BotPath"/>.
-/// </para>
-/// </summary>
 public static class BotReach
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotReach));
@@ -153,6 +127,7 @@ public static class BotReach
 
     private static BotReachVerdict Sweep(Map map, Point3D goal, BotArrival arrival, bool hasHere, int here)
     {
+
         var reach = Math.Min(arrival.Tiles, MaxSweep);
         var goalZ = (sbyte)Math.Clamp(goal.Z, sbyte.MinValue, sbyte.MaxValue);
         var sealedSeen = false;

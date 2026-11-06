@@ -7,31 +7,9 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// One bot as the debugger has actually seen it: everything here was measured by this file, on this file's
-/// own clock, since the moment the debugger first laid eyes on the bot.
-///
-/// <para>
-/// <b>Nothing is read out of a stamp the bot is carrying, and that is deliberate.</b> A bot holds several
-/// tick stamps — when it took its work on, when its work last said anything but "working" — and every one
-/// of them is unusable for this purpose the moment it has not been set: on some hosts the tick counter is
-/// the machine's uptime and starts enormous, so an unseeded stamp does not read as "never", it reads as
-/// "eleven days". A debugger built on those would report a population that had been frozen since before the
-/// shard started. So the durations below are all of the form "for as long as I have been watching", which is
-/// a smaller claim and a true one, and the prompt says so in those words.
-/// </para>
-///
-/// <para>
-/// <b>Every symptom carries the number it was raised on.</b> A row that says "stuck" is worth nothing; a row
-/// that says "has not left 1441,1502 for 11 minutes while its journey wants 1502,1601, 40 tiles off" is a
-/// defect report. This is the same rule the shard's own summaries are held to — a count with no denominator
-/// and no unit is a sentence that cannot be checked — and it matters more here than anywhere else, because
-/// what reads these rows is a language model, and a model handed an adjective will produce a paragraph of
-/// adjectives back.
-/// </para>
-/// </summary>
 public sealed class BotWatch
 {
+
     public static int FrozenMs { get; set; } = 90000;
 
     public static int ImmortalMs { get; set; } = 300000;
@@ -424,6 +402,7 @@ public sealed class BotWatch
         }
         else
         {
+
             NoCloserMs = 0;
         }
     }
@@ -822,6 +801,7 @@ public sealed class BotWatch
 
             if (!string.IsNullOrWhiteSpace(Why))
             {
+
                 sb.Append(
                     _kind == "-"
                         ? " The last work it took, now over, was chosen because: "

@@ -2,25 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a captain the worst square on the island and a company to take there.
-///
-/// <para>
-/// <b>It answers one bot, and that is the whole of what "authority" means on this shard.</b> There is no
-/// rank, no chain of command and nothing anybody is obliged to do. A captain gets an offer nobody else gets;
-/// the bots it calls on are free, come because they were free, and go back to their own business the moment
-/// the company ends. This project has refused to model obedience since the first week — a bot that does what
-/// it is told is a bot whose motivation has been replaced by somebody else's — and a proposer that only ever
-/// answers one class is the entire mechanism by which one bot can nevertheless lead.
-/// </para>
-///
-/// <para>
-/// <b>It refuses far more often than it offers, and every refusal is named.</b> A patrol needs a captain, a
-/// quiet captain, volunteers standing near it and somewhere genuinely dangerous to go — and when there is no
-/// patrol happening, "which of those four was missing" is the only question worth being able to answer. An
-/// unnamed nought is the failure mode this shard has paid for more than any other.
-/// </para>
-/// </summary>
 public sealed class BotPatrol : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPatrol));
@@ -114,6 +95,7 @@ public sealed class BotPatrol : IBotProposer
 
         if (square == Point3D.Zero)
         {
+
             if (Closed + Outmatched > refusedBefore)
             {
                 Unwinnable++;

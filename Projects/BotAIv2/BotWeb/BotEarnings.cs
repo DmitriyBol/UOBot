@@ -6,26 +6,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// <b>What the bots earn, for the page (29.09.2026, build 327; Patrick: "add money to the web dashboard — how much the bots
-/// earn; leave the special classes out").</b>
-///
-/// <para>
-/// Two numbers, because they answer different questions. <b>Earned</b> is the coin every settled undertaking brought into
-/// the pack (<see cref="BotTakings.Coin"/>, the "N coin" of each ending line), summed over the last hour: what work pays.
-/// <b>Net</b> is how the population's purses and bank balances together moved over the same hour, sampled once a minute:
-/// what work pays less what the bots spend on supplies, repairs, inns and ships. A shard where the first is healthy and the
-/// second is negative is one where the shopkeepers take everything.
-/// </para>
-///
-/// <para>
-/// The special classes are left out (<see cref="Excluded"/>): the Baron, the Captain, the Architect and the Sage hold posts
-/// — stipends, a till, the drill field, houses — and one of them moves more coin in an afternoon than a class of twelve,
-/// which would make the page about them.
-/// </para>
-/// </summary>
 public static class BotEarnings
 {
+
     public static string[] Excluded { get; set; } = ["Baron", "Captain", "Architect", "Sage"];
 
     public static int WindowMs { get; set; } = 3600000;
@@ -236,6 +219,7 @@ public static class BotEarnings
 
             if (sampledHours > 0 && then.Bots > 0 && bots.Bots > 0)
             {
+
                 w.WriteNumber("netPerBotPerHour", Math.Round(((double)bots.Wealth / bots.Bots - (double)then.Wealth / then.Bots) / sampledHours, 1));
             }
             else

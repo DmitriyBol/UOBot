@@ -6,31 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a fight to any bot healthy enough to want one.
-///
-/// <para>
-/// <b>Nothing decides who is a fighter.</b> No class list, no role check: whoever can beat the thing standing
-/// in the field is offered it, and a mage with wrestling at thirty will find that the arithmetic says no. That
-/// is the same rule as the pickaxe and the pen — the ability decides, not the name — and it means a crafter
-/// caught in a lean patch can go and hit something rather than sitting in a census as "nothing was worth
-/// doing".
-/// </para>
-///
-/// <para>
-/// <b>Only within the population's own ground, and that is the whole of the answer to the first version's
-/// worst night.</b> Four hundred and forty-three deaths, a hundred and four of them one bot resurrecting in
-/// the same tile every thirty seconds, all of it in the far zones the population had walked to. A hunt that
-/// cannot begin more than a screen and a half from where the bot is standing, in a world already bounded to
-/// two hundred tiles around the spawn, cannot build that loop: the bot is never far from where it gets up.
-/// </para>
-///
-/// <para>
-/// The cost of this proposer is a real spatial sweep, every time a free bot asks. That is unavoidable and it
-/// is the honest exception to "ask the world cheaply": a vein stays where it is and can be remembered, a shop
-/// keeper stands still, but a monster walks and respawns, so a remembered one is a lie inside a minute.
-/// </para>
-/// </summary>
 public sealed class BotHunter : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHunter));
@@ -97,6 +72,7 @@ public sealed class BotHunter : IBotProposer
         if (quarry != null
             && BotThreat.Overrun(body, quarry, BotMobile.NoticeRange))
         {
+
             BotQuarry.Crowd(quarry);
             Overrun++;
 
@@ -134,7 +110,9 @@ public sealed class BotHunter : IBotProposer
         sighted = null;
 
         var ledger = bot?.Resolve?.Ledger;
+
         var home = BotPopulation.HomeOf(body);
+
         var roam = Math.Clamp(BotPopulation.Leash(body) / 2, BotQuarry.Reach, Walkable);
 
         var best = Point3D.Zero;
@@ -356,6 +334,7 @@ public sealed class BotHunter : IBotProposer
 
             if (lethal || !dares)
             {
+
                 if (overland)
                 {
                     Overmatched++;
@@ -781,6 +760,7 @@ public sealed class BotHunter : IBotProposer
 
     private static Point3D Feared(Mobile body, Map map)
     {
+
         var middle = BotQuad.WorstNear(map, BotPopulation.HomeOf(body), FearedReach);
 
         if (middle == Point2D.Zero || !BotStep.Settle(map, middle.X, middle.Y, out var z))
@@ -976,6 +956,7 @@ public sealed class BotHunter : IBotProposer
 
             if (zone.Level >= BotZoneLevel.Hostile)
             {
+
                 if (zone.Threat > together * ZoneDare)
                 {
                     continue;
@@ -1010,6 +991,7 @@ public sealed class BotHunter : IBotProposer
             }
 
             var away = Math.Max(Math.Abs(zone.Stand.X - body.X), Math.Abs(zone.Stand.Y - body.Y));
+
             var score = quarry * worth * BotQuarry.ZonePays(zone.Kinds, body) / (1.0 + away / 150.0);
 
             if (score <= 0.0)

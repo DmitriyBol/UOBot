@@ -4,12 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-web.json</c> may say. Everything optional; an empty file keeps the code's numbers.
-/// Keys are PascalCase and a wrong key is silent — the boot line is the proof of what took.
-/// </summary>
 public sealed class BotWebSettings
 {
+
     public bool? Enabled { get; set; }
 
     public string Bind { get; set; }

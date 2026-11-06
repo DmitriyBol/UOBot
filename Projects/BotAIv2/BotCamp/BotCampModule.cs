@@ -5,9 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-camp.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotCampSettings
 {
+
     public bool? Running { get; set; }
 
     public double? LighterShare { get; set; }
@@ -53,11 +53,6 @@ public sealed class BotCampSettings
     public int? MostLinesEach { get; set; }
 }
 
-/// <summary>
-/// Fires in the woods, company round them, and a word on the road, as a module: reads its numbers, puts its words into the
-/// voice's bank, offers the camp and the seat to the auction, and runs the camp's clock — the fires fed and talked at, and
-/// a slice of the population looked at for meetings — once a second. Patrick's point 6 of 29.09.2026. See <see cref="BotCamp"/>.
-/// </summary>
 public sealed class BotCampModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCampModule));

@@ -6,27 +6,9 @@ using Server.Spells;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Mending: what a bot can heal with, who needs it, and the two ways of doing it.
-///
-/// <para>
-/// <b>Spell before bandage, for anybody who can cast at all.</b> Not a preference — an ordering with three
-/// reasons behind it. A spell lands in a couple of seconds where a bandage on yourself takes nine or ten; mana
-/// comes back on its own where bandages cost money at a counter; and the herbs a heal spends are the ones a
-/// caster is already walking to town for. So the cloth is what a caster falls back to when the pool is empty,
-/// and what everybody else has instead.
-/// </para>
-///
-/// <para>
-/// <b>Every judgement about whether healing is possible belongs to the engine.</b> A bandage refuses an
-/// undamaged patient by itself — "That being is not damaged!" — which is the anti-exploit this project would
-/// otherwise have had to invent, because "bandage a healthy friend for ever" is the training dummy in a
-/// different coat. A spell consumes its own reagents and mana in its own sequence. Nothing here simulates a
-/// heal.
-/// </para>
-/// </summary>
 public static class BotMend
 {
+
     public static int BeyondMs { get; set; } = 10000;
 
     private static readonly Dictionary<Serial, long> _beyond = [];

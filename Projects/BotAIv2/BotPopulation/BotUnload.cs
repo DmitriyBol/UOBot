@@ -6,32 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Going to the counter when the pack is getting heavy: coin into the account, everything spare into the bank box — except
-/// what somebody near has said it wants, which stays in the pack for a carrier's walk.
-///
-/// <para>
-/// <b>Being unable to move is the one failure a bot cannot work its way out of.</b> Past the engine's
-/// overweight line every step costs five stamina and more, and with none left the step is refused outright —
-/// so the cure for a full pack is a walk to the bank, and a full pack is exactly what stops the walk. Nothing
-/// in this project acted on that: the fact was readable and nobody read it.
-/// </para>
-///
-/// <para>
-/// So it is caught early, before the line rather than after it. What goes is decided by what a bot is for:
-/// coin belongs in an account, surplus in the bank box where the bot's own shop by the bank sells it and a peddle takes what
-/// nobody asks for to a shopkeeper, and the kit, the supplies and the tools of the trade stay exactly where they are — a bot
-/// that unloaded its own bandages to make room for a rusty sword has not solved anything.
-/// </para>
-///
-/// <para>
-/// <b>Nothing goes on a market from here any more (01.10.2026, Patrick's order of 30.09: the auction removed, every purchase
-/// hand to hand).</b> The porter used to fill wants and list the rest on the auction's stalls from wherever it stood — 4 things
-/// straight to a standing order and 409 trips "because the board wanted something in the pack" in the five minutes to 16:52 on
-/// 30.09.2026. A want is answered by a walk now (<see cref="BotCourier"/>), so what somebody within a carrier's reach wants is
-/// kept in the pack for that walk (<see cref="Filled"/>) and everything else is put away.
-/// </para>
-/// </summary>
 public sealed class BotUnload : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotUnload));
@@ -127,26 +101,11 @@ public sealed class BotUnload : BotDeed
 
         if (_counter == Point3D.Zero)
         {
+
             if (BotLadder.Load(body) > BotLadder.Ceiling(body))
             {
-                if (Refilling(body))
-                {
-                    return BotDoing.Failed(Treadmilled(body));
-                }
 
-                var freed = Store(bot, body, true);
-
-                Shed += freed;
-                Stranded++;
-
-                if (freed > 0)
-                {
-                    return BotDoing.Done(
-                        $"{freed} lots put in the bank box from where it stood, too heavy to walk and no counter known"
-                    );
-                }
-
-                return Ditch(bot, body);
+                return StandStill(bot, body, false);
             }
 
             return BotDoing.Failed("nowhere known to put it");
@@ -156,27 +115,17 @@ public sealed class BotUnload : BotDeed
 
         if (!stuck && !body.InRange(_counter, Reach))
         {
+
             return BotDoing.Walk(_map, _counter, BotArrival.Within(Reach), "to the counter with a full pack");
         }
 
         if (stuck && !body.InRange(_counter, Reach))
         {
-            if (Refilling(body))
-            {
-                return BotDoing.Failed(Treadmilled(body));
-            }
 
-            var shed = Store(bot, body, true);
-
-            Shed += shed;
-
-            if (shed > 0)
-            {
-                return BotDoing.Done($"{shed} lots put in the bank box from where it stood, too heavy to walk");
-            }
-
-            return Ditch(bot, body);
+            return StandStill(bot, body, true);
         }
+
+        Gather(body, true);
 
         var carried = body.Backpack?.Items.Count ?? 0;
         var held = Filled;
@@ -258,6 +207,18 @@ public sealed class BotUnload : BotDeed
 
         List<Item> carried = [.. pack.Items];
 
+        if (all)
+        {
+            carried.Sort(
+                (a, b) =>
+                {
+                    var made = b.PlayerConstructed.CompareTo(a.PlayerConstructed);
+
+                    return made != 0 ? made : WorthPerStone(b).CompareTo(WorthPerStone(a));
+                }
+            );
+        }
+
         for (var i = 0; i < carried.Count; i++)
         {
             var item = carried[i];
@@ -299,6 +260,7 @@ public sealed class BotUnload : BotDeed
 
             if (over < Math.Max(1, item.Amount))
             {
+
                 if (Mobile.LiftItemDupe(item, over) == null)
                 {
                     continue;
@@ -445,17 +407,21 @@ public sealed class BotUnload : BotDeed
     public static bool Treadmill(Mobile body) =>
         body != null && _treadmill.TryGetValue(body.Serial, out var when) && Core.TickCount - when < TreadmillMs;
 
-    private static bool Refilling(Mobile body)
+    private static bool Refilling(Mobile body, out bool lighter)
     {
         var now = Core.TickCount;
         var load = BotLadder.Load(body);
 
         var count = 1;
 
+        lighter = false;
+
         if (_passes.TryGetValue(body.Serial, out var last) && now - last.Tick < PassMs)
         {
+
             if (load >= last.Load || last.Count + 1 >= MostPasses)
             {
+                lighter = load < last.Load;
                 _passes.Remove(body.Serial);
                 _treadmill[body.Serial] = now;
                 Treadmills++;
@@ -476,9 +442,12 @@ public sealed class BotUnload : BotDeed
         return false;
     }
 
-    private static string Treadmilled(Mobile body) =>
-        $"still too heavy to walk at {BotLadder.Load(body)} of {BotLadder.Ceiling(body)} stones, no lighter than when the last pass "
-        + "put things away from where it stood; left alone for a while";
+    private static string Treadmilled(Mobile body, bool lighter) =>
+        lighter
+            ? $"still too heavy to walk at {BotLadder.Load(body)} of {BotLadder.Ceiling(body)} stones after {MostPasses} passes inside "
+              + $"{PassMs / 1000}s, each a little lighter; left alone for a while"
+            : $"still too heavy to walk at {BotLadder.Load(body)} of {BotLadder.Ceiling(body)} stones, no lighter than when the last "
+              + "pass put things away from where it stood; left alone for a while";
 
     public static bool Wedged(Mobile body) =>
         body != null && _wedged.TryGetValue(body.Serial, out var when) && Core.TickCount - when < WedgedMs;
@@ -649,24 +618,238 @@ public sealed class BotUnload : BotDeed
     public static int Holds(IBotWilful bot, Type kind, int over) =>
         bot?.Self == null ? 0 : Hold(bot, bot.Self, kind, over, [], false);
 
-    private static BotDoing Ditch(IBotWilful bot, Mobile body)
+    public static bool Releases { get; set; } = true;
+
+    public static int StuckFails { get; set; } = 3;
+
+    public static int StuckWindowMs { get; set; } = 600000;
+
+    public static int JoinMs { get; set; } = 60000;
+
+    public static long Joined { get; private set; }
+
+    public static long JoinedPacks { get; private set; }
+
+    public static long JoinedStones { get; private set; }
+
+    public static long StoodBanked { get; private set; }
+
+    public static long KitOver { get; private set; }
+
+    public static long Released { get; private set; }
+
+    public static long ReleasedBoxed { get; private set; }
+
+    public static long ReleasedGround { get; private set; }
+
+    public static long GroundWorth { get; private set; }
+
+    public static long StuckTrips { get; private set; }
+
+    public static long StuckWithheld { get; private set; }
+
+    public static int StuckNow { get; private set; }
+
+    private static readonly Dictionary<Serial, (long Since, int Count, int Load)> _noLighter = [];
+
+    private static readonly Dictionary<Serial, int> _stuckAt = [];
+
+    private static readonly Dictionary<Serial, long> _gatheredAt = [];
+
+    private static int Stones(Item item) => item.PileWeight + item.TotalWeight;
+
+    private BotDoing StandStill(IBotWilful bot, Mobile body, bool counterKnown)
     {
-        var dumped = Dump(bot, body);
-
-        if (dumped > 0)
+        if (Refilling(body, out var lighter))
         {
-            Dumped += dumped;
 
-            return BotDoing.Done($"{dumped} things nobody would buy left on the ground, to be able to walk again");
+            if (lighter)
+            {
+                _noLighter.Remove(body.Serial);
+            }
+            else
+            {
+                NoLighter(bot, body);
+            }
+
+            return BotDoing.Failed(Treadmilled(body, lighter));
+        }
+
+        if (!counterKnown)
+        {
+            Stranded++;
+        }
+
+        var before = BotLadder.Load(body);
+        var joined = Gather(body, true);
+        var banked = 0;
+        var shed = 0;
+        var dumped = 0;
+        var released = 0;
+        var stocked = 0;
+
+        if (BotLadder.Overloaded(body) && !BotOutlaw.IsRed(body))
+        {
+            banked = Bank(body);
+            StoodBanked += banked;
+        }
+
+        if (BotLadder.Overloaded(body))
+        {
+            shed = Store(bot, body, true);
+            Shed += shed;
+        }
+
+        if (BotLadder.Overloaded(body))
+        {
+            dumped = Dump(bot, body, false);
+            Dumped += dumped;
+        }
+
+        if (BotLadder.Overloaded(body) && Releases)
+        {
+            released = Release(bot, body);
+        }
+
+        if (BotLadder.Overloaded(body))
+        {
+            stocked = Dump(bot, body, true);
+            Dumped += stocked;
+        }
+
+        _banked = banked;
+        _stored = shed;
+
+        var after = BotLadder.Load(body);
+        var ceiling = BotLadder.Ceiling(body);
+        var did = $"{joined} piles joined, {banked}gp banked, {shed} lots boxed, {dumped} surplus things left on the ground, "
+                  + $"{released} kept things let go, {stocked} lots of its own wares left on the ground";
+
+        if (after <= ceiling)
+        {
+            _noLighter.Remove(body.Serial);
+
+            return BotDoing.Done($"can walk again at {after} of {ceiling} stones, from {before}, without a step: {did}");
+        }
+
+        if (after < before)
+        {
+
+            _noLighter.Remove(body.Serial);
+
+            return BotDoing.Done($"{before - after} stones lighter from where it stood ({did}), still over at {after} of {ceiling}");
         }
 
         Immovable++;
         _wedged[body.Serial] = Core.TickCount;
+        NoLighter(bot, body);
 
-        return BotDoing.Failed("too heavy to walk, and nothing on it the market would take or the ground would hold");
+        return BotDoing.Failed(
+            $"too heavy to walk at {after} of {ceiling} stones, and nothing on it could be joined, banked, boxed or put down; "
+            + $"the heaviest: {Heaviest(bot, body, 3)}"
+        );
     }
 
-    private static int Dump(IBotWilful bot, Mobile body)
+    public static int Gather(Mobile body, bool force)
+    {
+        var pack = body?.Backpack;
+
+        if (pack == null || pack.Deleted || pack.Items.Count < 2)
+        {
+            return 0;
+        }
+
+        if (!force)
+        {
+            var now = Core.TickCount;
+
+            if (_gatheredAt.TryGetValue(body.Serial, out var at) && now - at < JoinMs)
+            {
+                return 0;
+            }
+
+            if (_gatheredAt.Count > 4096)
+            {
+                _gatheredAt.Clear();
+            }
+
+            _gatheredAt[body.Serial] = now;
+        }
+
+        var bond = (body as BotMobile)?.Bond;
+        var before = body.TotalWeight;
+        Dictionary<(Type, int, int, double, LootType), Item> first = [];
+
+        List<Item> items = [.. pack.Items];
+        var joined = 0;
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+
+            if (item == null || item.Deleted || !item.Stackable || !item.Movable || item is Container || item.Parent != pack
+                || BotBinding.IsBound(item, bond))
+            {
+                continue;
+            }
+
+            var key = (item.GetType(), item.ItemID, item.Hue, item.Weight, item.LootType);
+
+            if (!first.TryGetValue(key, out var pile) || pile.Deleted || pile.Parent != pack)
+            {
+                first[key] = item;
+
+                continue;
+            }
+
+            if (pile.StackWith(body, item, false))
+            {
+                joined++;
+
+                continue;
+            }
+
+            first[key] = item;
+        }
+
+        if (joined > 0)
+        {
+            Joined += joined;
+            JoinedPacks++;
+            JoinedStones += Math.Max(0, before - body.TotalWeight);
+        }
+
+        return joined;
+    }
+
+    public static void IntoPack(Mobile body, Container pack, Item item)
+    {
+        if (pack == null || item == null || item.Deleted)
+        {
+            return;
+        }
+
+        if (item.Stackable)
+        {
+            var bond = (body as BotMobile)?.Bond;
+            var items = pack.Items;
+
+            for (var i = 0; i < items.Count; i++)
+            {
+                var pile = items[i];
+
+                if (pile is { Deleted: false } && pile is not Container && pile != item && pile.Weight == item.Weight
+                    && pile.LootType == item.LootType && !BotBinding.IsBound(pile, bond) && pile.StackWith(body, item, false))
+                {
+                    return;
+                }
+            }
+        }
+
+        pack.DropItem(item);
+    }
+
+    private static int Release(IBotWilful bot, Mobile body)
     {
         var pack = body?.Backpack;
 
@@ -677,7 +860,275 @@ public sealed class BotUnload : BotDeed
 
         var keep = Needed(bot);
         Dictionary<Type, int> seen = [];
-        var loose = new List<Item>();
+        List<Item> kept = [];
+
+        for (var i = 0; i < pack.Items.Count; i++)
+        {
+            var item = pack.Items[i];
+
+            if (item == null || item.Deleted || !item.Movable || item is Gold || BotBinding.IsBound(item, bot.Bond))
+            {
+                continue;
+            }
+
+            if (Over(keep, seen, item) > 0)
+            {
+                continue;
+            }
+
+            if (Stones(item) <= 0 || BotBinding.BoundCount(item.GetType(), bot.Bond) > 0)
+            {
+                continue;
+            }
+
+            kept.Add(item);
+        }
+
+        if (kept.Count == 0)
+        {
+            return 0;
+        }
+
+        KitOver++;
+
+        logger.Warning(
+            "{Name} is over its ceiling at {Load} of {Ceiling} stones on what it is allowed to keep, which is a kit it cannot carry: {Heaviest}; its kept things go to its bank box, or the ground, least worth a stone first, until it can walk",
+            body.Name,
+            BotLadder.Load(body),
+            BotLadder.Ceiling(body),
+            Heaviest(bot, body, Census)
+        );
+
+        kept.Sort(
+            (a, b) =>
+            {
+                var order = WorthPerStone(a).CompareTo(WorthPerStone(b));
+
+                return order != 0 ? order : Stones(b).CompareTo(Stones(a));
+            }
+        );
+
+        var box = body.BankBox;
+        var put = 0;
+
+        for (var i = 0; i < kept.Count; i++)
+        {
+            if (!BotLadder.Overloaded(body))
+            {
+                break;
+            }
+
+            var item = kept[i];
+
+            if (Stones(item) <= 0)
+            {
+                break;
+            }
+
+            var kind = item.GetType();
+            var units = Math.Max(1, item.Amount);
+
+            if (box is { Deleted: false } && box.TryDropItem(body, item, false))
+            {
+                ReleasedBoxed++;
+                put++;
+
+                continue;
+            }
+
+            var worth = (long)units * BotMarket.Worth(kind, 1);
+
+            item.MoveToWorld(body.Location, body.Map);
+            ReleasedGround++;
+            GroundWorth += worth;
+            put++;
+
+            logger.Warning(
+                "{Name} put its own {Units} {Kind} on the ground at {X},{Y}, worth about {Worth}gp: kept things it could not carry and its bank box would not take",
+                body.Name,
+                units,
+                kind.Name,
+                body.X,
+                body.Y,
+                worth
+            );
+        }
+
+        Released += put;
+
+        return put;
+    }
+
+    private static string Heaviest(IBotWilful bot, Mobile body, int many)
+    {
+        Dictionary<Type, (int Units, int Piles, int Stones, bool Bound)> kinds = [];
+        var pack = body.Backpack;
+
+        if (pack != null)
+        {
+            for (var i = 0; i < pack.Items.Count; i++)
+            {
+                var item = pack.Items[i];
+
+                if (item == null || item.Deleted)
+                {
+                    continue;
+                }
+
+                var kind = item.GetType();
+                var had = kinds.TryGetValue(kind, out var was) ? was : default;
+
+                kinds[kind] = (had.Units + Math.Max(1, item.Amount), had.Piles + 1, had.Stones + Stones(item),
+                    had.Bound || BotBinding.IsBound(item, bot?.Bond) || BotBinding.BoundCount(kind, bot?.Bond) > 0);
+            }
+        }
+
+        List<(string Said, int Stones)> heavy = [];
+
+        foreach (var (kind, (units, piles, stones, bound)) in kinds)
+        {
+            var lying = piles > 1 ? $" in {piles} piles" : "";
+            var tied = bound ? ", bound" : "";
+
+            heavy.Add(($"{kind.Name} x{units}{lying}{tied}", stones));
+        }
+
+        var worn = body.Items;
+
+        for (var i = 0; i < worn.Count; i++)
+        {
+            var item = worn[i];
+
+            if (item == null || item.Deleted || item.IsVirtualItem || item.Layer == Layer.Backpack || item is Container)
+            {
+                continue;
+            }
+
+            var stones = Stones(item);
+
+            if (stones > 0)
+            {
+                heavy.Add(($"{item.GetType().Name} worn{(BotBinding.IsBound(item, bot?.Bond) ? ", bound" : "")}", stones));
+            }
+        }
+
+        if (heavy.Count == 0)
+        {
+            return "nothing that weighs";
+        }
+
+        heavy.Sort((a, b) => b.Stones.CompareTo(a.Stones));
+
+        List<string> named = [];
+
+        for (var i = 0; i < heavy.Count && i < many; i++)
+        {
+            named.Add($"{heavy[i].Said} {heavy[i].Stones} stones");
+        }
+
+        return string.Join(", ", named);
+    }
+
+    private static void NoLighter(IBotWilful bot, Mobile body)
+    {
+        var now = Core.TickCount;
+        var load = BotLadder.Load(body);
+        var since = now;
+        var count = 1;
+
+        if (_noLighter.TryGetValue(body.Serial, out var was) && now - was.Since < StuckWindowMs && was.Load == load)
+        {
+            since = was.Since;
+            count = was.Count + 1;
+        }
+
+        if (count < StuckFails)
+        {
+            if (_noLighter.Count > 4096)
+            {
+                _noLighter.Clear();
+            }
+
+            _noLighter[body.Serial] = (since, count, load);
+
+            return;
+        }
+
+        _noLighter.Remove(body.Serial);
+
+        if (_stuckAt.Count > 4096)
+        {
+            _stuckAt.Clear();
+        }
+
+        _stuckAt[body.Serial] = load;
+        StuckTrips++;
+
+        logger.Warning(
+            "{Name} got no lighter in {Count} stand-still passes in {Minutes} minutes at {Load} of {Ceiling} stones and is not offered the pass again until its weight changes; it carries {Heaviest}",
+            body.Name,
+            count,
+            (now - since) / 60000,
+            load,
+            BotLadder.Ceiling(body),
+            Heaviest(bot, body, Census)
+        );
+    }
+
+    public static bool SetAside(Mobile body)
+    {
+        if (body == null || !_stuckAt.TryGetValue(body.Serial, out var load))
+        {
+            return false;
+        }
+
+        if (BotLadder.Load(body) == load && BotLadder.Overloaded(body))
+        {
+            return true;
+        }
+
+        _stuckAt.Remove(body.Serial);
+
+        return false;
+    }
+
+    public static void Withhold() => StuckWithheld++;
+
+    public static long StockSpared { get; private set; }
+
+    public static long StockGround { get; private set; }
+
+    public static long StockGroundWorth { get; private set; }
+
+    private static bool Ware(IBotWilful bot, Item item, int over, Dictionary<Type, int> held) =>
+        item.PlayerConstructed || BotMarket.Holding(bot, item.GetType(), over, held) > 0;
+
+    private static double WorthPerStone(Item item)
+    {
+        var weight = item.Weight;
+
+        if (weight <= 0.0 && item.TotalWeight <= 0)
+        {
+            return double.MaxValue;
+        }
+
+        return item is Container ? double.MaxValue / 2 : BotMarket.Worth(item.GetType(), 1) / Math.Max(weight, 0.01);
+    }
+
+    private static int Dump(IBotWilful bot, Mobile body, bool wares)
+    {
+        var pack = body?.Backpack;
+
+        if (pack == null)
+        {
+            return 0;
+        }
+
+        var keep = Needed(bot);
+        Dictionary<Type, int> seen = [];
+        Dictionary<Type, int> held = [];
+        List<(Item Item, int Over, double PerStone)> loose = [];
+        var spared = 0;
 
         for (var i = 0; i < pack.Items.Count; i++)
         {
@@ -693,17 +1144,35 @@ public sealed class BotUnload : BotDeed
                 continue;
             }
 
-            if (Over(keep, seen, item) <= 0)
+            var over = Over(keep, seen, item);
+
+            if (over <= 0)
             {
                 continue;
             }
 
-            loose.Add(item);
+            if (Ware(bot, item, over, held) != wares)
+            {
+                spared += wares ? 0 : 1;
+
+                continue;
+            }
+
+            loose.Add((item, over, WorthPerStone(item)));
         }
 
-        loose.Sort((a, b) => b.TotalWeight.CompareTo(a.TotalWeight));
+        loose.Sort(
+            (a, b) =>
+            {
+                var order = a.PerStone.CompareTo(b.PerStone);
+
+                return order != 0 ? order : Stones(b.Item).CompareTo(Stones(a.Item));
+            }
+        );
 
         var put = 0;
+        var worth = 0L;
+        List<string> what = [];
 
         for (var i = 0; i < loose.Count; i++)
         {
@@ -712,24 +1181,75 @@ public sealed class BotUnload : BotDeed
                 break;
             }
 
-            if (keep.TryGetValue(loose[i].GetType(), out var cap) && cap > 0 && cap < int.MaxValue)
+            var (lot, over, perStone) = loose[i];
+
+            if (perStone >= double.MaxValue)
             {
-                BotSurplus.Count(BotSurplus.Ground, loose[i].GetType(), Math.Max(1, loose[i].Amount));
+                break;
             }
 
-            loose[i].MoveToWorld(body.Location, body.Map);
+            if (lot.Deleted || lot.Parent != pack)
+            {
+                continue;
+            }
+
+            if (over < Math.Max(1, lot.Amount) && Mobile.LiftItemDupe(lot, over) == null)
+            {
+                continue;
+            }
+
+            var kind = lot.GetType();
+            var units = Math.Max(1, lot.Amount);
+
+            if (keep.TryGetValue(kind, out var cap) && cap > 0 && cap < int.MaxValue)
+            {
+                BotSurplus.Count(BotSurplus.Ground, kind, units);
+            }
+
+            worth += (long)units * BotMarket.Worth(kind, 1);
+            what.Add($"{units} {kind.Name}");
+
+            lot.MoveToWorld(body.Location, body.Map);
             put++;
+        }
+
+        if (!wares)
+        {
+            StockSpared += spared;
         }
 
         if (put > 0)
         {
-            logger.Warning(
-                "{Name} could neither walk nor sell, and has put {Put} things on the ground at {X},{Y} to move again",
-                body.Name,
-                put,
-                body.X,
-                body.Y
-            );
+            GroundWorth += worth;
+
+            if (wares)
+            {
+                StockGround += put;
+                StockGroundWorth += worth;
+
+                logger.Warning(
+                    "{Name} could neither walk nor sell, had nothing left to put down but its own wares, and has put {Put} lots of them on the ground at {X},{Y}, worth about {Worth}gp: {What}",
+                    body.Name,
+                    put,
+                    body.X,
+                    body.Y,
+                    worth,
+                    string.Join(", ", what)
+                );
+            }
+            else
+            {
+                logger.Warning(
+                    "{Name} could neither walk nor sell, and has put {Put} things on the ground at {X},{Y} to move again, worth about {Worth}gp, least worth a stone first ({Spared} lots of its own wares kept): {What}",
+                    body.Name,
+                    put,
+                    body.X,
+                    body.Y,
+                    worth,
+                    spared,
+                    string.Join(", ", what)
+                );
+            }
         }
 
         return put;
@@ -752,6 +1272,15 @@ public sealed class BotUnload : BotDeed
         var overUnits = 0;
         var worstUnits = 0;
         var worst1 = "";
+
+        Dictionary<(Type, int, int, double, LootType), (int Piles, int Units, int Stones)> piles = [];
+        Dictionary<Type, int> looseKinds = [];
+        var loosePiles = 0;
+        var looseStones = 0;
+        var loosePacks = 0;
+        var overNow = 0;
+        var stuckNow = 0;
+        List<string> stuckNames = [];
         var boxes = 0;
         var full = 0;
 
@@ -782,17 +1311,44 @@ public sealed class BotUnload : BotDeed
                 blockedBots++;
             }
 
+            if (BotLadder.Overloaded(body))
+            {
+                overNow++;
+
+                if (SetAside(body))
+                {
+                    stuckNow++;
+                    stuckNames.Add($"{body.Name} {BotLadder.Load(body)}/{BotLadder.Ceiling(body)}");
+                }
+            }
+
+            piles.Clear();
+
             for (var j = 0; j < pack.Items.Count; j++)
             {
                 var item = pack.Items[j];
 
-                if (item == null || item.Deleted || item is Gold || BotBinding.IsBound(item, body.Bond))
+                if (item == null || item.Deleted)
+                {
+                    continue;
+                }
+
+                if (item.Stackable && item is not Container)
+                {
+                    var key = (item.GetType(), item.ItemID, item.Hue, item.Weight, item.LootType);
+                    var heap = piles.TryGetValue(key, out var p) ? p : default;
+
+                    piles[key] = (heap.Piles + 1, heap.Units + Math.Max(1, item.Amount), heap.Stones + item.PileWeight);
+                }
+
+                if (item is Gold || BotBinding.IsBound(item, body.Bond))
                 {
                     continue;
                 }
 
                 var kind = item.GetType();
                 var many = Math.Max(1, item.Amount);
+
                 var weight = (double)(item.PileWeight + item.TotalWeight);
 
                 carried += weight;
@@ -839,7 +1395,31 @@ public sealed class BotUnload : BotDeed
                     worst1 = body.Name;
                 }
             }
+
+            var apart = false;
+
+            foreach (var ((kind, _, _, each, _), (count, amount, weighs)) in piles)
+            {
+                if (count < 2)
+                {
+                    continue;
+                }
+
+                var extra = weighs - (int)Math.Ceiling(each * amount);
+
+                apart = true;
+                loosePiles += count - 1;
+                looseStones += extra;
+                looseKinds[kind] = looseKinds.GetValueOrDefault(kind) + extra;
+            }
+
+            if (apart)
+            {
+                loosePacks++;
+            }
         }
+
+        StuckNow = stuckNow;
 
         if (looked == 0)
         {
@@ -872,7 +1452,47 @@ public sealed class BotUnload : BotDeed
         }
 
         return $"{looked} packs hold {carried:F0} stones, {surplus:F0} of it over what the bots are allowed to "
-               + $"keep ({surplus / Math.Max(1.0, carried) * 100.0:F0}%); heaviest: {string.Join(", ", named)}; {capped}";
+               + $"keep ({surplus / Math.Max(1.0, carried) * 100.0:F0}%); heaviest: {string.Join(", ", named)}; {capped}; "
+               + $"{Loose(loosePiles, loosePacks, looseStones, looseKinds)}; {Ceilinged(overNow, stuckNow, stuckNames)}";
+    }
+
+    private static string Loose(int piles, int packs, int stones, Dictionary<Type, int> byKind)
+    {
+        if (piles == 0)
+        {
+            return "no pack holds piles of one kind lying apart";
+        }
+
+        List<(Type Kind, int Stones)> kinds = [];
+
+        foreach (var (kind, extra) in byKind)
+        {
+            kinds.Add((kind, extra));
+        }
+
+        kinds.Sort((a, b) => b.Stones.CompareTo(a.Stones));
+
+        List<string> named = [];
+
+        for (var i = 0; i < kinds.Count && i < Census; i++)
+        {
+            named.Add($"{kinds[i].Kind.Name} {kinds[i].Stones}");
+        }
+
+        return $"loose piles: {piles} piles lying apart in {packs} packs weigh {stones} stones over the same things in one pile "
+               + $"({string.Join(", ", named)}); {Joined} piles joined in {JoinedPacks} packs so far, {JoinedStones} stones off";
+    }
+
+    private static string Ceilinged(int over, int stuck, List<string> names)
+    {
+        var who = stuck > 0 ? $" ({string.Join(", ", names)})" : "";
+
+        return $"over the ceiling now: {over} bots, stuck over the ceiling: {stuck} bots{who}; the stand-still pass: "
+               + $"{StoodBanked}gp banked from where a bot stood, {KitOver} packs over on their kept things alone ({Released} kept "
+               + $"things let go, {ReleasedBoxed} to the box and {ReleasedGround} to the ground), {GroundWorth}gp of things left on the "
+               + $"ground; wares: {StockSpared} lots spared by the ground drop, {StockGround} lots put down last ({StockGroundWorth}gp); "
+               + $"{StuckTrips} bots set aside by the breaker ({StuckFails} passes no lighter in {StuckWindowMs / 60000} "
+               + $"minutes), {StuckWithheld} offers withheld (one a review)";
     }
 
     private static string Capped(int bots, int units, Dictionary<Type, int> byKind, string worst, int worstUnits)
@@ -1141,6 +1761,7 @@ public sealed class BotUnload : BotDeed
 
         if (BotAnvil.Kit(body) != null)
         {
+
             BotAnvil.Keep(body, keep, Math.Max(BotBullion.Enough, BotSmith.Short(body)));
         }
 
@@ -1195,14 +1816,6 @@ public sealed class BotUnload : BotDeed
     }
 }
 
-/// <summary>
-/// Offers the trip to the counter to any bot whose pack is filling up.
-///
-/// <para>
-/// Only when it is actually heavy, so it costs nothing the rest of the time — and when it is offered it wins,
-/// because a bot that cannot walk cannot do anything else either.
-/// </para>
-/// </summary>
 public sealed class BotPorter : IBotProposer
 {
     public string Name => "Porter";
@@ -1220,6 +1833,19 @@ public sealed class BotPorter : IBotProposer
         }
 
         var laden = BotLadder.Load(body) >= BotLadder.Ceiling(body) * BotUnload.Heavy;
+
+        if (laden && BotUnload.SetAside(body))
+        {
+            BotUnload.Withhold();
+
+            return null;
+        }
+
+        if (laden && BotUnload.Gather(body, BotLadder.Overloaded(body)) > 0)
+        {
+            laden = BotLadder.Load(body) >= BotLadder.Ceiling(body) * BotUnload.Heavy;
+        }
+
         var flush = (body.Backpack?.TotalGold ?? 0) >= BotUnload.Purse;
 
         var immobile = BotLadder.Load(body) > BotLadder.Ceiling(body);

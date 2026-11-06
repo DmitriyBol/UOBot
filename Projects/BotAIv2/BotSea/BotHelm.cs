@@ -8,7 +8,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One ship at sea with a bot at its helm: where it is bound, how far along, and how it is going.</summary>
 public sealed class BotSeaVoyage
 {
     public enum Tide
@@ -81,37 +80,6 @@ public sealed class BotSeaVoyage
     public int Left(Point3D at) => Leg >= Course.Count ? 0 : BotHelm.Away(at, Course[Leg]) + Rest[Leg];
 }
 
-/// <summary>
-/// The helm: puts a bot's ship in the water and takes it aboard, steers every ship at sea on its own clock, puts it ashore
-/// at the far dock and dry-docks the ship into its pack again.
-///
-/// <para>
-/// <b>Steered through the ship's own movement, not the tillerman's words.</b> The tillerman obeys speech keywords, and a
-/// keyword is a number the client encodes into what a player types; a bot's <c>Say</c> carries none, so "forward" from a
-/// bot moves nothing. The helm calls what those keywords call — <c>BaseBoat.Move</c>, the same step the ship's own move
-/// timer takes, which asks <c>CanFit</c> of every tile it moves through, and <c>BaseBoat.Turn</c> — once every
-/// <see cref="StrokeMs"/>, the engine's own interval before High Seas, at the engine's own <see cref="Speed"/>: three tiles
-/// forward, one sideways or back. No ship here is faster than a player's.
-/// </para>
-///
-/// <para>
-/// <b>The ship is steered whatever the bot is doing.</b> A sea serpent that comes alongside puts the captain on the Hunted
-/// rung and its own will fights it from the deck, or runs about the deck; the helm is a timer, not the voyage's deed, so
-/// the ship sails on meanwhile — which is the flight a ship has. A voyage whose deed is dropped or paused is sailed to its
-/// dock and put ashore all the same: nobody is left adrift because an auction changed its mind.
-/// </para>
-///
-/// <para>
-/// <b>What happens when it goes wrong, each counted.</b> A ship that cannot move tries a step to either side (another
-/// ship in the way); after <see cref="StuckStrokes"/> it shuts the cell ahead and asks for a new course from where it is,
-/// up to <see cref="MostReroutes"/> times; blocked in the arrival harbour it lands where it is if there is shore within
-/// reach; blocked leaving its own harbour it puts back in. A captain who dies aboard leaves the ship at anchor where it is
-/// (the key is on the corpse); a captain no longer aboard leaves it too. A ship that makes no headway for
-/// <see cref="BecalmedMs"/>, or is out past its time, is wrecked: the shard's hand carries captain and crew to the nearest
-/// dock and dry-docks the ship into the captain's pack — the one thing here that moves a bot by hand, the last resort, and
-/// said by name.
-/// </para>
-/// </summary>
 public static class BotHelm
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHelm));
@@ -250,6 +218,7 @@ public static class BotHelm
 
         if (ship == null)
         {
+
             Clear(map, berth);
             ship = ShipOf(captain);
         }
@@ -1061,6 +1030,7 @@ public static class BotHelm
 
         if (home)
         {
+
             if (voyage.Lane != null)
             {
                 voyage.Lane.Lost++;
@@ -1160,6 +1130,7 @@ public static class BotHelm
 
     private static Point3D? Beside(Map map, Point3D spot)
     {
+
         for (var r = 1; r <= 3 && BotReachMap.Ready; r++)
         {
             for (var dx = -r; dx <= r; dx++)
@@ -1325,6 +1296,7 @@ public static class BotHelm
 
     private static void Lose(BotSeaVoyage voyage, string why)
     {
+
         if (voyage.State != BotSeaVoyage.Tide.Lost && voyage.Lane != null)
         {
             voyage.Lane.Lost++;

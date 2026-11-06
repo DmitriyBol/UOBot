@@ -5,18 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The fence's run out to the chest for the band's goods.
-///
-/// <para>
-/// <b>The other half of Patrick's keeper.</b> "Who looks after the band's goods and orders." The thieves carry their
-/// takings out to the chest (<c>BotStash</c>) and cannot go a step further, because every counter and every shopkeeper
-/// on this island stands inside a guarded town and a red is turned back at the wards. The fence can walk in as itself.
-/// So this deed is only the carrying: it fills the fence's pack from the chest and ends, and the island's ordinary
-/// machinery — the peddler's walk to a shopkeeper, the stalls, the market — turns the goods into coin without knowing
-/// where they came from. The coin goes back to the chest by the same sweep that sent the thieves' takings out.
-/// </para>
-/// </summary>
 public sealed class BotFetch : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFetch));
@@ -125,6 +113,7 @@ public sealed class BotFetch : BotDeed
 
         for (var i = 0; i < chest.Items.Count && taking.Count < Armful; i++)
         {
+
             if (chest.Items[i] is not { Deleted: false, Movable: true } item || item is Gold)
             {
                 continue;

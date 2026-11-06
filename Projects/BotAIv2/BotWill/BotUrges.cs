@@ -2,36 +2,9 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The two things a bot feels, and why there are only two.
-///
-/// <para>
-/// <b>Wanting things is not what drives this population — getting better at something is.</b> The first
-/// version made every motive a shortage, and shortages get filled: by the end of an hour thirty-eight of
-/// fifty-one bots were patrolling with their drive stuck at 0.62. That was not a defect in the arithmetic.
-/// They had run out of things to want. So the value of work here is the <em>rate</em> at which it produces
-/// skill and money — see <see cref="BotYield"/> — which cannot be satisfied and put away, because it falls
-/// to nothing on its own as the work stops teaching the bot anything. That is the mechanism, and this file
-/// is only what is left over.
-/// </para>
-///
-/// <para>
-/// <b>Boredom is what is left over on the empty side.</b> It is the one thing that grows while nothing
-/// happens, so it cannot be settled and forgotten, and it exists for the case the ledger cannot price: a bot
-/// with nothing on offer at all. It does not compete with work — it changes how work is chosen, by making a
-/// bored bot discount the thing it has been doing over and over and by shortening the margin it demands
-/// before trying something else.
-/// </para>
-///
-/// <para>
-/// <b>Need is what is left over on the full side, and it is a fact rather than a feeling</b>: how short the
-/// purse is of what this bot was about to try to do. Not a comfort line — the first version compared every
-/// purse against a flat 250 while handing every bot 100 at birth, so the entire population read as short of
-/// money from its first second, and a signal that is on for everybody always is not a signal.
-/// </para>
-/// </summary>
 public sealed class BotUrges
 {
+
     public static double BoredomPerMinute { get; set; } = 0.10;
 
     public static double ReliefPerHundred { get; set; } = 0.25;

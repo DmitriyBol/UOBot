@@ -6,7 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What the check found, published whole for the dashboard through one volatile reference.</summary>
 public sealed record BotReachCheckReport(
     int Version,
     int Asked,
@@ -20,26 +19,6 @@ public sealed record BotReachCheckReport(
     int Stood
 );
 
-/// <summary>
-/// The reach map examined where it is most likely wrong: on its borders, tile by tile, by the walker's own means rather than
-/// the map's.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026, night: "Argus and the debuggers must help."</b> The map is drawn by the navigation graph's
-/// probe (<see cref="BotReachBuilder"/>); the check asks the questions a bot's walker asks, through code that shares none of
-/// the map's own path: the walker's search (<see cref="BotPath.Find"/>, over the engine's step cache and the items on the
-/// ground), a flood of the walker's own steps (<see cref="BotStep.Mask"/>), and the walker's footing test. A free debugger is
-/// carried to each tile as it is examined, so a client standing with Argus sees where the map is being proved.
-/// </para>
-///
-/// <para>
-/// <b>What each class is asked.</b> Open ground: can the walker's search get onto the tile from open ground a few tiles off?
-/// Isle and pocket: can it — and if the search runs out of clock, does a flood of the walker's steps from the tile close
-/// within <see cref="FloodCells"/> (a pocket walked to its edges)? Water and blocked: can a walker standing on open ground
-/// beside it step onto it? An answer the walker's means cannot give (the clock ran out, the flood reached the world) is
-/// counted as unsure, never as agreement.
-/// </para>
-/// </summary>
 public static class BotReachCheck
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotReachCheck));

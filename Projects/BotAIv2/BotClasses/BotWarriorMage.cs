@@ -1,21 +1,5 @@
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Plate, a blade, and spells anyway.
-///
-/// The one class that is defined by what it gives up. Meditation is how a caster gets mana back, and
-/// the engine refuses it to anybody in metal — so a fighter who wanted to cast had to choose between
-/// armour and being able to cast twice. This class chooses armour and is paid back with mana that
-/// arrives on its own, in plate, in a fight, without sitting down.
-///
-/// Its trickle is worth the same as a mage's staff and does not stack with one: holding a mage's staff
-/// buys it nothing. The advantage is not the quantity, it is that its hands are free for a sword while
-/// it happens — and a mage that wants a sword has no answer to that at all.
-///
-/// It is the only class allowed two mana potions, for the same reason it is the only one with the
-/// trickle: mana is what it runs out of, and the bottle is the only mana available to anybody who is
-/// being hit.
-/// </summary>
 public sealed class BotWarriorMage : BotClass
 {
     public override string Name => "WarriorMage";

@@ -4,24 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// A log of its own, beside the shard's, holding what a mind decided and why.
-///
-/// <para>
-/// <b>Separate because it is a different kind of reading.</b> The session log is a stream of events at
-/// several a second; a mind produces one decision every few seconds and one reckoning after it, and both
-/// are paragraphs. Interleaved, each ruins the other: the thinking is lost in the traffic and the traffic
-/// is broken up by walls of text. Here they are in order, in one place, and the shard's own log gets one
-/// line per decision.
-/// </para>
-///
-/// <para>
-/// <b>Stamped with <see cref="DateTime.Now"/>, and that is a correction rather than a preference.</b>
-/// <c>Core.Now</c> is UTC while Serilog stamps local time, so a file written with the former cannot be laid
-/// beside a session log at all without arithmetic — and the whole reason to keep this file is to read the
-/// two together.
-/// </para>
-/// </summary>
 public static class BotMindLog
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMindLog));
@@ -41,6 +23,7 @@ public static class BotMindLog
 
         try
         {
+
             var folder = System.IO.Path.GetFullPath(System.IO.Path.Combine(Core.BaseDirectory, "..", "logs"));
 
             Directory.CreateDirectory(folder);

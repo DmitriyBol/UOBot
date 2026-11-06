@@ -4,25 +4,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The student's half of a class: pay, walk to the field, find your place in the block, and stay in it.
-///
-/// <para>
-/// <b>A separate undertaking on a separate bot, and it has to be.</b> The captain could not simply be given
-/// a list of pupils to improve: a bot that is being taught has stopped mining, stopped hunting and stopped
-/// spending, for a quarter of an hour, and on this shard that is a decision it makes for itself against
-/// everything else it could be doing. So attendance goes through the same auction as every other piece of
-/// work and loses to a good ore vein exactly as often as it deserves to. The one place this project has ever
-/// modelled being told what to do, it removed it again.
-/// </para>
-///
-/// <para>
-/// <b>Paid up front, and paid once.</b> The fee is taken when the bot arrives and enrols rather than when
-/// the lesson ends, for the same reason a shop takes money at the counter: an undertaking can be dropped for
-/// something better at any beat, and a debt that has to be collected from a bot that has wandered off to a
-/// mine is a debt nothing on this shard can collect.
-/// </para>
-/// </summary>
 public sealed class BotAttend : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAttend));
@@ -129,6 +110,7 @@ public sealed class BotAttend : BotDeed
         {
             if (_enrolled)
             {
+
                 return _stayPut
                     ? BotDoing.Walk(_map, BotSchool.Ground, BotArrival.Within(BotSchool.Pace * BotSchool.Rank), "back into the ranks")
                     : BotDoing.Walk(_map, BotSchool.Station(body), BotArrival.Within(0), "back to my place in the ranks");
@@ -193,7 +175,8 @@ public sealed class BotAttend : BotDeed
                 _nearest = gap;
                 _stalled = 0;
             }
-            else if (++_stalled >= StalledBeats && gap <= NearEnough)
+
+            else if (body is not BotMobile { Journey.Held: true } && ++_stalled >= StalledBeats && gap <= NearEnough)
             {
                 _stayPut = true;
                 Unstationed++;
@@ -253,6 +236,7 @@ public sealed class BotAttend : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+
         if (!_enrolled)
         {
             return false;

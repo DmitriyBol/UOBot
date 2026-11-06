@@ -6,20 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers whoever holds stolen goods the way to turn them into coin: the walk to the band's fence, who buys at half their worth,
-/// or — for the fence itself, or a thief with no fence to go to — the walk to a shopkeeper in another town than the one they
-/// were taken in.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "a fence".</b> The brief: a Shadow trader buys stolen goods at fifty per cent and resells them in
-/// another town; the market's worth applies; counted; and the fence may itself be caught — wanted once three stolen things are
-/// traced to it. The fence is <see cref="BotFence"/>'s keeper, the one member of the band who commits no crime: it pays out of
-/// its own purse (<see cref="FenceShare"/> of <see cref="BotMarket.Worth"/>), and sells over a counter as far from the theft as
-/// the leash allows. A sale in the town the thing was stolen in is traced <see cref="TraceAtHome"/> of the time, anywhere else
-/// <see cref="TraceChance"/>; <see cref="TracesToPost"/> traces and the town posts the seller.
-/// </para>
-/// </summary>
 public sealed class BotFencer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFencer));
@@ -302,7 +288,6 @@ public sealed class BotFencer : IBotProposer
     }
 }
 
-/// <summary>A thief's walk to the fence with stolen goods, and the sale at half their worth, pack to pack. See <see cref="BotFencer"/>.</summary>
 public sealed class BotFenceSale : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFenceSale));
@@ -444,6 +429,7 @@ public sealed class BotFenceSale : BotDeed
             }
             else
             {
+
                 BotCrime.Cool(thief, kind, want);
             }
         }
@@ -472,7 +458,6 @@ public sealed class BotFenceSale : BotDeed
     }
 }
 
-/// <summary>Stolen goods carried to a counter in another town and sold there. See <see cref="BotFencer"/>.</summary>
 public sealed class BotResell : BotDeed
 {
     public const string Trade = "resell";
@@ -549,6 +534,7 @@ public sealed class BotResell : BotDeed
 
         if (goods.Count == 0)
         {
+
             for (var i = lots.Count - 1; i >= 0; i--)
             {
                 BotCrime.Cool(body, lots[i].Kind, lots[i].Amount);

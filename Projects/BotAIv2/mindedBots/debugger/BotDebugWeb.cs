@@ -4,26 +4,9 @@ using Server.BotAI.V2;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The debugger squad on the dashboard's live window. Patrick, 02.10.2026: "windows that show the debuggers and what they
-/// are thinking right now."
-///
-/// <para>
-/// <b>Reported through <see cref="BotWebHooks.Debuggers"/>, as the minds' own line is.</b> The bot assembly may not reference
-/// this one, so it asks once a second, on the game loop and only while somebody has the window open, and gets one record a
-/// watcher: where its body stands, what it is doing there, the last thing it asked the model and what came back, and the last
-/// lines it wrote into <c>logs/bot-debugger.log</c>.
-/// </para>
-///
-/// <para>
-/// <b>Nothing here is a new opinion.</b> The doing is read off the same states the vigil reads before it moves a watcher on —
-/// a meeting it witnesses, a zone it holds for the tour, a place it heralds, the dungeons it charts, the bot it went to stand
-/// beside — in that order, which is the vigil's own order of precedence. The thinking is the answer as the vigil filed it, and
-/// the feed is the log's own lines, given to the watcher they name.
-/// </para>
-/// </summary>
 public static class BotDebugWeb
 {
+
     public static IReadOnlyList<BotDebuggerReport> Report()
     {
         var squad = BotVigil.Squad;
@@ -151,6 +134,7 @@ public static class BotDebugWeb
 
         if (who == null)
         {
+
             if (text[^1] == ':')
             {
                 return;

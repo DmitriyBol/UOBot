@@ -4,25 +4,9 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Buying one workbench for the guild's hall and setting it up.
-///
-/// <para>
-/// <b>Patrick's order of 08.09.2026: the tools are bought, not given.</b> The halls used to come furnished,
-/// which made a hall a single decision and then nothing. A guild that must buy its forge, then its anvil,
-/// then its loom has something to spend on for the rest of the evening — and this shard's oldest economic
-/// complaint is that its money has almost nowhere to go: a captain's till reached ninety-eight thousand gold
-/// doing nothing at all.
-/// </para>
-///
-/// <para>
-/// Same levy as the hall itself, same order of business: check, take the money, set the thing down, and hand
-/// the money back if it will not fit. What is different is that it is small and repeatable, so it is the
-/// first piece of work on this shard a guild does over and over as it gets richer.
-/// </para>
-/// </summary>
 public sealed class BotBench : BotDeed
 {
+
     public const string Trade = "fit";
 
     public static double Prior { get; set; } = 300.0;
@@ -116,6 +100,7 @@ public sealed class BotBench : BotDeed
 
         if (!BotFittings.Install(_hall, _bench))
         {
+
             BotEstate.Refund(paid, body);
 
             return BotDoing.Failed($"there is nowhere in the hall to put {_bench.Name}");

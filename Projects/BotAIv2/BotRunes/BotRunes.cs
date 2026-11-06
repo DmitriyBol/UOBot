@@ -9,37 +9,9 @@ using Server.Spells.Sixth;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Runes: a mage marks where it has stood, recalls there alone, and opens a gate there for its company.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point 7: "a mage with Magery 40+ marks a rune (Mark) where it has been, and then
-/// Gate Travel opens a gate for the whole company; Recall — alone. A rune library in the guild hall and a pathfinder who
-/// got there by gate or boat. Instant transfer of a company anywhere they have stood."</b> Until now the only way across
-/// the island was on foot, and a delve's party walked four hundred tiles to the mouth of Despise and a thousand to
-/// Shame's.
-/// </para>
-///
-/// <para>
-/// <b>Every cast is the engine's own spell object, cast by the engine's own sequence.</b> Mark is <see cref="MarkSpell"/>
-/// with its target filled in by the bot (<c>Target.Invoke</c> on a blank <see cref="RecallRune"/>, as the heals are
-/// aimed); Recall and Gate Travel are <see cref="RecallSpell"/> and <see cref="GateTravelSpell"/> built on a
-/// <see cref="RunebookEntry"/>, which is the path the engine's own runebook gump takes. Skill, mana and reagents are asked
-/// and spent by <c>Spell.CheckSequence</c>, a fizzle is the engine's, and the travel rules are the engine's
-/// (<see cref="SpellHelper.CheckTravel(Map, Point3D, TravelCheckType, out TextDefinition)"/>): nobody marks inside a
-/// Felucca dungeon, so a mouth's rune stands on the island side of the mouth, and the company walks the last few tiles
-/// through the cave mouth as it always has.
-/// </para>
-///
-/// <para>
-/// <b>What "Magery 40+" means in this era.</b> <c>MagerySpell._requiredSkill</c> for UOR puts Recall from a book at 30 to
-/// 70, Mark at 50 to 90 and Gate Travel at 60 to 100 (a scroll: two circles lower). So at 40 a mage recalls one time in
-/// four, marks only from a scroll, and gates not at all; <see cref="LeastMagery"/> is Patrick's floor for being a rune-mage
-/// at all, and the engine's own chance (<see cref="LeastChance"/>) decides each cast.
-/// </para>
-/// </summary>
 public static class BotRunes
 {
+
     public const int Recall = 31;
 
     public const int Mark = 44;
@@ -461,6 +433,7 @@ public static class BotRunes
 
     public static bool Landable(Map map, Point3D p)
     {
+
         if (map == null || map == Map.Internal || !Region.Find(p, map).AllowSpawn() || !map.CanFit(p.X, p.Y, p.Z, 16, false, false))
         {
             return false;

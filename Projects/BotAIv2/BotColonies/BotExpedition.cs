@@ -6,11 +6,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a guild's captain an expedition: the member holding the guild's ship, or its head when the guild has none and can
-/// adopt or buy one; to found a colony on the first free island, or to take the ship and fresh hands back to the colony it has.
-/// One guild weighed every <see cref="BotColonies.ConsiderMs"/>, one expedition at a time (<see cref="BotOffice"/>).
-/// </summary>
 public sealed class BotExpeditioner : IBotProposer
 {
     public const string Office = "expedition";
@@ -178,12 +173,6 @@ public sealed class BotExpeditioner : IBotProposer
     }
 }
 
-/// <summary>
-/// The captain's expedition: the ship in the pack (held, adopted at anchor, or bought at the shipwright), the walk to the dock,
-/// the muster of the party at its side, the stores paid out of the chest as the ship puts to sea, the voyage with the party
-/// aboard as the helm's company, and on the island the colony set down and its square claimed — or, for a relief, the ship
-/// and its hands brought back to the colony.
-/// </summary>
 public sealed class BotExpedition : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotExpedition));

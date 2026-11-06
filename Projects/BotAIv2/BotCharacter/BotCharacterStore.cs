@@ -3,22 +3,11 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps every bot's character across restarts: its traits, its kills and veteran's title, the counts and the three tales of
-/// its biography, and its ties. See <see cref="BotLife"/>.
-///
-/// <para>
-/// <b>By name, never by serial.</b> A bot is raised afresh at every boot with a new serial; the name is what
-/// <c>BotProgress</c> carries over, and it is what a tie names the other bot by. A record for a name nobody bears any more is
-/// kept (a bot resting through the boot is still somebody's friend) and costs a few dozen bytes. A shape this build cannot read
-/// is dropped whole rather than guessed at, and then every nature is drawn again from the names, which gives the same natures.
-/// </para>
-/// </summary>
 public sealed class BotCharacterStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCharacterStore));
 
-    private const int Shape = 1;
+    private const int Shape = 2;
 
     private static BotCharacterStore _store;
 
@@ -61,6 +50,7 @@ public sealed class BotCharacterStore : GenericPersistence
                 writer.Write(tale.Weight);
                 writer.WriteEncodedInt(tale.Number);
                 writer.Write(tale.At);
+                writer.Write(tale.ToldAt);
             }
 
             writer.WriteEncodedInt(life.Ties.Count);
@@ -75,6 +65,21 @@ public sealed class BotCharacterStore : GenericPersistence
                 writer.WriteEncodedInt(tie.Wronged);
                 writer.WriteEncodedInt(tie.Beside);
             }
+
+            writer.WriteEncodedInt(life.HeardTales.Count);
+
+            for (var i = 0; i < life.HeardTales.Count; i++)
+            {
+                var heard = life.HeardTales[i];
+
+                writer.Write(heard.Teller);
+                writer.Write(heard.Kind);
+                writer.Write(heard.About);
+                writer.Write(heard.Text);
+                writer.Write(heard.Place);
+                writer.Write(heard.At);
+                writer.WriteEncodedInt(heard.Hops);
+            }
         }
     }
 
@@ -82,7 +87,7 @@ public sealed class BotCharacterStore : GenericPersistence
     {
         var shape = reader.ReadEncodedInt();
 
-        if (shape != Shape)
+        if (shape is < 1 or > Shape)
         {
             logger.Warning("The saved characters are shape {Found} and this build reads {Wanted}; every nature is drawn again from the names, and no story or tie is kept", shape, Shape);
 
@@ -125,7 +130,8 @@ public sealed class BotCharacterStore : GenericPersistence
                         Text = reader.ReadString(),
                         Weight = reader.ReadDouble(),
                         Number = reader.ReadEncodedInt(),
-                        At = reader.ReadDateTime()
+                        At = reader.ReadDateTime(),
+                        ToldAt = shape >= 2 ? reader.ReadDateTime() : default
                     }
                 );
             }
@@ -144,6 +150,27 @@ public sealed class BotCharacterStore : GenericPersistence
                         Beside = reader.ReadEncodedInt()
                     }
                 );
+            }
+
+            if (shape >= 2)
+            {
+                var heardCount = reader.ReadEncodedInt();
+
+                for (var i = 0; i < heardCount; i++)
+                {
+                    life.HeardTales.Add(
+                        new BotHeardTale
+                        {
+                            Teller = reader.ReadString(),
+                            Kind = reader.ReadString(),
+                            About = reader.ReadString(),
+                            Text = reader.ReadString(),
+                            Place = reader.ReadString(),
+                            At = reader.ReadDateTime(),
+                            Hops = reader.ReadEncodedInt()
+                        }
+                    );
+                }
             }
 
             if (string.IsNullOrEmpty(life.Name))

@@ -7,27 +7,9 @@ using Server.Targeting;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a woodcutter needs to know: the axe, the trees within reach, and how much wood is worth a trip.
-///
-/// <para>
-/// <b>Lumberjacking stood in the Gatherer's skill list from the day the class was written and nothing on
-/// this shard ever used it.</b> One line, one hundred points, and not a single errand that swung an axe — so
-/// the only wood on the island was whatever a carpenter had on his shelf. That mattered the moment arrows
-/// became something a bot could make: an arrow is a shaft and a feather, a shaft is a log, and a trade whose
-/// raw material can only be bought is a trade that stops when the shopkeeper's stock does.
-/// </para>
-///
-/// <para>
-/// <b>Almost all of this is the miner's, and that is the point.</b> <c>BotOre.Examine</c> asks the engine
-/// which harvest definition a tile belongs to and <c>BotOre.Swing</c> hands the target over — neither knows
-/// or cares that it was written for rock. Trees are static tiles rather than land, which <c>Examine</c>
-/// already handles because most stone is a static too. What is left for this file is the axe, the ring
-/// search and the arithmetic of when a trip is worth taking.
-/// </para>
-/// </summary>
 public static class BotTimber
 {
+
     public static int Reach { get; set; } = 80;
 
     public static long Townbound { get; private set; }
@@ -198,6 +180,7 @@ public static class BotTimber
             {
                 for (var dy = -radius; dy <= radius; dy++)
                 {
+
                     if (Math.Abs(dx) != radius && Math.Abs(dy) != radius)
                     {
                         continue;

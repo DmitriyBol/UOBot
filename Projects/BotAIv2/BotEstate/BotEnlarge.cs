@@ -5,19 +5,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Moves a guild out of the hall it has filled and into the next size up: new ground proved, the price levied, the old hall
-/// taken down with its counter and benches carried across, the bigger one raised. See <see cref="BotHallKind"/>.
-///
-/// <para>
-/// <b>Patrick's order of 26.09.2026: the hall grows with the guild.</b> The order of business is the carrier's
-/// (<see cref="BotRemove"/>) for the reason written there — the new ground is proved before anything is knocked down, or a
-/// failed check leaves a guild homeless — with the levy between the proof and the demolition, so a guild that cannot pay
-/// keeps its hall. Two things the carrier leaves on the ground are carried here: the benches, which the engine would turn
-/// into deeds lying where they stood (they are taken down first and set up again inside, <c>BotFittings.Strip</c> and
-/// <c>Install</c>), and the counter, which is carried as the carrier carries it.
-/// </para>
-/// </summary>
 public sealed class BotEnlarge : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEnlarge));
@@ -171,6 +158,7 @@ public sealed class BotEnlarge : BotDeed
 
         if (house == null || house.Deleted)
         {
+
             BotEstate.Refund(paid, body);
             Refused++;
 
@@ -267,17 +255,6 @@ public sealed class BotEnlarge : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a member of a guild that has nearly filled its hall the move into the next size up, when the guild can pay for it.
-/// See <see cref="BotEnlarge"/> and <see cref="BotHallKind"/>.
-///
-/// <para>
-/// Nearly full is within <see cref="Fullness"/> of the hall's room, so the move is under way before the guild turns anybody
-/// away. The money is the guild's chest and its members' spare purses together, as the levy reads them; one member at a
-/// time (the office), and the ground looked for at most once a <see cref="LookMs"/> a guild, because the search for a large
-/// house is the dearest question the estate asks.
-/// </para>
-/// </summary>
 public sealed class BotEnlarger : IBotProposer
 {
     public const string Office = "enlarger";

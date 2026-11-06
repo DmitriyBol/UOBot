@@ -4,33 +4,6 @@ using Server.Guilds;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bot's mood in one word, read off facts the shard already keeps, so that a mood line carries a tag that the person at
-/// the log and the bot in earshot can both read (01.10.2026, build 387; Patrick's point 4 of the night plan: "bots understand
-/// each other's mood from the phrases, and depending on the mood other bots offer company or help").
-///
-/// <para>
-/// <b>Seven moods that ask for something, and three shades of content that do not.</b> <c>hurt</c>, <c>tired</c>,
-/// <c>grieving</c>, <c>poor</c>, <c>lonely</c>, <c>bored</c> and <c>proud</c> are each a fact with a remedy somebody else
-/// can offer — a bandage, a fire, a word, a hunt, a company, a cheer. <c>content</c>, <c>middling</c> and <c>glum</c> are
-/// the old contentment scale (<see cref="BotMobile.Mood"/>) and ask nothing. One tag per line, worst first: a bot that is
-/// bleeding and broke says it is bleeding.
-/// </para>
-///
-/// <para>
-/// <b>Every reading is a field read.</b> Hurt is the mender's own test; tired is the rest's record; poor is the hunter's own
-/// poverty line (<c>BotHunter.PoorBelow</c>), one line for the whole shard rather than a second number on the same shelf;
-/// lonely and bored are the urges; grief and pride are two small records fed from the death and the ending hooks the voice
-/// already has. Nothing here walks the map.
-/// </para>
-///
-/// <para>
-/// <b>Bored only when idle.</b> Boredom holds while a bot works and falls only when it is paid, so a miner two minutes into a
-/// seam still carries the boredom of the wait before it. A bot at a seam is not bored; it is waiting to be paid. The tag is
-/// given only to a bot with nothing in hand or on a guess (a prowl), which is also what keeps the answers to it — a company's
-/// call — from taking a bot off paying work.
-/// </para>
-/// </summary>
 public static class BotMoods
 {
     public const string Hurt = "hurt";

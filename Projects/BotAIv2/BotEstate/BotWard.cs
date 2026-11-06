@@ -2,22 +2,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A warden's walk to a stranger hunting the guild's land, and the sentence that makes the toll owed. See
-/// <see cref="BotTollman"/> and <see cref="BotToll"/>.
-///
-/// <para>
-/// Shaped on the bailiff's eviction (<see cref="BotEvict"/>), and for the same reasons: followed rather than aimed at,
-/// because a hunter moves about its hunt; finished, not failed, when the stranger left the land before anybody arrived —
-/// the land is clear, which is what the walk was for; and once the word is said nothing is left to decide, so a follow that
-/// loses the stranger afterwards cannot turn a told stranger into a failed errand.
-/// </para>
-///
-/// <para>
-/// The stranger answers, and what it answers is its guild's opinion of the warden's: a toll is the start of a quarrel
-/// between guilds that already dislike each other, and a formality between ones that do not.
-/// </para>
-/// </summary>
 public sealed class BotWard : BotDeed
 {
     public const string Trade = "ward";

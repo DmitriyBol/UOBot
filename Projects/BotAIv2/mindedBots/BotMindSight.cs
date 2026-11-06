@@ -8,35 +8,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The world as one bot can see it, written out for the model.
-///
-/// <para>
-/// <b>Every line here is a defect surface, and that is not a figure of speech.</b> The first version of this
-/// wrote "Carrying 39 of 215 stones" — the engine's own unit for weight — and the model read it as cargo:
-/// the first plan that bot ever made in its life was to walk to the market and sell its stones. Nothing was
-/// wrong with the code, the data or the schema. The sentence was wrong. So each fact below is written the
-/// way a person would say it, units named, and nothing is included that the bot could not actually be said
-/// to know.
-/// </para>
-///
-/// <para>
-/// <b>A weight is not a cargo, and the very first live answer proved it again.</b> Told only that its pack
-/// was "12% full by weight", the model chose to go and sell what it was carrying — of an empty pack, on a
-/// bot that had just been born. The percentage was true and it was not the fact being asked about. So the
-/// count of things is said beside it: how heavy the pack is answers whether there is room, and how many
-/// things are in it answers whether there is anything to sell.
-/// </para>
-///
-/// <para>
-/// <b>And it is given what the shard already knows.</b> A mind told only "you are at 1440, 1470" will decide
-/// to go and look for a forge while standing next to one — the second lesson of the first run. What the
-/// population has already surveyed is a fact about the bot's world, so it goes in the state rather than
-/// being left for the model to rediscover by walking.
-/// </para>
-/// </summary>
 public static class BotMindSight
 {
+
     public static int Notice { get; set; } = 14;
 
     public static int Recall { get; set; } = 6;
@@ -836,6 +810,7 @@ public static class BotMindSight
 
         if (shown == 0)
         {
+
             sb.AppendLine(
                 Bench(skill) == null
                     ? "    nothing is made with this skill - it fetches material."
@@ -1071,6 +1046,7 @@ public static class BotMindSight
         }
 
         sb.AppendLine("\nWHAT IS FOR SALE AT THE SHOPS BY BRITAIN'S BANK, AND WHAT IT COSTS");
+
         sb.AppendLine("You pay from your pack, and whatever it is short of is taken from your bank account automatically. Both purses spend.");
 
         var lots = BotShopkeep.Lots();
@@ -1337,6 +1313,7 @@ public static class BotMindSight
 
     private static void Offers(ref ValueStringBuilder sb, IReadOnlyList<string> trades, IReadOnlyList<string> band)
     {
+
         sb.AppendLine("\nTRADES WITH WORK IN THEM RIGHT NOW");
 
         for (var i = 0; i < trades.Count; i++)

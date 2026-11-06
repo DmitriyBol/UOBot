@@ -3,26 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// Which mind has said it will fill which row of the board, so the others leave it alone.
-///
-/// <para>
-/// <b>Patrick's order of 15.09.2026: the thinking crafters discuss the market between them and share out who takes
-/// which order.</b> They could already hear each other (<see cref="BotMindTalk"/>) and see what each other held
-/// (the fellows block), and still four of them read one board and went to one bench, because "I will make the
-/// bustier arms" was never a fact anybody else could read — it was a sentence in a reason field. A claim is that
-/// sentence made into a fact: the row's own label, the name that took it, and when.
-/// </para>
-///
-/// <para>
-/// <b>A claim is a note, not a lock.</b> Nothing on the shard refuses the work to anybody else — the crafts fill
-/// the board in their own order and the auction weighs as it always did. What changes is what the other minds are
-/// told: a row with a name against it is somebody's, and the prompt says so. It lapses on its own clock, because a
-/// mind that has died or been switched off must not hold a row for ever.
-/// </para>
-/// </summary>
 public static class BotMindClaims
 {
+
     public static int HoldsMs { get; set; } = 900000;
 
     private static readonly Dictionary<string, (string Who, long Tick)> _claims = new(StringComparer.OrdinalIgnoreCase);

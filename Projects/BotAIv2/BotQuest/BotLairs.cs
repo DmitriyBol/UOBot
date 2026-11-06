@@ -6,39 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Where a creature lives on the island, read from the spawners that keep it.
-///
-/// <para>
-/// <b>"Kill three mongbats anywhere" sent its taker nowhere.</b> The errand named no place, so the taker looked round
-/// wherever it happened to stand and, finding none, stood there. On build 94, from 20:41 on 16.09.2026, Bryn Ashdown held
-/// it beside Britain for 5.4 minutes, "looking for Mongbat, 0 of 3 down", and Nessa Ashdown held it for 7.1 minutes for one
-/// kill; nothing on the shard knew where a mongbat lives.
-/// </para>
-///
-/// <para>
-/// <b>The engine does.</b> A spawner names what it keeps and stands where the engine put those creatures, which is the
-/// reading <see cref="BotDungeon"/> already takes of the dungeons. This reads the island's block of the map — west of
-/// <see cref="IslandEdge"/>, where the dungeons begin — once per world load, on the first question, and keeps each kind's
-/// spawners by type, so an errand asking for a creature is sent to where one is kept rather than to where its taker was.
-/// </para>
-///
-/// <para>
-/// <b>And to where one is alive now, which is a second reading of the same spawner.</b> Build 95's first kill of orcs went
-/// to the three nearest orc spawners to Britain and found nothing at any of them — "saw no Orc at the 3 nearest places on
-/// the island that keep them", 9.6 minutes, 21:40 on 16.09.2026 — and the door's own look at two of them said "nothing
-/// alive within 14 tiles". A population of eighty that hunts round its home empties the spawners nearest it; the spawner
-/// is still there and its creatures are not. Each spawner entry keeps the list of what it has put into the world, so a lair
-/// is offered only while that list holds a living one (DECISIONS W7: positive knowledge, and of now).
-/// </para>
-///
-/// <para>
-/// <b>A lair with no road is passed over, and only where the road map can say so.</b> Inside the square the road flood
-/// covers (<see cref="BotRoads"/>) a lair no road reaches is left out; outside it nothing is known and distance is the
-/// price (DECISIONS W4). Each lair is asked once and the answer kept, so the road map's own counters are not swamped by
-/// every bot that considers an errand.
-/// </para>
-/// </summary>
 public static class BotLairs
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLairs));

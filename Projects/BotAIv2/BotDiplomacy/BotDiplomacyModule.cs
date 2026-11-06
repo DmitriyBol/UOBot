@@ -6,9 +6,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-diplomacy.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotDiplomacySettings
 {
+
     public bool? Running { get; set; }
 
     public bool? Towns { get; set; }
@@ -96,17 +96,6 @@ public sealed class BotDiplomacySettings
     public int? TownReach { get; set; }
 }
 
-/// <summary>
-/// Meetings between guilds and with the towns, as a module: reads its file, fills in the meetings' words, offers the envoy's
-/// errand, and runs the meetings' clock. Patrick's order of 29.09.2026, evening. See <see cref="BotParley"/>.
-///
-/// <para>
-/// <b>World phase, after the population, the will and the travel</b>, because it offers work, walks to towns the travel module
-/// reads, and asks where guilds live. Switched off (<c>bots.diplomacy.enabled</c> or <c>Running</c> in the file), a grievance
-/// declares war and a friendship makes an alliance at once, exactly as before; the agreements already sworn keep their effect
-/// on the market until they run out, since they are read wherever goods change hands.
-/// </para>
-/// </summary>
 public sealed class BotDiplomacyModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDiplomacyModule));
@@ -250,6 +239,7 @@ public sealed class BotDiplomacyModule : BotModule
 
     private static void Tick()
     {
+
         if (!_resolved && BotTowns.Surveyed)
         {
             _resolved = true;

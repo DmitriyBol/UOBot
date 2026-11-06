@@ -5,9 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-social.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotSocialSettings
 {
+
     public bool? Running { get; set; }
 
     public int? MostListeners { get; set; }
@@ -45,12 +45,6 @@ public sealed class BotSocialSettings
     public double? ProudPerMinute { get; set; }
 }
 
-/// <summary>
-/// Bots answering each other's moods, as a module: reads its numbers, puts its words into the voice's bank, listens to the
-/// voice for mood lines with an audience, offers the help a listener undertook through the auction (<see cref="BotFellow"/>),
-/// counts how the offers end through the will's own hooks, and runs the layer's second. Patrick's point 4 of the night plan
-/// of 01.10.2026. See <see cref="BotSocial"/> and <see cref="BotMoods"/>.
-/// </summary>
 public sealed class BotSocialModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSocialModule));

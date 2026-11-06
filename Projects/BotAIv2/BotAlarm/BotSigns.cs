@@ -4,39 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The rules that decide when the shard should speak up: read once a minute, each one comparing a number
-/// the shard already keeps against a threshold, over a window it names.
-///
-/// <para>
-/// <b>Six rules, not sixty, and every one of them was checked against a live shard before its threshold was
-/// chosen.</b> A watchdog is the easiest thing in this project to get wrong, because a rule that fires
-/// wrongly costs more than no rule at all: a night of finding out that the instrument was the fault. The
-/// debugger produced ten false alarms against two real defects in its first day, so the thresholds here sit
-/// far from what the running shard actually does — errors were 0.3 a minute when this was written and the
-/// alarm is at five; four out of five pieces of work were finishing and the alarm is at one in four.
-/// </para>
-///
-/// <para>
-/// <b>Everything is a difference over a window, never a total.</b> The counters in this assembly only ever
-/// grow, and reading one as the state of this minute is the single most common way this shard has lied to
-/// itself: "848 could not afford armour" was true, and was about the first five minutes of a session that
-/// had been running for hours. So each rule keeps an anchor — a value and the moment it was taken — and asks
-/// its question of the difference.
-/// </para>
-///
-/// <para>
-/// <b>A rule that cannot state its denominator is not written.</b> Errors are counted against the minute
-/// they were read in, unfinished work against the work taken on, the stuck against the population, deaths
-/// against the population, the silent market against the stalls and wants that were standing at the time.
-/// </para>
-///
-/// <para>
-/// <b>The thresholds are dials, so they move without a restart.</b> That is the point of tuning a watchdog
-/// on a living shard: the first version of a rule is wrong, the evidence for how wrong it is arrives over
-/// the following hour, and stopping the shard to change a number would throw that hour away.
-/// </para>
-/// </summary>
 public static class BotSigns
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSigns));

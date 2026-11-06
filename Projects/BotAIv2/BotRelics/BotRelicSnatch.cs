@@ -3,22 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a thief a relic in a carrier's pack (07.10.2026, relics20; Patrick: "a relic can be stolen — thieves get a target"). The
-/// thieves are <c>BotCrime</c>'s: a member of The Shadow or a recruit on its roll (<see cref="BotCrime.IsThief"/>), and every try
-/// is one of the island's hourly tries at a pack (<see cref="BotCutpurse.Room"/>, <see cref="BotCutpurse.Spent"/>), so relic
-/// thefts are bounded by the same number the crowds by the banks are.
-///
-/// <para>
-/// <b>The relic bar.</b> The engine's Stealing will not lift an item that cannot be moved, and a relic cannot, so the try is the
-/// shard's own, on the engine's skill: only a thief at <see cref="Bar"/> Stealing or better is offered a relic at all, and it takes
-/// it with a chance of its skill over a hundred times <see cref="Odds"/> (at most <see cref="Most"/>). A miss is always seen: the
-/// carrier cries thief and reports it to the town. A lift is seen <see cref="SeenChance"/> of the time, and then reported with the
-/// weight of two (a relic's theft posts the thief at once). Only a relic on the road is a target — one in a hall is taken by a war
-/// alone — and never one carried by the thief's own guild. At most one relic theft is tried on the island every
-/// <see cref="EveryMs"/>.
-/// </para>
-/// </summary>
 public sealed class BotRelicSnatch : IBotProposer
 {
     public string Name => "RelicThief";
@@ -139,7 +123,6 @@ public sealed class BotRelicSnatch : IBotProposer
     }
 }
 
-/// <summary>A thief after a relic in a carrier's pack: close on it, reach for it, and slip away.</summary>
 public sealed class BotRelicTheft : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRelicTheft));

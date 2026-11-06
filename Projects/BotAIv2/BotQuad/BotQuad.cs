@@ -6,34 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The island cut into squares thirty tiles across, each carrying one number: how safe the population has
-/// found it to be.
-///
-/// <para>
-/// <b>This is a different question from <see cref="BotPeril"/>'s and the two must not be merged.</b> Peril
-/// answers "where is it dangerous <em>now</em>" — a decaying frequency of blows, right for a captain deciding
-/// where a company should be standing this minute, and deliberately forgetful, because a graveyard that was
-/// terrible an hour ago and quiet since is not where anybody should be sent. This answers "what sort of
-/// ground is that" — a standing reputation that a place earns slowly, in both directions, and does not
-/// forget on its own. A quiet meadow and a graveyard nobody has visited since the last massacre read the
-/// same on Peril's map and must never read the same here.
-/// </para>
-///
-/// <para>
-/// <b>Both directions, which is what makes it a reputation rather than a scar.</b> Blows and deaths push a
-/// square down; bots walking through it and coming out the other side push it back up. So ground that was
-/// cleared genuinely recovers — by being walked, which is evidence — rather than by a clock running out,
-/// which is not. A square nothing has happened in for a day reads exactly what it read yesterday, and that
-/// is the point: the population's memory of the island should outlive any one session's worth of walking.
-/// </para>
-///
-/// <para>
-/// <b>Shared by everybody, kept nowhere else.</b> There is one map and every bot reads and writes the same
-/// squares, the way the squad's stations and the market's prices are shared: nothing is messaged anywhere,
-/// and two bots asking the same question of the same ground get the same answer by construction.
-/// </para>
-/// </summary>
 public static class BotQuad
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotQuad));
@@ -241,7 +213,6 @@ public static class BotQuad
 
     private static bool _saidFull;
 
-    /// <summary>One square of the island, and everything the population knows about it.</summary>
     public sealed class Quad
     {
         public Map Map;
@@ -413,6 +384,7 @@ public static class BotQuad
 
         if (_quads.Count >= Most)
         {
+
             if (!_saidFull)
             {
                 _saidFull = true;

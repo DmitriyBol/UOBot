@@ -6,41 +6,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The channel the shard raises its own alarms into: one line of JSON per event in
-/// <c>logs/alerts.ndjson</c>, meant to be watched rather than searched.
-///
-/// <para>
-/// <b>It exists because everything the shard knows had to be asked for.</b> The session log says everything
-/// and therefore says nothing without a question; the debugger answers when spoken to; the summaries come on
-/// a clock whether or not anything has happened. So the shard could be broken for half an hour before
-/// anybody looked, and the half hour was the expensive part — the evidence for what caused it is in that
-/// same half hour, and it scrolls past either way.
-/// </para>
-///
-/// <para>
-/// <b>Every event carries a numerator, a denominator and a window, or it is not raised.</b> This shard has
-/// produced twelve distinct kinds of false alarm and the majority were shapes of the same fault: a count
-/// with nothing to divide it by, or a total that had been accumulating since boot being read as the state
-/// of this minute. <see cref="Raise"/> takes <c>n</c>, <c>of</c> and <c>window</c> as arguments rather than
-/// as advice, so a rule that cannot say what it counted cannot be written.
-/// </para>
-///
-/// <para>
-/// <b>An alarm stays one event while it lasts.</b> A condition true on every tick would otherwise write a
-/// line every tick and bury the channel in the very thing it is reporting. The first crossing is written;
-/// repeats are counted and said once per <see cref="RestMs"/>; the return to normal is written as its own
-/// event, because a watcher who is told only when things break can never be told that they are fixed.
-/// </para>
-///
-/// <para>
-/// <b>And it says so when nothing is wrong.</b> <see cref="Alive"/> writes a quiet heartbeat on a slow
-/// clock. Silence on this channel would otherwise be indistinguishable from a channel that has stopped
-/// working, which is exactly how an instrument fails without anybody noticing — the debugger has the same
-/// rule, and the same reason: an observer with no way to say "all is well" is one whose silence means
-/// nothing.
-/// </para>
-/// </summary>
 public static class BotAlarm
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAlarm));

@@ -3,16 +3,11 @@ using Server.Guilds;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One sailing of a guild's ship with a party aboard: the muster at the dock, the voyage, and the landing. An expedition out
-/// to an island (<see cref="BotExpedition"/>) and a run home with the colony's goods (<see cref="BotColonyRun"/>) each hold one;
-/// the members who sign on (<see cref="BotSignOn"/>) read it to know where to stand, whether they are aboard, and where to go
-/// once ashore. The captain's own deed owns it and ends it.
-/// </summary>
 public sealed class BotSailing
 {
     public enum Way
     {
+
         Out,
 
         Home

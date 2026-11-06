@@ -6,19 +6,9 @@ using Server.BotAI.V2;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// What a mind came back with: one trade, one number it is prepared to be judged on, and its reason.
-///
-/// <para>
-/// <b>The prediction is the point of the whole arrangement.</b> Without a number the model can say anything
-/// and nothing can ever be shown to have been wrong; with one, every choice ends in a comparison between
-/// what was promised and what the ledger actually measured, and that comparison is the only honest material
-/// a lesson can be made of. It is also what the auction weighs the offer by, so an optimistic mind loses
-/// its bots to the shard's own arithmetic within a few jobs rather than being argued with.
-/// </para>
-/// </summary>
 public sealed class BotMindChoice
 {
+
     public string Intent { get; init; }
 
     public double Expect { get; init; }
@@ -223,6 +213,7 @@ public sealed class BotMindChoice
                 WantAmount = Whole(root, "wantamount")
             };
         }
+
         catch (Exception)
         {
             return null;
@@ -246,6 +237,7 @@ public sealed class BotMindChoice
 
             return (string.IsNullOrWhiteSpace(lesson) ? null : lesson.Trim(), keep);
         }
+
         catch (Exception)
         {
             return (null, false);

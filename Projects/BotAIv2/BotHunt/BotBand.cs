@@ -4,29 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Calling a company together for something one bot cannot take, and seeing it through.
-///
-/// <para>
-/// <b>The squad machinery has been complete and unused since it was written.</b> Formation, stations,
-/// scouting, the share-out, yielding a tile to whoever outranks you on it — all of it works, and
-/// <c>BotSquads.Form</c> had no caller at all. Its own note says so in as many words: joining will be an
-/// undertaking once somebody proposes one. This is that undertaking, and what it proposes on is the one
-/// fact that makes a company worth its cost — a creature the arithmetic says one bot must refuse and four
-/// bots may have.
-/// </para>
-///
-/// <para>
-/// <b>It calls, and then it stops giving orders.</b> Everything after the moment the company agrees on a
-/// target belongs to the squad's own beat: where each member stands, who is anchored on whom, who swings,
-/// and how the corpse is divided. This undertaking holds on only so that the fight has an owner — somebody
-/// whose ledger the takings land in, and who can say the word when it is over. It sends the bot nowhere,
-/// which is the whole reason it is allowed to run alongside a squad at all; see
-/// <see cref="BotDeed.Alongside"/>.
-/// </para>
-/// </summary>
 public sealed class BotBand : BotDeed
 {
+
     public const string Trade = "band";
 
     public static double Prior { get; set; } = 30.0;
@@ -196,6 +176,7 @@ public sealed class BotBand : BotDeed
 
         if (_called < 2)
         {
+
             BotSquads.Leave(member);
             _squad = null;
 
@@ -510,6 +491,7 @@ public sealed class BotBand : BotDeed
 
         if (squad == null || !ReferenceEquals(squad, _squad))
         {
+
             if (kills > 0 || !Standing())
             {
                 return BotDoing.Done($"the company broke up with {Down(kills)}");

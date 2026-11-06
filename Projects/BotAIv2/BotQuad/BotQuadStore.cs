@@ -2,27 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps the island's reputation across restarts. What the population found out about the ground outlives
-/// the population.
-///
-/// <para>
-/// <b>The one thing on this shard that genuinely should not start again every morning.</b> Skills are a
-/// bot's own and are already carried over; belongings are rebuilt from nothing on purpose. But where the
-/// ground is dangerous is a fact about the island rather than about anybody standing on it, learned slowly
-/// and only by walking — four hundred quadrants take a company most of an evening — and thrown away on
-/// every restart it was learned nothing at all. The map that decides where hunters go, where a Baron
-/// harrows and what the world map pins say was blank at the start of every session, which is why those
-/// pins never showed anything a person could act on.
-/// </para>
-///
-/// <para>
-/// <b>Names and numbers only, exactly as <see cref="BotProgress"/> is.</b> Nothing here holds a reference to
-/// an item, a mobile or a serial — a quadrant is a facet id, two coordinates and a handful of counters — so
-/// it can outlive a world the rest of the shard cannot. The facet is written as its id and looked up again
-/// on load, because a <c>Map</c> from the world being replaced is a reference to a deleted object.
-/// </para>
-/// </summary>
 public sealed class BotQuadStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotQuadStore));

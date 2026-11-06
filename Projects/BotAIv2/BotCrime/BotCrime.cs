@@ -7,34 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The town's side of crime: the thieves' roll, the reports a victim makes, the wanted list with a bounty on each head paid out
-/// of the town's purse, the term in a cell, the guild's ransom and the repentance that brings a criminal back to honest life.
-///
-/// <para>
-/// <b>Patrick's idea of 07.10.2026, approved for the night ("a livelier world").</b> "Thieves stealing from packs in the crowd
-/// by the bank, ambushes on lone carriers with goods on the road, a fence, a wanted list: the town sets a bounty on a head,
-/// bounty hunters from any guild, trial and jail when caught (time in a cell, a ransom by the guild), repentance and a return
-/// to honest life. This gives a living reason for guards, escorts and caravan guards."
-/// </para>
-///
-/// <para>
-/// <b>Built on what the underworld already had.</b> The cells, the clock that lets a prisoner go, the engine's grey for the
-/// wanted and the law-abiding who set on an outlaw in sight are <see cref="BotOutlaw"/>'s; the band and its fence are
-/// <see cref="BotUnderworld"/>'s and <see cref="BotFence"/>'s; a beaten mark's choice is <see cref="BotQuarter"/>'s. This
-/// class adds the record those did not keep — who was reported for what, in which town, what the town will pay for it — and
-/// the four pieces of work in this folder: the cutpurse (<see cref="BotCutpurse"/>), the ambush (<see cref="BotHighway"/>),
-/// the fence's trade (<see cref="BotFencer"/>) and the bounty (<see cref="BotBountyBoard"/>). Counted at the end of the
-/// <c>Underworld:</c> line.
-/// </para>
-///
-/// <para>
-/// <b>Money only moves.</b> A theft moves coin from one pack to another by the engine's own Stealing; the fence pays the thief
-/// out of its own purse; a bounty is paid out of the city's treasury (<see cref="BotCity.Reward"/>) and a ransom goes into it
-/// (<see cref="BotCity.Tax"/>); the only new coin is a stolen thing sold over an NPC's counter, which is the one way the
-/// shard has always minted it.
-/// </para>
-/// </summary>
 public static class BotCrime
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCrime));
@@ -125,7 +97,6 @@ public static class BotCrime
 
     public static long CriminalDeaths { get; private set; }
 
-    /// <summary>One name's record in the town's books. Ticks are of uptime; nought means never.</summary>
     public sealed class Sheet
     {
         public string Name;
@@ -167,7 +138,6 @@ public static class BotCrime
 
     private static readonly Dictionary<string, Sheet> _sheets = new(StringComparer.Ordinal);
 
-    /// <summary>One lot of stolen goods: what, how many, and where and from whom it was taken.</summary>
     public sealed class Hot
     {
         public Type Kind;
@@ -861,6 +831,7 @@ public static class BotCrime
             else if (sheet.CaughtTick > 0 && bot != null && !BotOutlaw.Jailed(bot)
                      && now - sheet.CaughtTick > ((long)Math.Max(60000, TermMs) << Math.Clamp(MostDoublings, 0, 8)) + 600000)
             {
+
                 Freed(bot);
             }
 

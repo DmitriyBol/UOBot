@@ -5,31 +5,9 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// What the debugger is told: who it is, what it is looking at, and what it has already learned about the
-/// shapes defects take here.
-///
-/// <para>
-/// <b>This file is the whole of the debugger's judgement, and every line of it is a defect surface.</b> The
-/// measuring is done in <see cref="BotWatch"/> and <see cref="BotVigil"/> and cannot be argued with; what
-/// happens here decides whether a true set of numbers is read as the thing it is. The minds' own version of
-/// this file cost a first run to the sentence "carrying 39 of 215 stones", which was true, was the engine's
-/// unit for weight, and was read as a cargo of rocks. So: units named, sentences a person would say,
-/// nothing included that was not measured, and every duration said as what it is — <em>time I have
-/// watched</em>, never time the bot has existed.
-/// </para>
-///
-/// <para>
-/// <b>The standing instruction is long, and here that is the right trade.</b> A mind choosing between trades
-/// is given a short prompt on purpose: everything situational belongs in the state, where it can be measured
-/// against what happened. The debugger's task is not situational — it is to recognise the shapes this
-/// particular shard's defects come in, and those shapes were bought with whole evenings apiece. A model that
-/// has to rediscover "a hard zero in a summary is two thresholds disagreeing, not broken code" will spend
-/// every report rediscovering it and never get to the second question.
-/// </para>
-/// </summary>
 public static class BotDebugSight
 {
+
     public static string System(string who) =>
         $"""
          You are {who}, the debugger of this shard.
@@ -256,6 +234,7 @@ public static class BotDebugSight
 
             if (!string.IsNullOrWhiteSpace(subsystems))
             {
+
                 sb.Append("\nWHAT THE SHARD'S OWN SUBSYSTEMS SAY ABOUT THEMSELVES\n");
                 sb.AppendLine(
                     "Read these as TOTALS SINCE THE SHARD STARTED, not as what is happening now. They only"
@@ -409,6 +388,7 @@ public static class BotDebugSight
 
         try
         {
+
             sb.Append("This population lives at ");
             sb.Append(BotPopulation.Where.X);
             sb.Append(",");

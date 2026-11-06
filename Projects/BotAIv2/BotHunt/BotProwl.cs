@@ -4,40 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Going to look for a fight, when there is nothing to fight where the bot is standing.
-///
-/// <para>
-/// <b>Without this a fighter is only as good as where somebody put it.</b> Hunting begins when something
-/// hostile is within sight, and a town forbids fighting outright — so a population raised in a city has
-/// warriors that stand about for ever, and a population raised at a graveyard hunts only that graveyard until
-/// it is empty. Neither is a bot deciding anything; both are a bot being placed well or badly.
-/// </para>
-///
-/// <para>
-/// <b>It is priced at almost nothing on purpose.</b> Walking somewhere produces no coin, no goods and no
-/// skill, so it wins only when the auction has nothing else to offer at all — which is exactly when a bot
-/// should be out looking rather than standing still. The moment anything worth fighting comes into reach, the
-/// hunt itself scores an order of magnitude higher and takes over at the next review.
-/// </para>
-///
-/// <para>
-/// And it ends itself the instant it has worked: a bot that walks into sight of a quarry does not finish the
-/// walk first. "Stand and complete the errand" is the shape of bug this project keeps finding in itself.
-/// </para>
-///
-/// <para>
-/// <b>A sweep of named squares, not a look round where the bot stands (06.10.2026, build next).</b> Patrick, 06.10 ~10:00:
-/// "Ideally, when they go on a prowl they are given several quadrants to clear; if they walked them and found nobody, that is
-/// fine, that is a success." On build 400 (06.10, 06:12–09:42) 1761 of the 2669 prowls that ended said "nothing here" after a
-/// walk to one point a median of 0.6 minutes long, and each counted as finished work. A prowl is now a route over two to four
-/// squares of <see cref="BotQuad.Side"/> tiles (<c>BotHunter.Sweep</c>), each entered and crossed — its waypoint reached —
-/// before the next. A fight found on the way ends this sweep as finished ("something worth fighting", with the square), the
-/// hunt is fought by the hunter's own rules, and the squares left are offered again afterwards (<see cref="BotSweepRecord.Left"/>).
-/// "Found nothing" is finished only when every square was walked; a sweep that could not reach its squares fails with the
-/// reason. Its price is what sweeps of its squares paid lately (<see cref="BotSweepRecord.Worth"/>), not a flat number.
-/// </para>
-/// </summary>
 public sealed class BotProwl : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotProwl));
@@ -390,6 +356,7 @@ public sealed class BotProwl : BotDeed
 
         if (_company && !_raised)
         {
+
             if (!_gated)
             {
                 _gated = true;
@@ -411,6 +378,7 @@ public sealed class BotProwl : BotDeed
 
                 if (squad != null)
                 {
+
                     _recruits.Clear();
 
                     foreach (var mobile in _map.GetMobilesInRange<Mobile>(body.Location, BotMuster.Reach))
@@ -460,6 +428,7 @@ public sealed class BotProwl : BotDeed
 
             if (!BotQuad.Dares(body, _map, _where))
             {
+
                 var instead = Redart(body, company: true);
 
                 if (instead != Point3D.Zero)
@@ -594,6 +563,7 @@ public sealed class BotProwl : BotDeed
 
         if (body.InRange(_where, ArriveWithin))
         {
+
             if (!_chasing)
             {
                 _walked++;
@@ -652,8 +622,10 @@ public sealed class BotProwl : BotDeed
             _nearest = System.Math.Min(_nearest, gap);
             _stalled = 0;
         }
-        else if (++_stalled >= TrekLimit)
+
+        else if (body is not BotMobile { Journey.Held: true } && ++_stalled >= TrekLimit)
         {
+
             if (_chasing)
             {
                 _chasing = false;

@@ -6,33 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Finding ground a house will actually stand on.
-///
-/// <para>
-/// <b>The engine is the only authority here and it is asked directly.</b> <c>HousePlacement.Check</c> knows
-/// the five rules — nothing impassable touching the foundation, five clear tiles front and back, a flat
-/// surface, no road underneath, no no-housing region — and it answers with which one was broken. Guessing
-/// any part of that here would be a second opinion about the world, and this project has paid for those:
-/// the fastest way to a house that cannot be placed is code that believes it knows where houses go.
-/// </para>
-///
-/// <para>
-/// <b>Trodden ground is preferred for the length of one look, and never required.</b> A hall in a corner
-/// of the island nobody walks through is a hall whose forge no sweep will ever find, so
-/// <see cref="BotQuad.Trodden"/> decides between two valid plots found in the same search. It does not
-/// decide whether a plot is valid — that would be a veto dressed as a preference — and it does not
-/// outlive the search either: holding the untrodden plot back until the whole spiral had been walked meant
-/// holding it for an hour, and the shard spent twenty minutes reporting "1 would take a hall" while
-/// nothing was ever offered to anybody.
-/// </para>
-///
-/// <para>
-/// The search is a spiral outwards from where the population lives, kept between calls, budgeted per call.
-/// A full check costs the engine a 7x7 multi's worth of tile and item queries; forty-nine bots taking their
-/// turn at that on one beat is a stall, and a stall is the thing this shard is least willing to pay.
-/// </para>
-/// </summary>
 public static class BotPlot
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPlot));
@@ -89,19 +62,9 @@ public static class BotPlot
 
     private static int _hallowedBy = -1;
 
-    /// <summary>
-    /// One search, from one origin: how far round the spiral it has got and what it has found.
-    ///
-    /// <para>
-    /// <b>One per origin, because every guild now looks from its own seat.</b> The first cut kept a single
-    /// cursor and a single remembered plot for the whole island, which was right while the whole island
-    /// looked from one point; with five guilds looking from five seats a shared cursor would be a search
-    /// that jumps three hundred tiles between one call and the next and remembers a plot found for the
-    /// wrong guild. See <c>BotSeat</c>.
-    /// </para>
-    /// </summary>
     private sealed class Search
     {
+
         public int Cursor;
 
         public Point3D Spare;
@@ -198,6 +161,7 @@ public static class BotPlot
         {
             if (search.Cursor >= _ring.Count)
             {
+
                 search.Cursor = 0;
                 Exhausted++;
 
@@ -286,6 +250,7 @@ public static class BotPlot
 
             if (result != HousePlacementResult.Valid)
             {
+
                 switch (result)
                 {
                     case HousePlacementResult.BadRegion:
@@ -328,6 +293,7 @@ public static class BotPlot
 
             if (toMove is { Count: > 0 })
             {
+
                 Occupied++;
 
                 continue;
@@ -478,6 +444,7 @@ public static class BotPlot
 
                 for (var t = 0; t < tiles.Length && !foundation; t++)
                 {
+
                     foundation = tiles[t].Z == 0 &&
                                  TileData.ItemTable[tiles[t].ID & TileData.MaxItemValue].Wall;
                 }
@@ -617,6 +584,7 @@ public static class BotPlot
 
     private static void Build()
     {
+
         if (_ring != null && _builtNear == Near && _builtFar == Far)
         {
             return;

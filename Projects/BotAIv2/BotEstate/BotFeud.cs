@@ -6,32 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who each guild at war has called its members onto, and how long the call stands.
-///
-/// <para>
-/// <b>Written 10.09.2026 because a war meant nothing at all.</b> <c>BotRegard</c> could declare one, the
-/// engine's own <c>Guild.IsWar</c> held it, and <c>BotRegard.AtWar</c> had not one caller anywhere in the
-/// assembly — so five guilds could hate each other to the floor of the scale and go on trading. Patrick
-/// watched a member of The Crown tell somebody "this is the land of The Crown, move along", get refused, and
-/// walk away. His order: they are to call their guildmates and fight.
-/// </para>
-///
-/// <para>
-/// <b>A board rather than a squad, and that is the whole design decision.</b> The squad machinery is real
-/// and complete, and every part of it is typed to a <c>BaseCreature</c> quarry — formation, stations, the
-/// share-out of a corpse. Re-typing it for a bot would touch a dozen files to gain what one shared list of
-/// "who we are all on" gains here: several members choosing the same enemy at the same time, which is what
-/// calling your guildmates looks like from the outside. The squad's own work is unaffected and none of its
-/// rules had to be loosened.
-/// </para>
-///
-/// <para>
-/// <b>Every call expires.</b> A quarrel that outlives the fight is a guild that hunts one bot for the rest
-/// of the session; <see cref="CallMs"/> is short enough that the call has to be renewed by somebody actually
-/// standing there, which is the only evidence that the fight is still happening.
-/// </para>
-/// </summary>
 public static class BotFeud
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFeud));
@@ -128,6 +102,7 @@ public static class BotFeud
             {
                 if (!muster.Out)
                 {
+
                     if (Threat(ours) != null)
                     {
                         muster.Out = true;
@@ -141,6 +116,7 @@ public static class BotFeud
                 else if (company.Count < LeastToAttack && Threat(ours) == null
                          && company.Leader?.Self is { Deleted: false } head0 && !head0.InRange(muster.Where, Assembly))
                 {
+
                     company.Disengage("too few left in the field; back to the muster");
                     muster.Out = false;
                     muster.Since = now;
@@ -216,6 +192,7 @@ public static class BotFeud
 
             if (!onOurs)
             {
+
                 var bid = BotClaim.On(body.Map, body.Location);
 
                 onOurs = bid != null && bid.Guild == theirs && bid.From == ours;
@@ -333,7 +310,6 @@ public static class BotFeud
 
     public static long Waves { get; private set; }
 
-    /// <summary>Where a war company forms up, since when, whether it has set out, and who is waiting there for the next wave.</summary>
     private sealed class Muster
     {
         private Point3D _where;

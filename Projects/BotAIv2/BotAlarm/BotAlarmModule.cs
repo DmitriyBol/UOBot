@@ -5,18 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-alarm.json</c> may say. Everything optional; an empty file keeps the code's
-/// numbers.
-///
-/// <para>
-/// <b>PascalCase, and it is not a style question.</b> The deserialiser matches these names as written, so a
-/// key in lower case is not an error and not a warning — it is a value silently left at its default. The
-/// only proof of a live threshold is the line this module writes at boot, or asking the debugger's door.
-/// </para>
-/// </summary>
 public sealed class BotAlarmSettings
 {
+
     public int? TickMs { get; set; }
 
     public int? ErrorsAt { get; set; }
@@ -40,7 +31,6 @@ public sealed class BotAlarmSettings
     public int? RestMs { get; set; }
 }
 
-/// <summary>Reads the alarm file and moves the numbers it names.</summary>
 public static class BotAlarmConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAlarmConfig));
@@ -76,22 +66,6 @@ public static class BotAlarmConfig
     }
 }
 
-/// <summary>
-/// The alarm channel as a module: it reads the shard once a minute and writes an event when something it
-/// can name has gone wrong.
-///
-/// <para>
-/// <see cref="BotPhase.World"/> and after <c>Population</c>, because every rule divides by something the
-/// population keeps. It offers nothing into the auction and answers for no bot's body — like the debugger,
-/// it only reads, which is what lets it be switched off with no effect on anything.
-/// </para>
-///
-/// <para>
-/// <b>Separate from the debugger on purpose.</b> The debugger is an observer with a model, a body and an
-/// opinion; this is a smoke alarm. The one is worth switching off while working on the other, and a shard
-/// running with no watcher at all should still be able to shout when its work stops finishing.
-/// </para>
-/// </summary>
 public sealed class BotAlarmModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAlarmModule));

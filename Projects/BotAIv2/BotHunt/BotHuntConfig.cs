@@ -4,18 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-hunt.json</c> is allowed to say. Everything optional.
-///
-/// <para>
-/// What is not here: what monsters exist, what they carry, how hard they hit, and where they stand. All of
-/// that is the shard's own content, and a file able to disagree with it would be a file able to send a bot at
-/// something it cannot beat. What a fight is worth is not here either — that is the ledger's, measured per
-/// patch of ground.
-/// </para>
-/// </summary>
 public sealed class BotHuntSettings
 {
+
     public int? Reach { get; set; }
 
     public int? Notice { get; set; }
@@ -59,9 +50,16 @@ public sealed class BotHuntSettings
     public int? BandMedicReach { get; set; }
 
     public bool? MusterJudged { get; set; }
+
+    public bool? SlayStandsWhenDue { get; set; }
+
+    public int? SlayRetreatMs { get; set; }
+
+    public int? SlayFootStepMs { get; set; }
+
+    public int? SlayMountStepMs { get; set; }
 }
 
-/// <summary>Reads the hunt file and moves the numbers it names.</summary>
 public static class BotHuntConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHuntConfig));
@@ -112,5 +110,10 @@ public static class BotHuntConfig
 
         BotSlay.NoProgressMs = settings.SlayNoProgressMs ?? BotSlay.NoProgressMs;
         BotSlay.CapMs = settings.SlayCapMs ?? BotSlay.CapMs;
+
+        BotSlay.StandsWhenDue = settings.SlayStandsWhenDue ?? BotSlay.StandsWhenDue;
+        BotSlay.RetreatMs = settings.SlayRetreatMs ?? BotSlay.RetreatMs;
+        BotSlay.FootStepMs = settings.SlayFootStepMs ?? BotSlay.FootStepMs;
+        BotSlay.MountStepMs = settings.SlayMountStepMs ?? BotSlay.MountStepMs;
     }
 }

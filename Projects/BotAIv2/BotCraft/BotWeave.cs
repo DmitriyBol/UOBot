@@ -7,15 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The spinning wheels and looms of the towns, read from the world once.
-///
-/// <para>
-/// A wheel and a loom are addons — the tailor's shop has both — and an addon is a set of components on the map. One pass
-/// over the map's components finds every <c>ISpinningWheel</c> and every <c>ILoom</c>; where each stands is what a weaver
-/// walks to. Nothing is written down, by the rule the forges and the dungeons' rooms are found by.
-/// </para>
-/// </summary>
 public static class BotLooms
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLooms));
@@ -141,39 +132,10 @@ public static class BotLooms
     }
 }
 
-/// <summary>
-/// The flocks of the map, read off the spawners that keep them: where each pasture is, and which of its sheep have their wool
-/// grown.
-///
-/// <para>
-/// <b>Patrick's word of 29.09.2026: the weavers walk to the sheep; the world is not bent to the bots.</b> Build 336 asked 1331
-/// times to weave in its first 105 minutes and 872 of the answers were "no shorn sheep near": the only question asked was whether a
-/// sheep with its wool stood within <see cref="BotWeave.SheepReach"/> of wherever the weaver happened to be. The needle's nine live in
-/// Britain (five), Minoc (one) and Yew (three). Britain's bank has no sheep that close — the nearest are single wild ones in the
-/// WildLife spawners two and three hundred tiles out — and the flocks are on the farms by Yew: three spawners of ten and three of
-/// fifteen round (571–676, 939–1179), with smaller ones by Skara Brae and Jhelom. In the same window the population bought 1871
-/// cloth from shopkeepers for 3773gp, the largest single thing it bought.
-/// </para>
-///
-/// <para>
-/// <b>Read off the spawners rather than swept, so the question costs a list and not a map.</b> A spawner keeps its own creatures
-/// (<c>SpawnerEntry.Spawned</c>) and stands where it keeps them. One pass over the map's spawners when the first weaver asks — the
-/// rule the looms above are found by — keeps those with an entry that raises sheep, and from then on "how many sheep with their wool
-/// grown has that flock" is a walk over a handful of references, where the old question was a sweep of every sector within a
-/// hundred and fifty tiles on every ask. Nothing is written down: a spawner that stops raising sheep answers nought.
-/// </para>
-///
-/// <para>
-/// <b>Grown by the engine's clock, not by the body.</b> <c>Sheep.Carve</c> refuses by <c>NextWoolTime</c>, and the shorn body is put
-/// back only in <c>OnThink</c>, which only a running AI calls. A sheep in a sector nobody has woken (<see cref="BotWake"/>) has none,
-/// so a flock whose wool grew back while nobody was near read as shorn by its body for as long as it slept.
-/// </para>
-/// </summary>
 public static class BotPastures
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPastures));
 
-    /// <summary>One spawner that raises sheep, and the entries on it that do.</summary>
     public sealed class Pasture
     {
         public Pasture(BaseSpawner spawner, List<SpawnerEntry> flocks)
@@ -408,26 +370,6 @@ public static class BotPastures
     }
 }
 
-/// <summary>
-/// From a sheep to a bolt of cloth: shear, spin, weave, cut — and cut some of the cloth into bandages.
-///
-/// <para>
-/// <b>Patrick's sixth point of the night of 29.09.2026: make the economy self-sufficient.</b> In twenty-five minutes of build
-/// 282 the population bought 435 things over counters, and 334 of them were cloth (180) and bandages (154): the tailors'
-/// cloth and everybody's bandages, and neither had a source on the island. The engine has had the whole chain since the
-/// first day: a sheep with its wool grown back gives two wool to scissors (<c>Sheep.Carve</c>), a spinning wheel turns one
-/// wool into three yarn (<c>Wool.OnSpun</c>), a loom takes five yarn for a bolt (<c>BaseClothMaterial</c>, phases 0–4),
-/// scissors cut a bolt into fifty cloth (<c>BoltOfCloth.Scissor</c>) and a cloth into a bandage (<c>Cloth.Scissor</c>). So
-/// two wool are a bolt, and a bolt is fifty cloth or fifty bandages. Britain's sheep graze by its farms; the tailor's shop
-/// has the wheel and the loom.
-/// </para>
-///
-/// <para>
-/// <b>Everything here is the engine's own verb, said by the bot.</b> The shearing is the sheep's method with the bot's
-/// scissors; the spinning is the wheel's timer with the wool's callback; the loom's phases are stepped exactly as the
-/// yarn's target steps them; the cutting is the bolt's and the cloth's own <c>Scissor</c>. Nothing is made out of nothing.
-/// </para>
-/// </summary>
 public sealed class BotWeave : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWeave));
@@ -991,21 +933,6 @@ public sealed class BotWeave : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a bot with scissors and the tailor's trade a weaving stint when its cloth is short: at the flock that gives the most wool
-/// for the walk, as far off as the bot's leash allows.
-///
-/// <para>
-/// <b>Asked of the flocks, not of the bot's surroundings (30.09.2026).</b> Until build 336 this asked whether a sheep with its wool
-/// stood within <see cref="BotWeave.SheepReach"/> of the bot and refused the stint otherwise — 872 of 1331 asks — so a weaver in
-/// Britain never wove at all and the island bought its cloth. Now every pasture the spawners keep (<see cref="BotPastures"/>) is
-/// weighed as the woods and the seams are: within the bot's leash and <see cref="PastureReach"/>, on the bot's own land, not refused
-/// to the population or lately to this bot, not on ground that asks more than the weaver brings, not sealed, and with a wheel and a
-/// loom within <see cref="BotWeave.LoomReach"/> of it — in Britain since 01.10.2026 (<see cref="BotLooms.WorkshopsInBritain"/>). Of
-/// those, the one with the least road per sheep ready to shear. The walk there is priced by the auction like every other walk: a
-/// flock three hundred tiles off wins only when its wool is worth the road.
-/// </para>
-/// </summary>
 public sealed class BotWeaver : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWeaver));

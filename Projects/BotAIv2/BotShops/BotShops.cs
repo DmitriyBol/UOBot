@@ -6,24 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Buying things from the shopkeepers. The capability, available to every bot rather than to a trade.
-///
-/// <para>
-/// <b>A purchase goes through the shopkeeper's own <c>OnBuyItems</c>.</b> That is the same call a player's
-/// shop window makes: it charges the shard's real prices out of the pack and the account behind it, and
-/// hands over real goods. A bot is a customer on exactly the terms a player is, which is worth more than it
-/// sounds — every price scalar, every access rule and every stock limit applies without being reimplemented,
-/// and nothing here can accidentally invent goods or money.
-/// </para>
-///
-/// <para>
-/// <b>Two lines that are not obvious and both were paid for in the first version.</b> Shelves refill on a
-/// timer that is only wound when somebody <em>opens</em> the shop window — and bots never open one, so a
-/// shop a bot has cleaned out stays empty for good unless the restock is asked for. And prices carry the
-/// shard's own scalars, brought up to date only on demand.
-/// </para>
-/// </summary>
 public static class BotShops
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotShops));

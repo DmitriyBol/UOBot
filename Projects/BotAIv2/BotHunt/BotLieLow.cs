@@ -3,17 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A murderer getting away from the body and lying low: a dozen tiles off, hidden, not moving, for a few minutes.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026: criminals act unseen.</b> Until then a robber that had killed went straight back to
-/// what it had put down, red and in plain sight beside the corpse, and the law-abiding set on it at once (build 111c). Now a
-/// robber that can hide is pressed into this the moment the corpse is gone through (<see cref="BotInquest"/> presses it on
-/// the next sweep). The body is left behind for somebody to find, the killer is <see cref="AwayTiles"/> off and hidden, and
-/// what finds it is a search with Detect Hidden, a passer-by with that skill within four tiles, or its own next step.
-/// </para>
-/// </summary>
 public sealed class BotLieLow : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLieLow));

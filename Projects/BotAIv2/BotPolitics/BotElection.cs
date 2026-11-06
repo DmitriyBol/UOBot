@@ -8,41 +8,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who leads each guild, by the members' vote: elections of the head every few hours or when the head is gone or has fallen,
-/// and the plot that can depose a head the members have lost faith in.
-///
-/// <para>
-/// <b>Patrick's order of 07.10.2026, night: "elections of the guild head (members vote by the candidate's appeal: kills,
-/// generosity, victories); a conspiracy: the discontented can depose the head".</b> Until now a guild's head was whoever the
-/// engine had put there — the founder, or, when a head was deleted, the member the engine's getter drew by fealty
-/// (<c>Guild.CalculateGuildmaster</c>) — and nothing the members did or thought ever changed it.
-/// </para>
-///
-/// <para>
-/// <b>The vote.</b> Every <see cref="EveryMs"/> of running time, at once when the head has left or been deleted, and when the
-/// head falls (<see cref="OnFall"/>, not inside <see cref="GapMs"/> of the last vote), the guild's <see cref="Candidates"/> best
-/// members by their record stand, with the head. A candidate's appeal is its renown (the engine's fame, which kills earn,
-/// times <see cref="FameWeight"/>), its kills of other guilds' members (<see cref="KillWeight"/>), the wars its guild won while
-/// it was a member (<see cref="WinWeight"/>), and the coin it gave the chest as dues (one point per <see cref="GiftPer"/>gp);
-/// each voter weighs that by its own needs — a poor voter counts gifts <see cref="PoorGifts"/> times, a fighter counts kills
-/// <see cref="FighterKills"/> times — and adds its own regard of the candidate and the candidate's being a veteran when those
-/// are wired (<see cref="BotPolitics.TiesRegard"/>, <see cref="BotPolitics.Veteran"/>). Every member votes for the candidate
-/// that appeals to it most (a candidate for itself); the most votes win, the better record breaks a tie. The winner becomes the
-/// engine's leader with every member's fealty sworn to it (<see cref="BotGuilds.Crown"/>), so the engine's own daily count
-/// agrees, and the "head never leaves" rule holds for it as for any head.
-/// </para>
-///
-/// <para>
-/// <b>The plot.</b> Every <see cref="PlotLookMs"/>, not while the guild is at war and not inside <see cref="GapMs"/> of a vote,
-/// the members are asked whether they are discontented: the guild lost <see cref="LostInRow"/> wars in a row, or the member
-/// stands under the keep while the chest holds the rich mark and has paid for nothing in <see cref="UnpaidMs"/>, or its regard
-/// of the head is <see cref="LowRegard"/> or worse (when wired). At <see cref="DiscontentShare"/> of the members they call a
-/// vote of no confidence: the discontented vote against, and so does any content member to whom a rival appeals
-/// <see cref="RivalMargin"/> times as much as the head. Above <see cref="CarryShare"/> it carries, and an election is held at
-/// once without the deposed head, who stays a member.
-/// </para>
-/// </summary>
 public static class BotElection
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotElection));
@@ -139,9 +104,9 @@ public static class BotElection
 
     public static long GiftsCounted { get; private set; }
 
-    /// <summary>One guild's office: who heads it by whose vote, and its run of lost wars.</summary>
     private sealed class Office
     {
+
         public string Head;
 
         public long At;
@@ -169,7 +134,6 @@ public static class BotElection
         public bool Restore;
     }
 
-    /// <summary>One member's record, by name: what it is elected by.</summary>
     private sealed class Record
     {
         public int WarKills;
@@ -191,6 +155,7 @@ public static class BotElection
     {
         if (!_offices.TryGetValue(guild, out var office))
         {
+
             var delay = Math.Max(0, FirstMs) / 2 + Utility.Random(Math.Max(1, FirstMs));
 
             _offices[guild] = office = new Office
@@ -938,6 +903,7 @@ public static class BotElection
 
             _offices[name] = new Office
             {
+
                 Head = elected && !string.IsNullOrEmpty(head) ? head : null,
                 At = now - Math.Clamp(ago, 0L, (long)int.MaxValue),
                 Elected = elected,

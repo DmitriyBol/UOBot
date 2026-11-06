@@ -5,28 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The first steps of a trade, bought from a shopkeeper who knows it — the engine's own teaching, paid for in gold.
-///
-/// <para>
-/// <b>Nobody on the island had cooked a thing, and nothing on it could ever have started.</b> On 24.09.2026 the cook's line
-/// read "12001 asked to cook: 0 put something on, 7757 had no meat worth cooking, 4244 had meat but no recipe their skill
-/// would carry". Every meal is a recipe from nought to a hundred in a craft whose chance at the bottom is nought
-/// (<c>DefCooking.GetChanceAtMin</c>), so a bot with no cooking has no chance at all and the engine will not let it try —
-/// "you don't have the required skills to attempt this item" — and a skill that rises only by trying cannot rise from
-/// there. The chain the population was built around, kill → carve → fire → meal, stopped at the fire the day the last
-/// cook was reset to a novice.
-/// </para>
-///
-/// <para>
-/// A player in the same place does what the game offers: walks to a cook, a baker or a herbalist and pays to be shown how,
-/// which the engine does for a third of the teacher's own skill, never more than forty-two points, at a gold coin a tenth
-/// of a point (<see cref="BaseCreature.CheckTeachSkills"/>). This offers exactly that to a bot holding meat worth cooking
-/// with less than <see cref="Below"/> points to cook it with, priced high on purpose — it is one lesson in a bot's life,
-/// and the auction has no way to price what it unlocks — and no more than <see cref="AtOnce"/> on the road to a teacher
-/// at a time, so the whole population does not queue at one stall.
-/// </para>
-/// </summary>
 public sealed class BotTutor : IBotProposer
 {
     public string Name => "Tutor";
@@ -187,7 +165,6 @@ public sealed class BotTutor : IBotProposer
         + $"{NoRoom} with no room to learn, {Crowded} waiting for the road to a teacher to clear, {Walking} on it now";
 }
 
-/// <summary>Walking to a shopkeeper, paying, and being taught. See <see cref="BotTutor"/>.</summary>
 public sealed class BotTutoring : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTutoring));
@@ -289,6 +266,7 @@ public sealed class BotTutoring : BotDeed
 
         if (!_teacher.Teach(_skill, body, points, true))
         {
+
             body.Backpack?.DropItem(new Gold(points));
             Failed++;
 

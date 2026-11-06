@@ -5,20 +5,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The crafting chain as the engine defines it and the population fills it: for each material the craft
-/// systems consume, where it comes from, how much is on the market, what can be made from it, who can make
-/// each thing, and what is wanted.
-///
-/// <para>
-/// <b>Read out of the craft systems, not written down here.</b> Every recipe, its skill and its material
-/// come from the same <c>CraftSystem</c> tables the bots use, so the page cannot describe a chain the bots
-/// cannot walk. What this file adds is the accounting: the sources of the raw materials (which the tables do
-/// not know), the market's stock, the population's skills and the day's output.
-/// </para>
-/// </summary>
 public static class BotWebCraft
 {
+
     private static readonly (string Name, Func<CraftSystem> System, SkillName Skill)[] Systems =
     [
         ("Blacksmithy", () => DefBlacksmithy.CraftSystem, SkillName.Blacksmith),
@@ -31,7 +20,6 @@ public static class BotWebCraft
         ("Carpentry", () => DefCarpentry.CraftSystem, SkillName.Carpentry)
     ];
 
-    /// <summary>Who gathers a raw material: nobody (it is bought), whoever has a skill, one class, or every fighter.</summary>
     private enum Gatherers
     {
         Nobody,
@@ -339,6 +327,7 @@ public static class BotWebCraft
 
                     w.WriteStartObject();
                     w.WriteString("item", want.Kind.Name);
+
                     w.WriteNumber("amount", Math.Max(0, want.Amount));
                     w.WriteNumber("price", want.Offer);
                     w.WriteNumber("lodged", 0);

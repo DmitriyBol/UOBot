@@ -8,7 +8,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What <c>Configuration/bot-townground.json</c> may say. Everything optional; no file, no record.</summary>
 public sealed class BotTownGroundSettings
 {
     public bool? Running { get; set; }
@@ -18,7 +17,6 @@ public sealed class BotTownGroundSettings
     public List<BotTownGroundPaid> Paid { get; set; }
 }
 
-/// <summary>One square's real price: the guild, any tile of the square, and the gold its last winning claim cost.</summary>
 public sealed class BotTownGroundPaid
 {
     public string Guild { get; set; }
@@ -30,41 +28,6 @@ public sealed class BotTownGroundPaid
     public int Gold { get; set; }
 }
 
-/// <summary>
-/// <b>No guild holds a square where the town's guards act</b> (Patrick, 07.10.2026 ~10:20: "guilds may not claim town squares
-/// with guards. Remove such claims right now and give the guilds their money back if they paid for the claim").
-///
-/// <para>
-/// <b>The test, exact and the engine's own.</b> A thirty-tile square (<see cref="BotQuad.Key(Map, Point3D)"/>) is town ground
-/// when on any one of its 900 tiles the engine's answer to "would a guard come here" is yes: <c>Region.Find(tile, map)</c> at
-/// z 0, then <c>GetRegion&lt;GuardedRegion&gt;()</c> not disabled — the same question <c>BotHaven.Guarded</c> and
-/// <c>BotOutlaw.Guarded</c> ask of one point. So a town's <c>TownRegion</c> (Britain, Trinsic, Yew, …) and the moongates'
-/// <c>GuardedRegion</c> count, Buccaneer's Den (guards disabled) does not, and a corner of sixteen tiles counts as much as
-/// a square wholly inside the walls: strict, like the walls of a hall (<c>BotBounds</c>). Asked once a square and kept
-/// (<see cref="Guarded(Map, ValueTuple{int, int, int}, out string, out int)"/>); a square whose sectors carry no guarded
-/// region is answered without a single probe. The answers are forgotten at every sweep, so a town whose guards a GM turned
-/// off or on is read again within the hour.
-/// </para>
-///
-/// <para>
-/// <b>What it refuses.</b> The staker (<c>BotHolder.Worth</c>) passes such a square over, open or held (a held one is
-/// therefore never weighed for a seizure, <c>BotSeizure.Weigh</c>), and <c>BotClaim.Open</c> refuses it as the last wall.
-/// <b>What it sweeps.</b> At the first look after the halls are adopted, and every <see cref="SweepEveryMs"/> after, every
-/// held square on town ground is dropped (WRN, naming the guild, the square and the town) and the guild gets back what it
-/// paid for it: the claim store records whether a square was paid for, not the price, so a bought square is refunded at
-/// the standing price for its kind (<c>BotClaim.Price</c>, 5000gp — the same as <c>BotClaim.Ousting</c>) and a free one
-/// with nothing. The coin comes out of the city's purse, which took every coin of the claims (<c>BotCity.Tax</c>,
-/// build 408), into the guild's chest; a purse that cannot cover it still makes the chest whole, and the shortfall is
-/// counted and logged. A claim still mustering on town ground is called off and its held price goes back to the chest.
-/// </para>
-///
-/// <para>
-/// <b>What it does not touch.</b> A guild hall's own square (its yard, <c>BotClaim.Seat</c>) stays its guild's even when it
-/// reaches into a town, and a seat is a point, not a claim. A guild house in a town is bought from the town
-/// (<c>BotGuildHouses</c>) and is a different thing altogether. A yard in a town cannot be seized, though: no claim of any
-/// kind is opened on town ground.
-/// </para>
-/// </summary>
 public static class BotTownGround
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTownGround));
@@ -356,6 +319,7 @@ public static class BotTownGround
             }
             else
             {
+
                 BotCity.Tax(held);
             }
         }

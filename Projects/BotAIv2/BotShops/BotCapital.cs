@@ -5,48 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Britain as the centre of trade: the capital's shopkeepers pay better for goods, a load drawn out of a bank box walks to them
-/// when the better price pays for the road, and a bot with a shop's worth of goods, offered a journey, takes it to the capital.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026, evening: «rework the trade: the traders must put Britain first as the centre
-/// of trade».</b> Measured on the day's events (<c>logs/bot-events.ndjson</c>, 00:00–18:40): Britain already carried half the
-/// counter trade — 2031 of 3865 purchases from shopkeepers (64524 of 120124gp), 560 of 1268 sales to them (36091 of 83463gp),
-/// 510 of 1158 trips to a bank, 108 of 341 bots' shop shifts — and none of it came from beyond Britain's own ring. Every
-/// chooser of a counter was "the nearest", and every other town stands 800 to 2200 tiles off (Skara Brae 803, Cove 826, Yew
-/// 992, Trinsic 1124, Minoc 1129, Vesper 1478, Jhelom 2200): of the 3865 purchases only 21 began within 600 tiles of Britain
-/// and were made elsewhere. Nothing made the capital worth a road, so nobody took one.
-/// </para>
-///
-/// <para>
-/// <b>What makes it worth one, and nobody is ordered there.</b> A road is not free: after build 350 restocks that walked 600
-/// tiles and more died 22 times in 191 (11.5 %) against 0.8 % under 200, and journeys between towns 51 times in 195. So the
-/// capital is a price and not a rule. Its counters pay <see cref="Premium"/> times their own price, never above what the island's
-/// shopkeepers ask for the thing (<see cref="Factor"/>: no counter may pay more than a shelf asks, or buying at one and selling at
-/// the next is a trade), the difference out of the city's treasury (<see cref="BotCity.Draw"/>) above <see cref="Reserve"/> — a
-/// lever with a budget, never more than the mint — and the peddler weighs every buyer by what the load fetches there less the
-/// road at the peddler's own price of a tile (<see cref="BotPeddler.PettyPerTile"/>, the number its "worth less than the walk"
-/// gate already reads, so the chooser and the gate cannot disagree). Four hundred gold of ingots from Skara Brae pays for its
-/// road; a handful of reagents does not, and goes where it always went.
-/// </para>
-///
-/// <para>
-/// <b>Who is pulled, and who trades at home.</b> The premium is counted in the choice (<see cref="Pull"/>) only for a load drawn
-/// out of a bank box at a bank for the walk (until 01.10.2026, a load on a stall, which rode safe in the market); goods already
-/// riding about in the pack go to the best buyer at its own price — and only where the capital's counter lies within the bot's own
-/// leash from home (<see cref="BotPopulation.Leash"/>: a newcomer at a quarter of its trade stays within three hundred tiles of
-/// its seat), within <see cref="Reach"/> of the bot, on a land the gates join to the bot's (<see cref="BotGates.Joined"/>), and
-/// while the treasury can pay. Jhelom, Minoc, Vesper and the islands trade at home. The price itself is paid to whoever sells
-/// at the capital's counters, pulled or not: a price is a price.
-/// </para>
-///
-/// <para>
-/// <b>Everything here is counted where it happens</b> — sales and purchases at the capital's counters against everywhere else,
-/// the premium paid and the premium the treasury could not meet, loads walked past a nearer buyer, the reasons the price did
-/// not pull, shop shifts, and the traders' journeys — and printed in the <c>Trade:</c> line (<see cref="Describe"/>).
-/// </para>
-/// </summary>
 public static class BotCapital
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCapital));
@@ -133,7 +91,6 @@ public static class BotCapital
 
     private static bool _saidFirst;
 
-    /// <summary>Why the capital's price did or did not count in one choice.</summary>
     public enum Why
     {
         Pulled,

@@ -4,34 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A fight with one of our own — a duel, a robbery, a manhunt — as a piece of work: close, hit, and stop when told.
-///
-/// <para>
-/// <b>Every fight on this shard until 15.09.2026 was against a creature.</b> <c>BotSlay</c> takes a
-/// <c>BaseCreature</c>, <c>BotThreat</c> counts only creatures, and a bot hit by another bot swung back by reflex
-/// and otherwise carried on with its errand. Patrick's orders for the night — a championship between the strongest
-/// bots, murderers who kill and rob, a Baron's patrol that catches them — all need a bot to go after a bot on
-/// purpose, and this is the one undertaking that does it. The fighting itself is still the engine's: <c>Combatant</c>
-/// and <c>Warmode</c> start its swing timer, and a caster throws what <c>BotStrike</c> says it can.
-/// </para>
-///
-/// <para>
-/// <b>It ends when whoever set it up says so, not when the other side is dead.</b> A duel is over at a share of
-/// health; a robbery at a corpse; a manhunt at a catch. So the caller hands in the rule — a function answering with
-/// the reason the fight is over, or nothing while it goes on — and the deed asks it every beat before it swings.
-/// Nothing here decides whether a bot may fight another; that is the caller's, and the engine's notoriety rules
-/// underneath (see <c>BotMobile.IsHarmfulCriminal</c>).
-/// </para>
-///
-/// <para>
-/// Committed and summoning: it is taken by being pressed on a bot rather than won at auction, and no better offer
-/// takes the bot off it. Unpaid, so the earnings veto lets it through; braves lethal ground, because the duel's ring
-/// and the robber's victim are wherever they are.
-/// </para>
-/// </summary>
 public sealed class BotBrawl : BotDeed
 {
+
     public static double Prior { get; set; } = 200.0;
 
     public static double WorkMinutes { get; set; } = 3.0;

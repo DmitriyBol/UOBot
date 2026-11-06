@@ -2,17 +2,9 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// How dangerous a piece of ground is to a bot walking across it, in the four words the planners, the hunt and the
-/// dashboard share.
-///
-/// <para>
-/// <b>Ordered, and the order is the meaning.</b> A comparison (<c>level &gt;= Hostile</c>) is how every caller asks "may
-/// something attack me here", so the values must never be renumbered.
-/// </para>
-/// </summary>
 public enum BotZoneLevel : byte
 {
+
     Clear = 0,
 
     Edge = 1,
@@ -22,13 +14,9 @@ public enum BotZoneLevel : byte
     Deadly = 3
 }
 
-/// <summary>
-/// One zone as the last build left it: where it is, what lives in it, how strong that is against a bot, how sure the shard
-/// is of its shape, and who has died in it. Immutable: a build makes new ones and the old ones are dropped whole, so a zone
-/// read by a planner on the loop, or by the dashboard's thread, never changes under the reader.
-/// </summary>
 public sealed class BotZone
 {
+
     public int Id { get; init; }
 
     public BotZoneLevel Level { get; init; }
@@ -112,15 +100,11 @@ public sealed class BotZone
     public override string ToString() => $"zone {Id} ({BotZones.Word(Level)}, {Label})";
 }
 
-/// <summary>One kind of creature in a zone.</summary>
 public readonly record struct BotZoneKindCount(string Kind, int Live, int Max, double Power, bool Aggressive, bool Caster);
 
-/// <summary>
-/// Everything one build published, swapped in whole through <see cref="BotZones"/>'s one volatile reference. The raster is
-/// the answer to "what is here", read per node by the planners; the zones are the answer to "what is that".
-/// </summary>
 public sealed class BotZoneState
 {
+
     public const int Shift = 2;
 
     public const int Cell = 1 << Shift;

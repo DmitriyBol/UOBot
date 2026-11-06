@@ -4,46 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot is trying to get to, what it has put aside to do first, and the plan it is walking now.
-///
-/// <para>
-/// <b>Owned by the bot</b>, like <see cref="BotBond"/>, and for the same reason: a bot that is deleted takes
-/// its journey with it, and answering "where is this bot going" means asking the bot.
-/// </para>
-///
-/// <para>
-/// <b>A queue, not a single destination — and that is what makes an interruption something other than a
-/// loss.</b> A bot walking to market that gets hit has three honest answers, and in the first version it only
-/// had one. There, fleeing was a <em>goal</em>: it overwrote the errand, so the bot forgot where it had been
-/// going, and half an hour of walking became a bot standing in a field wondering what it was for. Here, being
-/// attacked pushes a second errand on top of the first. Deal with what is in front of you; the road is still
-/// underneath, and it resumes by itself.
-/// </para>
-///
-/// <para>
-/// So the three answers become: the threat is several times over — keep walking, the errand never changed;
-/// it is manageable — put the destination aside, kill the thing, then carry on; it killed you — the queue
-/// dies with the bot. Movement implements the putting-aside. <b>Which of the three</b> is the decision
-/// layer's, and nothing here has an opinion about combat.
-/// </para>
-///
-/// <para>
-/// <b>What counts as progress is the part that has to be got right</b>, and the first version got it wrong
-/// three separate ways. It measured distance to the goal — true only while the only way to walk is straight,
-/// and false the moment a bot leaves an enclosure, because the gate is twenty tiles the wrong way. It
-/// compared a fresh plan's length against the finished one's, so a bot crossing a continent correctly, one
-/// leg at a time, was told off every twenty-five seconds for going backwards. And it judged bots that were
-/// not walking at all: a bot standing at a counter trading was measured against the distance to a home it had
-/// no intention of visiting, and after twenty-five seconds was declared stuck, had its errand cancelled and
-/// was barred from trading for five minutes — for trading.
-/// </para>
-///
-/// <para>
-/// So: progress is measured <b>along the plan</b>, in <b>attempts rather than seconds</b>, it restarts
-/// whenever the plan does, and a journey with no plan is not judged at all.
-/// </para>
-/// </summary>
 public sealed class BotJourney
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotJourney));
@@ -55,6 +15,18 @@ public sealed class BotJourney
     public static int MaxEmptyPlans { get; set; } = 8;
 
     public static int MaxPlansWithoutCloser { get; set; } = 12;
+
+    public static bool KeepUp { get; set; } = true;
+
+    public static long KeptUp { get; private set; }
+
+    public static long KeptOn { get; private set; }
+
+    internal static void ForgetKeptUp()
+    {
+        KeptUp = 0;
+        KeptOn = 0;
+    }
 
     public static int DangerAvoidMs { get; set; } = 120000;
 
@@ -91,6 +63,12 @@ public sealed class BotJourney
     private int _bestAway = int.MaxValue;
 
     private int _plansSinceCloser;
+
+    private int _oldBestAway = int.MaxValue;
+
+    private int _oldSinceCloser;
+
+    private bool _keptOn;
 
     private BotErrand _awayErrand;
 
@@ -231,6 +209,7 @@ public sealed class BotJourney
 
         if (errand.Gate != Point3D.Zero && Away(at, errand.GateTo) <= BotGates.Through)
         {
+
             BotGates.WalkedThrough(map, errand.Gate);
 
             errand.Gate = Point3D.Zero;
@@ -275,6 +254,7 @@ public sealed class BotJourney
 
         while (errand.Leg < errand.Route.Count && Away(at, errand.Route[errand.Leg]) <= LegReached)
         {
+
             if (errand.Gate != Point3D.Zero && errand.Leg == errand.Route.Count - 1
                 && (at.X != errand.Route[errand.Leg].X || at.Y != errand.Route[errand.Leg].Y))
             {
@@ -286,6 +266,7 @@ public sealed class BotJourney
 
         if (errand.Leg >= errand.Route.Count)
         {
+
             if (errand.Gate != Point3D.Zero)
             {
                 BotGates.NotedRefused();
@@ -357,6 +338,7 @@ public sealed class BotJourney
                 }
             case Server.Engines.Pathing.Tiered.NavStatus.Unreachable:
                 {
+
                     if (BotGates.Next(map, at, target, out var gate))
                     {
                         var toGate = Server.Engines.Pathing.Tiered.NavigationService.Route(map, at, gate.From, errand.Route, 0);
@@ -385,6 +367,7 @@ public sealed class BotJourney
                 }
             default:
                 {
+
                     if (BotChart.Route(map, at, target, errand.Route))
                     {
                         Charted++;
@@ -489,14 +472,14 @@ public sealed class BotJourney
         Rebase(new BotErrand { Map = map, Where = where, Arrival = arrival, Reason = reason });
     }
 
-    public void Rebase(Map map, Mobile follow, BotArrival arrival, string reason)
+    public void Rebase(Map map, Mobile follow, BotArrival arrival, string reason, bool keepsUp = false)
     {
         if (map == null || follow == null)
         {
             return;
         }
 
-        Rebase(new BotErrand { Map = map, Follow = follow, Arrival = arrival, Reason = reason });
+        Rebase(new BotErrand { Map = map, Follow = follow, Arrival = arrival, Reason = reason, KeepsUp = keepsUp });
     }
 
     private void Rebase(BotErrand errand)
@@ -619,11 +602,17 @@ public sealed class BotJourney
         _dangerous = false;
     }
 
-    public void Hold(int ms) => _heldUntil = Core.TickCount + System.Math.Max(0, ms);
+    public void Hold(int ms)
+    {
+        _heldUntil = Core.TickCount + System.Math.Max(0, ms);
+        _holding = true;
+    }
 
-    public bool Held => Active && Core.TickCount < _heldUntil;
+    public bool Held => Active && _holding && Core.TickCount - _heldUntil < 0;
 
     private long _heldUntil;
+
+    private bool _holding;
 
     private bool _beside;
 
@@ -703,6 +692,7 @@ public sealed class BotJourney
         {
             _awayStamp = RouteStamp;
             _bestAway = int.MaxValue;
+            _oldBestAway = int.MaxValue;
         }
 
         if (!ReferenceEquals(_awayErrand, Current))
@@ -710,13 +700,37 @@ public sealed class BotJourney
             _awayErrand = Current;
             _bestAway = int.MaxValue;
             _plansSinceCloser = 0;
+            _oldBestAway = int.MaxValue;
+            _oldSinceCloser = 0;
+            _keptOn = false;
             Probed = false;
             Escalated = false;
         }
 
         var slack = Current?.Follow != null ? FollowSlack : 0;
 
-        if (away < _bestAway - slack)
+        var keeps = KeepUp && Current is { KeepsUp: true, Follow: not null };
+
+        if (keeps)
+        {
+            if (away < _oldBestAway - slack)
+            {
+                _oldBestAway = away;
+                _oldSinceCloser = 0;
+            }
+            else
+            {
+                _oldSinceCloser++;
+            }
+        }
+
+        if (keeps && outcome == BotPathOutcome.Reached)
+        {
+            KeptUp++;
+            _bestAway = away;
+            _plansSinceCloser = 0;
+        }
+        else if (away < _bestAway - slack)
         {
             _bestAway = away;
             _plansSinceCloser = 0;
@@ -724,6 +738,12 @@ public sealed class BotJourney
         else
         {
             _plansSinceCloser++;
+        }
+
+        if (keeps && !_keptOn && _oldSinceCloser >= MaxPlansWithoutCloser && _plansSinceCloser < MaxPlansWithoutCloser)
+        {
+            _keptOn = true;
+            KeptOn++;
         }
 
         _planStamp++;
@@ -906,7 +926,7 @@ public sealed class BotJourney
         _plan.Clear();
         _step = 0;
         _beside = false;
-        _heldUntil = 0;
+        _holding = false;
         _planErrand = null;
         _planGoal = Point3D.Zero;
         _planBuiltTick = 0;
@@ -919,6 +939,7 @@ public sealed class BotJourney
         _emptyPlans = 0;
 
         _plansSinceCloser = 0;
+        _oldSinceCloser = 0;
 
         Plans = 0;
         Partial = false;

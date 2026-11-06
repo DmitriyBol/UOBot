@@ -1,29 +1,12 @@
 using System;
+using System.Collections.Generic;
 using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// <b>A company whose fight is well in hand spares a member or two to a dire cry near it (06.10.2026, react18).</b>
-///
-/// <para>
-/// At prime time nearly everybody near a cry is in a company: on build 410 (11:44–12:35) 84 of 167 dire cries had "nobody free,
-/// fit and friendly within 60 tiles", and 607 of the bots near them were members. A company came only when it was idle
-/// (<c>BotCry.Brings</c>: 5 brought, 144 refused for a fight of their own). Here the company keeps its enemy and its line, and lends
-/// what it can spare: the one or two members nearest the thing, who turn on it and walk to it as the blow's reflex would have them
-/// (<c>BotMobile.Engage</c>: the combatant set, the walk put on top of the road), and whom the press leaves on it
-/// (<see cref="Sparing"/>) until the crier is safe or dead, the thing is down, or <see cref="SpareMs"/> is up — then the press
-/// turns them back and the stations walk them home. No deed, no roster change, nothing dropped: the company's own machinery.
-/// </para>
-///
-/// <para>
-/// Well in hand: the company's enemy reckoned at no more than <see cref="SpareShare"/> of what the company can bring, no member
-/// under <c>DyingShare</c>, no pull-back running, no muster under way. Spared: not the leader, not a medic, fit, within
-/// <see cref="SpareReach"/> of the thing, not running or raising.
-/// </para>
-/// </summary>
 public sealed partial class BotSquad
 {
+
     public static bool Spares { get; set; } = true;
 
     public static double SpareShare { get; set; } = 0.5;
@@ -33,6 +16,8 @@ public sealed partial class BotSquad
     public static int MostSpared { get; set; } = 2;
 
     public static int SpareMs { get; set; } = 30000;
+
+    public static double SpareDyingShare { get; set; } = 0.35;
 
     public static long Spared { get; private set; }
 
@@ -46,6 +31,12 @@ public sealed partial class BotSquad
 
     public static long SpareRefusedNobody { get; private set; }
 
+    public static long SpareRefusedWar { get; private set; }
+
+    public static long SpareRefusedKept { get; private set; }
+
+    public static long SpareRefusedShort { get; private set; }
+
     public static long SparingBeats { get; private set; }
 
     private Mobile _spareFoe;
@@ -54,11 +45,20 @@ public sealed partial class BotSquad
 
     private long _spareTick;
 
+    private static readonly List<(IBotSquadMember Member, BotMobile Body, int OffFoe, int OffCrier)> _spareable = [];
+
     internal bool WellInHand()
     {
         if (!Spares || Disbanded || Recovering || Mustering)
         {
             SpareRefusedBleeding++;
+
+            return false;
+        }
+
+        if (Warring)
+        {
+            SpareRefusedWar++;
 
             return false;
         }
@@ -72,7 +72,7 @@ public sealed partial class BotSquad
 
         for (var i = 0; i < _members.Count; i++)
         {
-            if (_members[i].Self is { Deleted: false, Alive: true, HitsMax: > 0 } body && body.Hits < body.HitsMax * DyingShare)
+            if (_members[i].Self is { Deleted: false, Alive: true, HitsMax: > 0 } body && body.Hits < body.HitsMax * SpareDyingShare)
             {
                 SpareRefusedDying++;
 
@@ -83,9 +83,11 @@ public sealed partial class BotSquad
         return true;
     }
 
-    internal int Spare(Mobile crier, BaseCreature foe, long now)
+    internal int Spare(Mobile crier, BaseCreature foe, long now, double need, out double brought)
     {
-        if (foe is not { Deleted: false, Alive: true } || foe.Map != Map || Leader?.Self is not { } lead)
+        brought = 0.0;
+
+        if (foe is not { Deleted: false, Alive: true } || foe.Map != Map || Leader?.Self is not { } lead || crier == null)
         {
             return 0;
         }
@@ -95,10 +97,7 @@ public sealed partial class BotSquad
             return 0;
         }
 
-        IBotSquadMember first = null;
-        IBotSquadMember second = null;
-        var firstOff = int.MaxValue;
-        var secondOff = int.MaxValue;
+        _spareable.Clear();
 
         for (var i = 0; i < _members.Count; i++)
         {
@@ -113,33 +112,80 @@ public sealed partial class BotSquad
             }
 
             var off = Math.Max(Math.Abs(body.X - foe.X), Math.Abs(body.Y - foe.Y));
+            var at = _spareable.Count;
 
-            if (off < firstOff)
+            while (at > 0 && _spareable[at - 1].OffFoe > off)
             {
-                second = first;
-                secondOff = firstOff;
-                first = member;
-                firstOff = off;
+                at--;
             }
-            else if (off < secondOff)
+
+            if (at >= MostSpared)
             {
-                second = member;
-                secondOff = off;
+                continue;
+            }
+
+            _spareable.Insert(at, (member, body, off, Math.Max(Math.Abs(body.X - crier.X), Math.Abs(body.Y - crier.Y))));
+
+            if (_spareable.Count > MostSpared)
+            {
+                _spareable.RemoveAt(_spareable.Count - 1);
             }
         }
 
-        if (first == null)
+        if (_spareable.Count == 0)
         {
             SpareRefusedNobody++;
 
             return 0;
         }
 
-        var sent = Send(first, foe);
+        var enemy = Focus is { Deleted: false, Alive: true } focus ? Reckon(focus) : 0.0;
+        var kept = Able();
+        var count = 0;
 
-        if (second != null && MostSpared > 1)
+        for (var i = 0; i < _spareable.Count; i++)
         {
-            sent += Send(second, foe);
+            var power = BotThreat.Power(_spareable[i].Body);
+
+            if (enemy > SpareShare * Math.Max(1.0, kept - power))
+            {
+                break;
+            }
+
+            kept -= power;
+            count++;
+
+            if (_spareable[i].OffCrier > BotMobile.NoticeRange || BotThreat.Held(_spareable[i].Body, foe))
+            {
+                brought += power;
+            }
+
+            if (brought >= need)
+            {
+                break;
+            }
+        }
+
+        if (count == 0)
+        {
+            SpareRefusedKept++;
+
+            return 0;
+        }
+
+        if (brought < need)
+        {
+            SpareRefusedShort++;
+            brought = 0.0;
+
+            return 0;
+        }
+
+        var sent = 0;
+
+        for (var i = 0; i < count; i++)
+        {
+            sent += Send(_spareable[i].Member, foe);
         }
 
         if (sent > 0)
@@ -149,6 +195,12 @@ public sealed partial class BotSquad
             _spareTick = now;
             SparedTo++;
             Spared += sent;
+
+            BotReflex.Spared(crier);
+        }
+        else
+        {
+            brought = 0.0;
         }
 
         return sent;
@@ -183,6 +235,7 @@ public sealed partial class BotSquad
 
         if (now - _spareTick >= SpareMs || _spareFor is not { Deleted: false, Alive: true } || !BotCry.Crying(_spareFor))
         {
+
             (body as BotMobile)?.Journey?.Shed();
 
             return false;
@@ -193,6 +246,21 @@ public sealed partial class BotSquad
         return true;
     }
 
+    public static void ForgetSpares()
+    {
+        _spareable.Clear();
+        Spared = 0;
+        SparedTo = 0;
+        SpareRefusedFight = 0;
+        SpareRefusedDying = 0;
+        SpareRefusedBleeding = 0;
+        SpareRefusedNobody = 0;
+        SpareRefusedWar = 0;
+        SpareRefusedKept = 0;
+        SpareRefusedShort = 0;
+        SparingBeats = 0;
+    }
+
     public static string DescribeSpares() =>
-        $"{SparedTo} dire cries answered by a company sparing {Spared} members from a fight well in hand (its enemy under {SpareShare:P0} of its strength, nobody under {DyingShare:P0}), {SparingBeats} beats the press left them on it; companies asked that would not: {SpareRefusedFight} with a fight not in hand, {SpareRefusedDying} with a member dying, {SpareRefusedBleeding} pulling back or mustering, {SpareRefusedNobody} with nobody fit within {SpareReach} tiles of the thing";
+        $"{SparedTo} dire cries answered by a company sparing {Spared} members from a fight well in hand (its enemy under {SpareShare:P0} of its strength, nobody under {SpareDyingShare:P0}), {SparingBeats} beats the press left them on it; companies asked that would not: {SpareRefusedFight} with a fight not in hand, {SpareRefusedKept} whose fight would not stay in hand without the member nearest, {SpareRefusedDying} with a member under {SpareDyingShare:P0}, {SpareRefusedBleeding} pulling back or mustering, {SpareRefusedWar} at war, {SpareRefusedNobody} with nobody fit within {SpareReach} tiles of the thing, {SpareRefusedShort} with too little to spare for what the thing asks (members already on the crier's side adding nothing){(Spares ? "" : " (off)")}";
 }

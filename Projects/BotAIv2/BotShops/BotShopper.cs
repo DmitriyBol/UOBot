@@ -6,21 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a trip to the shops to any bot that has run out of something its class needs.
-///
-/// <para>
-/// <b>Every bot, not a trade.</b> A caster with no reagents is not a caster, a bot with no bandages cannot
-/// mend itself, and both facts are true of whoever happens to be standing there. What each one needs comes
-/// from its own class's kit — the same list the world handed it at birth — so this needs no table of who
-/// buys what and gains a class the moment one is added.
-/// </para>
-///
-/// <para>
-/// Supplies are deliberately not bound: they are meant to run out. That is what makes a shop worth walking
-/// to, and later what makes another bot's production worth buying.
-/// </para>
-/// </summary>
 public sealed class BotShopper : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotShopper));
@@ -174,6 +159,7 @@ public sealed class BotShopper : IBotProposer
 
         if (!Wanting(bot, klass, pack, out var wanted, out var amount, out var band, out var spare))
         {
+
             if (BotAskFirst.ParkedThisLook)
             {
                 BotAskFirst.OnlyWaited();
@@ -223,6 +209,7 @@ public sealed class BotShopper : IBotProposer
             }
             else if (BotShops.Nearest(bot, typeof(Scissors)) != null)
             {
+
                 wanted = typeof(Scissors);
                 amount = 1;
                 spare = true;
@@ -244,6 +231,7 @@ public sealed class BotShopper : IBotProposer
         _short[wanted] = seen + 1;
 
         var shop = BotShops.Nearest(bot, wanted);
+
         var counter = shop == null ? 0 : BotBurgh.Dear(body, shop, BotShops.Price(shop, wanted));
 
         var need = _cutting ? askedKind : wanted;
@@ -257,6 +245,7 @@ public sealed class BotShopper : IBotProposer
 
         if (front != null)
         {
+
             frontUnits = ByPurse(body, askedKind, wanted, frontUnits, frontUnit, needy, band, pack);
 
             if (frontUnits <= 0)
@@ -328,6 +317,7 @@ public sealed class BotShopper : IBotProposer
             }
             else if (BotMarket.Wanted(bot, wanted) != null)
             {
+
                 if (_askedPile.Count > 4096)
                 {
                     _askedPile.Clear();
@@ -359,6 +349,7 @@ public sealed class BotShopper : IBotProposer
 
         if (counter <= 0)
         {
+
             if (BotAskFirst.Asks(bot, body, klass, pack, need, wanted, amount, BotAskFirst.Price(wanted), band, _cutting, needy, Owned(body.Serial, wanted, need), true))
             {
                 return null;
@@ -374,6 +365,7 @@ public sealed class BotShopper : IBotProposer
             }
             else
             {
+
                 var wealth = BotYield.Spendable(body);
 
                 if (wealth - BotMarket.Worth(wanted, Stand(wanted)) * amount <= Reserve)
@@ -446,6 +438,7 @@ public sealed class BotShopper : IBotProposer
             }
             else if (BotMarket.Wanted(bot, wanted) is { } standing && !OwnAsk(standing, at))
             {
+
                 _askedFar[key] = standing.PostedTick;
                 ForeignKept++;
 
@@ -453,6 +446,7 @@ public sealed class BotShopper : IBotProposer
             }
             else if (BotMarket.Withdrawn(bot, wanted, BotWithdraw.Walked) > 0)
             {
+
                 WalkedFar++;
             }
         }
@@ -776,6 +770,7 @@ public sealed class BotShopper : IBotProposer
 
         for (var i = 0; i < tools.Count; i++)
         {
+
             if (Kept(body, pack, tools[i], out var spent) || BotAskFirst.Parked(body.Serial, tools[i]))
             {
                 continue;
@@ -934,52 +929,6 @@ public sealed class BotShopper : IBotProposer
         return wanted > 0;
     }
 
-    /// <summary>
-    /// Nothing on any shelf and nothing on any stall: ask the population for it.
-    ///
-    /// <para>
-    /// <b>The end of this method used to be a shrug.</b> It wrote one error line and returned nothing, so a
-    /// caster on a shard whose shopkeepers do not stock sulphurous ash simply stopped casting, for ever, and
-    /// the only trace was a single line at boot. <see cref="BotSeeker"/> has ended the other way since it was
-    /// written — no shop, no stall, so put it on the board — and there was never a reason for supplies to be
-    /// the exception. A reagent nobody sells is a reagent somebody can pick: the foragers put them out at a
-    /// few gold apiece, and a funded order is what reaches them.
-    /// </para>
-    ///
-    /// <para>
-    /// One order per bot per kind, as everywhere else: the want tops itself up and raises its own offer, and
-    /// asking again would turn one order into nine.
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// Whether any craft system on this shard can make the thing at all.
-    ///
-    /// <para>
-    /// <b>The caller's own comment has always said Board refuses when nobody can make the thing, and Board
-    /// never asked.</b> An order for something only a shopkeeper produces cannot be filled by anybody, ever:
-    /// it holds escrow, raises its own offer every StaleMs and charges the buyer more for it each time, and
-    /// the goods it is waiting for do not exist. Patrick rolled back exactly this for glass on 04.09.2026 —
-    /// see the note in that day's handover — and bandages walked into the same hole from the other side:
-    /// nothing in Engines/Craft makes a Bandage, so when the healer's shelf ran dry at 08:00 on 05.09.2026
-    /// the shopper put the shortage on the board instead, and the board raised it from five gold to
-    /// forty-eight while 7,752 bots stood hurt with nothing to bind a wound with. Twenty-six thousand gold
-    /// of escrow against thirteen thousand in every purse on the island.
-    /// </para>
-    ///
-    /// <para>
-    /// Asked of the shard's own craft systems rather than of a list kept here, for the reason every other
-    /// file in this assembly gives for the same choice: a list is a second copy of the truth and it drifts.
-    /// Cached by type, because the answer cannot change while the server is up.
-    /// </para>
-    /// </summary>
-    /// <summary>What craft makes a thing, which skill it is made with, and how much of that skill it takes.</summary>
-    /// <summary>
-    /// What it takes to make one of a thing: the craft, the trade on a bot's menu, the skill and its
-    /// threshold, and the material the recipe consumes.
-    ///
-    /// <c>Material</c> is the first resource line, which for every recipe on this shard is the one that
-    /// matters — ingots for armour, leather for a bustier, boards for a shaft. The others are trimmings.
-    /// </summary>
     public readonly record struct BotRecipeFact(
         string Craft,
         string Trade,

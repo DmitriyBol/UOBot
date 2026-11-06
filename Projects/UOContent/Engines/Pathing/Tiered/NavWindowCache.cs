@@ -2,14 +2,9 @@ using System.Collections.Generic;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>
-/// The clusters the planners look into most, kept probed: a route's two ends are joined to the graph by a flood inside
-/// each end's cluster, and probing a cluster's cells costs far more than flooding them. Bots set out from and go to the
-/// same few places — the bank, the forge, their hall — so a small cache holds most ends. Emptied round a cluster whose
-/// ground changed (<see cref="Invalidate"/>).
-/// </summary>
 public sealed class NavWindowCache
 {
+
     public int Capacity { get; set; } = 64;
 
     private readonly Dictionary<long, NavWindow> _windows = new();

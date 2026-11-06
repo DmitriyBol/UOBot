@@ -2,23 +2,6 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot with a spoken want a walk to a bot's shop that sells the thing for no more than it says it will pay.
-///
-/// <para>
-/// <b>The buyer's half of hand to hand.</b> A want is a buyer that has said aloud what it needs and what it will pay — a
-/// tailor's leather, a cook's ribs, a warrior's replacement cap — and it is answered one of two ways: a carrier walks the thing
-/// to it (<see cref="BotCourier"/>), or it walks to where the thing is on show. When an open shop within the bot's reach holds
-/// the kind and its price, with the walk counted (<see cref="BotShopkeep.Best"/>), is at or under the want's own offer, the bot
-/// is offered the walk; at the till it pays the keeper's price, never more than its offer, and the want comes down by what it
-/// bought (<see cref="BotShopkeep.Visit"/>). What the shop could not supply is still wanted.
-/// </para>
-///
-/// <para>
-/// <b>A purchase, not work</b> (see <c>BotRestock</c>): the errand is the shopper's own, unpaid and claimed at what a shopping
-/// trip is claimed at, so it is taken when nothing that produces anything is on offer and never over work in hand.
-/// </para>
-/// </summary>
 public sealed class BotPatron : IBotProposer
 {
     public string Name => "Patron";
@@ -35,6 +18,7 @@ public sealed class BotPatron : IBotProposer
 
     public BotDeed Propose(IBotWilful bot)
     {
+
         if (!BotShopkeep.Running || BotShopkeep.OpenCount == 0)
         {
             return null;

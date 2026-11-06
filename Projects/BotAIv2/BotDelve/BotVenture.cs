@@ -4,26 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One fighter's walk into a dungeon by its mouth, alone.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026: "travel to such caves as a party, or alone, or alone and gather a party
-/// inside".</b> The delve is a guild's undertaking and needs five; this is the other half of the order. A fighter strong
-/// enough for a dungeon's worst inhabitant walks to the cave mouth the gates know (<see cref="BotGates"/>), steps
-/// through, and the errand is done: from there it is a bot at work underground like any other — the hunt offers it what
-/// lives in the next room, a corpse is gone through, a band forms round it when another bot is near (<c>BotBand</c>),
-/// and when nothing is worth doing the walk home is offered and the journey takes it out by the mouth it came in by
-/// (<c>BotHomeward</c>). Nothing here fights; the point of the errand is to be somewhere that offers something, which
-/// is the same point the walk home has, pointed the other way.
-/// </para>
-///
-/// <para>
-/// <b>Where is the mouth, not the room.</b> The appraisal prices an errand by the walk to its place, and a room four
-/// thousand tiles off in the dungeon block would price every venture at nothing. The gate the route begins with is on
-/// the island, and it is what the walk actually costs.
-/// </para>
-/// </summary>
 public sealed class BotVenture : BotDeed
 {
     public const string Trade = "venture";
@@ -130,9 +110,6 @@ public sealed class BotVenture : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a fighter with nothing better to do a dungeon it can walk into and survive alone. See <see cref="BotVenture"/>.
-/// </summary>
 public sealed class BotVenturer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotVenturer));

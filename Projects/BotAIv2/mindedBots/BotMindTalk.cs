@@ -2,26 +2,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The one place the thinking bots can hear each other.
-///
-/// <para>
-/// <b>A board, not a conversation, and the difference is what keeps it from eating the shard.</b> Three minds
-/// that replied to each other would take turns at a graphics card that answers one question at a time, and a
-/// remark would cost the same second and a half a decision costs — so a round of pleasantries is a round of
-/// decisions nobody made. Here a line is a by-product: it rides along on a decision that was being taken
-/// anyway, on the same call, in the same answer. Nothing is ever asked purely in order to speak.
-/// </para>
-///
-/// <para>
-/// <b>And it is heard rather than addressed.</b> There is no recipient and no reply: a mind writes what it is
-/// doing or what it has found, and whoever is asked next reads the last few lines as part of the world it is
-/// deciding about. That is the same shape as everything else the population shares — a fact left lying where
-/// others will pass it — and it means a mind that dies, or is switched off, breaks nothing.
-/// </para>
-/// </summary>
 public static class BotMindTalk
 {
+
     public static int Keep { get; set; } = 6;
 
     public static int HoldsMs { get; set; } = 240000;

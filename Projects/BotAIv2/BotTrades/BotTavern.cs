@@ -5,7 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One tavern while it is open: the cook keeping it, the inn it stands in, the table round it, and what it has sold.</summary>
 public sealed class BotTavern
 {
     public BotTavern(BotMobile keeper, BotInns.Inn inn, Map map, Point3D stand)
@@ -44,6 +43,8 @@ public sealed class BotTavern
 
     public Mobile LastSpeaker { get; internal set; }
 
+    internal BotDice.Game Dice;
+
     public int Lines { get; internal set; }
 
     internal readonly Dictionary<Serial, (BotMobile Bot, long Seen, bool Greeted)> Table = [];
@@ -66,25 +67,6 @@ public sealed class BotTavern
     }
 }
 
-/// <summary>
-/// The taverns: a cook keeping one at an inn, the meals it sells there, the guests at its table, and the hooks by which the rest's
-/// clock, the inns and the lodging errand learn that a tavern is open (07.10.2026, trades17).
-///
-/// <para>
-/// <b>A tavern is a fire indoors, with supper.</b> A guest who has bought and eaten a meal at the table (the cook's own cooking,
-/// pack to pack, at the market's price for it: <see cref="BotHandover.Exchange"/>) sits there, and while it sits its play is counted
-/// backwards at <see cref="RestShare"/> of the inn's rate — more than a campfire's one, because it has eaten (the meal itself doubles
-/// what it regenerates, <c>BotMeal</c>) — and it regains <see cref="RegenPoints"/> of hits, stamina and mana every
-/// <see cref="RegenEveryMs"/> on top. Round the table, with two or more seated, the campfire's talk is said (<c>BotCampTalk</c>).
-/// </para>
-///
-/// <para>
-/// <b>And the tired eat before they sleep.</b> A tired bot sent to an inn is sent to an inn with an open tavern when one is within
-/// <see cref="Detour"/> tiles of the nearest inn (<see cref="InnFor"/>); arriving, it buys supper at the table before it pays for the
-/// bed (<see cref="Supper"/>), and a night after supper buys <see cref="SupperBuff"/> times the rested regeneration on its return
-/// (<see cref="SupperFactor"/>, read off the rest record's inn name, which is saved, so a restart neither loses it nor grants it).
-/// </para>
-/// </summary>
 public static class BotTaverns
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTaverns));
@@ -340,7 +322,9 @@ public static class BotTaverns
         }
 
         tavern.Table.Clear();
+        BotDice.Drop(tavern);
         Closed++;
+
         if (shown > 0)
         {
             Shifts++;
@@ -483,6 +467,8 @@ public static class BotTaverns
         tavern.Served++;
         Meals += given;
         Gold += paid;
+
+        BotDay.Guest();
 
         Count(tavern, Core.TickCount);
 
@@ -716,6 +702,11 @@ public static class BotTaverns
                 continue;
             }
 
+            if (BotDice.Play(tavern, _talkers))
+            {
+                continue;
+            }
+
             var first = Utility.Random(_talkers.Count);
             BotMobile speaker = null;
 
@@ -742,13 +733,23 @@ public static class BotTaverns
             listener ??= tavern.Keeper;
 
             var fill = new Dictionary<string, string>();
-            var topic = BotCampTalk.Topic(speaker, tavern.Map, tavern.Stand, fill, "tavern:small");
+            var topic = BotCampTalk.Topic(speaker, tavern.Map, tavern.Stand, fill, "tavern:small", out var told, _talkers);
 
             if (BotCampTalk.Say(speaker, topic, "tavern:small", listener, fill))
             {
                 tavern.Lines++;
                 tavern.LastSpeaker = speaker;
                 Lines++;
+
+                if (told != null)
+                {
+                    var place = BotBiography.Place(tavern.Map, tavern.Stand);
+
+                    for (var k = 0; k < _talkers.Count; k++)
+                    {
+                        BotBiography.Heard(_talkers[k], speaker, told, place);
+                    }
+                }
             }
         }
     }
@@ -793,7 +794,15 @@ public static class BotTaverns
             ["tavern:close"] = ["That's the kitchen closed. Safe roads.", "No more tonight, friends.", "Kitchen's shut. Thank you all."],
             ["tavern:greet"] = ["Evening, {other}. Something hot, please.", "A plate of whatever's good, {other}.", "I've walked a long way for this, {other}."],
             ["tavern:lodger"] = ["A bite to eat, then bed.", "Supper first, then sleep.", "Something warm before I turn in, {other}."],
-            ["tavern:small"] = ["Good food, this.", "My feet thank me.", "Warm in here.", "Another day done.", "Pass the salt.", "Best meal I've had all week."]
+            ["tavern:small"] = ["Good food, this.", "My feet thank me.", "Warm in here.", "Another day done.", "Pass the salt.", "Best meal I've had all week."],
+            ["tavern:dice:call"] = ["Dice, {other}? {stake} gold a throw.", "Fancy a throw, {other}? {stake} gold.", "The bones, {other}. {stake} gold says I out-roll you."],
+            ["tavern:dice:take"] = ["Done. {stake} gold it is.", "Roll them.", "You're on, {other}."],
+            ["tavern:dice:poor"] = ["Not this purse, not tonight.", "Keep your dice; my pouch is light."],
+            ["tavern:dice:roll"] = ["{rollA} against {rollB} — mine!", "{rollA} to your {rollB}. The table holds its breath.", "{rollA} and {rollB}. Luck's a fickle cook."],
+            ["tavern:dice:tie"] = ["Even. Again — once.", "A push. One more throw settles it."],
+            ["tavern:dice:paid"] = ["{stake} gold, as agreed. Well thrown.", "There — {stake}. The bones hate me tonight."],
+            ["tavern:dice:void"] = ["Then we call it no game. Another night.", "No coin, no wager. Forgotten."],
+            ["tavern:dice:watch"] = ["Ha! The bones choose.", "Well rolled.", "That's supper money changing hands."]
         };
 
     public static string Describe()
@@ -809,7 +818,7 @@ public static class BotTaverns
         return $"taverns {_open.Count} open now ({seated} at table): {Opened} opened, {Closed} shut ({SoldOut} sold out, {TimeUp} ran their {ShiftMinutes:F0} minutes, {ClosedAway} shut when the cook was taken away); "
                + $"{Meals} meals sold for {Gold}gp, sell-through {Share:P0} over {Shifts} shifts; {Rests} guests sat at a table after supper ({SatMinutes:F0} minutes, {GivenBack:F0} minutes of play given back, {RegenGiven} points regained); "
                + $"{Steered} tired bots sent to an inn with a tavern, {Lodgers} ate before bed and {LodgersNot} went without, {SupperBuffs} woke to the supper's longer buff; {Lines} lines said at table; "
-               + $"{BotTaverner.Describe()}; {BotSupperer.Describe()}";
+               + $"{BotDice.Describe()}; {BotTaverner.Describe()}; {BotSupperer.Describe()}";
     }
 
     public static void Forget()
@@ -842,5 +851,6 @@ public static class BotTaverns
         Shifts = 0;
         Shown = 0;
         Taken = 0;
+        BotDice.Forget();
     }
 }

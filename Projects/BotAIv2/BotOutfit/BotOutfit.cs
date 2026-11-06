@@ -5,24 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Turns a class's kit into things a bot is actually holding.
-///
-/// <para>
-/// One step, run once at birth, and it is the only place in v2 that creates a bot's belongings. The
-/// first version had this as a switch statement inside the bot itself, which meant that "what does a
-/// smith own" was a question you answered by reading control flow, and that the ordering rules below —
-/// every one of them a bug that was paid for — were scattered through it as comments.
-/// </para>
-///
-/// <para>
-/// <b>Order is not cosmetic here.</b> A two-handed weapon is refused by the engine while anything at
-/// all is in the other hand, so whatever needs both hands goes on first. Handing out the dagger before
-/// the bow cost the first version ten archers who spent their entire lives stabbing skeletons with
-/// knives while carrying the bows they had trained for — and it was invisible, because the bow was in
-/// the pack, exactly where a spare weapon belongs.
-/// </para>
-/// </summary>
 public static class BotOutfit
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOutfit));

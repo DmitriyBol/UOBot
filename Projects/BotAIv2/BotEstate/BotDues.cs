@@ -7,47 +7,9 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A guild's dues: the share of what its members' work brings in that goes into the guild's chest, and what the chest keeps
-/// back from everyday spending while the guild saves for its hall or its house in Britain.
-///
-/// <para>
-/// <b>Why no hall had been raised since the wipe of 29.09.2026, measured before anything was changed.</b> A guild's money was
-/// never a store. <c>BotEstate.Fund</c> was the sum, at the moment of asking, of what each member held above
-/// <c>BotEstate.Keep</c> (300gp), and it did not count the chest at all. On the day of the wipe the middling purse read
-/// 19 to 242gp in all 207 money lines, 68gp at the median (19:53: "poorest 0gp, middling 27gp"), so hardly a member ever
-/// stood above the keep — and the
-/// few who did were emptied again within minutes by <c>BotGuilds.Stand</c>, which draws on exactly the same spare, richest
-/// first, down to the same 300, to pay for other members' armour and, since build 259, their compulsory supplies. Fifty-three
-/// of the day's 207 money lines name a fattest purse of exactly 300gp; one session stood 29,374gp for members (16:04:31). Two
-/// claimants on one pool, and the one that spends every minute always wins against the one that has to wait for five
-/// thousand. The chest, the one thing that does keep, is fed only by tithes on held ground, ground is a hall's yard or a
-/// claim, and a claim is offered only to a guild with a hall — 1,366 of 1,366 looks at 19:53 "had no hall to want ground
-/// near". A ring of three gates, and the Estate line printed "0 of 5000" for every guild all day.
-/// </para>
-///
-/// <para>
-/// <b>The repair is a store, not a bigger number.</b> <see cref="Share"/> of the coin a member's settled work brought in (the
-/// takings' own <c>Coin</c>, pack, bank and escrow, the same figure the ledger learns from) is paid into the guild's chest
-/// the moment the work is settled — before the next purchase or the next stand can reach it — less whatever that work
-/// already tithed to the same chest on the guild's own ground. Nothing is minted: the coin moves from a member to its guild,
-/// and a hall's price leaves the world when the hall is bought, as it always has. It is booked aside for the member
-/// (<c>BotYield.Aside</c>), so no piece of work is taught that dues are its cost. The chest now counts in <c>Fund</c>, which
-/// every purchase's gate asks; and while the guild has no hall — or is saving for a house in Britain — the chest keeps that
-/// price back from the everyday draws (<c>BotProvision.Fund</c>, a ship's price), which still go to the members as before.
-/// </para>
-///
-/// <para>
-/// <b>What it costs the members, in the day's numbers.</b> Settled work brought in some 14,000 to 17,500gp an hour across
-/// the population on 29.09.2026 (the positive coin of every finished line: 14,176/h 17:38–18:38, 17,569/h 19:12–19:36), about
-/// nine tenths of it to guild members (86 of 96 bots at 19:53). A fifth is then some 2,500 to 3,100gp an hour into seven
-/// chests — a guild of fifteen reaches the hall's 5,000 in nine to eleven hours, a guild of six in about a day. That is a
-/// judgement, not an accident: the dial is <see cref="Share"/> and the price is <c>BotEstate.Price</c>, and the
-/// "Treasuries:" line prints what each chest gained since the start, so the rate can be read before either is moved.
-/// </para>
-/// </summary>
 public static class BotDues
 {
+
     public static bool Running { get; set; } = true;
 
     public static double Share { get; set; } = 0.2;

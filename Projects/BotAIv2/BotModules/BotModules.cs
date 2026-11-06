@@ -4,23 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Holds the modules, works out the order, starts them and says what happened.
-///
-/// <para>
-/// Registration is a flat list and the order of that list means nothing — the sequence comes from what
-/// each module says it needs. That is the whole difference from the first version, where the list
-/// <em>was</em> the order, and where "why is this line here" was answered by a comment rather than by
-/// anything a program could check.
-/// </para>
-///
-/// <para>
-/// <b>Failure is loud and contained.</b> A module that throws does not take the shard with it and does
-/// not half-run: it is reported by name and anything that declared it as a requirement is refused with
-/// the same clarity. The failure mode this exists to prevent is the one the first version had — a
-/// subsystem that quietly read an empty list and then behaved plausibly for eight hours.
-/// </para>
-/// </summary>
 public static class BotModules
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotModules));
@@ -84,6 +67,7 @@ public static class BotModules
 
             if (missing != null)
             {
+
                 logger.Error(
                     "Module {Name} needs {Missing}, which is not ready; {Name} did not start",
                     module.Name,
@@ -195,6 +179,7 @@ public static class BotModules
         {
             if (seen == Visiting)
             {
+
                 logger.Error(
                     "Module {Name} is part of a circular dependency; the ring is broken here and the modules in it will not start",
                     module.Name

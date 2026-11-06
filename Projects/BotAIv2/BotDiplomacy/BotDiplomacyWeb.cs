@@ -4,11 +4,6 @@ using Server.Guilds;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guilds' dealings on the page: what each pair of guilds thinks of the other and what stands between them, each guild's
-/// standing in each town it deals with, and the meetings standing. Written into the snapshot by one line in
-/// <c>BotWebSnapshot.Build</c>; every figure is one the log's <c>Diplomacy:</c> line already prints.
-/// </summary>
 public static class BotDiplomacyWeb
 {
     public static void Write(Utf8JsonWriter w)

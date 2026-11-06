@@ -4,19 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Practising being unseen: hiding again and again where it stands, and once it hides well enough for the engine to allow
-/// it, moving a few quiet steps at a time.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026: criminals train their stealth.</b> A fighter tempted to rob that cannot hide yet
-/// (<see cref="BotShadow.RobHiding"/>) is pressed into this instead of a robbery — his choice, over robbing openly — and a
-/// bot that has ever practised is pressed back into it every <see cref="EveryMs"/>. Its Hiding above nought is the only mark
-/// a crook carries that outlives a restart, because <see cref="BotProgress"/> keeps every skill a bot has any of. The rate is
-/// the engine's own: a use every ten seconds, a tenth of a point when the gain roll comes up, which is some six or seven hours
-/// of practice from nothing to the eighty that Stealth wants.
-/// </para>
-/// </summary>
 public sealed class BotSkulk : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSkulk));
@@ -65,11 +52,15 @@ public sealed class BotSkulk : BotDeed
 
     private readonly Map _map;
 
-    private readonly Point3D _where;
+    private Point3D _where;
 
     private bool _started;
 
     private long _began;
+
+    private long _pausedAt;
+
+    public static long StaleResumes { get; private set; }
 
     private double _hiding;
 
@@ -86,6 +77,8 @@ public sealed class BotSkulk : BotDeed
     public override string Kind => Trade;
 
     public override bool Committed => true;
+
+    public override bool Resumes => true;
 
     public override bool Unpaid => true;
 
@@ -192,6 +185,70 @@ public sealed class BotSkulk : BotDeed
         }
     }
 
+    public override void Paused(IBotWilful bot) => _pausedAt = Core.TickCount;
+
+    public override void Resumed(IBotWilful bot)
+    {
+        if (bot?.Self is not { } body)
+        {
+            return;
+        }
+
+        var hideout = BotUnderworld.Hideout;
+
+        if (_started || hideout == Point3D.Zero || _where != hideout)
+        {
+            _where = body.Location;
+        }
+
+        _aim = Point3D.Zero;
+
+        if (_started)
+        {
+            _began += Core.TickCount - _pausedAt;
+        }
+    }
+
+    public override string Stale(IBotWilful bot)
+    {
+        if (bot?.Self is not { } body || body.Map is not { } map || map == Map.Internal)
+        {
+            return null;
+        }
+
+        string why;
+
+        if (BotOutlaw.Jailed(body))
+        {
+            why = "the bot is in a cell";
+        }
+        else if (BotDungeon.Under(body.Location))
+        {
+            why = "the company left it underground";
+        }
+        else if (BotZones.LevelAt(map, body.X, body.Y) is var level && level != BotZoneLevel.Clear)
+        {
+            why = level switch
+            {
+                BotZoneLevel.Edge => "it stands on the fringe of hostile ground",
+                BotZoneLevel.Hostile => "it stands on hostile ground",
+                _ => "it stands on deadly ground"
+            };
+        }
+        else if (BotThreat.ThreatPower(body, BotBolt.Watch) > 0.0)
+        {
+            why = $"something hostile stands within {BotBolt.Watch} tiles";
+        }
+        else
+        {
+            return null;
+        }
+
+        StaleResumes++;
+
+        return $"no place to practise hiding: {why}";
+    }
+
     private BotDoing Finish(Mobile body)
     {
         Ended++;
@@ -291,7 +348,8 @@ public sealed class BotSkulk : BotDeed
         _urgedTick[body.Serial] = now;
 
         if (body.Map is not { } map || map == Map.Internal || body.Squad != null || BotDuel.Duelling(body) || BotOutlaw.Jailed(body)
-            || body.Resolve?.Deed is BotSkulk or BotRob or BotLieLow or BotBrawl or BotManhunt or BotSentence)
+            || body.Resolve?.Deed is BotSkulk or BotRob or BotLieLow or BotBrawl or BotManhunt or BotSentence or BotEnlist
+            || body.Resolve?.Paused?.Deed is BotSkulk)
         {
             return;
         }
@@ -403,7 +461,7 @@ public sealed class BotSkulk : BotDeed
     }
 
     public static string Describe() =>
-        $"{Stints} stints of practising hiding ({Urged} of them from the itch: {Waited} of those begun between two pieces of work after waiting for the one in hand, {Eager} an apprentice's; {_waiting.Count} itches waiting now, {_apprentices.Count} apprentices named), {Ended} run to the end, gaining {HidingGained:F1} Hiding and {StealthGained:F1} Stealth between them";
+        $"{Stints} stints of practising hiding ({Urged} of them from the itch: {Waited} of those begun between two pieces of work after waiting for the one in hand, {Eager} an apprentice's; {_waiting.Count} itches waiting now, {_apprentices.Count} apprentices named), {Ended} run to the end, gaining {HidingGained:F1} Hiding and {StealthGained:F1} Stealth between them; {StaleResumes} put down for a company and not taken up where it left the bot";
 
     public static void Forget()
     {
@@ -415,6 +473,7 @@ public sealed class BotSkulk : BotDeed
         Eager = 0;
         HidingGained = 0;
         StealthGained = 0;
+        StaleResumes = 0;
         _urgedTick.Clear();
         _apprentices.Clear();
     }

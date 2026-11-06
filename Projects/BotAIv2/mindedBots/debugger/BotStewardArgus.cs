@@ -4,19 +4,9 @@ using Server.BotAI.V2;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The model as a town's steward (07.10.2026, steward20): asked, when the slot is free, to choose one of the decrees the rule set
-/// found lawful in the town this round — or none — and to say it in a sentence. Filled into <see cref="BotStewardship.Ask"/> from
-/// <c>BotDebugModule.Start</c> and emptied on a reload, as the duke's witness is; the bots' assembly never references this one.
-///
-/// <para>
-/// <b>Narrow the enumeration instead of persuading</b> (DECISIONS N2, the duke's rule): the schema's enumeration is exactly the
-/// ids the rule set offered, so a model cannot decree what is unlawful; what it chooses is checked again before it is given, and
-/// an answer that cannot be read, or none at all, leaves the round to the rule.
-/// </para>
-/// </summary>
 public static class BotStewardArgus
 {
+
     public static bool Running { get; set; } = true;
 
     public static string Model { get; set; }
@@ -158,6 +148,7 @@ public static class BotStewardArgus
 
             return (id, speech, Field(root, "reason"));
         }
+
         catch (Exception)
         {
             return (null, null, null);

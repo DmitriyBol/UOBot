@@ -5,27 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A trader's haul: the orders written into its book, the purchase, the road — by land, gate or sea — and the handing over to
-/// each buyer in turn, each line struck as it ends.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026, point 5, and plan v2's point 3 (01.10.2026, build 385).</b> Taken: one line a buyer in the
-/// book (<see cref="BotOrders.Write"/>), the units reserved on each want (<see cref="BotWant.Reserve"/>, kept by the market's
-/// sweep through <see cref="IBotWantCarrier"/>) so no second carrier sets out for them, and the word said in the trade chat.
-/// Then the source — the trader's pack, its box at the bank, a bot's shop or a shopkeeper — and the buyers, nearest first,
-/// walked to while far and followed once near (<see cref="BotTrading.NearTiles"/>), handed over at a meeting
-/// (<see cref="BotHandover.Exchange"/>) at the price agreed. Each line struck as delivered or as given up, with the reason.
-/// </para>
-///
-/// <para>
-/// <b>A promise, and held like one.</b> Steadfast, and <see cref="Committed"/> from the moment it is taken: the book is the
-/// trader's word to its buyers, so a better price elsewhere does not take it off the road — only what will not wait (a flight,
-/// a friend in trouble), after which it is taken up again. Its own clocks end it: <see cref="BotTrading.MostHaulMs"/> for the
-/// whole, <see cref="BotTrading.ChaseMs"/> after a buyer that keeps walking away. Goods left when every order has ended go to
-/// another open want for the same kind if one can be had (<see cref="Adopt"/>), else stay as the trader's stock for its shop.
-/// </para>
-/// </summary>
 public sealed class BotHaul : BotDeed, IBotWantCarrier
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHaul));
@@ -339,10 +318,12 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         {
             if (!_orders[i].Closed && BotMarket.Stands(_orders[i].Want))
             {
+
                 var held = Math.Min(_orders[i].Units, BotMarket.Affords(_orders[i].Want, _orders[i].Price, bot));
 
                 if (held > 0)
                 {
+
                     _orders[i].Want.Reserve(bot, held, _orders[i].Price, true);
                 }
             }
@@ -546,6 +527,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                 }
             case BotHaulFrom.Box:
                 {
+
                     var carried = BotHandover.Carried(bot, _kind);
                     var need = Math.Max(0, Owed - carried);
 
@@ -726,6 +708,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
         if (need > 0)
         {
+
             var glutted = BotGlut.Glutted(_kind);
             var vendor = glutted ? null : BotShops.Nearest(bot, _kind);
             var price = vendor == null ? 0 : BotShops.Price(vendor, _kind);
@@ -934,6 +917,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
             if (order == null)
             {
+
                 if (OpenCount > 0)
                 {
                     _current = null;
@@ -1013,7 +997,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                         : BotDoing.Walk(_map, place, BotArrival.Within(2), $"to the meeting place for {order.BuyerName} with {order.Units} {_label}");
                 }
 
-                return BotDoing.Walk(_map, buyer, BotArrival.Within(BotHandover.MeetTiles), $"after {order.BuyerName} with {order.Units} {_label}");
+                return BotDoing.WalkAfter(_map, buyer, BotArrival.Within(BotHandover.MeetTiles), $"after {order.BuyerName} with {order.Units} {_label}");
             }
 
             Hand(bot, body, order);
@@ -1219,6 +1203,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
             if (BotMarket.Stands(order.Want))
             {
+
                 order.Want.Reserve(bot, order.Units, order.Price, true);
             }
         }

@@ -3,37 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guild's own company for the guild's own ground.
-///
-/// <para>
-/// <b>A claim that only ever cost money meant nothing once it was paid for.</b> A guild bought a square, bots
-/// died in it, the square went dire, and the Baron came to clear it — or did not, the island having worse
-/// squares — while the guild that held it went on hunting elsewhere. Patrick's fourth Quad idea of 16.09.2026,
-/// taken that evening: when a square a guild holds goes dire, the guild raises its own company onto it, led by
-/// its own leader, and the Baron leaves such ground to the guild while it has somebody to raise one.
-/// </para>
-///
-/// <para>
-/// The errand is the Baron's <see cref="BotHarrow"/>, unchanged: a muster, a march, the square walked and its
-/// spawn killed, the company paid what the city put on it. What differs is the office: any fit fighter of the
-/// guild — armed, no novice — rather than the Baron, and only the guild's own squares rather than the island's
-/// worst. Not the leader classes: the first cut asked for <see cref="BotClass.Leads"/>, and the 92 window read "53
-/// guild leaders asked: 53 in no guild" — the Captain is nobody's member, and the guilds' masters are crafters, made
-/// ordinary bots by Patrick the same evening. Reckoned by the harrow's own prior, so it outbids ordinary work as
-/// the Baron's does; two of a guild cannot raise for the same square, since a square being raised for is passed
-/// over (<see cref="BotProwl.Raising"/>).
-/// </para>
-///
-/// <para>
-/// <b>Patrick's answer of 26.09.2026, once the world was awake round the bots and halls stood beside live spawns: "they
-/// put it there, so let them defend their own ground — that is their duty"; "yes, they gather themselves and clear it
-/// themselves".</b> So the company forms at the guild's own hall and is made of the guild's own members, wherever they
-/// are (<c>BotHarrow.Rally</c>, <c>BotHarrow.Levy</c>); it is a duty, not a trade
-/// (<see cref="BotHarrow.DutyPrior"/>); it takes in the squares round the hall's own whoever else does not hold them
-/// (<see cref="Ring"/>); and nobody goes without its supplies, the leader first (<see cref="BotProvision"/>).
-/// </para>
-/// </summary>
 public sealed class BotReeve : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotReeve));

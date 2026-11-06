@@ -12,41 +12,6 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The debugger's hands: the handful of things a person with an administrator's account would type at a
-/// stuck shard, made available to Argus by name, bounded, and written down every single time.
-///
-/// <para>
-/// <b>Why a set of our own rather than the engine's command system.</b> Almost every GM command in ModernUO
-/// ends in a target cursor — <c>[props</c>, <c>[tele</c>, <c>[set</c> all wait for a click — and Argus has
-/// no client to click with. Handing him <c>CommandSystem.Handle</c> would hand him a door that opens onto a
-/// prompt nobody can answer. So each verb here does what the command of that name does, addressed by the one
-/// thing he can name reliably: a bot off the roster.
-/// </para>
-///
-/// <para>
-/// <b>Six of the ten verbs only look, and the proportion is on purpose.</b> A watcher's first duty is to find
-/// out, and this project's own record says the watcher is wrong far more often than the shard is — ten false
-/// alarms against two real defects in the first day of it. Verbs that change the world are for the cases
-/// where looking has already produced the answer: a bot in a pocket, a bot dead in a field, a creature
-/// nothing can reach.
-/// </para>
-///
-/// <para>
-/// <b>What is absent is not an oversight.</b> Nothing here deletes, nothing sets a property, nothing touches
-/// an account or an access level, and nothing acts on a mobile that is not one of ours. The world save holds
-/// a real person's character; a model that can be talked round by its own previous sentence must not be able
-/// to reach it. The engine's own guards sit underneath as well — a bot is only ever put down on ground the
-/// engine agrees a body fits on.
-/// </para>
-///
-/// <para>
-/// <b>Every use goes in its own file.</b> <c>logs/bot-debugger-commands.log</c>, beside the log the polls and
-/// the conclusions go in, because those are read forwards for what the shard is like and this is read
-/// backwards from "why did that bot move" — and a hand whose uses are mixed in with its own observations is
-/// a hand that can quietly alter what it is observing without the record showing it.
-/// </para>
-/// </summary>
 public static class BotHand
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHand));
@@ -116,7 +81,7 @@ public static class BotHand
         + "a tile (open to a walker from home, an isle only a ship reaches, a sealed pocket, water a ship sails, nowhere to "
         + "stand) and what the walker's own search finds there; reach — the map, and how its check of the borders came out.";
 
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "arena", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench", "go", "gates", "parley", "meet", "zones", "zone", "zonewatch", "charters", "charter", "relics", "relic", "steward", "decree", "officers", "appoint"];
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "rearm", "census", "tourney", "arena", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench", "go", "gates", "parley", "meet", "zones", "zone", "zonewatch", "charters", "charter", "relics", "relic", "steward", "decree", "officers", "appoint"];
 
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
@@ -124,6 +89,7 @@ public static class BotHand
         + "this second instead of waiting a quarter of an hour for the watcher to think of it; naming a spot "
         + "raises a camp there, pulled into the ring around the population if it is too near or too far. "
         + "wars — every war standing, with its score and its clock. "
+        + "rearm — hand every bot a catch left bare the weapon it was born to back; asking twice hands nothing twice. "
         + "parley — the guilds' meetings standing and the last few ended, the agreements between guilds, and each guild's "
         + "standing in its towns with the task in hand. meet <guild> ; <guild or town> [; grievance|safety|friendship|commerce] — "
         + "call a meeting now, the pair's clock ignored: the envoy walks, the host answers, a watcher witnesses, the duke gives "
@@ -375,6 +341,9 @@ public static class BotHand
 
             case "arms" when string.IsNullOrWhiteSpace(tail):
                 return Quivers();
+
+            case "rearm":
+                return BotOutlaw.ReturnWeapons();
 
             case "reset":
                 return ResetPopulation();
@@ -889,6 +858,8 @@ public static class BotHand
         var coffers = BotPolitics.Wipe();
         var held = BotSeasons.Wipe();
         var lives = BotLives.Wipe();
+
+        var timetables = BotTimetables.Wipe();
         var charters = BotCharters.Wipe();
         var colonies = BotColonies.Wipe();
         var wanted = BotCrime.Wipe();
@@ -898,6 +869,8 @@ public static class BotHand
         var relics = BotRelics.Wipe();
 
         var runes = BotRuneShelf.Wipe();
+
+        var stories = BotStory.Wipe();
         var unheld = BotCity.Unhold();
 
         var saving = SaveWiped(0);
@@ -905,9 +878,9 @@ public static class BotHand
         return $"reset: {halls} halls razed, {claims} claims let go, {seats} hand-set seats forgotten, {houses} guild houses emptied, wars, truces and opinions forgotten, "
                + $"{learned} bots' learning wiped and {bodies} bodies deleted with everything they were carrying, "
                + $"the market, the wants and the board of errands emptied, the city's wants and bounties and the championship's record forgotten, every crime and the band forgotten, the guilds disbanded, "
-               + $"{lives} bots' characters, ties and tales forgotten, {charters} charters let go, {colonies} colonies given up with their stores, {wanted} names struck off the books on crime, {loans} loans and {posts} officers' posts with the guilds' stores and kit debts, "
+               + $"{lives} bots' characters, ties and tales forgotten, {timetables} timetables forgotten, {charters} charters let go, {colonies} colonies given up with their stores, {wanted} names struck off the books on crime, {loans} loans and {posts} officers' posts with the guilds' stores and kit debts, "
                + $"the politics and the stewardships ({coffers}gp of coffers and watches' wages back into the treasury), the events ({held}gp of their holds back to the purse and the crown), "
-               + $"{relics} relic items taken out of the world (the town relics hidden again), {runes} guilds' runes forgotten, the seizures, the guild splits and widenings, {unheld}gp held for nobody back into the treasury; "
+               + $"{relics} relic items taken out of the world (the town relics hidden again), {runes} guilds' runes forgotten, {stories} bots' stories and the Chronicle forgotten, the seizures, the guild splits and widenings, {unheld}gp held for nobody back into the treasury; "
                + $"everything known about what pays where wiped (the island's danger map, the zones and the roads walked are kept); "
                + (saving
                    ? "the world is being saved"
@@ -1033,6 +1006,7 @@ public static class BotHand
 
             foreach (var item in pack.Items)
             {
+
                 if (item is BaseWeapon and not BaseRanged and not SkinningKnife and not ButcherKnife and not Cleaver)
                 {
                     blade = true;
@@ -1708,6 +1682,7 @@ public static class BotHand
             + $"warmode {bot.Warmode}, fighting {bot.Combatant?.Name ?? "nobody"}; "
             + $"{bot.TotalWeight} of {bot.MaxWeight} stones; alive {bot.Alive}, frozen {bot.Frozen}; "
             + $"at ({bot.X}, {bot.Y}, {bot.Z}) on {bot.Map} in {region?.Name ?? "no named region"}; "
+
             + $"skills: {Trade(bot)}, ItemID {bot.Skills[SkillName.ItemID].Base:F0}; "
             + $"rank {bot.BotRank ?? "none"}; "
             + $"guild {(bot.Guild == null ? "none" : $"{bot.Guild.Name} [{bot.Guild.Abbreviation}]")}.";
@@ -2684,6 +2659,7 @@ public static class BotHand
     private static string Homeward(BotMobile bot)
     {
         var map = BotPopulation.Home;
+
         var where = BotPopulation.HomeOf(bot);
 
         if (map == null)
@@ -2745,6 +2721,7 @@ public static class BotHand
 
     private static string Free(BotMobile bot)
     {
+
         var held = bot.Resolve?.Deed?.ToString() ?? "nothing";
 
         bot.Journey?.Discard();

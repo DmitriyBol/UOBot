@@ -4,43 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Work one bot keeps failing for the same reason is not offered to that bot for a while.
-///
-/// <para>
-/// <b>The defect this project has met more often than any other, closed once rather than one instance at a time.</b>
-/// A deed fails and the same deed is offered to the same bot at the next review, because nothing between the failure
-/// and the choice remembers it: the proposer does not ask the question the deed fails on, the note is written where no
-/// chooser reads it, or the work is unpaid and learns nothing. <c>DECISIONS.md</c> C1 records thirty-five of them since
-/// 15.08.2026 - the guild's hire failed 4,365 times in 43 minutes on the night of 14.09.2026 and Hale's restock 8,719
-/// times in half an hour that evening - each found by its symptom and each mended inside its own proposer.
-/// </para>
-///
-/// <para>
-/// <b>Keyed on the reason as well as the kind.</b> A hunter that loses one skeleton and then another has failed twice
-/// for two reasons and is not in a loop; a bot told "the pack would not hold the 32gp it drew to pay with" six times in
-/// five minutes is. Reasons are compared with their numbers taken out, so "could not raise 1252gp" and "could not raise
-/// 1260gp" are one reason. Replayed over every session log of 14.09.2026 before this was written, six in five minutes
-/// stopped every loop of that day - 48,287 of the 54,409 failures of the afternoon session, 9,559 of the 9,937 of the
-/// night's hire session - and tripped at most once in a session with no loop in it.
-/// </para>
-///
-/// <para>
-/// <b>Only failures that produced nothing, which is the test the ledger already takes.</b> <c>BotWill.Settle</c> writes
-/// <c>Beware</c> only when a failure's takings are nought or less, because a great many endings called failures did the
-/// work - a tool worn through, a seam emptied, a shelf run out. Counted here regardless, the breaker would rest the one
-/// trade a scribe is paid for: Ilsa ended eight inscriptions "nothing to write with" in build 41's first half hour, seven
-/// of them carrying scrolls worth up to 449. Replayed over the twenty-four session logs of 14.09.2026 both ways, the loops
-/// stopped are the same ones - 48,280 failures prevented against 48,287 in the afternoon, 9,548 against 9,559 in the hire
-/// session - and the seven trips that go were on errands that earned something on the way.
-/// </para>
-///
-/// <para>
-/// <b>A backstop, not a repair, so it speaks every time it trips.</b> A rule that quietly rests a failing kind of work
-/// is a rule that hides the defect under it. Each trip is a log line naming the bot, the work and the reason, and the
-/// counts are in the Will line; the loop it stopped still has to be found and mended where it starts.
-/// </para>
-/// </summary>
 public static class BotBreaker
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBreaker));

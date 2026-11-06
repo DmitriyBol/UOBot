@@ -3,34 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot carrying what somebody has said it wants the walk to that somebody, and the sale at the other end.
-///
-/// <para>
-/// <b>The supplier's half of hand to hand (01.10.2026).</b> Under the auction a want was filled from wherever the supplier
-/// stood: the porter at a counter, the miner at its forge, the tailor at its bench — 421 fills for some 1,200 things in the
-/// hour of 16:42–17:42 on 30.09.2026, leather 369, iron ingots 365, raw ribs 210, feathers 157, logs 40 and 93 pieces of
-/// leather and plate armour. Every one of those is now a walk. Anything in the pack over what the bot keeps for itself
-/// (<see cref="BotUnload.Keeps"/>) — and, for a bot standing at a bank, anything in its bank box — is weighed against every open
-/// want for its kind, and the best by what it pays over the minutes of the walk is offered as a <see cref="BotDeliver"/>.
-/// </para>
-///
-/// <para>
-/// <b>Priced as a sale, and corrected by what sales paid.</b> The claim is the gold the delivery would bring over the walk and
-/// the handing over. The ledger learns what deliveries really paid, as it learns everything else, so a carrier whose buyers
-/// keep walking away stops being sent after them. A delivery worth less than <see cref="LeastGold"/>, or on another land, or
-/// past <see cref="Reach"/>, or to a buyer who could not pay for one at its own offer, is not offered — each counted apart.
-/// </para>
-///
-/// <para>
-/// <b>Three walls made prices or questions (06.10.2026, needs15; Patrick: "95 on work and on Needs orders").</b> Build 400 failed 591
-/// Needs lines in 11.3 hours, and three causes in this file held 472 of them. The tail of a part-handed want is offered under
-/// <see cref="LeastGold"/> (<see cref="TailExempt"/>). A buyer past <see cref="Reach"/> nobody within it has answered is walked to
-/// out to <see cref="FarReach"/>, the buyer paying carriage (<see cref="FarOpen"/>, <see cref="FarPrice"/>). And the straight road
-/// the auction judges the walk by is asked here, of the want that would win, so the carrier offers the best walk its auction will
-/// take rather than one it will refuse (<see cref="BotPass.Road"/>).
-/// </para>
-/// </summary>
 public sealed class BotCourier : IBotProposer
 {
     public string Name => "Courier";
@@ -334,6 +306,7 @@ public sealed class BotCourier : IBotProposer
 
             if (gold < LeastGold)
             {
+
                 if (TailExempt && want.Filled > 0 && units >= want.Payable)
                 {
                     tail = true;
@@ -353,6 +326,7 @@ public sealed class BotCourier : IBotProposer
 
             if (rate > bestRate)
             {
+
                 if (BotDanger.Road(body, map, body.Location, buyer.Location, strength, out _, out _, out _))
                 {
                     RoadRefused++;

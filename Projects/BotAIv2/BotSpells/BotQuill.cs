@@ -6,32 +6,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Writing scrolls: what can be written, what it takes, and the attempt itself.
-///
-/// <para>
-/// <b>Everything goes through the shard's own <see cref="CraftSystem"/></b>, exactly as sewing does — the same
-/// call a player's craft window makes. The skill check, the failure, the blank and the herbs burnt on a bad
-/// attempt and the scroll that appears are all the engine's, so the Inscribe a scribe gains here is gained by
-/// inscribing rather than by being credited.
-/// </para>
-///
-/// <para>
-/// <b>It is the same shape as the needle and it needs no place either.</b> A pen works where the bot is
-/// standing, so this is the second trade rather than the third: a smith still needs a forge. What it needs
-/// instead is mana — four for the first circle and fifty for the eighth, which at fifty Intelligence is a
-/// mage's entire pool — and that is what makes Meditation on a mage's own vector something other than
-/// decoration.
-/// </para>
-///
-/// <para>
-/// <b>And unlike cloth, what comes off it has no shopkeeper above the third circle.</b> That is the whole
-/// reason this trade is worth adding: it is the first work in the project whose output only another bot can
-/// buy.
-/// </para>
-/// </summary>
 public static class BotQuill
 {
+
     public static double Margin { get; set; } = 5.0;
 
     public static double Markup { get; set; } = 0.20;
@@ -326,6 +303,7 @@ public static class BotQuill
             if (funded && BotScribes.Order(wilful, kind) is { } want && want.Offer > (line?.For?.Offer ?? 0)
                 && !BotCourier.Holding(wilful, want))
             {
+
                 keep.TryGetValue(kind, out var allowed);
                 var units = allowed >= int.MaxValue
                     ? 0
@@ -476,10 +454,6 @@ public static class BotQuill
     }
 }
 
-/// <summary>
-/// What one session at the pen is for, and what it has to buy before it starts. Made by <see cref="BotQuill.Plan"/>, carried by
-/// <see cref="BotInscribe"/> from the proposal to the last scroll, so the work writes what it was chosen for.
-/// </summary>
 public sealed class BotQuillPlan
 {
     public CraftItem Recipe { get; init; }

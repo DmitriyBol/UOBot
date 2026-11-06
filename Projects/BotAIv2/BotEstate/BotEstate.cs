@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Server.Guilds;
 using Server.Logging;
@@ -8,34 +8,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The halls the guilds own: where they stand, who paid for them, and what they hold.
-///
-/// <para>
-/// <b>Ordered by Patrick on 08.09.2026, and the shape of the order is the interesting part.</b> The plan
-/// said "a bot buys a house". The arithmetic said otherwise: the cheapest classic house in this engine costs
-/// 35,250gp (<c>HousePlacementEntry.ClassicHouses</c>), the fattest purse on this shard was 843gp when the
-/// question was asked, the middle one 355gp, and the whole population of forty-nine held under 25,000gp
-/// between them — with <c>BotProgress.Savings</c> off by his own order of the same day, so none of it
-/// survives a restart. A house per bot at the engine's price is a threshold nothing on the shard can reach:
-/// the exact defect this project keeps meeting, two numbers on one shelf that never meet.
-/// </para>
-///
-/// <para>
-/// So the guild buys it. Four halls rather than forty-nine huts, paid for out of a levy on the members, and
-/// the guild tag stops being a word over a head: it is the thing that opens a door, holds a chest, and owns
-/// the forge inside. That is what makes <see cref="BotGuilds"/> worth having.
-/// </para>
-///
-/// <para>
-/// <b>A hall outlives the population that raised it, and that is what this class is really for.</b> Bots are
-/// rebuilt from nothing every start and their owner mobile is deleted with them; the house is a world object
-/// and stays. An unowned house in this engine decays. So every start this reads the world back — houses are
-/// found by the name on their sign, which is the guild's — and hands each one to whoever leads that guild
-/// now. The sign is the record. Nothing else is written down, because anything else could disagree with the
-/// world and this cannot.
-/// </para>
-/// </summary>
 public static class BotEstate
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEstate));
@@ -167,7 +139,6 @@ public static class BotEstate
         return total;
     }
 
-    /// <summary>What one member paid, kept so it can be handed back if the purchase falls over.</summary>
     public readonly struct Contribution
     {
         public Contribution(BotMobile who, int paid)
@@ -183,6 +154,7 @@ public static class BotEstate
 
     public static int Levy(Guild guild, int want, List<Contribution> paid, Mobile except = null)
     {
+
         var got = Take(guild, want, paid, except);
 
         Levied += got;
@@ -260,6 +232,7 @@ public static class BotEstate
 
             if (fromBank > 0 && !Banker.Withdraw(member, fromBank))
             {
+
                 if (fromPack > 0)
                 {
                     pack.DropItem(new Gold(fromPack));
@@ -630,7 +603,7 @@ public static class BotEstate
             var owed = wanting.Length == 0 ? "every guild has one" : wanting.ToString();
 
             return
-                $"{halls}; {ledger}; {owed}; {BotSteward.Describe()}; {BotFitter.Describe()}; {BotHirer.Describe()}; {Merchanted} merchants hired for {Contracts}gp; {BotSupplier.Describe()}; {BotOffice.Describe()}; {BotShelf.Describe()}; {BotLand.Describe()}; {BotRegard.Describe()}; {BotBailiff.Describe()}; {BotFeuder.Describe()}; {BotExile.Describe()}; {BotRemover.Describe()}; {BotHolder.Describe()}; {BotReeve.Describe()}; {BotChest.Describe()}; {BotToll.Describe()}; {BotTollman.Describe()}; {BotEnlarger.Describe()}; {BotAbode.Describe()}; {BotAbodeBuyer.Describe()}; {BotReposer.Describe()}; {BotOutposter.Describe()}; {Barred} times a workshop was passed over as somebody else's; {BotPlot.Describe()}";
+                $"{halls}; {ledger}; {owed}; {BotSteward.Describe()}; {BotFitter.Describe()}; {BotHirer.Describe()}; {Merchanted} merchants hired for {Contracts}gp; {BotSupplier.Describe()}; {BotOffice.Describe()}; {BotShelf.Describe()}; {BotLand.Describe()}; {BotRegard.Describe()}; {BotBailiff.Describe()}; {BotFeuder.Describe()}; {BotExile.Describe()}; {BotRemover.Describe()}; {BotHolder.Describe()}; {BotReeve.Describe()}; {BotChest.Describe()}; {BotToll.Describe()}; {BotTollman.Describe()}; {BotEnlarger.Describe()}; {BotAbode.Describe()}; {BotAbodeBuyer.Describe()}; {BotReposer.Describe()}; {BotFurnish.Describe()}; {BotOutposter.Describe()}; {Barred} times a workshop was passed over as somebody else's; {BotPlot.Describe()}";
         }
         finally
         {

@@ -5,24 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot whose health is going the one thing that was missing from that rung: leaving.
-///
-/// <para>
-/// <b>It shares <c>Failing</c> with <see cref="BotMedic"/> and the two do not overlap.</b> This one offers
-/// nothing at all unless something hostile is standing there, so an ordinarily hurt bot is offered a bandage
-/// and nothing else, exactly as before. When something <em>is</em> standing there the two compete on the
-/// same arithmetic as everything else on this shard, and flight is priced to win — see
-/// <see cref="BotBolt.Prior"/> for why that price is honest rather than a thumb on the scale.
-/// </para>
-///
-/// <para>
-/// <b>Not every hostile is worth running from</b>, and the test is what is left rather than what the bot
-/// started with. A bot at a third of its health has a third of its fighting power, and the question is
-/// whether what is here can finish that third — a rat cannot and an ogre plainly can. Judging by full
-/// strength would have said "you can take these three" of a bot that had already lost the ability to.
-/// </para>
-/// </summary>
 public sealed class BotFugitive : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFugitive));
@@ -116,6 +98,7 @@ public sealed class BotFugitive : IBotProposer
 
         if (threat <= 0.0)
         {
+
             return null;
         }
 

@@ -6,7 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One ragman's buying post while it is open: the trader keeping it, the cave mouth it serves, where it stands, and what it bought.</summary>
 public sealed class BotRagPost
 {
     public BotRagPost(BotMobile keeper, Map map, Point3D stand, Point3D mouth, string dungeon)
@@ -44,30 +43,6 @@ public sealed class BotRagPost
     public string Name => $"{Keeper?.Name}'s buying post by the mouth of {Dungeon}";
 }
 
-/// <summary>
-/// The ragmen: a trader keeping a buying post on safe ground near a dungeon's mouth, buying the hunters' loot below what a town's counter
-/// pays and carrying it to the counters itself afterwards (07.10.2026, life18b).
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "a ragman buying loot from hunters at the dungeon mouth"; that morning: "let's try, but if he dies often to the
-/// mobs (there are many hostile mobs at a dungeon mouth) we take the role out, or make him stand REALLY safely, though not too far from
-/// the entrance".</b> So the post is chosen, once a mouth and remembered for <see cref="PostMemoryMs"/>, on ground <see cref="PostNear"/> to
-/// <see cref="PostFar"/> tiles from the mouth where the zones' map reads clear for <see cref="SafeSlack"/> tiles every way (outside every
-/// aggressive spawner's patrol and its fringe, <see cref="BotZones.LevelAt(Map, int, int)"/>), no blood stands on the square
-/// (<see cref="BotQuad.Muscle(Map, Point3D)"/>), and no creature that attacks on sight is alive within its own perception of it (the reach
-/// <c>BotSight</c> prices: <c>RangePerception</c>, capped at <see cref="BotZones.PerceptionMost"/>, and the margin). At the post the ragman
-/// leaves at once when its sight holds a danger it cannot beat (<c>BotJourney.Sighted</c>, the reaches <c>BotSight</c> keeps), and the post is
-/// rested for <see cref="UnsafeMs"/>; within a creature's reach the sight's own stand-down puts it off its work anyway. Its deaths are
-/// counted apart, and <c>BotTrades.Ragmen</c> switches the role off live.
-/// </para>
-///
-/// <para>
-/// <b>The money is honest on both sides.</b> The hunter is paid <see cref="Share"/> of what the nearest counter pays for each thing, hand to
-/// hand (<see cref="BotHandover.Exchange"/>), and keeps hunting instead of walking a pack across the island; the ragman pays out of its own
-/// purse, keeps <see cref="KeepPurse"/>, and sells the goods over a counter later (<see cref="BotRagHauler"/>, the peddle) — the counter is
-/// where the coin enters the world, as it always was.
-/// </para>
-/// </summary>
 public static class BotRagmen
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRagmen));
@@ -590,11 +565,6 @@ public static class BotRagmen
     }
 }
 
-/// <summary>
-/// A trader's shift keeping a buying post near a dungeon's mouth: the walk to the safe ground, the post opened, the hunters' loot bought as
-/// the auction sends them, and the post shut when the shift, the purse or the pack runs out — or at once when a danger it cannot beat comes
-/// into sight (07.10.2026, life18b). Measured as coin, with the goods bought counted at what the counters pay for them.
-/// </summary>
 public sealed class BotKeepRagPost : BotDeed
 {
     public const string Trade = "ragpost";
@@ -784,10 +754,6 @@ public sealed class BotKeepRagPost : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a trader with coin to spend a buying post by the busiest dungeon mouth within its reach, on safe ground (07.10.2026, life18b).
-/// Every gate counted.
-/// </summary>
 public sealed class BotRagman : IBotProposer
 {
     public string Name => "Ragman";
@@ -909,10 +875,6 @@ public sealed class BotRagman : IBotProposer
     }
 }
 
-/// <summary>
-/// A hunter's walk to a ragman's post with its loot: each kind the ragman can pay for, sold hand to hand at <see cref="BotRagmen.Share"/> of
-/// the nearest counter's price (07.10.2026, life18b). Measured as coin.
-/// </summary>
 public sealed class BotRagSale : BotDeed
 {
     public const string Trade = "ragman sale";
@@ -1029,10 +991,6 @@ public sealed class BotRagSale : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a hunter with a laden pack outside a town, whose nearest counter for its loot is far, the ragman's post near it (07.10.2026,
-/// life18b). The pack is read at most once a minute for one hunter. Every gate counted.
-/// </summary>
 public sealed class BotRagSeller : IBotProposer
 {
     public string Name => "Ragman's customer";
@@ -1255,11 +1213,6 @@ public sealed class BotRagSeller : IBotProposer
     }
 }
 
-/// <summary>
-/// Offers a ragman whose post has shut the goods it bought, a kind at a time, to the counter that pays most for them once the road is paid
-/// for: the peddle (<see cref="BotPeddle"/>), as a fighter's loot goes (07.10.2026, life18b). Runs with the posts switched off too, so what
-/// was bought is never stranded.
-/// </summary>
 public sealed class BotRagHauler : IBotProposer
 {
     public string Name => "Ragman's haul";
@@ -1319,6 +1272,7 @@ public sealed class BotRagHauler : IBotProposer
 
             if (held <= 0)
             {
+
                 stock.Remove(kind);
 
                 continue;
@@ -1337,6 +1291,7 @@ public sealed class BotRagHauler : IBotProposer
 
             if (shop == null || price <= 0)
             {
+
                 stock.Remove(kind);
 
                 continue;

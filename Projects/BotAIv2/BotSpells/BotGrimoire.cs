@@ -5,25 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a book holds, what it is short of, and how a scroll becomes a spell in it.
-///
-/// <para>
-/// <b>The book is the one thing a caster owns that grows.</b> It is bound at birth — weightless, kept through
-/// death, never merchandise — and it starts with the two or three spells that make the class function at all.
-/// Everything above that has to come from somewhere, and this is the file that knows where.
-/// </para>
-///
-/// <para>
-/// <b>The engine draws a line across the middle of the spell list, and the whole economy of magic on this
-/// shard is that line.</b> A mage vendor stocks the first three circles — twenty-four scrolls, at twelve,
-/// twenty-two and thirty-two gold — and stops. The other forty spells are sold by nobody at any price: they
-/// come from a monster's corpse or from somebody with the Inscribe skill, a blank scroll and a handful of
-/// herbs. There is no hunting in this version, so on this shard, today, they come from exactly one place —
-/// another bot. That is not a rule anybody wrote; it is the shape of the content, and it is the reason a
-/// caster's ambition is a market rather than a shopping list.
-/// </para>
-/// </summary>
 public static class BotGrimoire
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGrimoire));

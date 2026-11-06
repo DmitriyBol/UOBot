@@ -7,31 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bot's double for one fight on the proving ground: the same body, build, skills and kit, and nothing that makes it one
-/// of the population. See <see cref="BotProving"/>.
-///
-/// <para>
-/// <b>A <see cref="PlayerMobile"/>, not a <see cref="BotMobile"/>, and that is the first decision rather than a detail.</b>
-/// Everything the population does with a bot is keyed on that type: a blow on a BotMobile is written into the peril map and
-/// the quadrants' record, a death is filed with the Will, the squads, the wars and the guilds' regard, and the dashboards,
-/// the census and Argus's own reports walk the population by it. A double that was a BotMobile would teach the island that
-/// Green Acres is deadly every time it lost a fight. Argus himself inherits PlayerMobile for the same reason.
-/// </para>
-///
-/// <para>
-/// <b>What is copied is what decides a fight and nothing more:</b> the raw stats (a player's hit points on this era are
-/// Str/2 + 50, see <c>PlayerMobile.HitsMax</c>), every skill's base and cap, everything worn, and from the pack only what a
-/// bot reaches for in a fight — bandages, bottles, reagents, scrolls, its spellbook and its arrows. The copies are the
-/// engine's own dupe (<c>Dupe.DoDupe</c>), so a vanquishing blade stays vanquishing and an invulnerable chest stays
-/// invulnerable; that is the whole point of measuring with the real kit rather than with a formula.
-/// </para>
-///
-/// <para>
-/// <b>It must not outlive its fight, and it must not outlive a save.</b> The trial deletes it and its corpse when the fight
-/// is over; one that comes back out of a world save — the shard stopped in the middle of a trial — deletes itself on load.
-/// </para>
-/// </summary>
 public class BotStandIn : PlayerMobile
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStandIn));
@@ -77,6 +52,7 @@ public class BotStandIn : PlayerMobile
 
         var double_ = new BotStandIn
         {
+
             Player = true,
             Of = bot.Name,
             Name = $"{bot.Name}'s double",
@@ -141,6 +117,7 @@ public class BotStandIn : PlayerMobile
 
         if (pack != null)
         {
+
             _carried.Clear();
             Gather(pack, _carried);
 

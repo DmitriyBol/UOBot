@@ -1,37 +1,16 @@
+
+
 using ModernUO.Serialization;
 using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The King's Rangers' kit: the Baron's livery on five more bodies.
-///
-/// <para>
-/// <b>The same gold and the same red, by order, and it is the point rather than a saving.</b> These five are
-/// the crown's, as the Baron is, and a person watching from a client should be able to tell that at a glance
-/// from further away than a name will carry. Gold plate under a red cloak is what the crown looks like on
-/// this shard; anything else would have made them read as another warband.
-/// </para>
-///
-/// <para>
-/// <b>Restored rather than indestructible, exactly as the Baron's is.</b> A piece with no durability at all
-/// is a piece the engine deletes, so the blow lands, the engine takes its point, and the point is put back.
-/// It also means <c>BotUpkeep</c> reads every piece at full life and never asks the population for a
-/// replacement nobody could make.
-/// </para>
-///
-/// <para>
-/// <b>And the archer wears studded, which is not a downgrade.</b> A full plate suit on a shooting build is a
-/// build that cannot draw: this era wants a free arm for the bow. Studded in the same livery is the armour a
-/// bow can actually be used in, and the choice is the engine's rule rather than a preference.
-/// </para>
-/// </summary>
 public static class BotRangerKit
 {
+
     public const int Livery = BotRegalia.RoyalRed;
 }
 
-/// <summary>The ranger's blade. Swordsmanship, and it never blunts.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerBlade : Broadsword
 {
@@ -59,7 +38,6 @@ public partial class BotRangerBlade : Broadsword
     }
 }
 
-/// <summary>The ranger's bow. Archery, and it never blunts.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerBow : Bow
 {
@@ -87,7 +65,6 @@ public partial class BotRangerBow : Bow
     }
 }
 
-/// <summary>The ranger's shield. Parried with, and it never splits.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerShield : HeaterShield
 {
@@ -100,7 +77,6 @@ public partial class BotRangerShield : HeaterShield
     }
 }
 
-/// <summary>The ranger's cuirass.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerChest : PlateChest
 {
@@ -113,7 +89,6 @@ public partial class BotRangerChest : PlateChest
     }
 }
 
-/// <summary>The ranger's greaves.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerLegs : PlateLegs
 {
@@ -126,7 +101,6 @@ public partial class BotRangerLegs : PlateLegs
     }
 }
 
-/// <summary>The ranger's vambraces.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerArms : PlateArms
 {
@@ -139,7 +113,6 @@ public partial class BotRangerArms : PlateArms
     }
 }
 
-/// <summary>The ranger's gauntlets.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerGloves : PlateGloves
 {
@@ -152,7 +125,6 @@ public partial class BotRangerGloves : PlateGloves
     }
 }
 
-/// <summary>The ranger's gorget.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerGorget : PlateGorget
 {
@@ -165,7 +137,6 @@ public partial class BotRangerGorget : PlateGorget
     }
 }
 
-/// <summary>The ranger's helm.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerHelm : PlateHelm
 {
@@ -178,7 +149,6 @@ public partial class BotRangerHelm : PlateHelm
     }
 }
 
-/// <summary>The archer's tunic. Studded, so the bow can be drawn: see the file note.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerArcherChest : StuddedChest
 {
@@ -191,7 +161,6 @@ public partial class BotRangerArcherChest : StuddedChest
     }
 }
 
-/// <summary>The archer's leggings.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerArcherLegs : StuddedLegs
 {
@@ -204,7 +173,6 @@ public partial class BotRangerArcherLegs : StuddedLegs
     }
 }
 
-/// <summary>The archer's sleeves.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerArcherArms : StuddedArms
 {
@@ -217,7 +185,6 @@ public partial class BotRangerArcherArms : StuddedArms
     }
 }
 
-/// <summary>The archer's bracers.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerArcherGloves : StuddedGloves
 {
@@ -230,7 +197,6 @@ public partial class BotRangerArcherGloves : StuddedGloves
     }
 }
 
-/// <summary>The archer's collar.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerArcherGorget : StuddedGorget
 {
@@ -243,7 +209,6 @@ public partial class BotRangerArcherGorget : StuddedGorget
     }
 }
 
-/// <summary>The archer's cap. Leather, because a plate helm and a bowstring do not agree.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerArcherCap : LeatherCap
 {
@@ -256,10 +221,6 @@ public partial class BotRangerArcherCap : LeatherCap
     }
 }
 
-/// <summary>
-/// The red royal cloak of the rangers. Clothing rather than armour: it stops nothing, and is worn for the
-/// one reason the Baron's is — so that five bots in a field read as the crown's from across it.
-/// </summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerCloak : Cloak
 {
@@ -272,25 +233,10 @@ public partial class BotRangerCloak : Cloak
     }
 }
 
-/// <summary>
-/// The King's Rangers' own spellbook: the first five circles, whole, and bound to the bot.
-///
-/// <para>
-/// <b>A book of its own rather than one assembled from a kit list.</b> The ordinary route builds a book by
-/// setting one bit per spell named on the class, which is right for a bot that learns its trade over an
-/// evening and wrong for a company issued its equipment by the crown. This one is complete the moment it is
-/// made: every spell of circles one through five, so <c>BotStrike</c> can always walk its ladder down from
-/// the strongest the mana will pay for, and nothing anywhere has to remember to add the next one.
-/// </para>
-///
-/// <para>
-/// The sixth circle and above are deliberately absent, and the class note says why: that is where one caster
-/// starts making the other four rangers scenery.
-/// </para>
-/// </summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerBook : Spellbook
 {
+
     public const int Circles = 5;
 
     [Constructible]
@@ -314,7 +260,6 @@ public partial class BotRangerBook : Spellbook
     }
 }
 
-/// <summary>The ranger mage's robe. Dress rather than armour — see BotHarness on why it cannot be ordered.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerRobe : Robe
 {
@@ -326,7 +271,6 @@ public partial class BotRangerRobe : Robe
     }
 }
 
-/// <summary>The ranger healer's robe. The same livery, named for the office so the two read apart up close.</summary>
 [SerializationGenerator(0, false)]
 public partial class BotRangerHealerRobe : Robe
 {

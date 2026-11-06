@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One remembered event of a bot's life, told in its own words: what happened, who to, and how much it weighed.</summary>
 public sealed class BotTale
 {
+
     public string Kind;
 
     public string Other;
@@ -17,9 +17,27 @@ public sealed class BotTale
     public int Number;
 
     public DateTime At;
+
+    public DateTime ToldAt;
 }
 
-/// <summary>What one bot thinks of one other bot, by name, from −100 to +100. See <see cref="BotTies"/>.</summary>
+public sealed class BotHeardTale
+{
+    public string Teller;
+
+    public string Kind;
+
+    public string About;
+
+    public string Text;
+
+    public string Place;
+
+    public DateTime At;
+
+    public int Hops;
+}
+
 public sealed class BotTie
 {
     public string Name;
@@ -33,11 +51,6 @@ public sealed class BotTie
     public int Beside;
 }
 
-/// <summary>
-/// Everything one bot has become as a person rather than as a worker: its nature, its life's story and the bots it
-/// loves and hates. Keyed by name, because a bot is raised afresh with a new serial at every boot and its name is the
-/// one thing that carries over (see <c>BotProgress</c>). Persisted by <see cref="BotCharacterStore"/>.
-/// </summary>
 public sealed class BotLife
 {
     public BotLife(string name) => Name = name;
@@ -74,6 +87,8 @@ public sealed class BotLife
 
     public readonly List<BotTale> Tales = new(3);
 
+    public readonly List<BotHeardTale> HeardTales = new(4);
+
     public readonly List<BotTie> Ties = new(12);
 
     public int ToldIndex = -1;
@@ -109,10 +124,6 @@ public sealed class BotLife
     }
 }
 
-/// <summary>
-/// The register of <see cref="BotLife"/> records: by name for the store and for other bots' ties, and by serial for the
-/// auction, which asks once per offer and must not hash a string to do it.
-/// </summary>
 public static class BotLives
 {
     private static readonly Dictionary<string, BotLife> _byName = new(StringComparer.Ordinal);

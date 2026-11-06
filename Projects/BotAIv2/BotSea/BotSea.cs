@@ -5,26 +5,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The sea as the rest of the population sees it: which towns a traveller may sail to, the dock it sets out from, whether
-/// it can have a ship, and the one summary line.
-///
-/// <para>
-/// <b>Patrick's point 7 of 29.09.2026: "teach the bots to travel by sea, on boats."</b> The traveller offers towns a road
-/// reaches (<see cref="BotTraveller"/>); asked first, this offers — by <see cref="Share"/> for a bot on home's land, always
-/// for a bot on an island — a town no road reaches whose dock has a lane from a dock the bot can walk to. On an island the
-/// sea is the only way anywhere, so a bot there travels by sea or not at all, and when nothing on the island is worth doing
-/// it is offered the way home by sea (<see cref="BotSeafarer"/>).
-/// </para>
-///
-/// <para>
-/// <b>A ship costs what the shopkeepers ask: 10,177 gold for a small one, from a shipwright or a provisioner.</b> On a world
-/// wiped that morning the middling purse was 66 gold and the fattest 9,850 (18:58 on 29.09.2026), so a guild stands what a
-/// member lacks (<see cref="GuildPays"/>, the way supplies are funded — <see cref="BotProvision.Fund"/>), and a ship once
-/// bought is kept as the bot's own and sails every voyage after. <see cref="Grant"/> hands one over for nothing, for proving
-/// the voyage on a young world; it is off.
-/// </para>
-/// </summary>
 public static class BotSea
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSea));
@@ -311,6 +291,7 @@ public static class BotSea
         }
 
         var here = BotTowns.Nearest(bot.Location);
+
         var voyage = new BotVoyage(bot.Map, from, dock, lane, town, town.Square, here?.Name ?? "the wild", false, null, true);
 
         if (BotWill.Press(bot, voyage, "ordered to sea by hand (BotSea.Order)"))
@@ -376,11 +357,6 @@ public static class BotSea
     }
 }
 
-/// <summary>
-/// Offers a bot on an island — ground no road joins to its home — the way home by sea, once it has had nothing worth doing
-/// for as long as the walk home waits (<see cref="BotHomeward.BarrenFor"/>). The walk home cannot be offered there: its
-/// place is on another land and the appraisal refuses it.
-/// </summary>
 public sealed class BotSeafarer : IBotProposer
 {
     public static long Asked { get; private set; }

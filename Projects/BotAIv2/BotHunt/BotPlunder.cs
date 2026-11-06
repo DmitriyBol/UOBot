@@ -6,35 +6,9 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Going through a chest, a crate or a barrel standing out in the world.
-///
-/// <para>
-/// <b>Ordered by Patrick on 08.09.2026, and the world already provides the case.</b> An <c>OrcCamp</c>
-/// spawns three orcs, a captain, a prisoner, an unlocked chest filled the way a treasure-map chest is
-/// filled, and a locked crate holding a hundred to four hundred gold. Until now the population could kill
-/// everything standing in that camp and walk away from the chest, because nothing on this shard had any
-/// notion of a container that was not a corpse, a stall or its own pack.
-/// </para>
-///
-/// <para>
-/// <b>What it takes and at what price is not decided here.</b> That is <see cref="BotSlay.Rifle"/>, which
-/// already knows to keep an archer's own arrows, to hold back a cook's meat, to price what it lists off a
-/// shopkeeper's own offer rather than a flat gold, and to stop when the pack is full. A second copy of
-/// those rules written for chests would have disagreed with the first inside a week — this file has the
-/// scars to prove it.
-/// </para>
-///
-/// <para>
-/// <b>Two things it will not touch, each with its own bucket.</b> A chest whose camp is still garrisoned —
-/// by Patrick's order of 08.09.2026 the chest is what the fight is for, so it opens when the last hostile
-/// is dead and not before — and anything standing inside a town, which is the same rule the woodsman and
-/// the miner keep and what stops a population from emptying the crates in Britain's shops and calling it
-/// work. Locks and traps are counted but no longer refuse: the garrison is the lock.
-/// </para>
-/// </summary>
 public sealed class BotPlunder : BotDeed
 {
+
     public const string Trade = "plunder";
 
     public static double Prior { get; set; } = 160.0;
@@ -317,16 +291,6 @@ public sealed class BotPlunder : BotDeed
         + $"{Trapped} trapped; passed over: {Held} still held by a garrison, {Townbound} standing inside a town and {Theirs} belonging to The Shadow";
 }
 
-/// <summary>
-/// Offers a bot the job of going through a chest standing near it.
-///
-/// <para>
-/// The sweep is a spatial query over <see cref="BotPlunder.Reach"/> tiles and it is rationed by
-/// <c>BotNeeds</c> to once a minute per bot, for the reason every sweep on this shard is rationed: the
-/// auction asks every proposer on every free review, and a query that looks at forty-eight tiles of world
-/// per bot per review is a query the population runs thousands of times a minute for nothing.
-/// </para>
-/// </summary>
 public sealed class BotPlunderer : IBotProposer
 {
     public string Name => "Plunderer";

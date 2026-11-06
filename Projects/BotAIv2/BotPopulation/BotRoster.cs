@@ -5,44 +5,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who a guild's leader may put out and who it may take in, and how often.
-///
-/// <para>
-/// <b>Patrick's order of 11.09.2026.</b> A guild could lose members and had no way to gain one: bots were
-/// dealt in at birth, walked out of a guild that was getting nowhere, and nothing on the shard could ever
-/// offer any of them a place again. On the evening this was written that had run to its conclusion — all
-/// five guilds standing at one member each, seventy bots outside them, and the hall that would have made
-/// the guilds worth staying in unraisable because raising one takes a levy on members nobody had.
-/// </para>
-///
-/// <para>
-/// <b>The power is the leader's, not the code's, and that is the point rather than an implementation
-/// detail.</b> The five makers are the shard's thinking bots; they already charge their bands with a trade
-/// to gather at and a trade to make at, through <see cref="BotCharter"/>, and this is the same kind of
-/// power over the same band. What this file does is the part a model must not be asked to do: keep the
-/// clock, rank the candidates, and refuse the moves that would turn a roster into a revolving door.
-/// </para>
-///
-/// <para>
-/// <b>One change per guild per <see cref="EveryMs"/>, and it may be both halves of one thought.</b> A
-/// leader that could hire on every beat would empty the pool in a minute and a guild that could expel on
-/// every beat would be a queue rather than a band. Expelling one and taking one in is a single act of
-/// judgement, so it costs one turn of the clock, not two.
-/// </para>
-///
-/// <para>
-/// <b>What "productive" is measured by, and what it is not.</b> This shard keeps no per-bot ledger of
-/// earnings — the ledger it has is per-place and per-trade — so the honest answer to "who is worth taking"
-/// is <see cref="BotMobile.Progress"/>: the share of what its own class set out to learn that it has
-/// actually reached. It is the population's own answer to whether a bot is becoming something, it cannot be
-/// gamed by a bot that happens to be standing on a pile of gold, and it is the number the dashboard already
-/// shows. The purse breaks ties, because a bot that has kept some is a bot whose work has been going
-/// somewhere. If a per-bot earnings ledger is ever kept, this method is the one place that has to change.
-/// </para>
-/// </summary>
 public static class BotRoster
 {
+
     public static bool Running { get; set; } = true;
 
     public static int EveryMs { get; set; } = 1800000;
@@ -128,6 +93,7 @@ public static class BotRoster
 
         for (var i = 0; i < guild.Members.Count; i++)
         {
+
             if (guild.Members[i] is BotMobile { Deleted: false } member && !BotGuilds.IsHead(member))
             {
                 found.Add(member);

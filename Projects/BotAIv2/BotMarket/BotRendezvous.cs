@@ -4,36 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A delivery is a meeting: once the carrier is near, the buyer comes to it — or both go to safe ground — instead of the
-/// carrier walking after a buyer that is at work and moving.
-///
-/// <para>
-/// <b>Patrick's order of 02.10.2026: "Today I saw a couple of times the customer of the goods running away from the
-/// supplier. The result of the trade must be that they meet: either they walk towards each other, or they meet on safe
-/// ground."</b> Measured on build 388's first nine hours: 654 deliveries ended, 555 handed over, median 26 seconds from
-/// taking to handing — and 195 took over a minute, 108 over two, 39 over five; 28 were dropped and 13 put down on the
-/// way, most of them walks after a buyer that took up a prowl, a hunt or a counter and kept going (Liriel after Dorin for
-/// 304 s, dropped; Berengar after Norbert 184 s, dropped). The "could not catch up in 8 minutes" ending never fired once
-/// in nine hours, because the auction took the carrier off the chase first. The carrier followed the buyer by its body
-/// (<c>BotDoing.Walk(map, buyer, …)</c>) and the buyer knew nothing of it.
-/// </para>
-///
-/// <para>
-/// <b>Now the buyer is told.</b> A carrier within <see cref="CallTiles"/> of its buyer calls the meeting
-/// (<see cref="Call"/>), and the buyer's own proposer (<see cref="BotMeeter"/>, on the free rung, pressing) offers it a
-/// <see cref="BotMeet"/>: walk towards the carrier, stand when it is within <see cref="BotHandover.MeetTiles"/>, and let
-/// the carrier's own beat hand the goods over. Where either stands on ground that is not safe — a hostile or deadly patrol
-/// zone, or a square whose record asks more than the bot brings — the place is the nearest guarded ground to the point
-/// between them within <see cref="SafeReach"/> (<see cref="BotHaven.Nearest"/>: a town's edge or a bank), and both walk
-/// there. One meeting a buyer at a time; a second carrier for the same buyer follows as before until the first is done.
-/// </para>
-///
-/// <para>
-/// Counted: meetings arranged, met, missed — and why missed: the buyer waited and the carrier never came, the carrier
-/// gave the delivery up with a meeting standing, the two stood together and nothing changed hands.
-/// </para>
-/// </summary>
 public static class BotRendezvous
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRendezvous));
@@ -92,6 +62,76 @@ public static class BotRendezvous
     public static long CarrierGaveUp { get; private set; }
 
     public static long Doubled { get; private set; }
+
+    public static int StandTiles { get; set; } = 10;
+
+    public static int StandMs { get; set; } = 1500;
+
+    public static int StandMostMs { get; set; } = 10000;
+
+    public static long Stood { get; private set; }
+
+    public static long StoodHanded { get; private set; }
+
+    public static long StandSpent { get; private set; }
+
+    public static long StandPassed { get; private set; }
+
+    public sealed class StandClock
+    {
+        internal bool Began;
+
+        internal bool Spent;
+
+        internal long Since;
+    }
+
+    public static bool Stand(Mobile carrier, Mobile buyer, int apart, StandClock clock)
+    {
+        if (!Running || StandTiles <= 0 || clock == null || clock.Spent || apart > StandTiles
+            || buyer is not BotMobile { Deleted: false, Alive: true } bot || carrier == null || bot.Map != carrier.Map)
+        {
+            return false;
+        }
+
+        var journey = bot.Journey;
+
+        if (journey is not { Active: true } || journey.Current is not { } walk || !journey.Moving && !journey.Held)
+        {
+            return false;
+        }
+
+        if (walk.Interruption || bot.Squad != null || bot.Combatant != null || bot.Hidden
+            || walk.Reason != null && walk.Reason.StartsWith("away from", StringComparison.Ordinal)
+            || bot.Resolve?.Deed is BotMeet || bot.Resolve?.Deed is { } deed && (deed.Foe != null || deed.Braves))
+        {
+            StandPassed++;
+
+            return false;
+        }
+
+        var now = Core.TickCount;
+
+        if (!clock.Began)
+        {
+            clock.Began = true;
+            clock.Since = now;
+            Stood++;
+        }
+        else if (now - clock.Since >= StandMostMs)
+        {
+            clock.Spent = true;
+            StandSpent++;
+
+            return false;
+        }
+
+        journey.Hold(StandMs);
+
+        return true;
+    }
+
+    internal static void HandedAfterStand() => StoodHanded++;
 
     public static Approach Call(IBotWilful carrier, IBotWilful buyer, BotWant want, int units)
     {
@@ -191,6 +231,7 @@ public static class BotRendezvous
             || Math.Max(Math.Abs(place.X - carrier.X), Math.Abs(place.Y - carrier.Y)) > SafeReach
             || Math.Max(Math.Abs(place.X - buyer.X), Math.Abs(place.Y - buyer.Y)) > SafeReach)
         {
+
             return Point3D.Zero;
         }
 
@@ -306,7 +347,8 @@ public static class BotRendezvous
     public static string Describe() =>
         !Running
             ? "meetings are off; the carrier follows the buyer"
-            : $"meetings: {Arranged} called by a carrier within {CallTiles} tiles ({OnSafeGround} of them moved to guarded ground for the ground one stood on), {TakenUp} taken up by the buyer, {Met} met with the goods handed over, {Missed} missed ({BuyerWaited} the buyer waited {MeetMs / 60000} minutes and the carrier never came, {StoodApart} stood together {WaitMs / 1000}s and nothing changed hands, {CarrierGaveUp} the carrier gave the delivery up first, {FellOutOfCall} the carrier fell out of call for {StaleMs / 1000}s), {Doubled} calls for a buyer already meeting another carrier";
+            : $"meetings: {Arranged} called by a carrier within {CallTiles} tiles ({OnSafeGround} of them moved to guarded ground for the ground one stood on), {TakenUp} taken up by the buyer, {Met} met with the goods handed over, {Missed} missed ({BuyerWaited} the buyer waited {MeetMs / 60000} minutes and the carrier never came, {StoodApart} stood together {WaitMs / 1000}s and nothing changed hands, {CarrierGaveUp} the carrier gave the delivery up first, {FellOutOfCall} the carrier fell out of call for {StaleMs / 1000}s), {Doubled} calls for a buyer already meeting another carrier; "
+              + $"buyers stood for their carrier within {StandTiles} tiles: {Stood} walks ({StoodHanded} of them handed over, {StandSpent} stood {StandMostMs / 1000}s and walked on), {StandPassed} beats a walking buyer was not stood (a company, a fight, a flight, a meeting)";
 
     public static void Forget()
     {
@@ -321,10 +363,13 @@ public static class BotRendezvous
         CarrierGaveUp = 0;
         FellOutOfCall = 0;
         Doubled = 0;
+        Stood = 0;
+        StoodHanded = 0;
+        StandSpent = 0;
+        StandPassed = 0;
     }
 }
 
-/// <summary>Offers a buyer whose carrier is near the walk to meet it. See <see cref="BotRendezvous"/>.</summary>
 public sealed class BotMeeter : IBotProposer
 {
     public string Name => "Meeter";
@@ -375,16 +420,6 @@ public sealed class BotMeeter : IBotProposer
     }
 }
 
-/// <summary>
-/// The buyer's half of a hand-to-hand delivery: going to meet the carrier, and standing while the goods are handed over.
-///
-/// <para>
-/// Pressing, because the carrier is standing a screen away now and the buyer's next review may be half a minute off; a
-/// summons, because a buyer at a seam is still a buyer, and the seam is put down and taken up again. The exchange itself
-/// is the carrier's (<see cref="BotDeliver"/>, <see cref="BotHaul"/>): this only puts the buyer where it can happen and
-/// keeps it there, and ends when the want has been filled, or the carrier is gone, or the clocks run out.
-/// </para>
-/// </summary>
 public sealed class BotMeet : BotDeed
 {
     public const string Trade = "meet";
@@ -520,6 +555,6 @@ public sealed class BotMeet : BotDeed
             return BotDoing.Work($"at the meeting place, waiting for {carrier.Name}");
         }
 
-        return BotDoing.Walk(_map, carrier, BotArrival.Within(BotHandover.MeetTiles), $"towards {carrier.Name} to meet it");
+        return BotDoing.WalkAfter(_map, carrier, BotArrival.Within(BotHandover.MeetTiles), $"towards {carrier.Name} to meet it");
     }
 }

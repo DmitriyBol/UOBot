@@ -6,23 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The part of making things that is the same whatever is being made.
-///
-/// <para>
-/// <b>Lifted out of the tailor when the smith arrived, rather than copied.</b> Choosing the hardest recipe a
-/// bot can still manage, reading a recipe's skill requirement, refusing anything that needs a second
-/// material, taking a swing, counting what is actually in the pack afterwards — none of that knows or cares
-/// whether the material is cloth or iron. Written twice it would be two sets of the same four decisions, and
-/// this project already has the note about what that costs: a second list of the same facts is a list that
-/// disagrees with the first one the day somebody edits either.
-/// </para>
-///
-/// <para>
-/// What stays with each trade is what genuinely differs: which craft system, which skill, which tool, which
-/// material. Those are arguments here and properties on <see cref="BotThread"/> and <see cref="BotAnvil"/>.
-/// </para>
-/// </summary>
 public static class BotCraftwork
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCraftwork));

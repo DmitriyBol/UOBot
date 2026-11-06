@@ -5,24 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A walk to another town, for its own sake.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026: the bots should scatter over the world by themselves, travel, meet new horizons,
-/// build roads to other towns and share what they find.</b> A bot with nothing pressing walks to a town it has not seen
-/// — the roads nobody has walked first (<see cref="BotRoadbook"/>) — and on arriving tells its guild what the road was
-/// like, in the quadrant map's own words: safe, positive, neutral, unsafe, dangerous. Then it is a bot in Trinsic with
-/// Trinsic's shops, mines and creatures round it, and every ordinary errand works there as it did at home, because the
-/// population's ground now includes every reachable town (<c>BotPopulation.Within</c>); when nothing there is worth
-/// doing, the walk home is offered as it always was.
-/// </para>
-///
-/// <para>
-/// <b>Cheap on purpose, and steadfast.</b> A few coins a minute, so any real work beats it; held once taken, so a
-/// traveller does not turn back for every stall on the road. Counted as coin, like flight, so a bot born poor may go.
-/// </para>
-/// </summary>
 public sealed class BotTravel : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTravel));
@@ -132,6 +114,7 @@ public sealed class BotTravel : BotDeed
         _town.Arrivals++;
 
         var minutes = (Core.TickCount - _began) / 60000.0;
+
         var road = _recall is { Moved: true } ? BotRoadbook.Between(_from, _town.Name) : BotRoadbook.Walked(_from, _town.Name, _broken ? null : _track);
         var safety = road != null ? BotRoadbook.Safety(road) : BotQuad.Fresh;
         var band = BotQuad.Band(safety);
@@ -208,7 +191,6 @@ public sealed class BotTravel : BotDeed
     }
 }
 
-/// <summary>Offers a bot with nothing pressing a town it has not seen. See <see cref="BotTravel"/>.</summary>
 public sealed class BotTraveller : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTraveller));

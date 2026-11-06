@@ -5,39 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What the population as a whole has found out about what pays where.
-///
-/// <para>
-/// <b>Thirty-three bots were learning one island thirty-three times.</b> <see cref="BotLedger"/> is per bot
-/// and its own note says why — "that a hundred bots have exhausted a field says nothing about whether this
-/// one has seen it" — which is exactly right about <em>seeing</em> and exactly wrong about the field. Two
-/// different facts had been folded into one record: "I could not get there from here", which is a fact about
-/// the bot and must stay private, and "there is nothing left in that seam", which is a fact about the seam
-/// and belongs to everybody. This is the second of those, and only the second.
-/// </para>
-///
-/// <para>
-/// <b>It is shaped like <see cref="BotPeril"/> on purpose.</b> Squares rather than points, because a payout
-/// at tile resolution is thirty facts each worth nothing; a frequency rather than a total, because last
-/// week's gold is a fact about last week; and shard-wide, because the whole value of it is that bot number
-/// thirty starts where bot number one finished. That map has worked for danger since the day it was written
-/// and there was never a reason for money to be different.
-/// </para>
-///
-/// <para>
-/// <b>Own experience always wins, and that ordering is the whole safety of this.</b> A bot that has worked a
-/// place knows more about it than the population does — more recent, and about this bot's own skill — so
-/// <see cref="BotLedger.Expect"/> reaches here only when it has nothing of its own. What this replaces is not
-/// a bot's judgement; it is the hand-written constant a bot would otherwise have used for its first guess.
-/// </para>
-///
-/// <para>
-/// <b>Nothing here is a decision.</b> It answers a question the auction asks and takes no view about what
-/// anybody should do — the same contract the ledger keeps. A shared board that could compel would be the one
-/// thing this project has refused since its first week.
-/// </para>
-/// </summary>
 public static class BotCommons
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCommons));
@@ -77,25 +44,9 @@ public static class BotCommons
         public int Minded;
     }
 
-    /// <summary>
-    /// What one trade turned out to be worth across the whole island, against what it claims to be worth.
-    ///
-    /// <para>
-    /// <b>Every <c>Prior</c> in this project is a number somebody typed.</b> A sweep asserts forty-five a
-    /// minute, an unload a hundred and twenty, a prowl eight — nine-tenths of what the auction weighs is
-    /// those constants, and not one of them has ever been checked against what the work actually paid. They
-    /// were reasonable when written and the shard has changed underneath every one of them.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>The three thinking bots found this out on their own, in words.</b> Cedric wrote itself the rule "if
-    /// Scribe forecast exceeds 100 gold per minute, reduce expected value to 60% of forecast" — which is this
-    /// record, discovered by a language model and applicable only to itself. What is kept here is the same
-    /// discovery in a form the other thirty can read.
-    /// </para>
-    /// </summary>
     private sealed class Trade
     {
+
         public double Claimed;
 
         public double Measured;

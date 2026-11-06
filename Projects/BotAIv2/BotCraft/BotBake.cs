@@ -5,27 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One turn at the skillet: raw meat in the pack becomes suppers, and what the cook does not keep goes out
-/// to the market.
-///
-/// <para>
-/// <b>A walk to a fire, which this errand was written without and could not work without.</b> It opened with
-/// a swing on the strength of <c>DefCooking.CanCraft</c> asking for the tool and nothing else — but the heat
-/// is required by each recipe rather than by the system, and a recipe refused for want of heat sends its
-/// complaint to a screen the bot does not have. What that looked like on 05.09.2026 was eight swings, three
-/// lamb legs still in the pack, and silence. See <c>BotOven.AtAHearth</c> for the test, which is asked of the
-/// engine.
-/// </para>
-///
-/// <para>
-/// <b>Crafting is asynchronous and the count is taken before the next swing, never after this one.</b>
-/// <c>CraftItem.Craft</c> ends by starting a timer; the meal appears a second or so later. A leg that swung
-/// and then counted would see no change every single time and give the round up — the exact fault that had
-/// alchemy reading "0 finished against 34 failed" while it was in fact brewing. See <c>BotBrew.Brewing</c>,
-/// which carries the measurement.
-/// </para>
-/// </summary>
 public sealed class BotBake : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBake));
@@ -153,6 +132,7 @@ public sealed class BotBake : BotDeed
 
         if (!_counting)
         {
+
             _counting = true;
             _had = BotCraftwork.Made(body, _meal);
         }
@@ -170,6 +150,7 @@ public sealed class BotBake : BotDeed
 
         if (left <= 0)
         {
+
             if (_swung && Core.TickCount - _swungTick < SettleMs)
             {
                 return BotDoing.Work("waiting for the pan");
@@ -283,6 +264,7 @@ public sealed class BotBake : BotDeed
 
         if (_cooked <= 0)
         {
+
             return BotDoing.Done($"{_swings} swings, nothing came of it — {why}");
         }
 
@@ -292,6 +274,7 @@ public sealed class BotBake : BotDeed
 
         if (pack != null)
         {
+
             List<Item> made = BotCraftwork.Gather(body, _meal);
 
             var keep = Keeps;

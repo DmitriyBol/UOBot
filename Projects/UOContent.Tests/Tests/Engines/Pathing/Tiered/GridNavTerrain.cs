@@ -5,19 +5,6 @@ using Server.Engines.Pathing.Tiered;
 
 namespace Server.Tests.Pathfinding.Tiered;
 
-/// <summary>
-/// A synthetic ground for the navigation tests, drawn from rows of characters. Each character names the standable
-/// surfaces of its cell:
-/// <c>.</c> ground at 0, <c>#</c> and <c>~</c> nothing (wall, deep water), <c>=</c> a bridge deck at 20 over water,
-/// <c>+</c> a bridge deck at 20 over ground at 0 (two strata), <c>h</c> high ground at 10, <c>/</c> and <c>r</c> ramps
-/// at 5 and 15.
-///
-/// <para>
-/// A step goes to the neighbour's surface nearest the mover's height, allowed when it climbs at most 5 or drops at most
-/// 10: so high ground drops to the ground beside it but cannot be climbed back, a ramp joins the two, and a deck is
-/// reached only from a deck or a ramp at its own height. The mask is raw, as the engine's is: no corner rule.
-/// </para>
-/// </summary>
 internal sealed class GridNavTerrain : INavTerrain
 {
     public const int Climb = 5;

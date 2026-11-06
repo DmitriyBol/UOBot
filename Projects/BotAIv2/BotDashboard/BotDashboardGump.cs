@@ -10,37 +10,6 @@ using Server.Network;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One window onto the whole population, onto the market it trades in, and onto what it cannot get hold of.
-///
-/// <para>
-/// <b>This exists because the first version could not answer "why is that bot doing that".</b> Its decisions
-/// were unobservable, so every question about behaviour was answered by watching a shard for an evening — and
-/// the answers, when they finally came, were things like "it is trading, one tick at a time, and walking a
-/// graveyard while it does". Everything on the first tab is a number the decision layer already keeps; the
-/// only new thing here is that they are in one place, side by side, per bot.
-/// </para>
-///
-/// <para>
-/// The column that matters most is the last kind: <b>the vector</b>. A bot's class declares what it is
-/// working towards, and that share — how far along its own trade it is — is the only measure of whether this
-/// population is going anywhere at all. Money says what a bot has; the vector says whether it is becoming
-/// something.
-/// </para>
-///
-/// <para>
-/// The third tab is the newest and the one an admin will reach for when the population looks idle: it is the
-/// demand side of the market — who is short of what, at what price, and with how much of their own money
-/// already down. A shard where nothing is being asked for and a shard where everything is being asked for at
-/// four times its opening offer look identical on the other two tabs.
-/// </para>
-///
-/// <para>
-/// Built as a <see cref="DynamicGump"/> rather than a cached one because every row is different, and behind
-/// a static <see cref="DisplayTo"/> because that is this shard's rule: prerequisites are checked before the
-/// gump exists, so it can never be sent empty.
-/// </para>
-/// </summary>
 public sealed class BotDashboardGump : DynamicGump
 {
     private const int Width = 1180;
@@ -145,6 +114,7 @@ public sealed class BotDashboardGump : DynamicGump
 
             if (_tab == ClaimTab)
             {
+
                 foreach (var bid in BotClaim.Bids)
                 {
                     if (_spots.Count >= 5)
@@ -323,6 +293,7 @@ public sealed class BotDashboardGump : DynamicGump
         builder.AddLabelCropped(310, 44, 70, 20, Head, "class");
         builder.AddLabelCropped(386, 44, 60, 20, Head, "rung");
         builder.AddLabelCropped(452, 44, 214, 20, Head, "doing");
+
         builder.AddLabelCropped(672, 44, 56, 20, Head, "beats");
         builder.AddLabelCropped(734, 44, 46, 20, Head, "mood");
         builder.AddLabelCropped(786, 44, 56, 20, Head, "vector");
@@ -368,6 +339,7 @@ public sealed class BotDashboardGump : DynamicGump
             builder.AddLabelCropped(848, y, 60, 20, Ink, $"{Purse(bot)}");
             builder.AddLabelCropped(914, y, 68, 20, Ink, $"{Banker.GetBalance(bot)}");
             builder.AddLabelCropped(988, y, 40, 20, Ink, $"{bot.BankBox?.TotalItems ?? 0}");
+
             builder.AddLabelCropped(1034, y, 50, 20, Ink, $"{BotShopkeep.Look(bot).Units}");
             builder.AddLabelCropped(1090, y, 50, 20, Ink, $"{BotShopkeep.Look(bot).Worth}");
 
@@ -1291,6 +1263,7 @@ public sealed class BotDashboardGump : DynamicGump
 
         if (notice == null)
         {
+
             builder.AddLabelCropped(
                 14,
                 60,

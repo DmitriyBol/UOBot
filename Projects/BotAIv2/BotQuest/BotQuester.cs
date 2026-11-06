@@ -3,19 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot the errand on the board that fits it best: a kill to a fighter who is no novice and dares the
-/// ground, a delivery to a bot already carrying the goods, a scouting to anybody. Reckoned by the reward against
-/// the walk and the work, so a rich errand far away and a poor one close by are weighed rather than ranked — by
-/// <see cref="BotQuestDeed.Claim"/>, the very number the errand is then claimed at: until build 95 the proposer reckoned
-/// a delivery or a look at one minute and the deed at two, and every errand was claimed at a flat sixty whatever it
-/// paid.
-///
-/// <para>
-/// A kill anywhere is offered with the nearest lair of the creature to the bot as its place (<see cref="BotLairs"/>),
-/// and not at all when the island keeps none that a road reaches.
-/// </para>
-/// </summary>
 public sealed class BotQuester : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotQuester));

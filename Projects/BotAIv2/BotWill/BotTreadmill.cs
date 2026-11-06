@@ -3,39 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The same deed against the same thing, failing the moment it is taken, is not offered to that bot again for a few seconds.
-///
-/// <para>
-/// <b>Orlando's treadmill (07.10.2026, loops18).</b> Build 418, 11:47:34-11:47:42: Orlando the WarriorMage took "rescue: hitting
-/// back at a troll" 39 times in eight seconds, five a second, and every one failed at once "a troll was winning", 0 coin. Since
-/// react14 a fight that ends is decided again at the clock's next look (<c>BotWill.Settle</c> hurries it), so a deed that fails
-/// on its first beat is offered and failed at the clock's pace. The breaker (<see cref="BotBreaker"/>) never rests a defence,
-/// on Patrick's "it must hit back in a fight", and its six-in-five-minutes count is far too slow for a loop of ten a second.
-/// The cause of that loop is mended where it starts (<c>BotDefender</c> read the standing flight share, the fight the bot's own,
-/// leaned by its nature: a cautious bot between 40 and 44 % of its health was offered a fight that gave itself up on its first
-/// beat). This is the rule under it, for every deed, so the next loop of this shape stops at its second turn.
-/// </para>
-///
-/// <para>
-/// <b>Two rules, keyed on the bot, the kind of work and its target</b> (what it fights when it fights something, the place
-/// otherwise). (1) A fight that ends on a <em>losing judgement</em> ("X was winning": the bot's health under its own flight share)
-/// rests that fight against that foe for <see cref="LosingRestMs"/> at once — fight what you beat, leave what you do not — and
-/// for those seconds the flight is what the Hunted rung offers (<c>BotFugitive</c>, its early flight judged as on the failing
-/// rung). The fight carried on to the end (<c>BotDefender.Stand</c>, which no losing judgement ends) is not rested by it: a bot
-/// with no flight on offer runs or fights, never neither (react14). (2) Any deed that fails inside <see cref="InstantMs"/> of
-/// being taken, having made nothing, twice inside <see cref="TwiceMs"/> against the same target, is rested for
-/// <see cref="RestMs"/>. A flight never is: running away is never rested (<see cref="BotBreaker"/>), and a cornered flight
-/// has its own rest (<c>BotFugitive.CorneredRestMs</c>).
-/// </para>
-///
-/// <para>
-/// <b>A rested offer is not a failure.</b> It is refused in the appraisal like the breaker's rests, so the hurried decision asks
-/// the same question and cannot pass it; the work in hand is never refused. Everything is counted in the Will line.
-/// </para>
-/// </summary>
 public static class BotTreadmill
 {
+
     public static bool Running { get; set; } = true;
 
     public static int LosingRestMs { get; set; } = 15000;

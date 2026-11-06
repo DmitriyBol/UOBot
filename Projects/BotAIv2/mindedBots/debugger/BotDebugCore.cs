@@ -3,23 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The debugger's way in, and the whole of its contact with the rest of the shard.
-///
-/// <para>
-/// The server finds this by reflection — every public static parameterless <c>Configure</c> in every loaded
-/// assembly is called — so one class is all the wiring there is. It registers a module and does nothing
-/// else, exactly as <see cref="BotMindCore"/> does for the thinking bots. The two are switched on and off
-/// separately: <c>bots.debugger.enabled</c> takes the debugger away and leaves the minds, and taking
-/// <c>BotMindAI.dll</c> out of <c>assemblies.json</c> takes both.
-/// </para>
-///
-/// <para>
-/// <b>Off by default is deliberately not the setting.</b> A watcher that has to be remembered is a watcher
-/// that is off on the night something goes wrong. It costs one pass over the roll every two seconds and one
-/// question every two minutes, and both are cheaper than the evening it saves.
-/// </para>
-/// </summary>
 public static class BotDebugCore
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDebugCore));

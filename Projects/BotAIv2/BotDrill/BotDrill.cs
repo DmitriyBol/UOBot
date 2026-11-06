@@ -3,18 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a captain an afternoon of teaching, when there is anybody on the island worth teaching.
-///
-/// <para>
-/// <b>It asks whether there are pupils before it offers a class, and that ordering is the whole design.</b>
-/// A captain that opened a school whenever it was idle would spend its life standing on an empty field:
-/// nobody is obliged to come, and a class with no pupils costs the shard a captain for a quarter of an hour
-/// and returns nothing. So the question asked here is the same one a student will ask itself — is there
-/// somebody who is behind this captain in a skill they both care about, and can they pay for it — and it is
-/// asked of the whole population, cheaply, once per review.
-/// </para>
-/// </summary>
 public sealed class BotDrill : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDrill));
@@ -97,6 +85,7 @@ public sealed class BotDrill : IBotProposer
 
     private static int Pupils(BotMobile captain)
     {
+
         var counted = 0;
         var bots = BotPopulation.Bots;
 
@@ -137,19 +126,9 @@ public sealed class BotDrill : IBotProposer
     }
 }
 
-/// <summary>
-/// Offers a warrior or an archer a place in whatever class is being called.
-///
-/// <para>
-/// <b>Every refusal is a different fact and every one of them is counted.</b> "No bot ever goes to be
-/// taught" has at least five distinct causes — no class is open, the roll is closed, this bot is the wrong
-/// sort, it has nothing left to learn from this captain, it cannot afford the fee — and a single silent
-/// nought would be equally consistent with all of them. That is the failure this shard has paid for more
-/// often than any other.
-/// </para>
-/// </summary>
 public sealed class BotStudent : IBotProposer
 {
+
     public static double Punctual { get; set; } = 1.33;
 
     public static long Belated { get; private set; }

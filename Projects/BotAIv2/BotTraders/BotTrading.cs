@@ -8,30 +8,6 @@ using Server.Multis.Deeds;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The traders as the rest of the shard sees them: what neutrality closes, what a haul is allowed to be, the shopkeepers that
-/// sell a kind, and the <c>Traders:</c> line.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026, point 5, and plan v2 of 01.10.2026, point 3 (build 385).</b> A trader reads what the
-/// island has said it wants (<see cref="BotMarket.Wants"/>), buys it where it is to be had — its own stock, a bot's shop, a
-/// shopkeeper in any town — only against a want that is open, carries it to the buyer by road, gate or, once well off, by sea,
-/// and hands it over at a meeting (<see cref="BotHandover.Exchange"/>). The want is the whole of the demand it answers, so a
-/// trader never buys anything nobody asked for and never floods a shelf: with no open want it has no haul, and does what any
-/// bot with nothing to sell does — hunts (Patrick, 30.09: poor bots hunt). Its leftovers are sold by its own shift at
-/// Britain's bank (<c>BotShopkeeper.Merchant</c>, the producer role).
-/// </para>
-///
-/// <para>
-/// <b>Where the margin comes from, and why it is not a handout.</b> A want names the buyer's price. When that price already
-/// pays the road (<see cref="LeastMarkup"/> over what the goods cost the trader) the trader takes it as said. When it does not,
-/// the trader offers carriage: the two split what carrying saves the buyer (<see cref="CarriageShare"/>) between the trader's
-/// least price and the buyer's own alternative — its walk to its nearest counter and back at the shard's own price of a
-/// shopping minute (<see cref="BotShopkeep.WalkGold"/>) — never more than <see cref="MostMarkup"/> over cost. A buyer agrees,
-/// because it is cheaper than walking; the units are what it can pay for. Every coin a trader earns is a buyer's coin for
-/// goods it asked for. The median purse on 384 was 70gp (the 384 trade baseline), so the split is half, not all.
-/// </para>
-/// </summary>
 public static class BotTrading
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTrading));
@@ -412,6 +388,7 @@ public static class BotTrading
 
     internal static bool OverItsCeiling(BotWant want, int cost)
     {
+
         if (want is { CeilingPending: true } && Meat(want.Kind))
         {
             BotMarket.Recap(want);

@@ -4,23 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The debugger as a module of the shard's own bot system, registered from outside it.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, and after <c>Population</c>: there is nobody to watch until the population
-/// has been raised, and the debugger's body is placed relative to where the population lives. It does not
-/// require <c>Will</c> — a population that decides nothing is a legitimate state of the shard, and it is
-/// precisely the state somebody would most want a debugger for.
-/// </para>
-///
-/// <para>
-/// <b>It offers nothing into the auction and nothing offers anything to it.</b> Every other module here
-/// either proposes work or answers for a bot's body; this one only reads. That is what lets it be switched
-/// off with no effect on anything — and switched on with no effect either, which is the harder half and the
-/// reason the observer is not a <c>BotMobile</c>. See <see cref="BotDebugger"/>.
-/// </para>
-/// </summary>
 public sealed class BotDebugModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDebugModule));
@@ -69,6 +52,7 @@ public sealed class BotDebugModule : BotModule
         BotEventsArgus.Open();
 
         BotStewardArgus.Open();
+
         BotOfficersArgus.Open();
 
         _timer?.Stop();
@@ -129,6 +113,7 @@ public sealed class BotDebugModule : BotModule
 
     public override void Reset()
     {
+
         BotAppraisal.Revelry = null;
         BotCrier.Posted = null;
         BotCrier.Watchers = null;

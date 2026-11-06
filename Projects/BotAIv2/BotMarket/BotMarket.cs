@@ -7,31 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The bots' market with the auction taken out of it: Britain's square by the bank, the wants the bots say aloud, the prices
-/// the island has learned from goods that really changed hands, and the one correct way to take a bot's money.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026, night: "The auction is removed completely; all trade and all the workshops live in
-/// Britain… Trade through talk and the global chat. Every order and every purchase must now be hand to hand."</b> The auction held
-/// goods out of the world and money in escrow, and every trade on it happened between two bots that never met: 563 stall sales
-/// and 421 fills for 24,482gp in the hour of 16:42–17:42 on 30.09.2026, 806 things crossed from a stall to a want by the
-/// market's own beat, 171 deliveries fetched off the board by a reflex, against 20 sales for 526gp at the bots' shops by the
-/// banks where both sides stood. None of that placeless half is left. What is here is what trade between two bots needs when
-/// they must meet: a place (<see cref="Square"/>), a way to say what one wants (<see cref="Ask"/>, spoken in the world's
-/// chat), a price that means something (<see cref="Worth"/>), and money that moves only with the goods
-/// (<see cref="BotHandover"/>).
-/// </para>
-///
-/// <para>
-/// <b>Where the goods go now.</b> A seller keeps its goods in its own pack and bank box, where the engine and the save keep
-/// them. It sells them standing by Britain's bank (<see cref="BotShopkeep"/>, a guild's in its own town), carries them to a
-/// bot that has said it wants them (<see cref="BotCourier"/>, <see cref="BotDeliver"/>), or takes them to a shopkeeper
-/// (<see cref="BotPeddler"/>). A buyer walks to a shop by the bank (<see cref="BotPatron"/>, <see cref="BotShopper"/>) or
-/// says what it wants and waits for a carrier. Every one of those ends with the two standing within
-/// <see cref="BotHandover.MeetTiles"/> of each other, goods pack to pack and coin pack to pack.
-/// </para>
-/// </summary>
 public static class BotMarket
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMarket));
@@ -60,7 +35,11 @@ public static class BotMarket
 
     public static int Floor { get; set; } = 2;
 
-    public static int MaxWants { get; set; } = 512;
+    public static int MaxWants { get; set; } = 1200;
+
+    public static int BoardFull { get; private set; }
+
+    private static long _boardFullSaidTick = Core.TickCount - 60000;
 
     public static int BeatMs { get; set; } = 30000;
 
@@ -298,6 +277,7 @@ public static class BotMarket
 
     public static int Worth(Type kind, int fallback)
     {
+
         if (kind != null && _dealt.TryGetValue(kind, out var dealt) && dealt.Units > 0)
         {
             return (int)Math.Max(1, dealt.Gold / dealt.Units);
@@ -500,6 +480,7 @@ public static class BotMarket
 
         if (cap <= 0)
         {
+
             if (Core.TickCount - _startedTick >= RecapMs)
             {
                 want.CeilingPending = false;
@@ -588,7 +569,6 @@ public static class BotMarket
 
     public static long ShelfHeld { get; private set; }
 
-    /// <summary>What <see cref="Opening"/> did to one opening, counted only when the want is really said.</summary>
     private struct OpeningNote
     {
         public int Shelf;
@@ -901,6 +881,7 @@ public static class BotMarket
 
             if (want.Buyer?.Self is { } buyer)
             {
+
                 _reserved[buyer.Serial] = _reserved.GetValueOrDefault(buyer.Serial) + Holds(want);
             }
         }
@@ -1109,6 +1090,7 @@ public static class BotMarket
             }
             else if (BotScribes.Ceiling(kind, offer, out scribeless) is > 0 and var writ)
             {
+
                 if (offer > writ)
                 {
                     BotScribes.Capped(units, offer - writ);
@@ -1163,7 +1145,21 @@ public static class BotMarket
 
         if (_wants.Count >= MaxWants)
         {
-            logger.Error("The market already holds {Count} wants, so {Name} could not ask for {Item}", _wants.Count, body.Name, kind.Name);
+            BoardFull++;
+
+            if (Core.TickCount - _boardFullSaidTick >= 60000)
+            {
+                _boardFullSaidTick = Core.TickCount;
+
+                logger.Warning(
+                    "The market already holds {Count} wants (MaxWants {Max}), so {Name} could not ask for {Item}; {Refused} asks turned away so far",
+                    _wants.Count,
+                    MaxWants,
+                    body.Name,
+                    kind.Name,
+                    BoardFull
+                );
+            }
 
             return null;
         }
@@ -2193,7 +2189,7 @@ public static class BotMarket
                + $"{KeptThroughDeath} wants kept through their buyer's death and {KeptRising} through its first {RisenGraceMs / 60000} minutes back, {UnpaidAfterDeath} of the stand-downs after a death, {KeptAway} kept while their buyer rested out of the world; "
                + $"{Held} raises the buyer could not reserve, the want waiting at its price, {AgedOut} given up at {MostAgeMs / 60000} minutes for it; "
                + $"taken back: {_retractedFor[(int)BotWithdraw.Have]} had it another way, {_retractedFor[(int)BotWithdraw.Walked]} walked to a counter, {_retractedFor[(int)BotWithdraw.Unpaid]} could not pay at the meeting, {_retractedFor[(int)BotWithdraw.Closed]} gatherings closed, {_retractedFor[(int)BotWithdraw.Other]} other; "
-               + $"the board kept across restarts: {RestoredWants} wants and {RestoredLines} lines read back, {DroppedWants} dropped (buyer gone or kind unknown), {Recapped} given their material's ceiling on the beat and {BroughtDown} of them brought down to it ({BroughtDownGold}gp less held); "
+               + $"{BoardFull} asks turned away by the board's ceiling of {MaxWants}; the board kept across restarts: {RestoredWants} wants and {RestoredLines} lines read back, {DroppedWants} dropped (buyer gone or kind unknown), {Recapped} given their material's ceiling on the beat and {BroughtDown} of them brought down to it ({BroughtDownGold}gp less held); "
                + $"carriage over the offer agreed with traders and held now: {Carriage()}gp";
     }
 
@@ -2227,6 +2223,7 @@ public static class BotMarket
         w.WriteNumber("keptThroughDeath", KeptThroughDeath);
         w.WriteNumber("raisesHeld", Held);
         w.WriteNumber("restoredWants", RestoredWants);
+        w.WriteNumber("boardFull", BoardFull);
         w.WriteNumber("secured", Secured);
         w.WriteNumber("securedGold", SecuredGold);
         w.WriteNumber("savedByBank", SavedByBank);
@@ -2243,7 +2240,6 @@ public static class BotMarket
 
     public static int DroppedWants { get; private set; }
 
-    /// <summary>One want as the save holds it. Made into a <see cref="BotWant"/> at <see cref="Start"/>, once the world is in memory.</summary>
     private sealed class Saved
     {
         public int Id;

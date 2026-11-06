@@ -10,23 +10,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The dashboard's door: a small HTTP server on the loopback address that hands out what the snapshot has
-/// already written.
-///
-/// <para>
-/// <b>Nothing here reads the world.</b> Every answer is a string the game loop prepared, or a file on disk,
-/// or the event ring under its lock. That is what lets the listener run on the thread pool without a single
-/// lock on the loop, and it is the rule that keeps a page refreshed every two seconds from costing the
-/// population anything at all.
-/// </para>
-///
-/// <para>
-/// <b>Loopback by default.</b> The page can teleport nothing and change nothing, but it names every bot and
-/// every guild's chest, and the shard is somebody's living room. Binding elsewhere is a setting, not a
-/// default.
-/// </para>
-/// </summary>
 public static class BotWebServer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWebServer));
@@ -105,6 +88,7 @@ public static class BotWebServer
         }
         catch
         {
+
         }
     }
 
@@ -183,6 +167,7 @@ public static class BotWebServer
                     return;
                 case "/api/zones":
                     {
+
                         var zones = BotZones.Page;
 
                         response.Headers["ETag"] = zones.ETag;
@@ -254,6 +239,19 @@ public static class BotWebServer
                     Text(response, BotReachWeb.Tile(request), "application/json; charset=utf-8");
 
                     return;
+
+                case "/api/story":
+                    Story(response, request.QueryString["bot"], request.QueryString["poll"] == "1");
+
+                    return;
+                case "/api/chronicle":
+                    Text(
+                        response,
+                        BotStory.Running ? BotChronicle.Json : "{\"days\":[],\"note\":\"the stories are off: bot-story.json says Running is false\"}",
+                        "application/json; charset=utf-8"
+                    );
+
+                    return;
             }
 
             if (path.StartsWith("/api/art/", StringComparison.Ordinal) || path.StartsWith("/api/anim/", StringComparison.Ordinal))
@@ -309,6 +307,7 @@ public static class BotWebServer
             }
             catch
             {
+
             }
         }
     }
@@ -413,6 +412,7 @@ public static class BotWebServer
         {
             if (!queue.TryAdd(e.Json))
             {
+
             }
         }
 
@@ -443,6 +443,7 @@ public static class BotWebServer
         }
         catch
         {
+
         }
         finally
         {
@@ -456,6 +457,7 @@ public static class BotWebServer
             }
             catch
             {
+
             }
         }
     }
@@ -488,6 +490,48 @@ public static class BotWebServer
                     w.WriteString("bot", bot.Trim());
                     w.WriteBoolean("pending", true);
                     w.WriteString("note", "watched from now; the first frame is built on the loop within a second");
+                }
+            ),
+            "application/json; charset=utf-8"
+        );
+    }
+
+    private static void Story(HttpListenerResponse response, string bot, bool poll)
+    {
+        if (!BotStory.Running)
+        {
+            response.StatusCode = 503;
+            Text(response, "{\"error\":\"the stories are off: bot-story.json says Running is false\"}", "application/json; charset=utf-8");
+
+            return;
+        }
+
+        if (BotStory.Sealed && !string.IsNullOrWhiteSpace(bot))
+        {
+            response.StatusCode = 503;
+            Text(response, "{\"error\":\"the stories are sealed by do reset until the restart\"}", "application/json; charset=utf-8");
+
+            return;
+        }
+
+        var json = BotStory.Story(bot, poll);
+
+        if (json != null)
+        {
+            Text(response, json, "application/json; charset=utf-8");
+
+            return;
+        }
+
+        response.StatusCode = 404;
+        Text(
+            response,
+            BotJson.Object(
+                w =>
+                {
+                    w.WriteString("bot", bot.Trim());
+                    w.WriteBoolean("pending", true);
+                    w.WriteString("note", "no story in the snapshot yet; if this is a bot, it is built on the loop within a few seconds");
                 }
             ),
             "application/json; charset=utf-8"
@@ -545,6 +589,7 @@ public static class BotWebServer
 
             while (Running && !_stopping.IsCancellationRequested)
             {
+
                 var (seq, json) = BotWebLive.Ask(bot);
 
                 if (json != null && seq != shown)
@@ -563,6 +608,7 @@ public static class BotWebServer
         }
         catch
         {
+
         }
         finally
         {
@@ -574,6 +620,7 @@ public static class BotWebServer
             }
             catch
             {
+
             }
         }
     }

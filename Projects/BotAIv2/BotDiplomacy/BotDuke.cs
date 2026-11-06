@@ -6,28 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The duke: what two guilds' envoys say before the witness, the facts the duke is given, the answers he may give, the rule
-/// that answers when the model cannot, and what each answer does.
-///
-/// <para>
-/// <b>Patrick's words of 29.09.2026: the envoys state their claims, and the one who decides is prompted "you are the duke of
-/// this land; your vassals quarrel over land: one says the other attacks it too often, the other that the first crosses its
-/// borders; the first takes the reward from the second's fighters but does it on its own land" — nothing grand, but so the
-/// world comes alive.</b> The model is the duke and is asked through a hook the thinking assembly fills
-/// (<see cref="BotParley.Judge"/>); what it is told is written here, from what the shard actually knows — each side's book of
-/// grievances (<see cref="BotGrievances"/>), their opinions, their strength, their ground, their agreements and wars — and what
-/// it may answer is an enumeration narrowed per topic (<see cref="Allowed"/>), so a duke cannot give an alliance to a pair that
-/// came to declare war, nor a war to a pair that came to trade. DECISIONS N2: narrow the enumeration instead of persuading.
-/// </para>
-///
-/// <para>
-/// <b>The rule is not a lesser duke, it is the same judgement in arithmetic.</b> Ollama may be off, the one slot may be held
-/// by a reflection for seven minutes, or the answer may be unreadable; the meeting must still end, and end the same way the
-/// facts point. So <see cref="Rule"/> reads the same book the model is shown: blood, a claim on the hall's own ground or a
-/// grievance both ways is war; a quarrel of trespass and borders between guilds that trade is trade terms; the rest is peace.
-/// </para>
-/// </summary>
 public static class BotDuke
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDuke));
@@ -132,6 +110,7 @@ public static class BotDuke
         }
         else if (m.Topic is BotTopic.Grievance or BotTopic.Safety)
         {
+
             Causes(m, BotSpeaker.Host, m.Host, m.Guest, "parley:deny", fill, false);
         }
         else

@@ -2,25 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The Baron walking his own ground: the nearest square nobody has stood in, alone if need be.
-///
-/// <para>
-/// <b>The same errand the captain's scoutmaster offers, on two different terms, and both differences are
-/// the office rather than the errand.</b> A captain buys a party — he is taking bots away from work that
-/// pays, so he pays for it, and he does not go at all if too few will come. The Baron pays nobody and goes
-/// regardless: whoever wants to walk with him may, for nothing, and if nobody does he walks alone. That is
-/// what the office is. He already takes no share of any corpse and lives on a stipend — see
-/// <c>BotStipend</c> — so a Baron who paid for company would be spending the crown's money to buy the
-/// crown's own subjects, which is not a thing this shard should learn to do.
-/// </para>
-///
-/// <para>
-/// <b>And it is deliberately the humblest thing he does.</b> Reckoned low, so a great hunt or a rescue
-/// outbids it every time: walking the frontier is what a Baron does when the island has nothing worse to
-/// offer, which is most of the time and is exactly when the map most needs filling in.
-/// </para>
-/// </summary>
 public sealed class BotWarden : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWarden));

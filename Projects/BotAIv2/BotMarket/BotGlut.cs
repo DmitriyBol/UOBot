@@ -4,66 +4,9 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Supply against spoken demand, by kind: whether one more of a thing is work or a pile.
-///
-/// <para>
-/// <b>Patrick, 01.10.2026 (night plan v2, point 8): "Special attention to trade balance: do not let bots flood the market;
-/// after a pile of offers and zero demand it must pay them better to go hunting or join a company. The bar here is 95 %."</b>
-/// </para>
-///
-/// <para>
-/// <b>Every maker counted its output at the island's price whether or not anybody would ever buy it, and that is how a flood
-/// pays.</b> <see cref="BotMarket.Worth"/> answers the best standing bid, else what the kind last changed hands for, else the
-/// maker's own guess — so a smith beating out its fortieth dagger onto a shelf already holding thirty was credited forty-five
-/// gold a piece, the ledger learned that forging pays hundreds a minute, and the forge outbid every hunt. Measured on build 384
-/// (session 00:42 of 01.10.2026, cumulative at 10:17): 1,338 tools tinkered, 0 to order, 1,310 put out unsold; 900 forge stints
-/// on spec against 136 to order; 409 shop shifts ended and 328 of them sold nothing; 26,938 things stayed in their sellers'
-/// hands with nowhere to go; the shops showed 945 ingots of seven metals while 9,075 smiths' looks read "short of metal".
-/// Nothing in the appraisal could see the pile, because the number it was handed was a price, and a price is not a buyer.
-/// </para>
-///
-/// <para>
-/// <b>What this reads, for one kind.</b> The units open wants ask for (<see cref="BotMarket.Asked"/>); the units sold between
-/// bots this half hour (<see cref="Sold"/>, booked where <see cref="BotMarket.Traded"/> is); the units made this half hour
-/// (<see cref="Made"/>, booked where every craft counts its own output, and where ore becomes bars); the units peddled to
-/// shopkeepers this half hour (<see cref="Peddled"/>, booked at the counter); and what the shops by the bank show now
-/// (<see cref="BotShopkeep.Showing"/>). The pile is the larger of what is on show and what was made and not sold or peddled;
-/// the demand is what is asked for and what sold. <see cref="Factor"/> is demand over pile, with a shelf's worth
-/// (<see cref="Tolerance"/>) always allowed and a floor (<see cref="Floor"/>), so a glut is a low price and never a veto — a
-/// multiplier without a floor is a veto, and this project has paid for that shape more than once.
-/// </para>
-///
-/// <para>
-/// <b>Where it bites: three places and no more.</b> (1) <see cref="Yield"/> — what a maker counts its output at: the units
-/// somebody is asking for at the island's price, the rest at the surplus price, which is what a shopkeeper pays for one when
-/// that is known (<see cref="Scrap"/>, learned from real peddles) and otherwise the price times the factor. The ledger learns
-/// from takings, so a trade that floods learns within a few stints that flooding pays little, and hunting or a company wins
-/// the choice on the ordinary arithmetic. (2) <see cref="Claim"/> — a maker's claim for work on spec reads the factor of the
-/// kind it would make, so the choice sees the glut at once rather than after the ledger has learned it; an order is never
-/// marked down, because somebody has said it will pay. (3) <see cref="Glutted"/> — a maker choosing what to make on spec
-/// passes a glutted kind over for one that is not, when it can make one, so producers keep producing what is wanted and the
-/// shelves carry more kinds rather than more of one. No handouts anywhere in it: a bot the glut makes poor hunts.
-/// </para>
-///
-/// <para>
-/// <b>Not a second price.</b> Buyers' offers still come from <see cref="BotMarket.Worth"/>; a want for a glutted kind is paid
-/// in full at the meeting. Only what the maker <em>reckons</em> changes, and only for the part nobody asked for.
-/// </para>
-///
-/// <para>
-/// <b>A trader's want is not demand (01.10.2026, build 385 review).</b> A trader gathering at its town's bank says a want of its
-/// own for what a far buyer asked (<c>BotHaul</c>, <c>BotHaulFrom.Gather</c>) and withdraws it when it sets out, five to ten
-/// minutes later; the far want it answers is reserved meanwhile and reads as nothing open. Counted here, that want would have
-/// turned a glutted kind back to ×1 for the length of a gathering and sent the makers' choice after a buyer who is leaving:
-/// the piece finished after the trader has gone is the maker's stock, which is the pile this reading exists to stop. So the
-/// units a neutral class asks for are left out of <see cref="Reading.Asked"/>; the carriers still read the trader's want
-/// (<see cref="BotMarket.Wants"/>) and bring it what they hold, and what it then hands over counts as sold between bots like
-/// any other meeting. Units left out are counted (<see cref="TraderUnitsLeftOut"/>) and printed.
-/// </para>
-/// </summary>
 public static class BotGlut
 {
+
     public static bool Enabled { get; set; } = true;
 
     public static int WindowMs { get; set; } = 1800000;

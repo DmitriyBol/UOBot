@@ -5,38 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Meetings: one guild's envoy walks to another guild's town, or to its own town's hall, and a word is given there before a
-/// witness — war, peace, trade, standing orders, an alliance, or a task from the town.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, evening.</b> "Guilds may declare war on each other only if they meet in the main building
-/// of a town. One of the debuggers is invited as the witness: he becomes visible and hears both sides. The bots can come to an
-/// agreement or start a war. The meeting must be on the guild's own ground: if The Blade wants war with The Needle and The Needle
-/// is in Cove, The Blade's envoy must go to Cove and talk to them there. This removes lightning decisions and gives the guilds
-/// time for their work." And the same way: alliances, orders, trade and safety for each other; and a guild's dealings with its
-/// town, whose voice gives it a task.
-/// </para>
-///
-/// <para>
-/// <b>What it replaces.</b> <c>BotRegard</c> declared a war the moment an opinion crossed <c>Enmity</c> and the war's rules let
-/// it, and made an alliance the moment both opinions crossed <c>Alliance</c>. Both now call a meeting instead
-/// (<see cref="Grieve"/>, <see cref="Befriend"/>), and the war or the alliance comes of the meeting or does not. Two more topics
-/// are called by this file's own look: a guild another thinks ill of goes to ask for peace before the grievance reaches the war
-/// line (<see cref="WaryShare"/>), and two guilds on good terms go to agree trade (<see cref="Cordial"/>). Wars already standing
-/// are left alone.
-/// </para>
-///
-/// <para>
-/// <b>A meeting is walked, waited for and heard; nothing in it is instant.</b> An envoy (any member; a guild of one sends its
-/// founder) takes the errand (<see cref="BotEnvoy"/>) and walks to the place (<see cref="Seat"/>); the host guild is asked to
-/// send somebody once the envoy is near; a witness is summoned from the debugger's squad through <see cref="Summon"/>; the
-/// lines are said a few seconds apart; the duke's word is asked of the model through <see cref="Judge"/> and, if it does not
-/// come in <see cref="JudgeWaitMs"/>, given by rule (<see cref="BotDuke.Rule"/>). Every stage has its own clock, so a meeting
-/// that cannot happen lapses and says why, and the errands that served it end honestly — finished when the word was given,
-/// failed when it lapsed.
-/// </para>
-/// </summary>
 public static class BotParley
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotParley));
@@ -779,6 +747,7 @@ public static class BotParley
 
         if (m.Envoy != null && !Held(m.Envoy, m.EnvoyTick, now) && m.Stage < BotHearingStage.Hearing)
         {
+
             m.Envoy = null;
             m.Stage = BotHearingStage.Called;
             m.StageTick = now;
@@ -886,6 +855,7 @@ public static class BotParley
     {
         if (!There(m, m.Envoy))
         {
+
             m.Stage = BotHearingStage.Walking;
             m.StageTick = now;
 
@@ -1036,6 +1006,7 @@ public static class BotParley
 
     private static void Words(BotHearing m, BotSpeaker who, string text, Dictionary<string, string> fill)
     {
+
         var speech = who == BotSpeaker.Envoy && m.Witness == null
             ? BotDuke.Phrase(m.Between ? "parley:relay" : "parley:relay-town", m.Envoy, new Dictionary<string, string>(fill) { ["speech"] = text })
             : text;
@@ -1353,6 +1324,7 @@ public static class BotParley
                 }
                 catch (Exception)
                 {
+
                 }
             }
         }

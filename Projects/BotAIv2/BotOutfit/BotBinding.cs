@@ -5,44 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What "bound" means, in one place.
-///
-/// Bound is two promises and a ceiling: the thing weighs nothing, death does not take it, and nobody
-/// may sell it. Each of the three answers a failure the first version measured, and none of them is
-/// decoration.
-///
-/// <para>
-/// <b>Weightless.</b> Past <c>40 + 3.5 × Str</c> stones the engine charges five stamina and more for
-/// every single step, and refuses the step outright once stamina reaches zero — so an overloaded bot
-/// drains itself flat in a dozen paces and then stands there for the rest of the shard's life. Three
-/// bots spent an entire session exactly that way, and the log insisted six hundred times over that the
-/// ground was clear and the engine approved of the step. It did. Stamina was not in the message. For a
-/// gatherer, whose whole job is to fill a pack, tools that weigh are ore that cannot be carried.
-/// </para>
-///
-/// <para>
-/// <b>Kept through death.</b> A bot's working tools are what let it start again after being killed. The
-/// first version's smith who lost its hammer was not a smith any more — it could not forge, could not
-/// take commissions, and quietly spent the rest of its life hitting skeletons like everybody else. An
-/// entire mechanism existed there to soften this: spare tools kept in a bank box, and a trip across
-/// Britain to fetch one. Binding retires that mechanism rather than improving it.
-/// </para>
-///
-/// <para>
-/// <b>Not merchandise.</b> A bound item is never sold, auctioned, scrapped or posted. Without this the
-/// weightlessness becomes an exploit — a bot would carry a free anvil to market — and worse, the
-/// scrapper would eat the hammer, since "destroy it" was the first version's final answer for anything
-/// nobody would buy.
-/// </para>
-///
-/// <para>
-/// <b>The engine does two thirds of this and the ledger does the rest.</b> <c>LootType.Newbied</c> is
-/// how this era keeps a thing with its owner through death, and it works on whole objects. It cannot
-/// express a partial stack, which is why ammunition is counted instead — see
-/// <see cref="TrimAmmunition"/>.
-/// </para>
-/// </summary>
 public static class BotBinding
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBinding));
@@ -236,7 +198,66 @@ public static class BotBinding
         return handed;
     }
 
-    public static int Forfeit(Mobile bot, BotBond bond)
+    public static long Reissued { get; private set; }
+
+    public static int Reissue(BotMobile bot)
+    {
+        if (bot is not { Deleted: false, Bond: { } bond, Backpack: { } pack })
+        {
+            return 0;
+        }
+
+        var handed = 0;
+
+        if (bond.Weapon is { Weapon: { } kind })
+        {
+            handed += Reissue(bot, bond, pack, kind);
+        }
+
+        if (bot.Class?.Kit?.Sidearm is { Weapon: { } side })
+        {
+            handed += Reissue(bot, bond, pack, side);
+        }
+
+        if (bot.Class?.Kit is { Staff: true })
+        {
+            handed += Reissue(bot, bond, pack, typeof(BotCasterStaff));
+        }
+
+        return handed;
+    }
+
+    private static int Reissue(Mobile bot, BotBond bond, Container pack, Type kind)
+    {
+        if (bond.Issued.Contains(kind))
+        {
+            return 0;
+        }
+
+        if (Holds(bot, kind))
+        {
+            bond.Issued.Add(kind);
+
+            return 0;
+        }
+
+        var weapon = Make(kind, 1);
+
+        if (weapon == null)
+        {
+            return 0;
+        }
+
+        Bind(weapon, bond);
+        pack.DropItem(weapon);
+        Reissued++;
+
+        logger.Information("{Name} is handed back the {Thing} a catch took off it", bot.Name, kind.Name);
+
+        return 1;
+    }
+
+    public static int Forfeit(Mobile bot, BotBond bond, HashSet<Item> spared = null)
     {
         if (bond == null)
         {
@@ -252,7 +273,7 @@ public static class BotBinding
 
             for (var i = 0; i < worn.Count; i++)
             {
-                if (IsBound(worn[i], bond))
+                if (IsBound(worn[i], bond) && !(spared != null && worn[i] is BaseWeapon))
                 {
                     gone.Add(worn[i]);
                 }
@@ -262,7 +283,7 @@ public static class BotBinding
             {
                 for (var i = 0; i < pack.Items.Count; i++)
                 {
-                    if (IsBound(pack.Items[i], bond))
+                    if (IsBound(pack.Items[i], bond) && !(spared != null && pack.Items[i] is BaseWeapon))
                     {
                         gone.Add(pack.Items[i]);
                     }
@@ -274,6 +295,26 @@ public static class BotBinding
                 gone[i].Delete();
                 taken++;
             }
+        }
+
+        if (spared != null)
+        {
+            var owed = bond.Issued.Count;
+            HashSet<Serial> kept = [];
+
+            foreach (var item in spared)
+            {
+                kept.Add(item.Serial);
+            }
+
+            bond.Items.RemoveWhere(serial => !kept.Contains(serial) && World.FindItem(serial) is not BaseWeapon { Deleted: false });
+            bond.Issued.RemoveAll(type => !typeof(BaseWeapon).IsAssignableFrom(type));
+
+            var struck = owed - bond.Issued.Count;
+
+            Forfeited += taken + struck;
+
+            return taken + struck;
         }
 
         var entitled = bond.Issued.Count;

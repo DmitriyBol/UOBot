@@ -6,7 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-officers.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotOfficersSettings
 {
     public bool? Running { get; set; }
@@ -44,16 +43,6 @@ public sealed class BotOfficersSettings
     public bool? Patrols { get; set; }
 }
 
-/// <summary>
-/// The guilds' officers as a module: reads its numbers, puts its words into the voice's bank, offers the officers' work and the
-/// members' draws to the auction, and runs the clock that appoints, collects the store's debts and referees the bouts. Patrick's
-/// approval of 07.10.2026 (night 17, "a livelier world"). See <see cref="BotOfficers"/>.
-///
-/// <para>
-/// <b>Registers itself</b> from its own <c>Configure</c> (priority 42, after <c>BotCore</c>'s 40 and the character's 41), as the
-/// character module does, so the list in <c>BotCore</c> is not one more hunk four agents collide in.
-/// </para>
-/// </summary>
 public sealed class BotOfficersModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOfficersModule));
@@ -243,11 +232,6 @@ public sealed class BotOfficersModule : BotModule
     }
 }
 
-/// <summary>
-/// Keeps the guilds' officers and stores across restarts: the posts by holder's name with the age of the appointment, each store's
-/// goods by kind name, the kit debts with how far into their play they are, and the defaulters. A shape this build cannot read is
-/// dropped whole: the heads appoint again and the stores start empty.
-/// </summary>
 public sealed class BotOfficersStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOfficersStore));

@@ -3,21 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The fence's chase after a witness it could not buy: kill it before it gets away, or it tells.
-///
-/// <para>
-/// <b>Patrick's word of 17.09.2026, night.</b> "They may buy the witness off, or kill it. A killed witness tells
-/// nobody; a witness that gets away tells." So this is a race and not a fight: the fence has <see cref="GivesUpMs"/>
-/// and <see cref="LosesAt"/> tiles, and the moment either runs out the witness is over the hill and the Baron knows.
-/// </para>
-///
-/// <para>
-/// The killing is a murder like any other and is entered on the fence's own rap sheet by the ordinary machinery: a
-/// keeper of stolen goods who cuts a witness down has stopped being the quiet one, and the island will hunt it as it
-/// hunts the rest of the band.
-/// </para>
-/// </summary>
 public sealed class BotSilence : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSilence));

@@ -6,24 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a thief a turn in the crowd by a bank: the engine's own Stealing on a bot's pack.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "thieves stealing from packs in the crowd by the bank (Stealing is in the engine)".</b> Nothing about
-/// the theft is the bots': the thief joins the engine's thieves' guild, puts its weapon away (both hands must be free), uses the
-/// skill and targets the mark, and the engine picks a random thing off the top of the mark's pack, weighs it against the skill,
-/// takes as much of a stack as the skill allows, and decides whether anybody noticed — a thief at nought is noticed almost
-/// always, at a hundred one time in three. Noticed is a criminal act: grey, and in a guarded town with a shopkeeper or a banker
-/// within eight tiles the engine sends its guards at once. That is the risk Patrick named, and it is the engine's.
-/// </para>
-///
-/// <para>
-/// <b>Bounded twice.</b> One thief per <see cref="BotCrime.ThiefPerBots"/> bots in the world, and <see cref="PerHour"/> tries
-/// across the whole island: a thief caught by a bank usually dies to a guard, and deaths per bot-hour are one of the night's
-/// key numbers. Each thief waits <see cref="EveryMs"/> between tries of its own.
-/// </para>
-/// </summary>
 public sealed class BotCutpurse : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCutpurse));
@@ -296,7 +278,6 @@ public sealed class BotCutpurse : IBotProposer
     }
 }
 
-/// <summary>A thief's turn in the crowd by a bank: find a mark, close on it, try its pack, and slip away. See <see cref="BotCutpurse"/>.</summary>
 public sealed class BotPickpocket : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPickpocket));
@@ -394,6 +375,7 @@ public sealed class BotPickpocket : BotDeed
 
         if (_done)
         {
+
             if (body.InRange(_away, 2) || now - _leaving >= 20000)
             {
                 return _lifted ? BotDoing.Done(_outcome) : BotDoing.Failed(_outcome);
@@ -553,6 +535,7 @@ public sealed class BotPickpocket : BotDeed
 
         if (gold <= 0 && things <= 0 && !caught)
         {
+
             BotCutpurse.Refuse();
 
             if (_tries < Math.Max(1, BotCutpurse.Tries))

@@ -7,24 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bout between two guilds, called by a herald: each guild's champion against the other's at the herald's stand, before Argus,
-/// for a purse paid chest to chest.
-///
-/// <para>
-/// <b>Patrick's approval of 07.10.2026: the herald "challenges a rival guild to a tournament — a guild-vs-guild bout before Argus
-/// with a purse from both chests".</b> The hourly championship (<c>BotTourney</c>, Argus's) is one bot against one for a title; this
-/// is a guild's honour and a guild's coin. Once in <see cref="EveryMs"/> a herald standing by the bank names the guild nearest its
-/// own in might (<see cref="BotWar.Might"/>) that it is not at war with; the purse is <see cref="PurseShare"/> of the poorer chest,
-/// between <see cref="PurseLeast"/> and <see cref="PurseMost"/>, and both chests must hold it. A rival under
-/// <see cref="AcceptOdds"/> of the challenger's might declines, and so does one with no champion near. Each guild's champion is its
-/// strongest member free within <see cref="Reach"/> of the stand (<see cref="BotQuad.Strength"/>); both are called to the stand
-/// (<see cref="BotWill.Press"/>, as a championship summons is) and the duel is the duel everyone fights (<see cref="BotDuel"/>:
-/// yield at a third, two minutes, no criminal flag). The loser's chest pays the purse to the winner's (<see cref="BotChest.Pay"/>):
-/// coin moves, nothing is made. Argus's herald announces it when the debugger is on (<see cref="Witness"/>, filled from
-/// <c>mindedBots/debugger/BotOfficersArgus</c>).
-/// </para>
-/// </summary>
 public static class BotGuildBout
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuildBout));
@@ -434,7 +416,6 @@ public static class BotGuildBout
 
     private static bool Standing(Bout bout) => _bouts.Contains(bout);
 
-    /// <summary>A champion's walk to the stand. Pressed, ended by arriving; the duel is pressed after it.</summary>
     private sealed class Answer : BotDeed
     {
         public const string Trade = "guild-bout";

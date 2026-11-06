@@ -5,12 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-zones.json</c> may say. Everything optional; an empty file keeps the code's numbers. PascalCase:
-/// a key in lower case is silently a default, and the boot line is the proof of what took.
-/// </summary>
 public sealed class BotZonesSettings
 {
+
     public bool? Enabled { get; set; }
 
     public int? TickMs { get; set; }
@@ -156,15 +153,6 @@ public sealed class BotZonesSettings
     public int? MemorySaveMs { get; set; }
 }
 
-/// <summary>
-/// The danger and safety zones as a module: the numbers read, the beat started, and one <c>Zones:</c> line every five minutes
-/// with every counter the system keeps.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, after <c>Population</c>: the zones are drawn on the population's home map, and the yardstick
-/// of a zone's strength is the population's median bot.
-/// </para>
-/// </summary>
 public sealed class BotZonesModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotZonesModule));

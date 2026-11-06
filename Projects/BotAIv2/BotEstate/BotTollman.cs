@@ -3,26 +3,9 @@ using Server.Guilds;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Sends a fighter of a patrolling guild to a stranger hunting the guild's land, to tell it the hunting there is tolled.
-///
-/// <para>
-/// <b>The patrol half of Patrick's order of 26.09.2026</b> ("…or by actively patrolling, pointing out that the land belongs
-/// to the guild and that their income will be taxed"). The bailiff (<see cref="BotBailiff"/>) only notices a trespasser
-/// standing near a member who happens to be home; a warden goes looking: the strangers hunting a patrolling guild's land are
-/// listed every few seconds (<see cref="BotToll.Look"/>), and a fighter of that guild within <see cref="Reach"/> is offered
-/// the walk to the nearest one. What it says is what makes the toll owed (<see cref="BotToll.Warn"/>).
-/// </para>
-///
-/// <para>
-/// Only fighters, because a patrol that pulls the smith off the anvil is a patrol the guild pays for twice; one warden to a
-/// stranger (<see cref="BotOffice.OfferedMs"/> while offered, <see cref="ClaimMs"/> while walking); and a stranger a warden
-/// could not reach is left to somebody else for <see cref="ShunMs"/> — the bailiff's lesson of 371 charges to one outsider
-/// in a session, learned before this was written.
-/// </para>
-/// </summary>
 public sealed class BotTollman : IBotProposer
 {
+
     public static int Reach { get; set; } = 160;
 
     public static int ClaimMs { get; set; } = 30000;

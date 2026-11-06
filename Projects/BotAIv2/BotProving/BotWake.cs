@@ -7,28 +7,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Wakes the ground round the bots the way the engine wakes it round a player.
-///
-/// <para>
-/// <b>The engine keeps a creature's mind switched off wherever no client is.</b> A map sector wakes only when a mobile with
-/// a network connection walks into it (<c>Map.Sector.OnEnter</c>), and a creature in a sleeping sector has its AI timer
-/// stopped (<c>AITimer.ShouldStop</c>, <c>BaseCreature.OnSectorDeactivate</c>): it does not walk, look for enemies, cast,
-/// breathe, heal itself or run. It still swings at whatever it is fighting when that stands next to it, because the swing is
-/// the engine's combat timer and whoever struck it first became its combatant (<c>Mobile.AggressiveAction</c>). A bot holds
-/// no connection (<see cref="BotMobile"/>), so with Patrick off the shard every creature a bot has met was asleep: an orcish
-/// mage that never cast, a deer that never ran, a wolf that never came at anybody on a road. Found on 26.09.2026 through the
-/// proving ground, whose creatures never touched a double that did not stand next to them (build 249).
-/// </para>
-///
-/// <para>
-/// <b>What this does when it runs.</b> Every <see cref="EveryMs"/>, every living bot in the world that qualifies — with
-/// <see cref="DeepsOnly"/>, only one inside a dungeon — wakes the sectors round it exactly as a player's client would
-/// (<c>Map.ActivateSectors</c>, the same five by five). A sector no bot has needed for <see cref="GraceMs"/> is put back to
-/// sleep, unless a client is near enough to keep it awake by the engine's own rule. <b>Off by default:</b> the world's
-/// balance — every hunt, every road, every delve — was struck against sleeping creatures, and waking it is Patrick's call.
-/// </para>
-/// </summary>
 public static class BotWake
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWake));

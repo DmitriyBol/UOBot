@@ -8,36 +8,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Where a walker from home can get to, tile by tile: the reach map.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026, night, point 4:</b> "build unreachability zones as precise as possible — no path may be
-/// formed into them, one tile of precision; Argus and the debuggers help; I want to see it on the web dashboard. Water is
-/// unreachable ground too, but it can be sailed: in a boat the water's unreachability is lifted, and the land stays
-/// unreachable." Every tile of the population's map is one of <see cref="BotReachClass"/>: open (a walk from home reaches it,
-/// over the ground and through the gates), isle (standing ground no walk reaches, with a shore a ship could land on), pocket
-/// (standing ground nothing reaches), water (a ship's, never a walker's), blocked (nowhere to stand).
-/// </para>
-///
-/// <para>
-/// <b>How it is drawn.</b> A cluster of 16 × 16 tiles at a time on the game loop, never more than <see cref="SliceMs"/> a
-/// tick (the tiles are game state: CLAUDE.md rule 3), through the navigation graph's own window and step rule
-/// (<see cref="BotReachBuilder"/>): each tile's standing places, the regions they make inside the cluster, and every step out
-/// of it. Then the whole map is solved at once — the regions joined, the gates added, a search from home along every step
-/// the way it can be taken (<see cref="BotReachSolve"/>) — on a worker when the machine has the cores, since it reads nothing
-/// but the clusters. Kept on disk (<see cref="BotReachFile"/>), so a boot draws only what a house or an item changed.
-/// </para>
-///
-/// <para>
-/// <b>What it refuses.</b> A walker standing on open ground is refused any place with no open tile within its reach
-/// (<see cref="Refuses"/>): that place is not reachable from home, and nothing reachable from home reaches it. Asked by the
-/// reach ledger (<see cref="BotReach.Ask"/>, which every chooser and the walker's own search consult), the population's
-/// sampler (<see cref="BotPopulation.Reachable"/>) and the route planner (<see cref="BotJourney"/>). A walker aboard a ship
-/// is refused the land: only water is somewhere a ship goes. A walker standing anywhere else — a pocket, an island no road
-/// reaches — gets no answer from the map, and the old questions stand.
-/// </para>
-/// </summary>
 public static class BotReachMap
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotReachMap));
@@ -885,6 +855,7 @@ public static class BotReachMap
 
         if (here == BotReachClass.Water)
         {
+
             if (!Afloat(map, from) || snap.Any(goal.X, goal.Y, reach, BotReachClass.Water))
             {
                 return false;

@@ -4,27 +4,9 @@ using System.Diagnostics;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A course over the open cells of the chart: A* from one cell to another, sliced across ticks, one search at a time.
-///
-/// <para>
-/// <b>A search across the sea is too big for one tick and too cheap to thread.</b> The worst pair on map0 — Britain's dock
-/// to Skara Brae's, round the south of the continent — expands 113,061 cells, and a pair that cannot be joined expands the
-/// whole open sea, 214,506 (the Python pass of 29.09.2026). That is tens of milliseconds, so a search keeps its heap and its
-/// marks between slices and stops at the slice's deadline. The marks are stamped rather than cleared: the arrays are the
-/// size of the chart and allocated once, and a new search is a new stamp.
-/// </para>
-///
-/// <para>
-/// <b>What a course is.</b> Eight directions, ten a straight step and fourteen a diagonal one, a diagonal only past two open
-/// corners (<see cref="BotSeaChart.Passable"/>), and a cell shut for a while by a ship that found it blocked is not entered
-/// (<see cref="Shut"/>). The cells come back as the turns only: a straight run of cells is one leg, sailed straight from one
-/// cell's middle to another's, which is a line of cells the chart has already proved open.
-/// </para>
-/// </summary>
 public static class BotSeaCourse
 {
-    /// <summary>One course asked for. Filled in when <see cref="Done"/>.</summary>
+
     public sealed class Ask
     {
         public int From;

@@ -5,17 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-baron.json</c> may say. Everything optional; empty keeps the code's numbers.
-///
-/// <para>
-/// <b>PascalCase, and it is not a style question.</b> The deserialiser matches these names as written, so a
-/// key in lower case is not an error and not a warning — it is a value silently left at its default, and a
-/// configuration file that appears to have been read is worse than one that fails to load.
-/// </para>
-/// </summary>
 public sealed class BotBaronSettings
 {
+
     public int? Side { get; set; }
 
     public int? Company { get; set; }
@@ -57,24 +49,6 @@ public sealed class BotBaronSettings
     public int? StipendFloat { get; set; }
 }
 
-/// <summary>
-/// The Baron as a module: his two errands registered, his numbers read, and one line an hour saying what
-/// they came to.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, because a harrowing is a place on the map and a walk through a town needs a
-/// counter that has been surveyed. It requires <c>Squads</c> for the plainest possible reason: the whole of
-/// this class is six bots standing together, and without squads running the offer could never be taken up.
-/// </para>
-///
-/// <para>
-/// <b>Its own module rather than a few lines inside the squads' one, and the switch is the reason.</b>
-/// Turned off, the Baron is still raised and still wears his plate, and he is simply never offered anything
-/// — which is the cheapest possible experiment when the question is "is the Baron doing this, or is
-/// something else doing it and he is being blamed". Half this project's investigations have been that
-/// question about one subsystem or another.
-/// </para>
-/// </summary>
 public sealed class BotBaronModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBaronModule));

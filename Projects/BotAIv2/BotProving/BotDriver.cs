@@ -3,18 +3,6 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One double's hands in a fight: the bot's own reflexes, beat by beat, against whatever it is set on. Shared by the
-/// single fight (<see cref="BotTrial"/>) and the company's (<see cref="BotRoomTrial"/>), so the two measure the same bot.
-///
-/// <para>
-/// In the order a bot reaches for things: a spell of its own coming round to its target; a bottle when poisoned or low
-/// (<see cref="BotMend.Draught"/>); a healing spell for a caster that has one, a bandage underneath for anybody, when under
-/// <see cref="BotMend.Hurt"/>; the blade drawn when a class that closes has something on top of it and a dry bow put away
-/// (<c>BotArms.Suit</c>, <c>BotArms.Check</c>); a step closer when it cannot reach; the best attack spell it can throw
-/// (<see cref="BotStrike"/>). The swing itself is the engine's, on Combatant and Warmode.
-/// </para>
-/// </summary>
 public sealed class BotDriver
 {
     public BotDriver(BotStandIn me, long now)
@@ -109,6 +97,7 @@ public sealed class BotDriver
         }
         else if (me.Shoots && me.Weapon is not BaseRanged)
         {
+
             me.Draw(melee: false);
         }
 
@@ -121,6 +110,7 @@ public sealed class BotDriver
 
         if (!me.InRange(foe.Location, reach) || !me.InLOS(foe))
         {
+
             if (now - _stepTick >= BotProving.StepMs)
             {
                 _stepTick = now;

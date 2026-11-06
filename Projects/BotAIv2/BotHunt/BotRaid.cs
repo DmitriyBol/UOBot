@@ -3,19 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The Baron's raid on The Shadow's hideout, once a caught thief has given it away: the Baron and a posse march there, search
-/// it with Detect Hidden, and set on every member of The Shadow they find; then the hideout is burned and The Shadow finds
-/// another.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026: the price of The Shadow's trade is prison and pursuit, and if the Baron learns where the
-/// hideout is — a caught thief gives it away — he raids it.</b> A member found there is made wanted on the Baron's word
-/// (<see cref="BotOutlaw.Want"/>), which is what makes setting on it lawful in the engine's reckoning, and a member that falls
-/// to the raid falls to a patrol and is caught (<see cref="BotOutlaw.Fell"/>). A hidden member is found only by a search, or
-/// by stepping out.
-/// </para>
-/// </summary>
 public sealed class BotRaid : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRaid));

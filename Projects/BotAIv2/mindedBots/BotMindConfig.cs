@@ -4,18 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// What <c>Configuration/bot-mind.json</c> is allowed to say. Everything optional; empty means "keep the
-/// numbers the code chose".
-///
-/// <para>
-/// <b>PascalCase, and it is not a style question.</b> The deserialiser matches these names as written, so a
-/// key in lower case is not an error and not a warning — it is a value silently left at its default, and a
-/// configuration file that appears to have been read is worse than one that fails to load.
-/// </para>
-/// </summary>
 public sealed class BotMindSettings
 {
+
     public string Model { get; set; }
 
     public string Api { get; set; }
@@ -49,7 +40,6 @@ public sealed class BotMindSettings
     public double? Insistence { get; set; }
 }
 
-/// <summary>Reads the mind file and moves the numbers it names.</summary>
 public static class BotMindConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMindConfig));

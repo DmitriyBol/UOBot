@@ -6,36 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The debugger as witness to the guilds' meetings, and the voice of the duke and of the towns: one of the squad appears at the
-/// meeting, shows itself, hears both sides, and says the word the model gives.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, evening: "one of the debuggers is invited as the witness — he becomes visible and hears the
-/// sides' arguments"; and for a town, "the debugger is summoned, and feedback on the town's situation is taken from him, and he
-/// gives the guild a unique task."</b> The meetings themselves are the bot assembly's (<c>BotParley</c>), which may not reference
-/// this one; it asks through three hooks filled here when the debugger starts: <see cref="Summon"/>, <see cref="Dismiss"/> and
-/// <see cref="Judge"/>.
-/// </para>
-///
-/// <para>
-/// <b>Its harmlessness is the engine's, and none of it is given up to be seen.</b> The body stays blessed — nothing can harm
-/// it and it can harm nothing (<c>Mobile.CanBeHarmful</c>) — and stays above Player, which creatures' target search passes
-/// over as it passes over the blessed (<c>BaseAI.AcquireFocusMob</c>). Only <c>Hidden</c> is lifted, for the meeting and no
-/// longer, so a player standing there sees the scene; it is put back when the meeting ends, and <c>BotDebugger.Hover</c>
-/// hides it again on any move besides. While shown it is solid to the walkers — a hidden administrator is walked through, a
-/// visible one is walked round — so it is put two tiles off the place, not on it. It never walks: it appears there
-/// (<c>Hover</c>). And while it witnesses, the vigil does not move it on (<see cref="Busy"/>, asked in <c>BotVigil.Follow</c>).
-/// </para>
-///
-/// <para>
-/// <b>The word is asked in the one slot, off the loop, and never waited on.</b> The ask is queued and put to the model the
-/// moment the slot is free (<c>BotOllama.Free</c>), with the population's fast model and a keep-alive of seconds
-/// (<c>BotParley.JudgeModel</c>, <c>JudgeKeepAlive</c>), so the watchers' own thinking model is not pushed off the card for long.
-/// The answer is constrained by a schema whose outcome is an enumeration of exactly what the meeting allows (DECISIONS N2);
-/// <c>BotParley</c> gives the word by rule if it has not come back in time, and a late answer is counted and dropped.
-/// </para>
-/// </summary>
 public static class BotWitness
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWitness));
@@ -279,6 +249,7 @@ public static class BotWitness
         );
     }
 
+    /// <summary>The duke, in Patrick's words of 29.09.2026, and what his answer is for.</summary>
     private static string Duke(BotHearing m) =>
         "You are the duke of this land. The guilds are your vassals, and their quarrels and bargains come before you; your word settles them. "
         + "What you hear is what vassals always bring: one says the other attacks its people too often, the other says the first crosses its borders; "
@@ -295,6 +266,9 @@ public static class BotWitness
         + "and set the guild one task from those offered: the one the town needs most that the guild can do. "
         + "Answer in English with: task — exactly one of the task ids offered; report — how the town stands, one or two plain sentences from the numbers; "
         + "speech — the task put to the guild, one sentence naming it and the place or the goods; reason — one sentence for the record.";
+
+    /// <summary>
+    /// The answer's shape: the outcome (or task) an enumeration of exactly what this meeting allows, and floors on the words so
 
     private static string Schema(BotHearing m)
     {
@@ -380,6 +354,7 @@ public static class BotWitness
                 Report = m.Between ? null : Cut(Field(root, "report"), MostSpeech)
             };
         }
+
         catch (Exception)
         {
             return null;

@@ -7,41 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Argus's proving ground in Green Acres: who is fought against what, what each fight measured, and the strength a bot is
-/// judged by once it has been measured.
-///
-/// <para>
-/// <b>Patrick's order of 26.09.2026, the fifth and the largest of the night:</b> the bots dress, train and grow stronger,
-/// and nobody goes past the Orc Caves; Argus is to spawn a copy of a bot and a creature on the green and judge the bot's
-/// strength, with the skills, the weapon's properties "and everything else" counted — "it is time for a new branch of
-/// judging what a bot can do". One fight at a time is <see cref="BotTrial"/>; this is the schedule, the record and the
-/// reading of it.
-/// </para>
-///
-/// <para>
-/// <b>What a bot is tried against is the dungeons' own ladder.</b> The delve already ranks every dungeon by its worst
-/// inhabitant (<see cref="BotDungeon"/>) and sends a band where it is half again the strength of that one creature. So the
-/// rungs here are exactly those creatures, one per dungeon, weakest first: a bot is tried at the lowest rung it has not
-/// beaten, climbs one rung when it wins, and is tried again when its build moves (<see cref="BotBuild"/>) or its reading
-/// grows old. A fight against the creature a decision is actually about is worth more than any number of fights against
-/// creatures it is not, and a dozen rungs is a ladder a population of fifty can climb in an evening.
-/// </para>
-///
-/// <para>
-/// <b>What it changes: the delve reads proven strength instead of the formula</b> (<see cref="Against"/>, when
-/// <see cref="Judges"/>). A bot measured against a dungeon's worst creature is counted at what it proved there; one
-/// measured only against other rungs at what it proved on the nearest, discounted when that is a rung below
-/// (<see cref="Reach"/>); one never measured at the old formula scaled by what the ground has found that formula to be
-/// worth across everybody measured (<see cref="Calibration"/>). Nothing is vetoed by the absence of a measurement.
-/// </para>
-///
-/// <para>
-/// <b>The ground is Argus's, not the population's.</b> The double is a <see cref="BotStandIn"/>, which nothing in the
-/// population can see; the creature and both corpses are deleted when the fight ends, so no gold, no loot and no skill
-/// leaves the field; a double or a creature that outlived a stop is swept off at boot (<see cref="Sweep"/>).
-/// </para>
-/// </summary>
 public static class BotProving
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotProving));
@@ -131,7 +96,6 @@ public static class BotProving
 
     public static long RoomsFailed { get; private set; }
 
-    /// <summary>One guild's company against one dungeon's worst room: the last time, and how it went.</summary>
     private sealed class RoomMark
     {
         public bool Cleared;
@@ -179,7 +143,6 @@ public static class BotProving
 
     public static long Formula { get; private set; }
 
-    /// <summary>One bot's reading against one creature.</summary>
     private sealed class Mark
     {
         public string Class;
@@ -219,7 +182,6 @@ public static class BotProving
 
     private static readonly Queue<(string Bot, string Kind, string By)> _asked = new();
 
-    /// <summary>One rung: the worst creature of one or more dungeons.</summary>
     private sealed class Rung
     {
         public string Kind;
@@ -548,6 +510,7 @@ public static class BotProving
         {
             if (trial.Verdict == null)
             {
+
                 logger.Information("Proving: the fight of {Bot}'s double against the {Kind} was taken off the field undecided", trial.Bot, trial.Kind);
             }
             else
@@ -934,6 +897,7 @@ public static class BotProving
         {
             foreach (var mark in marks.Values)
             {
+
                 if (mark.PowerThen > 0.0 && mark.Might > 0.0 && mark.R < CalibrateUnder)
                 {
                     ratios.Add(mark.Strength / mark.PowerThen);
@@ -1023,6 +987,7 @@ public static class BotProving
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(middle, range))
         {
+
             if (mobile is BotStandIn
                 || mobile is BaseCreature { Deleted: false } creature
                 && (creature.ControlMaster is not PlayerMobile || creature.ControlMaster is BotStandIn))
@@ -1385,6 +1350,7 @@ public static class BotProving
 
         if (shape < 1 || shape > Shape)
         {
+
             logger.Warning("The saved proving ground is shape {Found} and this build reads {Wanted}; every bot is measured afresh", shape, Shape);
 
             return 0;

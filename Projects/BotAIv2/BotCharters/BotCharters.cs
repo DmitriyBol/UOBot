@@ -10,55 +10,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Town charters: a monopoly on a craft in a town, sold at a sealed auction every six hours, and the levy everybody else pays
-/// its holder on each sale of that craft's goods there.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026 evening, approved:</b> "every N hours a town auctions charters (the smiths' charter of Britain, the
-/// tailors' of Minoc, the woodsmen's of Yew). The charter guild sells that kind in the town's shops without a levy; everyone else
-/// pays the charter guild a levy on each sale (the guild's money, not the town's); the town's purse gets the auction price.
-/// Charters make real specialisation; losing one at the auction is a grievance; a failed town task can cost the charter."
-/// </para>
-///
-/// <para>
-/// <b>Six crafts, read off the goods.</b> A kind belongs to a craft when it is that craft's material (ingots; leather and cloth;
-/// logs, boards, shafts, arrows and bolts; potions; scrolls; food) or when the engine's own recipe book for the craft makes it
-/// (<c>DefBlacksmithy</c>, <c>DefTailoring</c>, <c>DefBowFletching</c> and <c>DefCarpentry</c>, <c>DefAlchemy</c>,
-/// <c>DefInscription</c>, <c>DefCooking</c>) — the same books the market's material ceiling reads. One charter per craft per town.
-/// </para>
-///
-/// <para>
-/// <b>The craft's sales are its practitioners' sales.</b> A hunter selling a looted kryss or a Flamestrike scroll off a corpse is
-/// not practising smithing or scribing, and the poor hunt (Patrick's standing rule): with <see cref="LootFree"/> a seller under
-/// <see cref="CraftSkill"/> in the craft's skills is neither levied nor counted in the craft's book. The book of each town's
-/// craft — the gold its practitioners took there this period, by guild — is what a guild's bid is reckoned from.
-/// </para>
-///
-/// <para>
-/// <b>The auction.</b> Every <see cref="EveryMs"/> each town's crafts that sold anything, or are held, go under the hammer. A
-/// guild bids when its practitioners took at least <see cref="LeastShare"/> of the craft's gold there: the charter's worth over a
-/// term is the levy on the whole book (<see cref="Levy"/> × the period's gold, scaled to the term), and a guild offers
-/// <see cref="Appetite"/> × (½ + ½ × its share) of it, never more than <see cref="SpareShare"/> of what its chest spares
-/// (<c>BotDues.Spare</c>, which already keeps back what the members voted to save for, <c>BotPurpose</c>); a chest voted to a war
-/// chest bids nothing while it is one. The highest sealed bid wins and its chest pays the town's purse (<c>BotCity.Tax</c>); no bid
-/// and the charter rests. The holder that lost it, and every other losing bidder at half the weight, think worse of the winner
-/// (<see cref="LostRegard"/>, written into the grievance book as "a charter lost at auction").
-/// </para>
-///
-/// <para>
-/// <b>The levy is hand to hand and makes no coin.</b> At a bot's shop (<c>BotShopkeep.Serve</c>, the city's buy) the buyer's coin is
-/// split at the till: the levy into the holder's chest, the rest to the keeper. At a shopkeeper's counter (<c>BotShops.Sell</c>) and
-/// a tavern's table the seller pays it out of what it was just paid, pack first, then account. A seller whose guild is hostile to
-/// the holder (at war, or at the war line of regard) pays the town's purse instead: nothing crosses between enemies. The holder's own sales are free and counted.
-/// </para>
-///
-/// <para>
-/// <b>Losing it early.</b> A holder that fails <see cref="FailsToLose"/> of the town's tasks in a row (<c>BotBurgh</c>), or is put out
-/// of the town, loses the town's charters at once; they go to an early auction the next minute, with that guild barred from it
-/// until the next general auction. A holder guild that no longer exists loses them too.
-/// </para>
-/// </summary>
 public static class BotCharters
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCharters));
@@ -165,7 +116,6 @@ public static class BotCharters
 
     public static long Grievances { get; private set; }
 
-    /// <summary>One charter: a town's craft, held by a guild, bought for a price.</summary>
     public sealed class Charter
     {
         public string Town;
@@ -280,6 +230,7 @@ public static class BotCharters
 
         try
         {
+
             if (DefBlacksmithy.CraftSystem == null)
             {
                 sure = false;
@@ -618,6 +569,7 @@ public static class BotCharters
         }
 
         charter = held;
+
         enemy = mine != null && BaseGuild.FindByName(held.Holder) is Guild holder
                 && (BotRegard.AtWar(mine, holder) || BotRegard.Of(mine, holder) <= BotRegard.Enmity || BotRegard.Of(holder, mine) <= BotRegard.Enmity);
 
@@ -734,7 +686,6 @@ public static class BotCharters
         }
     }
 
-    /// <summary>One guild's sealed bid.</summary>
     private readonly record struct Offer(string Guild, int Bid, double Share, long Sales, int Spare);
 
     public static void Look(long now)
@@ -891,7 +842,7 @@ public static class BotCharters
             new Dictionary<string, string> { ["town"] = key.Town, ["craft"] = Word(key.Craft), ["why"] = why }
         );
 
-        BotEvents.Post("charter", null, null, charter.Holder, 0, 0, $"{key.Town} took the {Word(key.Craft)} charter from {charter.Holder}: {why}", null, "revoked");
+        BotEvents.Post("charter", null, null, charter.Holder, 0, 0, $"{key.Town} took the {Word(key.Craft)} charter from {charter.Holder}: {why}", null, BotJson.Object(w => w.WriteString("outcome", "revoked")));
     }
 
     public static int General(long now, string why)
@@ -1133,7 +1084,7 @@ public static class BotCharters
             BotVoice.ToGuild(prev.Holder, "charter:lost", new Dictionary<string, string>(fill));
         }
 
-        BotEvents.Post("charter", null, null, won.Guild, town.Square.X, town.Square.Y, $"{won.Guild} holds the {Word(craft)} charter of {town.Name}: {paid}gp to the town", null, kept ? "kept" : "won");
+        BotEvents.Post("charter", null, null, won.Guild, town.Square.X, town.Square.Y, $"{won.Guild} holds the {Word(craft)} charter of {town.Name}: {paid}gp to the town", null, BotJson.Object(w => w.WriteString("outcome", kept ? "kept" : "won")));
 
         return $"{won.Guild} holds {town.Name}'s {Word(craft)} charter for {paid}gp ({won.Share:P0} of {total}gp of sales; bids: {said}).";
     }

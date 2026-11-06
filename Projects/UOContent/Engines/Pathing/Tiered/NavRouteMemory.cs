@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>What the route memory made of a request. See <see cref="NavRouteMemory.Recall"/>.</summary>
 public enum NavRecall
 {
+
     Skipped,
 
     Missed,
@@ -17,9 +17,9 @@ public enum NavRecall
     Bloodied
 }
 
-/// <summary>What a remembered road's clusters said when it was proved against the graph. See NavRouteMemory.Prove.</summary>
 internal enum NavProof
 {
+
     Valid,
 
     Waiting,
@@ -27,9 +27,9 @@ internal enum NavProof
     Changed
 }
 
-/// <summary>What became of a route offered to the memory. See <see cref="NavRouteMemory.Offer"/>.</summary>
 public enum NavOffer
 {
+
     Declined,
 
     Stored,
@@ -39,56 +39,9 @@ public enum NavOffer
     Kept
 }
 
-/// <summary>
-/// Routes the tiered navigation has found, remembered and handed out again — Patrick's order of 29.09.2026: "paths and graphs
-/// must be remembered; they can only be optimised."
-///
-/// <para>
-/// <b>A road is remembered node by node, not pair by pair.</b> Every node of a planned route is a place to join it, keyed
-/// by where the node stands and the cluster the road ends in. A walker asking from anywhere in a cluster the road passes
-/// through joins it at the cheapest node its own cluster's flood reaches, and walks the rest: a suffix of a best road is a
-/// best road from where it begins. So the walker that strayed, the second bot leaving the same yard, and the re-draw half
-/// way along all find the road without a search. What the memory hands back is exactly what a plan would: one point a
-/// cluster, a gate's near side left out (<see cref="HierarchicalPlanner.LastPath"/>).
-/// </para>
-///
-/// <para>
-/// <b>Only ever cheaper.</b> A newly planned route is offered (<see cref="Offer"/>) and takes a place to join from the
-/// remembered road there only when what is left of it from that place, to the same goal, costs less; never a dearer one.
-/// A road whose every place has been taken by cheaper ones is dropped. The comparison is made at the moment of the offer,
-/// against the same ends, over the graph as it stands.
-/// </para>
-///
-/// <para>
-/// <b>The ground changes; the memory checks, cheaply.</b> A road keeps, for every run of its nodes in one cluster, the
-/// cluster's version when it was last proved (<see cref="NavGraph.ClusterVersion"/>) and a signature of the cluster's
-/// nodes and edges. Same version: nothing changed. A different version with the same signature: the cluster was drawn
-/// again the same — every cluster after a boot, the clusters beside a house redrawn at boot — so the node ids are looked up
-/// again from where they stand and the road stands. A different signature: the ground changed, and the road is forgotten
-/// and planned afresh. A cluster being drawn again right now makes the road wait, not die.
-/// </para>
-///
-/// <para>
-/// <b>The danger moves; the memory is of the ground (29.09.2026).</b> The danger hook (<see cref="NavigationService.Danger"/>,
-/// BotDanger: sixty tiles a bloodied quadrant's node, eight hundred a barred one) changes by the minute: sightings stand
-/// five minutes, a quarantine two hours. A road planned round the blood and remembered for good would be a detour served
-/// for ever after the blood dried. So the roads remembered are ground roads, planned with the hook off, and at every
-/// recall the road's nodes are read against the danger as it is now: a road that crosses none is served, and it is then
-/// the road the danger-aware planner would find — it was the cheapest on the ground and nothing along it is charged, so
-/// every other road costs at least its ground price, which is no less. A road that crosses blood is planned round
-/// (<see cref="NavRecall.Bloodied"/>), and the way round is kept beside it for <see cref="DetourMs"/> as a detour: served
-/// while it is no bloodier than when it was drawn and the ground road no less bloody — the reason for it still stands.
-/// </para>
-///
-/// <para>
-/// <b>Bounded, and kept.</b> At most <see cref="Capacity"/> roads and <see cref="NodeCapacity"/> nodes; the road least
-/// lately used goes first. The roads outlive a restart in a file beside the graph's (<see cref="NavRouteFile"/>), written
-/// by a worker from arrays that never change once a road is made; read back, a road is proved against the graph by its
-/// signatures the first time it is used.
-/// </para>
-/// </summary>
 public sealed class NavRouteMemory
 {
+
     public int Capacity { get; set; } = 2048;
 
     public int NodeCapacity { get; set; } = 262144;
@@ -145,7 +98,6 @@ public sealed class NavRouteMemory
 
     private int _offer;
 
-    /// <summary>A place to join a road: the road, and the node's index along it.</summary>
     private readonly record struct Place(NavRememberedRoute Route, int At);
 
     private readonly record struct Candidate(NavRememberedRoute Route, int From, int To, long Cost);
@@ -300,6 +252,7 @@ public sealed class NavRouteMemory
 
             if (c.Route.Slot < 0)
             {
+
                 continue;
             }
 
@@ -817,6 +770,7 @@ public sealed class NavRouteMemory
     {
         for (var t = from; t <= to; t++)
         {
+
             if (t < to && route.RunOf[t + 1] != route.RunOf[t])
             {
                 continue;
@@ -1160,11 +1114,6 @@ public sealed class NavRouteMemory
               + $"{DetoursDropped} dropped; {Read} read from disk";
 }
 
-/// <summary>
-/// One remembered road. The arrays the file writes (<see cref="NavRouteRecord"/>) are filled once when the road is made and
-/// never changed after, so a worker may write them while the loop goes on; the node ids and the clusters' stamps are the
-/// loop's, and are looked up again whenever a cluster is proved by its signature.
-/// </summary>
 internal sealed class NavRememberedRoute
 {
     public readonly int GraphId;
@@ -1347,7 +1296,6 @@ internal sealed class NavRememberedRoute
     }
 }
 
-/// <summary>A remembered road as the file keeps it. See <see cref="NavRouteFile"/>.</summary>
 public sealed class NavRouteRecord
 {
     public int Goal;

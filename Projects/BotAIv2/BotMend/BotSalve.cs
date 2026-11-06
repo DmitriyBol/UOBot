@@ -3,35 +3,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Patching somebody up — itself or somebody else, by spell if it can and by cloth if it cannot.
-///
-/// <para>
-/// <b>This is the undertaking the ladder has been missing since it was written.</b> The rung for a bot that is
-/// losing has always been there and has always had nothing on it, so the brain's answer to failing health was
-/// to hold on to whatever the bot was already doing. That was survivable while nothing fought; the moment
-/// hunting existed it meant a bot at two hit points going back to a skeleton, which is the first version's
-/// worst night in one sentence.
-/// </para>
-///
-/// <para>
-/// <b>The same undertaking serves both, and the rung is what makes them different.</b> Mending itself is
-/// offered above everything — a bot on the floor does not weigh options. Mending somebody else is offered as
-/// ordinary work, competing on the same arithmetic as digging: it pays in real Healing and real Magery, which
-/// at five hundred a point is a living, and it pays nothing at all in coin. That ordering is not tidiness. The
-/// first version put "shout for help" <em>above</em> "I am dying", so a bot on its last few points announced a
-/// company it could not join, found nobody able, and posted it again — dozens of times in a row. Looking after
-/// somebody else must never outrank looking after yourself.
-/// </para>
-///
-/// <para>
-/// <b>Nothing here is a state that can wait indefinitely.</b> Out of mana, out of cloth, patient healed,
-/// patient dead, patient walked away — every one of them ends the undertaking on the same beat it becomes true.
-/// A healer standing over a corpse with no bandages is the shape of bug this project keeps finding.
-/// </para>
-/// </summary>
 public sealed class BotSalve : BotDeed
 {
+
     public const string Trade = "mend";
 
     public static double Prior { get; set; } = 30.0;
@@ -232,6 +206,7 @@ public sealed class BotSalve : BotDeed
 
         if (BotMend.Whole(_patient))
         {
+
             if (!_onSelf && _casts + _cloths + _draughts > 0)
             {
                 BotBiography.Healed(body, _patient);
@@ -286,6 +261,7 @@ public sealed class BotSalve : BotDeed
 
         if (!_onSelf && !body.InRange(_patient.Location, near))
         {
+
             if (!_askedToWait && (!_askedEver || Core.TickCount - _askedTick >= AskEveryMs))
             {
                 _askedEver = true;
@@ -346,6 +322,7 @@ public sealed class BotSalve : BotDeed
         }
         else
         {
+
             if (spell >= 0 && BotMend.Begin(body, spell) && Cast(body))
             {
                 _awaiting = true;

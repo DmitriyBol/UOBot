@@ -3,11 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Bots' own shops as a module: reads its numbers, offers the shift and the customer's walk, and says every five minutes what
-/// the shops did. Since 01.10.2026 the shops by Britain's bank are the market itself — the auction and its cap on the kinds a
-/// bot may hold out are gone (see <c>BotMarket</c>).
-/// </summary>
 public sealed class BotShopkeepModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotShopkeepModule));

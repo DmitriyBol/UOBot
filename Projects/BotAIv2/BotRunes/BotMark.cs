@@ -8,24 +8,6 @@ using Server.Spells.Sixth;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A rune-mage marking a rune for a place its guild holds none for: walk to a tile the engine will let a rune be marked
-/// on, cast Mark, aim it at a blank, and keep the rune.
-///
-/// <para>
-/// <b>The pathfinder is simply the first mage of its guild to stand there.</b> Nothing sends a mage to mark anything: a
-/// mage that arrives in a town (a journey, a boat, a gate), comes home to its seat, or walks out of a cave mouth with its
-/// party is offered the mark by <see cref="BotMarker"/> when its guild holds no rune there and it carries a blank. The
-/// rune goes into the mage's own book (<see cref="BotRunes.Satchel"/>) and the place into the guild's knowledge
-/// (<see cref="BotRuneShelf"/>), from which the library is written and the other mages are lent copies.
-/// </para>
-///
-/// <para>
-/// <b>A fizzle is the engine's, and so is the cost of one.</b> <c>Spell.CheckSequence</c> takes the reagents before the
-/// skill check, so every failed try spends a set of herbs; <see cref="BotRunes.Tries"/> bounds how many, and a mark given
-/// up rests its place for this mage for <see cref="BotMarker.RestMs"/>.
-/// </para>
-/// </summary>
 public sealed class BotMark : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMark));
@@ -151,6 +133,7 @@ public sealed class BotMark : BotDeed
 
         if (!BotRunes.Ready(body, BotRunes.Mark, out var scroll, out _, out var why))
         {
+
             if (why is "too little mana" or "not recovered" or "already casting")
             {
                 _nextTick = now + BotRunes.RetryMs;
@@ -281,6 +264,7 @@ public sealed class BotMark : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
+
         if (_spell != null && bot?.Self is { Target: SpellTarget<Item> aim } body && ReferenceEquals(aim.Spell, _spell))
         {
             body.Target.Cancel(body, Server.Targeting.TargetCancelType.Canceled);
@@ -302,10 +286,6 @@ public sealed class BotMark : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a rune-mage with a blank the mark of a place its guild holds no rune for, where it stands: its seat, a cave
-/// mouth, or the town it is in. See <see cref="BotMark"/>.
-/// </summary>
 public sealed class BotMarker : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMarker));
@@ -418,6 +398,7 @@ public sealed class BotMarker : IBotProposer
 
         if (!BotRunes.Ready(body, BotRunes.Mark, out _, out _, out var why) && why is not ("too little mana" or "not recovered" or "already casting"))
         {
+
             Unable++;
             BotRunes.Unready($"mark: {why}");
             Rest(mage, name);

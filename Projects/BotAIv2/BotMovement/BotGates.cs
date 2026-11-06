@@ -8,53 +8,13 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The teleporters of the world read as gates between lands, so that a walk can be drawn through a cave mouth
-/// instead of stopping at it.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026: "we have cave mouths in the world — entrances to the dungeons. Instead of carrying
-/// and teleporting, every cave gets its proper entrance that teleports the bots inside, and the way out is the same:
-/// come back to the entrance. Travel there as a party, alone, or alone and gather a party inside."</b> The engine already
-/// does the teleporting: a <see cref="Teleporter"/> is an invisible item on a tile, and a body that steps onto it is put
-/// down at the item's destination (<c>Teleporter.OnMoveOver</c>). What no bot could do was <i>plan</i> a walk through one,
-/// because the dungeon block from x 5120 eastward shares no ground with the island — the navigation graph's components say
-/// so, provably — and a search for a road that does not exist answers "no way through" however it is asked. So every
-/// delve since 11.09.2026 put its party down by <c>MoveToWorld</c> and lifted it out again (<c>BotDelve.Put</c>,
-/// <c>BotDelveParty.Surface</c>).
-/// </para>
-///
-/// <para>
-/// <b>A gate is a fact about two components.</b> Every active teleporter on the population's map whose destination is on
-/// the same map is read once from the world's items, folded with its neighbours (three in a row across a doorway are one
-/// gate), and each end is placed in the graph's component it stands in (<see cref="NavigationService.ComponentOf"/>).
-/// A land is a component. A route from one land to another is a shortest path over the gates — a few hundred of them,
-/// Dijkstra by straight distance — and what the journey is handed is the first gate on it: walk to that tile exactly,
-/// the engine does the rest, and the next beat draws the next leg from wherever the walker has been put down
-/// (<c>BotJourney.Draw</c>).
-/// </para>
-///
-/// <para>
-/// <b>Read from the world rather than written down, by the rule the dungeons are surveyed by.</b> A table of entrances
-/// would be a promise about a map; the items are the map. And the lands are not written down at all: the component is
-/// asked of the graph, which is rebuilt when houses go up and read back from disk at boot, so a gate's two ends are as
-/// current as the graph is.
-/// </para>
-///
-/// <para>
-/// <b>What it will not do.</b> It does not route <i>within</i> a land — that is the tiers' business — and it does not
-/// step: a walker on a gate's tile is teleported by the engine or is not (a criminal at a guarded gate, a body mid-fight
-/// where the gate checks for it), and a walker that was not is a walker planning straight at a goal in another land,
-/// which fails the way it always did and is counted (<see cref="Refused"/>).
-/// </para>
-/// </summary>
 public static class BotGates
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGates));
 
-    /// <summary>One way through: the tile to step on, where it leads, and the land at each end.</summary>
     public sealed class Gate
     {
+
         public Point3D From;
 
         public Point3D To;
@@ -308,6 +268,7 @@ public static class BotGates
         {
             Land(map);
         }
+
         else if (Landed && map == _map && NavigationService.ComponentsCounted(map) && NavigationService.ComponentEpoch(map) != _landEpoch)
         {
             Reland(map);
@@ -841,6 +802,7 @@ public static class BotGates
 
     private static void Settle(Gate gate)
     {
+
         if (gate.Moongate)
         {
             gate.From = gate.Tiles[0];

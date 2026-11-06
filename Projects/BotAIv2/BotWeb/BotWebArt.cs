@@ -12,28 +12,9 @@ using System.Threading;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The pictures the live window draws its scene with, decoded from the client's own files on the listener's threads and
-/// kept (02.10.2026: "the picture straight from the game").
-///
-/// <para>
-/// <b>Never on the game loop.</b> Every route here runs on the thread that took the request; it reads the client's files
-/// through <see cref="BotArtFiles"/> and the server's tiledata table, which is loaded at boot and never written again. The
-/// world is not touched. A decoded picture is kept as PNG bytes in a bounded cache (the oldest asked-for goes first), and
-/// the browser is told to keep it for a week: the page puts the files' fingerprint in every address, so a patched client
-/// gets new addresses rather than stale pictures.
-/// </para>
-///
-/// <para>
-/// The routes: <c>/api/art/land/ID.png</c> (the 44 by 44 diamond), <c>/api/art/tex/ID.png</c> (the land's texture, for
-/// slopes), <c>/api/art/static/ID.png?hue=H</c> (a static or item through its hue), <c>/api/art/tiledata</c> (heights and the
-/// flags the draw order needs), <c>/api/anim/BODY/DIR.png?hue=H&amp;a=stand|war|war2|ride|die</c> (one frame of a body),
-/// <c>/api/anim/item/ITEM/DIR.png?body=B&amp;hue=H&amp;a=…</c> (what a worn or ridden item looks like on that body) and
-/// <c>/api/anim/BODY/meta</c>. Every picture says where it stands in <c>X-Anchor: x,y</c>.
-/// </para>
-/// </summary>
 public static class BotWebArt
 {
+
     public static int MostKept { get; set; } = 4096;
 
     public static long MostKeptBytes { get; set; } = 96L * 1024 * 1024;
@@ -91,6 +72,7 @@ public static class BotWebArt
         }
         catch
         {
+
         }
 
         var kept = new Kept { Key = key };

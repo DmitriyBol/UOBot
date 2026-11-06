@@ -1,37 +1,5 @@
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Ground a single plan is to keep out of. Tactical and short-lived, never a statement about the world.
-///
-/// Two shapes, because the population produced exactly two reasons:
-///
-/// <para>
-/// <b>One tile, because somebody is standing on it.</b> The measurement was unambiguous: (1371, 1477, 10)
-/// is the gate to the Britain graveyard, and two bots parked on it accounted for seventy-seven refused
-/// steps in two minutes — twice, on two different days, with two different bots. A bot at an auction or
-/// going through a corpse can stand still for minutes, and if it happens to be in a doorway then nobody
-/// gets through the doorway. Excluding the tile from the next plan is the difference between walking round
-/// a person and asking them to move for the twentieth time.
-/// </para>
-///
-/// <para>
-/// <b>One square, because something in it nearly killed the bot.</b> This is what makes a route bend
-/// without the destination moving: the goal is untouchable, the way to it is not.
-/// </para>
-///
-/// <para>
-/// <b>And a few squares of ground priced rather than shut, because something the bot cannot beat stands in them (03.10.2026,
-/// sight13).</b> The reach of a creature the walker has seen (<see cref="BotSight"/>): a step into it costs more, so the
-/// search goes round when a way round is not dear, and through when it is the only way — the walk itself then waits or turns
-/// back. Never a wall: the goal may stand inside one.
-/// </para>
-///
-/// <para>
-/// Neither may ever be recorded as knowledge about the ground. A search that failed because of an avoid
-/// has proved nothing — which is why <see cref="BotPath"/> refuses to write a pocket into
-/// <see cref="BotReach"/> from any search that carried one.
-/// </para>
-/// </summary>
 public readonly struct BotAvoid
 {
     private readonly int _tileX;

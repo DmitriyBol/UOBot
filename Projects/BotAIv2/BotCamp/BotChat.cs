@@ -4,17 +4,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Two bots that met in the open, stopped, and are having a word: facing each other until the talk is over, then back to
-/// whatever each was doing.
-///
-/// <para>
-/// <b>Pressed, and the work in hand put down rather than dropped.</b> A meeting is not an offer weighed against a seam — it
-/// is something that happens to two bots on the road — so both are pressed into it (<c>BotWill.Press</c>), which puts the
-/// errand in hand down to be taken up again when the talk settles, exactly as a duel's call or a summons does. That is why
-/// <see cref="BotMeetings"/> only stops bots whose work resumes: a hunt or a flight would be thrown away, and is not stopped.
-/// </para>
-/// </summary>
 public sealed class BotChat : BotDeed
 {
     public const string Trade = "chat";
@@ -109,7 +98,6 @@ public sealed class BotChat : BotDeed
     public override void Drop(IBotWilful bot) => BotMeetings.End(_meeting, $"{bot?.Self?.Name} broke off");
 }
 
-/// <summary>One word on the road between two bots: who, how far it has got, and when the next line is due.</summary>
 public sealed class BotMeeting
 {
     public BotMeeting(BotMobile first, BotMobile second, long now)
@@ -137,19 +125,9 @@ public sealed class BotMeeting
     public string Why { get; internal set; }
 }
 
-/// <summary>
-/// Chance meetings: two free bots passing within a few tiles in the open, and a small chance they stop and talk.
-///
-/// <para>
-/// <b>Cheap by construction.</b> Each bot is looked at once every <see cref="EveryMs"/> — a slice of the population on each
-/// of the camp's seconds, never the whole of it — and only a bot that passes every cheap test (free, its work resumable,
-/// not in a company or a fight, in the open, not met lately) costs one spatial query of <see cref="Reach"/> tiles. A pair
-/// that rolled no is not rolled again for <see cref="MissRestMs"/>, so two miners at one seam are not a meeting every
-/// eight seconds.
-/// </para>
-/// </summary>
 public static class BotMeetings
 {
+
     public static bool Running { get; set; } = true;
 
     public static int EveryMs { get; set; } = 8000;
@@ -331,6 +309,7 @@ public static class BotMeetings
 
         if (!BotWill.Press(second, new BotChat(meeting, first), $"met {first.Name} on the way"))
         {
+
             Refused++;
             End(meeting, $"{second.Name} would not stop");
 
@@ -396,9 +375,19 @@ public static class BotMeetings
     {
         var (speaker, listener) = Utility.RandomBool() ? (meeting.First, meeting.Second) : (meeting.Second, meeting.First);
         var fill = new Dictionary<string, string>();
-        var topic = BotCampTalk.Topic(speaker, speaker.Map, speaker.Location, fill, "meet:small");
+        var topic = BotCampTalk.Topic(speaker, speaker.Map, speaker.Location, fill, "meet:small", out var told, new[] { listener });
 
-        return BotCampTalk.Say(speaker, topic, "meet:small", listener, fill);
+        if (!BotCampTalk.Say(speaker, topic, "meet:small", listener, fill))
+        {
+            return false;
+        }
+
+        if (told != null)
+        {
+            BotBiography.Heard(listener, speaker, told, BotBiography.Place(speaker.Map, speaker.Location));
+        }
+
+        return true;
     }
 
     public static void End(BotMeeting meeting, string why)

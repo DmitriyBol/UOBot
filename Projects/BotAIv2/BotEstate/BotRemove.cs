@@ -7,31 +7,9 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Carrying a beaten guild's hall out of the winner's yard and putting it down again.
-///
-/// <para>
-/// <b>The only thing on this shard that takes a building down.</b> The engine has no way to move a house —
-/// a player demolishes and places again — so this does exactly that, in that order, and the order matters:
-/// the ground is proved first, and the old hall only comes down once the new one has somewhere to go.
-/// A guild left with neither is a guild that lost a war and its home, which is not what was asked for.
-/// </para>
-///
-/// <para>
-/// <b>What the move costs is the fittings, and that is the whole of the punishment.</b> The old hall's
-/// merchant, its counter and everything standing on it go with the building; the new hall is furnished from
-/// scratch by <c>BotFittings</c> and its shelf starts empty. No levy is taken — a guild that has just lost a
-/// war is not asked for five thousand gold as well, and a punishment that can be refused for want of money
-/// is not a punishment.
-/// </para>
-///
-/// <para>
-/// <b>Nothing is paid for and nothing is earned</b>, so this is <c>Unpaid</c>. See <c>BotBaron</c> for the
-/// twelve minutes a bot once stood still because unpaid work was marked down for being unpaid.
-/// </para>
-/// </summary>
 public sealed class BotRemove : BotDeed
 {
+
     public const string Trade = "remove";
 
     public static double Prior { get; set; } = 400.0;
@@ -273,23 +251,9 @@ public sealed class BotRemove : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a member of a beaten guild the work of moving its hall.
-///
-/// <para>
-/// Offered to whoever of the guild is choosing work, not to its leader, for the reason <c>BotSteward</c>
-/// carries at length: a guild whose leader is in a company is a guild that can never build anything. The
-/// guild's own claim keeps it to one member at a time.
-/// </para>
-///
-/// <para>
-/// <b>The ground is looked for before anybody is offered anything</b>, and it is looked for with the
-/// winner's hall shunned — see <c>BotPlot.Find</c>'s four-argument form. An offer made before the ground
-/// exists is an errand that walks across the island to discover there is nowhere to go.
-/// </para>
-/// </summary>
 public sealed class BotRemover : IBotProposer
 {
+
     public static long Asked { get; private set; }
 
     public static long Offered { get; private set; }
@@ -338,6 +302,7 @@ public sealed class BotRemover : IBotProposer
 
         if (winner == null)
         {
+
             if (BotBounds.Owes(ours, out var under, out var whose))
             {
                 if (BotOffice.Busy(BotExile.Office, ours))

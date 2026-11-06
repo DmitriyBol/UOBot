@@ -5,44 +5,13 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Where each bot lives: the town it was born in or chose, and what "home" means to it there.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point 5: "teach the bots to choose a town of residence, live there, hunt there, do
-/// their routine — all the same things they do in Britain. The result: the bots spread over the world."</b> Until now the
-/// population had one home, <c>BotPopulation.Where</c> by Britain's graveyard, and every per-bot "home" in the code asked
-/// it: the walk home, the flight's last resort, the herb woods, the hunting darts, where a newborn appears and where the
-/// dead rise. At the boot of 18:38 on 29.09.2026 sixty of sixty-three bots stood in four guilds, three of the four had no
-/// seat ("The Crown has no seat, The Hammer has no seat, The Blade has no seat, The Needle at 2248,1204"), so everybody but
-/// The Needle's fifteen lived, was born and rose within 350 tiles of one tile.
-/// </para>
-///
-/// <para>
-/// <b>One question, one answer: <c>BotPopulation.HomeOf</c>, which asks <see cref="Home"/>.</b> A member of a guild seated
-/// abroad lives by its guild (<see cref="BotRelocate.Forced"/>) as it did before; everybody else has a town of its own,
-/// chosen at birth or at first sight (<see cref="BotSettle.Choose"/>) and changed only by walking there
-/// (<see cref="BotResettle"/>). In the population's home town "home" is exactly what it was — the guild's hall or seat,
-/// else the population's home — so a bot that lives in Britain is the bot it was before this file existed. In any other
-/// town home is the town's bank (<see cref="BotSettle.Hearth"/>), or the guild's own hall or seat when that stands in the
-/// same town.
-/// </para>
-///
-/// <para>
-/// <b>Filed by name, as what a bot has learned is filed (<c>BotProgress</c>), and kept across restarts
-/// (<see cref="BotResidenceStore"/>)</b>: a bot that lives in Trinsic still lives there after a deploy, and a bot raised
-/// under a name the store knows is born in that name's town, as it is handed that name's learning. The record is also held
-/// on the body (<c>BotMobile.Residence</c>), so asking where a bot lives — which every sampler does per candidate through
-/// the leash — costs a field read and nothing else.
-/// </para>
-/// </summary>
 public static class BotResidence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotResidence));
 
-    /// <summary>What one bot's residence is. Filed by the bot's name; the session half is never saved.</summary>
     public sealed class Record
     {
+
         public string Name;
 
         public string Town;

@@ -3,11 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A poor bot's walk to a moneylender — a rich keeper's shop by the bank — and the loan made there, hand to hand (07.10.2026,
-/// trades17). Not about money in the auction's sense (<see cref="BotDeed.Unpaid"/>): the coin borrowed is booked outside the
-/// errand, so nothing learns that borrowing pays; what the loan buys is the kit, and the shopper's next look sends the bot for it.
-/// </summary>
 public sealed class BotBorrow : BotDeed
 {
     public const string Trade = "borrow";
@@ -102,16 +97,6 @@ public sealed class BotBorrow : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a poor bot short of its kit, with a trade its own record says pays, the walk to a moneylender (07.10.2026, trades17).
-///
-/// <para>
-/// <b>Every reason a loan is refused is asked here first, and counted apart</b>: a borrower in debt or once defaulted, a bot that is
-/// not poor or not short of its kit or could buy it from what it has, a bot whose own work has never paid it
-/// <see cref="LeastPays"/> a minute (no loan without a trade), and no lender in reach. The sum is what the kit costs over what the
-/// bot can spend (<c>BotProvision.Bill</c>), between <see cref="BotLoans.Least"/> and <see cref="BotLoans.Sum"/>.
-/// </para>
-/// </summary>
 public sealed class BotBorrower : IBotProposer
 {
     public string Name => "Borrower";

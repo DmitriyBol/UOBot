@@ -5,17 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-drill.json</c> may say. Everything optional; empty keeps the code's numbers.
-///
-/// <para>
-/// <b>PascalCase, and it is not a style question.</b> The deserialiser matches these names as written, so a
-/// key in lower case is not an error and not a warning — it is a value silently left at its default, and a
-/// configuration file that appears to have been read is worse than one that fails to load.
-/// </para>
-/// </summary>
 public sealed class BotDrillSettings
 {
+
     public int[] Ground { get; set; }
 
     public int? Pace { get; set; }
@@ -43,17 +35,6 @@ public sealed class BotDrillSettings
     public int? Range { get; set; }
 }
 
-/// <summary>
-/// The captain's other office: a field, a fee, and an hour of being shouted at.
-///
-/// <para>
-/// <b>Two proposers rather than one, and they are on two different bots.</b> Teaching cannot be a thing the
-/// captain does <em>to</em> people — a bot standing in a square for a quarter of an hour has given up
-/// everything else it could have been doing, and on this shard that has to be its own decision, weighed by
-/// the same auction against the same alternatives. So the captain offers to hold a class and each student
-/// offers itself a place, and either half can lose. A class nobody comes to is a real answer.
-/// </para>
-/// </summary>
 public sealed class BotDrillModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDrillModule));

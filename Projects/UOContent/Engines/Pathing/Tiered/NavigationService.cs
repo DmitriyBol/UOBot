@@ -7,25 +7,6 @@ using Server.Logging;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>
-/// The tiered navigation, as the rest of the shard sees it: one graph a map, drawn on the game loop a slice at a time,
-/// kept in step with the houses raised and taken down, and asked for routes.
-///
-/// <para>
-/// <b>The tiers.</b> A walk nearer than a cluster or two is the precise search's alone (Short: the caller's own tile
-/// planner, with everything dynamic in it — doors, creatures, items). A longer one is asked of the first level of the
-/// graph (<see cref="HierarchicalPlanner"/>, Medium), which answers with one point a cluster for the precise search to
-/// walk a leg at a time, <see cref="NavStatus.Direct"/> when the two ends are joined inside one cluster, and
-/// <see cref="NavStatus.Unreachable"/> — without searching, from the components — when the ground has no way. The long
-/// tier (regions of 128 tiles, teleporters, a route cache) sits above it.
-/// </para>
-///
-/// <para>
-/// <b>On the loop, and never off it.</b> The graph is drawn from the map's tiles, which are game state: a slice of at
-/// most <see cref="SliceMs"/> every <see cref="EveryMs"/>, nearest the prioritized place first (<see cref="Prepare"/>),
-/// so the ground round home is ready within seconds of a boot and the rest follows.
-/// </para>
-/// </summary>
 public static class NavigationService
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(NavigationService));
@@ -109,7 +90,6 @@ public static class NavigationService
 
     public static bool Persist { get; set; } = true;
 
-    /// <summary>A graph being read from disk on a worker thread, per map, and what it read.</summary>
     private sealed class Load
     {
         public ulong Fingerprint;
@@ -457,6 +437,7 @@ public static class NavigationService
 
     public static void GroundChanged(Map map, Rectangle2D bounds)
     {
+
         GroundChangedHook?.Invoke(map, bounds);
 
         if (map == null || !_graphs.TryGetValue(map.MapID, out var graph))
@@ -482,6 +463,7 @@ public static class NavigationService
 
         foreach (var (mapId, graph) in _graphs)
         {
+
             if (_loads.TryGetValue(mapId, out var load) && load != null)
             {
                 if (!load.Done)
@@ -547,6 +529,7 @@ public static class NavigationService
 
             if (graph.Complete && graph.ComponentsValid)
             {
+
                 if (Persist && !_saved.Contains(mapId) && !_writing && !World.Saving)
                 {
                     Save(mapId, graph);

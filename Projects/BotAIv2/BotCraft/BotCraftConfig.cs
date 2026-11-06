@@ -4,14 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-craft.json</c> is allowed to say. Everything optional.
-///
-/// What is not here: recipes, difficulties and yields. Those are the shard's craft system, and a file able
-/// to disagree with it would be a file able to send a bot swinging at something it cannot make.
-/// </summary>
 public sealed class BotCraftSettings
 {
+
     public double? Margin { get; set; }
 
     public int? Bolt { get; set; }
@@ -41,7 +36,6 @@ public sealed class BotCraftSettings
     public int? TinkerLeastMetal { get; set; }
 }
 
-/// <summary>Reads the craft file and moves the numbers it names.</summary>
 public static class BotCraftConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCraftConfig));

@@ -6,22 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A picture of the map for the page to draw the bots on, made from the client's own radar colours.
-///
-/// <para>
-/// <b>Drawn in slices on the game loop, encoded off it.</b> The tile matrix is not safe to read from
-/// another thread, so the sampling runs here a few rows at a time; the PNG encoding is pure arithmetic over
-/// a byte array and goes to the thread pool. Once the file is on disk it is not drawn again until the map
-/// files change, because a shard restarts often and the picture does not.
-/// </para>
-///
-/// <para>
-/// <b>Statics over land, top one wins.</b> That is what the client's radar does: a road, a house or a tree
-/// shows in its own colour, and bare ground in the land tile's. The colours come from <c>radarcol.mul</c>,
-/// sixteen bits each, in the client folder the server already knows.
-/// </para>
-/// </summary>
 public static class BotWebMap
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWebMap));

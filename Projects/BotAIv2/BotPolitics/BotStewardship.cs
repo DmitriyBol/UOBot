@@ -8,50 +8,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Each town's steward: the head of the guild with the best standing in it, holding the town's coffer and its levers, and
-/// answering for both.
-///
-/// <para>
-/// <b>Patrick, approved 07.10.2026 (wave 17, "a livelier world"):</b> "A town elects a steward (the head of the guild with the
-/// best standing in the town, or a thinking role like the duke). Real levers, each a decree announced in town and logged:
-/// raise/lower the shops' tax (±1–3 %), hire the captain of the guard (a guild gets the post and pay), set a bounty on a head,
-/// call the militia, bar an outcast guild from the town for a day, declare a holiday (an extra fair), order a caravan. Guilds
-/// react (a higher tax sends traders to another town; a bounty draws hunters). The steward answers: an empty purse or a falling
-/// town regard deposes it."
-/// </para>
-///
-/// <para>
-/// <b>Who.</b> In each town reached from home, the guild with the best standing there (<c>BotBurgh</c>: the cheapest prices,
-/// then the most tasks done, then the fewest failed — the council's own order, <c>BotCouncil</c>), with <see cref="LeastDone"/>
-/// tasks done, not put out of the town, not The Shadow and with a head. The steward is that guild's head, whoever it is now.
-/// Chosen again every <see cref="ChooseMs"/>, and at once when the guild is gone, headless, put out or barred, when its head
-/// falls, or when the steward is deposed. A deposed guild may not be chosen in that town for <see cref="DeposedMs"/>.
-/// </para>
-///
-/// <para>
-/// <b>The coffer is the treasury's coin, held for the town.</b> Every coin in a coffer is held out of the city's purse
-/// (<see cref="BotCity.Escrow"/>), so the <c>City:</c> line counts it as held and a restart keeps it (<see cref="BotStewardStore"/>).
-/// It fills two ways: an allowance of <see cref="Allowance"/>gp an hour while the treasury holds more than <see cref="CityKeep"/>,
-/// and the town's tax — the part of every bill at the town's counters that the steward's tax added, paid into the treasury as
-/// tax (<see cref="BotCity.Tax"/>) and held for the coffer. A tax cut is a rebate the coffer pays (<see cref="BotCity.Disbursed"/>),
-/// suspended while the coffer holds under <see cref="CutCover"/>. Every decree that costs anything moves the coin to where it
-/// works: the captain's and the guard line's watches are paid out of the purse per watch stood (the coin is handed back to the
-/// purse and the town's wage budget raised by it, <c>BotCouncil.Appoint/Fund</c>); a bounty is paid out of the purse when the
-/// head is taken (<c>BotCrime.Raise</c>); the militia's head money goes into the invasion's own hold (<c>BotSeasons.Hold</c>);
-/// a caravan's hold out of the purse; a holiday's feast is bought from the town's shopkeepers (spent, like any NPC purchase).
-/// Nothing is made and nothing vanishes unseen: the <c>Stewards:</c> line prints every flow and what the coffers hold now.
-/// </para>
-///
-/// <para>
-/// <b>The town's regard</b> of its steward is 50 with the steward's guild's prices there taken off (×1.05 is −10) plus the
-/// town's mood: each decree moves it once (a tax raised −2 a point, cut +2 a point, the militia +5, a holiday +6, a caravan +3,
-/// a bounty, a captain or a bar +2), and every round presses on it (a tax over nought −0.15 a point, each head at large posted
-/// in the town −0.5, an invasion with no company come −2, a coffer under the floor −1), between −40 and +40. Deposed: the
-/// coffer under <see cref="Floor"/> for <see cref="PoorMs"/>, or the regard not risen once in <see cref="FallMs"/> and lower by
-/// <see cref="FallLeast"/> or more over it.
-/// </para>
-/// </summary>
 public static partial class BotStewardship
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStewardship));
@@ -148,7 +104,6 @@ public static partial class BotStewardship
 
     public static Func<BotStewardAsk, Action<string, string, string>, bool> Ask { get; set; }
 
-    /// <summary>One decree as remembered.</summary>
     public sealed class Decree
     {
         public DateTime Utc;
@@ -162,7 +117,6 @@ public static partial class BotStewardship
         public string By;
     }
 
-    /// <summary>One town's stewardship.</summary>
     public sealed class Office
     {
         public string Town;
@@ -691,6 +645,7 @@ public static partial class BotStewardship
 
         if (ModelChooses && Ask is { } ask && !AnyAsking() && (options[0].Rule || o.Held % Math.Max(1, AskEvery) == 0))
         {
+
             var q = Question(o, town, options, regard);
 
             if (ask(q, (id, speech, reason) => Answered(o.Town, options, id, speech, reason)))
@@ -1200,7 +1155,7 @@ public static partial class BotStewardship
         if (o.Guild != null && Speaker(o, town) is { } speaker)
         {
             BotVoice.Say(speaker, "local", line, true);
-            BotEvents.Post("politics", speaker, line, "steward", kind);
+            BotEvents.Post("politics", speaker, line, "steward", BotJson.Object(w => w.WriteString("outcome", kind)));
 
             return;
         }
@@ -1212,7 +1167,7 @@ public static partial class BotStewardship
             return;
         }
 
-        BotEvents.Post("politics", o.Head ?? $"the steward of {town.Name}", null, o.Guild, town.Square.X, town.Square.Y, line, "steward", kind);
+        BotEvents.Post("politics", o.Head ?? $"the steward of {town.Name}", null, o.Guild, town.Square.X, town.Square.Y, line, "steward", BotJson.Object(w => w.WriteString("outcome", kind)));
     }
 
     public static string Pct(double tax) => tax > 0.00001 ? $"+{tax * 100:0.#}%" : tax < -0.00001 ? $"{tax * 100:0.#}%" : "0%";
@@ -1355,6 +1310,7 @@ public static partial class BotStewardship
             writer.Write(o.Guild ?? "");
             writer.Write(o.Head ?? "");
             writer.Write(Math.Max(0L, now - o.Since));
+
             writer.WriteEncodedInt(o.Coffer + o.Pending);
             writer.Write(o.Tax);
             writer.Write(o.Mood);
@@ -1484,7 +1440,6 @@ public static partial class BotStewardship
     }
 }
 
-/// <summary>A question to the model as the steward: who, the facts, and the decrees it may give, each with what it does.</summary>
 public sealed class BotStewardAsk
 {
     public string Town;

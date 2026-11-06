@@ -5,17 +5,6 @@ using Server.Targeting;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Cutting wood: walk to the nearest tree and swing until the pack has enough or the tree has nothing left.
-///
-/// <para>
-/// <b>Deliberately the smallest harvest on the shard.</b> The miner has veins worth different money, a lode
-/// to walk to, a forge to smelt at and a bank to leave metal in; a woodcutter has trees, and every tree is
-/// the same tree. So there is no survey, no ledger of good ground and no second leg — the errand is "cut
-/// until the axe stops paying", and the walk that brought the bot into the woods is the walk the auction
-/// already priced.
-/// </para>
-/// </summary>
 public sealed class BotChop : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotChop));
@@ -321,6 +310,7 @@ public sealed class BotChop : BotDeed
         }
         else if (have < _had)
         {
+
             _had = have;
         }
 
@@ -372,6 +362,7 @@ public sealed class BotChop : BotDeed
 
             case BotHeard.Word.Full:
                 {
+
                     BotHeard.Clear(body);
                     Sheathe(body);
 
@@ -384,6 +375,7 @@ public sealed class BotChop : BotDeed
 
             case BotHeard.Word.Adrift:
                 {
+
                     BotHeard.Clear(body);
                     _grewTick = now;
 

@@ -6,37 +6,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Brewing: what a potion is made of, and the swing that makes it.
-///
-/// <para>
-/// <b>The whole trade was scaffolded and never built.</b> Three classes on this shard — Healer, Mage and
-/// Sage — ask for Alchemy at a hundred; <see cref="BotOutfit"/> hands every one of them a mortar and pestle
-/// on the strength of that skill; <c>BotUnload</c> keeps their empty glass out of the market because "glass
-/// is stock to an alchemist"; and the word <c>DefAlchemy</c> appeared nowhere in the assembly. The tool was
-/// issued, the glass was protected and the skill was trained for a trade that did not exist. Meanwhile the
-/// only potion on the island came off an alchemist's shelf at fifteen gold, and on the evening of 27.08.2026
-/// two hundred and twenty-one of two hundred and fifty-two moments at death's door were a bot reaching for
-/// a bottle it did not have.
-/// </para>
-///
-/// <para>
-/// <b>Two materials, which is what makes this its own file rather than another caller of
-/// <see cref="BotCraftwork"/>.</b> Every recipe in <c>DefAlchemy</c> declares a reagent and a
-/// <see cref="Bottle"/> — <c>AddRes(index, typeof(Bottle), …)</c> on every single one — and
-/// <c>BotCraftwork.Simple</c> refuses any recipe with more than one resource, by design and for good
-/// reasons on the trades it serves. So the arithmetic of "can I make one" is done here, over both halves.
-/// </para>
-///
-/// <para>
-/// <b>The glass is the half that comes back.</b> A drunk potion leaves its bottle in the pack — the engine
-/// does it, <c>BasePotion.Drink</c> — so a population that drinks is a population that produces the second
-/// material of its own supply. The alchemist's counter sells the rest at five gold a hundred, which makes
-/// glass the cheap half and the reagent the dear one, the opposite way round from every other trade here.
-/// </para>
-/// </summary>
 public static class BotFlask
 {
+
     public static CraftSystem System => DefAlchemy.CraftSystem;
 
     public static BaseTool Kit(Mobile bot) => BotOutfit.Oldest<MortarPestle>(bot?.Backpack);
@@ -217,21 +189,9 @@ public static class BotFlask
 
     private static bool _saidNeeds;
 
-    /// <summary>
-    /// Why the last look at the mortar found nothing, split apart because one bucket was holding three
-    /// answers.
-    ///
-    /// <para>
-    /// <b>"Had the glass but no herbs" was everything Choose refused for.</b> It refuses on three quite
-    /// different grounds — the skill will not carry any draught, the reagent is not in the pack, or the
-    /// recipe table has nothing that fits — and the alchemist wrote all three into one number. Measured on
-    /// 05.09.2026 the share of new asks landing there rose from 14% to 37% inside one run *after* the
-    /// reagents were fixed, which is a time pattern rather than a supply one and could not be read at all
-    /// while the three were together.
-    /// </para>
-    /// </summary>
     public enum Refusal
     {
+
         None,
 
         Unskilled,
@@ -253,6 +213,7 @@ public static class BotFlask
 
         if (recipes == null)
         {
+
             return want;
         }
 
@@ -262,6 +223,7 @@ public static class BotFlask
 
             for (var j = 0; j < recipes.Count; j++)
             {
+
                 if (recipes[j].ItemType != kind || !Twofold(recipes[j], out var reagent, out _, out _))
                 {
                     continue;

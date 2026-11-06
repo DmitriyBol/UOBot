@@ -5,33 +5,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Buy paper, write scrolls, keep what the book is short of and sell the rest. The scribe's chain.
-///
-/// <para>
-/// <b>This is the first work in the project whose output only another bot can buy.</b> A mage vendor sells
-/// the first three circles and nothing above them, so every scroll from the fourth circle up that exists on
-/// this shard was written by somebody. Mining put metal out that nothing needed; sewing bought its cloth from
-/// a shelf. This trade sits on both sides of a market made of bots: it buys herbs and paper from shopkeepers
-/// and sells the one thing shopkeepers cannot supply.
-/// </para>
-///
-/// <para>
-/// <b>Filling its own book costs it nothing and is decided here, not priced anywhere.</b> A scroll it has
-/// just written is worth what the market says; whether it keeps it or sells it does not change what it
-/// produced. So the first one of a kind goes into its own book if the book lacks it, and every further one is
-/// sold — and "collecting all the spells" turns out to be what happens to a scribe who gets good at writing,
-/// rather than a goal anybody had to give it a price for.
-/// </para>
-///
-/// <para>
-/// <b>Mana is the throttle, and it is the engine's.</b> Four for the first circle, fifty for the eighth. A
-/// mage with fifty Intelligence writes one top-circle scroll and then has to sit down, which is why this trade
-/// and Meditation are on the same vector.
-/// </para>
-/// </summary>
 public sealed class BotInscribe : BotDeed
 {
+
     public const string Trade = "inscribe";
 
     public static double Prior { get; set; } = 60.0;
@@ -198,6 +174,7 @@ public sealed class BotInscribe : BotDeed
 
     private BotDoing Shopping(IBotWilful bot, Mobile body)
     {
+
         var paper = PaperWanted(body);
 
         if (paper <= 0 && !HerbsLacking(body))
@@ -214,11 +191,13 @@ public sealed class BotInscribe : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
+
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for blank scrolls");
         }
 
         if (paper > 0 && BotShops.Buy(bot, _shop, typeof(BlankScroll), paper, out var refused) <= 0)
         {
+
             var next = BotShops.Next(bot, _shop, typeof(BlankScroll), ref _repicks);
 
             if (next != null)
@@ -430,6 +409,7 @@ public sealed class BotInscribe : BotDeed
     {
         if (_scrolls <= 0)
         {
+
             return BotDoing.Done($"{_swings} attempts, nothing came of it{(_worn ? ", the pen worn through" : "")}");
         }
 

@@ -4,31 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers any bot with a mana pool the chance to lay in a few attack scrolls.
-///
-/// <para>
-/// <b>The market had a supplier and no customers, and this is why.</b> Scribes write scrolls all day and put
-/// them on the stalls; the only bot that ever asked for one was a bot filling a spellbook, because
-/// <see cref="BotSeeker"/> refuses outright to anybody without a book. So the whole of demand was "mages
-/// completing their libraries" — a want each, once, for ever — the goods piled up unsold, and the dashboard's
-/// board of what the population is short of stayed empty for days while the log cheerfully reported scrolls
-/// being written. A market with one buyer per spell is not a market.
-/// </para>
-///
-/// <para>
-/// <b>And a scroll is not a mage's tool.</b> The engine settles that: <c>Spell.ConsumeReagents</c> waves the
-/// herbs away the moment a scroll is attached, no book is consulted anywhere, and the scroll is spent on the
-/// cast. A warrior can throw two arrows at something on the way in and then draw a blade; a crafter caught in
-/// the open can throw the thing that is chasing it instead of dying with a hammer in its hands. That is what
-/// these are for, and it makes every fight on the shard into recurring demand for somebody's work — which is
-/// the one shape of trade this economy has been missing.
-/// </para>
-///
-/// <para>
-/// It is offered, priced and refused like any other work. A bot that would rather dig, digs.
-/// </para>
-/// </summary>
 public sealed class BotArmoury : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotArmoury));
@@ -89,6 +64,7 @@ public sealed class BotArmoury : IBotProposer
 
         if (kind == null)
         {
+
             if (spell < 0)
             {
                 NoPool++;

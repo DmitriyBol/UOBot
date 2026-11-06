@@ -6,59 +6,9 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// <b>The road the planner would draw, judged where the straight line refuses (06.10.2026, road15; Patrick's targets of that
-/// night: paths 99 %, work 95 %, Needs 95 %, "money gathers very slowly", and his rule of 03.10: "zones are for understanding
-/// danger and who can be met, but the actual presence nearby must not be excluded").</b>
-///
-/// <para>
-/// <b>Measured on build 400 (04.10, 11.3 h, 210 bots).</b> <see cref="Road"/> was asked 64.0 million times and refused 56.6
-/// million (88 %): 5.0 million refusals an hour, the first veto printed for weave 579 times an hour, prowl 351, envoy 322,
-/// deliver 219, errand 201. The square that refused asked a median 5.2 times what the work brought (9000 against 1511), and
-/// 91 % of the printed refusals by the record were for a square nobody had died on in the three hours before: the record of a
-/// square is one number moved a quarter by every death, whoever died and whatever killed, kept across restarts and bought
-/// back only by crossings the veto itself prevents. And the line is not the road: the planner already charges such a square
-/// <see cref="BloodBeyond"/> tiles a node and a deadly patrol <see cref="DeadlyCost"/>, and goes round both.
-/// </para>
-///
-/// <para>
-/// <b>The rule (second form, 06.10.2026, road16).</b> The line is asked first, as before, and a road it passes is offered
-/// as before. A road it refuses is judged: a search over the navigation graph for a road <em>clear</em> of ground beyond
-/// the walker — every node further than <see cref="RoadStep"/> tiles from both ends and outside guarded ground is read as
-/// the line's samples were (a patrol crossed at <see cref="ZoneRoadShare"/> of its fight; the record of a square somebody
-/// died on within <see cref="RoadFreshMs"/>, or where creatures were counted now, or with dead of an age unknown since the
-/// boot, against ×<see cref="RoadDare"/>; an older record past ×<see cref="RoadStaleDare"/>), and a node that fails is not
-/// walked through — priced for the rest by the planners' own hook (<see cref="Cost"/>) for a walker of that strength, no
-/// further than <see cref="RouteDetour"/> tiles outside the line's own box and <see cref="RouteMost"/> nodes. A clear road
-/// found is offered only when the planner would draw it: when its price is within <see cref="RouteSlack"/> tiles of the
-/// straight distance, since any road through one node beyond the walker costs the planner at least the straight distance
-/// and <see cref="BloodBeyond"/> more; a clear road dearer than that is a detour the walk would not take, and the line's
-/// refusal stands. Where no clear road is found inside the box, or the question was not asked (more than
-/// <see cref="RoutePerSecond"/> searches or <see cref="RouteMsPerSecond"/> ms this second, ends the graph cannot place),
-/// the line's answer stands. A verdict is kept <see cref="RouteKeepMs"/> for its origin square of <see cref="Cell"/> tiles,
-/// goal square and band of strength, and a kept verdict answers any walker.
-/// </para>
-///
-/// <para>
-/// <b>Why the second form (build 405, 3.5 h).</b> The first form priced the whole road and read it after: with a record past
-/// the walker charged 300 tiles a node and 1341 squares of the island so priced, the search's estimate was nothing like the
-/// cost, it expanded the whole box before the goal and hit its 3000 nodes: 567 080 of 604 629 judgements were "no road
-/// within 240 tiles" (2820 nodes a search), while offline 47–67 % of a sample of 120 had a clear road inside the box. And
-/// 16.4 M of 21.6 M line refusals were never judged for a walker that had not stood two seconds: 74 % of the road vetoes
-/// printed at the moment a bot took work were those, and the bot had come from elsewhere in the minute before — a bot
-/// chooses its next work the moment it stops. The standing rule is gone; a walker holding work (<c>busy</c>) searches only
-/// while the second's budget is under <see cref="RouteBusyShare"/>, and reads kept verdicts freely.
-/// </para>
-///
-/// <para>
-/// <b>What it costs, read directly.</b> A road offered here that the line refused is remembered for its walker; when the
-/// walk draws a leg to it the road is counted walked (<see cref="RouteWalked"/>), and a death within
-/// <see cref="RouteDeathMs"/> of such a leg is counted (<see cref="RouteDied"/>): deaths on roads the old rule would have
-/// refused. <see cref="RouteJudged"/> off is the old rule.
-/// </para>
-/// </summary>
 public static partial class BotDanger
 {
+
     public static bool RouteJudged { get; set; } = true;
 
     public static bool RouteAlways { get; set; }
@@ -159,6 +109,7 @@ public static partial class BotDanger
 
     private enum RouteVerdict : byte
     {
+
         None,
         Clear,
 
@@ -175,6 +126,7 @@ public static partial class BotDanger
     {
         public long Tick;
         public RouteVerdict Verdict;
+
         public float Asked;
     }
 
@@ -291,6 +243,7 @@ public static partial class BotDanger
             }
             else
             {
+
                 kept.Verdict = RouteVerdict.Unplaced;
             }
 
@@ -346,6 +299,7 @@ public static partial class BotDanger
                 }
             case RouteVerdict.Detour:
                 {
+
                     if (lineRefused)
                     {
                         RouteDetours++;
@@ -362,6 +316,7 @@ public static partial class BotDanger
                 }
             default:
                 {
+
                     if (lineRefused)
                     {
                         RouteNone++;

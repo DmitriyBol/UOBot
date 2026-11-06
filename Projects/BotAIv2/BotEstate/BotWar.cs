@@ -5,43 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The wars themselves: which pairs are fighting, what each side has taken off the other, and the rules
-/// that begin, end and forbid one.
-///
-/// <para>
-/// <b>Patrick's order of 13.09.2026, and the twelve hours that produced it.</b> Between 02:12 and 14:21
-/// the shard declared twelve wars and ended five; the worst opinion on the island sat at the floor of the
-/// scale for the whole session, seven wars stood at once, and 3,054 bots were killed by other bots —
-/// about 250 an hour, one death every fifteen seconds. Nothing in the war ever finished it: it began as a
-/// number crossing a threshold and it could only end as the same number climbing back, and 4,337 refusals
-/// to move along at twelve apiece meant the number never climbed anywhere. A war with no way to be won is
-/// not a war, it is the weather.
-/// </para>
-///
-/// <para>
-/// <b>Four rules, each a dial, and the whole design is that a war now has an end it can reach.</b> It is
-/// won by <see cref="Kills"/> of the enemy or by <see cref="Loot"/> gold's worth taken off their corpses;
-/// it cannot be ended by a change of heart before <see cref="LeastMs"/>, and it is judged on what blood
-/// there was when <see cref="LongestMs"/> runs out. A guild may declare one war in <see cref="DeclareEveryMs"/>
-/// and stand in <see cref="MostWars"/> at a time, and the two guilds keep a truce of <see cref="TruceMs"/>
-/// afterwards — a peace that is broken the next minute was not a peace.
-/// </para>
-///
-/// <para>
-/// <b>The opinion still decides when a war begins; this decides whether it may.</b> <c>BotRegard</c> keeps
-/// what every guild thinks of every other and asks here before it declares. The engine still holds the war
-/// itself (<c>Guild.IsWar</c>) and still does the enforcing — nothing about notoriety or looting changed.
-/// What changed is that a war is a thing with a beginning, a score and an end, all of them printed.
-/// </para>
-///
-/// <para>
-/// <b>One war begins without an opinion and without a meeting: a claim on a square another guild holds</b> (Patrick,
-/// 06.10.2026). <c>BotSeizure.Seize</c> declares it at once, the claimant the declarer of record, past the truce, the clock
-/// and the count of wars; the claimant has weighed it before (<c>BotSeizure.Weigh</c>). Everything after the declaration —
-/// score, ends, capitulation, the losing side's call — is the same as for any other war here.
-/// </para>
-/// </summary>
 public static class BotWar
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWar));
@@ -152,9 +115,9 @@ public static class BotWar
 
     public static long Plundered { get; private set; }
 
-    /// <summary>One war.</summary>
     public sealed class War
     {
+
         public string A;
 
         public string B;
@@ -596,6 +559,7 @@ public static class BotWar
 
         foreach (var (pair, _) in _wars)
         {
+
             if (pair.A == BotUnderworld.GuildName || pair.B == BotUnderworld.GuildName)
             {
                 (stale ??= []).Add(pair);
@@ -651,6 +615,7 @@ public static class BotWar
 
             for (var i = 0; i < enemies.Count; i++)
             {
+
                 if (enemies[i] is Guild theirs && theirs.Name != BotUnderworld.GuildName && Of(mine.Name, theirs.Name) == null)
                 {
                     standing.Add((mine, theirs));
@@ -1133,6 +1098,7 @@ public static class BotWar
 
     public static void Forget()
     {
+
         BotSeizure.Wipe();
         _wars.Clear();
         _truces.Clear();

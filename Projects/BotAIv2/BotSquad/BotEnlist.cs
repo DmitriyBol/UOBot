@@ -4,25 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Falling in with a company that is already fighting, rather than starting a fight of your own beside it.
-///
-/// <para>
-/// <b>A company could only ever be joined at the moment it was formed, and after that it was closed.</b>
-/// <c>BotBand</c> and <c>BotSweep</c> both sweep up whoever is standing nearby when they call the roll, and
-/// neither ever looks again — so a bot that walked into a graveyard thirty seconds later found five of its
-/// own people fighting a troll, four of them in a formation with room for a fifth, and had no way at all to
-/// go and stand with them. What it did instead was pick its own quarry two tiles away and fight it alone,
-/// which is the one thing a company exists to stop.
-/// </para>
-///
-/// <para>
-/// <b>It is an offer to the newcomer, not a summons from the company.</b> Written the other way round — the
-/// squad reaching out and pulling people in — it would be the squad deciding what somebody else's afternoon
-/// is for, and this shard has refused that shape since its first week. The bot weighs falling in against
-/// everything else it could do, in the same auction, and a miner with a good vein is entitled to walk past.
-/// </para>
-/// </summary>
 public sealed class BotEnlist : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEnlist));
@@ -129,6 +110,8 @@ public sealed class BotEnlist : BotDeed
 
     public override bool Resumes => true;
 
+    public override bool Keeps => true;
+
     public override bool Committed => true;
 
     public override bool Pressing(IBotWilful bot) => Standing();
@@ -158,6 +141,7 @@ public sealed class BotEnlist : BotDeed
         {
             if (_joined || _pressedIn)
             {
+
                 _letGo = !_served;
 
                 if (_letGo)
@@ -222,6 +206,7 @@ public sealed class BotEnlist : BotDeed
 
         if (!BotSquads.Join(_squad, member))
         {
+
             return BotDoing.Failed($"company {_squad.Id} had no room by the time it arrived");
         }
 
@@ -321,6 +306,7 @@ public sealed class BotEnlist : BotDeed
 
         if (self is { Deleted: false, Alive: true } && anchor != Point3D.Zero && !self.InRange(anchor, CloseUp))
         {
+
             if (_squad.Leader?.Self is { Deleted: false, Alive: true } across
                 && Math.Max(Math.Abs(self.X - across.X), Math.Abs(self.Y - across.Y)) > BotDelve.GateApart
                 && BotGates.MoongateAt(self.Location, across.Location) is { } moon && BotGates.Travel(self, moon))
@@ -344,6 +330,7 @@ public sealed class BotEnlist : BotDeed
 
             if (!bound)
             {
+
                 var off = Math.Max(Math.Abs(self.X - anchor.X), Math.Abs(self.Y - anchor.Y));
 
                 if (Core.TickCount - _stillUntil < 0)
@@ -399,6 +386,7 @@ public sealed class BotEnlist : BotDeed
 
                 if (lead is { Deleted: false, Alive: true } && lead.Map == _map && !ReferenceEquals(lead, self))
                 {
+
                     var stale = _closeAt != Point3D.Zero && self.InRange(_closeAt, arrive);
 
                     if (_closeAt == Point3D.Zero || !lead.InRange(_closeAt, CloseUp) || stale)
@@ -498,16 +486,6 @@ public sealed class BotEnlist : BotDeed
         _squad is { Count: >= 2, Disbanded: false } && _squad.Map == _map && _squad.Leader?.Self is { Deleted: false, Alive: true };
 }
 
-/// <summary>
-/// Offers a free bot a place in whatever company is fighting within sight of it.
-///
-/// <para>
-/// <b>Only companies that are actually in a fight, and only ones with room.</b> A company marching or
-/// scouting has no need of a fifth body and would only be slowed by one arriving from behind; a company that
-/// is <em>Fighting</em> is short-handed by definition, because that is what being in a fight means. And a
-/// full one is not offered at all, so nobody ever walks forty tiles to be turned away.
-/// </para>
-/// </summary>
 public sealed class BotEnlister : IBotProposer
 {
     public string Name => "Enlist";

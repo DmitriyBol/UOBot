@@ -6,24 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Making arrows: buy the wood if it is short of it, cut the shafts, feather them, and hand them to whoever
-/// put the money down.
-///
-/// <para>
-/// <b>Three legs and no station.</b> The smith walks to a forge and the tailor to a counter; a fletcher works
-/// wherever it is standing, so the only walking here is to a carpenter for logs and to a counter to sell.
-/// See <see cref="BotFletching"/> for why this trade exists and why the feather is the half that matters.
-/// </para>
-///
-/// <para>
-/// <b>Feathers are never bought from a shopkeeper, because no shopkeeper on this shard has one.</b> They
-/// come out of the pack — a hunter that went through a bird's corpse is carrying them — or off the
-/// population's own market, where that hunter listed them. That is the whole loop Patrick asked for, and it
-/// is the same shape as the leather one: something is killed, the market moves the parts, a crafter turns
-/// them into a thing the killer needs.
-/// </para>
-/// </summary>
 public sealed class BotFletch : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFletch));
@@ -93,6 +75,7 @@ public sealed class BotFletch : BotDeed
         _price = price;
         _take = take;
         _order = order;
+
         _leg = take > 0 ? Leg.Wood : Leg.Work;
     }
 
@@ -191,11 +174,13 @@ public sealed class BotFletch : BotDeed
 
         if (!body.InRange(_shop.Location, BotShops.CounterReach))
         {
+
             return BotDoing.Walk(_shop.Map, _shop, BotArrival.Within(BotShops.CounterReach), $"to {_shop.Name} for wood");
         }
 
         if (BotShops.Buy(bot, _shop, typeof(Log), _take, out var refused) <= 0)
         {
+
             var next = BotShops.Next(bot, _shop, typeof(Log), ref _repicks);
 
             if (next != null)
@@ -243,6 +228,7 @@ public sealed class BotFletch : BotDeed
 
         if (feathers <= 0)
         {
+
             return Finish("no feathers left to fletch with");
         }
 

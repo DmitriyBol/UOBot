@@ -5,42 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a guild has claimed of the island itself, square by square, and how a claim is won.
-///
-/// <para>
-/// <b>Patrick's order of 10.09.2026.</b> A guild may lay claim to a quadrant — four of them for nothing and
-/// five thousand gold for each one after that. Having declared, it gathers there; if no other guild comes
-/// and beats it, the square passes into that guild's zone of influence. Another guild may lay claim to a
-/// square somebody already holds, and chooses as it does: five thousand to take the square for itself, or
-/// two and a half to strike the holder's name off it and leave it to nobody. A square somebody took with one
-/// of their free claims may be claimed against for nothing at all.
-/// </para>
-///
-/// <para>
-/// <b>Why a square rather than a circle.</b> <c>BotQuad</c> already cuts the island into thirty-tile squares
-/// and the population already has an opinion about each one — how safe it is, what lives there, how often
-/// somebody was hit. Land a guild can own had to be the same shape as land the population can talk about, or
-/// the map would have carried two different griddings of the same island and every question would have had
-/// to say which it meant.
-/// </para>
-///
-/// <para>
-/// <b>Held is a register and land near a hall is not.</b> <c>BotLand</c> computes its claim from where the
-/// halls stand, deliberately, so it can never go stale. This cannot be computed from anything — it is the
-/// record of something that happened — so it is kept, and it is cleared on a world reload like every other
-/// board on this shard.
-/// </para>
-///
-/// <para>
-/// <b>Claiming somebody's square is an act against them and is filed as one.</b> See
-/// <c>BotRegard.Claimed</c>: it costs the holder's opinion of the claimant about half what a killing costs,
-/// so two claims against the same guild is roughly a war. That is the whole of how a contested claim comes
-/// to be fought over — the fighting itself belongs to <c>BotFeud</c>, which needs a war and will have one.
-/// Since 06.10.2026 the war is not left to the opinion: the claim is a war at once and has a price in everybody's
-/// regard (<c>BotSeizure</c>), and the staker weighs both before it declares (<c>BotHolder</c>).
-/// </para>
-/// </summary>
 public static class BotClaim
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotClaim));
@@ -95,9 +59,9 @@ public static class BotClaim
 
     public static long Paid { get; private set; }
 
-    /// <summary>What a claim is for.</summary>
     public enum Kind
     {
+
         Settle,
 
         Oust,
@@ -105,7 +69,6 @@ public static class BotClaim
         Strip
     }
 
-    /// <summary>A square somebody holds.</summary>
     private sealed class Holding
     {
         public string Guild;
@@ -113,7 +76,6 @@ public static class BotClaim
         public bool Bought;
     }
 
-    /// <summary>A claim in progress.</summary>
     public sealed class Bid
     {
         public string Guild;
@@ -381,6 +343,7 @@ public static class BotClaim
             }
             else
             {
+
                 for (var dx = -1; dx <= 1; dx++)
                 {
                     for (var dy = -1; dy <= 1; dy++)
@@ -526,6 +489,7 @@ public static class BotClaim
     {
         if (!_held.TryGetValue(key, out var held))
         {
+
             var nth = Holds(guild) + 1;
 
             if (nth <= Free)
@@ -598,6 +562,7 @@ public static class BotClaim
             }
             else
             {
+
                 escrow = price;
                 Escrowed += price;
                 EscrowedClaims++;
@@ -623,6 +588,7 @@ public static class BotClaim
 
         if (held != null)
         {
+
             BotSeizure.Seize(guild, held.Guild, middle, want, price);
 
             BotRegard.Claimed(guild.Name, held.Guild, Important(held.Guild, map, middle));
@@ -916,6 +882,7 @@ public static class BotClaim
 
         if (_bids.ContainsKey((facet, x, y)) || _byGuild.ContainsKey(guild) || middle == Point3D.Zero)
         {
+
             if (escrow > 0)
             {
                 _owed.Add((guild, (facet, x, y), escrow));
@@ -932,6 +899,7 @@ public static class BotClaim
             Middle = middle,
             Key = (facet, x, y),
             Began = Core.TickCount,
+
             From = string.IsNullOrEmpty(from) ? null : from,
             Escrow = Math.Max(0, escrow)
         };
@@ -1114,6 +1082,7 @@ public static class BotClaim
 
     public static void Forget()
     {
+
         foreach (var bid in _bids.Values)
         {
             if (bid.Escrow > 0)

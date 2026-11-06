@@ -4,19 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Every class, built once, looked up by name.
-///
-/// A registry rather than an enum, because a class is a couple of dozen numbers and a kit, and an enum
-/// would only be a label pointing at a switch statement somewhere else. Everything that wants to know
-/// what a healer is asks here.
-///
-/// <para>
-/// Names are the key everywhere — configuration, logs, the summary — and they are stable strings
-/// rather than positions in a list. The first version learned the general form of this lesson about
-/// cities: the thing you identify something by must not be able to move.
-/// </para>
-/// </summary>
 public static class BotClasses
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotClasses));
@@ -47,6 +34,7 @@ public static class BotClasses
     {
         for (var i = 0; i < _all.Length; i++)
         {
+
             _all[i].Reset();
 
             _byName[_all[i].Name] = _all[i];
@@ -115,10 +103,6 @@ public static class BotClasses
     }
 }
 
-/// <summary>
-/// What configuration is allowed to say about one class. Every member is optional; absent means "leave
-/// the number the code chose".
-/// </summary>
 public sealed class BotClassOverride
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotClassOverride));

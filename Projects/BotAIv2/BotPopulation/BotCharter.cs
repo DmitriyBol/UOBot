@@ -7,33 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a guild's maker has told the guild to be doing: a trade to gather at, a trade to make at, and
-/// somewhere to be.
-///
-/// <para>
-/// <b>Patrick's order of 11.09.2026.</b> The crafters are the guilds' makers and the only bots on this shard
-/// with a mind; until now that mind chose work for one body. This gives it the guild: it may say what the
-/// band should be collecting, what it should be making, and where it should all be. Everything else about a
-/// guild — its hall, its ground, its wars — is already somebody's business; what nobody had was the ability
-/// to point fifteen bots at one thing.
-/// </para>
-///
-/// <para>
-/// <b>An order is a price and never a command, which is the rule this whole shard is built on.</b> A
-/// charter multiplies what the named work is worth to a member, exactly as a revel does and exactly as a
-/// guild's own ground does. A bot with something better in front of it goes on doing that, and a charter
-/// nobody follows is a fact about the order rather than a fault in the bots — it shows up as a charter that
-/// expired with nothing done under it.
-/// </para>
-///
-/// <para>
-/// <b>Named in trades, not in materials, and that is deliberate.</b> The mind already answers with a trade
-/// out of an enum of the trades this shard actually has; letting it name a material instead would mean a
-/// second vocabulary, a second way to be wrong, and a mapping from goods to work that nothing else needs.
-/// "Gather at mining" and "make at the forge" are the same orders in the words the shard already speaks.
-/// </para>
-/// </summary>
 public static class BotCharter
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCharter));
@@ -75,7 +48,6 @@ public static class BotCharter
 
     public static long Fetched { get; private set; }
 
-    /// <summary>One request on a guild's board.</summary>
     private sealed class Request
     {
         public string Material;
@@ -335,7 +307,6 @@ public static class BotCharter
         return string.Join("; ", said);
     }
 
-    /// <summary>What one guild has standing.</summary>
     private sealed class Charter
     {
         public string Gather;

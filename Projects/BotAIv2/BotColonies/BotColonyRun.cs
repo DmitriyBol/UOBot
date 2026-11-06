@@ -7,10 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers the holder of a colony's ship, on the colony's land, the run home: when the store holds <see cref="BotColonies.CargoAt"/>
-/// units, or a colonist's shift is over — and no oftener than <see cref="BotColonies.RunEveryMs"/>.
-/// </summary>
 public sealed class BotColonyRunner : IBotProposer
 {
     public const string Office = "colonyrun";
@@ -97,11 +93,6 @@ public sealed class BotColonyRunner : IBotProposer
     }
 }
 
-/// <summary>
-/// The run home: the store's goods into the captain's pack as far as it can carry them, the colonists whose shift is over at its
-/// side at the island's dock, the voyage, the ore melted at a mainland fire, the goods sold over the counters that pay best,
-/// and what they fetched shared — the captain's share kept, the hands' share into their banks, the rest into the guild's chest.
-/// </summary>
 public sealed class BotColonyRun : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotColonyRun));
@@ -503,6 +494,7 @@ public sealed class BotColonyRun : BotDeed
                 }
             default:
                 {
+
                     if (_afloat && _passage.State == BotSailing.Tide.Sailing && BotHelm.Of(body) == null)
                     {
                         _passage.State = BotSailing.Tide.Landed;
@@ -761,6 +753,7 @@ public sealed class BotColonyRun : BotDeed
 
         if (!Banker.Deposit(hand, gold))
         {
+
             Banker.Deposit(captain, gold);
 
             return false;

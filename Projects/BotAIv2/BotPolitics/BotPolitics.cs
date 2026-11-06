@@ -9,24 +9,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Politics inside guilds and towns, as one clock: the page's politics object, the phrases, and the seams other folders wire.
-///
-/// <para>
-/// The four parts are <see cref="BotElection"/> (the head by vote, and the plot that deposes it), <see cref="BotPurpose"/>
-/// (what the chest saves for, by vote), <see cref="BotCouncil"/> (the towns' posts, their income and the outcasts' surcharge)
-/// and <see cref="BotTribute"/> (ultimatums, and tribute instead of war). Patrick's order of 07.10.2026, night.
-/// </para>
-///
-/// <para>
-/// <b>Three seams are left for other folders, wired at merge.</b> <see cref="TiesRegard"/> (what one bot thinks of another —
-/// <c>BotTies.Regard</c>) and <see cref="Veteran"/> (<c>BotTraits.Veteran</c>) come from the character folder, and
-/// <see cref="Ransom"/> (what a guild's jailed members' ransom needs) from the crime folder. Until wired they are null and
-/// read as nought: voters weigh records alone, nobody is discontented by dislike, and no chest saves for a ransom.
-/// </para>
-/// </summary>
 public static class BotPolitics
 {
+
     public static Func<BotMobile, BotMobile, double> TiesRegard { get; set; }
 
     public static Func<BotMobile, bool> Veteran { get; set; }
@@ -109,7 +94,6 @@ public static class BotPolitics
         };
 }
 
-/// <summary>The numbers of <c>Configuration/bot-politics.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotPoliticsSettings
 {
     public bool? Elections { get; set; }
@@ -153,10 +137,6 @@ public sealed class BotPoliticsSettings
     public double? TributeShare { get; set; }
 }
 
-/// <summary>
-/// Politics as a module: reads its file, fills the voice's bank, offers the captain's guard, and runs the clock. World phase,
-/// after the population, the will, the travel, the estate and the diplomacy, whose guilds, towns, chests and wars it reads.
-/// </summary>
 public sealed class BotPoliticsModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPoliticsModule));

@@ -5,29 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The ambush on the road: two or three of The Shadow lie in wait ahead of a lone carrier with goods worth taking, out of any
-/// guarded town, and fall on it as it passes.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "ambushes on lone carriers with goods on the road … this gives a living reason for guards, escorts and
-/// caravan guards."</b> A carrier is a bot on a delivery (<see cref="BotDeliver"/>) or a trader's haul (<see cref="BotHaul"/>)
-/// whose goods are worth <see cref="LeastCargo"/> or more by the market's worth; lone means nobody of ours who could fight
-/// within <see cref="EscortWithin"/> tiles, so an escort or a caravan guard makes it no target at all. One party at a time
-/// (<see cref="EveryMs"/> between them), never in a guarded town, and only when the party is no weaker than the carrier
-/// (<see cref="ChooseOdds"/>), the companies' own choosing rule.
-/// </para>
-///
-/// <para>
-/// <b>The fight is the engine's, and so is the carrier's answer.</b> The bandits close with <see cref="BotBrawl"/>'s robbery; the
-/// carrier's reflexes (react14 on) fight, flee or cry for help as against anything; beaten to a quarter it chooses by
-/// <see cref="BotQuarter"/>'s rule — help near or still a match: fight on; a ward in reach: run; otherwise throw half its pack
-/// down — and the bandits take what is thrown and go. They withdraw as a company does, when what stands against them on the
-/// field passes <c>BotSquad.WithdrawOdds</c> times their own strength. A carrier killed is a murder on the killer's record (red,
-/// the Baron's patrol, the inquest), and its corpse is gone through. A carrier that lives reports the whole party: posted at once.
-/// What is taken is stolen goods (<see cref="BotCrime.Heat"/>) and goes to the fence.
-/// </para>
-/// </summary>
 public static class BotHighway
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHighway));
@@ -172,7 +149,6 @@ public static class BotHighway
 
     private static readonly int[] _cargoSort = new int[CargoWindow];
 
-    /// <summary>One ambush: who lies in wait, for whom, where, and how it has gone.</summary>
     public sealed class Party
     {
         public readonly List<BotMobile> Members = [];
@@ -314,6 +290,7 @@ public static class BotHighway
             }
             else if (Press && !party.Hit && party.Took.Count > 0 && party.Committed() < Math.Max(1, LeastParty))
             {
+
                 FellApart++;
                 Close(party, $"fewer than {Math.Max(1, LeastParty)} of the band were left on it before the carrier came");
             }
@@ -1407,7 +1384,6 @@ public static class BotHighway
             : $"cargo of the last {_cargoCount} carriers on the roads: {Quantile(0.5)}gp at the median, {Quantile(0.75)} at the 75th percentile, {Quantile(0.9)} at the 90th";
 }
 
-/// <summary>Offers a bandit called to the standing ambush its place in it. See <see cref="BotHighway"/>.</summary>
 public sealed class BotHighwayman : IBotProposer
 {
     public string Name => "Highwayman";
@@ -1426,7 +1402,6 @@ public sealed class BotHighwayman : IBotProposer
     }
 }
 
-/// <summary>One bandit's part in an ambush: walk to the spot, hide, wait for the carrier, strike, and go through what is left.</summary>
 public sealed class BotLieInWait : BotDeed
 {
     public const string Trade = "ambush";
@@ -1520,6 +1495,7 @@ public sealed class BotLieInWait : BotDeed
 
             if (!_party.Hit && body.InRange(carrier.Location, BotHighway.StrikeWithin) && body.InLOS(carrier) && !BotHighway.Together(_party, carrier))
             {
+
                 return BotDoing.Work($"lying in wait for {carrier.Name}, waiting for the rest of the band");
             }
 
@@ -1535,6 +1511,7 @@ public sealed class BotLieInWait : BotDeed
             {
                 if (_stamp != _party.SpotStamp)
                 {
+
                     _stamp = _party.SpotStamp;
                     _waitFrom = 0;
                 }

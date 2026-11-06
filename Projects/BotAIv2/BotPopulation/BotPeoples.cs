@@ -6,9 +6,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One people of the population, as <c>Configuration/bot-names.json</c> describes it.</summary>
 public sealed class BotPeopleSettings
 {
+
     public string Race { get; set; }
 
     public double? Share { get; set; }
@@ -29,39 +29,6 @@ public sealed class BotNamesSettings
     public Dictionary<string, BotPeopleSettings> Peoples { get; set; }
 }
 
-/// <summary>
-/// Who the bots are born as: their people, their name, their race and their looks.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, points seven and eight: "add a settings document that says where the bots' names
-/// come from; invent two hundred names of the period, human, elvish and dwarvish, from the warlike to the magical; and
-/// teach the bots to be born of different classes and races."</b> Until now every bot was a human of one of sixty-four
-/// given names and twenty-two houses, dealt in order (<c>BotPopulation.Names</c>), and every class drew from the same
-/// pool.
-/// </para>
-///
-/// <para>
-/// <b>The file is the authority, and the code is what the file says when it says nothing.</b> The whole bank below is
-/// written to <c>Configuration/bot-names.json</c> the first time the shard runs, so the names can be changed, added to
-/// or replaced without touching the code; a people taken out of the file is a people nobody is born as. A name is
-/// never dealt twice while somebody wears it, and a newcomer is never given a name whose learning the shard still
-/// remembers (<c>BotProgress</c>), which is the old rule kept: the name is the key to everything a bot has learned.
-/// </para>
-///
-/// <para>
-/// <b>Race is the engine's, and a people is a name for it.</b> Humans and elves are bodies the client draws
-/// (<c>Race.Human</c>, <c>Race.Elf</c>); there are no dwarves in this era's client, so the dwarves are humans with
-/// beards, dwarvish names and a dwarf's leanings — smiths, warriors and architects more often than mages. Elves lean
-/// the other way. The class is dealt first, from the configured mix, as it always was; the people is drawn for the
-/// class, by share times the class's weight; the name follows the people and the sex.
-/// </para>
-///
-/// <para>
-/// <b>Which people a bot is, is read off its name.</b> Nothing new is saved: the race is the engine's and survives a
-/// restart with the body; the people is whichever list the given name is in, so the dashboard and the log can say it
-/// and the wipe has nothing to clear.
-/// </para>
-/// </summary>
 public static class BotPeoples
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPeoples));

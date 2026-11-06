@@ -4,34 +4,9 @@ using Server.Guilds;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What is said round a fire and on the road: a greeting and a welcome, then news of the roads, the worst ground near,
-/// trade and the speaker's guild, and small talk, with an answer now and then.
-///
-/// <para>
-/// The news is read where the shard keeps it: the roads the population has walked and how they read
-/// (<see cref="BotRoadbook"/>), the worst square near by the quadrant map (<see cref="BotQuad"/>), what the speaker is
-/// carrying that somebody wants, or after, or what the island's wants pay most for (<see cref="BotMarket"/>), how its guild's war stands
-/// (<see cref="BotWar"/>) or what it is working towards (<c>BotGuilds.Aim</c>).
-/// </para>
-///
-/// <para>
-/// <b>Every line is a fact the shard already keeps, said in the voice's own channel.</b> Nothing here is decided for the
-/// sake of talking: a road's band is <c>BotRoadbook.Safety</c>, a square's deaths are the quadrant's own count, a price is a
-/// stall's or a want's. So a bot at a fire says what the population knows, which is the only news there is — and the
-/// person watching learns it from the fire, in <c>logs/bot-speech.log</c> and on the event stream, like every other line
-/// (<see cref="BotVoice.Say"/>).
-/// </para>
-///
-/// <para>
-/// <b>Spaced by the fire, not by the bot.</b> The voice rations each bot to a line every fifteen seconds; a fire of five
-/// would then say five lines in a second and nothing for fifteen. Lines here are paced by the fire's own clock
-/// (<see cref="LineMs"/>), said with the voice's <c>force</c> — the use it names, "a line that is the whole point" — and
-/// each bot says at most <see cref="MostLinesEach"/>.
-/// </para>
-/// </summary>
 public static class BotCampTalk
 {
+
     public static int LineMs { get; set; } = 7000;
 
     public static int LineSpreadMs { get; set; } = 4000;
@@ -121,6 +96,10 @@ public static class BotCampTalk
                 "I could sleep for a week."
             ],
             ["camp:reply"] = ["Is that so.", "Good to know.", "Hm.", "Aye.", "I'll keep that in mind.", "Huh. Thanks."],
+            ["camp:tale-witness"] = ["Aye, {about}. I know them well.", "I have a tale of {about} myself, another evening.", "So that's what became of {about}."],
+            ["camp:tale-heard"] = ["I've heard this one — told well all the same.", "Aye, {about}'s name travels.", "This one's reached my ears before."],
+            ["camp:tale-retold"] = ["A story I picked up in {place}, from {teller}: {tale}", "{teller} told it in {place}, and I tell it again: {tale}", "Word travels. In {place} I heard {teller} tell it: {tale}"],
+            ["abode:furnished"] = ["A bed of my own, at last.", "There. A real bed, in my own house.", "Look at that. A bed, and it's mine."],
             ["meet:greet"] = ["Well met, {other}.", "{other}! Where are you off to?", "Hail, {other}. Keeping well?"],
             ["meet:answer"] = ["Well met yourself.", "About my work. You?", "Can't stop long, {other}.", "Keeping well enough."],
             ["meet:small"] = ["Warm day.", "Long road, this.", "Busy, busy.", "Have you seen the market lately?"]
@@ -179,11 +158,18 @@ public static class BotCampTalk
 
         if (fire.Owed.Who is { } owing)
         {
-            var (_, to, occasion) = fire.Owed;
+            var (_, to, occasion, about) = fire.Owed;
 
             fire.Owed = default;
 
-            if (fire.PlaceOf(owing) is { Seated: true } answerer && Said(fire, answerer, to, occasion, null, null))
+            Dictionary<string, string> owedFill = null;
+
+            if (about != null)
+            {
+                owedFill = new Dictionary<string, string> { ["about"] = about };
+            }
+
+            if (fire.PlaceOf(owing) is { Seated: true } answerer && Said(fire, answerer, to, occasion, null, owedFill))
             {
                 if (occasion == "camp:reply")
                 {
@@ -215,7 +201,7 @@ public static class BotCampTalk
             if (host != null && Said(fire, place, host, "camp:greet", null, null))
             {
                 Greetings++;
-                fire.Owed = (host, place.Bot, "camp:welcome");
+                fire.Owed = (host, place.Bot, "camp:welcome", null);
                 fire.NextLineTick = now + ReplyMs;
 
                 return;
@@ -242,18 +228,68 @@ public static class BotCampTalk
 
         var listener = Other(fire, speaker.Bot, seated, n, preferKeeper: false);
         var fill = new Dictionary<string, string>();
-        var topic = Topic(speaker.Bot, fire.Map, fire.Centre, fill, "camp:small");
 
-        if (Said(fire, speaker, listener, topic, "camp:small", fill) && listener != null && Utility.RandomDouble() < ReplyChance)
+        var audience = new List<Mobile>(n - 1);
+
+        for (var k = 0; k < n; k++)
         {
-            fire.Owed = (listener, speaker.Bot, "camp:reply");
+            var hearer = places[seated[k]].Bot;
+
+            if (!ReferenceEquals(hearer, speaker.Bot))
+            {
+                audience.Add(hearer);
+            }
+        }
+
+        var topic = Topic(speaker.Bot, fire.Map, fire.Centre, fill, "camp:small", out var told, audience);
+
+        if (!Said(fire, speaker, listener, topic, "camp:small", fill))
+        {
+            return;
+        }
+
+        if (told != null)
+        {
+            if (listener != null)
+            {
+                var answer = BotBiography.Answer(listener, told);
+
+                if (answer != null)
+                {
+                    fire.Owed = (listener, speaker.Bot, answer, told.Other);
+                    fire.NextLineTick = now + ReplyMs;
+                }
+                else if (Utility.RandomDouble() < ReplyChance)
+                {
+                    fire.Owed = (listener, speaker.Bot, "camp:reply", null);
+                    fire.NextLineTick = now + ReplyMs;
+                }
+            }
+
+            var place = BotBiography.Place(fire.Map, fire.Centre);
+
+            for (var i = 0; i < fire.Places.Length; i++)
+            {
+                if (fire.Places[i] is { Seated: true, Bot: { } hearer })
+                {
+                    BotBiography.Heard(hearer, speaker.Bot, told, place);
+                }
+            }
+
+            return;
+        }
+
+        if (listener != null && Utility.RandomDouble() < ReplyChance)
+        {
+            fire.Owed = (listener, speaker.Bot, "camp:reply", null);
             fire.NextLineTick = now + ReplyMs;
         }
     }
 
-    public static string Topic(Mobile speaker, Map map, Point3D at, Dictionary<string, string> fill, string small)
+    public static string Topic(Mobile speaker, Map map, Point3D at, Dictionary<string, string> fill, string small, out BotTale told, IEnumerable<Mobile> audience = null)
     {
-        if (BotBiography.Tale(speaker, fill) is { } tale)
+
+        if (BotBiography.Tale(speaker, fill, out told, audience) is { } tale)
         {
             return tale;
         }

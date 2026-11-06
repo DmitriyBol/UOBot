@@ -7,9 +7,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-character.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotCharacterSettings
 {
+
     public bool? Traits { get; set; }
 
     public double? Lean { get; set; }
@@ -24,6 +24,14 @@ public sealed class BotCharacterSettings
 
     public double? TaleChance { get; set; }
 
+    public int? MostHeard { get; set; }
+
+    public double? RetellShare { get; set; }
+
+    public double? TaleRestHours { get; set; }
+
+    public double? SociableTaleBoost { get; set; }
+
     public bool? Ties { get; set; }
 
     public double? DuelAt { get; set; }
@@ -33,18 +41,6 @@ public sealed class BotCharacterSettings
     public bool? Duels { get; set; }
 }
 
-/// <summary>
-/// A bot's character as a module: reads its numbers, puts its words into the voice's bank, offers the seeking out of an enemy
-/// to the auction, runs the clock that challenges, judges duels, lets ties fade and writes the <c>Character:</c> line, and says at
-/// boot how the population's natures fall. Patrick's idea of 07.10.2026 (night 17, "a livelier world"). See <see cref="BotTraits"/>,
-/// <see cref="BotBiography"/>, <see cref="BotTies"/> and <see cref="BotGrudges"/>.
-///
-/// <para>
-/// <b>Registers itself</b> from its own <c>Configure</c>, after <c>BotCore.Configure</c> (priority 41 against 40), rather than from
-/// the list in <c>BotCore</c>: four agents built new modules on the same night and each one line in the same list would have been
-/// four patches colliding in one hunk. A World-phase module needs nothing from the Settings phase, so the order is harmless.
-/// </para>
-/// </summary>
 public sealed class BotCharacterModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCharacterModule));
@@ -78,6 +74,7 @@ public sealed class BotCharacterModule : BotModule
 
     public override void Start()
     {
+
         BotPolitics.TiesRegard = static (a, b) => BotTies.Regard(a, b);
         BotPolitics.Veteran = static bot => BotTraits.Veteran(bot);
 
@@ -217,6 +214,10 @@ public sealed class BotCharacterModule : BotModule
         BotTraits.VeteranKills = settings.VeteranKills ?? BotTraits.VeteranKills;
         BotBiography.On = settings.Biography ?? BotBiography.On;
         BotBiography.TaleChance = settings.TaleChance ?? BotBiography.TaleChance;
+        BotBiography.MostHeard = settings.MostHeard ?? BotBiography.MostHeard;
+        BotBiography.RetellShare = settings.RetellShare ?? BotBiography.RetellShare;
+        BotBiography.TaleRestHours = settings.TaleRestHours ?? BotBiography.TaleRestHours;
+        BotBiography.SociableTaleBoost = settings.SociableTaleBoost ?? BotBiography.SociableTaleBoost;
         BotTies.On = settings.Ties ?? BotTies.On;
         BotTies.DuelAt = settings.DuelAt ?? BotTies.DuelAt;
         BotTies.FriendAt = settings.FriendAt ?? BotTies.FriendAt;
@@ -246,9 +247,9 @@ public sealed class BotCharacterModule : BotModule
     }
 }
 
-/// <summary>A bot's character on its page: <c>/api/bot/&lt;name&gt;</c> and the snapshot. Called by <c>BotWebSnapshot</c>.</summary>
 public static class BotCharacterWeb
 {
+
     public static int MostTies { get; set; } = 6;
 
     public static double LeastRegard { get; set; } = 10.0;

@@ -4,29 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Getting away from whatever is killing it. The one piece of work in this project whose whole product is
-/// that the bot still exists afterwards.
-///
-/// <para>
-/// <b>The rung it answers has had a proposer for a while and it was only half the answer.</b>
-/// <c>Failing</c> is the rung for a bot whose health is going, and the only thing offering work on it was
-/// <see cref="BotMedic"/> — mending, standing still, where it stands. That is right when a bot is simply
-/// hurt and wrong in the one case the rung exists for: three creatures on one bot, the bot at a third of
-/// its health, winding a bandage that takes several seconds while all three go on hitting it. Watched from
-/// a client it reads as a bot that has decided to die politely, and it is the same defect the ladder's own
-/// notes describe twice — <em>standing still is not an option at any number</em> — reappearing as the thing
-/// the rung does instead of standing still.
-/// </para>
-///
-/// <para>
-/// <b>It walks away from the worst of it and no further than that.</b> There is no clever route and there
-/// must not be: a bot computing an escape path is a bot spending the population's whole path-search budget
-/// at the moment it can least afford to stand about. Straight back along the line the creature came in on,
-/// recomputed only on arrival, and towards home when straight back would leave the ground the population
-/// lives on.
-/// </para>
-/// </summary>
 public sealed class BotBolt : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBolt));
@@ -169,6 +146,7 @@ public sealed class BotBolt : BotDeed
         }
         else if (!under)
         {
+
             var home = BotPopulation.HomeOf(body);
 
             if (home == Point3D.Zero || Math.Max(Math.Abs(home.X - body.X), Math.Abs(home.Y - body.Y)) <= 3)
@@ -428,6 +406,7 @@ public sealed class BotBolt : BotDeed
 
         if (worst == null && now - _begun >= _least)
         {
+
             BotFugitive.Cleared(body);
 
             return BotDoing.Done(_legs > 0 ? $"clear of it after {_legs} legs" : "nothing following");
@@ -435,6 +414,7 @@ public sealed class BotBolt : BotDeed
 
         if (now - _begun >= GiveUpMs)
         {
+
             if (worst == null)
             {
                 return BotDoing.Done($"ran for {(now - _begun) / 1000}s");
@@ -453,6 +433,7 @@ public sealed class BotBolt : BotDeed
 
         if (_to == Point3D.Zero)
         {
+
             EndedCornered++;
             BotFugitive.CorneredRun(body);
 
@@ -853,6 +834,7 @@ public sealed class BotBolt : BotDeed
 
     private static Point3D Homeward(Map map, Mobile body)
     {
+
         var home = BotPopulation.HomeOf(body);
         var dx = home.X - body.X;
         var dy = home.Y - body.Y;

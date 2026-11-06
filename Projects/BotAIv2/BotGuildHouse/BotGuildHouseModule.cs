@@ -5,9 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-guildhouse.json</c>. A missing key keeps the code's value.</summary>
 public sealed class BotGuildHouseSettings
 {
+
     public bool? Running { get; set; }
 
     public int? MostPerTown { get; set; }
@@ -47,18 +47,6 @@ public sealed class BotGuildHouseSettings
     public bool? Cache { get; set; }
 }
 
-/// <summary>
-/// Guild houses in the towns, as a module: reads its file, surveys the towns' empty buildings on its own clock, puts every
-/// house of the save back, and looks the guilds over once a minute. Patrick's idea of 29.09.2026, evening. See
-/// <see cref="BotGuildHouses"/>.
-///
-/// <para>
-/// <b>After the estate, the travel and the residences</b>: a house is a seat (<c>BotSeat</c>, the estate's), it is chosen
-/// among the towns the gates join to home (<c>BotTowns</c>, the travel's) and fit to live in (<c>BotSettle</c>, the
-/// residences'), and it moves its members' residence. Switched off (<c>bots.guildhouse.enabled</c>, or <c>Running</c> in the
-/// file), no guild has a house and every seat is what it was before.
-/// </para>
-/// </summary>
 public sealed class BotGuildHouseModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuildHouseModule));

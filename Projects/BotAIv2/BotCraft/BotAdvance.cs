@@ -6,36 +6,10 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A brewer's glass and herbs for a draught somebody has asked for, paid out of that want's own reservation and settled at the
-/// hand-over; what is not settled so the brewer pays back.
-///
-/// <para>
-/// <b>Patrick, 03.10.2026: "proposal 3 — a potion want's reserve pays the alchemist's bottles. Do it."</b> Measured on build 396
-/// (04:19–12:47, 210 bots): 64,759 looks at the mortar, 23 took an order off the board and 67 brewed on spec; 1,946 looks were
-/// brewers holding their herbs whose purse would not carry the glass (the fattest 24gp), and 53,006 held neither. The island
-/// bought 4.4k gp of heal and cure potions an hour over counters (flow9) while 109 potion wants were said in eight hours and a
-/// fifth of their lines failed "offered, nothing brought" or "taken by a carrier, not brought in time". A draught costs about
-/// eight to make (a bottle at five, a herb at three) and is asked for at eight to eleven.
-/// </para>
-///
-/// <para>
-/// <b>An advance, not a gift.</b> At the counter the buyer's account pays what the brewer is short of for the draughts it took
-/// on (<see cref="Lend"/>: the buyer's coin, drawn on its want's own reservation as the meeting would draw on it, into the
-/// brewer's pack and over the counter in the same breath; what the counter did not take goes straight back). The want then holds
-/// that much less (<see cref="On"/>, read by <c>BotMarket.Holds</c>), because the money is already out. At the hand-over the
-/// advance comes off the bill (<see cref="Credit"/>, <see cref="Settle"/>): the buyer pays the rest of the offer and the brewer is
-/// paid the rest. A brewer that does not hand the draughts over owes the money: called when the want is gone, when the want asks
-/// less than is owed, or past <see cref="CallMs"/> with nothing on its way, and paid back out of the brewer's free money as soon as
-/// it has any (<see cref="Sweep"/>). One loan a brewer at a time, for no more draughts than <see cref="MostUnits"/>, and never
-/// for more than the hand-over would pay.
-/// </para>
-/// </summary>
 public static class BotAdvance
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAdvance));
 
-    /// <summary>One brewer's loan against one want.</summary>
     public sealed class Loan
     {
         public Mobile Brewer;

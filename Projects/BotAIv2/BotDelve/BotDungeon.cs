@@ -6,43 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The dungeons of this era: where each one is, what rooms it has, and how hard it is.
-///
-/// <para>
-/// <b>Patrick's order of 11.09.2026: the places at the bottom of the map are meant to be dungeons.</b>
-/// They have been standing in the world since it was generated — twelve of them, six hundred-odd spawners
-/// between them — and nothing on this shard had ever been inside one. They are cut into their own block of
-/// the map, from x 5120 eastward, with no walkable road from the island at all: the engine's own way in is
-/// a teleporter at an entrance, and a bot that plans a walk to one gets "no way through" as many times as
-/// it is asked.
-/// </para>
-///
-/// <para>
-/// <b>The rooms are read out of the world rather than written down here, and that is the difference
-/// between a table and a survey.</b> Every dungeon in the save carries spawners, and a spawner's own
-/// location is a tile the engine itself has decided a creature can stand on. So the rooms of a dungeon are
-/// its spawners — guaranteed to be real floor, guaranteed to be where the fighting is, and guaranteed to
-/// still be right if somebody re-imports the spawn files tomorrow. A hand-typed list of coordinates would
-/// be a promise about a map, and this project has paid for that kind of promise before.
-/// </para>
-///
-/// <para>
-/// <b>And the difficulty is measured, not asserted.</b> Patrick's order names the reason — a demon is
-/// plainly not a harpy — and the shard already has the arithmetic for it: <see cref="BotThreat.Power"/>,
-/// health times what a thing hits for, which is the same number the hunt and the muster weigh a fight by.
-/// One of each creature a dungeon's spawners name is built, measured and destroyed at once, exactly as
-/// <c>BotHarness</c> measures armour. Nothing here decides what those numbers mean; that is
-/// <see cref="BotDelver"/>'s business.
-/// </para>
-///
-/// <para>
-/// <b>The boxes are the one hand-written thing, and they are drawn tight on purpose.</b> Each is the
-/// cluster its own spawn file actually occupies, with the neighbours checked — Shame ends before Ice
-/// begins, the Orc Caves before Terathan Keep — because two boxes that overlap would hand one dungeon the
-/// other's rooms and quietly report a lizard den as a drake pit.
-/// </para>
-/// </summary>
 public static class BotDungeon
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDungeon));
@@ -140,12 +103,6 @@ public static class BotDungeon
 
     private static readonly Dictionary<string, double> _might = [];
 
-    /// <summary>
-    /// What a kind is besides its strength, read off the same specimen <see cref="Might"/> builds: whether it attacks on sight,
-    /// what mind it has, how far it sees, whether it can leave the water, whether it is the towns' rather than the wild's. For
-    /// the danger zones (<see cref="BotHaunts"/>), which must classify a spawner whose creatures are all dead; one specimen a
-    /// kind, never two.
-    /// </summary>
     public readonly record struct KindTraits(FightMode Mode, AIType AI, int Perception, bool CantWalk, bool CanSwim, bool Townsfolk);
 
     private static readonly Dictionary<string, KindTraits> _traits = [];
@@ -293,6 +250,7 @@ public static class BotDungeon
         }
         catch (Exception)
         {
+
             Unknown++;
         }
         finally

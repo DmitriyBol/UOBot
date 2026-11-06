@@ -5,31 +5,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Whether a bot has anything in its hands, asked at the moment it matters.
-///
-/// <para>
-/// <b>Being armed was treated as an event and it is a condition.</b> A weapon is put on at birth, and
-/// <c>BotMobile.Rearm</c> puts one back on after a death, after a bot recovers its own corpse, and after a
-/// shopping trip — three moments, all of them chosen. Nothing anywhere asks the question at the only moment
-/// it decides anything, which is the moment a fight starts. So a staff that wears out mid-session, or a
-/// weapon that comes back into the pack by any route nobody thought of, leaves the bot swinging its fists
-/// until something kills it: healers and mages were seen doing exactly that on 24.08.2026, holding nothing,
-/// against creatures that hit back.
-/// </para>
-///
-/// <para>
-/// <b>The brawler is the one exception and it is a real one.</b> Its whole build is wrestling — its skills
-/// are in its hands, and putting a blade on it would be worse than useless. Every other class carrying
-/// nothing is a class that has lost something.
-/// </para>
-///
-/// <para>
-/// This fixes what it can from the pack and counts what it cannot, and the second half is the point: "the
-/// staff is in the backpack" and "the staff no longer exists" want completely different remedies, and
-/// nothing so far could tell them apart.
-/// </para>
-/// </summary>
 public static class BotArms
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotArms));
@@ -148,6 +123,7 @@ public static class BotArms
 
     public static bool Check(Mobile body, BotClass klass)
     {
+
         Quiver(body, klass);
 
         if (Armed(body, klass))

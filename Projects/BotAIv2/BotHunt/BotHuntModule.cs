@@ -2,23 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Fighting for a living, as a module.
-///
-/// <para>
-/// <see cref="BotPhase.World"/> and requires <c>Classes</c>, <c>Will</c> and <c>Auction</c> — the last
-/// because what comes off a corpse goes onto the market before it goes to a counter.
-/// </para>
-///
-/// <para>
-/// <b>This is the module that gives the world money.</b> Before it, every coin on the shard was a coin that
-/// already existed: bots are born with none, trade between them only moves it about, and a shopkeeper's
-/// counter was a place where it left. So every piece of work that cost something to begin failed on its first
-/// beat, and the only thing that could happen was digging, which is free. A monster's purse is where gold
-/// comes from, and everything else — the crafter paid for a blade, the scribe paid for a scroll, the miner
-/// paid for ore — is that same gold moving one step further from the field.
-/// </para>
-/// </summary>
 public sealed class BotHuntModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHuntModule));
@@ -32,6 +15,8 @@ public sealed class BotHuntModule : BotModule
     public override void Start()
     {
         BotHuntConfig.Load();
+
+        BotCombatConfig.Load();
 
         BotWill.Offer(new BotHunter());
 
@@ -55,6 +40,7 @@ public sealed class BotHuntModule : BotModule
         BotOutlaw.Start();
 
         logger.Information(
+
             "The hunt is on: quarry looked for {Reach} tiles out and taken up to ×{Daring} of our own power, anything inside {Notice} tiles worth dropping other work for, set out above {Fit:P0} health and given up below {Flee:P0} or when outnumbered; ground to look over is picked beyond {Beyond} tiles and walked to within {Arrive}",
             BotQuarry.Reach,
             BotQuarry.Daring,
@@ -72,12 +58,20 @@ public sealed class BotHuntModule : BotModule
         );
 
         logger.Information(
-            "A cry for help carries {Carries} tiles and stands {Holds}ms; anybody above {Fit:P0} health within {Reach} tiles may answer, and a bot hits back at whatever is on it inside {Near} tiles",
+            "A cry for help carries {Carries} tiles and stands {Holds}ms; anybody above {Fit:P0} health within {Reach} tiles may answer, and a bot hits back at whatever is on it inside {Near} tiles; a dire cry (under {Dire:P0}) summons up to {Most} at once{Summons}, a steady one its nearest free neighbour within {NearReach} tiles when the thing is {NearOdds:P0} of its own strength or more{NearCalls}; a bot refused the fight for the odds with no flight on offer takes the stand{Stands}; one unanswered cry in {Sample} is said with who was in earshot",
             BotCry.Carries,
             BotCry.HoldsMs,
             BotRescuer.FitAt,
             BotRescuer.Reach,
-            BotDefender.Reach
+            BotDefender.Reach,
+            BotCry.DireAt,
+            BotCry.MostCalled,
+            BotCry.Summons ? "" : " (off)",
+            BotCry.NearReach,
+            BotCry.NearOdds,
+            BotCry.NearCalls ? "" : " (off)",
+            BotDefender.Stands ? "" : " (off)",
+            BotReflex.SampleEvery
         );
 
         logger.Information(

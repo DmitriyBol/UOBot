@@ -5,12 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-voice.json</c> may say. Everything optional; the starter file the shard writes
-/// carries the whole phrase bank so that it can be edited rather than discovered.
-/// </summary>
 public sealed class BotVoiceSettings
 {
+
     public bool? Enabled { get; set; }
 
     public bool? World { get; set; }

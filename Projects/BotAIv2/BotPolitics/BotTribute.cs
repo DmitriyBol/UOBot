@@ -7,34 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Ultimatums and tribute: a strong guild about to make war on a weak one — at the duke's word, or by seizing its ground —
-/// demands so much a day instead, and the weak pays from its chest while it can.
-///
-/// <para>
-/// <b>Patrick's order of 07.10.2026, night: "ultimatums and tribute: a strong guild demands tribute from a neighbour instead of
-/// war, the weak pays or fights"</b>, and his standing rule that the weak do not declare on the strong and capitulate
-/// (<c>BotWar.DauntedAt</c>, <c>BotWar.YieldOdds</c>). Tribute is the peaceful form of that capitulation: the war that would
-/// have cost the weak its dead and its ground costs it coin instead, and the strong gets the coin without the blood.
-/// </para>
-///
-/// <para>
-/// <b>When.</b> Only where a war was about to begin: the duke's word was war between two guilds and the war's rules allowed it
-/// (<c>BotDuke.Apply</c>), or a guild weighed a held square and would seize it (<c>BotSeizure.Judge</c>). Only when the would-be
-/// declarer's might (<c>BotWar.Might</c>) is <see cref="Odds"/> times the other's or more, and not within
-/// <see cref="RefuseMs"/> of the same guild refusing the same demand.
-/// </para>
-///
-/// <para>
-/// <b>The terms.</b> <see cref="Share"/> of the weak chest a day, between <see cref="Least"/> and <see cref="Most"/>gp, paid an
-/// instalment every <see cref="EveryMs"/> from chest to chest (<c>BotChest.Pay</c>: nothing made, nothing lost). The weak pays
-/// when its chest holds the first instalment, and the first is paid at once; otherwise it refuses and the war follows by the
-/// existing rules. While the tribute stands, neither side may declare on the other (<c>BotWar.MayDeclare</c>) and the strong
-/// does not seize the weak's ground. It ends after <see cref="Hours"/>, when the strong falls under <see cref="EndOdds"/> times
-/// the weak's might, or when an instalment cannot be paid — and then the strong thinks <see cref="LapseRegard"/> worse of the
-/// weak, and the grievance takes its course.
-/// </para>
-/// </summary>
 public static class BotTribute
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTribute));
@@ -61,7 +33,6 @@ public static class BotTribute
 
     public static double LapseRegard { get; set; } = -30.0;
 
-    /// <summary>One tribute standing.</summary>
     private sealed class Pact
     {
         public string Payer;

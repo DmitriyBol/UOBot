@@ -7,14 +7,9 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The reach of a few creatures a walker has seen: a square round each, as many tiles as the creature notices a body at (the
-/// engine measures range in squares, <c>GetMobilesInRange</c>), plus a margin. Read by the precise search as a price on every
-/// step inside one (<see cref="BotAvoid.Reaches"/>), and by the route's danger hook for the walker that saw them
-/// (<see cref="BotDanger.For"/>). Kept by <see cref="BotSight"/>, one per bot, filled again on every look.
-/// </summary>
 public sealed class BotReaches
 {
+
     public const int Most = 8;
 
     private readonly int[] _x = new int[Most];
@@ -58,71 +53,6 @@ public sealed class BotReaches
     public int Penalty(int x, int y) => Within(x, y, 0) ? BotSight.StepCost : 0;
 }
 
-/// <summary>
-/// <b>A bot sees the dangerous creature near it before it is set upon, and goes round it (03.10.2026, sight13).</b> Patrick, that
-/// afternoon: "The giant serpent is a dangerous enemy, yes. The bot has sight around itself — why can it not see the enemy BEFORE
-/// it aggroes on it, and go round it? The zones are there so that bots understand the danger and whom they may meet, but the
-/// actual presence nearby must not be excluded either."
-///
-/// <para>
-/// <b>What was there before, and why it did not.</b> Nothing in the walk looked at a living creature: <see cref="BotWalk"/> asks the
-/// map for a body only on the very tile it is about to step onto (<c>AskAsideAt</c>), the precise search (<see cref="BotPath"/>)
-/// prices nothing at all, and the walk under <see cref="BotJourney.DirectTiles"/> is never routed. The danger the walk does read
-/// is the zones' map and the record of deaths (<see cref="BotDanger"/>), asked once per graph node when a far route is drawn — a
-/// forecast, rebuilt every twenty seconds from a sweep, priced at most forty tiles for an aggro fringe. A creature that
-/// noticed a bot at sixteen tiles with nothing in the forecast, or one the road ran beside inside a leg, was met by the walk
-/// when its first blow landed. <see cref="BotJourney.AvoidDanger"/> was written for "ground that nearly killed the bot" and
-/// nothing has ever called it. Measured on build 396 (04:30–12:45, `sight13-tools/contact_deaths.py`): 1413 deaths to
-/// creatures, 544 of them lone bots; 365 of the 544 at work that is not a hunt (prowl 111 and restock 104 the most), 423 of
-/// them met more than 24 tiles from where the work was taken on and 144 of the 153 whose work names a goal more than 24
-/// tiles short of it — on the road; 402 of the 544 to a killer past ×1.5 the dead bot's strength at its kind's price; a
-/// median 36 seconds from the first blow to death.
-/// </para>
-///
-/// <para>
-/// <b>What a bot sees, and what is worth going round.</b> Every <see cref="EveryMs"/>, one look at the map within
-/// <see cref="SightTiles"/> (the creatures and our own near, in one query): a creature that attacks on sight
-/// (<see cref="BotHaunts.AttacksFirst"/>), hostile to this bot, not the one it is closing on or fighting and not already on it,
-/// is weighed at what the hunt chooses quarry by (<see cref="BotQuarry.Priced"/>: strength × its kind's price in our lives — a
-/// giant serpent at ×3.1 on 396), times the health it has left, plus <see cref="BotThreat.Secondary"/> of whatever of its kind
-/// stands within <see cref="PackTiles"/> of it. Past <see cref="Odds"/> times what the bot brings — its own strength by its
-/// health, our able ones within <see cref="AllyTiles"/>, its company's, the one it walks beside — it is a danger, and its reach
-/// is the square it notices a body in: <c>RangePerception</c> (sixteen for every one of 396's killers) capped at
-/// <see cref="BotZones.PerceptionMost"/>, a few tiles for one rooted or in the water, the zones' own rule
-/// (<c>BotZoneBuild.ReachOf</c>), plus <see cref="Margin"/>. What the bot can beat, and what it hunts, is never gone round.
-/// </para>
-///
-/// <para>
-/// <b>What the walk does about it, in this order.</b> The reaches stand on the journey for <see cref="KeepMs"/>
-/// (<see cref="BotJourney.Sight"/>), so every plan drawn meanwhile prices a step inside one <see cref="StepCost"/> and every far
-/// route prices a node inside one <see cref="BotDanger.SightCost"/> tiles. A live route that passes through one within
-/// <see cref="RouteAhead"/> tiles is drawn again from where the bot stands (<see cref="BotJourney.Resight"/>, not counted as a
-/// reroute), once per set of creatures seen; a plan drawn before they were seen that comes within their reach and margin is
-/// drawn again, and one drawn since only when a creature has moved into its way, at most every <see cref="ReplanMs"/>. When
-/// the plan, drawn round, is about to step into a creature's own reach all the same (within <see cref="Imminent"/> steps) —
-/// its goal stands in it, or the only way on runs through it — the bot waits at the edge (<see cref="BotJourney.Hold"/>) for
-/// the creature to move off, and after <see cref="WaitMs"/> it turns back: its work is given up as unreached
-/// (<see cref="BotWill.Abandon"/>), which rests the place in <see cref="BotRefused"/> for two minutes and up. A bot whose goal
-/// is in a reach and which already stands in it turns back at once. A goal on guarded ground is never turned back from. A
-/// bot at work, standing, that a danger comes within reach of with a line to it, leaves its work the same way
-/// (<see cref="Standing"/>).
-/// </para>
-///
-/// <para>
-/// <b>Who only goes round, and never waits or turns back:</b> a bot in a company (the company weighs its own fights and
-/// withdraws from what it cannot beat, <c>BotSquad.Overmatched</c>), work with a foe of its own choosing (the hunt weighs its
-/// own odds), and a flight — which also bends to another retreat when the one it runs to lies in another creature's reach
-/// (<see cref="BotBolt.Retreat"/> passes such a landing over on its first pass). Nobody looks in a town, underground, in a
-/// company's line, on a voyage, in a fight, or for <see cref="FightCalmMs"/> after a blow.
-/// </para>
-///
-/// <para>
-/// <b>Counted</b> on <c>Getting about:</c> (<see cref="Describe"/>): looks and their cost, dangers seen and passed as beatable, how
-/// far each danger was when first seen against its reach, the walks changed (routes drawn round, plans drawn round, waits,
-/// turn-backs, work left, flights bent) by creature kind, and every death to a creature by what this bot had made of its
-/// killer in the minute before: never seen, seen and judged beatable, seen as a danger and the walk not changed, or changed.
-/// </para>
-/// </summary>
 public static class BotSight
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSight));
@@ -597,6 +527,7 @@ public static class BotSight
         {
             case Mode.Stand:
                 {
+
                     for (var i = 0; i < _dangers.Count; i++)
                     {
                         var (c, threat, reach) = _dangers[i];
@@ -704,6 +635,7 @@ public static class BotSight
 
         if (!watch.Redrawn && journey.RouteEnters(reaches, bot.Location, RouteAhead))
         {
+
             if (now - watch.RouteTick < ReplanMs)
             {
                 RoutesHeld++;

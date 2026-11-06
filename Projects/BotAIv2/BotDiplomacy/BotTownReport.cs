@@ -5,22 +5,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// How a town stands, from the shard's own numbers: what its shops are out of, what the market wants, how dangerous the ground
-/// round it reads, who lives there. What the town's voice tells a guild's envoy, and what the tasks are chosen from.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point 3: "the debugger is summoned, and feedback on the town's situation — economic,
-/// hostile, trade — is taken from him."</b> Nothing here is the model's: every figure is read off a record the shard already
-/// keeps — the shopkeepers <c>BotShops</c> knows inside the town's box, the island's shortages (<c>BotShops.Dry</c>) that none
-/// of them sells now, the market's board (<c>BotMarket.Board</c>), the squares of <c>BotQuad</c> within
-/// <see cref="Reach"/> of the town's hall, and the residents (<c>BotResidence</c>). The model is handed this and phrases it; the
-/// rule says it plainly. Built once per audience, so a pass over a thousand shopkeepers and fifty squares costs nothing that
-/// matters.
-/// </para>
-/// </summary>
 public sealed class BotTownReport
 {
+
     public static int Reach { get; set; } = 90;
 
     public string Town { get; init; }

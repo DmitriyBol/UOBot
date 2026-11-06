@@ -5,22 +5,9 @@ using System.Text.Json;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// What the debugger came back with after one look at the population: one claim, the numbers it was made
-/// from, a guess at the cause and one change worth making.
-///
-/// <para>
-/// <b>Every field here exists to make the claim checkable by somebody who was not there.</b> A finding
-/// without evidence is an opinion, a cause without a finding is a theory about nothing, and a fix without
-/// either is a patch waiting to be applied to code that was working. The one that earns its place hardest
-/// is <see cref="Last"/>: the debugger is shown what it said the time before and has to say whether the
-/// numbers still support it. A watcher that never revisits its own claims produces a log of confident
-/// paragraphs with no way to tell the true ones from the rest — which is exactly what the minds' own
-/// reckonings were before they were made to predict a number and be measured against it.
-/// </para>
-/// </summary>
 public sealed class BotDebugNote
 {
+
     public string Kind { get; init; }
 
     public string Bot { get; init; }
@@ -69,6 +56,7 @@ public sealed class BotDebugNote
 
             Enumeration(writer, "kind", Kinds);
             Roster(writer, "bot", names);
+
             Text(writer, "finding", 90);
             Text(writer, "evidence", 70);
             Text(writer, "cause", 45);
@@ -183,6 +171,7 @@ public sealed class BotDebugNote
                 At = Word(root, "at") ?? "-"
             };
         }
+
         catch (Exception)
         {
             return null;
@@ -209,25 +198,9 @@ public sealed class BotDebugNote
     public override string ToString() => $"{Kind} — {Finding}";
 }
 
-/// <summary>
-/// The slower answer: what the debugger makes of an hour of its own findings put together.
-///
-/// <para>
-/// <b>A different question from the one above, and it is worth the cost of a thinking call precisely
-/// because it is not the same question asked more often.</b> A finding is about this minute — that bot, that
-/// pair of numbers. This asks what the findings have in common, which is where a defect that shows up
-/// differently in six places is actually visible. The shard's worst faults have all had that shape: an
-/// empty purse read as a veto looked like idle gatherers, timid crafters and a market with no smith, and
-/// each of the three on its own looked like a different bug.
-/// </para>
-///
-/// <para>
-/// <see cref="Wrong"/> is the field that keeps this honest. A conjecture that names nothing which could
-/// falsify it is not a conjecture, and a log full of those is a log that gets acted on and never checked.
-/// </para>
-/// </summary>
 public sealed class BotDebugThought
 {
+
     public string Blocking { get; init; }
 
     public string Evidence { get; init; }
@@ -274,6 +247,7 @@ public sealed class BotDebugThought
                 Confidence = BotDebugNote.Sure(root)
             };
         }
+
         catch (Exception)
         {
             return null;
@@ -308,6 +282,7 @@ public sealed class BotDebugThought
 
             return string.IsNullOrWhiteSpace(evidence) ? answer : $"{answer}\n  evidence: {evidence}";
         }
+
         catch (Exception)
         {
             return null;

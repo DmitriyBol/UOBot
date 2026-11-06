@@ -1,24 +1,5 @@
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers the Baron his own town to walk through.
-///
-/// <para>
-/// <b>Always available, and that is a deliberate choice against the tidier alternative.</b> The obvious way
-/// to write the pair was to make this the negative of <see cref="BotHarrower"/> — offer the walk only when
-/// there is no ground to harrow — and the two errands would then never compete, which would have made both
-/// prices unfalsifiable and left the Baron's mind with a menu of exactly one item every time it was asked.
-/// A mind with one option is not thinking; it is being told. Offered together, there is a real question in
-/// front of him — go now with the five who happen to be standing here, or walk and be asked again in four
-/// minutes — and the arithmetic answers it by default while the mind is allowed to disagree and be measured.
-/// </para>
-///
-/// <para>
-/// The anchor is the bank counter rather than a list of towns. Towns are not a thing this shard keeps; a
-/// counter is, it is found by the same survey everything else uses, and it is within a few streets of
-/// everywhere a person would look for somebody.
-/// </para>
-/// </summary>
 public sealed class BotStroll : IBotProposer
 {
     public string Name => "Stroll";

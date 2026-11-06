@@ -6,25 +6,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who exists. Builds the population at every world load, hands the clock its list, and puts the fallen
-/// back on their feet.
-///
-/// <para>
-/// <b>Rebuilt from configuration rather than restored from the save, and that is a design choice with a
-/// reason.</b> A bot's state lives in objects — a bond, a journey, a ledger of what paid — and none of it is
-/// worth a save format. Loading a saved bot means rebuilding all of it anyway, and the one thing that
-/// <em>would</em> come back intact is its pack, so handing out the kit again would produce a bot with two of
-/// everything. So bots that arrive from a save are deleted and the population is raised fresh. What survives
-/// a restart is what should: names, and the configuration that says who exists.
-/// </para>
-///
-/// <para>
-/// The population is small on purpose. Nothing here holds a client, and content that assumes one is the
-/// standing hazard of putting <see cref="PlayerMobile"/>-derived bots in a world; a handful of them makes
-/// that discoverable, a hundred and fifty makes it a log to read.
-/// </para>
-/// </summary>
 public static class BotPopulation
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPopulation));
@@ -65,6 +46,7 @@ public static class BotPopulation
 
     public static bool Reachable(Map map, Point3D from, Point3D to)
     {
+
         if (BotReachMap.Refuses(map, from, to, BotReachMap.SampleReach))
         {
             Unreached++;
@@ -362,6 +344,7 @@ public static class BotPopulation
 
             if (klass == null)
             {
+
                 logger.Error("No class is called {Name}, so none of the {Count} asked for were raised", name, count);
 
                 continue;
@@ -389,6 +372,7 @@ public static class BotPopulation
 
     public static BotMobile RaiseNewcomer(BotClass klass)
     {
+
         var people = BotPeoples.Pick(klass);
 
         if (people != null)
@@ -576,9 +560,13 @@ public static class BotPopulation
 
         BotProgress.Restore(bot);
 
+        var fresh = BotLives.Of(bot) is { Fresh: true };
+
         BotTraits.Born(bot, BotCharacterModule.Started);
 
         BotResidence.Raised(bot);
+
+        BotStory.Born(bot, fresh);
 
         if (!TryPlace(bot))
         {
@@ -628,6 +616,7 @@ public static class BotPopulation
 
         if (!bot.Alive)
         {
+
             if (!bot.ReviveComplained)
             {
                 bot.ReviveComplained = true;
@@ -805,6 +794,7 @@ public static class BotPopulation
 
     private static void Enlist(BotMobile bot)
     {
+
         var step = Math.Max(1, BotWalk.StepDelayMs(BotMobile.Runs));
 
         var spread = Math.Max(step, BotWill.IdleMs);
@@ -867,6 +857,7 @@ public static class BotPopulation
 
         for (var pass = 0; pass < 3; pass++)
         {
+
             var reach = pass < 2 ? span : Spread;
 
             for (var attempt = 0; attempt < Attempts; attempt++)
@@ -982,6 +973,7 @@ public static class BotPopulation
 
     private static string Christen()
     {
+
         string name;
 
         do

@@ -4,34 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot with a fletching tool and a handful of feathers a turn at making arrows, and offers it the
-/// board's orders first.
-///
-/// <para>
-/// <b>Every gate here is a skipped candidate and never a failed errand.</b> That distinction has cost this
-/// shard five separate loops, most recently a want board that filled up and produced a hundred and
-/// seventy-six errands that died on their first beat. A fletcher with no feathers is passed over; it is not
-/// sent out to discover that at the bench.
-/// </para>
-///
-/// <para>
-/// <b>Feathers are checked before wood, because they are the half nobody sells.</b> Logs are money — the
-/// carpenter has them — so a fletcher short of wood is a fletcher with an errand. A fletcher short of
-/// feathers has nothing to do until a hunter kills a bird and lists what it took, and telling those two
-/// apart is what makes the counters below worth reading.
-/// </para>
-///
-/// <para>
-/// <b>And when a hunter has listed them, they are bought (30.09.2026).</b> "No feathers and nobody sells one" was never asked of
-/// the stalls: the fletcher looked in its own pack and at its own stall, and put an order on the board only when its purse
-/// carried five feathers over the hundred gold it keeps back — which a crafter's seldom does ("1259 cannot afford one, the
-/// fattest purse among them held 116gp"). So at 00:18 on build 336 the board read "most stocked: … Feather 257" while 597 of
-/// 740 asks by 01:13 were fletchers with no feathers. The feathers are now the first leg of the round, bought off the
-/// cheapest stall like the wood (<see cref="BotFletch"/>), placeless and priced as the round's outlay; and a fletcher that
-/// finds neither feathers nor any on a stall marks the want for the hunters (<see cref="Starved"/>).
-/// </para>
-/// </summary>
 public sealed class BotFletcher : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFletcher));

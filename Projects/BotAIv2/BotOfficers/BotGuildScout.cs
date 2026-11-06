@@ -8,33 +8,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The scout's work, in the order it is offered: a rumoured chest reached first, another guild's company shadowed and reported,
-/// and a patrol of the dangerous ground by a plan.
-///
-/// <para>
-/// <b>The rumour.</b> A chest Argus has spread word of (<see cref="BotRumour"/>) within its reach and not a lair: the scout is offered
-/// the same seeking any bot is (<see cref="BotRumourSeek"/>, at most <see cref="BotRumour.MostSeekers"/> at once), reckoned
-/// <see cref="RumourLean"/> times higher — it is the scout's trade to get there first. Counted apart, and who found the chest.
-/// </para>
-///
-/// <para>
-/// <b>The shadow.</b> Another guild's company of <see cref="ShadowLeast"/> or more within <see cref="ShadowReach"/> of the scout's
-/// guild's seat is followed at <see cref="ShadowKeep"/> tiles for <see cref="ShadowMs"/>, then reported in the guild's channel and
-/// as news ("The Wolf gathers 12 at Cove"). When the two guilds are at war and the company is within <see cref="WarnReach"/> of the
-/// seat, the report is a warning: the company's leader becomes the threat the guild's war company musters against
-/// (<see cref="BotFeud.Warn"/>), before it is on the guild's ground.
-/// </para>
-///
-/// <para>
-/// <b>The patrol.</b> The hostile zone (<see cref="BotZones"/>, never a deadly one, nor the sea) within <see cref="PatrolReach"/> of
-/// the seat that scouts watched longest ago, then least awake, then nearest; the scout stands at a lookout outside its aggro range on
-/// the side of home, and for <see cref="HoldMs"/> passes the zone's box to the scan every <see cref="FocusMs"/>
-/// (<see cref="BotZoneScan.Focus"/>, the debuggers' tour's own feed), so the patrols the paths and the danger records read are fresh.
-/// It counts what it saw and says it. A square of the death map in the zone that reads high while nothing attacking lives there now
-/// is knocked down (<see cref="BotPeril.Scouted"/>), so work is not refused for a field that has gone quiet.
-/// </para>
-/// </summary>
 public sealed class BotGuildScout : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuildScout));
@@ -201,7 +174,6 @@ public sealed class BotGuildScout : IBotProposer
         return new Rumour(new BotRumourSeek(tale));
     }
 
-    /// <summary>The seeking of a rumoured chest, as the scout's own work: the same walk and the same chest, reckoned higher.</summary>
     public sealed class Rumour : BotDeed
     {
         public const string Trade = "scout-rumour";

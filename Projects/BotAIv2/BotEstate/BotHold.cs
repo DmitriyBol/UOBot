@@ -6,29 +6,9 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Standing in a square your guild has laid claim to, for as long as the claim takes.
-///
-/// <para>
-/// <b>The whole of "the guild gathers in the quadrant".</b> There is nothing to do here and that is the
-/// point: the claim is won by being there, in numbers, where anybody who minds can find you. See
-/// <c>BotClaim.Gather</c> for why it is the peak over the window rather than a headcount at the end.
-/// </para>
-///
-/// <para>
-/// <b>No claim on the errand, unlike every other guild office.</b> The steward, the fitter, the hirer and
-/// the remover are each one bot's work and <c>BotOffice</c> keeps them to one; this one wants as many of the
-/// guild as will come, so nothing stops a second member taking it. That is the only difference between this
-/// and the four of them, and it is the reason it exists as its own file.
-/// </para>
-///
-/// <para>
-/// Nothing is earned. See <c>BotBaron</c> for the twelve minutes a bot once stood still because unpaid work
-/// was being marked down for being unpaid.
-/// </para>
-/// </summary>
 public sealed class BotHold : BotDeed
 {
+
     public const string Trade = "stake";
 
     public static double Prior { get; set; } = 200.0;
@@ -185,26 +165,9 @@ public sealed class BotHold : BotDeed
     }
 }
 
-/// <summary>
-/// Decides which square a guild wants, declares the claim, and sends its members to stand on it.
-///
-/// <para>
-/// <b>The declaring and the standing are one proposer because the first member to be asked does both.</b>
-/// <c>BotClaim.Open</c> refuses a second claim from the same guild, so whichever member is offered work
-/// first opens the claim and the rest are handed the standing. Splitting them would need an officer, a claim
-/// on the officer, and a way for the officer to tell the others — which is three mechanisms to arrange what
-/// one dictionary entry already arranges.
-/// </para>
-///
-/// <para>
-/// <b>What it wants, in order.</b> Open ground first while the free claims last, because free ground is the
-/// cheapest thing a guild can own. Then somebody else's, if the purse will stand it — and it takes the
-/// square for itself rather than merely striking a name off it whenever it can afford to, because a square
-/// held is worth more than a square denied. Only then open ground at the full price.
-/// </para>
-/// </summary>
 public sealed class BotHolder : IBotProposer
 {
+
     public static int Look { get; set; } = 180;
 
     public static double Worst { get; set; } = BotQuad.Unsafe;
@@ -304,6 +267,7 @@ public sealed class BotHolder : IBotProposer
 
         if (bid != null)
         {
+
             if (BotReach.Ask(body.Map, body.Location, bid.Middle, BotArrival.Within(BotHold.Reach)) == BotReachVerdict.Sealed)
             {
                 Walled++;

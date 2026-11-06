@@ -7,6 +7,7 @@ namespace Server.Tests.Pathfinding.Tiered;
 
 public class NavGraphFileTests
 {
+
     [Fact]
     public void WrittenAndReadBack_PlansTheSame()
     {

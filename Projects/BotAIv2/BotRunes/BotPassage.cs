@@ -7,37 +7,6 @@ using Server.Spells.Seventh;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A company put through a Gate Travel: a mage of the company opens the gate where the company stands, the members step
-/// through one by one, the leader last, and the march goes on from the far side.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026: "Gate Travel opens a gate for the whole company … instant transfer of a company
-/// anywhere they have stood."</b> Asked by the two companies that march a long way — a delve from its muster to the cave
-/// mouth (<see cref="BotDelve"/>), a captain's sweep to its square (<see cref="BotSweep"/>) — at the moment they would set
-/// out (<see cref="Open"/>). When a member can cast Gate Travel and holds a rune within <see cref="BotRunes.GateNear"/> of
-/// where the company is going, the passage takes the leader's beats (<see cref="Lead"/>) and the members'
-/// (<see cref="Steer"/>, from the enlistment's hold) until the company is through; then the company's own march takes over
-/// from wherever the leader now stands, and the delve's hold at the landing (build 313) regroups it at the mouth as before.
-/// </para>
-///
-/// <para>
-/// <b>The engine moves the bodies.</b> The gate is the engine's <see cref="GateTravelMoongate"/>, opened by the engine's
-/// spell, and a member is put through by the engine's own use of it: <c>Moongate.EndConfirmation</c>, which is what a
-/// player's double-click and "yes" come to — range one, the same map, not casting. Stepping on the gate alone is not enough
-/// for a bot: a gate in a guarded town to a place outside one asks a confirmation gump, which a bot has no screen for.
-/// </para>
-///
-/// <para>
-/// <b>Never half through.</b> The members go first and the leader last, so the company's anchor stays on the near side until
-/// the crossing is done and nobody is re-stationed back through the gate. The leader crosses when nobody is left to wait for
-/// or at <see cref="CrossMs"/>, inside the thirty seconds this era's gate stands; whoever has not reached the gate by then
-/// stays with the near side and is left to the march's own hold, which leaves a member beyond <c>MarchLost</c> rather than
-/// waiting for it. Should the gate close with the leader still on the near side and members through (dispelled, or the leader
-/// held), the leader walks to them (<see cref="RejoinMs"/>) and they wait where they landed. A fizzle is tried again up to
-/// <see cref="BotRunes.Tries"/>; after that the company marches by road, as it would have.
-/// </para>
-/// </summary>
 public sealed class BotPassage
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPassage));
@@ -323,6 +292,7 @@ public sealed class BotPassage
         {
             case Stage.Cast:
                 {
+
                     if (!ReferenceEquals(self, _mage) || _spell == null)
                     {
                         return false;

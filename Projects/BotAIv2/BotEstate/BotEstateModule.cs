@@ -1,17 +1,8 @@
-﻿using Server.Logging;
+using System;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guilds' halls, as a module.
-///
-/// <para>
-/// <see cref="BotPhase.World"/> and after <c>Population</c>, and that order is not a preference: the first
-/// thing this module does is hand every hall in the world back to the guild that owns it, and a guild has no
-/// leader until the population has been built and enrolled. Started earlier it would adopt nothing, every
-/// hall on the island would stay ownerless, and this era condemns an ownerless house.
-/// </para>
-/// </summary>
 public sealed class BotEstateModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEstateModule));
@@ -109,6 +100,10 @@ public sealed class BotEstateModule : BotModule
             BotSeat.Tell(),
             BotSeat.Settled
         );
+
+        _furnishTimer?.Stop();
+        _furnishTimer = new FurnishTimer(TimeSpan.FromSeconds(60));
+        _furnishTimer.Start();
     }
 
     public override void Reset()
@@ -149,5 +144,20 @@ public sealed class BotEstateModule : BotModule
         BotOutposter.Forget();
         BotShelf.Forget();
         BotFittings.Forget();
+        BotFurnish.Forget();
+
+        _furnishTimer?.Stop();
+        _furnishTimer = null;
+    }
+
+    private static Timer _furnishTimer;
+
+    private sealed class FurnishTimer : Timer
+    {
+        public FurnishTimer(TimeSpan interval) : base(interval, interval)
+        {
+        }
+
+        protected override void OnTick() => BotFurnish.Tick(Core.TickCount);
     }
 }

@@ -1,10 +1,5 @@
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a trader or a crafter within <see cref="BotFair.Reach"/> of an open fair the walk to it (07.10.2026): once a fair, while
-/// at least half an hour of it is left, when the way is not sealed and the straight road does not ask more than the bot brings
-/// (<c>BotDanger.Road</c>, the walk's own question). Priced at <see cref="BotFair.Prior"/> until the ledger knows what fairs pay.
-/// </summary>
 public sealed class BotFairCall : IBotProposer
 {
     public string Name => "Fair";
@@ -47,11 +42,6 @@ public sealed class BotFairCall : IBotProposer
     }
 }
 
-/// <summary>
-/// Going to the fair: the walk to its town's square, a lottery ticket on arrival, and a few minutes there among the stalls and the
-/// cheaper counters, then done. What it pays is whatever the bot made of being there — the ledger's <c>fair</c> row — and the lottery,
-/// should its ticket be drawn.
-/// </summary>
 public sealed class BotFairgoer : BotDeed
 {
     public const string Trade = "fair";

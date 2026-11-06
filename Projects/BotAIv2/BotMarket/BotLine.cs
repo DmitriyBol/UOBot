@@ -2,9 +2,9 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>Why a bot able to answer a want passed it over. Recorded on the want by whoever passed; see <see cref="BotWant.Passed"/>.</summary>
 public enum BotPass
 {
+
     Reach,
 
     Land,
@@ -30,7 +30,6 @@ public enum BotPass
     Room
 }
 
-/// <summary>How the units of a line reached the buyer. A line met by more than one route is counted under each.</summary>
 [Flags]
 public enum BotRoute
 {
@@ -43,9 +42,9 @@ public enum BotRoute
     Shop = 4
 }
 
-/// <summary>Why a buyer took its own want back. See <see cref="BotMarket.Withdrawn"/>.</summary>
 public enum BotWithdraw
 {
+
     Have,
 
     Walked,
@@ -57,9 +56,9 @@ public enum BotWithdraw
     Other
 }
 
-/// <summary>Where a line stands.</summary>
 public enum BotLineState
 {
+
     Open,
 
     Met,
@@ -69,25 +68,9 @@ public enum BotLineState
     KeptOut
 }
 
-/// <summary>
-/// One line of a want: the units a buyer asked for at one time, with its own clock (02.10.2026, build 391; the Needs plan).
-///
-/// <para>
-/// <b>Patrick's measure is a line, not a want.</b> "A new line is fulfilled within its first hour, by one bot or jointly", target
-/// 99 %. A want is one per buyer and kind and is topped up in place, so a want's age is not a line's age: the first ask opens a
-/// line, and a top-up more than <see cref="BotLines.NewLineMs"/> after the newest line opened opens another on the same want.
-/// Units handed over against the want fill its lines oldest first. A line is settled once — met, failed or kept out — and a line
-/// that failed its hour and is met later is counted as met after the hour, never as met.
-/// </para>
-///
-/// <para>
-/// <b>What the line remembers is what a failure needs to name its cause without asking anybody twice.</b> The want counts who
-/// passed it over and why (<see cref="BotWant.Passed"/>), the walks offered for it and the carriers that took one, and how long its
-/// buyer lay dead; a line keeps those counts as they stood when it opened, so the difference at its end is its own.
-/// </para>
-/// </summary>
 public sealed class BotLine
 {
+
     private const int MostHands = 4;
 
     private readonly Serial[] _hands = new Serial[MostHands];
@@ -244,7 +227,6 @@ public sealed class BotLine
         }
     }
 
-    /// <summary>One line as the save holds it, before its want is made again. See <see cref="BotMarket.Load"/>.</summary>
     internal readonly record struct Record(
         int Seq, int Units, int Filled, long Age, bool AnyFill, long FirstAge, int State, bool MetLate, string Cause, int Routes,
         bool Procurement, int Hands, Serial[] Known

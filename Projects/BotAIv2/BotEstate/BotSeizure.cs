@@ -5,37 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A claim on a square another guild holds: war at once, without a meeting, the price of it in every guild's and every town's
-/// regard for the claimant, and the weighing a guild does before it pays that price.
-///
-/// <para>
-/// <b>Patrick's order of 06.10.2026, 00:10:</b> "if another guild tries to remove a claim or seizes a square, war is declared
-/// without negotiations … but for such a thing every guild's and every town's rating towards that guild falls; they must
-/// understand that they are taking a risky step with a great price". Until build 402 a claim on held ground only moved the
-/// holder's opinion (<c>BotRegard.Claimed</c>), and since 29.09.2026 an opinion reaches a war only through a meeting — whose
-/// duke, on 04.10, answered every grievance with trade terms. At 00:35 on 06.10 The Hammer thought −198 of The Wolf for
-/// "claiming the ground by our hall ×8, claiming our ground ×2", and the two stood under trade terms: ten claims on one
-/// victim's ground and no war.
-/// </para>
-///
-/// <para>
-/// <b>Both kinds of claim count, and only on ground somebody holds.</b> Taking a square (<c>Oust</c>) and striking a name off
-/// it (<c>Strip</c>) are the order's "seizes" and "removes a claim". Ground nobody holds is untouched by all of this, including
-/// ground by another guild's hall that it never claimed: that is a border (<c>BotRegard.Border</c>), not a seizure. The
-/// grievance "claiming the ground by our hall" is written only for a square the victim <em>holds</em> next to its hall
-/// (<c>BotClaim.Important</c>), so both of the victim's grievance kinds are seizures.
-/// </para>
-///
-/// <para>
-/// <b>The price compounds and is felt for days.</b> The n-th seizure inside <see cref="MemoryMs"/> costs n times
-/// <see cref="Regard"/> of every other guild's opinion and n times <see cref="TownStep"/> on the claimant's prices in every
-/// town; while a seizure is remembered, time's forgetting (<c>BotRegard.Mend</c>) lifts no opinion of the claimant above
-/// −<see cref="Cold"/> times the number remembered; the towns' prices come back down only by tasks done for them
-/// (<c>BotBurgh</c>, half a percent each). The fall stops one point above the war line for any guild that was above it, so one
-/// seizure never sets the island on the claimant on the same beat — but every neighbour is that much nearer its own grievance.
-/// </para>
-/// </summary>
 public static class BotSeizure
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeizure));
@@ -58,7 +27,6 @@ public static class BotSeizure
 
     public const string Grievance = "seizing another guild's ground";
 
-    /// <summary>Why a weighing said no.</summary>
     public enum Cause
     {
         None,

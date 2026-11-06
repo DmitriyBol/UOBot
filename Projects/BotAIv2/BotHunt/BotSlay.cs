@@ -6,32 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Close, fight, go through what is left. The fighter's chain, and the first work in this project that brings
-/// new gold into the world.
-///
-/// <para>
-/// <b>Its stages are its own business, and the third one is the point of it.</b> A hunt that ends when the
-/// thing falls over leaves a bot standing next to everything it earned. Mining learned this first — an
-/// undertaking that ends at the vein leaves a bot underground holding rock — and it is the same lesson: the
-/// work is not the fight, it is the fight <em>and getting paid for it</em>.
-/// </para>
-///
-/// <para>
-/// <b>The fighting itself is entirely the engine's.</b> Setting <c>Combatant</c> starts a server-side timer
-/// that swings the weapon, rolls to hit, applies damage and wears the blade down — no client involved and
-/// nothing simulated. So this file never decides a blow. What it decides is when to stop, and that is the one
-/// judgement it must not get wrong.
-/// </para>
-///
-/// <para>
-/// <b>It runs away, and it has to, because nothing above it will.</b> The rung for a bot that is losing has no
-/// proposer, so the brain's answer to failing health is to hold on to whatever the bot is already doing — and
-/// what this bot is already doing is being killed. The first version's sharpest lesson was that flight must
-/// outrank everything social; here it also has to outrank the undertaking's own stubbornness. Giving up marks
-/// the place with caution, which is exactly the right record: this patch of ground kills me.
-/// </para>
-/// </summary>
 public sealed class BotSlay : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSlay));
@@ -171,6 +145,7 @@ public sealed class BotSlay : BotDeed
         _tookTick = Core.TickCount;
         _progressTick = Core.TickCount;
         _seenTick = Core.TickCount;
+        _fightTick = Core.TickCount;
         _armedTick = Core.TickCount - BotArms.EveryMs;
     }
 
@@ -182,9 +157,21 @@ public sealed class BotSlay : BotDeed
 
     private int _kited;
 
+    private int _backed;
+
+    private int _hits;
+
+    private int _dues;
+
+    private Point3D _retreatTo;
+
+    private long _fightTick;
+
     public bool ToTheEnd { get; init; }
 
     private bool _stood;
+
+    private bool _urged;
 
     public override void Resumed(IBotWilful bot)
     {
@@ -197,6 +184,7 @@ public sealed class BotSlay : BotDeed
 
         _begun = false;
         _crowdedTick = 0;
+        _retreatTo = Point3D.Zero;
 
         if (_quarry is { Deleted: false } quarry)
         {
@@ -346,6 +334,7 @@ public sealed class BotSlay : BotDeed
 
         if (strayed > Leash && !engaged)
         {
+
             BotQuarry.Crowd(_quarry);
             Slipped++;
 
@@ -362,6 +351,7 @@ public sealed class BotSlay : BotDeed
 
         if (drawn > Leash + _outward)
         {
+
             if (!_pastLeash)
             {
                 _pastLeash = true;
@@ -376,10 +366,12 @@ public sealed class BotSlay : BotDeed
 
         if (!body.InRange(_quarry.Location, standoff))
         {
+
             return BotDoing.Walk(_map, _quarry, BotArrival.Within(standoff), $"after {_quarry.Name}");
         }
 
         _seenTick = Core.TickCount;
+        _fightTick = Core.TickCount;
         _leg = Leg.Fight;
         _fought = true;
 
@@ -397,8 +389,19 @@ public sealed class BotSlay : BotDeed
             return Looting(bot, body);
         }
 
+        if (_retreatTo != Point3D.Zero && body is BotMobile { Journey.Active: false })
+        {
+            _retreatTo = Point3D.Zero;
+        }
+
         if (_quarry.Hits < _lowest)
         {
+
+            if (_lowest != int.MaxValue)
+            {
+                _hits++;
+            }
+
             _lowest = _quarry.Hits;
             _progressTick = Core.TickCount;
         }
@@ -437,6 +440,7 @@ public sealed class BotSlay : BotDeed
         }
         else
         {
+
             if (!body.InRange(_quarry.Location, 1))
             {
                 return BotDoing.Walk(_map, _quarry, BotArrival.Within(1), $"looking for a line on {_quarry.Name}");
@@ -454,15 +458,15 @@ public sealed class BotSlay : BotDeed
 
             if (stalled)
             {
+
                 BotQuarry.Crowd(_quarry);
 
-                var pack = body.Backpack;
-                var ammo = (pack?.GetAmount(typeof(Arrow)) ?? 0) + (pack?.GetAmount(typeof(Bolt)) ?? 0);
                 var apart = Math.Max(Math.Abs(body.X - _quarry.X), Math.Abs(body.Y - _quarry.Y));
 
                 return BotDoing.Failed(
                     $"{_quarry.Name} would not go down: {left}% of it left and not a scratch in {NoProgressMs / 1000}s "
-                    + $"(holding {body.Weapon?.GetType().Name ?? "nothing"}, {ammo} arrows or bolts, {apart} tiles off, {_kited} kites, "
+                    + $"(holding {body.Weapon?.GetType().Name ?? "nothing"}, {Quiver(body)}, {apart} tiles off, {_kited} kites, {_backed} back-offs, "
+                    + $"{_hits} hits seen, {_dues} stood for a due arrow, "
                     + $"{(body is BotMobile { Journey.Moving: true } ? "moving" : "still")}, in sight {body.InLOS(_quarry)})"
                 );
             }
@@ -489,7 +493,19 @@ public sealed class BotSlay : BotDeed
             _weighed = true;
             _oddsTick = Core.TickCount;
 
-            if (BotThreat.Decide(body, BotMobile.NoticeRange) == BotStand.Outmatched)
+            var outmatched = BotThreat.Decide(body, BotMobile.NoticeRange) == BotStand.Outmatched;
+
+            if (outmatched && ToTheEnd)
+            {
+
+                if (!_urged)
+                {
+                    _urged = true;
+                    BotDefender.StoodOnOdds++;
+                    BotMuster.Urge(body, _quarry);
+                }
+            }
+            else if (outmatched)
             {
                 body.Combatant = null;
                 body.Warmode = false;
@@ -536,6 +552,8 @@ public sealed class BotSlay : BotDeed
 
                 BotQuarry.Claim(body, _quarry);
 
+                _retreatTo = opening;
+
                 return BotDoing.Walk(_map, opening, BotArrival.Within(1), $"keeping {_quarry.Name} at arm's length");
             }
         }
@@ -555,6 +573,22 @@ public sealed class BotSlay : BotDeed
             Stand(body);
         }
 
+        if (StandsWhenDue && !casting && body.Weapon is BaseRanged
+            && body.NextCombatTime - Core.TickCount <= StillMs + KiteSlackMs)
+        {
+            if (Stand(body))
+            {
+                Halted++;
+            }
+
+            if (crowded && body is not BotMobile { Class.Closes: true })
+            {
+                crowded = false;
+                _dues++;
+                Due++;
+            }
+        }
+
         if (!crowded)
         {
             _crowdedTick = 0;
@@ -562,16 +596,19 @@ public sealed class BotSlay : BotDeed
 
         if (crowded)
         {
+
             var closing = BotArms.Suit(body, _quarry, TooClose);
 
             if (closing)
             {
+
                 _backing = Point3D.Zero;
 
                 Closed++;
             }
             else
             {
+
                 if (_backing != Point3D.Zero
                     && (body.InRange(_backing, 1) || !Utility.InRange(_backing, _quarry.Location, yield)))
                 {
@@ -605,6 +642,10 @@ public sealed class BotSlay : BotDeed
 
                     BotQuarry.Claim(body, _quarry);
 
+                    _retreatTo = back;
+                    _backed++;
+                    Backed++;
+
                     return BotDoing.Walk(_map, back, BotArrival.Within(1), $"backing off {_quarry.Name}");
                 }
             }
@@ -615,6 +656,7 @@ public sealed class BotSlay : BotDeed
 
         if (casting)
         {
+
             if (_aiming && body.Target != null)
             {
                 _aiming = false;
@@ -689,6 +731,7 @@ public sealed class BotSlay : BotDeed
 
         if (corpse == null)
         {
+
             return BotDoing.Done("nothing left on it");
         }
 
@@ -850,6 +893,7 @@ public sealed class BotSlay : BotDeed
 
             if (BotLadder.Load(body) >= ceiling)
             {
+
                 break;
             }
 
@@ -960,8 +1004,9 @@ public sealed class BotSlay : BotDeed
         Asked == 0
             ? "nobody has been offered a kite"
             : $"{Asked} asked: {Handless} were melee and have no kite to give, {Kited} gave ground, {Distant} were far enough off to simply shoot, {Rushed} had the shot too near, {Closed} drew steel instead — longest clock seen {Longest}ms against {StillMs + KiteSlackMs}ms needed; "
-              + $"{Steady} of them had been standing still long enough for the engine to loose an arrow, longest stillness seen {Stillest}ms against the {StillMs}ms it wants; "
-              + $"{Outpaced} beats an archer stood and shot rather than give ground to a quarry that steps as fast as it runs, {Planted} fights an archer stopped backing off in after {PlantMs / 1000}s with the quarry still inside {TooClose} tiles";
+              + $"{Steady} of them had been standing still long enough for the engine to loose an arrow ({SteadyBows} of the bows' own asks), longest stillness seen {Stillest}ms against the {StillMs}ms it wants; "
+              + $"{Outpaced} beats an archer stood and shot rather than give ground to a quarry that steps as fast as it runs, {Planted} fights an archer stopped backing off in after {PlantMs / 1000}s with the quarry still inside {TooClose} tiles; "
+              + $"{Backed} back-off walks ordered, {Due} beats a crowded archer stood for an arrow that was due instead, {Halted} retreats ended for one, {Unpaid} fights an archer planted in after {RetreatMs / 1000}s without the quarry's health falling";
 
     public static void ForgetBows()
     {
@@ -974,8 +1019,13 @@ public sealed class BotSlay : BotDeed
         Closed = 0;
         Stillest = 0;
         Steady = 0;
+        SteadyBows = 0;
         Outpaced = 0;
         Planted = 0;
+        Backed = 0;
+        Due = 0;
+        Halted = 0;
+        Unpaid = 0;
         Rebased = 0;
         Dragged = 0;
         Unleashed = 0;
@@ -985,6 +1035,8 @@ public sealed class BotSlay : BotDeed
     public static long Stillest { get; private set; }
 
     public static long Steady { get; private set; }
+
+    public static long SteadyBows { get; private set; }
 
     private bool Kiting(Mobile body, int reach)
     {
@@ -1007,6 +1059,11 @@ public sealed class BotSlay : BotDeed
             Handless++;
 
             return false;
+        }
+
+        if (still >= StillMs)
+        {
+            SteadyBows++;
         }
 
         if (!body.InRange(_quarry.Location, KiteWithin))
@@ -1069,6 +1126,7 @@ public sealed class BotSlay : BotDeed
 
         for (var d = want; d >= 1; d--)
         {
+
             var x = from.X + dx * d / step;
             var y = from.Y + dy * d / step;
 
@@ -1095,29 +1153,56 @@ public sealed class BotSlay : BotDeed
 
         var step = _quarry?.ActiveSpeed ?? 0.0;
 
-        if (step <= 0.0)
+        if (step > 0.0 && step * 1000.0 < (body.Mounted ? MountStepMs : FootStepMs) * OutpaceShare)
         {
-            return true;
+            return false;
         }
 
-        return step * 1000.0 >= (body.Mounted ? MountStepMs : FootStepMs) * OutpaceShare;
+        if (RetreatMs > 0)
+        {
+            var since = _progressTick - _fightTick >= 0 ? _progressTick : _fightTick;
+
+            if (Core.TickCount - since >= RetreatMs)
+            {
+                _planted = true;
+                Unpaid++;
+
+                return false;
+            }
+        }
+
+        return true;
     }
 
-    private void Stand(Mobile body)
+    private bool Stand(Mobile body)
     {
         _backing = Point3D.Zero;
 
+        var ended = false;
+
         if (body is BotMobile { Journey: { Active: true } journey })
         {
+            ended = _retreatTo != Point3D.Zero
+                    && journey.Bottom is { Interruption: false, Follow: null } bottom
+                    && bottom.Where == _retreatTo;
+
             journey.Finish();
         }
+
+        _retreatTo = Point3D.Zero;
+
+        return ended;
     }
 
     public static double OutpaceShare { get; set; } = 1.25;
 
-    public static int FootStepMs { get; set; } = 200;
+    public static int FootStepMs { get; set; } = 225;
 
     public static int MountStepMs { get; set; } = 100;
+
+    public static bool StandsWhenDue { get; set; } = true;
+
+    public static int RetreatMs { get; set; } = 10000;
 
     public static int PlantMs { get; set; } = 3000;
 
@@ -1128,6 +1213,26 @@ public sealed class BotSlay : BotDeed
     public static long Outpaced { get; private set; }
 
     public static long Planted { get; private set; }
+
+    public static long Backed { get; private set; }
+
+    public static long Due { get; private set; }
+
+    public static long Halted { get; private set; }
+
+    public static long Unpaid { get; private set; }
+
+    private static string Quiver(Mobile body)
+    {
+        if (body.Weapon is not BaseRanged bow)
+        {
+            return "no bow";
+        }
+
+        var count = body.Backpack?.GetAmount(bow.AmmoType) ?? 0;
+
+        return bow.AmmoType == typeof(Bolt) ? $"{count} bolts" : $"{count} arrows";
+    }
 
     private bool Down() =>
         _quarry == null || _quarry.Deleted || !_quarry.Alive || _quarry.Map != _map;

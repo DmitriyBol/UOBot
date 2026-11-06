@@ -3,19 +3,9 @@ using Server.Misc;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Which rung the bot is on, from facts only. No opinions, no weighing, no memory.
-///
-/// <para>
-/// <b>Facts the ladder can actually produce, and nothing else.</b> Every rung below corresponds to a
-/// question the engine can answer right now — is it alive, will it move, how much health is left, is it in
-/// a squad. The rungs the first version had that could not be answered that way were the ones that
-/// misfired: its "danger" rung was a utility score over things it could see, so a caster striking from
-/// eight tiles never triggered it.
-/// </para>
-/// </summary>
 public static class BotLadder
 {
+
     public static double FailingFraction { get; set; } = 0.35;
 
     public static int HuntedMs { get; set; } = 8000;

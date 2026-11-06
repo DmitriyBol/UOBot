@@ -6,19 +6,9 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The reach map on the dashboard: a summary the loop writes, and the tiles themselves, cut out of the immutable snapshot on
-/// the listener's own threads.
-///
-/// <para>
-/// <b>Classes, not colours (01.10.2026).</b> The page is sent one byte a tile — or one a square of tiles for the whole map —
-/// and paints them in its own theme's colours, so a light page and a dark one agree and a tile under the pointer can be named
-/// exactly. Sent deflated: the open sea and the open fields are long runs of one byte, and the whole map at four tiles a pixel
-/// goes out in a few hundred kilobytes.
-/// </para>
-/// </summary>
 public static class BotReachWeb
 {
+
     public static int MostCells { get; set; } = 2 * 1024 * 1024;
 
     private static volatile string _json = "{\"ready\":false,\"state\":\"starting\"}";

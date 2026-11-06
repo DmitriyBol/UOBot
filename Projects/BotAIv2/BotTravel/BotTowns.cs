@@ -5,30 +5,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The towns of the map, read from its regions, and which of them the population can walk to.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026: "as the limits arrive the bots can naturally spread over the world; give them
-/// knowledge of the roads between the towns and the ways round. Some guilds may decide to settle by other towns, so as
-/// not to be so dense round Britain. The bots should scatter over the world by themselves, travel, meet new horizons,
-/// build roads to other towns, share what they find — the danger and the safety."</b> Until now the population had one
-/// home, one roam of a thousand tiles round it, and no word for anywhere else.
-/// </para>
-///
-/// <para>
-/// <b>A town is a region the engine already draws.</b> Every town on Felucca is a <c>TownRegion</c> with a name and a box —
-/// Britain, Trinsic, Minoc, Vesper, Yew, Cove, and the island towns — and the fields round Britain and Yew are town regions
-/// too, which is why anything called "A Wheatfield in ..." is passed over. The middle of the box, settled on the ground, is
-/// the town's square: where a traveller aims, where a guild that settles there is seated near, and what "in Trinsic" means.
-/// </para>
-///
-/// <para>
-/// <b>Whether a town can be reached is the gates' answer, not a table's.</b> Jhelom, Moonglow, Magincia, Nujel'm and Ocllo
-/// are islands with no boat, and the graph's components say so (<see cref="BotGates.Joined"/>); the towns joined to home
-/// by ground — or by a gate, should one ever be — are the ones travellers go to and guilds settle by.
-/// </para>
-/// </summary>
 public static class BotTowns
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTowns));

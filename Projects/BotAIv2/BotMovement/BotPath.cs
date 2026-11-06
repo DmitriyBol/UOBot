@@ -7,9 +7,9 @@ using CalcMoves = Server.Movement.Movement;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What a search concluded. Three answers, and the difference between two of them is load-bearing.</summary>
 public enum BotPathOutcome
 {
+
     Sealed,
 
     Partial,
@@ -17,9 +17,9 @@ public enum BotPathOutcome
     Reached
 }
 
-/// <summary>What asking about the far side of a journey concluded.</summary>
 public enum BotEnclosure
 {
+
     Enclosed,
 
     TooBig,
@@ -31,26 +31,6 @@ public enum BotEnclosure
     Deferred
 }
 
-/// <summary>
-/// Tile-by-tile A* over the engine's own step masks, bounded by a clock.
-///
-/// <para>
-/// <b>Why a clock and not a tile count.</b> The first version budgeted expansions — twelve thousand of
-/// them. Its own measurements say what that costs: 90 006 tiles across 538 searches at 215 ms total is
-/// 167 tiles per search at 0.40 ms, so about 2.4 µs a tile, so a search that spent its whole allowance
-/// cost something like <b>thirty milliseconds</b>. The average was honest and the worst case was two
-/// orders of magnitude worse, which is the shape of a frame that stutters when fifty bots decide to cross
-/// the continent in the same tick. Worse, a tile is not a fixed price: on a warm <see cref="StepCache"/>
-/// it is a lookup, on a cold one it is a full recompute. Budget the thing that was promised.
-/// </para>
-///
-/// <para>
-/// <b>Two properties matter more than speed.</b> A failed search still answers — it has established
-/// exactly which tiles it can reach, so finding the gate out of a walled graveyard is not a mechanism
-/// with its own ring sweeps and gate memory, it is the ordinary search read correctly. And a refusal is
-/// trustworthy, which is what turns "stuck" from a state a bot occupies into an answer it receives.
-/// </para>
-/// </summary>
 public static class BotPath
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPath));
@@ -348,6 +328,7 @@ public static class BotPath
 
         if (BotReach.Ask(map, from, to, arrival) == BotReachVerdict.Sealed)
         {
+
             Searches++;
             SealedRuns++;
 
@@ -631,6 +612,7 @@ public static class BotPath
 
         if (!outOfTime && !clipped && avoid.Empty)
         {
+
             if (!doorsShut && _lookup.Count >= MinPocket)
             {
                 BotReach.Record(map, _lookup.Keys, from);
@@ -833,6 +815,7 @@ public static class BotPath
 
         if (_lookup.Count < MinPocket)
         {
+
             ProbedTooBig++;
 
             return BotEnclosure.TooBig;

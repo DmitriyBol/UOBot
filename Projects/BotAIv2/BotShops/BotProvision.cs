@@ -7,34 +7,6 @@ using Server.Spells;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot must carry before it goes into a fight it chose — a dungeon's delve, or a war company sent against somebody
-/// else's ground — and the guild's money for what it cannot buy itself.
-///
-/// <para>
-/// <b>Patrick's order of 26.09.2026: "supply and the purchase of every consumable needed — THIS IS COMPULSORY. A mage may
-/// not go without reagents for its casts, a healer without bandages, and the other classes have no right to go without
-/// bottles and bandages either. Set everybody an entry threshold."</b> Until then nothing at any door asked what a bot
-/// carried: the delve, the war company and the hunt asked only its health and its class. The proving ground showed what
-/// that costs once the world is awake — a healer with no bandage, mages with no reagents, archers with a dozen arrows,
-/// all losing to one orcish mage.
-/// </para>
-///
-/// <para>
-/// <b>The threshold is the class's own kit, at a share.</b> Bandages: half the kit's. Bottles: one of each kind the class
-/// carries. Ammunition: half the quiver it was born with. Reagents: <see cref="Casts"/> casts of its key spell — a caster's
-/// strongest attack in its book, a healer's greatest heal and its cure, a warrior-mage's heal. Every share sits at or below
-/// the point where the shopper already buys (<c>BotShopper.Short</c>), so a bot turned away is always a bot the shopper
-/// will send for more.
-/// </para>
-///
-/// <para>
-/// <b>Asked at the doors a bot chooses to walk through, and at no other.</b> A delve's leader and every member it calls,
-/// and a member of a war company going onto somebody else's ground. Not a solo hunt — that is how a poor bot earns the money
-/// for its bandages, and closing it would lock the poor out of the thing that makes them less poor — and not the defence
-/// of its own ground: a bot does not ask its pack before it defends its door.
-/// </para>
-/// </summary>
 public static class BotProvision
 {
     public static bool Running { get; set; } = true;

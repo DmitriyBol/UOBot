@@ -4,28 +4,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What the island's spawners keep alive near a place, reckoned as a fight and set beside what the square asks and what a
-/// bot brought there — counted and written down, and nothing refused. §5 S8 of DECISIONS.md, in shadow.
-///
-/// <para>
-/// <b>The ground map counts heads, and only as fresh as the last look.</b> A square asks strength of whoever goes there
-/// (<see cref="BotQuad.Muscle(Map, Point3D)"/>) from its earned reading less a tenth for each hostile creature somebody
-/// standing in it counted in the last five minutes (<see cref="BotQuad.MobWorth"/>, <see cref="BotQuad.SightMs"/>). So an
-/// ogre counts as a mongbat, and a square nobody has stood in lately counts nothing at all: the three spawners east of
-/// Britain at (1969, 1409), (1986, 1463) and (1983, 1517) keep ettins, gargoyles, gazers, ogres, trolls and water elementals,
-/// seven of each, with a walking range of thirty, and at 23:01 on 16.09.2026 the square at (1998, 1494) read +0.08 and asked
-/// nothing while seven bots died there in two minutes. The spawners are known at every boot (<see cref="BotLairs"/>), what
-/// they keep alive is in their entries, and <see cref="BotThreat.Power"/> speaks the units a square asks in.
-/// </para>
-///
-/// <para>
-/// <b>Measured before it is enforced, because it would move the fear of the whole map at once.</b> Every prowl, hunt and
-/// sweep refusal reads the same number. Decided by Claude on Patrick's word of 17.09.2026 ("as you consider necessary"):
-/// first how often the dead fell where the spawners kept more than they brought while the square asked no more, and how
-/// much of the island such a rule would close to a bot alone; then whether to make it a wall.
-/// </para>
-/// </summary>
 public static class BotKept
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotKept));

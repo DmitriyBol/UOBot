@@ -5,35 +5,9 @@ using CalcMoves = Server.Movement.Movement;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One tile, and everything the engine knows about stepping off it.
-///
-/// <para>
-/// This is the whole foundation, and the reason the rest of the movement code can be simple. The engine
-/// caches, per tile, an eight-direction mask — "can I step this way, and what height do I land on" —
-/// computed from the very rules <c>MovementImpl</c> enforces. It needs no mobile and has no distance
-/// ceiling. The first version spent months building a compensation layer around the belief that no such
-/// thing existed: a lattice of guessed legs, an arc sweep that walked at obstacles until something gave,
-/// ring probes hunting for a way out of enclosures, and a memory of walls learned by bots leaning on
-/// them for twenty-five seconds at a time. One night's log holds 1728 abandoned errands. A fence is not
-/// discovered. It is seen.
-/// </para>
-///
-/// <para>
-/// <b>Everything here mirrors an engine rule exactly, and every deviation in the first version cost an
-/// evening.</b> A planner that simplifies a rule is not faster — it is a planner whose paths the bot
-/// cannot walk, and the difference shows up as a bot pressed against a railing insisting its route is
-/// fine.
-/// </para>
-///
-/// <para>
-/// What is deliberately <b>not</b> here: creatures, dropped items and shut doors. They move. A planner
-/// that treats a skeleton standing in a doorway as a wall teaches itself that the doorway is one. Those
-/// belong to the moment the step is taken — see <see cref="BotWalk"/>.
-/// </para>
-/// </summary>
 public static class BotStep
 {
+
     public const int StepUp = 2;
 
     public const int StandingReach = 24;
@@ -52,6 +26,7 @@ public static class BotStep
 
         if (lookup.IsHit)
         {
+
             if (!ClimbsTooHigh(lookup, z))
             {
                 return lookup;
@@ -68,10 +43,12 @@ public static class BotStep
                 }
             case CacheHitKind.Fallthrough_Multi:
                 {
+
                     return MultiMaskCache.Instance.GetMask(map, x, y, z);
                 }
             default:
                 {
+
                     return StepProbe.ComputeMaskAt(map, x, y, z);
                 }
         }

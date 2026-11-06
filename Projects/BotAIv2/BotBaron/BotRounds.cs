@@ -4,26 +4,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The Baron walking his town, because nowhere has taken anybody lately.
-///
-/// <para>
-/// <b>The point of this errand is that it produces nothing, and it still has to exist.</b> Every other bot
-/// on the shard has somewhere to be at all times — the mine, the forge, the counter, a corpse — because
-/// every other bot is making a living. The Baron is not, and a Baron with no ground to harrow is a bot with
-/// literally nothing on the board. Left there he would stand on the spot he was born on until somebody died
-/// somewhere, which is not a bot at rest, it is a bot that has stopped. So this is deliberately not busywork
-/// dressed up as trade: it is where he is between harrowings, it pays nothing, it claims nothing, and it is
-/// the only work on the shard whose whole justification is that a person watching should see him.
-/// </para>
-///
-/// <para>
-/// <b>Inside the walls, and the walls are the engine's own.</b> A guarded region is where nothing can be
-/// fought, which is exactly the property that makes it the right place to be idle in — a Baron loitering in
-/// open country would be a Baron picking fights alone, and the whole design of him is that he fights with
-/// five bots behind him or not at all.
-/// </para>
-/// </summary>
 public sealed class BotRounds : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRounds));

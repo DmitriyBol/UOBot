@@ -2,10 +2,6 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The numbers a build works by, copied off the dials when its input is gathered, so a build running off the loop never reads
-/// a property the door may be changing under it.
-/// </summary>
 public sealed class BotZoneSettings
 {
     public int DeclaredMost { get; init; }
@@ -75,15 +71,14 @@ public sealed class BotZoneSettings
     public int WanderMostCells { get; init; }
 }
 
-/// <summary>A creature kind as the build sees it: plain values, no type and no creature.</summary>
 public readonly record struct BotZoneKindIn(
     string Name, double Power, bool Aggressive, bool Caster, int Perception, bool Water, bool Rooted, bool Swims, int Strike = 0
 )
 {
+
     public bool WaterAt(bool wet) => Water || Swims && wet;
 }
 
-/// <summary>One haunt as the build sees it.</summary>
 public sealed class BotZoneHauntIn
 {
     public int X { get; init; }
@@ -119,29 +114,15 @@ public sealed class BotZoneHauntIn
     public DateTime LastAwake { get; init; }
 }
 
-/// <summary>
-/// One living creature where it stands now, with its own traits (an instance may differ from its kind). <see cref="Event"/>: the
-/// index of the event it belongs to, or -1. <see cref="TrailFrom"/> and <see cref="TrailCount"/>: its recent places in
-/// <see cref="BotZoneInput.Trail"/>, newest first (08.10.2026).
-/// </summary>
 public readonly record struct BotZoneLiveIn(
     int X, int Y, int Kind, int Haunt, bool Awake, float Power, bool Aggressive, bool Caster, int Perception, bool Water, bool Rooted,
     int Strike = 0, int Event = -1, int TrailFrom = 0, int TrailCount = 0
 );
 
-/// <summary>
-/// An event's creatures as one temporary zone (08.10.2026): what it is, its field (a point and the leash round it), painted while
-/// any of them lives. See <see cref="BotZones"/>' gather.
-/// </summary>
 public readonly record struct BotZoneEventIn(string Label, int X, int Y, int Radius);
 
-/// <summary>A named place: a town (a point) or a dungeon (a box).</summary>
 public readonly record struct BotZonePlaceIn(string Name, int X1, int Y1, int X2, int Y2);
 
-/// <summary>
-/// Everything one build needs, gathered on the loop and never touched by it again: plain values and fresh arrays, the
-/// previous state (immutable) for matching numbers, and the one back buffer no published state refers to.
-/// </summary>
 public sealed class BotZoneInput
 {
     public Map Map { get; init; }

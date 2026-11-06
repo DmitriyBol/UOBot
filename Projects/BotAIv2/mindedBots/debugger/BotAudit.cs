@@ -5,45 +5,15 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The roll-call: every two minutes, three questions asked of every bot, and a hand laid on the ones that
-/// answer no to all of them.
-///
-/// <para>
-/// <b>It asks no model anything, and that is the first decision here.</b> The three questions — did it get
-/// where it was going, did it finish what it took on, did anything change at all — are arithmetic. A model
-/// is worth asking why a bot is stuck; it is not worth asking whether one is, and a check that depends on a
-/// model is a check that does not run while the card is busy. This runs on a two-minute clock whatever else
-/// is happening, costs one pass over the roll, and cannot fail to fire.
-/// </para>
-///
-/// <para>
-/// <b>It is also the point at which the debugger stops being only an observer, and that is worth saying out
-/// loud.</b> Everything else in this folder was built so the watcher could not affect what it watched. From
-/// here it can: it clears a stale route, and if that does not help it ends the piece of work. So every
-/// intervention is written down with what was true before it and what was true two minutes after, and the
-/// counts are reported separately from everything else. An intervention nobody measures is not a fix, it is
-/// a second source of behaviour nobody can account for — and this shard already knows what that costs.
-/// </para>
-///
-/// <para>
-/// <b>Two strengths, escalated, because they mean different things.</b> A remind throws the route away and
-/// keeps the destination: the bot still wants the same thing and draws a fresh path to it, which is the
-/// whole cure when the plan has gone stale under it. A shake ends the undertaking as a failure, so the
-/// ledger learns that place was no good and the auction offers something else. The first is cheap and
-/// reversible and is tried first; the second throws away work in hand and is only for a bot that was
-/// reminded and did not take it.
-/// </para>
-/// </summary>
 public static class BotAudit
 {
+
     public static int WindowMs { get; set; } = 120000;
 
     public static int MostTouched { get; set; } = 4;
 
     public static int RestMs { get; set; } = 300000;
 
-    /// <summary>What was true about one bot when the window opened.</summary>
     private sealed class Mark
     {
         public string Kind;
@@ -124,6 +94,7 @@ public static class BotAudit
     {
         if (!_opened)
         {
+
             _opened = true;
             _sweptTick = now;
 
@@ -200,6 +171,7 @@ public static class BotAudit
 
                 if (mark.Kind == "-")
                 {
+
                 }
                 else if (over)
                 {
@@ -207,6 +179,7 @@ public static class BotAudit
                 }
                 else if (watch.Following)
                 {
+
                     chasing++;
                 }
                 else if (!mark.Going)
@@ -296,6 +269,7 @@ public static class BotAudit
         bool touched
     )
     {
+
         var was = mark.Stuck;
 
         mark.Stuck = wedged;

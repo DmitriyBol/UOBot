@@ -6,39 +6,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bandit breaks into a guild's hall or a bot's own house: creeps up hidden, picks the lock of the chest with a
-/// lockpick, and carries off a share of what was put by — and is wanted if anybody sees it.
-///
-/// <para>
-/// <b>Patrick, 26.09.2026, beside the order that made The Shadow every guild's enemy:</b> "since The Shadow is the enemy of
-/// every guild, bandits may rob guild houses — by stealth and lockpicking." <b>And on the night of 29.09.2026, his second
-/// addition:</b> "houses, like guild halls, can be robbed by bandits, but that needs the lockpicking skill, lockpicks
-/// themselves and stealth. If a bandit is seen in a house or a hall, it is declared wanted." So it is the band's trade,
-/// and a bandit out of every guild for its crimes (<c>BotUnderworld.Outlawed</c>): chosen instead of a person when the
-/// thought of robbery comes (<see cref="Share"/> of the times), against the hall whose guild has the most put by, or the
-/// house whose chest holds the most, and has not been broken into within <see cref="AgainMs"/>.
-/// </para>
-///
-/// <para>
-/// <b>The chest is the treasury, and the lock is a skill roll with a pick in hand.</b> A guild's money is a number kept by
-/// guild name (<see cref="BotChest"/>), and the wooden chest in its hall is its furniture; a bot's house keeps real things
-/// in a real chest (<see cref="BotAbode.Chest"/>). The engine's own lockpick refuses a locked-down container to anybody
-/// not a co-owner, so the pick is the engine's skill check (<c>Mobile.CheckSkill</c>, Lockpicking, which also trains it)
-/// against a lock that is harder in a bigger house (<see cref="Lock"/>), one try every <see cref="PickMs"/>,
-/// <see cref="MostPicks"/> tries in all, and a <see cref="Lockpick"/> in the pack that a failed try snaps now and then
-/// (<see cref="BreakChance"/>). A pick that opens a hall's chest takes <see cref="TakeShare"/> of the treasury, at most
-/// <see cref="MostTake"/>; one that opens a house's chest takes up to <see cref="MostThings"/> things out of it.
-/// </para>
-///
-/// <para>
-/// <b>Seen is wanted.</b> Hidden on the way in when it can hide at all (<c>BotShadow.Hide</c>, within <see cref="HideAt"/>),
-/// moving quietly when its Stealth lets it (<c>BotShadow.Quiet</c>); a bot with neither walks in openly. A burglar that is
-/// not hidden at a try, or is revealed by a noisy one (<see cref="NoiseChance"/>), with a bot outside the band in sight
-/// within <see cref="Sight"/>, is posted wanted on that witness's word (<c>BotOutlaw.Want</c>) — the law's own machinery
-/// then hunts it — and a guild fighter that can see one of the band sets on it as before (<c>BotFeuder</c>).
-/// </para>
-/// </summary>
 public sealed class BotBurgle : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBurgle));

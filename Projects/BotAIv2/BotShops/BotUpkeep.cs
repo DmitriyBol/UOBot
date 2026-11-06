@@ -4,28 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Asking the population, by name, for a replacement for something that is wearing out.
-///
-/// <para>
-/// <b>The board of what the population needs was empty for days, and this is the half that was missing.</b>
-/// Everything on this shard could already <em>supply</em> a want — a miner selling ingots, a tailor selling
-/// cloth and a scribe selling scrolls all check the board before they check a shopkeeper — and exactly one
-/// thing in the whole assembly ever <em>raised</em> one. So the board held at most a handful of scroll
-/// requests from mages completing their books, and a smith could have read it every minute of every session
-/// without ever finding work. A market needs somebody to want something.
-/// </para>
-///
-/// <para>
-/// <b>What a bot may ask for is settled by two refusals, and both are the order of 24.08.2026.</b> It may not
-/// ask for something it could not use, and it may not ask for something it could not pay for. The first is
-/// answered without a table of what each class may wear: a bot asks for <em>another one of what it is already
-/// wearing</em>, so the question "could this bot use it" has already been answered by the fact that it is
-/// holding one. The second is the market's own rule — <see cref="BotMarket.Ask"/> refuses a want its buyer could
-/// not pay for — with a reserve on top, because a bot that spends its last coin ordering a sword has
-/// no coin left to be resurrected with.
-/// </para>
-/// </summary>
 public sealed class BotUpkeep : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotUpkeep));

@@ -3,34 +3,9 @@ using Server.Engines.Craft;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What the craft system last told each bot, and how often it has said each thing.
-///
-/// <para>
-/// <b>The craft system names every reason an attempt produced nothing, and until 21.09.2026 no bot could hear
-/// one of them.</b> "You must be near an anvil and a forge", "You do not have sufficient metal", "You have worn
-/// out your tool", "You must wait to perform another action", "You don't have the required skills" — each goes
-/// out through <c>SendLocalizedMessage</c> or a <c>CraftGump</c>, and both write to a <c>NetState</c> a bot does
-/// not have. So a trade standing at its bench learnt nothing from the engine but silence, and this project's
-/// longest list of engine rules found by symptom is the list of things crafting refuses without a word.
-/// </para>
-///
-/// <para>
-/// <b>Written for one loop and meant for the class.</b> On 20.09.2026 Hale failed at the forge 160 times —
-/// "24 attempts, 0 made … nothing came of the iron", with the iron never running out, so the engine was
-/// refusing every attempt before it touched the metal — and the code cannot say why: the smith's own checks
-/// all passed. This is the harvest's ear (<see cref="BotHeard"/>) turned to the bench, through the same kind
-/// of seam: <c>CraftItem.Said</c>, see <c>engine-patches/CraftItem-said.patch</c>.
-/// </para>
-///
-/// <para>
-/// <b>Numbers, and words only for the ones met so far.</b> A table of every cliloc would be a second copy of
-/// the client's; the number is always printed, so a sentence nobody has named yet can be looked up rather
-/// than lost.
-/// </para>
-/// </summary>
 public static class BotCraftEar
 {
+
     public static int FreshMs { get; set; } = 30000;
 
     public static bool Running { get; private set; }

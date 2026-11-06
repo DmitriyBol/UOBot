@@ -5,35 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bot's life story: the three most important things that ever happened to it, in its own words with the real names and
-/// numbers, and the counts behind them; written from the hooks where those things happen, and told at the fire and now and
-/// then on the road.
-///
-/// <para>
-/// <b>Patrick's idea of 07.10.2026: "a biography — memory of its three most important events (first death, who saved it, who
-/// robbed it) that it tells at the campfire and in the trade chat".</b> Each event is a <see cref="BotTale"/> with a weight;
-/// <see cref="Keep"/> holds one tale of a kind and the three heaviest kinds. The first death weighs 50; being saved 40 and up to
-/// 20 more the nearer to death it was; being raised 38; being robbed under threat 40 and up, murdered 60, killed in a war 55;
-/// the best sale 15 and up to 25 more by its size; a war fought 30 and two a kill; a duel 35; a veteran's title 60. So a bot
-/// that has been murdered, saved at three hits and made veteran tells those, and its best sale of 40gp is let go.
-/// </para>
-///
-/// <para>
-/// <b>Written where it happens, never reconstructed.</b> <c>BotMobile.OnDeath</c> (<see cref="Died"/>), <c>BotRescue</c> on a rescue
-/// ending well (<see cref="Rescued"/>), <c>BotRaise</c> (<see cref="Raised"/>), <c>BotSalve</c> (<see cref="Healed"/>), <c>BotRob</c>'s
-/// paid demand (<see cref="Extorted"/>), <c>BotHandover</c> (<see cref="Sold"/>), <c>BotSlay</c> on a lone kill and <c>BotSquad</c> on a
-/// company's (<see cref="Slew"/>, <see cref="CompanyKill"/>), and the grudge duels (<see cref="Dueled"/>). Each also moves the ties
-/// (<see cref="BotTies"/>) and the kills that make a veteran (<see cref="BotTraits.Credit"/>).
-/// </para>
-///
-/// <para>
-/// <b>Told, counted.</b> At a fire or a meeting on the road one line in <see cref="TaleChance"/> is a tale or a word about a
-/// friend or an enemy instead of the news (<c>BotCampTalk.Topic</c>); after a mood line somebody heard, one in
-/// <see cref="VoiceChance"/> is followed by a tale in the local channel, and a tale of a sale goes to the trade room one time in
-/// <see cref="TradeChance"/> (<c>BotVoice.Mood</c>).
-/// </para>
-/// </summary>
 public static class BotBiography
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBiography));
@@ -47,6 +18,14 @@ public static class BotBiography
     public static double VoiceChance { get; set; } = 0.12;
 
     public static double TradeChance { get; set; } = 0.25;
+
+    public static int MostHeard { get; set; } = 4;
+
+    public static double RetellShare { get; set; } = 0.35;
+
+    public static double TaleRestHours { get; set; } = 6.0;
+
+    public static double SociableTaleBoost { get; set; } = 1.5;
 
     public static long Written { get; private set; }
 
@@ -63,6 +42,18 @@ public static class BotBiography
     public static long FriendTales { get; private set; }
 
     public static long EnemyTales { get; private set; }
+
+    public static long HeardRecorded { get; private set; }
+
+    public static long HeardKnown { get; private set; }
+
+    public static long WitnessReplies { get; private set; }
+
+    public static long HeardReplies { get; private set; }
+
+    public static long RetoldTales { get; private set; }
+
+    public static long RepeatsSuppressed { get; private set; }
 
     public static double KillsCredited { get; private set; }
 
@@ -399,9 +390,23 @@ public static class BotBiography
         }
     }
 
-    public static string Tale(Mobile speaker, Dictionary<string, string> fill)
+    public static string Tale(Mobile speaker, Dictionary<string, string> fill, out BotTale told, IEnumerable<Mobile> audience = null)
     {
-        if (!On || fill == null || Utility.RandomDouble() >= TaleChance || BotLives.Of(speaker) is not { } life)
+        told = null;
+
+        if (!On || fill == null || BotLives.Of(speaker) is not { } life)
+        {
+            return null;
+        }
+
+        var chance = TaleChance;
+
+        if ((life.Traits & BotTrait.Sociable) != 0)
+        {
+            chance *= Math.Max(1.0, SociableTaleBoost);
+        }
+
+        if (Utility.RandomDouble() >= chance)
         {
             return null;
         }
@@ -430,15 +435,111 @@ public static class BotBiography
             }
         }
 
+        if (Utility.RandomDouble() < RetellShare && PickRetold(life) is { } heard)
+        {
+            if (KnownToMost(heard.Kind, heard.About, heard.Text, audience, speaker))
+            {
+                RepeatsSuppressed++;
+            }
+            else
+            {
+                heard.Hops++;
+                fill["tale"] = heard.Text;
+                fill["teller"] = heard.Teller ?? "a traveller";
+                fill["place"] = heard.Place ?? "a far fire";
+                told = new BotTale { Kind = heard.Kind, Other = heard.About, Text = heard.Text, At = heard.At };
+                RetoldTales++;
+                ToldAtFire++;
+
+                return "camp:tale-retold";
+            }
+        }
+
         if (Next(life) is not { } tale)
         {
             return null;
         }
 
+        if (KnownToMost(tale.Kind, tale.Other, tale.Text, audience, speaker))
+        {
+            RepeatsSuppressed++;
+
+            return null;
+        }
+
+        tale.ToldAt = DateTime.UtcNow;
         fill["tale"] = tale.Text;
         ToldAtFire++;
+        told = tale;
 
         return "camp:tale";
+    }
+
+    private static BotHeardTale PickRetold(BotLife life)
+    {
+        BotHeardTale pick = null;
+        var seen = 0;
+
+        for (var i = 0; i < life.HeardTales.Count; i++)
+        {
+            var heard = life.HeardTales[i];
+
+            if (heard.Hops >= 2 || string.IsNullOrEmpty(heard.Text) || string.Equals(heard.About, life.Name, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (Utility.Random(++seen) == 0)
+            {
+                pick = heard;
+            }
+        }
+
+        return pick;
+    }
+
+    private static bool KnownToMost(string kind, string about, string text, IEnumerable<Mobile> audience, Mobile speaker)
+    {
+        if (audience == null)
+        {
+            return false;
+        }
+
+        var carriers = 0;
+        var total = 0;
+
+        foreach (var m in audience)
+        {
+            if (m == null || ReferenceEquals(m, speaker))
+            {
+                continue;
+            }
+
+            total++;
+
+            var life = BotLives.Of(m);
+
+            if (life == null)
+            {
+                continue;
+            }
+
+            for (var i = 0; i < life.HeardTales.Count; i++)
+            {
+                var heard = life.HeardTales[i];
+
+                if (string.Equals(heard.Kind, kind, StringComparison.Ordinal)
+                    && string.Equals(heard.About, about, StringComparison.Ordinal)
+                    && string.Equals(heard.Text, text, StringComparison.Ordinal))
+                {
+                    carriers++;
+
+                    break;
+                }
+            }
+        }
+
+        return total > 0 && carriers * 2 >= total;
     }
 
     private static BotTale Next(BotLife life)
@@ -448,9 +549,128 @@ public static class BotBiography
             return null;
         }
 
-        life.ToldIndex = (life.ToldIndex + 1) % life.Tales.Count;
+        var now = DateTime.UtcNow;
+        var rest = TimeSpan.FromHours(Math.Max(0.0, TaleRestHours));
 
-        return life.Tales[life.ToldIndex];
+        for (var k = 0; k < life.Tales.Count; k++)
+        {
+            life.ToldIndex = (life.ToldIndex + 1) % life.Tales.Count;
+
+            var tale = life.Tales[life.ToldIndex];
+
+            if (tale.ToldAt == default || now - tale.ToldAt >= rest)
+            {
+                return tale;
+            }
+        }
+
+        return null;
+    }
+
+    public static void Heard(Mobile listener, Mobile teller, BotTale tale, string place)
+    {
+        if (!On || tale == null || listener == null || teller == null || ReferenceEquals(listener, teller))
+        {
+            return;
+        }
+
+        if (BotLives.Of(listener) is not { } life)
+        {
+            return;
+        }
+
+        var heard = life.HeardTales;
+
+        for (var i = 0; i < heard.Count; i++)
+        {
+            if (string.Equals(heard[i].Kind, tale.Kind, StringComparison.Ordinal)
+                && string.Equals(heard[i].About, tale.Other, StringComparison.Ordinal)
+                && string.Equals(heard[i].Text, tale.Text, StringComparison.Ordinal))
+            {
+                HeardKnown++;
+
+                return;
+            }
+        }
+
+        var at = heard.Count;
+
+        if (at >= Math.Max(1, MostHeard))
+        {
+            at = 0;
+
+            for (var i = 1; i < heard.Count; i++)
+            {
+                if (heard[i].At < heard[at].At)
+                {
+                    at = i;
+                }
+            }
+
+            heard.RemoveAt(at);
+        }
+
+        heard.Add(
+            new BotHeardTale
+            {
+                Teller = teller.Name,
+                Kind = tale.Kind,
+                About = tale.Other,
+                Text = tale.Text,
+                Place = place,
+                At = DateTime.UtcNow,
+                Hops = 0
+            }
+        );
+        HeardRecorded++;
+    }
+
+    public static string Answer(Mobile listener, BotTale tale)
+    {
+        if (!On || tale == null || BotLives.Of(listener) is not { } life)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrEmpty(tale.Other) && !string.Equals(tale.Other, life.Name, StringComparison.Ordinal))
+        {
+            var knows = false;
+
+            for (var i = 0; i < life.Tales.Count; i++)
+            {
+                if (string.Equals(life.Tales[i].Other, tale.Other, StringComparison.Ordinal))
+                {
+                    knows = true;
+
+                    break;
+                }
+            }
+
+            if (!knows && life.Tie(tale.Other) is { } tie && tie.Saved + tie.Beside + tie.Wronged > 0)
+            {
+                knows = true;
+            }
+
+            if (knows)
+            {
+                WitnessReplies++;
+
+                return "camp:tale-witness";
+            }
+        }
+
+        for (var i = 0; i < life.HeardTales.Count; i++)
+        {
+            if (string.Equals(life.HeardTales[i].Kind, tale.Kind, StringComparison.Ordinal)
+                && string.Equals(life.HeardTales[i].About, tale.Other, StringComparison.Ordinal))
+            {
+                HeardReplies++;
+
+                return "camp:tale-heard";
+            }
+        }
+
+        return null;
     }
 
     public static void AfterMood(BotMobile who)
@@ -490,7 +710,9 @@ public static class BotBiography
         return !On
             ? "biographies are off"
             : $"{Written} events written into a life ({(kinds.Length == 0 ? "none" : kinds)}), {PushedOut} pushed a lighter one out, {TooLight} too light to keep; "
-              + $"tales told: {ToldAtFire} at a fire or on the road ({FriendTales} of a friend, {EnemyTales} of an enemy), {ToldLocal} after a mood in the local channel, {ToldTrade} in the trade room; {KillsCredited:F0} kills credited";
+              + $"tales told: {ToldAtFire} at a fire or on the road ({FriendTales} of a friend, {EnemyTales} of an enemy), {ToldLocal} after a mood in the local channel, {ToldTrade} in the trade room; {KillsCredited:F0} kills credited; "
+              + $"heard: {HeardRecorded} stories remembered by listeners ({HeardKnown} tellings already carried), {WitnessReplies} answered by somebody who knew the one in it, {HeardReplies} by somebody who had heard it, "
+              + $"{RetoldTales} carried on to another fire, {RepeatsSuppressed} tellings given up as already known";
     }
 
     public static void Forget()
@@ -503,6 +725,12 @@ public static class BotBiography
         ToldTrade = 0;
         FriendTales = 0;
         EnemyTales = 0;
+        HeardRecorded = 0;
+        HeardKnown = 0;
+        WitnessReplies = 0;
+        HeardReplies = 0;
+        RetoldTales = 0;
+        RepeatsSuppressed = 0;
         KillsCredited = 0;
         _byKind.Clear();
     }

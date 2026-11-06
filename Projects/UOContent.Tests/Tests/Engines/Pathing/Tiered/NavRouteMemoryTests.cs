@@ -7,22 +7,11 @@ using Xunit.Abstractions;
 
 namespace Server.Tests.Pathfinding.Tiered;
 
-/// <summary>
-/// The tiered planners read one static hook, <see cref="NavigationService.Danger"/>, and <c>DangerHookTests</c> sets it: run
-/// beside another class's routes it changes their costs under them (StrategicPlannerTests' river failed that way on
-/// 29.09.2026 whenever the two ran at once). The classes that set it or measure costs run in this collection, one at a
-/// time, after everything else.
-/// </summary>
 [CollectionDefinition("Tiered navigation, one at a time", DisableParallelization = true)]
 public class TieredNavigationSequential
 {
 }
 
-/// <summary>
-/// The route memory (<see cref="NavRouteMemory"/>): a road planned once is served again, from its start or from anywhere
-/// along it; a cheaper road replaces it and a dearer one does not; a change in the ground forgets it and a cluster drawn
-/// again the same does not; it survives a file; and a road through blood is not served while the blood is on it.
-/// </summary>
 [Collection("Tiered navigation, one at a time")]
 public class NavRouteMemoryTests
 {

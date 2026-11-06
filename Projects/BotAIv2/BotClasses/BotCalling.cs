@@ -5,42 +5,12 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Whether a piece of work is this bot's own trade, another class's trade, or anybody's work — what that does to
-/// its price, and how the population's working minutes actually divide between the three.
-///
-/// <para>
-/// <b>Measured before it was priced.</b> Over the first seventy minutes of 14.09.2026 gatherers spent 67% of their
-/// working minutes on their own trade and crafters 73%, while healers spent 10%, warriors 12%, mages 15% and
-/// archers 16%. Almost none of that gap is fighters doing other classes' work — the share was nought to five in a
-/// hundred — it is fighters doing anybody's work: looking for a fight for a quarter of the day, carrying loot to a
-/// counter, standing for the guild. So this is the smaller of the two repairs a role needs. It keeps a warrior away
-/// from the forge and the mortar; it cannot give a warrior something to fight.
-/// </para>
-///
-/// <para>
-/// <b>Read off what a class already says about itself, rather than a table somebody typed.</b> A class names the
-/// skills it works towards — <see cref="BotClass.Wants"/> — and a piece of work names the one skill it trains —
-/// <see cref="BotDeed.Trains"/>. Work that trains one of this class's skills is its own trade; work that trains a
-/// skill some other class is for is another trade; work that trains nothing, or a skill no class is for — carrying,
-/// selling, standing for the guild, cooking — is anybody's. That is RimWorld's split between a pawn's passions and
-/// what it is incapable of, and Crusader Kings' personality weights, without a second list that could drift from
-/// the classes it describes.
-/// </para>
-///
-/// <para>
-/// <b>Applied outside the appraisal's fifth root, and on purpose.</b> Everything inside that geometric mean is
-/// flattened by it — a fiftieth arrives as 0.46 — which suits considerations about a place and does not suit a
-/// statement about who the bot is. Own trade at 1.3 against another's at 0.6 is a ratio of a little over two: a
-/// warrior walks past a mortar paying half as much again as its hunt, and a miner with nothing else on the island
-/// still mines. Never nought; see <see cref="LeastCalling"/>.
-/// </para>
-/// </summary>
 public static class BotCalling
 {
-    /// <summary>Which of the three a piece of work is to one bot.</summary>
+
     public enum Fit
     {
+
         Anybody,
 
         Own,
@@ -58,7 +28,6 @@ public static class BotCalling
 
     private static bool _surveyed;
 
-    /// <summary>One class's working minutes, split three ways and by kind of work.</summary>
     private sealed class Book
     {
         public double Own;

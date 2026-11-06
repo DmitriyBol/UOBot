@@ -2,21 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The class layer as a module: reads its file, then says what the nine came out as.
-///
-/// <para>
-/// Runs in <see cref="BotPhase.Settings"/> and requires nothing. It is the only module that can make
-/// both claims honestly — what a class is has no dependence on the world at all, which is exactly why
-/// it can be built and read before there is one.
-/// </para>
-///
-/// <para>
-/// The census is logged here rather than by the entry point, because the entry point should not know
-/// what a role is. A module that cannot report on itself has to be reported on by something that
-/// reaches inside it, and that is how a loader turns into the thing it was meant to replace.
-/// </para>
-/// </summary>
 public sealed class BotClassModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotClassModule));

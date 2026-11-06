@@ -7,31 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The herald's work: a recruiting stand by the bank of the guild's town, the guild's news read aloud there, and a challenge to
-/// a rival guild's bout.
-///
-/// <para>
-/// <b>A shift like a shop's.</b> The herald walks to the banker nearest its guild's seat (<see cref="BotShopkeep.BankNear"/>)
-/// and stands <see cref="ShiftMinutes"/> there, then rests <see cref="RestMs"/>. Every <see cref="LookMs"/> it looks round
-/// <see cref="Reach"/> tiles: a bot in no guild that may join one, or a member of another guild that is discontented in it — it
-/// thinks <see cref="SourRegard"/> or worse of its head, or its guild has nothing to show (<see cref="BotGuilds.Worth(Guild)"/>
-/// nought) while the herald's has a hall or ground — is invited once in <see cref="InviteRestMs"/>, and joins at
-/// <see cref="JoinChance"/> (the unguilded) or <see cref="CrossChance"/> (the discontented), by the guild's own doors
-/// (<see cref="BotGuilds.Recruit"/>, <see cref="BotGuilds.Poach"/>) with every one of their rules. Never across a war, never an
-/// outlaw, never a head or an officer, never out of a guild at its fewest.
-/// </para>
-///
-/// <para>
-/// <b>News.</b> Every <see cref="NewsEveryMs"/> the herald reads one piece aloud: what the officers and the folders have posted
-/// (<see cref="BotOfficers.News"/>), else a standing fact — a war and its score, the chest and what it saves for, the store.
-/// </para>
-///
-/// <para>
-/// <b>A bout.</b> Once in <see cref="BotGuildBout.EveryMs"/> a herald at its stand challenges the guild nearest its own in might
-/// that is at war with nobody's side of it (<see cref="BotGuildBout"/>).
-/// </para>
-/// </summary>
 public sealed class BotHeraldStand : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHeraldStand));

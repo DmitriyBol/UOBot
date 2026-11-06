@@ -4,27 +4,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Picking spent ammunition up off the ground.
-///
-/// <para>
-/// <b>Where an arrow goes when it misses is the whole reason this exists.</b> On this era's rules a miss puts
-/// the arrow back into the world — <c>Ammo.MoveToWorld</c>, a tile or two from whatever was being shot at —
-/// with a four in ten chance, and a hit drops it into the target instead, which is to say into the corpse. The
-/// corpse half is already collected by whoever loots it. The ground half was collected by nobody at all, so an
-/// archer's quiver drained one way: out.
-/// </para>
-///
-/// <para>
-/// <b>It is priced as the errand it is.</b> Arrows are worth a few coppers each, so this wins only when there
-/// is nothing better to do — which is exactly what was asked for, and exactly where it belongs: a bot with a
-/// paying trade in front of it should not be crouching in a field over three arrows. What makes it worth
-/// having at all is that ammunition is otherwise bought, and an archer that has to buy every arrow it fires
-/// spends its takings on being able to earn them.
-/// </para>
-/// </summary>
 public sealed class BotGlean : BotDeed
 {
+
     public const string Trade = "glean";
 
     public static double Prior { get; set; } = 14.0;
@@ -96,6 +78,7 @@ public sealed class BotGlean : BotDeed
 
         if (lying == null)
         {
+
             return _gathered > 0
                 ? BotDoing.Done($"{_gathered} {_kind.Name} back off the ground")
                 : BotDoing.Done("nothing left lying about");
@@ -115,7 +98,7 @@ public sealed class BotGlean : BotDeed
 
         _gathered += Math.Max(1, lying.Amount);
 
-        pack.DropItem(lying);
+        BotUnload.IntoPack(body, pack, lying);
 
         return BotDoing.Work("gathering");
     }
@@ -154,40 +137,9 @@ public sealed class BotGlean : BotDeed
     }
 }
 
-/// <summary>
-/// Offers an archer the job of picking its arrows back up, when it is short of them and some are lying about.
-///
-/// <para>
-/// Only a bot that shoots, and only one that is actually short: the quiver it was born with is the measure,
-/// so a full archer walks past its own spent arrows rather than tidying the field for its own sake.
-/// </para>
-/// </summary>
-    /// <summary>
-    /// The road was refused, so the place is written down — and this is the half that was missing.
-    ///
-    /// <para>
-    /// <b>Asking the reach ledger was not enough and the log said so within the hour.</b>
-    /// <c>BotReach.Ask</c> answers out of pockets that enclosure searches have proved closed: it is about
-    /// the ground a bot is <em>standing in</em>. A corpse fifteen tiles below the floor is not a pocket
-    /// anybody has surveyed, so the answer is Unknown and the offer goes through. Corwin took the picking errand
-    /// 533 times in five minutes on 10.09.2026 at one such corpse and took the whole shard's band to 33%,
-    /// an hour after the reach guard went in and four hours after the identical loop on a spent arrow.
-    /// </para>
-    ///
-    /// <para>
-    /// So the failure marks the place, the way <c>BotUnload.Bend</c> has always marked a counter it could
-    /// not reach, and the proposer reads the mark. Both halves are needed: a mark nobody reads is this
-    /// project's oldest and most repeated defect, and the appraisal's own caution factor is not a substitute
-    /// — a fifth root turns 0.15 into 0.68, which does not stop anything.
-    /// </para>
-    ///
-    /// <para>
-    /// False, always: there is no second place to try. The errand ends and the mark stops it coming back.
-    /// </para>
-    /// </summary>
-
 public sealed class BotGleaner : IBotProposer
 {
+
     public static long Sealed { get; private set; }
 
     public static long Baulked { get; private set; }

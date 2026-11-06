@@ -3,25 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Movement as a module: reads its numbers, lets the population walk, and puts its counters back on a
-/// world reload.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, because everything under it asks the map questions — which tile has a
-/// floor, what is standing on it, where the doors are — and none of that can be answered before the world
-/// is in memory. Requires nothing: a path does not care what class the bot is.
-/// </para>
-///
-/// <para>
-/// <b>Its switch is the useful one.</b> Turned off, every bot stands where it is and everything else goes
-/// on running. Half the first version's investigations were the same question — is this navigation, or is
-/// navigation covering for something else? — and the honest answer took hours of watching a live shard.
-/// Four of the things eventually found underneath it were not navigation at all: bots blocking each other
-/// in a doorway, a stuck-detector that punished progress, a caster whose own spell read as a wall, and a
-/// bot at a counter being fined for standing at a counter.
-/// </para>
-/// </summary>
 public sealed class BotMovementModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMovementModule));
@@ -39,7 +20,7 @@ public sealed class BotMovementModule : BotModule
         BotWalk.Walking = true;
 
         logger.Information(
-            "Movement ready: a search is charged {PerTile}ms a tile of distance, never less than {Short}ms and never more than {Ceiling}ms, the population {Window}ms a second, floor {Floor}ms; a plan is trusted {Stale}ms and a journey is given up after {Stall} fruitless attempts at stepping or {NoCloser} plans that get no closer; after {FarSide} of those the far side of the destination is looked at, at most every {Gap}ms, for a pocket of up to {Cells} tiles costing at most {Look}ms",
+            "Movement ready: a search is charged {PerTile}ms a tile of distance, never less than {Short}ms and never more than {Ceiling}ms, the population {Window}ms a second, floor {Floor}ms; a plan is trusted {Stale}ms and a journey is given up after {Stall} fruitless attempts at stepping or {NoCloser} plans that get no closer (a reached plan after somebody about its own business starting that count again: {KeepUp}); after {FarSide} of those the far side of the destination is looked at, at most every {Gap}ms, for a pocket of up to {Cells} tiles costing at most {Look}ms",
             BotPath.MsPerTile,
             BotPath.ShortMs,
             BotPath.CeilingMs,
@@ -48,6 +29,7 @@ public sealed class BotMovementModule : BotModule
             BotJourney.PlanStaleMs,
             BotJourney.StallAttempts,
             BotJourney.MaxPlansWithoutCloser,
+            BotJourney.KeepUp,
             BotWalk.PlansBeforeAskingTheFarSide,
             BotPath.EnclosureGapMs,
             BotPath.EnclosureCells,

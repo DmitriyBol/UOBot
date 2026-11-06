@@ -5,9 +5,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-travel.json</c>. A missing key keeps the code's value.</summary>
 public sealed class BotTravelSettings
 {
+
     public bool? Running { get; set; }
 
     public double? EveryHours { get; set; }
@@ -21,10 +21,6 @@ public sealed class BotTravelSettings
     public double? Curiosity { get; set; }
 }
 
-/// <summary>
-/// The towns, the roads between them and the journeys. See <see cref="BotTowns"/>, <see cref="BotRoadbook"/> and
-/// <see cref="BotTravel"/> — Patrick's order of 29.09.2026.
-/// </summary>
 public sealed class BotTravelModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTravelModule));
@@ -101,7 +97,6 @@ public sealed class BotTravelModule : BotModule
         BotTowns.Forget();
     }
 
-    /// <summary>One slice of drawing while there is drawing to do; then a look at the roads' JSON once a minute for the danger readings.</summary>
     private sealed class TravelTimer : Timer
     {
         private long _wroteTick;

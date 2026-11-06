@@ -2,23 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Magic as a trade and as an appetite, as a module.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, and it requires <c>Classes</c>, <c>Will</c>, <c>Shops</c> and
-/// <c>Auction</c> — the last two because both ends of this subsystem are somebody else's counter: paper and
-/// herbs come off a shelf, and what is written goes to the bots' own market or to a want standing on it.
-/// </para>
-///
-/// <para>
-/// <b>This is the module that gives the market a buyer that is not us.</b> Mining put metal out that nothing
-/// needed; sewing bought its cloth off a shelf. A caster's book is the first appetite in this population that
-/// only another bot can satisfy, because the engine's shopkeepers stop at the third circle — so the first
-/// closed loop of the shard runs through here: a shopkeeper's herbs become a scribe's scroll, and a scribe's
-/// scroll becomes another caster's spell, at a price the two of them settle between themselves.
-/// </para>
-/// </summary>
 public sealed class BotSpellsModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSpellsModule));

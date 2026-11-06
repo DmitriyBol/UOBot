@@ -6,38 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What one guild thinks of another, and the two thresholds that turn an opinion into a war.
-///
-/// <para>
-/// <b>Stage four of Patrick's order of 08.09.2026, and the one he deliberately left unbuilt</b> — his own
-/// words: the only part that can make the population smaller. So it is built with the fighting behind a
-/// switch that is off, and the opinions running and visible from the first minute. An evening of watching
-/// guilds come to dislike each other, with nobody dying of it, is what says whether the numbers are right;
-/// the switch is then one dial.
-/// </para>
-///
-/// <para>
-/// <b>A number per ordered pair, and it is only ever moved by something that happened.</b> Nothing here
-/// decays towards a designed outcome and nothing drifts on a timer except the border, which is itself a
-/// fact about the ground. Every mover is listed in <see cref="Describe"/> with its own count, so a war can
-/// always be explained by what caused it rather than guessed at.
-/// </para>
-///
-/// <para>
-/// <b>Two thresholds and not one.</b> War is declared below <see cref="Enmity"/> and ended above
-/// <see cref="Amity"/>, and the gap between them is the whole reason a war does not flicker on and off every
-/// minute as one trade lands. That is the same shape the shard's other hysteresis has — see
-/// <c>BotUnload</c>'s pair — and it is here for the same reason.
-/// </para>
-///
-/// <para>
-/// <b>The engine does the enforcing.</b> <c>Guild.AddEnemy</c> makes the other side
-/// <c>Notoriety.Enemy</c>, which makes striking them lawful with no criminal flag and no guard reaction,
-/// and makes their corpses lawful to loot. Nothing here touches karma, the criminal flag or the watch, and
-/// no looting code is written: <c>BotPickings</c> already loots what a bot killed itself.
-/// </para>
-/// </summary>
 public static class BotRegard
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRegard));
@@ -423,6 +391,7 @@ public static class BotRegard
             if (!mine.IsAlly(theirs) && now >= Alliance && Of(about, of) >= Alliance
                 && (mine.Allies?.Count ?? 0) < MostAllies && (theirs.Allies?.Count ?? 0) < MostAllies)
             {
+
                 if (BotParley.Befriend(mine, theirs, $"{why} (regard {now:F1} and {Of(about, of):F1})"))
                 {
                     return;

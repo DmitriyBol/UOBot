@@ -5,11 +5,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a member of a guild with a party mustering the place in it: for a passage out, a member on the dock's land within
-/// <see cref="BotColonies.MusterReach"/> of it — one with a pick first, at a better price, since the colony is a mine; for a run
-/// home, a colonist on the colony's land whose shift is over. A guild's muster gets through a member's hold (<see cref="BotSignOn.Summons"/>).
-/// </summary>
 public sealed class BotSigner : IBotProposer
 {
     public string Name => "signer";
@@ -67,11 +62,6 @@ public sealed class BotSigner : IBotProposer
     }
 }
 
-/// <summary>
-/// A member's place in a party: to the dock, to the captain's side, aboard as the helm's company, and ashore — on the island to
-/// the colony's site and its square held while the claim is made, or on the mainland home from the colony. Paid nothing itself:
-/// the colony is a mine and its takings come in the store and at the counters.
-/// </summary>
 public sealed class BotSignOn : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSignOn));

@@ -7,33 +7,6 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// A door into the running shard for whoever is holding the keyboard rather than a character: write a line
-/// into <c>argus-in.txt</c> and the answer appears in <c>argus-out.txt</c> within a couple of seconds.
-///
-/// <para>
-/// <b>It exists because this shard is headless and its console cannot be typed into.</b> <c>Core.Headless</c>
-/// is true whenever standard input is redirected, which it always is here, and the engine's own console
-/// reader throws rather than reads. So the one way to ask a running world a question was to wait for the
-/// next report, and the one way to change what was asked was to stop the shard, rebuild and start it again —
-/// which throws away every measurement the debugger had accumulated, and the long-window measurements are
-/// precisely the ones worth having. Six restarts in one morning cost more evidence than they bought.
-/// </para>
-///
-/// <para>
-/// <b>It reads and it thinks, and since 04.09.2026 it can also reach.</b> Most of what is here answers out
-/// of measurements already taken, or puts a question to the model with those measurements attached.
-/// <c>note</c> files a remark exactly as speaking to the debugger in the world does. <c>do</c> hands one of
-/// <see cref="BotHand.Verbs"/> to the same bounded set of commands the model itself may ask for — and every
-/// use of it, from here or from the model, is written to <c>logs/bot-debugger-commands.log</c> before it
-/// happens, which is the only reason it is safe to have at all.
-/// </para>
-///
-/// <para>
-/// <b>Truncated after reading, and that is the whole of the protocol.</b> One writer, one reader, no locks
-/// and nothing to get out of step: what is in the file is what has not been answered yet.
-/// </para>
-/// </summary>
 public static class BotConsole
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotConsole));
@@ -126,6 +99,7 @@ public static class BotConsole
             }
             catch (Exception e)
             {
+
                 Say($"that question threw: {e.Message}");
             }
         }
@@ -221,6 +195,7 @@ public static class BotConsole
                 return;
 
             case "think":
+
                 if (BotVigil.Consider(rest, Say))
                 {
                     Say($"thinking about: {rest} — the answer will follow here and in the log.");

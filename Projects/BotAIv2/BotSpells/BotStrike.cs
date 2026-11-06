@@ -4,31 +4,9 @@ using Server.Spells;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Casting at something, as opposed to casting at somebody who is hurt.
-///
-/// <para>
-/// <b>The half of magic this project never wrote.</b> A caster's book filled up, its Inscribe climbed, its
-/// reagents were bought and spent — on writing. In a fight it walked up and hit things with a stick, which is
-/// what a mage is worst at and what its whole build is arranged to avoid. Watched from a client it reads
-/// exactly as it is: mages and healers being beaten while holding a full spellbook.
-/// </para>
-///
-/// <para>
-/// <b>Distance is not a nicety here, it is the mechanic.</b> A blow disturbs a cast whenever the caster is a
-/// player, and every bot is one — so a caster in contact does not cast slowly, it does not cast at all. That
-/// is why this pairs with the stand-off: a caster fights at the range its spells reach and gives ground when
-/// something closes, exactly as an archer does, and for a sharper reason.
-/// </para>
-///
-/// <para>
-/// What it does not do is choose cleverly. The strongest thing the book holds and the pool can pay for, and
-/// nothing else — no resistances, no target types, no combinations. Those are worth having and they are worth
-/// having <em>after</em> a caster stops losing fights it should win.
-/// </para>
-/// </summary>
 public static class BotStrike
 {
+
     private static readonly int[] Ladder =
     [
         BotArsenal.SpellMagicArrow,

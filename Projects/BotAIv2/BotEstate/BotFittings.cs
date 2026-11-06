@@ -6,41 +6,15 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What goes inside a hall: a chest, and the guild's own tools of the trade.
-///
-/// <para>
-/// <b>This is the cheapest part of the whole order and the one that pays for itself immediately.</b>
-/// <see cref="BotGround"/> already sweeps the ground wherever bots go and remembers forges with an anvil
-/// beside them, every fire the engine will cook over, and counters. A forge inside a hall is an ordinary
-/// item in the world, so the sweep finds it with no new code at all — the hall becomes a workshop by being
-/// built, and the economy picks it up without a line of arithmetic changing.
-/// </para>
-///
-/// <para>
-/// <b>The fittings say what the guild is.</b> The Hammer gets a forge and an anvil, because that is what
-/// smiths and miners are for; the Needle gets a loom, a wheel and an oven; the Blade and the Crown get a
-/// chest and a roof, because a barracks is a place to be rather than a place to make things.
-/// </para>
-///
-/// <para>
-/// <b>Inside means inside the walls, and working that out took a chest across a doorway.</b> The first
-/// version asked the multi which tiles it covered and treated all of them as the room — but a house's front
-/// steps are part of its multi, and <c>BaseHouse.IsInside</c> agrees they are inside it. So the Blade's
-/// chest was set down on the porch, in the one tile everybody has to walk through. The room is now found by
-/// flooding outwards from the middle of the house and refusing to pass through a doorway: what the flood
-/// reaches is the room, what it cannot reach is the world.
-/// </para>
-/// </summary>
 public static class BotFittings
 {
+
     public static bool Running { get; set; } = true;
 
     public static int Doorway { get; set; } = 1;
 
     public static long Moved { get; private set; }
 
-    /// <summary>One thing a guild wants in its hall, and what the guild will have to pay for it.</summary>
     public readonly struct Bench
     {
         public Bench(string name, Type kind, Func<BaseAddon> make, int price)
@@ -168,16 +142,26 @@ public static class BotFittings
 
     public static bool Install(BaseHouse hall, Bench bench)
     {
-        if (hall is not { Deleted: false } || hall.Map == null || hall.Map == Map.Internal)
+        if (Place(hall, bench.Make?.Invoke()) is not { } addon)
         {
             return false;
         }
 
-        var addon = bench.Make?.Invoke();
+        Bought++;
+        Spent += bench.Price;
 
-        if (addon == null)
+        return true;
+    }
+
+    public static BaseAddon InstallOwned(BaseHouse house, Func<BaseAddon> make) => Place(house, make?.Invoke());
+
+    private static BaseAddon Place(BaseHouse hall, BaseAddon addon)
+    {
+        if (addon == null || hall is not { Deleted: false } || hall.Map == null || hall.Map == Map.Internal)
         {
-            return false;
+            addon?.Delete();
+
+            return null;
         }
 
         var spots = Free(Room(hall), hall.Map);
@@ -207,15 +191,12 @@ public static class BotFittings
             hall.Addons ??= [];
             hall.Addons.Add(addon);
 
-            Bought++;
-            Spent += bench.Price;
-
-            return true;
+            return addon;
         }
 
         addon.Delete();
 
-        return false;
+        return null;
     }
 
     public static Point3D Spot(BaseHouse hall)
@@ -352,6 +333,7 @@ public static class BotFittings
 
         if (spots.Count > 0)
         {
+
             spots.Sort((a, b) => b.GetDistanceToSqrt(door).CompareTo(a.GetDistanceToSqrt(door)));
 
             var chest = new WoodenChest();

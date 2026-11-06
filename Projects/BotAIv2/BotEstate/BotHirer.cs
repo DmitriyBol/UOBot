@@ -5,23 +5,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Whether the guild wants a merchant in its hall, can pay for one, and who is going to fetch it.
-///
-/// <para>
-/// The third of the estate's proposers and the same shape as the other two — any member may go, one at a
-/// time per guild, and what the guild can afford is asked here rather than inside the work. A hall must
-/// exist first, which makes this the second piece of work on the shard that exists because the population
-/// built something.
-/// </para>
-///
-/// <para>
-/// It is asked for last of the three: a hall, then the tools its trade needs, then a shopkeeper to sell what
-/// those tools make. That order is not enforced anywhere — it falls out of what each costs.
-/// </para>
-/// </summary>
 public sealed class BotHirer : IBotProposer
 {
+
     public static int ClaimMs { get; set; } = 240000;
 
     public static long Offered { get; private set; }

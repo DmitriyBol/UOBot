@@ -8,28 +8,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a guild's chest saves for, by the members' vote: a hall, a house in Britain, a widening, a war chest, a ransom fund, or
-/// nothing kept back at all.
-///
-/// <para>
-/// <b>Patrick's order of 07.10.2026, night: "the guild chest with a vote on what we save for (a hall, a house, a war, a
-/// ransom)".</b> Until now the goal was a rule: the hall's price while the guild had none, then a house in Britain if it wished
-/// for one, else nothing (<c>BotDues.Goal</c>). The goal decides one thing only — how much of the chest is kept back from the
-/// everyday draws that pay for members' supplies (<c>BotDues.Spare</c>: at most <c>BotDues.SaveShare</c> of what it holds,
-/// never more than the goal) — so the vote moves no coin; it decides what the chest is slow to spend.
-/// </para>
-///
-/// <para>
-/// <b>The vote.</b> Every <see cref="EveryMs"/>, when the goal is reached, and when it stops making sense (the hall stands, the
-/// war is over), the head proposes the first that applies of: the hall (none stands), a war chest of <see cref="WarChest"/>gp
-/// (at war, or paying tribute), the house in Britain (the guild wishes for one), a ransom fund (members jailed, when
-/// <see cref="BotPolitics.Ransom"/> is wired), a widening (the guild is full), or nothing. Each member votes by its own need:
-/// the hall while there is none, the war chest if it fights and the guild is at war, the ransom when members are jailed,
-/// nothing when it stands under the keep itself (the poor want the chest to pay for their supplies), and otherwise the head's
-/// proposal. The most votes win; a tie goes to the head. Until a guild has voted the old rule stands.
-/// </para>
-/// </summary>
 public static class BotPurpose
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPurpose));

@@ -5,32 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot has become, kept across restarts: its skills, its fame, its karma and its savings.
-///
-/// <para>
-/// <b>The population itself is deliberately not saved, and this is not a reversal of that.</b> Bots are
-/// Mobiles, so the world save contains them, and <see cref="BotPopulation.PurgeSaved"/> throws them away on
-/// every load for a good reason written out there: half of what a bot needs lives in objects that would have
-/// to be rebuilt anyway, and a kit handed out twice is a bot with two of everything. That argument is about
-/// <em>things</em>. It says nothing about what the bot learned, and what the bot learned was going in the
-/// bin with the rest every single morning — a population that hunted, mined and sewed for a whole day woke
-/// up as sixteen novices, which makes the one number this project measures work by permanently worthless.
-/// </para>
-///
-/// <para>
-/// So the belongings are still rebuilt from nothing and only the learning is carried over. Nothing here
-/// holds a reference to an item, a mobile or a serial: it is names and numbers, which is exactly why it can
-/// outlive a world the rest of the bot cannot.
-/// </para>
-///
-/// <para>
-/// <b>Anything that stops matching is thrown away rather than patched.</b> Patrick's rule, and the right one
-/// for a store this cheap to rebuild: if the format changes the whole file is dropped, and if a name now
-/// belongs to a different class than it did the record for that name is dropped. A bot losing a day of skill
-/// costs a day; a bot restored into the wrong body costs an evening of wondering why the smith cannot smith.
-/// </para>
-/// </summary>
 public sealed class BotProgress : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotProgress));
@@ -41,7 +15,6 @@ public sealed class BotProgress : GenericPersistence
 
     private static readonly Dictionary<(string Name, string Class), Learned> _saved = new(NameAndClass.Instance);
 
-    /// <summary>A name and a class compared without regard to case, as the name alone was.</summary>
     private sealed class NameAndClass : IEqualityComparer<(string Name, string Class)>
     {
         public static readonly NameAndClass Instance = new();
@@ -223,6 +196,7 @@ public sealed class BotProgress : GenericPersistence
 
         if (shape < Oldest || shape > Shape)
         {
+
             logger.Warning(
                 "The saved progress is shape {Found} and this build reads {Oldest} to {Wanted}; it cannot be read, and the shard will stop on the engine's own prompt until Saves/BotProgress/BotProgress.bin is deleted",
                 shape,
@@ -262,7 +236,6 @@ public sealed class BotProgress : GenericPersistence
         }
     }
 
-    /// <summary>One bot's learning: no items, no serials, nothing that can dangle.</summary>
     private sealed class Learned
     {
         public string Class;

@@ -4,32 +4,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A buyer whose pack refused a hand-over: marked "no room", passed over by every carrier while it stays so, and pressed to make
-/// room (06.10.2026, deliver16).
-///
-/// <para>
-/// <b>Measured on build 407 (<c>session-2026-10-06_06-12.log</c>, 06:12–09:08, an-deliver16).</b> 267 of the 444 failed
-/// deliveries (60 %) ended "&lt;buyer&gt;'s pack would not take &lt;kind&gt;", from only 14 buyers (Brokk 72, Hrolf 46, Dorin 43, Greta
-/// 35): a pack at the engine's 125 things (Adela, live at 09:20: "at 125 of 125 things", 352 of 390 stones) refuses every lot that
-/// needs a place of its own. The refusal was counted (<see cref="BotHandover.PackFull"/>) and nothing read it: the want stayed
-/// open, and the next carrier took the same walk 22 seconds later (the median gap between two refusals at one buyer; 202 of 253
-/// gaps under two minutes). 160 of the 267 were followed within 20 minutes by an accepted hand-over of the same kind to the same
-/// buyer, so the state passes: a mark that lasts <see cref="MarkMs"/>, not an exile.
-/// </para>
-///
-/// <para>
-/// <b>What a mark does.</b> The courier passes the buyer over while it is marked and its pack still shows no room
-/// (<see cref="Shut"/>; <see cref="BotPass.Room"/> on the want, so a line that fails names it). The buyer is pressed to make room:
-/// its peddler weighs the pack at once, lets go of what was held for a shift at the shop, most places first
-/// (<c>BotPeddler</c>), and its porter takes the trip to the bank when the box can take anything (<c>BotPorter</c>). The mark
-/// clears the moment the pack shows <see cref="Places"/> free places and room for the refused lot's weight
-/// (<see cref="MadeRoom"/>), or when <see cref="MarkMs"/> runs out (<see cref="Lapsed"/>). The first refusal of each episode is
-/// still a failed delivery; nothing here changes what counts.
-/// </para>
-/// </summary>
 public static class BotRoom
 {
+
     public static bool Running { get; set; } = true;
 
     public static int MarkMs { get; set; } = 600000;

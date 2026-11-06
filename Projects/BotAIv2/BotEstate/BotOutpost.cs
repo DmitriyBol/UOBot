@@ -8,24 +8,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A guild's second house, out on the far edge of its land: where its members rise when they fall nearer to it than to the
-/// hall, and a yard of the guild's own out there — land the toll can be charged on.
-///
-/// <para>
-/// <b>Patrick's order of 26.09.2026 ("different houses for a guild, expansions"), the outposts he chose among its three
-/// parts:</b> a second house on the guild's far squares — a place to rise and a store nearer the hunting, and something to
-/// hold the hunting toll up by. One to a guild, a small house, raised on the guild's held square farthest from its hall once
-/// that square is at least <see cref="Far"/> out and the guild can pay <see cref="Price"/>.
-/// </para>
-///
-/// <para>
-/// <b>Its own register, and its own sign.</b> The halls are found by the guild's name on the sign and there is one to a
-/// guild (<c>BotEstate</c>); an outpost carries "The Blade outpost", which no guild is called, so the halls' adoption passes it
-/// over and this one takes it (<see cref="Adopt"/>). It makes a yard exactly as a hall does (<c>BotLand.Holder</c>), and a
-/// fallen member of its guild rises there when it fell nearer to it than to the hall (<c>BotSeat.Home</c>).
-/// </para>
-/// </summary>
 public static class BotOutpost
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOutpost));
@@ -235,10 +217,6 @@ public static class BotOutpost
     }
 }
 
-/// <summary>
-/// Offers a member of a guild with a hall, far-flung held land and the price the raising of its outpost there. See
-/// <see cref="BotOutpost"/>.
-/// </summary>
 public sealed class BotOutposter : IBotProposer
 {
     public const string Office = "outposter";
@@ -332,7 +310,6 @@ public sealed class BotOutposter : IBotProposer
     }
 }
 
-/// <summary>A member raises its guild's outpost: the ground proved, the price levied, a small house with the outpost's sign.</summary>
 public sealed class BotOutpostRaise : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOutpostRaise));

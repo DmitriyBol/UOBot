@@ -5,31 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// A real piece of the shard's work, taken up because a mind asked for it, and measured because a mind
-/// predicted something about it.
-///
-/// <para>
-/// <b>It forwards everything and invents nothing.</b> The work inside is the same object the shard's own
-/// proposer would have handed out — the same digging, the same hunt, the same shopping trip — so a thinking
-/// bot does exactly what the others do, by exactly the same code, and there is no second implementation of
-/// anything to drift out of step. Two members are this wrapper's own and they are the only two that could
-/// be: what it is <em>called</em>, and what it is <em>expected to be worth</em>.
-/// </para>
-///
-/// <para>
-/// <b>The name matters more than it looks.</b> Reported as <c>mind-hunt</c> rather than <c>hunt</c>, the
-/// ledger files a thinking bot's hunts separately from the population's, so the two learn about the same
-/// ground independently and neither one's experience is quietly averaged into the other's. It is still a
-/// kind of work and not one instance of it, which is the rule the ledger key has to satisfy.
-/// </para>
-///
-/// <para>
-/// <b>And the takings are measured here rather than taken from the ledger.</b> What the mind needs to be
-/// shown is the thing it predicted — gold a minute — measured over the same stretch of time by something
-/// that is not the mind. Pack and bank together, because banking money is not spending it.
-/// </para>
-/// </summary>
 public sealed class BotMindDeed : BotDeed
 {
     private readonly BotDeed _work;
@@ -142,6 +117,7 @@ public sealed class BotMindDeed : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
+
         Claim(bot);
 
         _work.Drop(bot);

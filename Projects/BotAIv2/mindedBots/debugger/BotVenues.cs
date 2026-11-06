@@ -7,42 +7,13 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// Where the watchers hold what they hold: a revel's feast in a town, a hunt's waves and an orc camp in the countryside, the
-/// championship's ring — each chosen from the places that fit it, are safe, can be walked to, were not used lately, and lie
-/// where the bots actually are.
-///
-/// <para>
-/// <b>Patrick, 02.10.2026: "I always see the debuggers holding feasts and events in one and the same place, which is also very
-/// bad."</b> They were in one place by construction. A revel was "called" at the population's home and every hunt's waves stood
-/// there — 27 of the 29 hunt revels between the wipe of 01.10.2026 11:32 and 11:00 on 02.10.2026 put every wave at (1440, 1470);
-/// the marshal's two camps stood at (1356, 1384) and two tiles from it, the model naming the same spot each time; and all 136
-/// championship bouts were fought on the drill ground at (1458, 1500). Nothing chose a place: a constant did.
-/// </para>
-///
-/// <para>
-/// <b>Four tests, one order.</b> A candidate must fit its use (a town's square for a feast; outdoors, out of every guarded
-/// region, for a field; enough open ground in sight of the middle for a ring), be safe (no hostile or deadly ground at the
-/// middle and no deadly ground within <see cref="SafeRadius"/> — <c>BotZones.LevelAt</c>, read only), be reached (open ground on
-/// the reach map, or joined by the gates while the map is still being drawn), and not lie within <see cref="RepeatApart"/> of
-/// the last <see cref="Recent"/> places of its use. Among those that pass, the draw is weighted by the bots near each: the
-/// square root of the count within <see cref="NearReach"/>, so the town most of the island lives in is likeliest without
-/// being the only answer. A field is pitched off a bot that is working in the open near the chosen town, which is where a
-/// hunter will see a wave.
-/// </para>
-///
-/// <para>
-/// <b>Every refusal has its own counter</b>, and a choice that fell back to the old fixed place says so (<see cref="Fallbacks"/>):
-/// a venue chooser that quietly returned home would read exactly like the defect it replaces.
-/// </para>
-/// </summary>
 public static class BotVenues
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotVenues));
 
-    /// <summary>What a place is for.</summary>
     public enum Use
     {
+
         Feast,
 
         Field,
@@ -50,7 +21,6 @@ public static class BotVenues
         Ring
     }
 
-    /// <summary>One place chosen: what for, a name a person reads, where, and how many bots were near it when it was chosen.</summary>
     public sealed class Venue
     {
         public Use Use { get; init; }
@@ -629,6 +599,7 @@ public static class BotVenues
 
         for (var c = 0; c < candidates.Count; c++)
         {
+
             var age = list.Count;
 
             for (var i = 0; i < list.Count; i++)
@@ -737,6 +708,7 @@ public static class BotVenues
 
     private static BotWatcher Crier()
     {
+
         if (BotMarshal.Standing is { Body: { Deleted: false } } marshal && !BotWitness.Busy(marshal) && !BotZoneTour.Holding(marshal.Body)
             && !ReferenceEquals(marshal, _referee))
         {
@@ -807,6 +779,7 @@ public static class BotVenues
 
         if (body.Map != _refereeMap || body.Location != _refereeAt)
         {
+
             body.Hover(_refereeMap, _refereeAt);
         }
 
@@ -884,6 +857,7 @@ public static class BotVenues
 
     public static bool Keep(BotWatcher w)
     {
+
         if (w != null && ReferenceEquals(w, _referee))
         {
             ShowReferee();

@@ -4,33 +4,9 @@ using Server.Items;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Where each member of a squad ought to be standing, worked out rather than assigned.
-///
-/// <para>
-/// <b>Nobody is told anything.</b> Every member computes every station from the same three facts — the
-/// roster, the anchor and the threat axis — in the same order, and therefore arrives at the same answer.
-/// This is the one genuinely good idea the first version had about collective behaviour, and it came out of
-/// spreading bots over a hunting ground: order by serial, cut the ground into a grid, take the cell at your
-/// own index. No messages, so no desynchronisation, no orphaned assignments, and two bots never pick the
-/// same patch. A shared mind does not need a shared mailbox; it needs shared arithmetic.
-/// </para>
-///
-/// <para>
-/// <b>The shape is not fixed — the order is.</b> A formation can be any shape at all, and trying to specify
-/// one would be specifying the wrong thing. What must hold is the ordering along the line to the threat:
-/// blades in front, bows behind them, casters and healers behind those, everybody else at the back. That is
-/// a single number per role, and every arrangement that satisfies it is acceptable.
-/// </para>
-///
-/// <para>
-/// <b>Built from the leader, forward of the leader.</b> If the leader is an archer, the melee ring is still
-/// in front — in front of <em>him</em>. The anchor is whoever the squad is organised around, not whoever
-/// happens to be closest to the enemy.
-/// </para>
-/// </summary>
 public static class BotFormation
 {
+
     public static int RingFor(BotRole role) =>
         role switch
         {
@@ -242,6 +218,7 @@ public static class BotFormation
 
     private static bool Stand(Map map, int x, int y, Point3D near, out Point3D spot)
     {
+
         if (BotStep.Ground(map, x, y, near.Z, PressReach, out var z) && Sighted(map, x, y, z, near)
             && BotReachMap.Class(map, x, y, z) is not (BotReachClass.Water or BotReachClass.Blocked))
         {
@@ -289,6 +266,7 @@ public static class BotFormation
 
         for (var back = 0; back <= steps; back++)
         {
+
             var cx = x + Math.Sign(anchor.X - x) * back;
             var cy = y + Math.Sign(anchor.Y - y) * back;
 

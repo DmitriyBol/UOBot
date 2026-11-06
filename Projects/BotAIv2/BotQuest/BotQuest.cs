@@ -2,9 +2,9 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What an errand on the board asks for.</summary>
 public enum BotQuestKind
 {
+
     Kill,
 
     Gather,
@@ -12,9 +12,6 @@ public enum BotQuestKind
     Scout
 }
 
-/// <summary>
-/// One errand on the board: who posted it, what it asks, what it pays, and who holds it. See <see cref="BotQuests"/>.
-/// </summary>
 public sealed class BotQuest
 {
     public int Id { get; init; }

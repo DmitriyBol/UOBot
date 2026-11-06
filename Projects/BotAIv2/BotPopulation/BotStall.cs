@@ -4,33 +4,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Notices a bot that has stopped getting anywhere, and says so as an error.
-///
-/// <para>
-/// <b>Standing still is this shard's most expensive defect and its quietest one.</b> Every failure this
-/// project has hunted all day ended the same way from outside: a bot in a field, doing nothing, for an hour.
-/// The Baron whose sweep failed on one unwalkable hilltop; the rangers whose round was thrown away by every
-/// skirmish; the company with three bots each believing they led it. Not one of those wrote a single error
-/// line — each was a chain of individually reasonable decisions — and every one of them was found by a
-/// person looking at the world and asking why nobody was moving.
-/// </para>
-///
-/// <para>
-/// <b>So it is watched directly rather than inferred.</b> Two facts per bot: where it stood when last looked
-/// at, and what it was doing. A bot that has neither moved nor changed its mind in <see cref="PatienceMs"/>
-/// is stuck by any definition worth having, whatever the subsystem underneath believes. It is reported at
-/// error level on purpose — this shard's error log is otherwise empty, so a stall is the loudest thing in
-/// it, which is exactly what it deserves to be.
-/// </para>
-///
-/// <para>
-/// <b>Standing still is not always wrong, and the exceptions are named rather than guessed.</b> A crafter at
-/// an anvil, a captain teaching a class, a bot meditating and one mending itself are all doing their work
-/// precisely by not moving. What they have in common is that their work is <em>advancing</em> — the stage
-/// they report changes — so the test is movement <b>or</b> a change of stage, never movement alone.
-/// </para>
-/// </summary>
 public static class BotStall
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStall));
@@ -189,6 +162,7 @@ public static class BotStall
         }
         else
         {
+
             if (swapped)
             {
                 watch.Swaps++;

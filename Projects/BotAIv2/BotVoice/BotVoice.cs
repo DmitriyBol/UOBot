@@ -11,44 +11,6 @@ using ChatChannel = Server.Engines.Chat.Channel;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The bots' voices: what they say out loud, to whom, and how often.
-///
-/// <para>
-/// <b>Speech is a by-product of doing, never a thing a bot decides to do.</b> Nothing here is offered to
-/// the auction and nothing costs a beat. A line rides on an event that was happening anyway — work taken
-/// up or finished, a blow landed, a war declared — and the only decisions taken here are whether to say it
-/// and in which channel. That keeps the voices from ever changing what the population does, which is the
-/// invariant every observer on this shard has to keep.
-/// </para>
-///
-/// <para>
-/// <b>Six channels, and the channel is the audience.</b> <c>local</c> is said overhead where the bot stands;
-/// <c>guild</c> goes to the guild's chat and overhead with the guild's letters; <c>trade</c> is what is bought,
-/// sold and carried, said overhead and posted to the engine's chat conference <see cref="TradeConference"/>,
-/// which a player joins or leaves in the client; <c>world</c> is shouted and, if allowed, broadcast to every
-/// client as the crier would; <c>mood</c> is a local line about how the bot feels; <c>cry</c> is a yell for
-/// help. Every line, whatever the channel, is also an event on the stream and a line in
-/// <c>logs/bot-speech.log</c>, because the person watching is more often at a page than in the world.
-/// </para>
-///
-/// <para>
-/// <b>Trade has its own room (02.10.2026; Patrick: "let the bots create a Trade chat and write into it,
-/// because they write into the global one and clog half the screen").</b> On build 389 every one of the 4018 lines
-/// the world channel carried in its first hour was a want, a raise, an offer, an order or a shop's call — 3780 an
-/// hour, each one a system message on every connected client. The global line is a broadcast nobody can leave;
-/// a chat conference is a room a player walks into from the client's chat window and out of again. The client on
-/// this shard prints a conference's lines in the same corner as a broadcast, so the room is not joined at login
-/// (<see cref="TradeAtLogin"/>), and the same item is not called twice in <see cref="TradeRepeatMs"/> by anybody:
-/// thirty buyers calling for raw ribs in one minute read as one buyer calling thirty times.
-/// </para>
-///
-/// <para>
-/// <b>Rationed per bot, not per shard.</b> Fifty bots each saying something every fifteen seconds is three
-/// lines a second, which reads as a crowd; one bot saying something every second is a fault. The throttle
-/// is by bot and channel, and a cry for help is exempt from everything but its own shorter clock.
-/// </para>
-/// </summary>
 public static class BotVoice
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotVoice));
@@ -395,6 +357,7 @@ public static class BotVoice
 
                 break;
             case "trade":
+
                 if (TradeOverhead)
                 {
                     who.PublicOverheadMessage(MessageType.Regular, TradeHue, true, line);
@@ -539,6 +502,7 @@ public static class BotVoice
         }
         catch
         {
+
         }
     }
 
@@ -698,6 +662,7 @@ public static class BotVoice
 
         if (!_moodTick.TryGetValue(who.Serial, out var last))
         {
+
             _moodTick[who.Serial] = now - Utility.Random(Math.Max(1, MoodEveryMs));
 
             return false;

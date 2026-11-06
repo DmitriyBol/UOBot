@@ -6,32 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The invasion (07.10.2026, Patrick's first idea: "every few hours a wave comes out of a dungeon onto the road by a town: an
-/// announcement to all, a militia musters, the town pays a reward"). Every <see cref="EveryMs"/>, jittered, one town whose fighters
-/// are near enough to answer is chosen (the one invaded longest ago; the next when it has no place), a place on one of its roads
-/// <see cref="PastEdge"/>–<see cref="PastEdgeMost"/> tiles past its guards, and a dungeon to come out of; the reward is held out of the city's purse at once; the town crier calls it.
-///
-/// <para>
-/// <b>The creatures come when the militia does, sized to the militia that came.</b> Nothing is put on the road at the call: a wave
-/// dropped on a road nobody defends kills whoever walks it, and deaths per bot-hour must not rise. The town's fighters are offered the
-/// militia (<see cref="BotMilitiaCall"/>): the patrol the shard already has (<c>BotSweep</c>) — a captain calls the free fighters
-/// round it, gathers, marches, holds the ground and fights there as a company under every rule company16 wrote (the choice gate,
-/// the muster at the enemy, the pull-back at two deaths in a minute). When a militia company's captain stands within
-/// <see cref="ArriveReach"/> of the place the first wave walks out, priced at the company record's price of each kind
-/// (<c>BotCompanyRecord.Priced</c>) to at most <see cref="Odds"/> — never above one — of the strength the company brings
-/// (<c>BotSquad.Able</c>), no single creature over <see cref="SingleShare"/> of it, casters left in the dungeon. The next wave waits
-/// for the last to fall and is sized to what is left of the company; <see cref="Waves"/> waves at most.
-/// </para>
-///
-/// <para>
-/// <b>Paid by the head, out of the hold.</b> Each creature that falls to a bot (or to its pet) pays its killer
-/// <see cref="HeadPay"/> — the hold over the heads the raid expects — straight into its account, so the gold lands on the work the
-/// bot was doing when it struck. What is not earned goes back to the purse when the raid ends: repelled, the militia gone from the
-/// field for <see cref="GoneMs"/>, nobody come in <see cref="MusterMs"/>, or <see cref="LifeMs"/> after the first wave, when whatever
-/// still stands is taken off the island.
-/// </para>
-/// </summary>
 public static class BotInvasion
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotInvasion));
@@ -150,7 +124,6 @@ public static class BotInvasion
 
     private static double _pricedShare;
 
-    /// <summary>One invasion: the town, the place, the hold, the militia and the creatures.</summary>
     public sealed class Raid
     {
         public BotTowns.Town Town;
@@ -498,6 +471,7 @@ public static class BotInvasion
 
                     if (Region.Find(new Point3D(x, y, a.Z), map)?.IsPartOf<GuardedRegion>() == true)
                     {
+
                         left = -1.0;
 
                         continue;
@@ -1042,6 +1016,7 @@ public static class BotInvasion
         }
         catch
         {
+
         }
 
         if (probe == null)

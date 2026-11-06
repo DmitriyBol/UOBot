@@ -4,26 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The sweep: every living creature of the home map passed once every few seconds, a window of sectors at a time, within a
-/// budget of loop time per beat.
-///
-/// <para>
-/// <b>Spatial questions only, never the world's list.</b> One window is <see cref="WindowSectors"/> sectors to a side
-/// (128 tiles at eight), asked of the map with <c>GetMobilesInBounds</c>, which walks the sectors of the window and nothing
-/// else; an empty window — the sea, the black between the facets — costs the walk of its sector heads. The beat takes
-/// windows until <see cref="BudgetMs"/> is spent or <see cref="MostWindows"/> are done, and the time is measured and printed,
-/// because a budget nobody measures is a hope.
-/// </para>
-///
-/// <para>
-/// <b>And the tour's ground more often.</b> While a debugger holds a zone awake, its box is passed every
-/// <see cref="BotZoneTour.FocusMs"/> (<see cref="Focus"/>) rather than once a sweep: the whole point of standing there is to
-/// see the patrol move, and a sighting every fifteen seconds would see a minute of it four times.
-/// </para>
-/// </summary>
 public static class BotZoneScan
 {
+
     public static int WindowSectors { get; set; } = 8;
 
     public static double BudgetMs { get; set; } = 0.6;

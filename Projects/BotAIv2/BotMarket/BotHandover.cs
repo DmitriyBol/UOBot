@@ -5,31 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Goods from one bot's pack into another's, and coin the other way, with the two standing together. The one place a trade
-/// between two bots away from a shop happens.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026: every order and every purchase hand to hand.</b> The auction settled a fill between a
-/// supplier in a mine and a buyer in a dungeon, the goods waiting in the market for the buyer's beat to fetch them. Here the
-/// exchange is refused unless both are alive, on one map and within <see cref="MeetTiles"/> of each other — the distance two
-/// people stand to pass a sack across — and the goods go from pack to pack and the coin from pack to pack.
-/// </para>
-///
-/// <para>
-/// <b>The auction's order is kept, because it is the whole of the money safety:</b> the buyer is charged first, all or nothing
-/// (<see cref="BotMarket.Charge(Mobile, int, out int)"/>: coin out of the pack, then the account — a bot at work keeps a hundred on
-/// it and the rest in the bank, so the balance behind the purse pays as a cheque would); then as much as the buyer's pack will
-/// take is handed over; what did not move is refunded; and only then is the seller paid, as coin into its pack. Charged equals
-/// paid plus refunded, always. How much went over as coin and how much was drawn on the account is counted apart.
-/// </para>
-///
-/// <para>
-/// <b>The buyer's purchase is booked outside the work it was doing.</b> A carrier walks up to a hunter in the middle of a hunt
-/// and the hunter pays; the hunt must not learn from that coin that hunting loses money (<see cref="BotYield.Aside"/>, the
-/// ledger's own rule for money moved by a decision outside the errand in hand).
-/// </para>
-/// </summary>
 public static class BotHandover
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHandover));
@@ -210,6 +185,7 @@ public static class BotHandover
 
         if (given < units)
         {
+
             var settled = Math.Min(lent, Math.Max(0, given) * price);
             var back = bill - lent - (Math.Max(0, given) * price - settled);
 
@@ -258,6 +234,7 @@ public static class BotHandover
 
         if (aside)
         {
+
             BotYield.Aside(buyer, takings - lent);
         }
 

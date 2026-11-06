@@ -5,24 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The band's fence: the one member of The Shadow who commits no crime, and keeps its goods and its errands.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026, night, and his word on it an hour later.</b> "Once there are two of them in the
-/// guild let them take in a keeper, who looks after the band's goods and orders. The keeper is shy of every unlawful
-/// act." And: "the Baron and the Captain cannot be keepers, but the Sage and the Architect can. If they are found in the
-/// company of thieves — say within ten or fifteen tiles of sight — they become criminals, and taking them is worth
-/// 5000gp. But they may buy the witness off, or kill it. A killed witness tells nobody; a witness that gets away tells."
-/// </para>
-///
-/// <para>
-/// <b>Known by his trade, not by a name in the store.</b> The band's roll is a list of names and nothing else, and a
-/// shape it cannot read is a shape that loses the whole record; so the fence is simply the member whose class is a
-/// Sage's or an Architect's. Neither robs, neither leads, both can walk into any town the red members cannot, and that
-/// is the whole of why the band wants one.
-/// </para>
-/// </summary>
 public static class BotFence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFence));
@@ -343,6 +325,7 @@ public static class BotFence
 
         if (took && fromBank > 0 && !Mobiles.Banker.Withdraw(fence, fromBank))
         {
+
             if (fromPack > 0)
             {
                 fence.AddToBackpack(new Gold(fromPack));

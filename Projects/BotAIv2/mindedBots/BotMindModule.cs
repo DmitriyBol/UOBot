@@ -3,22 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// Two thinking bots, as a module of the shard's own bot system — registered from outside it.
-///
-/// <para>
-/// <b>Nothing in BotAIv2 was touched to make this exist, and that is the requirement rather than a
-/// nicety.</b> The seam was already there: modules register themselves, proposers offer themselves, and the
-/// server loads whatever <c>Data/assemblies.json</c> names. So this assembly references BotAIv2, BotAIv2
-/// references nothing of this, and switching the whole thing off is one line in a file — with the population
-/// carrying on exactly as it did, because everything the two of them do is the population's own work.
-/// </para>
-///
-/// <para>
-/// <see cref="BotPhase.World"/> and after <c>Population</c> and <c>Will</c>: there is no body to think for
-/// until the population has raised one, and nothing to offer work into until the auction exists.
-/// </para>
-/// </summary>
 public sealed class BotMindModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMindModule));
@@ -45,6 +29,8 @@ public sealed class BotMindModule : BotModule
             BotOllama.Refused,
             BotOllama.LastMs
         );
+
+        BotStoryVoice.Open();
 
         if (BotMinds.All.Count == 0)
         {
@@ -86,6 +72,7 @@ public sealed class BotMindModule : BotModule
 
     public override void Reset()
     {
+        BotStoryVoice.Close();
         BotMinds.Stop();
         BotOllama.Forget();
     }

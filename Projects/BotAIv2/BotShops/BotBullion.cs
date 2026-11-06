@@ -4,32 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A crafter with money buys its metal instead of going and digging it.
-///
-/// <para>
-/// <b>Digging is the cheapest way to get metal and very nearly the worst.</b> A mining trip is eight minutes
-/// of walking to a seam, swinging at it, carrying rock to a fire and the metal to a counter — and at the end
-/// of it a crafter has twenty ingots and has spent the eight minutes not crafting. Its skill is in the forge,
-/// not in the rock. So once there is coin in the purse the sensible thing is to let somebody whose trade
-/// <em>is</em> the rock do the walking, and pay them for it.
-/// </para>
-///
-/// <para>
-/// <b>It buys by asking rather than by shopping, and that is the whole elegance of it.</b> An order on the
-/// board is read by every miner on the shard before it banks a single ingot — the carrier (<see cref="BotCourier"/>) weighs
-/// every want against what a miner holds, and walks the ingots over. So a crafter putting
-/// up money for metal does not merely acquire metal: it redirects the population's miners onto the thing the
-/// population is short of, without anybody being told anything. That is the same trick as everything else
-/// here — a fact left where others will pass it, and arithmetic on the far side.
-/// </para>
-///
-/// <para>
-/// Ordered on 24.08.2026: <em>if a crafter has a decent amount of money, say more than eight hundred to a
-/// thousand, let it simply buy the ore rather than walk after it — buying and smelting is faster, and for a
-/// crafter that is exactly right.</em>
-/// </para>
-/// </summary>
 public sealed class BotBullion : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBullion));

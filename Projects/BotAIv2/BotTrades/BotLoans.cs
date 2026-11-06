@@ -4,34 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The moneylenders' book: who owes whom, how much is left, the lien that takes a share of every gain the borrower makes until the
-/// debt is paid, and the defaulters, who are never lent to again (07.10.2026, trades17).
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "a moneylender (loans to the poor against future spoils: an honest way out of poverty, not a
-/// handout)".</b> His standing rule is that every coin comes from work and that a loan repaid with interest is work. So a loan here
-/// is a risk the lender really takes: <see cref="Sum"/> at most, from a keeper of a shop by the bank holding
-/// <see cref="LenderWealth"/> or more, to a bot under <see cref="PoorBar"/> that is short of the kit its trade needs and has a trade
-/// that has paid it (<see cref="BotLedger.Best"/>); never to a bot already in debt or once defaulted. The coin goes pack to pack at
-/// the shop. Back comes <see cref="Interest"/> on top, a <see cref="LienShare"/> of every rise in the borrower's wealth taken on the
-/// clock (<see cref="CollectMs"/>) and paid into the lender's account — and when <see cref="DefaultHours"/> of the borrower's own
-/// play pass with the debt unpaid, or the borrower leaves the island, the lender has lost what is left and the borrower is marked.
-/// </para>
-///
-/// <para>
-/// <b>Money moved by a decision outside the work in hand is booked aside</b> (<see cref="BotYield.Aside"/>): the principal out of
-/// the lender's shop shift and into the borrower's errand, the lien out of whatever the borrower is doing when it is taken and into
-/// whatever the lender is doing. Lending is a shop's side business, counted in the <c>Bot shops:</c> line and never in the
-/// keeper's ledger: the keeper does not choose to lend, it is asked at its counter.
-/// </para>
-///
-/// <para>
-/// <b>And a lender minds its risk.</b> A loan is made only while what it may expect is above nought (<see cref="Expected"/>: the
-/// interest on what is repaid, less the principal the measured default rate loses). At a fifth on top, defaults above one in six
-/// make every loan a loss, and the desks stop lending by themselves until the dial moves — the market's answer, said in the line.
-/// </para>
-/// </summary>
 public static class BotLoans
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLoans));
@@ -322,6 +294,7 @@ public static class BotLoans
 
             if (debtor == null)
             {
+
                 if (!BotRest.Records.ContainsKey(name))
                 {
                     (ended ??= []).Add(name);
@@ -384,6 +357,7 @@ public static class BotLoans
 
         if (lender == null && !BotRest.Records.ContainsKey(loan.Lender))
         {
+
             Forgiven++;
 
             logger.Information(
@@ -603,7 +577,6 @@ public static class BotLoans
     }
 }
 
-/// <summary>Keeps the moneylenders' book across restarts: every loan standing, and the names of those who defaulted.</summary>
 public sealed class BotLoanStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLoanStore));

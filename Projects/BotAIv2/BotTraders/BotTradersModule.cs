@@ -5,10 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The traders as a module (01.10.2026, build 385): reads <c>Configuration/bot-traders.json</c>, offers the haul
-/// (<see cref="BotHauler"/>), and writes the <c>Traders:</c> line every <see cref="BotTrading.SayEveryMs"/>.
-/// </summary>
 public sealed class BotTradersModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTradersModule));
@@ -65,7 +61,6 @@ public sealed class BotTradersModule : BotModule
     }
 }
 
-/// <summary><c>Configuration/bot-traders.json</c>: every key optional, PascalCase, nothing written means the code's own number.</summary>
 public sealed class BotTradersSettings
 {
     public bool? Running { get; set; }

@@ -9,17 +9,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One kind of creature as the zones know it: whether it attacks on sight, casts, how far it sees, whether it can leave the
-/// water, and how strong one is.
-///
-/// <para>
-/// <b>Read off a living one when there is one, and built once when there is not.</b> A living creature carries its own fight
-/// mode, mind and sight, and that is the truth about it; a kind nobody has seen alive yet — every creature of its spawners
-/// dead — is asked of <see cref="BotDungeon.Traits"/>, which builds one specimen, reads it and destroys it in the same breath,
-/// the same specimen <see cref="BotDungeon.Might"/> already builds for the delve, so a kind is never built twice.
-/// </para>
-/// </summary>
 public sealed class BotZoneKind
 {
     public BotZoneKind(Type type, string name = null)
@@ -90,20 +79,8 @@ public sealed class BotZoneKind
     }
 }
 
-/// <summary>One entry of a spawner: a kind and how many of it the spawner keeps.</summary>
 public readonly record struct BotHauntEntry(BotZoneKind Kind, int Entry, int Max, int Probability);
 
-/// <summary>
-/// One spawner as a haunt: where its creatures live by declaration, what they are, and what the shard has seen of them awake.
-///
-/// <para>
-/// <b>The declaration is a promise about a disc; the observation is what the creatures actually did.</b> The spawner says its
-/// creatures may wander <see cref="Radius"/> tiles from it. Where the ground is awake, the scan records where they really
-/// were (<see cref="BotZoneRaster"/>) and how far from home (<see cref="ObservedRange"/>); once <see cref="Confidence"/> is
-/// high, the build shrinks the declared disc to the observed reach and the observed shape wins. A creature on sleeping ground stands where it
-/// was spawned and proves nothing about its patrol, so only awake sightings count here.
-/// </para>
-/// </summary>
 public sealed class BotHaunt
 {
     public BotHaunt(BaseSpawner spawner, long now)
@@ -164,6 +141,7 @@ public sealed class BotHaunt
     {
         if (awake)
         {
+
             var gap = now - _sampledTick;
 
             if (_wasAwake && gap > 0 && gap <= BotZones.AwakeGapMs)
@@ -262,6 +240,7 @@ public sealed class BotHaunt
 
         if (_reach == null || _reach.Length != length)
         {
+
             _reach = new float[length];
             _reachTick = now;
             ReachWeight = 0.0;
@@ -298,7 +277,6 @@ public sealed class BotHaunt
     }
 }
 
-/// <summary>What the scan last knew about one living creature.</summary>
 public sealed class BotZoneSeen
 {
     public BotZoneKind Kind;
@@ -350,17 +328,6 @@ public sealed class BotZoneSeen
     }
 }
 
-/// <summary>
-/// The spawners of the bots' home map read as haunts, the kinds of creature they keep, and the register of living creatures
-/// the scan has passed.
-///
-/// <para>
-/// <b>Read in strips, a strip a beat.</b> <c>map.GetItemsInBounds&lt;BaseSpawner&gt;</c> over one column of the map is a
-/// fraction of a millisecond; the whole map at once is the nine milliseconds <see cref="BotLairs"/> spends on the island
-/// alone, and the dungeons and the lost lands double it. So the survey walks the map a strip per beat, and walks it again
-/// every <see cref="ResurveyMs"/> to find spawners added or removed, which on this shard is nearly never.
-/// </para>
-/// </summary>
 public static class BotHaunts
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHaunts));

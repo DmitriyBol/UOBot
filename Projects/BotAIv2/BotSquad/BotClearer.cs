@@ -6,67 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers any fighter the square where bots lately died, and a company to clear it.
-///
-/// <para>
-/// <b>Patrick's order of 02.10.2026: "I don't see bots gathering in companies and going to the squares where others died,
-/// to clear them and protect other bots on the road."</b> Measured on build 388's first nine hours (00:14–09:15): 721
-/// deaths, 500 of them of bots alone, in the same cells all night — (1300, 1400) 32, (900, 700) 25, (1700, 2500) 23,
-/// (1800, 3000) 22 — and what was raised against them: 59 patrols (<see cref="BotPatrol"/>, offered to captains and guild
-/// heads only, 3349 of 5078 asks refused for "too few free bots near" within forty tiles, aimed at the blow count rather
-/// than at the dead), 15 of the Baron's musters of which 1 marched (<see cref="BotHarrower"/>, one bot on the island may
-/// call one), 43 guild harrows offered for a guild's own squares (<see cref="BotReeve"/>, which needs a guild with ground).
-/// 94 boxes were closed to single bots that died twice on a piece of ground (<see cref="BotBreaker"/>) and 90 killing
-/// fields quarantined (<see cref="BotBarred"/>), and nothing on the shard lifted either except the clock. The three
-/// companies that clear ground were each behind a gate — a rank, a guild, a Baron — and the ground was behind all three.
-/// </para>
-///
-/// <para>
-/// <b>So any fighter may call one.</b> Not a producer, not a neutral trader, not a novice, not a healer (who is levied as
-/// the company's medic), not one already in a company, hurt, or standing off a muster that failed. The square: one of
-/// the quadrant map's where <see cref="LeastDeaths"/> or more died, the last inside <see cref="RecentMs"/>, within
-/// <see cref="Reach"/> of the fighter, reachable, not already being harrowed, not cleared within the last hour, and not
-/// damned beyond what the island can raise (<see cref="BotHarrower.Takeable"/>, the Baron's own test: damned ground is
-/// the Baron's). The ones on a road between towns come first (<see cref="BotRoadbook"/>: within <see cref="RoadWidth"/>
-/// of a drawn road's waypoints), then the most dead, then the latest. The company is the harrow's
-/// (<see cref="BotHarrow"/>, as a clearing): levied within two hundred tiles of the muster, sized by strength to what the
-/// square asks — the record of what has killed there (<see cref="BotQuad.Muscle"/>) or what stands there now
-/// (<see cref="BotPeril.Hostility"/>), whichever is more, at <see cref="BotHarrow.ClearFit"/> — and not offered at all
-/// when the bots within call do not bring that much (<see cref="BotHarrow.SupplyStrength"/>), because a muster that
-/// cannot be filled is five minutes of a fighter standing still.
-/// </para>
-///
-/// <para>
-/// <b>Every refusal is named.</b> When no clearing happens, which of the gates was shut is the only question worth being
-/// able to answer; an unnamed nought is the failure this shard has paid for most.
-/// </para>
-///
-/// <para>
-/// <b>The quarantined death squares, first, by the priced figure (03.10.2026, build next; Patrick's order of 02.10.2026, item 4:
-/// "companies must gather and go to the squares where others died, clear them, and protect bots on the road").</b> On builds 395
-/// and 396 this cleared nothing — 0 marched, 0 quarantines lifted, up to 72 standing at once — for four reasons, measured: of the
-/// 31563 asks on 396 that found a square, 62 % found fewer than three within call and 35 % found the bots within call short of
-/// the <i>first</i> square chosen and never tried the next (19 offered in 3.7 hours); the offer told the auction it brought the
-/// leader's strength six times over, not the company it would march with (<see cref="BotHarrow.Brings"/>); the company was sized
-/// in heads from the leader's strength while the march waited on strength, so every muster that was taken came up short at the
-/// bell with every member standing in it (11 of 11 with 16221 of the 16875 asked, 6 of 6 with 8970, 9 of 9 with 11509 — all for
-/// (1695, 1365), inside a Reapers' killing field); and the ground was judged by the Baron's test (a levy of lone bots, roads
-/// from Britain). Sweeps were kept out of closed ground the same night (march10), so nobody went in.
-/// </para>
-///
-/// <para>
-/// Now every quarantine standing within <see cref="Reach"/> is a candidate by the square holding its middle, whatever that
-/// square's own record, and comes first. What a square asks (<see cref="Asks"/>) is the record, the fight standing there now,
-/// the strongest thing alive in the box at its kind's price in our lives (<see cref="Strongest"/>), and for a quarantine the
-/// strongest thing recorded killing in it, priced the same (<see cref="BotBarred.Closing"/>) — the figure a company withdraws by
-/// (<see cref="BotSquad.Reckon"/>), so a clearing that marches does not withdraw from what it was sized for. A quarantine the
-/// plague or a killer of <see cref="BotBarred.QuarantinePower"/> declared, and one asking past what the island's strongest company
-/// of <see cref="BotSquad.MaxSize"/> brings (<see cref="Island"/>), stays closed and is said so in the log once; a square asking
-/// past what the strongest company of the bots within call makes is passed over for the next. The clearing walks the whole
-/// quarantine box and lifts it only when nothing in it is left past a lone bot (<see cref="BotBarred.Lift"/>).
-/// </para>
-/// </summary>
 public sealed class BotClearer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotClearer));

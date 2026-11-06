@@ -3,24 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The outline of a patch of cells as a few smooth rings: marching squares round the cells, Douglas–Peucker to drop the
-/// staircase, Chaikin to round the corners.
-///
-/// <para>
-/// <b>Pure arithmetic on arrays it is handed, and nothing else.</b> No map, no mobile, no static state of the shard: it may run
-/// on the loop or off it (<see cref="BotZoneBuild"/>) and gives the same answer either way. The rings are for the eye and for
-/// the JSON; nothing that routes or hunts reads them — the raster is the answer to "what is here", and a smoothed corner that
-/// cuts two tiles off a patrol must never make a planner believe the two tiles are safe.
-/// </para>
-///
-/// <para>
-/// <b>Holes are filled before tracing.</b> The contract allows outer rings only, and a hole inside a patrol area — a pond, a
-/// house — is not a place a bot can stand safe in the middle of a pack anyway.
-/// </para>
-/// </summary>
 public static class BotZoneShapes
 {
+
     private static readonly int[][] Cases =
     [
         [],
@@ -94,6 +79,7 @@ public static class BotZoneShapes
 
             for (var k = 0; k + 1 < half.Count; k += 2)
             {
+
                 points.Add(((ox - 1 + half[k] / 2.0) * BotZoneState.Cell, (oy - 1 + half[k + 1] / 2.0) * BotZoneState.Cell));
             }
 
@@ -309,6 +295,7 @@ public static class BotZoneShapes
 
         if (kept.Count > cap)
         {
+
             var thinned = new List<(double X, double Y)>(cap);
             var step = kept.Count / (double)cap;
 

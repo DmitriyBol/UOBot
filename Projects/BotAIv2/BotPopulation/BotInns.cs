@@ -8,39 +8,10 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The inns and taverns of the map, and what a bot gets for sleeping in one.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point two: "bots cannot simply go offline; they should leave from a tavern or an
-/// inn. Whoever goes to rest from an inn and pays for it gets a bonus to positive thought and an extra regeneration buff
-/// for a third of the time spent resting — rest sixty minutes, the buff lasts twenty."</b> Until now a tired bot logged
-/// out where it stood (<see cref="BotRest.Leave"/>), which is what a player does when the connection drops and not what
-/// a player does at the end of an evening.
-/// </para>
-///
-/// <para>
-/// <b>The inns are read from the world, two ways.</b> The engine's own word for an inn is a region with
-/// <c>NoLogoutDelay</c> — the room a player logs out of at once — and every town has one; and every tavern has a
-/// <c>TavernKeeper</c> or an <c>Innkeeper</c> standing in it, put there by a spawner whose own tile is the floor. Both
-/// are read once, the way the dungeons' rooms are read from their spawners: a table of inns would be a promise about a
-/// map. Britain has four taverns and one inn by this count; Trinsic, Minoc and Vesper one or two each.
-/// </para>
-///
-/// <para>
-/// <b>Paying is what earns the bonus, and the price is a night's, not a fortune.</b> <see cref="PricePerHour"/> gold for
-/// each hour of the rest, taken from the purse and then the bank; a bot that cannot pay still sleeps in the inn and gets
-/// nothing for it but the roof. The bonus is two things: the day's boredom falls by <see cref="Cheer"/> (the same relief
-/// a hundred gold of takings gives, times two — see <c>BotUrges.Paid</c>), so the mood the dashboard shows rises; and
-/// for <see cref="BuffShare"/> of the rest, hits, stamina and mana come back <see cref="RegenPoints"/> every
-/// <see cref="RegenEveryMs"/> on top of the engine's own rate (<see cref="Regen"/>, from the bot's beat).
-/// </para>
-/// </summary>
 public static class BotInns
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotInns));
 
-    /// <summary>One inn or tavern: a floor tile inside it, and what it is called for the log.</summary>
     public sealed class Inn
     {
         public Point3D Spot;
@@ -136,6 +107,7 @@ public static class BotInns
 
                 if (Place(map, x, y, out var spot))
                 {
+
                     var town = !string.IsNullOrWhiteSpace(inn.Name) ? inn.Name : inn.Parent?.Name ?? Region.Find(spot, map)?.Name ?? "the town";
 
                     _inns.Add(new Inn { Spot = spot, Name = $"the inn of {town}", NoLogoutDelay = true });
@@ -454,10 +426,6 @@ public static class BotInns
     }
 }
 
-/// <summary>
-/// The walk to an inn to sleep there: in at the door, the bed paid for, and the rest itself is <see cref="BotRest"/>'s,
-/// which takes the bot out of the world from where it stands. Pressed, like the walk home to rest (BotRepose).
-/// </summary>
 public sealed class BotLodge : BotDeed
 {
     public const string Trade = "lodge";

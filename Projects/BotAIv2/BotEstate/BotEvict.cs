@@ -4,27 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Walking over to somebody working your guild's land and telling them to move along.
-///
-/// <para>
-/// <b>What makes the land real, and it is deliberately almost nothing.</b> The errand is a walk, a sentence
-/// and a look at whether they went. No blow is struck here at any standing — striking is what a war is for,
-/// and a war is declared by <see cref="BotRegard"/> out of what these errands find, never inside one of
-/// them. Patrick's plan says eviction is rare and the measure that says it has gone wrong is the completion
-/// band falling while evictions rise; an errand that could kill would make that measure impossible to read.
-/// </para>
-///
-/// <para>
-/// <b>The refusal is the point rather than the going.</b> A bot told to move along does not obey — nothing
-/// on this shard obeys anybody — so what actually happens is that the guild learns something: they were
-/// asked, and they are still there. That is what moves the opinion, and it is why the errand waits a few
-/// seconds after speaking before looking again. Somebody who has wandered off in that time is not defying
-/// anybody, and counting them as though they had would be a war built out of ordinary walking.
-/// </para>
-/// </summary>
 public sealed class BotEvict : BotDeed
 {
+
     public const string Trade = "evict";
 
     public static double Prior { get; set; } = 380.0;
@@ -86,6 +68,7 @@ public sealed class BotEvict : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+
         if (_said || _them is not { Deleted: false } || !BotLand.Trespassing(_them, out var whose) || whose != _ours)
         {
             return true;
@@ -121,6 +104,7 @@ public sealed class BotEvict : BotDeed
         {
             if (!_said)
             {
+
                 Missed++;
 
                 return BotDoing.Done($"{_them.Name} had already left our land");
@@ -142,6 +126,7 @@ public sealed class BotEvict : BotDeed
 
             if (!body.InRange(_them.Location, Reach))
             {
+
                 return BotDoing.Walk(_them.Map, _them, BotArrival.Within(Reach), $"over to {_them.Name}");
             }
 

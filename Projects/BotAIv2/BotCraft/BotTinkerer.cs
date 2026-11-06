@@ -3,27 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot with tinker's tools and some iron a stint at making the tool the island is shortest of, and
-/// offers it the board's orders first.
-///
-/// <para>
-/// <b>Demand is read off the stalls, not guessed.</b> A tool is offered only while the market holds fewer than
-/// <see cref="LeastOnMarket"/> of it, so the tinker stops when the stalls are stocked and starts again when
-/// somebody buys — which is the glass rule (a material with no producer must not be ordered by the armful)
-/// turned the other way round: a producer with no reader of demand must not make by the armful.
-/// </para>
-///
-/// <para>
-/// <b>The iron is read off the stalls too (30.09.2026).</b> This asked only its own pack, so a tinker was a tinker only on the
-/// afternoon it had dug and smelted iron itself — and on that afternoon its forge outbid it for the same ingots. Build 336, its
-/// first 105 minutes: 1331 asks, 1211 "had no iron", 112 offered for the stalls and none of them taken ("over tinker" 26
-/// times, every time under the forge, at 123–561 a minute against the forge's 288–1370), no tool made — while the market held
-/// 59 to 618 iron ingots, most of the time over two hundred, at six gold ("The board: most stocked: IronIngot"), and the population bought 125 scissors, 47 skinning knives, 44 pickaxes and 10
-/// hatchets over counters for 3240gp. A tinker short of iron now buys a batch's worth off the cheapest stall as the stint's
-/// first leg — placeless, so no walk — priced as the stint's outlay, and counted apart when it cannot pay for it.
-/// </para>
-/// </summary>
 public sealed class BotTinkerer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTinkerer));

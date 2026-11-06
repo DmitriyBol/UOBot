@@ -6,29 +6,6 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a mark does when a robbery has beaten it down to a quarter of its health.
-///
-/// <para>
-/// <b>Patrick's rule of the evening of 18.09.2026.</b> "If the victim's health falls below 25% of the whole, it is
-/// given a choice — run, or throw down part of its pack for the robbers to take, or fight back and maybe die, because
-/// while they are fighting somebody may come to help."
-/// </para>
-///
-/// <para>
-/// <b>The choice is reasoned rather than rolled</b>, and Patrick's own sentence says what the reasoning is. Help
-/// coming is the thing that makes fighting worth it, so a mark with anybody of its own within <see cref="Helpers"/>
-/// tiles fights, and so does one that is still a match for the robber. Otherwise it is a question of what it can
-/// reach: a ward within <see cref="Bolt"/> tiles is worth running for, and if there is none, its pack buys its life.
-/// A mark with nothing to give has nothing to buy with and runs anyway — which is how this ends up being three
-/// answers rather than two.
-/// </para>
-///
-/// <para>
-/// Asked once per robbery. The mark that pays keeps the rest of its pack and its life, the robber keeps what it was
-/// given, and the robbery ends there: that is the whole point of paying.
-/// </para>
-/// </summary>
 public static class BotQuarter
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotQuarter));

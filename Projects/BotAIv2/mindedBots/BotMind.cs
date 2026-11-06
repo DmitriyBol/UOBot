@@ -5,7 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>One thing a mind chose, and what it turned out to be worth.</summary>
 public sealed class BotMindOutcome
 {
     public string Trade { get; init; }
@@ -23,28 +22,6 @@ public sealed class BotMindOutcome
     public string Ending { get; init; }
 }
 
-/// <summary>
-/// One bot's slow tier of thought: it chooses the next trade, watches what came of it, and writes down what
-/// it takes to be the rule.
-///
-/// <para>
-/// <b>It chooses an undertaking; it does not drive.</b> This is the one architectural decision the first
-/// version of this got right and it is worth restating: the model never says which tile to step onto, never
-/// picks a target and is not consulted about survival. Those are reflexes, they run at ten a second, and a
-/// thing that answers in three seconds cannot be in that loop at all. What it decides is what the bot is
-/// <em>for</em> over the next few minutes — and that decision is offered into the shard's own auction, where
-/// it competes with the arithmetic on equal terms and loses when it deserves to.
-/// </para>
-///
-/// <para>
-/// <b>It thinks while working, and it is protected from itself by the auction rather than by a rule here.</b>
-/// A mind that could reconsider every few seconds would produce a bot that finishes nothing — but the cure
-/// for that already exists one level down, in the dwell and the ×1.25 floor every offer has to clear, and
-/// duplicating it here would only mean two half-rules disagreeing. What this does refuse to think during is
-/// bleeding, being hit, and being in a company: none of those is a decision, and all three are answered by
-/// reflexes far faster than anything that has to be asked.
-/// </para>
-/// </summary>
 public sealed class BotMind
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMind));
@@ -152,6 +129,7 @@ public sealed class BotMind
 
     public void Stagger(int ms)
     {
+
         _askedTick = Core.TickCount + ms;
     }
 
@@ -208,6 +186,7 @@ public sealed class BotMind
 
         if (live.Count == 0)
         {
+
             Idle++;
 
             if (!_idle)
@@ -658,6 +637,7 @@ public sealed class BotMind
 
     private void Review(BotMindOutcome outcome, double minutes)
     {
+
         if (!outcome.Long || minutes * 60000 < WorthReviewingMs || Core.TickCount - _reviewedTick < ReviewEveryMs)
         {
             return;
@@ -819,6 +799,7 @@ public sealed class BotMind
 
         for (var i = 0; i < parts.Length; i++)
         {
+
             if (parts[i].Length > 3)
             {
                 set.Add(parts[i]);

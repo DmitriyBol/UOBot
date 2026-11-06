@@ -4,12 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// One place a ship is put in the water at a dock: the shore a bot boards from, the berth, and the harbour from it to the
-/// open sea. A dock's first berth is the dock's own; the others are where a ship goes in when the first is lying full.
-/// </summary>
 public sealed class BotBerth
 {
+
     public Point3D Shore;
 
     public Point3D Berth;
@@ -31,10 +28,6 @@ public sealed class BotBerth
     public override string ToString() => $"({Berth.X}, {Berth.Y}) off ({Shore.X}, {Shore.Y})";
 }
 
-/// <summary>
-/// One town's dock: its berths — where a bot stands to board, where its ship is put down, and the harbour between that
-/// berth and the open sea — and where a ship arriving there puts in. The fields below are the first berth's.
-/// </summary>
 public sealed class BotDock
 {
     public BotTowns.Town Town;
@@ -64,27 +57,6 @@ public sealed class BotDock
     public override string ToString() => $"{Name} ({Shore.X}, {Shore.Y})";
 }
 
-/// <summary>
-/// Where each town meets the sea, found from the map rather than written down.
-///
-/// <para>
-/// <b>A dock is a shore, a berth and a harbour.</b> From the town's square outward, ring by ring, the first ground a bot can
-/// stand on beside the water and walk to from the square (<see cref="BotGates.Joined"/>) is a shore; round it, the berth is
-/// where the small ship fits with a plank within <see cref="Gangway"/> tiles of the shore — the engine's own plank puts a
-/// walker down up to six tiles from itself (<c>Plank.OnMoveOver</c>) and takes one aboard from eight (<c>Plank.OnDoubleClick</c>);
-/// and the harbour is a breadth-first search over the tiles the ship's hull fits on, facing as it lies at the berth, out to
-/// the first open cell of the open sea. A shore whose harbour is a pond is passed over, and so is every shore within
-/// <see cref="Spread"/> of it.
-/// </para>
-///
-/// <para>
-/// <b>Measured with the same rules on map0 (29.09.2026, Python):</b> thirteen of the fourteen charted towns have a dock, the
-/// harbours 4 to 39 tiles; Minoc's shore is a bay whose way out is narrower than the small ship within 128 tiles, and Minoc
-/// is walked to anyway. Wind, the Heartwood, Delucia and Papua lie beyond the charted sea (x 5120 and east). Where the map
-/// is not what the search should pick, <c>Configuration/bot-sea.json</c> may pin where a town's shore is looked for from
-/// (<see cref="Pins"/>).
-/// </para>
-/// </summary>
 public static class BotDocks
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDocks));
@@ -638,10 +610,6 @@ public static class BotDocks
     }
 }
 
-/// <summary>
-/// A square of the map read exactly — statics everywhere, the canals and moats laid over ground included — for the harbour:
-/// where the small ship fits, and the way from a berth to the open sea.
-/// </summary>
 internal sealed class BotSeaWindow
 {
     private readonly int _x0;

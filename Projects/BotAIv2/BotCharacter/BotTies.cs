@@ -4,34 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Friendships and feuds between two bots, as one number each way: what this bot thinks of that one, from −100 to +100.
-///
-/// <para>
-/// <b>Patrick's idea of 07.10.2026: "personal friendships and feuds between bots — the one who saved you is a friend who
-/// answers your cry first; the one who killed you in a war is a personal enemy you seek out for a duel".</b> Fed only by
-/// things that happened between the two, each from the hook where it happens: saved from a creature (+<see cref="Saved"/>,
-/// and the rescuer +<see cref="Saver"/> back), raised where it fell (+<see cref="RaisedBy"/>), healed (+<see cref="Healed"/>),
-/// a kill side by side in one company (+<see cref="Beside"/> each way), a fair sale hand to hand (+<see cref="Traded"/> each
-/// way); killed in a war (<see cref="WarKilled"/>), murdered or robbed (<see cref="Murdered"/>), made to pay under threat
-/// (<see cref="Extorted"/>). A duel fought out settles a feud (+<see cref="Settled"/> each way).
-/// </para>
-///
-/// <para>
-/// <b>Everything decays, slowly, in the shard's running time</b>: every <see cref="DecayEveryMs"/> each regard moves
-/// <see cref="DecayShare"/> of the way to nought (at least <see cref="DecayLeast"/>); a grudge decays at half that pace in a
-/// vindictive bot and twice it in a forgiving one. A regard under one is forgotten. At most <see cref="MostTies"/> ties a bot,
-/// the strongest kept: a new one that is weaker than all twelve is not written.
-/// </para>
-///
-/// <para>
-/// <b>What the ties change, each counted.</b> A friend (either way at <see cref="FriendAt"/> or more) is ranked before
-/// everybody else when a dire cry picks who goes (<c>BotCry.Summon</c>) and when a mood line picks who answers
-/// (<c>BotSocial.Heard</c>). An enemy (this bot's regard at <see cref="DuelAt"/> or less) may be sought out and challenged to a
-/// duel (<see cref="BotGrudge"/>), and a bot that thinks <see cref="SpurnAt"/> or less of a speaker does not answer its mood.
-/// Public <see cref="Regard(Mobile, Mobile)"/> is what the guild elections read.
-/// </para>
-/// </summary>
 public static class BotTies
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTies));
@@ -132,6 +104,7 @@ public static class BotTies
         {
             if (life.Ties.Count >= Math.Max(1, MostTies))
             {
+
                 var weakest = 0;
 
                 for (var i = 1; i < life.Ties.Count; i++)

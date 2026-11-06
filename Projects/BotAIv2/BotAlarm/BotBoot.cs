@@ -4,24 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The one question asked once, at the boot: did the world come back?
-///
-/// <para>
-/// <b>Written after five hours on an empty island.</b> On 16.09.2026 at 00:20 a deploy stopped the shard inside the
-/// engine's own autosave, the snapshot on disk was left truncated, and the next boot read "Loading world done (1586
-/// items, 83 mobiles)" against 26,342 the boot before — the bots and the watchers, and nothing else: no vendors, no
-/// guards, no creatures, no player. Every alarm this folder had was quiet, because on an empty island nobody dies and
-/// every walk finishes; the shard ran that way until a person noticed at 05:24. The counts were in the log all along,
-/// and nothing read them.
-/// </para>
-///
-/// <para>
-/// The best boot on record is kept in <c>logs/bot-boot.txt</c>, outside <c>Saves</c>, so a restore of the saves does
-/// not restore the yardstick with them. A boot with fewer than <see cref="Least"/> of that many mobiles raises the
-/// alarm <c>world</c>, which stands until a boot comes back whole.
-/// </para>
-/// </summary>
 public static class BotBoot
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBoot));

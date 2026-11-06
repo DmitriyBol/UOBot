@@ -4,9 +4,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>Where a haul buys its goods.</summary>
 public enum BotHaulFrom
 {
+
     Stock,
 
     Box,
@@ -18,7 +18,6 @@ public enum BotHaulFrom
     Gather
 }
 
-/// <summary>One place to buy a kind, and what it asks.</summary>
 public sealed class BotHaulSource
 {
     public BotHaulFrom From { get; init; }
@@ -46,7 +45,6 @@ public sealed class BotHaulSource
         };
 }
 
-/// <summary>What a trader means to do: one kind, one place to buy it, up to <see cref="BotTrading.MostOrders"/> buyers.</summary>
 public sealed class BotHaulPlan
 {
     public Type Kind { get; init; }
@@ -81,20 +79,6 @@ public sealed class BotHaulPlan
     }
 }
 
-/// <summary>
-/// The trader's proposer: of the wants the island has said aloud, the one this trader can buy somewhere and bring to its buyer
-/// at the best profit a minute — and, riding on the same purchase, up to two more buyers of the same kind near the first.
-///
-/// <para>
-/// <b>Only open wants, only what the trader can pay for, only where there is a margin (01.10.2026, build 385).</b> A want left
-/// to the carriers within reach for its first <see cref="BotTrading.FreshMs"/>; a buyer that is a trader never (no carousel of
-/// traders buying from each other); a buyer on deadly ground or beyond any way through never; across water only for a trader
-/// well off enough to sail (<see cref="BotTrading.CanSail"/>). Sources weighed: its own pack, its own box at a bank, a bot's
-/// shop within reach (coin to a bot stays on the island), a shopkeeper in any town — the one that makes goods and road
-/// cheapest together at the shard's price of a minute. Asked of traders only; a trader that found nothing rests its look for
-/// <see cref="BotTrading.LookMs"/>.
-/// </para>
-/// </summary>
 public sealed class BotHauler : IBotProposer
 {
     public string Name => "Trader";
@@ -574,6 +558,7 @@ public sealed class BotHauler : IBotProposer
 
             var n = Math.Min(units, entry.Amount);
             var road = BotAppraisal.Travel(body.Location, vendor.Location) + BotAppraisal.Travel(vendor.Location, buyer);
+
             var landed = BotBurgh.Dear(body, vendor, entry.Price) * (double)n + road * minute;
 
             if (landed < bestLanded)

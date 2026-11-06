@@ -9,32 +9,6 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// Something for the population to do that nobody planned: a bounty, a hunt, a contest.
-///
-/// <para>
-/// <b>Ordered by Patrick on 08.09.2026 — the watcher thinks, so let it think of something worth doing.</b>
-/// Argus already reads the whole shard every ten minutes and forms an opinion about it. This turns that
-/// opinion into an event: it looks at what the population is short of, what it has too much of, who is idle
-/// and who is rich, and declares a revel.
-/// </para>
-///
-/// <para>
-/// <b>The design rule that makes this possible at all: a revel invents no mechanism.</b> Bots know nothing
-/// of events and never will. What a revel does is move two things they already answer to — the price of a
-/// kind of work, and the world itself. Declare rock worth triple for twelve minutes and the miners go;
-/// put an orc camp on the ridge and the hunters go. Nothing is scheduled, nothing is assigned, and a revel
-/// that nobody enters simply pays nobody, which is itself a measurement.
-/// </para>
-///
-/// <para>
-/// <b>The prize comes out of a fixed treasury, and that is deliberate.</b> Money minted for a party is
-/// still money minted: this shard has already paid once for coin entering the world faster than it left —
-/// see the note on shopkeepers' shelves. So the crown has <see cref="Treasury"/> for the session and no
-/// more; when it is spent, revels go on being declared and are paid in the only other currency the
-/// population has, which is a fight worth having.
-/// </para>
-/// </summary>
 public static class BotRevel
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRevel));
@@ -203,6 +177,7 @@ public static class BotRevel
 
         foreach (var guild in BotGuilds.Standing)
         {
+
             var spare = BotEstate.Spare(guild);
 
             if (spare <= 0)
@@ -275,6 +250,7 @@ public static class BotRevel
 
         if (camp && !exact && !BotVenues.Running)
         {
+
             if (where != Point3D.Zero)
             {
                 Placed++;
@@ -902,15 +878,9 @@ public static class BotRevel
         + "population walked past, and declaring it again is not reading your own results.";
 }
 
-/// <summary>
-/// What the model answered when asked to think of a revel.
-///
-/// A record of its own rather than a tuple, for the same reason <c>BotDebugNote</c> is one: the fields are
-/// what the schema promises, and a mismatch between the two should be a compile error rather than a silent
-/// null at two in the morning.
-/// </summary>
 public sealed class BotRevelPlan
 {
+
     public string Kind { get; init; }
 
     public int Prize { get; init; }
@@ -947,6 +917,7 @@ public sealed class BotRevelPlan
                 Camp = root.TryGetProperty("camp", out var camp) && camp.ValueKind == System.Text.Json.JsonValueKind.True,
                 Say = root.TryGetProperty("say", out var say) ? say.GetString() : null,
                 Why = root.TryGetProperty("why", out var why) ? why.GetString() : null,
+
                 Spot = root.TryGetProperty("x", out var x) && x.TryGetInt32(out var ax)
                        && root.TryGetProperty("y", out var y) && y.TryGetInt32(out var ay)
                     ? new Point3D(ax, ay, 0)
