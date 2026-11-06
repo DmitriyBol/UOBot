@@ -34,6 +34,7 @@ public sealed class NavGraph
 {
     public const int Side = NavWindow.ClusterSide;
 
+    /// <summary>A run of crossings longer than this across one edge gets two gates, one at each end.</summary>
     public static int LongEntrance { get; set; } = 6;
 
     private const int East = 2;
@@ -46,6 +47,7 @@ public sealed class NavGraph
 
     public INavTerrain Terrain { get; }
 
+    /// <summary>The map this graph is of, or null for a synthetic terrain.</summary>
     public Map Map { get; }
 
     public int ClustersX { get; }
@@ -76,6 +78,7 @@ public sealed class NavGraph
 
     private readonly NavCluster[] _clusters;
 
+    /// <summary>Bumped whenever a cluster's nodes or edges change, so a region built over it knows it is stale.</summary>
     private readonly int[] _versions;
 
     private readonly Queue<int> _rejoin = new();
@@ -92,6 +95,7 @@ public sealed class NavGraph
 
     private static int _ids;
 
+    /// <summary>A number of its own, for the caches keyed by graph.</summary>
     public int Id { get; } = ++_ids;
 
     public NavGraph(INavTerrain terrain, Map map = null)
@@ -104,26 +108,39 @@ public sealed class NavGraph
         _versions = new int[ClustersX * ClustersY];
     }
 
+    /// <summary>How many times a cluster's nodes or edges have changed. See <see cref="StrategicPlanner"/>.</summary>
     public int ClusterVersion(int cluster) => _versions[cluster];
 
+    /// <summary>Nodes alive.</summary>
     public int Nodes => _at.Count;
 
+    /// <summary>One more than the highest node id handed out: the size a search's arrays must have.</summary>
     public int Capacity => _high;
 
+    /// <summary>Clusters built.</summary>
     public int Built { get; private set; }
 
+    /// <summary>Edges, intra- and inter-cluster, over the joined clusters.</summary>
     public long Edges { get; private set; }
 
+    /// <summary>Gates made.</summary>
     public long Gates { get; private set; }
 
+    /// <summary>Whether every cluster in the bake order has been built and nothing waits to be rebuilt or re-joined.</summary>
     public bool Complete => _next >= _order.Length && _dirty.Count == 0 && _rejoin.Count == 0 && _order.Length > 0;
 
+    /// <summary>Whether <see cref="Component"/> answers: the graph is complete and the components were counted since.</summary>
     public bool ComponentsValid { get; private set; }
 
     public int ComponentCount { get; private set; }
 
+    /// <summary>
+    /// How many times the components were counted. A recount after a cluster is rebuilt may name the same land by another
+    /// root, so anything that keeps a component (a gate's two lands) holds it only as long as this number stays.
+    /// </summary>
     public int ComponentEpoch { get; private set; }
 
+    /// <summary>Cells probed by every window this graph was built with, for the cost of the bake.</summary>
     public long Probes { get; internal set; }
 
     public int ClusterOf(int x, int y) => y / Side * ClustersX + x / Side;
@@ -144,12 +161,16 @@ public sealed class NavGraph
 
     public int ClusterOfNode(int node) => _cluster[node];
 
+    /// <summary>The node on stratum <paramref name="s"/> of (x, y), or -1 when there is none.</summary>
     public int NodeAt(int x, int y, int s) => _at.TryGetValue(Key(x, y, s), out var id) ? id : -1;
 
+    /// <summary>The component of a node, or -1 when the components are not counted.</summary>
     public int Component(int node) => ComponentsValid ? _component[node] : -1;
 
+    /// <summary>The nodes of a cluster, or null when it has none yet.</summary>
     public IReadOnlyList<int> NodesOf(int cluster) => _clusters[cluster]?.Nodes;
 
+    /// <summary>The range of a node's outgoing edges in its cluster's arrays, or false when the cluster is not joined.</summary>
     public bool EdgesOf(int node, out int[] to, out int[] cost, out int from, out int until)
     {
         to = null;
@@ -174,6 +195,10 @@ public sealed class NavGraph
         return true;
     }
 
+    /// <summary>
+    /// Orders the bake outward from (x, y), nearest clusters first, and starts it over from the beginning of the new order
+    /// (built clusters are skipped when their turn comes again).
+    /// </summary>
     public void Prioritize(int x, int y)
     {
         var cx = Math.Clamp(x / Side, 0, ClustersX - 1);
@@ -217,6 +242,11 @@ public sealed class NavGraph
         ComponentsValid = false;
     }
 
+    /// <summary>
+    /// Builds, re-joins and rebuilds clusters until the stopwatch passes <paramref name="deadline"/> (in
+    /// <see cref="System.Diagnostics.Stopwatch"/> ticks). Returns true when the graph is complete. Counts the components
+    /// once on the slice that completes it.
+    /// </summary>
     public bool Slice(NavWindow window, long deadline)
     {
         var work = 0;
@@ -268,6 +298,7 @@ public sealed class NavGraph
         return Complete;
     }
 
+    /// <summary>Builds everything at once. For tests and small terrains.</summary>
     public void BuildAll(NavWindow window)
     {
         if (_order.Length == 0)
@@ -278,6 +309,10 @@ public sealed class NavGraph
         Slice(window, long.MaxValue);
     }
 
+    /// <summary>
+    /// The ground under a rectangle has changed: every cluster it touches, and the ring round them (a step onto the edge
+    /// of a house starts in the next cluster), is torn down and queued to be built again ahead of anything else.
+    /// </summary>
     public void MarkDirty(int x1, int y1, int x2, int y2)
     {
         var cx1 = Math.Clamp(Math.Min(x1, x2) / Side - 1, 0, ClustersX - 1);
@@ -361,6 +396,11 @@ public sealed class NavGraph
         Probes += w.Probes - probes;
     }
 
+    /// <summary>
+    /// The gates on one edge: the east edge of cluster <paramref name="c"/> when <paramref name="east"/>, its south edge
+    /// otherwise. The window must hold both sides of the edge — cluster c's own window does for its east and south edges,
+    /// and its east or south neighbour's window does too, through its ring.
+    /// </summary>
     private void Entrances(int c, bool east, NavWindow w)
     {
         var cx = c % ClustersX;
@@ -601,6 +641,7 @@ public sealed class NavGraph
         _local[last] = pos;
         cluster.Nodes.RemoveAt(cluster.Nodes.Count - 1);
 
+        // Its own gates' edges went with the edge that made them (Clear); anything left is dropped here.
         for (var i = cluster.InterFrom.Count - 1; i >= 0; i--)
         {
             if (cluster.InterFrom[i] != id)
@@ -625,6 +666,7 @@ public sealed class NavGraph
         Unjoin(c);
     }
 
+    /// <summary>A cluster's node set or its edges changed: its arrays are stale until it is joined again.</summary>
     private void Unjoin(int c)
     {
         var cluster = _clusters[c];
@@ -646,6 +688,7 @@ public sealed class NavGraph
         ComponentsValid = false;
     }
 
+    /// <summary>Takes a cluster's four edges down, both sides of each, so it can be built again from its ground.</summary>
     private void TearDown(int c)
     {
         var cx = c % ClustersX;
@@ -692,6 +735,7 @@ public sealed class NavGraph
         }
     }
 
+    /// <summary>The cluster's edges from each of its nodes: to each other node its flood reaches, and across its gates.</summary>
     private void Join(int c, NavWindow w)
     {
         var cluster = _clusters[c];
@@ -761,6 +805,10 @@ public sealed class NavGraph
         ComponentsValid = false;
     }
 
+    /// <summary>
+    /// A copy of the graph's arrays for <see cref="NavGraphFile.Write"/>, taken on the loop. Only a complete graph with every
+    /// cluster joined is worth keeping; null otherwise.
+    /// </summary>
     public NavGraphSnapshot Snapshot(ulong fingerprint, int[] housed)
     {
         if (!Complete)
@@ -801,6 +849,7 @@ public sealed class NavGraph
                 InterCost = cluster.InterCost.ToArray(),
                 East = cluster.East?.ToArray(),
                 South = cluster.South?.ToArray(),
+                // Replaced whole by every join, never changed in place, so shared rather than copied.
                 Start = cluster.Start,
                 To = cluster.To,
                 Cost = cluster.Cost
@@ -810,6 +859,10 @@ public sealed class NavGraph
         return snapshot;
     }
 
+    /// <summary>
+    /// Puts a graph read from a file in place of whatever this one holds, on the loop, and orders the bake from
+    /// <paramref name="x"/>, <paramref name="y"/> as finished. Houses are the caller's: see <see cref="MarkDirtyCluster"/>.
+    /// </summary>
     public void Restore(NavGraphSnapshot snapshot, int x, int y)
     {
         _free.Clear();
@@ -889,6 +942,7 @@ public sealed class NavGraph
         ComponentsValid = false;
     }
 
+    /// <summary>Tears one cluster down and queues it to be drawn again. See <see cref="MarkDirty"/>.</summary>
     public void MarkDirtyCluster(int c)
     {
         if (c < 0 || c >= _clusters.Length || _clusters[c] is not { Built: true })
@@ -901,6 +955,7 @@ public sealed class NavGraph
         ComponentsValid = false;
     }
 
+    /// <summary>Union-find over every edge, undirected: a component per node. Run when the graph completes.</summary>
     public void CountComponents()
     {
         var parent = new int[_high];

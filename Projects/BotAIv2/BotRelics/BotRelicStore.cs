@@ -111,6 +111,7 @@ public sealed class BotRelicStore : GenericPersistence
         _read = count;
     }
 
+    /// <summary>What was read back, settled: the town relics seeded, the items linked, a lair's relic hidden, the warden away.</summary>
     public static void Apply()
     {
         BotRelics.Seed();

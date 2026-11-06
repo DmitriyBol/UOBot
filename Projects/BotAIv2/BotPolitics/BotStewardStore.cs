@@ -53,6 +53,7 @@ public sealed class BotStewardStore : GenericPersistence
 /// <summary>The store registered from outside <c>BotCore</c>, after it has read its own switch, as the events' is.</summary>
 public static class BotStewardCore
 {
+    /// <summary>After <c>BotCore.Configure</c> (40), which sets <c>BotCore.Enabled</c>; before the world is read, which the store needs.</summary>
     [CallPriority(45)]
     public static void Configure()
     {

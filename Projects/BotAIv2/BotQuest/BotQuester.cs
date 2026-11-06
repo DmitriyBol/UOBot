@@ -28,18 +28,27 @@ public sealed class BotQuester : IBotProposer
 
     public static long Asked { get; private set; }
 
+    /// <summary>Asked while the board was empty.</summary>
     public static long Empty { get; private set; }
 
+    /// <summary>Asked while in a company.</summary>
     public static long Held { get; private set; }
 
+    /// <summary>Askings refused because the bot was a thief of The Shadow.</summary>
     public static long Banded { get; private set; }
 
+    /// <summary>Asked and fit for nothing on the board.</summary>
     public static long Unfit { get; private set; }
 
+    /// <summary>
+    /// Kills anywhere passed over because no lair of the creature a road reaches holds a living one now. Counted per errand
+    /// weighed.
+    /// </summary>
     public static long Lairless { get; private set; }
 
     public static long Offered { get; private set; }
 
+    /// <summary>Errands passed over for having just been let go by the bot asking. See <see cref="BotQuests.RetakeMs"/>.</summary>
     public static long Retakes { get; private set; }
 
     public BotDeed Propose(IBotWilful bot)
@@ -70,6 +79,10 @@ public sealed class BotQuester : IBotProposer
             return null;
         }
 
+        // <b>The board is the city's, and a thief of The Shadow has no business at it.</b> Patrick's order of
+        // 17.09.2026, night: "bandit bots may take part in championships, but the island's common doings are dangerous
+        // to them." An errand ends at a paymaster in a guarded town, which is the one place a red cannot go; the fence
+        // is not a thief and takes them as anybody does.
         if (BotUnderworld.Member(body) && !BotFence.Is(body))
         {
             Banded++;

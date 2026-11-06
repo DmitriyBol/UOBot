@@ -31,6 +31,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotKeepShop : BotDeed
 {
+    /// <summary>The ledger's key.</summary>
     public const string Trade = "shopkeep";
 
     private readonly Map _map;
@@ -45,6 +46,7 @@ public sealed class BotKeepShop : BotDeed
 
     private BotStorefront _front;
 
+    /// <summary>Minutes the shop has been open before the current opening, carried across a pause.</summary>
     private double _openBefore;
 
     private long _openedTick;
@@ -59,10 +61,13 @@ public sealed class BotKeepShop : BotDeed
 
     private int _customers;
 
+    /// <summary>What the island was asking for of the goods on show when the shop first opened: the shift's denominator.</summary>
     private int _firstShown = -1;
 
+    /// <summary>When the walk to the present pitch began; nought while not walking to one. See <see cref="BotShopkeep.OpenStandingMs"/>.</summary>
     private long _walkSince;
 
+    /// <summary>How many times a keeper finding a neighbour on its pitch looks for another before opening where it stands.</summary>
     public static int MostRepitches { get; set; } = 2;
 
     public BotKeepShop(Map map, Point3D stand, Point3D bank, double claim, int shown)
@@ -94,12 +99,22 @@ public sealed class BotKeepShop : BotDeed
 
     public override bool Still => _front != null;
 
+    /// <summary>
+    /// <b>An open shop keeps its shift to the end (30.09.2026, build 359).</b> The shift is reckoned at ShiftMinutes from the
+    /// taking, the walk to the pitch comes out of it, and the auction outbid the keeper in the last half minute of every shift:
+    /// "Dunstan shut its shop in Britain after 7.5 minutes … dropped shopkeep … outbid by cook at 171/min after 8.2 of 9.1
+    /// minutes reckoned" — on 358 16 dropped against 5 finished, each a shop that had stood its time counted as work given
+    /// up, and buyers still walking to it finding it shut. While the shop is open it is kept from the bidding, as a watch
+    /// inside the walls is; a flight, a mending, a rung above and whatever presses still take the keeper.
+    /// </summary>
     public override bool Committed => _front != null;
 
     public override bool Steadfast => true;
 
+    /// <summary>A bend with the shop open is the walk to the pitch ending beside it, which is routine and lifts no hold (07.10.2026, work18).</summary>
     public override bool BendIsTrouble => _front == null;
 
+    /// <summary>The rest of the shift and a minute, once open. See <see cref="BotDeed.HoldsFor"/>.</summary>
     public override double HoldsFor => _front != null ? Math.Max(1.0, BotShopkeep.ShiftMinutes - OpenMinutes(Core.TickCount)) + 1.0 : 0.0;
 
     public override bool Hurries => _front == null;
@@ -138,6 +153,7 @@ public sealed class BotKeepShop : BotDeed
             return Opening(body, now);
         }
 
+        // Taken off the list behind its back — a reload, a sweep of a shop nobody was behind. Opened again where it stands.
         if (_front.Shut)
         {
             Carry(now);
@@ -169,6 +185,8 @@ public sealed class BotKeepShop : BotDeed
             return BotDoing.Done(note);
         }
 
+        // Asked to step aside and further off than a customer would look: back to the pitch. Customers follow the keeper
+        // itself, so a step or two is nothing.
         if (body.Map != _map || !body.InRange(_stand, BotShopkeep.StandReach + BotShopkeep.ServeReach))
         {
             return BotDoing.Walk(_map, _stand, BotArrival.Within(BotShopkeep.StandReach), "back to its shop by the bank");
@@ -187,6 +205,9 @@ public sealed class BotKeepShop : BotDeed
     {
         if (body.Map != _map || !body.InRange(_stand, BotShopkeep.StandReach))
         {
+            // <b>Walked long enough near the bank: open where it stands (07.10.2026, work18).</b> The walk's own failure reaches Bend
+            // only when the walker gives up; the will's "stopped closing" and the stall watch end the shift without asking. A keeper
+            // still walking after OpenStandingMs on fit ground in the bank's ring opens there, as the bend's own fallback does.
             if (_walkSince == 0)
             {
                 _walkSince = now;
@@ -207,6 +228,7 @@ public sealed class BotKeepShop : BotDeed
             }
         }
 
+        // Somebody opened beside this pitch while it walked. Another pitch at the same bank, a couple of times; then here.
         if (BotShopkeep.Taken(_map, _stand, body) && _repitched < MostRepitches)
         {
             var next = BotShopkeep.Pitch(_map, _bank, body);
@@ -241,6 +263,12 @@ public sealed class BotKeepShop : BotDeed
         _cryTick = now;
         _walkSince = 0;
 
+        // <b>The walk to the pitch ends when the shop opens (07.10.2026, work18).</b> The shop opens with the keeper a tile from its
+        // pitch (StandReach), and the walk the will sent it on stayed on the road: work answers do not end a walk (BotWill), so the
+        // walker kept pressing for the pitch's own tile. Lucan opened at (1423, 1693) at 10:00:35 on 07.10.2026, and at 10:06:36
+        // "could not get one tile closer to (1423, 1693, 0) in 19 plans": the open shop failed "could not get nearer". On build
+        // 416 the pitches were struck 26 times against 195 failures at the strip, because Bend struck only a pitch not yet open;
+        // 75 of those failures had already taken coin. Not a company's station nor an interruption: only the shift's own walk.
         if (body.Squad == null && body.Journey is { Active: true } road && road.Current is { Interruption: false })
         {
             road.Finish();
@@ -257,6 +285,7 @@ public sealed class BotKeepShop : BotDeed
         return BotDoing.Work(Stage);
     }
 
+    /// <summary>What the shift came to, in the words the log and the ledger's line carry.</summary>
     private string Summary(long now, string why)
     {
         var minutes = OpenMinutes(now);
@@ -266,6 +295,7 @@ public sealed class BotKeepShop : BotDeed
             : $"{why}: kept shop {minutes:F1} minutes by the bank in {_front?.Town} and nobody came to buy";
     }
 
+    /// <summary>The takings of the opening now ending, kept for the shift's note.</summary>
     private void Carry(long now)
     {
         if (_front == null)
@@ -300,8 +330,17 @@ public sealed class BotKeepShop : BotDeed
         BotShopkeep.Close(front, learn, soldOut, minutes, Math.Max(0, _firstShown), _sold, _takings);
     }
 
+    /// <summary>
+    /// The pitch could not be reached. Filed under this work at that place, which is the word <see cref="BotShopkeep.Pitch"/>
+    /// asks in, so the next offer stands somewhere else at the same bank.
+    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
+        // <b>A walk that failed with the shop open is not a failed shift (07.10.2026, work18).</b> On build 416 (01:16-10:52) the pitch
+        // strip by Britain's bank failed shopkeep 195 times while only 26 pitches were struck: Bend struck and opened-where-it-stood
+        // only for a shop not yet open, and most failures were the walk to the pitch still running behind an open shop (see
+        // Opening). A keeper still within serving reach of its pitch, or on fit ground in the bank's ring, keeps the shift; its
+        // stand moves to where it is when that ground fits, so the walk back is not asked for the tile that could not be reached.
         if (_front != null && bot?.Self is BotMobile open && open.Map == _map)
         {
             var fits = BotShopkeep.StandsFit(open, _bank);
@@ -319,6 +358,11 @@ public sealed class BotKeepShop : BotDeed
             }
         }
 
+        // <b>Near the bank already: the shop opens where the keeper stands (06.10.2026, work17b).</b> On build 411 shopkeep failed 37
+        // times "could not get nearer to (1422, 1685-1693, 0)": the road reached the tile beside the pitch (Argus `road 1430 1700
+        // 1422 1690`: Reached, ending at (1422, 1691), the far side TooBig) and the press at the bank door stopped the last step.
+        // A keeper standing on open ground in the bank's ring of pitches, with no shop beside it, opens there; the failed
+        // pitch is still struck for the others. Counted.
         if (_front == null && bot?.Self is BotMobile keeper && keeper.Map == _map && BotShopkeep.StandsFit(keeper, _bank))
         {
             BotShopkeep.Strike(_map, _stand);
@@ -332,11 +376,18 @@ public sealed class BotKeepShop : BotDeed
 
         bot?.Resolve?.Ledger?.Beware(Trade, _map, _stand);
 
+        // And for every keeper, not this one's ledger alone (06.10.2026, work17): the next keeper chose the same strip. See
+        // BotShopkeep.Strike.
         if (_front == null)
         {
             BotShopkeep.Strike(_map, _stand);
         }
 
+        // <b>Another pitch at the same bank before the shift is given up (06.10.2026, work15).</b> On 04.10.2026 shopkeep failed 243
+        // times, 219 of them "could not get nearer to (1422, 1685-1693, 0)": the pitches on the step of Britain's bank, where the
+        // press of bots at the door stops the last tile; the bank at (1425, 1688) burned the walker's whole ceiling 597 times. The
+        // shift failed there and the next offer chose afresh. Not yet open, it takes the next free pitch Pitch gives (the ledger
+        // now cautious of this one), as a pitch somebody opened beside does; an open shop's way back is not moved.
         if (_front == null && _repitched < MostRepitches && bot?.Self is { } body && body.Map == _map)
         {
             var next = BotShopkeep.Pitch(_map, _bank, bot);
@@ -357,22 +408,30 @@ public sealed class BotKeepShop : BotDeed
         return false;
     }
 
+    /// <summary>Shifts sent on to another pitch at the same bank when the road to the first could not be walked. See <see cref="Bend"/>.</summary>
     public static long Rewalked { get; private set; }
 
+    /// <summary>The shift is this bot's: its pitch is spoken for while it walks there. See <see cref="BotShopkeep.Reserve"/>.</summary>
     public override void Taken(IBotWilful bot) => BotShopkeep.Reserve(bot?.Self, _map, _stand, _bank);
 
+    /// <summary>Away for something that would not wait: the shop is shut while it is, so nobody walks to an empty pitch.</summary>
     public override void Paused(IBotWilful bot)
     {
         Shut(false, Core.TickCount);
         BotShopkeep.Release(bot?.Self);
     }
 
+    /// <summary>Back from it: the pitch is spoken for again while it walks back.</summary>
     public override void Resumed(IBotWilful bot)
     {
         _walkSince = 0;
         BotShopkeep.Reserve(bot?.Self, _map, _stand, _bank);
     }
 
+    /// <summary>
+    /// However it ended, the shop is shut and the pitch let go. A shift that ran its course has already learned from it; anything
+    /// else has not.
+    /// </summary>
     public override void Drop(IBotWilful bot)
     {
         var now = Core.TickCount;

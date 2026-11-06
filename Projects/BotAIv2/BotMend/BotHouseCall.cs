@@ -27,12 +27,15 @@ public sealed class BotHouseCall : BotDeed
 
     public const string Trade = "housecall";
 
+    /// <summary>What the walk is reckoned at per minute. Above a stroll, below anything that heals somebody.</summary>
     public static double Prior { get; set; } = 8.0;
 
     public static double WorkMinutes { get; set; } = 4.0;
 
+    /// <summary>How near the fighter the healer stops. Ten: inside the attendant's reach, outside the fight.</summary>
     public static int Stay { get; set; } = 10;
 
+    /// <summary>The longest the walk may take before it is given up as too far.</summary>
     public static int CapMs { get; set; } = 300000;
 
     public static long Arrived { get; private set; }
@@ -41,14 +44,22 @@ public sealed class BotHouseCall : BotDeed
 
     public static long Capped { get; private set; }
 
+    /// <summary>Fighters somebody is already walking towards, so that two healers do not call on the same one.</summary>
     private static readonly HashSet<Serial> _called = [];
 
+    /// <summary>Whether a healer is already on its way to this fighter.</summary>
     public static bool CalledOn(BotMobile fighter) => fighter != null && _called.Contains(fighter.Serial);
 
     private readonly BotMobile _fighter;
 
     private readonly Map _map;
 
+    /// <summary>
+    /// Where the fighting was when the call was offered — and where the walk goes. Not after the fighter: a walk after
+    /// a moving bot changes its order with every step the bot takes, and the walker reads a changed order as a new
+    /// route, so four of the first twelve calls on 16.09.2026 ended "could not get nearer" to a fighter in the open.
+    /// The attendant and the surgeon look sixty and a hundred tiles from wherever the healer stops.
+    /// </summary>
     private readonly Point3D _found;
 
     private readonly long _began;
@@ -63,6 +74,7 @@ public sealed class BotHouseCall : BotDeed
 
     public override string Kind => Trade;
 
+    /// <summary>The patient is still waiting after a rescue. See <see cref="BotDeed.Resumes"/>.</summary>
     public override bool Resumes => true;
 
     public override Map Map => _map;
@@ -170,8 +182,10 @@ public sealed class BotHouseCall : BotDeed
 /// </summary>
 public sealed class BotHouseCalls : IBotProposer
 {
+    /// <summary>Whether the walk is ever offered.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How far a healer will go to find the fighting.</summary>
     public static int Range { get; set; } = 800;
 
     public static long Asked { get; private set; }
@@ -192,12 +206,18 @@ public sealed class BotHouseCalls : IBotProposer
 
     public static long Sealed { get; private set; }
 
+    /// <summary>Calls refused because the healer lately arrived somewhere to find the fighter gone.</summary>
     public static long Resting { get; private set; }
 
+    /// <summary>
+    /// How long a healer waits after an arrival that found nobody before it is offered another call. Three minutes:
+    /// Nyla made three calls in five minutes on 16.09.2026, each to a fighter that had moved on by the time she came.
+    /// </summary>
     public static int RestMs { get; set; } = 180000;
 
     private static readonly Dictionary<Serial, long> _restUntil = [];
 
+    /// <summary>The healer came to an empty place; no call for a while.</summary>
     public static void Rest(BotMobile healer)
     {
         if (healer != null)
@@ -281,6 +301,7 @@ public sealed class BotHouseCalls : IBotProposer
 
             var away = Math.Max(Math.Abs(m.X - body.X), Math.Abs(m.Y - body.Y));
 
+            // Somebody afield already within the attendant's reach: that is the attendant's offer, not this one's.
             if (away <= BotRetainer.Reach)
             {
                 Near++;
@@ -293,6 +314,7 @@ public sealed class BotHouseCalls : IBotProposer
                 continue;
             }
 
+            // See BotMend.Abetting.
             if (BotMend.Abetting(body, m) != null)
             {
                 continue;

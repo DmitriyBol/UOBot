@@ -131,6 +131,7 @@ public sealed class BotWarStore : GenericPersistence
             writer.Write(owed[i].Winner);
         }
 
+        // Shape 2: the opinions, so a restart is not a reconciliation. See BotRegard.Restore.
         List<(string Of, string For, double Held)> opinions = [];
 
         foreach (var (pair, held) in BotRegard.Opinions)

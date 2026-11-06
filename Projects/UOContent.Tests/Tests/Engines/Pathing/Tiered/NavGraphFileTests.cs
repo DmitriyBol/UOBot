@@ -7,6 +7,7 @@ namespace Server.Tests.Pathfinding.Tiered;
 
 public class NavGraphFileTests
 {
+    /// <summary>A graph written and read back plans the same routes at the same cost, and a file of other map files is refused.</summary>
     [Fact]
     public void WrittenAndReadBack_PlansTheSame()
     {
@@ -50,6 +51,7 @@ public class NavGraphFileTests
             Assert.Equal(a.LastCost, b.LastCost);
             Assert.Equal(pa, pb);
 
+            // A house raised on the restored graph is drawn again from the ground, as on the original.
             terrain.Fill(64, 90, 64, 92, '#');
             copy.MarkDirty(64, 90, 64, 92);
             copy.Slice(new NavWindow(), long.MaxValue);

@@ -415,6 +415,27 @@ BLOCKS = {
          "seconds puts it where the registry says. Never delete a `BotRelicItem` by hand without `do relic <name> ; hide`.",
          "A restart hides a relic that was in a lair and takes its warden away; every other relic stays where it was."],
     ),
+    "BotStory": (
+        "each bot's story and the island's Chronicle",
+        "PLAN-life A3, 13.10.2026. Every bot has a book of notes (`BotStoryBook`), written from two places: the event stream "
+        "as each event is posted (`BotEvents.Heard` → `BotStory.Heard`: offices, elections, relics, crime's turning points, "
+        "residences, halls and the guild services opened) and a slow walk over the population that notices what no event says "
+        "(a guild joined or left, a rank risen, a house bought, the champion's yellow, the veteran's title). `BotStoryWriter` "
+        "turns a book, the biography's three tales and the strongest ties into chapters by stage — youth, apprenticeship, the "
+        "guild, deeds, friends and foes, home, family, old age — one dated sentence a fact; that template is always the story. "
+        "When the minds assembly is loaded, `BotStoryVoice` asks the model to retell one chapter or one closed day, at most "
+        "`VoicePerHour` an hour, once for each set of facts (kept against their hash in the save), and the answer is thrown "
+        "away if it names anybody or any number the facts do not. `BotChronicle` keeps a page a day of the wars, guilds, "
+        "champions, relics, elections, the duke's words and the towns' news. The page reads both through volatile snapshots "
+        "(`/api/story?bot=`, `/api/chronicle`, the Story tab).",
+        ["The model's HTTP call is the only thing off the loop, inside `BotOllama`; the answer comes back through "
+         "`Core.LoopContext.Post` and is checked and stored on the loop. Nothing on a listener thread touches a book: it "
+         "reads the shelf and posts the name it was asked for.",
+         "A book is keyed by name, like a life. The first two minutes after a start (`SettleMs`) are taken as where a bot "
+         "stands, not as news — ranks are worked out and houses adopted a few seconds after the reclaim, and without the "
+         "settle every restart wrote \"became an Expert Tailor\" for the whole population.",
+         "`do reset` empties the store through `BotStory.Wipe` and seals the stories until the restart."],
+    ),
     "BotQuad": (
         "the island as squares",
         "The map cut into squares thirty tiles across, each carrying one number: how safe the population has "
@@ -470,6 +491,22 @@ BLOCKS = {
          "not an auction, and it takes only a bot whose work resumes and is not on paying work.",
          "`Society:` counts what was heard by mood, offered by kind, accepted, finished, lapsed, and refused for hostility; "
          "`Voice:` counts moods said to somebody against moods said to nobody."],
+    ),
+    "BotDay": (
+        "the daily cycle",
+        "A clock of six named parts of the day on local time (`BotDay`: dawn from 05, morning 07, noon 12, afternoon 14, "
+        "evening 18, night 22, each a dial in `bot-day.json`), a timetable per bot drawn once from its name, class and nature "
+        "and kept in its own store (`BotTimetable`: wake and bed hours, meal hours, an evening habit — tavern, fireside, home, "
+        "prowl — night owls who live the day ten hours later, and where it sleeps without a house), and the hour as one more "
+        "multiplier outside the auction's root beside the calling, the toll and the nature (`BotDay.Factor`: the evening's "
+        "tavern and fireside, the night's fire and the night's trades, the dawn's market, ×0.67–×1.5 held in ×0.5–×2). The "
+        "rest clock's queue to tire is put bedtime-first and its queue back wake-hour-first. PLAN-life A1, the week of "
+        "12.10.2026; measured on the `Day:` line and under `day` in `/api/state`.",
+        ["A factor without a floor is a veto: a markdown is never applied to a broke bot's paid work (`Floored` counts them), "
+         "and the whole factor is held in `Least`–`Most`, never nought.",
+         "The prime time's bands and shares are Patrick's and untouched: the cycle chooses *who* rests, never how many. "
+         "`BotRest.Look` asks `AtBed` for the order and the early candidates; the allowance arithmetic is the same.",
+         "The part of the day is read into a static on the module's two-second clock; the auction never reads the wall clock."],
     ),
     "BotWeb": (
         "the shard as a page",
@@ -542,6 +579,7 @@ LINES = {
     "BotQuest": ["Quests:"],
     "BotQuad": ["The captain:"],
     "mindedBots": ["Minds:"],
+    "BotStory": ["Stories:"],
 }
 
 TYPE_SUMMARY = re.compile(
@@ -601,8 +639,12 @@ def collect():
             for dial in DIAL.finditer(text):
                 here["dials"].append((stem, dial.group(2), " ".join(dial.group(3).split())))
 
+            found = re.search(r"Configuration/(bot-[a-z-]+\.json)", text)
+
+            # Each key is credited to the file its setter reads, not to the folder: BotPopulation/ reads bot-population.json,
+            # bot-rest.json and bot-names.json, and the folder heading alone named bot-names.json for all of them (12.10.2026).
             for reach in SETTABLE.finditer(text):
-                here["settable"][(reach.group(1), reach.group(2))] = reach.group(3)
+                here["settable"][(reach.group(1), reach.group(2))] = (reach.group(3), found.group(1) if found else None)
 
             if re.search(r"class\s+%s\s*:\s*[^{\n]*BotModule" % re.escape(stem), text):
                 here["module"] = stem
@@ -610,10 +652,10 @@ def collect():
             if re.search(r"class\s+%s\s*:\s*[^{\n]*BotDeed" % re.escape(stem), text):
                 here["deeds"].add(stem)
 
-            found = re.search(r"Configuration/(bot-[a-z-]+\.json)", text)
-
-            if found and not here["config"]:
+            # The heading names the file the folder's first *Config.cs reads, and only failing one the first file named anywhere.
+            if found and (not here["config"] or stem.endswith("Config") and not here.get("owned")):
                 here["config"] = found.group(1)
+                here["owned"] = here.get("owned") or stem.endswith("Config")
 
             if re.search(r"class\s+%s\s*:\s*[^{\n]*IBotProposer" % re.escape(stem), text):
                 offers = re.search(r'public string Name\s*=>\s*"([^"]+)"', text)
@@ -701,6 +743,12 @@ def dials(folders, order):
         "changed without a rebuild.",
     ]
 
+    # A dial may be set from another folder's config reader (BotHaven's steps from BotMendConfig): looked up everywhere.
+    everywhere = {}
+
+    for data in folders.values():
+        everywhere.update(data["settable"])
+
     for folder in order:
         if folder not in folders or not folders[folder]["dials"]:
             continue
@@ -713,9 +761,10 @@ def dials(folders, order):
         out.append("|---|---|---|---|")
 
         for owner, field, value in sorted(here["dials"]):
-            key = here["settable"].get((owner, field))
+            key, source = here["settable"].get((owner, field)) or everywhere.get((owner, field), (None, None))
+            where = " in `%s`" % source if source and source != here["config"] else ""
             out.append("| `%s` | `%s` | `%s` | %s |" % (
-                owner, field, value, "`%s`" % key if key else "*code only*"))
+                owner, field, value, "`%s`%s" % (key, where) if key else "*code only*"))
 
     with open("DIALS.md", "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(out) + "\n")

@@ -22,6 +22,7 @@ public sealed class BotOutlawStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOutlawStore));
 
+    /// <summary>Two since build 114: each record carries its wanted clock and whether the Baron was told. One is still read.</summary>
     private const int Shape = 2;
 
     private static BotOutlawStore _store;
@@ -32,6 +33,7 @@ public sealed class BotOutlawStore : GenericPersistence
     {
     }
 
+    /// <summary>Records read back at the last load. For the summary.</summary>
     public static int Restored { get; private set; }
 
     public override void Serialize(IGenericWriter writer)

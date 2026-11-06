@@ -33,26 +33,36 @@ public static class BotWake
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWake));
 
+    /// <summary>Whether bots wake the ground round them at all. Off: the world sleeps wherever no client is, as it always has.</summary>
     public static bool Running { get; set; }
 
+    /// <summary>Only a bot inside a dungeon wakes the ground: the delve meets what the proving ground measured, and a hunt in the open is as it was.</summary>
     public static bool DeepsOnly { get; set; } = true;
 
+    /// <summary>How often the bots' ground is looked over.</summary>
     public static int EveryMs { get; set; } = 2000;
 
+    /// <summary>How long a sector stays awake after the last bot that needed it has gone.</summary>
     public static int GraceMs { get; set; } = 60000;
 
+    /// <summary>How far round a bot the door's census looks for creatures.</summary>
     public static int CensusReach { get; set; } = 18;
 
+    /// <summary>Sectors this woke (each counted once per waking), and sectors it put back to sleep.</summary>
     public static long Woken { get; private set; }
 
     public static long PutBack { get; private set; }
 
+    /// <summary>Sectors past their grace that were left awake because a client was near them.</summary>
     public static long LeftToClients { get; private set; }
 
+    /// <summary>Sectors past their grace left awake because the debuggers' tour of the zones holds them (<see cref="BotZoneTour"/>).</summary>
     public static long LeftToTour { get; private set; }
 
+    /// <summary>Whether a bot needs this sector awake now. Asked by the zones' tour before it puts one of its own back to sleep.</summary>
     public static bool Needed(Map map, int x, int y) => _needed.ContainsKey((map, x, y));
 
+    /// <summary>Every sector a bot has needed lately, and when it last did.</summary>
     private static readonly Dictionary<(Map Map, int X, int Y), long> _needed = [];
 
     private static readonly List<(Map Map, int X, int Y)> _expired = [];
@@ -72,6 +82,7 @@ public static class BotWake
         _timer = null;
     }
 
+    /// <summary>One look over the bots' ground: wake what they stand in, put back what they left. Asleep, it only lets go.</summary>
     public static void Beat()
     {
         var now = Core.TickCount;
@@ -101,6 +112,7 @@ public static class BotWake
         LetGo(now);
     }
 
+    /// <summary>Wakes the five by five round one sector, as a client walking into it would, and marks each as needed now.</summary>
     private static void Hold(Map map, int cx, int cy, long now)
     {
         var width = map.Width >> Map.SectorShift;
@@ -128,6 +140,7 @@ public static class BotWake
         }
     }
 
+    /// <summary>Puts back to sleep every sector no bot has needed for the grace, unless a client keeps it awake.</summary>
     private static void LetGo(long now)
     {
         if (_needed.Count == 0)
@@ -160,6 +173,7 @@ public static class BotWake
                 continue;
             }
 
+            // The debuggers' tour is holding it to watch a patrol: handed over, and the tour puts it back to sleep on its own grace.
             if (BotZoneTour.Adopt(map, x, y))
             {
                 LeftToTour++;
@@ -179,6 +193,7 @@ public static class BotWake
         _expired.Clear();
     }
 
+    /// <summary>The engine's own rule for keeping a sector awake: a client within the active range of it.</summary>
     public static bool ClientNear(Map map, int x, int y)
     {
         foreach (var state in NetState.Instances)
@@ -198,6 +213,10 @@ public static class BotWake
         return false;
     }
 
+    /// <summary>
+    /// For the door: of the creatures within <see cref="CensusReach"/> of any bot, how many have their minds switched on — all
+    /// of them, those inside dungeons, and those that would fight — and how many clients are on the shard to wake anything.
+    /// </summary>
     public static string Census()
     {
         var seen = new HashSet<Serial>();
@@ -272,6 +291,7 @@ public static class BotWake
         + (LeftToClients > 0 ? $", {LeftToClients} left awake for a client" : "")
         + (LeftToTour > 0 ? $", {LeftToTour} left awake for the zones' tour" : "");
 
+    /// <summary>After a hot reload or reset: nothing is held. What was woken is let go on the next look, by the grace.</summary>
     public static void Forget()
     {
         Woken = 0;

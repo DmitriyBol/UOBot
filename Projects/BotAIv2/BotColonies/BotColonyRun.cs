@@ -108,8 +108,10 @@ public sealed class BotColonyRun : BotDeed
 
     public const string Trade = "colony-run";
 
+    /// <summary>What a run is reckoned at before the ledger has measured one.</summary>
     public static double Prior { get; set; } = 45.0;
 
+    /// <summary>How many kinds of goods the captain tries a counter for before it calls the selling done.</summary>
     public static int MostKinds { get; set; } = 6;
 
     public static long Runs { get; private set; }
@@ -214,8 +216,10 @@ public sealed class BotColonyRun : BotDeed
 
     public BotSailing Passage => _passage;
 
+    /// <summary>The kind the captain carries most worth of: what The Shadow's ambush weighs it by (<c>BotHighway</c>).</summary>
     public Type Goods => _units > 0 ? typeof(IronIngot) : null;
 
+    /// <summary>Units of the store's goods in the captain's pack now.</summary>
     public int Cargo => _units;
 
     public override string Kind => Trade;
@@ -239,6 +243,7 @@ public sealed class BotColonyRun : BotDeed
 
     public override double Coin => 1.0;
 
+    /// <summary>The guild's errand: the goods are the guild's, and the captain keeps only its share. Not refused for paying it little.</summary>
     public override bool Unpaid => true;
 
     public override bool Steadfast => true;
@@ -247,6 +252,7 @@ public sealed class BotColonyRun : BotDeed
 
     public override double HoldsFor => _minutes;
 
+    /// <summary>From the moment the store's goods are in its pack: a captain taken off now carries the guild's goods to nowhere.</summary>
     public override bool Committed => _step > Step.Load;
 
     public override bool Still => _step == Step.Muster || _voyage is { Still: true };
@@ -315,6 +321,7 @@ public sealed class BotColonyRun : BotDeed
         return BotDoing.Failed("could not settle on a next step");
     }
 
+    /// <summary>The store's goods into the pack, bars first (light and dear), then wood, then ore, up to <see cref="BotColonies.CargoLoad"/> of what it can carry.</summary>
     private BotDoing Load(BotMobile body)
     {
         var store = _colony.Store;
@@ -340,6 +347,7 @@ public sealed class BotColonyRun : BotDeed
 
         _colony.LastRun = Core.TickCount;
 
+        // Who goes home with it: every colonist whose shift is over.
         var wanted = 0;
         var now = Core.TickCount;
 
@@ -383,6 +391,7 @@ public sealed class BotColonyRun : BotDeed
         return default;
     }
 
+    /// <summary>Lifts up to the room's weight of one kind out of the store into the pack. Returns the room left.</summary>
     private int Take<T>(BotMobile body, Container store, int room) where T : Item
     {
         var pack = body.Backpack;
@@ -476,6 +485,7 @@ public sealed class BotColonyRun : BotDeed
     {
         var doing = _voyage.Advance(bot);
 
+        // Afloat: the muster is closed, and The Shadow hears of a loaded ship and may wait for it at the quay it makes for. See BotPiracy.
         if (!_afloat && BotHelm.Of(body) != null)
         {
             _afloat = true;
@@ -503,6 +513,7 @@ public sealed class BotColonyRun : BotDeed
                 }
             default:
                 {
+                    // Ashore at the far dock with a party of The Shadow lying in wait there: the crew forms up round the captain.
                     if (_afloat && _passage.State == BotSailing.Tide.Sailing && BotHelm.Of(body) == null)
                     {
                         _passage.State = BotSailing.Tide.Landed;
@@ -514,6 +525,7 @@ public sealed class BotColonyRun : BotDeed
         }
     }
 
+    /// <summary>The ore melted at the nearest fire on this land, if there is one: a shopkeeper buys bars, never ore.</summary>
     private BotDoing Melt(IBotWilful bot, BotMobile body)
     {
         if (BotOre.Carried(body) < BotOre.WorthSmelting)
@@ -549,6 +561,7 @@ public sealed class BotColonyRun : BotDeed
         return default;
     }
 
+    /// <summary>Kind by kind, the counter that pays best for it once the road is paid for (<see cref="BotShops.Buyer(IBotWilful, Item, int, bool, out int, out double, out int)"/>), and the sale.</summary>
     private BotDoing Sell(IBotWilful bot, BotMobile body)
     {
         var pack = body.Backpack;
@@ -631,6 +644,11 @@ public sealed class BotColonyRun : BotDeed
         return default;
     }
 
+    /// <summary>
+    /// What the goods fetched, shared: the captain keeps its share, the hands who came home with it have theirs put into their
+    /// banks, and the rest goes into the guild's chest. Coin moved, none made: it is the counters' gold, out of the captain's
+    /// purse — the pack first, then the account.
+    /// </summary>
     private BotDoing Pay(BotMobile body)
     {
         var unsold = 0;
@@ -680,10 +698,13 @@ public sealed class BotColonyRun : BotDeed
             }
         }
 
+        // Whatever the hands were not paid goes to the chest with the rest.
         chest += crewShare - paidCrew;
 
         var paidChest = 0;
 
+        // Not booked aside: the run is the guild's errand (Unpaid), and what it is measured at is the captain's own share, which is
+        // also all the guild's dues are taken on when it settles.
         if (chest > 0 && Withdraw(body, chest))
         {
             BotChest.Put(_guild.Name, chest);
@@ -722,6 +743,7 @@ public sealed class BotColonyRun : BotDeed
         return BotDoing.Done($"ran {_units} units of the colony's goods home and sold them for {total}gp, {paidChest} to the chest");
     }
 
+    /// <summary>Coin out of the captain's purse, the pack first and then the account. False, with nothing moved, when it is not there.</summary>
     private static bool Withdraw(BotMobile body, int gold)
     {
         var pack = body.Backpack;
@@ -752,6 +774,7 @@ public sealed class BotColonyRun : BotDeed
         return true;
     }
 
+    /// <summary>One hand's share: out of the captain's purse into the hand's account, kept out of the hand's work in hand (its shift is what earned it).</summary>
     private static bool Hand(BotMobile captain, Mobile hand, int gold)
     {
         if (!Withdraw(captain, gold))
@@ -761,6 +784,7 @@ public sealed class BotColonyRun : BotDeed
 
         if (!Banker.Deposit(hand, gold))
         {
+            // Back where it came from rather than lost.
             Banker.Deposit(captain, gold);
 
             return false;
@@ -771,6 +795,7 @@ public sealed class BotColonyRun : BotDeed
         return true;
     }
 
+    /// <summary>What the cargo in the pack is worth by the market, for the ledger's "made" while it is carried.</summary>
     private static int Worth(BotMobile body)
     {
         var pack = body.Backpack;

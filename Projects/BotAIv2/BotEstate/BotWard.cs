@@ -22,14 +22,18 @@ public sealed class BotWard : BotDeed
 {
     public const string Trade = "ward";
 
+    /// <summary>What the walk is reckoned at per minute. Unpaid and pressed on nobody: it is offered, and this orders it.</summary>
     public static double Prior { get; set; } = 300.0;
 
     public static double WorkMinutes { get; set; } = 1.5;
 
+    /// <summary>How close the warden comes to speak.</summary>
     public static int Reach { get; set; } = 3;
 
+    /// <summary>How long it follows before it gives up.</summary>
     public static int ChaseMs { get; set; } = 120000;
 
+    /// <summary>The opinion under which a stranger answers the warden in anger.</summary>
     public static double Surly { get; set; } = -20.0;
 
     public static long Spoken { get; private set; }

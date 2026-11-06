@@ -25,6 +25,7 @@ namespace Server.BotAI.V2;
 [SerializationGenerator(0, false)]
 public partial class BotGuildSign : Sign
 {
+    /// <summary>The guild whose sign this is, by name.</summary>
     [SerializableField(0)]
     [SerializedCommandProperty(AccessLevel.GameMaster)]
     private string _guild;

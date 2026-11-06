@@ -29,6 +29,7 @@ public sealed class BotBowmake : BotDeed
 
     public const string Trade = "bowyer";
 
+    /// <summary>A bow is worth a blade's forging a minute; a tinker's ninety would lose to the forge every time.</summary>
     public static double Prior { get; set; } = 150.0;
 
     public static double WorkMinutes { get; set; } = 4.0;
@@ -39,6 +40,7 @@ public sealed class BotBowmake : BotDeed
 
     public static int SwingMs { get; set; } = 3000;
 
+    /// <summary>What a bow is guessed to be worth on the stall before the market says. The provisioner sells them at about 35.</summary>
     public static int Guess { get; set; } = 40;
 
     public static long Stints { get; private set; }
@@ -61,6 +63,7 @@ public sealed class BotBowmake : BotDeed
 
     private readonly BotWant _order;
 
+    /// <summary>The want this is made for, or null on spec. Read by <see cref="BotCraftFirst"/> (03.10.2026, econ13).</summary>
     public BotWant Order => _order;
 
     private readonly Type _kind;
@@ -91,6 +94,7 @@ public sealed class BotBowmake : BotDeed
 
     public override Point3D Where => _where;
 
+    /// <summary>An order more; speculation marked down by the glut of the bow it means to make (01.10.2026). See <see cref="BotGlut.Claim"/>.</summary>
     public override double Expects => _order != null ? Prior * 1.4 : BotGlut.Claim(_kind, Prior);
 
     public override double Minutes => WorkMinutes;
@@ -99,6 +103,7 @@ public sealed class BotBowmake : BotDeed
 
     public override double Coin => _order == null ? 0.5 : 1.0;
 
+    /// <summary>The island's price for what somebody asks for, the surplus price for the rest. See <see cref="BotGlut.Yield"/>.</summary>
     public override int Made => BotGlut.Yield(_kind, _made, Guess);
 
     public override bool Steadfast => true;
@@ -157,6 +162,7 @@ public sealed class BotBowmake : BotDeed
 
         var cost = BotCraftwork.Cost(_recipe);
 
+        // Its own logs out of its own bank box, standing at a bank (01.10.2026: the box is reached only there).
         if (BotFletching.Logs(body) < cost && BotMarket.FromBank(bot, typeof(Log), cost * 2) > 0)
         {
             logger.Information("{Name} took its own logs out of its bank box to make {Item}", body.Name, _kind.Name);
@@ -203,6 +209,8 @@ public sealed class BotBowmake : BotDeed
             return BotDoing.Done($"{_swings} attempts at {_kind.Name} and nothing to show");
         }
 
+        // Hand to hand (01.10.2026): nothing leaves the bench. What an order waits for stays in the pack for the walk to whoever
+        // ordered it (BotCourier); the rest waits for the porter — the bank box, the shop by Britain's bank, a shopkeeper.
         var want = _order ?? BotMarket.Demand(bot, _kind);
         var made = 0;
 
@@ -256,10 +264,13 @@ public sealed class BotBowyer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBowyer));
 
+    /// <summary>The bows, in the order they are made when nothing is asked for.</summary>
     public static readonly Type[] Bows = [typeof(Bow), typeof(Crossbow)];
 
+    /// <summary>Fewest logs worth beginning with: a bow and a miss.</summary>
     public static int LeastWood { get; set; } = 14;
 
+    /// <summary>Fewest of a bow on the stalls before making more is offered.</summary>
     public static int LeastOnMarket { get; set; } = 2;
 
     public static long Asked { get; private set; }
@@ -282,6 +293,7 @@ public sealed class BotBowyer : IBotProposer
 
     public static bool IsBow(Type kind) => kind == typeof(Bow) || kind == typeof(Crossbow);
 
+    /// <summary>The recipe for that bow, if the bot's skill allows an attempt with a fair chance; null otherwise.</summary>
     public static CraftItem Recipe(Mobile bot, Type wanted)
     {
         var system = BotFletching.System;
@@ -326,6 +338,7 @@ public sealed class BotBowyer : IBotProposer
             return null;
         }
 
+        // Only a bot with the skill for the easiest bow: everybody else asks nothing of this.
         if (Recipe(body, typeof(Bow)) == null && Recipe(body, typeof(Crossbow)) == null)
         {
             return null;
@@ -387,6 +400,8 @@ public sealed class BotBowyer : IBotProposer
                 continue;
             }
 
+            // Only an order a carrier from here could deliver, and not one already made and waiting in the pack for the walk
+            // (01.10.2026, build 384 review). See BotCourier.Answerable and BotCourier.Holding.
             if (!BotCourier.Answerable(bot, want) || BotCourier.Holding(bot, want))
             {
                 continue;
@@ -399,6 +414,10 @@ public sealed class BotBowyer : IBotProposer
         return best;
     }
 
+    /// <summary>
+    /// The bow the island is shortest of that this bot can make, or null when every bow is stocked: the shops by the bank and the
+    /// bot's own pack and bank box (<see cref="BotMarket.Stock"/>, since the stalls went on 01.10.2026).
+    /// </summary>
     private static Type Choose(Mobile body)
     {
         Type best = null;

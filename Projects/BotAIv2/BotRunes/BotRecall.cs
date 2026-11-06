@@ -27,6 +27,7 @@ public sealed class BotRecall
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRecall));
 
+    /// <summary>How often a far walker that could not recall is asked again. Thirty seconds: mana comes back, a scroll is bought.</summary>
     public static int ReconsiderMs { get; set; } = 30000;
 
     private readonly Map _map;
@@ -53,8 +54,10 @@ public sealed class BotRecall
 
     private bool _held;
 
+    /// <summary>In the pause between a failed cast and the next try, when the bot stands rather than walks.</summary>
     private bool _retrying;
 
+    /// <summary>Whether the recall carried the bot. Read by the walk that asked, to tell a road walked from a road skipped.</summary>
     public bool Moved { get; private set; }
 
     private BotRecall(Map map, Point3D where, int arrival, string purpose)
@@ -66,6 +69,10 @@ public sealed class BotRecall
         _nextTick = Core.TickCount;
     }
 
+    /// <summary>
+    /// What a far walk does this beat instead of walking, or null to walk. <paramref name="recall"/> is the walk's own, made on
+    /// the first ask and kept for the walk's life.
+    /// </summary>
     public static BotDoing? Instead(IBotWilful bot, Map map, Point3D where, int arrival, string purpose, ref BotRecall recall)
     {
         if (!BotRunes.Running || map == null)
@@ -94,6 +101,7 @@ public sealed class BotRecall
 
         if (now - _nextTick < 0)
         {
+            // Standing only for the pause between a fizzle and the next try; a walker told to ask again later walks meanwhile.
             return _retrying ? BotDoing.Work($"gathering itself to recall to {_entry?.Description} again") : null;
         }
 
@@ -109,6 +117,7 @@ public sealed class BotRecall
             _nextTick = now + ReconsiderMs;
             _retrying = false;
 
+            // Asked afresh next time: the bot will have walked on, and the saving is measured from where it then stands.
             _entry = null;
 
             return null;
@@ -116,6 +125,7 @@ public sealed class BotRecall
 
         _retrying = false;
 
+        // A walk in hand is finished: the engine freezes a caster, and a walker refused every step reads as stuck.
         body.Journey?.Finish();
         _spell = new RecallSpell(body, _entry, null, scroll);
 
@@ -129,12 +139,14 @@ public sealed class BotRecall
         return BotDoing.Work($"recalling to {_entry.Description}");
     }
 
+    /// <summary>Whether this walk is worth a recall and the bot holds a rune for it. Asked once for the walk, then every <see cref="ReconsiderMs"/> while far.</summary>
     private bool Plan(BotMobile body)
     {
         var away = BotRunes.Apart(body.Location, _where);
 
         if (away < BotRunes.Far)
         {
+            // Nearer than a recall is worth, and a walk only gets nearer.
             _over = true;
 
             return false;
@@ -161,6 +173,7 @@ public sealed class BotRecall
             return false;
         }
 
+        // The engine's own two questions, asked before the reagents are: may one recall from here, and to there.
         if (!SpellHelper.CheckTravel(body, TravelCheckType.RecallFrom, out _)
             || !SpellHelper.CheckTravel(body, entry.Map, entry.Location, TravelCheckType.RecallTo, out _))
         {
@@ -206,6 +219,7 @@ public sealed class BotRecall
                 BotRuneShelf.Used(body.Guild.Name, body.Map, _entry.Location);
             }
 
+            // The plan in hand was drawn from where the bot stood; the walk that asked draws the next from here.
             body.Journey?.Finish();
 
             logger.Information(

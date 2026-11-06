@@ -19,8 +19,10 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotTownWatch : IBotProposer
 {
+    /// <summary>How far from the town a member is offered the watch.</summary>
     public static int Reach { get; set; } = 250;
 
+    /// <summary>Members of one guild on watch in one town at once.</summary>
     public static int MostAtOnce { get; set; } = 3;
 
     public static long Asked { get; private set; }
@@ -87,8 +89,10 @@ public sealed class BotStandGuard : BotDeed
 {
     public const string Trade = "watch";
 
+    /// <summary>How long one watch lasts once inside the walls.</summary>
     public static int StandMs { get; set; } = 300000;
 
+    /// <summary>What a watch is reckoned at: above a stroll, below real work.</summary>
     public static double Prior { get; set; } = 18.0;
 
     public static long Stood { get; private set; }
@@ -116,6 +120,7 @@ public sealed class BotStandGuard : BotDeed
         _guild = guild;
     }
 
+    /// <summary>How many of a guild are on watch for this task now.</summary>
     public static int Watching(string guild, BotTownTask task)
     {
         var count = 0;
@@ -155,6 +160,13 @@ public sealed class BotStandGuard : BotDeed
 
     public override bool Still => _in;
 
+    /// <summary>
+    /// <b>A watch inside the walls is a promise to the town (30.09.2026, build 340).</b> All five watches taken on 339's first
+    /// twenty minutes were "outbid by hunt at 91/min after 2.0 of 7.5 minutes", by a cook, by another hunt — the protection
+    /// ran out at two minutes and a watch reckoned at 18/min loses to any paid work — so none stood its five minutes and the
+    /// guard tasks crept (Cove 19 of 90 member-minutes with 36 left). Once inside it is kept from the bidding; a flight, a
+    /// mending, a rung above and whatever presses still take it (<c>BotWill</c>'s hold).
+    /// </summary>
     public override bool Committed => _in;
 
     public override string Stage => _in ? $"standing guard in {_task.Town?.Name}" : $"on the way to stand guard in {_task.Town?.Name}";

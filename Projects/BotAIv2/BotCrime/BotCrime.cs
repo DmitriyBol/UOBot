@@ -39,47 +39,75 @@ public static class BotCrime
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCrime));
 
+    // ---- Dials ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>Whether any of this runs. Off: no thief is recruited, nobody is reported or posted, no bounty, ransom or term of its own.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>One thief at most for this many bots in the world: the band's thieves and the recruits together. Patrick's bound.</summary>
     public static int ThiefPerBots { get; set; } = 20;
 
+    /// <summary>How often the underworld looks for a poor bot to recruit as a thief.</summary>
     public static int RecruitEveryMs { get; set; } = 900000;
 
+    /// <summary>A bot this poor or poorer (pocket and bank) may be recruited as a thief.</summary>
     public static int PoorBelow { get; set; } = 150;
 
+    /// <summary>
+    /// The least a recruit's skills come to, in tenths of a point: the underworld takes a fighter down on its luck, not a
+    /// newcomer born with nothing in its pocket an hour ago.
+    /// </summary>
     public static int RecruitLeastSkills { get; set; } = 2500;
 
+    /// <summary>How many reports against one name put it on the town's wanted list. Patrick's number: two.</summary>
     public static int ReportsToPost { get; set; } = 2;
 
+    /// <summary>The bounty's floor: what the town pays for any head on its list, before the damage done is added.</summary>
     public static int BountyBase { get; set; } = 200;
 
+    /// <summary>The most a bounty comes to, base and damage together.</summary>
     public static int BountyMost { get; set; } = 2000;
 
+    /// <summary>How long a name stays on the wanted list uncaught, in milliseconds of uptime. Six hours.</summary>
     public static int PostedMs { get; set; } = 21600000;
 
+    /// <summary>A wanted bot that is no murderer yields at this share of its health to whoever is hunting it, and goes to a cell alive.</summary>
     public static double YieldShare { get; set; } = 0.25;
 
+    /// <summary>Whether a wanted thief yields rather than fights to the death.</summary>
     public static bool Yields { get; set; } = true;
 
+    /// <summary>A first term in a cell for a crime on this list, in milliseconds of uptime. Patrick's dial: half an hour.</summary>
     public static int TermMs { get; set; } = 1800000;
 
+    /// <summary>How many times a repeat offender's term may double: a fourth term is eight times the first and no longer.</summary>
     public static int MostDoublings { get; set; } = 3;
 
+    /// <summary>Whether a prisoner's guild may pay to have it let out early.</summary>
     public static bool Ransoms { get; set; } = true;
 
+    /// <summary>A ransom's floor.</summary>
     public static int RansomBase { get; set; } = 300;
 
+    /// <summary>What each minute left of the term adds to the ransom.</summary>
     public static int RansomPerMinute { get; set; } = 20;
 
+    /// <summary>How long a prisoner sits before its guild is asked for the ransom: a term is not bought off at the cell door.</summary>
     public static int RansomAfterMs { get; set; } = 300000;
 
+    /// <summary>What a guild's chest keeps back from a ransom: the hall and the dues come first.</summary>
     public static int ChestKeep { get; set; } = 500;
 
+    /// <summary>How long after its release a criminal must keep clean to count as repentant. Patrick's two hours.</summary>
     public static int RepentMs { get; set; } = 7200000;
 
+    /// <summary>How long a stolen thing stays hot in its holder's pack before it is simply its holder's goods.</summary>
     public static int HotMs { get; set; } = 3600000;
 
+    /// <summary>How often the slow look runs: posting, ransoms, repentance and the recruit.</summary>
     public static int SweepMs { get; set; } = 60000;
+
+    // ---- Counters ------------------------------------------------------------------------------------------------------------
 
     public static long Recruited { get; private set; }
 
@@ -125,13 +153,17 @@ public static class BotCrime
 
     public static long CriminalDeaths { get; private set; }
 
+    // ---- The record ----------------------------------------------------------------------------------------------------------
+
     /// <summary>One name's record in the town's books. Ticks are of uptime; nought means never.</summary>
     public sealed class Sheet
     {
         public string Name;
 
+        /// <summary>On the thieves' roll: recruited by the underworld, until it repents.</summary>
         public bool Thief;
 
+        /// <summary>Reports against it since it was last posted or caught.</summary>
         public int Reports;
 
         public bool Posted;
@@ -142,12 +174,15 @@ public static class BotCrime
 
         public string Why;
 
+        /// <summary>What it is reported to have taken, in gold: the bounty's second half.</summary>
         public int Damage;
 
         public int Bounty;
 
+        /// <summary>What a town's steward added to the bounty, kept through a fresh report (07.10.2026, steward20). See <see cref="Raise"/>.</summary>
         public int Raised;
 
+        /// <summary>Terms served for crimes on this list: a repeat offender's term doubles.</summary>
         public int Served;
 
         public long CaughtTick;
@@ -158,6 +193,7 @@ public static class BotCrime
 
         public bool Ransomed;
 
+        /// <summary>Stolen things sold that the town traced back to it.</summary>
         public int Traced;
 
         public int Thefts;
@@ -191,6 +227,7 @@ public static class BotCrime
 
     private static bool _recruitClock;
 
+    /// <summary>The record for this name, or null; made when <paramref name="make"/>.</summary>
     public static Sheet Of(string name, bool make = false)
     {
         if (string.IsNullOrEmpty(name))
@@ -213,14 +250,21 @@ public static class BotCrime
         return sheet;
     }
 
+    /// <summary>Every record, for the store and the page.</summary>
     public static IEnumerable<Sheet> All => _sheets.Values;
 
+    /// <summary>The town's name for a place: the town it stands in, or the nearest one.</summary>
     public static string TownAt(Point3D where) => BotTowns.Of(where)?.Name ?? BotTowns.Nearest(where)?.Name ?? "the island";
 
+    /// <summary>Whether this name is on a town's wanted list now.</summary>
     public static bool Posted(Mobile m) => Running && Of(m?.Name) is { Posted: true };
 
+    // ---- Thieves -------------------------------------------------------------------------------------------------------------
+
+    /// <summary>The most thieves the island holds at once: one for every <see cref="ThiefPerBots"/> bots in the world.</summary>
     public static int MostThieves => Math.Max(1, BotPopulation.Count / Math.Max(1, ThiefPerBots));
 
+    /// <summary>Whether this bot works the crowd: a thief of The Shadow (never its fence), or a recruit on the roll.</summary>
     public static bool IsThief(Mobile m)
     {
         if (!Running || m is not BotMobile { Deleted: false } bot)
@@ -236,6 +280,7 @@ public static class BotCrime
         return Of(bot.Name) is { Thief: true };
     }
 
+    /// <summary>Thieves in the world now: the band's and the recruits.</summary>
     public static int ThievesNow()
     {
         var count = 0;
@@ -252,10 +297,18 @@ public static class BotCrime
         return count;
     }
 
+    /// <summary>
+    /// A class a thief can be: one that fights for a living, leads nothing and makes nothing — the band's own rule
+    /// (<c>BotUnderworld.Fit</c>) — and never a neutral one: the traders keep out of everything.
+    /// </summary>
     private static bool Fit(BotMobile bot) =>
         bot.Class is { } klass && klass.Role is not (BotRole.Producer or BotRole.Medic) && !klass.Unpaid && !klass.Leads
         && !klass.Neutral && klass is not (BotSage or BotArchitect) && bot.Squad == null;
 
+    /// <summary>
+    /// The underworld recruits one poor bot when the island has room for another thief. Only while The Shadow stands: the band
+    /// is who does the recruiting, and a poor bot is what it looks for — the poorest of the fighters, never a guild's head.
+    /// </summary>
     private static void Recruit(long now)
     {
         if (!BotUnderworld.Exists)
@@ -320,6 +373,13 @@ public static class BotCrime
         BotEvents.Post("crime", best, $"recruited by The Shadow as a thief with {poorest}gp to its name");
     }
 
+    // ---- Reports, the wanted list and the bounty -------------------------------------------------------------------------------
+
+    /// <summary>
+    /// A crime reported against this bot, by somebody who saw it or suffered it: <paramref name="weight"/> reports at once (a
+    /// victim of an ambush counts as the two the list asks for), what it took, and the town it is reported to. Posted at
+    /// <see cref="ReportsToPost"/>.
+    /// </summary>
     public static void Report(BotMobile criminal, Mobile by, string town, string why, int damage, int weight = 1)
     {
         if (!Running || criminal is not { Deleted: false })
@@ -337,6 +397,7 @@ public static class BotCrime
         sheet.Why = why ?? sheet.Why;
         Reports++;
 
+        // A crime after a term is no repentance: the clock starts again.
         if (sheet.ReleasedTick != 0)
         {
             sheet.ReleasedTick = 0;
@@ -368,6 +429,7 @@ public static class BotCrime
         }
     }
 
+    /// <summary>A crime nobody reported, for the repentance clock only.</summary>
     public static void Crime(Mobile criminal)
     {
         if (Of(criminal?.Name, true) is { } sheet)
@@ -390,6 +452,8 @@ public static class BotCrime
         sheet.Bounty = Math.Min(BountyMost, BountyBase + sheet.Damage);
         PostedCount++;
 
+        // The engine's own word for somebody anybody may set on: wanted, grey, kept out of the towns by the outlaws' roads, and
+        // set on by the law-abiding who see it (BotLawful). Kept so by the sweep for as long as the posting stands.
         BotOutlaw.Want(criminal, by?.Name ?? sheet.Town, sheet.Why);
 
         logger.Information(
@@ -412,6 +476,11 @@ public static class BotCrime
         BotEvents.Post("crime", criminal, $"posted as wanted in {sheet.Town} for {sheet.Why}, {sheet.Bounty}gp on its head");
     }
 
+    /// <summary>
+    /// A town's steward adds up to <paramref name="gold"/> to the bounty on a posted head, the bounty kept at or under
+    /// <paramref name="most"/> (07.10.2026, steward20). Returns what was added; the steward has handed that much to the treasury,
+    /// which pays the bounty when the head is taken (<see cref="Caught"/>). Nought when the head is not posted.
+    /// </summary>
     public static int Raise(string name, int gold, int most)
     {
         if (!Running || gold <= 0 || Of(name) is not { Posted: true } sheet)
@@ -434,6 +503,7 @@ public static class BotCrime
         return added;
     }
 
+    /// <summary>The wanted at large on the home map, worst first, for the bounty board and the page.</summary>
     public static void Wanted(List<(BotMobile Bot, Sheet Sheet)> into)
     {
         into.Clear();
@@ -458,6 +528,9 @@ public static class BotCrime
         into.Sort((a, b) => b.Sheet.Bounty.CompareTo(a.Sheet.Bounty));
     }
 
+    // ---- Stolen goods --------------------------------------------------------------------------------------------------------
+
+    /// <summary>Stolen goods taken into a holder's pack.</summary>
     public static void Heat(Mobile holder, Type kind, int amount, string town, string victim)
     {
         if (holder == null || kind == null || amount <= 0 || kind == typeof(Gold))
@@ -473,9 +546,11 @@ public static class BotCrime
         list.Add(new Hot { Kind = kind, Amount = amount, Town = town, Victim = victim, Tick = Core.TickCount });
     }
 
+    /// <summary>The stolen goods this holder carries, or null.</summary>
     public static List<Hot> HotOf(Mobile holder) =>
         holder != null && _hot.TryGetValue(holder.Serial, out var list) && list.Count > 0 ? list : null;
 
+    /// <summary>How many of a kind of stolen goods this holder carries, by the book.</summary>
     public static int HotAmount(Mobile holder, Type kind)
     {
         var list = HotOf(holder);
@@ -497,6 +572,10 @@ public static class BotCrime
         return amount;
     }
 
+    /// <summary>
+    /// Takes <paramref name="amount"/> of a kind off a holder's stolen goods, oldest first, and hands the lots to
+    /// <paramref name="to"/> when the goods changed hands rather than left the island's books.
+    /// </summary>
     public static void Cool(Mobile holder, Type kind, int amount, Mobile to = null)
     {
         var list = HotOf(holder);
@@ -534,8 +613,10 @@ public static class BotCrime
         }
     }
 
+    /// <summary>What a kind is worth to the island: what it has changed hands for, or the fallback.</summary>
     public static int Worth(Type kind, int fallback = 1) => Math.Max(1, BotMarket.Worth(kind, Math.Max(1, fallback)));
 
+    /// <summary>The stolen goods a holder carries, by the book, at what they are worth.</summary>
     public static int HotWorth(Mobile holder)
     {
         var list = HotOf(holder);
@@ -554,6 +635,7 @@ public static class BotCrime
         return worth;
     }
 
+    /// <summary>A pack read by kind: what is merchandise in it, unit counts. For the before-and-after of a theft or a toss.</summary>
     public static Dictionary<Type, int> Census(Mobile body)
     {
         var count = new Dictionary<Type, int>();
@@ -591,6 +673,7 @@ public static class BotCrime
         return count;
     }
 
+    /// <summary>What came into a pack between two censuses: gold apart, and the goods by kind.</summary>
     public static int Gained(Dictionary<Type, int> before, Dictionary<Type, int> after, List<(Type Kind, int Amount)> goods)
     {
         goods.Clear();
@@ -618,6 +701,13 @@ public static class BotCrime
         return gold;
     }
 
+    // ---- The law: catching, the cell, the ransom and the way back --------------------------------------------------------------
+
+    /// <summary>
+    /// A bot died. Counted if it is a criminal; and a wanted bot brought down inside a town — by its guards or by anybody — is
+    /// taken there and then: "brought to nought hits in town" is a catch. From <c>BotMobile.OnDeath</c>, after
+    /// <c>BotOutlaw.Fell</c>, which takes the hunters' catches first.
+    /// </summary>
     public static void Fell(BotMobile fallen, Mobile killer)
     {
         if (!Running || fallen == null)
@@ -657,9 +747,14 @@ public static class BotCrime
         }
     }
 
+    /// <summary>Whether this bot is on a bounty hunt for that one. Read by <c>BotOutlaw.Fell</c>: a bounty hunter's kill is a catch.</summary>
     public static bool Hunts(BotMobile by, Mobile fallen) =>
         Running && by?.Resolve?.Deed is BotBountyHunt hunt && ReferenceEquals(hunt.Foe, fallen);
 
+    /// <summary>
+    /// A wanted bot that is no murderer, beaten down to <see cref="YieldShare"/> by somebody hunting it, gives itself up and is
+    /// taken to a cell alive. Read by the manhunt's rule (<c>BotManhunt.Over</c>) and the bounty's. True when it yielded.
+    /// </summary>
     public static bool Yield(IBotWilful hunter, BotMobile foe)
     {
         if (!Running || !Yields || hunter?.Self is not { Deleted: false, Alive: true } by || foe is not { Deleted: false, Alive: true }
@@ -685,6 +780,11 @@ public static class BotCrime
         return true;
     }
 
+    /// <summary>
+    /// The term this bot is given for its crimes: <see cref="TermMs"/> doubled for every term served before, up to
+    /// <see cref="MostDoublings"/>. A murderer's own hour is the outlaws' (<c>BotOutlaw.JailMs</c>), whichever is longer. From
+    /// <c>BotOutlaw.Jail</c>.
+    /// </summary>
     public static int Term(BotMobile bot, int jailMs)
     {
         if (!Running || Of(bot?.Name) is not { } sheet || !sheet.Posted && !sheet.Thief && sheet.Traced == 0)
@@ -708,6 +808,10 @@ public static class BotCrime
         return (int)Math.Min(int.MaxValue, term);
     }
 
+    /// <summary>
+    /// Caught and in a cell: the bounty paid to whoever took it, out of the town's purse, and the term begun. From
+    /// <c>BotOutlaw.Jail</c>, after the cell door's seizure.
+    /// </summary>
     public static void Caught(BotMobile bot, Mobile by)
     {
         if (!Running || Of(bot?.Name) is not { } sheet || !sheet.Posted && !sheet.Thief && sheet.Traced == 0)
@@ -772,6 +876,10 @@ public static class BotCrime
         BotEvents.Post("crime", bot, $"caught by {by?.Name ?? "the guards"}: {term} minutes in a cell, bounty {paid}gp paid");
     }
 
+    /// <summary>
+    /// Let out of its cell: the grey is lifted, and a criminal its guild would not ransom is turned out of it. The repentance
+    /// clock starts here. From <c>BotOutlaw.Release</c>.
+    /// </summary>
     public static void Freed(BotMobile bot)
     {
         if (!Running || Of(bot?.Name) is not { CaughtTick: > 0 } sheet)
@@ -804,6 +912,10 @@ public static class BotCrime
         BotVoice.Say(bot, "local", sheet.Ransomed ? "My guild paid for me. I will not forget it." : "Free again. Never again, I swear it.", true);
     }
 
+    /// <summary>
+    /// Whether no honest guild takes this bot in: wanted, in a cell, a thief on the roll, or out of a cell and not yet repentant.
+    /// Read by <c>BotGuilds.Outside</c> for a bot in no guild only, so a member ransomed by its own guild is not put out by it.
+    /// </summary>
     public static bool Unrepentant(BotMobile bot)
     {
         if (!Running || bot is not { Guild: null } || Of(bot.Name) is not { } sheet)
@@ -814,6 +926,7 @@ public static class BotCrime
         return sheet.Posted || sheet.Thief || sheet.CaughtTick > 0 || sheet.ReleasedTick > 0;
     }
 
+    /// <summary>One look of the town's: the wanted kept wanted, postings lapsed, ransoms asked, the repentant forgiven, the recruit.</summary>
     public static void Beat(long now)
     {
         if (!Running)
@@ -861,6 +974,9 @@ public static class BotCrime
             else if (sheet.CaughtTick > 0 && bot != null && !BotOutlaw.Jailed(bot)
                      && now - sheet.CaughtTick > ((long)Math.Max(60000, TermMs) << Math.Clamp(MostDoublings, 0, 8)) + 600000)
             {
+                // Out of a cell by a road that did not tell us (a record lost to a reload): released all the same, but only past
+                // the longest term there is, because at a boot the cells' records are bound to the new bodies a moment after this
+                // look, and a prisoner read as free then would be turned out of its guild from inside its cell.
                 Freed(bot);
             }
 
@@ -900,6 +1016,7 @@ public static class BotCrime
         }
     }
 
+    /// <summary>Its guild is asked for the ransom once the prisoner has sat <see cref="RansomAfterMs"/>; paid into the town's purse if the chest holds it.</summary>
     private static void Ransom(BotMobile bot, Sheet sheet, long now)
     {
         if (!Ransoms || sheet.Ransomed || _asked.Contains(bot.Name) || now - sheet.CaughtTick < RansomAfterMs || bot.Guild is not Guild guild
@@ -917,6 +1034,7 @@ public static class BotCrime
 
         var price = RansomBase + RansomPerMinute * left;
 
+        // Asked once a term: the same chest is not counted short every minute, and the term's own clock is the answer from here.
         _asked.Add(bot.Name);
 
         if (BotChest.Holds(guild.Name) < price + ChestKeep)
@@ -965,6 +1083,7 @@ public static class BotCrime
 
     private static readonly HashSet<string> _asked = new(StringComparer.Ordinal);
 
+    /// <summary>Stolen goods older than <see cref="HotMs"/> are simply their holder's now.</summary>
     private static void Cool(long now)
     {
         List<Serial> cold = null;
@@ -990,6 +1109,7 @@ public static class BotCrime
         }
     }
 
+    /// <summary>The living bot of the population with this name, or null.</summary>
     public static BotMobile Named(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -1073,6 +1193,19 @@ public static class BotCrime
         BotBountyBoard.Forget();
     }
 
+    /// <summary>
+    /// <b>Patrick's reset (07.10.2026, reset26): the town's books on crime closed, so the save writes them empty.</b>
+    /// <see cref="Forget"/> keeps <see cref="_sheets"/> for a reload, and the reset of 20:56 that night left <c>Saves/BotCrime</c>
+    /// whole: a newcomer born under an old name would have been born a recruit on the thieves' roll, wanted with a bounty on its
+    /// head, or inside a term it never earned. This empties exactly what <see cref="Save"/> writes; the cutpurses, the highway
+    /// band, the fence and the bounty board go with <see cref="Forget"/>.
+    ///
+    /// <para>
+    /// <b>No coin is held here.</b> A bounty posted is a promise on the town's books, paid out of the city's purse only when the
+    /// head is brought in (<c>BotCity.Reward</c>), and a steward's raise was put back into the purse when it was decreed; a
+    /// ransom went into the purse when it was paid. Closing the books moves no gold. Returns the names struck off.
+    /// </para>
+    /// </summary>
     public static int Wipe()
     {
         var names = _sheets.Count;
@@ -1084,6 +1217,9 @@ public static class BotCrime
         return names;
     }
 
+    // ---- Persistence ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>Every record, its clocks written as how long ago they were, or -1 for never. See <see cref="BotCrimeStore"/>.</summary>
     internal static void Save(IGenericWriter writer)
     {
         var now = Core.TickCount;
@@ -1163,6 +1299,7 @@ public static class BotCrime
 
     private static long Ago(long tick, long now) => tick == 0 ? -1L : Math.Max(0L, now - tick);
 
+    // A clock read back as nought would read as "never"; one tick later is the same moment.
     private static long Back(long ago, long now)
     {
         if (ago < 0)

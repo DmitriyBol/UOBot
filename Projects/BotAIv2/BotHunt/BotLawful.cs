@@ -35,26 +35,37 @@ public static class BotLawful
 
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often the reds are looked at. Five seconds.</summary>
     public static int SweepMs { get; set; } = 5000;
 
+    /// <summary>How far from a red the law-abiding see it and are pressed against it. Eighteen tiles, a screen.</summary>
     public static int Sight { get; set; } = 18;
 
+    /// <summary>How many times the red's strength those set on it must come to together. A fight between equals is a coin toss.</summary>
     public static double Margin { get; set; } = 1.5;
 
+    /// <summary>The most pressed against one red in one look.</summary>
     public static int MostHands { get; set; } = 4;
 
+    /// <summary>How often the log says that nobody in sight of a red could take it. Two minutes a red.</summary>
     public static int SayEveryMs { get; set; } = 120000;
 
+    /// <summary>Looks at a red outside a guarded town.</summary>
     public static long Looked { get; private set; }
 
+    /// <summary>Looks at which nobody law-abiding was within sight of the red.</summary>
     public static long Unseen { get; private set; }
 
+    /// <summary>Looks at which those in sight would not have come to the margin between them, so nobody was pressed.</summary>
     public static long Outmatched { get; private set; }
 
+    /// <summary>Looks at which enough were on the red already.</summary>
     public static long Enough { get; private set; }
 
+    /// <summary>Bots pressed against a red.</summary>
     public static long Pressed { get; private set; }
 
+    /// <summary>Looks at a red that was hidden, and so seen by nobody.</summary>
     public static long Hidden { get; private set; }
 
     private static long _sweptTick;
@@ -65,6 +76,7 @@ public static class BotLawful
 
     private static readonly Dictionary<Serial, long> _saidTick = [];
 
+    /// <summary>One look at every red, from <c>BotOutlaw</c>'s clock.</summary>
     public static void Beat(long now)
     {
         if (!Running || now - _sweptTick < SweepMs)
@@ -86,11 +98,13 @@ public static class BotLawful
     {
         var map = red.Map;
 
+        // In a guarded town the guards have it.
         if (!red.Alive || map == null || map == Map.Internal || BotOutlaw.Guarded(map, red.X, red.Y, red.Z))
         {
             return;
         }
 
+        // A hidden red is seen by nobody. See BotShadow.
         if (red.Hidden)
         {
             Hidden++;
@@ -129,6 +143,7 @@ public static class BotLawful
             }
         }
 
+        // Seen by the law-abiding, so known to the Baron.
         if (inSight > 0 && BotOutlaw.Tell(red, _hands.Count > 0 ? _hands[0].Name : "those already on it"))
         {
             logger.Information(
@@ -155,8 +170,11 @@ public static class BotLawful
             return;
         }
 
+        // The strongest first, so that the fewest go and a crafter is sent only when the fighters in sight are not enough.
         _hands.Sort((a, b) => BotThreat.Now(b).CompareTo(BotThreat.Now(a)));
 
+        // Enough between them, and no more than the most hands? Asked before anybody is pressed, so that the few are
+        // never sent against what only the many could take.
         var together = on;
         var taking = 0;
 
@@ -220,6 +238,7 @@ public static class BotLawful
         }
     }
 
+    /// <summary>Whether this one is fighting the red already: a patrol's hand, or anybody not red with the red for its combatant.</summary>
     private static bool Against(BotMobile other, BotMobile red) =>
         other.Resolve?.Deed switch
         {
@@ -228,8 +247,10 @@ public static class BotLawful
             _ => ReferenceEquals(other.Combatant, red) && !BotOutlaw.Outlaw(other)
         };
 
+    /// <summary>Whether this one may be pressed against a red. See the class's last paragraph.</summary>
     private static bool Lawful(BotMobile other)
     {
+        // A thief does not hunt a murderer. See BotUnderworld.
         if (BotUnderworld.Member(other))
         {
             return false;

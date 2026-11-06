@@ -69,78 +69,141 @@ public static partial class BotTourney
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTourney));
 
+    /// <summary>Whether championships are held at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// How often one is held by the calendar. An hour: Patrick's order of 26.09.2026, "the tournament once an hour". It was a
+    /// week, and the marshal called one whenever the ring stood empty — seven between 03:19 and 07:42 that night, the last
+    /// two sixteen minutes apart.
+    /// </summary>
     public static long EveryMs { get; set; } = 3600000L;
 
+    /// <summary>How long after one ends before another may be called by anybody but the keyboard. An hour.</summary>
     public static long LeastGapMs { get; set; } = 3600000L;
 
+    /// <summary>
+    /// How long after a boot before the calendar may call one. The hour is kept across a restart now, and a shard down for
+    /// three hours would otherwise call one on its first beat, before the population has found its feet.
+    /// </summary>
     public static int BootGraceMs { get; set; } = 300000;
 
+    /// <summary>
+    /// How long the title bout waits for the champion and its challenger to be free together. A quarter of an hour: a company
+    /// marches, fights and breaks up in about that, and a dead champion is raised again well inside it.
+    /// </summary>
     public static int TitleWaitMs { get; set; } = 900000;
 
+    /// <summary>
+    /// Whether one may be called now: switched on, nothing in the ring, and the hour since the last one is up. Never at the arenas
+    /// (07.10.2026, arena27): that one is the day's, held by the calendar or the keyboard, and the marshal does not call it.
+    /// </summary>
     public static bool Ready => Running && !Arena && !ArenaOn && _stage == Stage.Idle && (DateTime.Now - _held).TotalMilliseconds >= LeastGapMs;
 
+    /// <summary>Calls refused for coming inside the hour.</summary>
     public static long TooSoon { get; private set; }
 
+    /// <summary>How many are called. Thirty, by order.</summary>
     public static int Entrants { get; set; } = 30;
 
+    /// <summary>
+    /// The drill ground: the ring when no other can be had, and Britain's ring whenever Britain is drawn (see
+    /// <see cref="BotVenues"/>). The ring of each championship is <see cref="Venue"/>.
+    /// </summary>
+    // 1458 from 1460 on 26.09.2026: the east point, 1463, is inside a building ("no body fits, the floor could not be found").
     public static Point3D Ring { get; set; } = new(1458, 1500, 0);
 
+    /// <summary>How far apart the two are put down, either side of the ring's middle.</summary>
     public static int Apart { get; set; } = 3;
 
+    /// <summary>The pause between one fight's end and the next pair's call. Eight seconds: long enough to read.</summary>
     public static int BetweenMs { get; set; } = 8000;
 
+    /// <summary>How long past the duel's own cap a fight may stand undecided before the referee calls it.</summary>
     public static int SlackMs { get; set; } = 30000;
 
+    /// <summary>Championships held.</summary>
     public static long Held { get; private set; }
 
+    /// <summary>
+    /// What a champion that already holds every prize its kind may choose is given instead: gold, into its bank. See
+    /// <see cref="Prize"/>.
+    ///
+    /// <para>
+    /// <b>Patrick, 25.09.2026: "why has Faron Ashdown got five maces in his pack?"</b> Because he had won five
+    /// championships, and the prize was a vanquishing copy of the weapon a bot was born with, bound, every time — every
+    /// win after the first handed him a war mace he could neither use nor sell. Hale, Gerda, Emrys and Bryn Ashdown
+    /// held two swords each the same way.
+    /// </para>
+    /// </summary>
     public static int RepeatPurse { get; set; } = 1000;
 
+    /// <summary>Championships held in the fair's town while a fair was open (07.10.2026, events17).</summary>
     public static long AtFair { get; private set; }
 
+    /// <summary>Champions paid in gold because they held every prize their kind may choose. See <see cref="RepeatPurse"/>.</summary>
     public static long Repeats { get; private set; }
 
+    /// <summary>Duplicate prizes already in the population's packs, exchanged for prizes of the owners' choosing. See <see cref="Sweep"/>.</summary>
     public static long Duplicates { get; private set; }
 
     private static bool _swept;
 
+    /// <summary>Championships called, by hand or by the marshal. See <c>BotMarshal.Act</c>.</summary>
     public static long Called { get; private set; }
 
+    /// <summary>Fights fought in them, title bouts included.</summary>
     public static long Fights { get; private set; }
 
+    /// <summary>Byes given for an odd entrant.</summary>
     public static long Byes { get; private set; }
 
+    /// <summary>Pairs that could not be set against each other and were passed over.</summary>
     public static long Unset { get; private set; }
 
+    /// <summary>Fights the referee had to call.</summary>
     public static long CalledOff { get; private set; }
 
+    /// <summary>Title bouts fought: the champion against its challenger, or the final for a vacant title.</summary>
     public static long TitleBouts { get; private set; }
 
+    /// <summary>Title bouts the champion won.</summary>
     public static long Defences { get; private set; }
 
+    /// <summary>Title bouts the challenger won: the title changed hands in the ring.</summary>
     public static long Changes { get; private set; }
 
+    /// <summary>Vacant titles won, in the final bout or with no bout left to fight.</summary>
     public static long VacantCrowns { get; private set; }
 
+    /// <summary>Of those, won without a bout: the last pair forfeited or a bye was the last word.</summary>
     public static long VacantByDefault { get; private set; }
 
+    /// <summary>Champions stripped for not coming to the title bout within <see cref="TitleWaitMs"/>; the challenger was crowned.</summary>
     public static long Stripped { get; private set; }
 
+    /// <summary>Challengers who did not come within <see cref="TitleWaitMs"/>; the champion kept the title without a bout.</summary>
     public static long Walkovers { get; private set; }
 
+    /// <summary>Championships that ended with the title standing and no bout: neither side free, the ring unset, or nobody left.</summary>
     public static long Unfought { get; private set; }
 
+    /// <summary>Contestants with a company when their pair was called, put to the back of the round once instead of forfeiting.</summary>
     public static long Deferred { get; private set; }
 
+    /// <summary>Pairs in which both were still with a company on their second call: both out, nobody goes on.</summary>
     public static long DoubleForfeits { get; private set; }
 
+    /// <summary>Why champions were away when their title bout was due, by reason: resting, with a company, dead, gone.</summary>
     private static readonly Dictionary<string, int> _away = [];
 
+    /// <summary>The name of the standing champion, or null.</summary>
     public static string Champion { get; private set; }
 
+    /// <summary>When the standing champion took the title.</summary>
     private static DateTime _reignSince;
 
+    /// <summary>Title bouts the standing champion has won.</summary>
     private static int _reignDefences;
 
     private enum Stage
@@ -158,22 +221,27 @@ public static partial class BotTourney
 
     private static readonly List<BotMobile> _next = [];
 
+    /// <summary>Contestants already put to the back of a round once for being with a company. See <see cref="Call"/>.</summary>
     private static readonly HashSet<Serial> _deferred = [];
 
     private static BotMobile _a;
 
     private static BotMobile _b;
 
+    /// <summary>Whether the pair in the ring fights for the title: the champion and its challenger, or the final for a vacant title.</summary>
     private static bool _title;
 
+    /// <summary>Whether the vacant title was decided in a bout rather than by a forfeit or a bye.</summary>
     private static bool _vacantFought;
 
+    /// <summary>The challenger waiting for, or fighting, the title bout.</summary>
     private static BotMobile _challenger;
 
     private static long _titleTick;
 
     private static bool _waitSaid;
 
+    /// <summary>Whether this title's failure to set the ring has been counted and said. See <see cref="Title"/>.</summary>
     private static bool _ringUnset;
 
     private static long _stageTick;
@@ -190,25 +258,35 @@ public static partial class BotTourney
 
     private static long _bootTick;
 
+    /// <summary>When the calendar's last call was turned away for too few fighters. See <see cref="Beat"/>.</summary>
     private static long _turnedTick = long.MinValue / 2;
 
+    /// <summary>Whether the world save handed back a record this boot. See <see cref="BotTourneyStore"/>.</summary>
     private static bool _restored;
 
+    /// <summary>The ring of the championship running, or of the last one.</summary>
     public static BotVenues.Venue Venue { get; private set; }
 
+    /// <summary>Where the pair in the ring stands: the venue's middle, or the drill ground.</summary>
     private static Point3D RingNow => Venue?.At ?? Ring;
 
     private static Map RingMap => Venue?.Map ?? BotPopulation.Home ?? Map.Felucca;
 
     private static string RingName => Venue?.Name ?? "the drill ground";
 
+    /// <summary>Whether one is running now.</summary>
     public static bool InProgress => _stage != Stage.Idle;
 
+    /// <summary>
+    /// At the vigil's start: the boot's clock for <see cref="BootGraceMs"/>, and with no record read back from the save, the
+    /// hour starts now and nobody holds the title.
+    /// </summary>
     public static void Load()
     {
         _bootTick = Core.TickCount;
         Clear();
 
+        // The round arenas: found in the map's own statics, the hold hooked into the duel's record, strays sent home (07.10.2026, arena27).
         ArenaLoad();
 
         if (!_restored)
@@ -230,8 +308,10 @@ public static partial class BotTourney
         );
     }
 
+    /// <summary>Written into the world save. See <see cref="BotTourneyStore"/>.</summary>
     public static void Save(IGenericWriter writer)
     {
+        // Shape 2 (07.10.2026, arena27): the day's championship at the arenas, as a UTC instant, after the shape-1 record.
         writer.WriteEncodedInt(2);
         writer.Write(_held.ToUniversalTime().Ticks);
         writer.Write(Champion ?? "");
@@ -241,6 +321,7 @@ public static partial class BotTourney
         writer.Write(_dayHeld.Ticks);
     }
 
+    /// <summary>Read back from the world save, before the vigil starts. False for a shape this build does not write.</summary>
     public static bool Load(IGenericReader reader)
     {
         var shape = reader.ReadEncodedInt();
@@ -259,15 +340,20 @@ public static partial class BotTourney
         _reignDefences = reader.ReadEncodedInt();
         BotVenues.Load(reader);
 
+        // Shape 1 knew nothing of the day: no day's championship on record, so the calendar may hold today's.
         _dayHeld = shape >= 2 ? new DateTime(reader.ReadLong(), DateTimeKind.Utc) : DateTime.MinValue;
         _restored = true;
 
         return true;
     }
 
+    /// <summary>Whether the hour is up, and the shard has been up long enough to hold one.</summary>
     public static bool Due(DateTime now) =>
         Running && (now - _held).TotalMilliseconds >= EveryMs && Core.TickCount - _bootTick >= BootGraceMs;
 
+    /// <summary>
+    /// Begins one, by hand or by the calendar. Returns what happened, for the door.
+    /// </summary>
     public static string Start(string by)
     {
         if (!Running)
@@ -275,6 +361,7 @@ public static partial class BotTourney
             return "championships are switched off (BotTourney.Running).";
         }
 
+        // At the arenas, once a day (07.10.2026, arena27): the keyboard's call is "do arena", anybody else's is refused there.
         if (Arena || ArenaOn)
         {
             return ArenaStart(by, false);
@@ -287,6 +374,7 @@ public static partial class BotTourney
                 : $"a championship is already running: round {_roundNo}, {_round.Count + _next.Count} still in it.";
         }
 
+        // The keyboard may call one whenever it likes; the marshal and the calendar keep to the hour.
         if (by != "the keyboard" && (DateTime.Now - _held).TotalMilliseconds < LeastGapMs)
         {
             TooSoon++;
@@ -296,6 +384,7 @@ public static partial class BotTourney
 
         var fighters = Fighters();
 
+        // A champion needs one challenger; a vacant title needs a final.
         var least = Champion != null ? 1 : 2;
 
         if (fighters.Count < least)
@@ -310,6 +399,8 @@ public static partial class BotTourney
             who.Add(holder);
         }
 
+        // At the fair while one is open (07.10.2026, events17): "a tournament before Argus" in the fair's town, when its square
+        // holds a ring; the town's turn otherwise. See BotFair.
         Venue = (BotFair.TownName is { } fair ? BotVenues.InTown(BotVenues.Use.Ring, BotPopulation.Home ?? Map.Felucca, fair) : null)
                 ?? BotVenues.Choose(BotVenues.Use.Ring, BotPopulation.Home ?? Map.Felucca, who);
 
@@ -353,8 +444,10 @@ public static partial class BotTourney
         return $"the championship is on {Where()}: {fighters.Count} entrants, {fighters[0].Name} the strongest at {BotThreat.Power(fighters[0]):F0}{(Champion != null ? $", for the right to challenge {Champion}" : ", for the vacant title")}. Watch the log for \"Tourney:\".";
     }
 
+    /// <summary>"at Minoc", "at the drill ground": where the ring of the championship stands, for a sentence.</summary>
     private static string Where() => $"at {RingName}";
 
+    /// <summary>Called off, by hand. Whoever is in the ring is released.</summary>
     public static string Stop()
     {
         if (ArenaOn)
@@ -380,6 +473,7 @@ public static partial class BotTourney
         return "the championship is called off.";
     }
 
+    /// <summary>The strongest fit fighters, most powerful first, up to <see cref="Entrants"/>; never the champion, who defends.</summary>
     private static List<BotMobile> Fighters()
     {
         var bots = BotPopulation.Bots;
@@ -422,6 +516,7 @@ public static partial class BotTourney
         return fit;
     }
 
+    /// <summary>One beat of the referee. Called from the watcher's own clock.</summary>
     public static void Beat(long now)
     {
         if (!Running)
@@ -429,6 +524,7 @@ public static partial class BotTourney
             return;
         }
 
+        // The champion's yellow name, kept on it: the population is rebuilt at every boot and a hue is not saved.
         if (Champion != null && now - _hueTick >= 60000)
         {
             _hueTick = now;
@@ -436,8 +532,10 @@ public static partial class BotTourney
             Regalia();
         }
 
+        // Strays in the rings sent home every minute whatever the dial says (07.10.2026, arena27 review). See StraySweep.
         StraySweep(now);
 
+        // At the arenas (07.10.2026, arena27): the day's calendar, the batches, and — for the title — the stages below.
         if (Arena || ArenaOn)
         {
             ArenaBeat(now);
@@ -448,6 +546,8 @@ public static partial class BotTourney
         switch (_stage)
         {
             case Stage.Idle:
+                // A calendar call the field turned away (too few fit fighters) is asked again a minute later, not every beat:
+                // each ask weighs the whole population's power.
                 if (now - _turnedTick >= 60000 && Due(DateTime.Now))
                 {
                     var before = Called;
@@ -488,11 +588,17 @@ public static partial class BotTourney
         }
     }
 
+    /// <summary>Whether a contestant is held by a company or a party, and is not to be summoned. See the note in <see cref="Call"/>.</summary>
     private static bool Busy(BotMobile bot) =>
         bot != null && (bot.Squad != null || BotDelveParty.Delving(bot) || bot.Resolve?.Deed is BotDelve or BotEnlist);
 
+    /// <summary>Bouts forfeited because a contestant was with a company. See <see cref="Busy"/>.</summary>
     public static long Forfeits { get; private set; }
 
+    /// <summary>
+    /// Why this one cannot come to the ring now, or null when it can: resting, gone, dead, with a company, down a dungeon,
+    /// in another duel. Asked of the champion and its challenger before the title bout.
+    /// </summary>
     private static string Away(BotMobile bot, string name)
     {
         if (bot == null)
@@ -535,11 +641,14 @@ public static partial class BotTourney
             return "down a dungeon";
         }
 
+        // The record, not the arena's hold: the challenger waits at the arenas held, and that is not another duel (07.10.2026, arena27).
         return BotDuel.InBout(bot) ? "in another duel" : null;
     }
 
+    /// <summary>The next pair into the ring, or the next round, or the challenger.</summary>
     private static void Call(long now)
     {
+        // Anybody who died or left the shard between rounds is out.
         _round.RemoveAll(m => m is not { Deleted: false, Alive: true });
         _next.RemoveAll(m => m is not { Deleted: false, Alive: true });
 
@@ -570,6 +679,7 @@ public static partial class BotTourney
             logger.Information("Tourney: round {Round} with {Count} left", _roundNo, _round.Count);
         }
 
+        // The only one left in the whole bracket — the others forfeited or the field was one — is the last one standing, not a bye.
         if (_round.Count == 1 && _next.Count == 0)
         {
             var last = _round[0];
@@ -594,6 +704,16 @@ public static partial class BotTourney
         var a = _round[0];
         var b = _round[1];
 
+        // <b>A bout does not take a bot out of its company (01.10.2026, build next).</b> Entrants are drawn free of any company, but
+        // the bracket runs for an hour and the summons carries a bot across the map: on build 384 (00:42–10:20) four delves were
+        // "dropped: pressed to duel" — the leader of a party of twelve, called out of the march — and enlistments were dropped
+        // the same way, with 1948 beats of marching leaders slowed for members off "duel". A contestant now in a company, or down
+        // a dungeon with a party, forfeits the bout; the other goes on. Counted with the pairs passed over.
+        //
+        // <b>Asked again once before forfeiting, and never the busy one sent on (02.10.2026).</b> A company is often on its way
+        // to breaking up, so a contestant with one is put to the back of the round once (Deferred); only on its second call does
+        // it forfeit. And a pair with both sides still busy sends nobody on: until build 389 it sent the busy one, and on
+        // 02.10.2026 at 07:27 Miriel was crowned champion while "with a company and forfeits".
         var busyA = Busy(a);
         var busyB = Busy(b);
 
@@ -643,6 +763,7 @@ public static partial class BotTourney
             return;
         }
 
+        // The last two of the bracket with nobody holding the title: their bout is the title bout.
         var final = Champion == null && _round.Count == 2 && _next.Count == 0;
 
         _round.RemoveRange(0, 2);
@@ -685,8 +806,10 @@ public static partial class BotTourney
         );
     }
 
+    /// <summary>Both into the ring, healed, and set against each other; false, with nobody moved, when either cannot be.</summary>
     private static bool Bring(BotMobile a, BotMobile b) => Bring(a, b, RingMap, RingNow);
 
+    /// <summary>The same, in this ring: the arenas set each pair of a batch in a ring of its own (07.10.2026, arena27).</summary>
     private static bool Bring(BotMobile a, BotMobile b, Map map, Point3D ring)
     {
 
@@ -695,6 +818,7 @@ public static partial class BotTourney
             return false;
         }
 
+        // At the arenas the champion is held from here, so it is sent back to where it came from afterwards (07.10.2026, arena27).
         if (ArenaOn)
         {
             Hold(a);
@@ -709,6 +833,7 @@ public static partial class BotTourney
         Heal(a);
         Heal(b);
 
+        // At the arenas each fighter's wait is put down over its own work, so both come back in order (BotDuel.Begin's stack).
         if (!BotDuel.Begin(a, b, Trains(a), Trains(b), ArenaOn))
         {
             logger.Warning("Tourney: {A} and {B} could not be set against each other", a.Name, b.Name);
@@ -719,8 +844,10 @@ public static partial class BotTourney
         return true;
     }
 
+    /// <summary>"Odile the WarriorMage": a name and a class, for the herald.</summary>
     private static string Billing(BotMobile bot) => bot?.Class?.Name is { } klass ? $"{bot.Name} the {klass}" : bot?.Name ?? "nobody";
 
+    /// <summary>The last of the ranks standing: crowned to a vacant title, or the champion's challenger.</summary>
     private static void Contender(BotMobile winner, long now)
     {
         if (Champion == null)
@@ -760,6 +887,10 @@ public static partial class BotTourney
         BotVenues.Announce($"{Billing(winner)} has come through {_entered} from the ranks and challenges {Champion} for the title {Where()}.");
     }
 
+    /// <summary>
+    /// The title bout, once the champion and its challenger are both free; or, after <see cref="TitleWaitMs"/>, the title
+    /// decided without one: the champion stripped, the challenger's walkover, or the title standing.
+    /// </summary>
     private static void Title(long now)
     {
         var holder = Find(Champion);
@@ -802,6 +933,7 @@ public static partial class BotTourney
                 return;
             }
 
+            // Counted and said once a title, not once a beat: the next beat tries the ring again.
             if (!_ringUnset)
             {
                 _ringUnset = true;
@@ -810,6 +942,7 @@ public static partial class BotTourney
             }
         }
 
+        // Nobody waits for a body that has left the island: a champion gone against a challenger at hand, or a challenger gone.
         if (now - _titleTick < TitleWaitMs && !(away == "gone" && late == null) && late != "gone")
         {
             if (!_waitSaid && (away != null || late != null))
@@ -833,6 +966,7 @@ public static partial class BotTourney
             return;
         }
 
+        // The quarter of an hour is up — or the champion is no longer on the island at all, and there is nobody to wait for.
         if (away != null && late == null && (away == "gone" || now - _titleTick >= TitleWaitMs))
         {
             Stripped++;
@@ -873,6 +1007,7 @@ public static partial class BotTourney
         Finish($"no title bout this time: {Champion} is {away} and {challenger?.Name} is {late}; the title stands.", true);
     }
 
+    /// <summary>A championship over without a new champion: the clock set, the herald's line; counted as unfought when no title bout was had.</summary>
     private static void Finish(string said, bool unfought)
     {
         if (unfought)
@@ -889,6 +1024,7 @@ public static partial class BotTourney
         BotVenues.Announce(char.ToUpperInvariant(said[0]) + said[1..]);
     }
 
+    /// <summary>Whether the pair in the ring has been decided, and the referee's own call when it has stood too long.</summary>
     private static void Judge(long now)
     {
         if (_a == null || _b == null)
@@ -909,6 +1045,7 @@ public static partial class BotTourney
 
         if (winner == null)
         {
+            // Both gone from the record: one died in the ring and the bout was cleared. The one standing has it.
             if (!BotDuel.InBout(_a) && !BotDuel.InBout(_b))
             {
                 winner = _a is { Deleted: false, Alive: true } ? _a : _b;
@@ -931,6 +1068,7 @@ public static partial class BotTourney
         _b = null;
         _title = false;
 
+        // The title bout of a reigning champion: the champion stands in _a.
         if (title && _stage == Stage.Fighting && _challenger != null && Champion != null)
         {
             BotVenues.Release();
@@ -948,6 +1086,12 @@ public static partial class BotTourney
                     _reignDefences,
                     _reignSince
                 );
+
+                // A defence in a forced test is not a defence of the title (see Crown): the story keeps the real ones. See BotStory.Defended.
+                if (!(ArenaOn && _forced))
+                {
+                    BotStory.Defended(winner.Name, loser?.Name, _reignDefences);
+                }
 
                 Finish($"{Billing(winner)} defends the title against {loser?.Name} — {_reignDefences} {(_reignDefences == 1 ? "defence" : "defences")} now.", false);
                 winner.Say($"The title stays with me, {loser?.Name}.");
@@ -968,6 +1112,7 @@ public static partial class BotTourney
 
         if (title)
         {
+            // The final of a vacant title: the winner goes on as the last one standing and is crowned on the next call.
             _vacantFought = true;
             BotVenues.Release();
         }
@@ -980,8 +1125,11 @@ public static partial class BotTourney
         _stageTick = now;
     }
 
+    /// <summary>The champion: a yellow name, the prize, the record, the herald's line.</summary>
     private static void Crown(BotMobile winner, string how, string line)
     {
+        // A forced test never takes a standing champion's title (07.10.2026, second pass of arena27 review B); with the title
+        // vacant it crowns, as Patrick asked to see a champion chosen in battle.
         if (ArenaOn && _forced && !string.IsNullOrEmpty(Champion))
         {
             _stage = Stage.Idle;
@@ -1006,6 +1154,7 @@ public static partial class BotTourney
         Uncrown(Champion);
         Crowned(winner);
 
+        // A forced test at the arenas pays nothing (07.10.2026, arena27 review): a test is not a championship.
         var test = ArenaOn && _forced;
         var prize = test ? "nothing: a forced test is not a championship" : Prize(winner);
 
@@ -1023,9 +1172,22 @@ public static partial class BotTourney
 
         BotVenues.Announce(test ? $"{line} (A test bout: no prize.)" : line);
 
+        // The island's Chronicle and the champion's own story, at the minute of the crowning (PLAN-life A3, 13.10.2026). See BotStory.Crowned.
+        if (!test)
+        {
+            BotStory.Crowned(winner, how);
+        }
+        else
+        {
+            // A test on a vacant title still crowns (Patrick asked to see a champion chosen in battle) and turns the name yellow;
+            // the story is told so, and writes neither the crown nor, later, its loss. See BotStory.TestCrowned.
+            BotStory.TestCrowned(winner);
+        }
+
         winner?.Say($"I am the champion of this island, and my name is {winner.Name}!");
     }
 
+    /// <summary>A new world has no champion: the record goes, the yellow with it. Called by the reset (<c>BotHand</c>).</summary>
     public static void Forget()
     {
         Clear();
@@ -1041,6 +1203,7 @@ public static partial class BotTourney
         BotVenues.Forget();
     }
 
+    /// <summary>Nothing in the ring and nobody waiting: a new world, or a vigil starting, has no championship in progress.</summary>
     private static void Clear()
     {
         _stage = Stage.Idle;
@@ -1053,6 +1216,7 @@ public static partial class BotTourney
         _title = false;
     }
 
+    /// <summary>Takes the yellow off anybody who is not the champion. The population is one list, so this is one pass.</summary>
     private static void Uncrown(string except)
     {
         var bots = BotPopulation.Bots;
@@ -1078,6 +1242,19 @@ public static partial class BotTourney
         }
     }
 
+    /// <summary>
+    /// The champion's prize, chosen by the champion: the first thing it lacks, in the order its kind needs them.
+    ///
+    /// <para>
+    /// <b>Patrick's orders of 25.09.2026: "prizes must be unique; the bot may choose — armour a mage can meditate in,
+    /// robes for mana, or a unique mount".</b> Until then the prize was a vanquishing copy of the weapon a bot was born
+    /// with (an invulnerable leather chest for a caster or healer), bound, every time — Faron Ashdown won five
+    /// championships and carried five identical war maces he could neither use nor sell. Now a fighter takes the weapon
+    /// if it has not got it, then an invulnerable copy of a piece of armour it wears, then a steed of its own; a caster
+    /// or a healer takes a robe of the arcane mind (see <see cref="RobeInt"/>), then invulnerable leather — the armour
+    /// meditation works in — then the steed. Only a champion holding all of it is paid <see cref="RepeatPurse"/> in gold.
+    /// </para>
+    /// </summary>
     private static string Prize(BotMobile bot)
     {
         var pack = bot?.Backpack;
@@ -1146,8 +1323,16 @@ public static partial class BotTourney
         return $"{won} (the draw fell on {draw.Name}, {draw.Weight} in {total})";
     }
 
+    /// <summary>The magic level of the top prize: vanquishing, invulnerability.</summary>
     private const int TopLevel = 5;
 
+    /// <summary>
+    /// The prize scale, Patrick's order of 26.09.2026: "giving a top item every time is really generous — a Fibonacci
+    /// principle, where 1 is the top item and 55 is just gold". A rung's weight is its chance, out of the sum (142): the top
+    /// rung once, the four below it at the lower magic levels 2, 3, 5 and 8 times, a pack of supplies 13, and gold the rest.
+    /// Within an item rung the champion still chooses what it lacks, as before: the weapon it was born with, then a piece of
+    /// the armour it wears (a caster: its robe at the top, then leather), and at the top a steed of its own.
+    /// </summary>
     private static readonly (int Weight, int Level, int Gold, string Name)[] Draws =
     [
         (1, 5, 0, "the top: vanquishing or invulnerability"),
@@ -1161,12 +1346,14 @@ public static partial class BotTourney
         (55, 0, 250, "a purse of 250")
     ];
 
+    /// <summary>How often each rung of <see cref="Draws"/> has come up since the boot.</summary>
     private static readonly long[] Drawn = new long[9];
 
     private static readonly string[] WeaponWords = ["", "ruin", "might", "force", "power", "vanquishing"];
 
     private static readonly string[] ArmourWords = ["", "defense", "guarding", "hardening", "fortification", "invulnerability"];
 
+    /// <summary>How many of each a supply prize holds.</summary>
     public static int SupplyBandages { get; set; } = 40;
 
     public static int SupplyHeals { get; set; } = 3;
@@ -1177,6 +1364,10 @@ public static partial class BotTourney
 
     public static int SupplyAmmo { get; set; } = 150;
 
+    /// <summary>
+    /// A pack of what a fight is fought with: bandages and bottles for anybody, reagents for anybody whose build casts, and
+    /// ammunition for a bow the bot was born with. Not bound: it is meant to run out.
+    /// </summary>
     private static string Supplies(BotMobile bot, Container pack)
     {
         var said = $"a pack of supplies: {SupplyBandages} bandages, {SupplyHeals} heal and {SupplyCures} cure potions";
@@ -1220,14 +1411,21 @@ public static partial class BotTourney
         return said;
     }
 
+    /// <summary>How much Intelligence the champion's robe lends while it is worn: mana, for a caster. See <see cref="Regalia"/>.</summary>
     public static int RobeInt { get; set; } = 15;
 
+    /// <summary>The robe's colour, which is also how it is known. Deep blue.</summary>
     public const int RobeHue = 0x0555;
 
+    /// <summary>A champion's steed's colour: gold, so it is known across a field.</summary>
     public const int SteedHue = 0x0501;
 
     private const string RobeMod = "champion's robe";
 
+    /// <summary>
+    /// A copy of the weapon the bot was born with at this magic level, if it swings or shoots and holds no prize of that
+    /// weapon as good. A better one replaces a worse prize of the same weapon, so a champion never carries two.
+    /// </summary>
     private static string Weapon(BotMobile bot, Container pack, int level)
     {
         if (bot.Class?.Role is not (BotRole.Melee or BotRole.Ranged) || bot.Bond?.Weapon is not { Weapon: { } kind })
@@ -1263,6 +1461,7 @@ public static partial class BotTourney
         return said;
     }
 
+    /// <summary>Takes the lesser prizes a better one has just replaced out of the bond and the world.</summary>
     private static void Replace(BotMobile bot, List<Item> lesser)
     {
         for (var i = 0; i < lesser.Count; i++)
@@ -1275,6 +1474,11 @@ public static partial class BotTourney
         }
     }
 
+    /// <summary>
+    /// An invulnerable copy of a piece of armour the bot is wearing and has no prize of: chest first, then legs, arms,
+    /// gloves, neck and head. What it wears it can wear, so the copy fits; the harness puts it on, as it puts on any
+    /// better piece found in the pack.
+    /// </summary>
     private static string Armour(BotMobile bot, Container pack, int level)
     {
         Layer[] order = [Layer.InnerTorso, Layer.Pants, Layer.Arms, Layer.Gloves, Layer.Neck, Layer.Helm];
@@ -1297,6 +1501,7 @@ public static partial class BotTourney
         return null;
     }
 
+    /// <summary>A copy of this piece of armour at this level, unless a prize of it as good is held; it replaces a worse one.</summary>
     private static string Piece(BotMobile bot, Container pack, Type type, int level)
     {
         var owned = Owned(bot, type);
@@ -1327,6 +1532,7 @@ public static partial class BotTourney
         return said;
     }
 
+    /// <summary>Invulnerable leather, a piece the caster has not got: the armour meditation still works in.</summary>
     private static string Leather(BotMobile bot, Container pack, int level)
     {
         Type[] set = [typeof(LeatherChest), typeof(LeatherLegs), typeof(LeatherArms), typeof(LeatherGloves), typeof(LeatherGorget), typeof(LeatherCap)];
@@ -1344,6 +1550,11 @@ public static partial class BotTourney
         return null;
     }
 
+    /// <summary>
+    /// A robe of the arcane mind, if the caster has not got one: put on at once, over whatever it wore, which goes into
+    /// the pack. It lends <see cref="RobeInt"/> Intelligence while worn (<see cref="Regalia"/>) — this era's items carry
+    /// no mana of their own, so the robe's is kept here.
+    /// </summary>
     private static string Robe(BotMobile bot, Container pack)
     {
         if (RobeOf(bot) != null)
@@ -1368,6 +1579,7 @@ public static partial class BotTourney
         return said;
     }
 
+    /// <summary>The champion's robe this bot holds, worn or carried, or null.</summary>
     private static Robe RobeOf(BotMobile bot)
     {
         if (bot?.Bond == null)
@@ -1396,6 +1608,11 @@ public static partial class BotTourney
         return null;
     }
 
+    /// <summary>
+    /// A steed of its own, of a kind no stable sells, if it has not got one: a kirin or a unicorn for a caster or healer,
+    /// a swamp dragon for a fighter, an ostard for an archer, a ridgeback for anybody else; gold, and named for its
+    /// rider. The bought horse in the pack, if there is one, is traded in for its price, into the bank.
+    /// </summary>
     private static string Steed(BotMobile bot, Container pack)
     {
         if (bot.Mount is BotChampionSteed || pack.FindItemByType<BotChampionSteed>() != null)
@@ -1436,6 +1653,7 @@ public static partial class BotTourney
         return $"a golden {kind} of its own";
     }
 
+    /// <summary>Into the pack and bound, or nothing if the pack will not take it.</summary>
     private static string Give(BotMobile bot, Container pack, Item prize, string said)
     {
         if (!pack.TryDropItem(bot, prize, false))
@@ -1450,6 +1668,10 @@ public static partial class BotTourney
         return said;
     }
 
+    /// <summary>
+    /// The robe's Intelligence, kept to whoever wears one: added while a champion's robe is worn, taken off when it is
+    /// not. Asked of every bot with the champion's yellow each minute, and of a robe's owner the moment it is given.
+    /// </summary>
     private static void Regalia(BotMobile bot)
     {
         if (bot is not { Deleted: false })
@@ -1470,6 +1692,7 @@ public static partial class BotTourney
         }
     }
 
+    /// <summary>Every bot's robe, once a minute. See <see cref="Regalia(BotMobile)"/>.</summary>
     private static void Regalia()
     {
         var bots = BotPopulation.Bots;
@@ -1483,9 +1706,11 @@ public static partial class BotTourney
         }
     }
 
+    /// <summary>Whether this is a weapon or armour of the kind the championship gives: vanquishing or invulnerable.</summary>
     private static bool IsPrize(Item item) =>
         item is BaseWeapon { DamageLevel: not WeaponDamageLevel.Regular } or BaseArmor { ProtectionLevel: not ArmorProtectionLevel.Regular };
 
+    /// <summary>The prizes of this type bound to the bot, worn or carried, the worn one first.</summary>
     private static List<Item> Owned(BotMobile bot, Type type)
     {
         List<Item> owned = [];
@@ -1519,6 +1744,7 @@ public static partial class BotTourney
         return owned;
     }
 
+    /// <summary>The last resort's gold: into the bank, or the pack if the bank will not take it.</summary>
     private static void Pay(BotMobile bot, Container pack, int amount)
     {
         if (!Banker.Deposit(bot, amount))
@@ -1527,6 +1753,11 @@ public static partial class BotTourney
         }
     }
 
+    /// <summary>
+    /// Every duplicate prize the population already holds, exchanged once: the first time a championship is crowned
+    /// after a boot, one of each kind is kept — the worn one if one is worn — and each copy beyond it is taken out of the
+    /// bond, deleted, and replaced by the prize its owner would choose now (<see cref="Prize"/>). Bots at rest too.
+    /// </summary>
     private static void Sweep()
     {
         if (_swept)
@@ -1583,6 +1814,10 @@ public static partial class BotTourney
         return exchanged;
     }
 
+    /// <summary>
+    /// A tile beside the spot a fighter can be put down on, in sight of the ring's middle; false when none is found. Public
+    /// because the venues ask the same question of a town's square before they offer it as a ring (<see cref="BotVenues"/>).
+    /// </summary>
     public static bool Spot(Map map, Point3D ring, int x, int y, out Point3D at)
     {
         at = Point3D.Zero;
@@ -1592,6 +1827,9 @@ public static partial class BotTourney
             return false;
         }
 
+        // Wider than a tile either way, and wider again when that is full: the losers stand about the ring and
+        // the school drills on the same ground, so by the third round of the first championship (00:25 on
+        // 16.09.2026) six of the last seven pairs "could not be put in the ring" and the title went by default.
         for (var attempt = 0; attempt < 32; attempt++)
         {
             var spread = attempt < 16 ? 3 : 7;
@@ -1603,6 +1841,10 @@ public static partial class BotTourney
                 continue;
             }
 
+            // <b>And in sight of the ring's middle.</b> The drill ground's east side backs onto a building, and a fighter put
+            // down behind its wall could not be reached at all: on 26.09.2026, 12 of 17 duels were called by the referee at
+            // 150 s with both fighters at full health ("Selwyn could not be reached for 30s"), and the title went to
+            // whoever the clock favoured — Hale the brawler, the weakest of 18 by any measure.
             if (!map.LineOfSight(new Point3D(sx, sy, z + 10), new Point3D(ring.X, ring.Y, ring.Z + 10)))
             {
                 continue;
@@ -1616,6 +1858,10 @@ public static partial class BotTourney
         return false;
     }
 
+    /// <summary>
+    /// Lifts one onto its mark in the ring, tears up its plan, and points it at nothing yet. Both marks are found before
+    /// either fighter is moved (<see cref="Bring"/>), so a pair that cannot be set leaves nobody stranded at the ring.
+    /// </summary>
     private static bool Put(BotMobile bot, Map map, Point3D at)
     {
         if (bot is not { Deleted: false, Alive: true } || map == null)
@@ -1623,6 +1869,7 @@ public static partial class BotTourney
             return false;
         }
 
+        // At the arenas every move is a moongate's flash at both ends (07.10.2026, arena27). See Flash.
         if (ArenaOn)
         {
             Flash(bot.Map, bot.Location);
@@ -1641,6 +1888,7 @@ public static partial class BotTourney
         return true;
     }
 
+    /// <summary>Whole again: health, stamina, mana, and no poison. The referee's hands before and after every fight.</summary>
     private static void Heal(BotMobile bot)
     {
         if (bot is not { Deleted: false, Alive: true })
@@ -1658,6 +1906,7 @@ public static partial class BotTourney
         bot.Mana = bot.ManaMax;
     }
 
+    /// <summary>Whoever is in the ring is let go of its brawl.</summary>
     private static void Release()
     {
         if (_a != null && _b != null)
@@ -1744,6 +1993,7 @@ public sealed class BotTourneyStore : GenericPersistence
 
     private static BotTourneyStore _store;
 
+    /// <summary>From <c>BotDebugCore.Configure</c>, before the world is read.</summary>
     public static void Configure() => _store ??= new BotTourneyStore();
 
     public BotTourneyStore() : base("BotTourney", 21)

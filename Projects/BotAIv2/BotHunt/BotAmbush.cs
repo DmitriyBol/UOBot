@@ -34,30 +34,54 @@ public static class BotAmbush
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAmbush));
 
+    /// <summary>Whether a blow out of hiding is worth more than any other. False makes an ambush an ordinary opening.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>What the blow out of hiding is worth against an ordinary swing of the same weapon.</summary>
     public static double Times { get; set; } = 3.0;
 
+    /// <summary>How long a victim struck by a hand weapon stands stunned.</summary>
     public static int MeleeStunMs { get; set; } = 5000;
 
+    /// <summary>How long a victim struck by an arrow stands stunned.</summary>
     public static int ArrowStunMs { get; set; } = 5000;
 
+    /// <summary>
+    /// How long a backstab holds the mark. Patrick's order of the evening of 18.09.2026: five seconds for anybody,
+    /// six for a bot that already knows how to move while hidden, which strikes from behind rather than out of a
+    /// bush. The extra second is the whole of the difference: the blow itself is worth the same <see cref="Times"/>.
+    /// </summary>
     public static int BackstabMs { get; set; } = 6000;
 
+    /// <summary>Blows struck by a bot that can move hidden: a backstab rather than an ambush.</summary>
     public static long Backstabs { get; private set; }
 
+    /// <summary>What a bare-handed ambusher's swing is worth when it carries no weapon at all.</summary>
     public static int BareBlow { get; set; } = 5;
 
+    /// <summary>Blows struck out of hiding.</summary>
     public static long Struck { get; private set; }
 
+    /// <summary>Of those, the ones struck with a bow.</summary>
     public static long ByArrow { get; private set; }
 
+    /// <summary>Victims the blow alone left dead.</summary>
     public static long Felled { get; private set; }
 
+    /// <summary>Hit points taken by ambushes in all.</summary>
     public static long Dealt { get; private set; }
 
+    /// <summary>Ambushes on a victim that was already dead, gone or out of the world by the time the blow landed.</summary>
     public static long Missed { get; private set; }
 
+    /// <summary>
+    /// Strikes the opening blow of a robbery that came out of hiding. Called once, at the moment the stalk ends and the
+    /// fight begins; the ordinary fight follows immediately and needs no help from here.
+    /// </summary>
+    /// <param name="backstab">
+    /// Whether the striker can move while hidden, which makes this a backstab and holds the mark a second longer.
+    /// </param>
+    /// <returns>How long the mark is held, in milliseconds, so that the caller knows when the hold ends.</returns>
     public static int Strike(Mobile robber, Mobile victim, bool backstab = false)
     {
         if (!Running)
@@ -78,6 +102,7 @@ public static class BotAmbush
         var swing = weapon?.ComputeDamage(robber, victim) ?? BareBlow;
         var damage = (int)Math.Round(Math.Max(1, swing) * Times);
 
+        // The engine reveals a harmful action by itself; saying it plainly first keeps the order of the log honest.
         robber.RevealingAction();
         robber.DoHarmful(victim);
 

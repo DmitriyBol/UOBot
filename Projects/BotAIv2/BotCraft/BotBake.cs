@@ -30,18 +30,42 @@ public sealed class BotBake : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBake));
 
+    /// <summary>How many suppers a cook keeps on itself rather than selling. One, and one is enough: the
+    /// eater's rule is one meal per ten minutes, so a second is a stall's worth of stock in a pocket.</summary>
     public static int Keeps { get; set; } = 1;
 
+    /// <summary>The ledger's key.</summary>
     public const string Trade = "cook";
 
+    /// <summary>What a turn at the skillet is reckoned at before the ledger knows better.</summary>
     public static double Prior { get; set; } = 70.0;
 
+    /// <summary>How long one is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 2.0;
 
+    /// <summary>How often the skillet comes round.</summary>
     public static int SwingMs { get; set; } = 3000;
 
+    /// <summary>How long the meat may sit unchanged before the round is given up. Eight swings' worth.</summary>
     public static int StallMs { get; set; } = SwingMs * 8;
 
+    /// <summary>
+    /// How long to wait for the pan after the last of the meat goes in.
+    ///
+    /// <para>
+    /// <b>The last swing takes the meat before it gives back the meal.</b> <c>CraftItem.Craft</c> ends by
+    /// starting a timer, so there is a second in which the pack holds neither — and a round that finishes the
+    /// moment the meat runs out finishes inside exactly that second. It then reports, truthfully as far as it
+    /// can see, that nothing came of it. On 05.09.2026 that was 37 rounds ending "the meat is gone" against
+    /// 26 that cooked something, and the 26 were only the ones where an earlier swing had already landed.
+    /// </para>
+    ///
+    /// <para>
+    /// The same fault the alchemist had, one step along: there it was the count taken after the swing instead
+    /// of before the next one, here it is the <em>exit</em> taken between the two. One swing's worth of
+    /// patience is enough, because that is what the engine's own timer is measured against.
+    /// </para>
+    /// </summary>
     public static int SettleMs { get; set; } = SwingMs;
 
     private enum Leg
@@ -54,10 +78,19 @@ public sealed class BotBake : BotDeed
 
     private Point3D _where;
 
+    /// <summary>Fires this cook has gone on to after finding one cold or roadless. See <see cref="MostHops"/>.</summary>
     private int _hops;
 
+    /// <summary>
+    /// <b>A cold fire sends the cook to the next one, twice (30.09.2026, build 367).</b> Standing beside a hearth the engine
+    /// would not cook over failed the trip, and the next trip found the next fire: 12 of 363's 160 failures, Quelindor three
+    /// in 40 seconds at (1487, 1351), (1422, 1472) and (1382, 1520), and two cooks each at (1477, 1369), (1329, 1402) and
+    /// (1410, 1470) within half a minute of each other. The cold hearth is still written off for everybody (<see cref="Refuse"/>);
+    /// the trip goes on to the nearest other one.
+    /// </summary>
     public static int MostHops { get; set; } = 2;
 
+    /// <summary>Cooks sent on to another fire. See <see cref="MostHops"/>.</summary>
     public static long Hopped { get; private set; }
 
     private Leg _leg;
@@ -80,6 +113,7 @@ public sealed class BotBake : BotDeed
 
     private long _swungTick;
 
+    /// <summary>Meat left at the last look. Minus one, which no amount can equal — see BotSew.</summary>
     private int _lastLeft = -1;
 
     private long _stirTick;
@@ -97,8 +131,14 @@ public sealed class BotBake : BotDeed
 
     public override string Kind => Trade;
 
+    /// <summary>A turn at the skillet is seen through. See <see cref="BotDeed.Steadfast"/>.</summary>
     public override bool Steadfast => true;
 
+    /// <summary>
+    /// Back at the fire after an interruption. The stall clock measures time since the meat last went down, so
+    /// left alone it would read the interruption as a skillet that stopped; the count of meals is seeded again
+    /// because some may have been eaten or sold in the meantime.
+    /// </summary>
     public override void Resumed(IBotWilful bot)
     {
         _swung = false;
@@ -111,16 +151,20 @@ public sealed class BotBake : BotDeed
 
     public override Point3D Where => _where;
 
+    /// <summary>Marked down by the glut of the meal it means to cook (01.10.2026): a larder full of ribs nobody asks for is a pile. See <see cref="BotGlut.Claim"/>.</summary>
     public override double Expects => BotGlut.Claim(_meal, Prior);
 
     public override double Minutes => WorkMinutes;
 
     public override SkillName? Trains => BotOven.Skill;
 
+    /// <summary>The meat was already in the pack. Nothing is bought to do this.</summary>
     public override int Outlay => 0;
 
+    /// <summary>Nothing here is coin. Suppers are goods, and what one is worth is what the market pays.</summary>
     public override double Coin => 0.0;
 
+    /// <summary>The island's price for what somebody asks for, the surplus price for the rest. See <see cref="BotGlut.Yield"/>.</summary>
     public override int Made => BotGlut.Yield(_meal, _cooked, BotOven.Worth);
 
     public override string Stage =>
@@ -153,10 +197,13 @@ public sealed class BotBake : BotDeed
 
         if (!_counting)
         {
+            // Seeded rather than started from nought: a cook may already be carrying supper, and counting
+            // that as made would price the round at what it did not do.
             _counting = true;
             _had = BotCraftwork.Made(body, _meal);
         }
 
+        // What the last swing produced, counted before the next one is made. See the note at the top.
         var have = BotCraftwork.Made(body, _meal);
 
         if (have > _had)
@@ -170,6 +217,7 @@ public sealed class BotBake : BotDeed
 
         if (left <= 0)
         {
+            // Not yet: the meal from the last swing may still be in the engine's timer. See SettleMs.
             if (_swung && Core.TickCount - _swungTick < SettleMs)
             {
                 return BotDoing.Work("waiting for the pan");
@@ -184,6 +232,10 @@ public sealed class BotBake : BotDeed
             _stirTick = Core.TickCount;
         }
 
+        // <b>The skillet stopped moving and the engine will not say why.</b> A craft refused by an action
+        // lock, a tool worn through mid-round, a stack the engine declines to consume — all three look
+        // identical from here, which is silence with meat still in the pack. The named give-up is the only
+        // thing standing between that and a bot swinging at nothing until the shard restarts.
         if (Core.TickCount - _stirTick >= StallMs)
         {
             logger.Information(
@@ -212,6 +264,16 @@ public sealed class BotBake : BotDeed
         return BotDoing.Work("cooking");
     }
 
+    /// <summary>
+    /// To the fire, and the arrival is judged by the engine and not by the distance.
+    ///
+    /// <para>
+    /// Standing on the remembered hearth with the engine still refusing is the end of the road for that
+    /// hearth, and it is written down under the place's name so the next choice is a different fire rather
+    /// than this one again — the ruling <c>BotForge.Walking</c> arrived at after a smith answered the same
+    /// unusable walk order for ever. See <c>BotGround.HearthKind</c>.
+    /// </para>
+    /// </summary>
     private BotDoing Walking(IBotWilful bot, Mobile body)
     {
         if (BotOven.AtAHearth(body))
@@ -240,12 +302,29 @@ public sealed class BotBake : BotDeed
         return BotDoing.Walk(_map, _where, BotArrival.Beside, "to a fire");
     }
 
+    /// <summary>
+    /// This fire is no use to this bot, and a cook standing beside it has proved it is no use to anybody for now.
+    ///
+    /// <para>
+    /// <b>The private half was written and the shared half was not.</b> The engine's heat test is about the place, not
+    /// the cook, yet only the cook's own ledger heard it — so every other cook was sent to the same cold tile to find
+    /// out for itself: 31 failures by 24 bots at (1440, 1481) on the evening of 14.09.2026, 19 by 17 at (1530, 1007),
+    /// and 12 by 11 at (1442, 1477) on build 41, a campfire long out. Rested for everybody rather than struck off,
+    /// because a sweep does not come back to ground it has seen and a fire wrongly struck off would be gone until a
+    /// restart — unless the engine finds nothing burning on the tile at all, which is a fire that has gone and is
+    /// struck off (build 224). See <see cref="BotGround.Cold"/>.
+    /// </para>
+    /// </summary>
     private void Refuse(IBotWilful bot)
     {
         bot?.Resolve?.Ledger?.Beware(BotGround.HearthKind, _map, _where);
         BotGround.Cold(_map, _where);
     }
 
+    /// <summary>
+    /// The way to the fire turned out not to exist. Nothing to bend to — the nearest is the nearest — but
+    /// the refusal is filed under the place so the next choice is a different fire.
+    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
         Refuse(bot);
@@ -253,8 +332,10 @@ public sealed class BotBake : BotDeed
         return Next(bot, bot?.Self);
     }
 
+    /// <summary>Another fire is the trip's own business, not trouble that lifts its hold. See <see cref="BotDeed.BendIsTrouble"/>.</summary>
     public override bool BendIsTrouble => false;
 
+    /// <summary>The nearest other known fire, if this trip has hops left. See <see cref="MostHops"/>.</summary>
     private bool Next(IBotWilful bot, Mobile body)
     {
         if (body == null || _hops >= MostHops)
@@ -277,12 +358,23 @@ public sealed class BotBake : BotDeed
         return true;
     }
 
+    /// <summary>
+    /// Counts the suppers: whatever the bot keeps for itself, what somebody's want is waiting for, and the rest.
+    ///
+    /// <para>
+    /// A cook that has finished in a field has finished: nothing is put out from the fire any more (01.10.2026, the auction
+    /// removed). What a want is waiting for rides in the pack to whoever asked (<see cref="BotCourier"/>); the rest waits for the
+    /// porter. The eater's side is a condition on the bot's own beat; see <c>BotMeal</c>.
+    /// </para>
+    /// </summary>
     private BotDoing Finish(IBotWilful bot, Mobile body, string why)
     {
         _served = true;
 
         if (_cooked <= 0)
         {
+            // The attempts were real and the skill checks happened. Finished rather than failed: what it
+            // cost is what learning a trade costs.
             return BotDoing.Done($"{_swings} swings, nothing came of it — {why}");
         }
 
@@ -292,8 +384,13 @@ public sealed class BotBake : BotDeed
 
         if (pack != null)
         {
+            // The same gatherer every craft here sells through, so a partial stack and a full one are
+            // handled the one way.
             List<Item> made = BotCraftwork.Gather(body, _meal);
 
+            // One supper kept back, because the whole point of the trade is that somebody eats. Split off
+            // the same way the brewer keeps its own draughts — LiftItemDupe or nothing, never a sale of the
+            // bot's own supplies through a failed split.
             var keep = Keeps;
 
             for (var i = 0; i < made.Count; i++)
@@ -340,6 +437,7 @@ public sealed class BotBake : BotDeed
 
     private static bool _said;
 
+    /// <summary>Said once. The first supper cooked on this shard is worth a line and the thousandth is not.</summary>
     private static void Once(Mobile body, Type meal)
     {
         if (_said)

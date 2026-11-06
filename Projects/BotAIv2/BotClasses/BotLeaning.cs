@@ -14,12 +14,16 @@ namespace Server.BotAI.V2;
 /// </summary>
 public enum BotTier
 {
+    /// <summary>No ladder: the band is the leaning's own two numbers.</summary>
     None,
 
+    /// <summary>The smith's metals: <c>DefBlacksmithy.CraftSubRes</c>, dull copper upwards.</summary>
     Metal,
 
+    /// <summary>The tailor's hides: <c>DefTailoring.CraftSubRes</c>, spined upwards.</summary>
     Leather,
 
+    /// <summary>The miner's veins: <c>Mining.OreAndStone</c>, the first vein that asks the miner anything.</summary>
     Ore
 }
 
@@ -67,10 +71,13 @@ public readonly record struct BotLeaning(
     (SkillName Skill, double Floor)[] Keeps = null
 )
 {
+    /// <summary>An even birth: the class's own fifty, thirty, twenty and the weapon at fifty, untouched.</summary>
     public static BotLeaning Even(int weight) => new("even", null, weight);
 
+    /// <summary>Whether this leaning moves no point at all.</summary>
     public bool IsEven => Skill == null && !Weapon;
 
+    /// <summary>The floor this leaning names for a skill, or null when it names none.</summary>
     public double? Floor(SkillName skill)
     {
         var keeps = Keeps;

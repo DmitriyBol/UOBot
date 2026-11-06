@@ -24,6 +24,7 @@ namespace Server.BotAI.Mind;
 /// </summary>
 public static class BotDebugWeb
 {
+    /// <summary>The squad, one record a watcher. Game loop only.</summary>
     public static IReadOnlyList<BotDebuggerReport> Report()
     {
         var squad = BotVigil.Squad;
@@ -72,6 +73,7 @@ public static class BotDebugWeb
         return rows;
     }
 
+    /// <summary>What the watcher is doing where it stands, in the vigil's own order: the first that holds it is the one that moves it.</summary>
     private static (string Doing, string What, string Subject) Doing(BotWatcher w, int rank, BotDebugger body)
     {
         if (body == null)
@@ -84,6 +86,7 @@ public static class BotDebugWeb
             return ("witness", meeting, null);
         }
 
+        // The zone keeper: on the zones and nothing else while the watch runs (07.10.2026). See BotVigil.Keeper.
         if (BotVigil.IsKeeper(w))
         {
             return ("zone keeper", BotZoneTour.StopOf(body) ?? "between zones, choosing the next by what the zones' accuracy most needs", null);
@@ -104,6 +107,7 @@ public static class BotDebugWeb
             return ("charting", $"charting the dungeons: standing in the room being probed at {BotHalls.Probing.X},{BotHalls.Probing.Y}", null);
         }
 
+        // Until its first move it stands where it was raised, and the vigil's opening reason belongs to no bot yet.
         var beside = w.Beside != null ? $"beside {w.Beside}: {w.Because}" : "where it was raised, not yet beside any bot";
 
         if (w.Organiser)
@@ -119,6 +123,11 @@ public static class BotDebugWeb
         return ("watching", beside, w.Beside);
     }
 
+    /// <summary>
+    /// One line of the debugger's log, given to the watcher it is about: the squad name that comes first in it, else the witness
+    /// of the meeting it names, else the marshal for a revel and the lead for the rest (the roll-call, the charting, the door).
+    /// The bodies of blocks — the measurements under a finding — and the rules between entries are left in the file.
+    /// </summary>
     public static void Heard(string line)
     {
         var squad = BotVigil.Squad;
@@ -151,6 +160,8 @@ public static class BotDebugWeb
 
         if (who == null)
         {
+            // A block's heading with nobody in it ("claim:", "evidence it quoted:") belongs to the entry above it, which is
+            // already in the feed; on its own it says nothing.
             if (text[^1] == ':')
             {
                 return;
@@ -179,6 +190,7 @@ public static class BotDebugWeb
         who?.Heard(text.Length > 400 ? text[..400] + "…" : text);
     }
 
+    /// <summary>Where the name stands as a whole word in the line, or -1.</summary>
     private static int Word(string text, string name)
     {
         if (string.IsNullOrEmpty(name))

@@ -18,24 +18,32 @@ public sealed class BotPrimeBandSettings
 /// <summary>What <c>bot-rest.json</c> may say under <c>PrimeTime</c>. See <see cref="BotPrime"/>.</summary>
 public sealed class BotPrimeTimeSettings
 {
+    /// <summary>The switch. Off, the island's floor is <c>FloorShare</c> round the clock, as on build 388.</summary>
     public bool? Running { get; set; }
 
+    /// <summary>How long the target takes to move from one band's share to the next, from the band's start.</summary>
     public int? RampMinutes { get; set; }
 
+    /// <summary>The most bots one look of the rest clock may tire for being over the target.</summary>
     public int? TirePerLook { get; set; }
 
+    /// <summary>The most bots one look may bring back from rest for being under it.</summary>
     public int? ReturnPerLook { get; set; }
 
+    /// <summary>The bands, in local server time; hours from nought to twenty-four, not overlapping.</summary>
     public List<BotPrimeBandSettings> Bands { get; set; }
 }
 
 /// <summary>What <c>bot-rest.json</c> may say under <c>Critical</c>. See <see cref="BotCritical"/>.</summary>
 public sealed class BotCriticalSettings
 {
+    /// <summary>The switch.</summary>
     public bool? Running { get; set; }
 
+    /// <summary>How far into its rest a bot of a post under its floor may be brought back.</summary>
     public int? EarlyMinutes { get; set; }
 
+    /// <summary>A floor per post: a class's name (Healer, Mage, Trader, Captain, Baron, Crafter, Gatherer) or a trade's (Smith, Tailor, Fletcher, Miner, Woodsman).</summary>
     public Dictionary<string, int> Floors { get; set; }
 }
 
@@ -45,20 +53,26 @@ public sealed class BotCriticalSettings
 /// </summary>
 public sealed class BotRestSettings
 {
+    /// <summary>Whether bots tire at all.</summary>
     public bool? Running { get; set; }
 
+    /// <summary>How often the clock looks, in milliseconds.</summary>
     public int? LookMs { get; set; }
 
     public double? LeastRestHours { get; set; }
 
     public double? MostRestHours { get; set; }
 
+    /// <summary>How long a tired bot is given to come free before its work and its company are let go of.</summary>
     public int? GraceMs { get; set; }
 
+    /// <summary>The furthest into its first session a bot is put the first time the clock meets it.</summary>
     public double? FirstShare { get; set; }
 
+    /// <summary>The least share of the island in the world when the prime time is off, or no band holds the hour.</summary>
     public double? FloorShare { get; set; }
 
+    /// <summary>Whether a guild in a fight may call its members back from their rest.</summary>
     public bool? Calls { get; set; }
 
     public int? CallMost { get; set; }
@@ -69,6 +83,7 @@ public sealed class BotRestSettings
 
     public double? CalledLeastRestHours { get; set; }
 
+    /// <summary>How near the end of its rest a bot may be brought back early under the floor, when the prime time is off.</summary>
     public int? EarlyMinutes { get; set; }
 
     public BotPrimeTimeSettings PrimeTime { get; set; }
@@ -83,6 +98,10 @@ public static class BotRestConfig
 
     private const string ConfigPath = "Configuration/bot-rest.json";
 
+    /// <summary>
+    /// The starter file carries the schedule and the floors written out, rather than empty, because those two are the
+    /// settings a reader opens this file for; the rest clock's own numbers stay as the code has them unless named.
+    /// </summary>
     private static BotRestSettings Starter()
     {
         var settings = new BotRestSettings

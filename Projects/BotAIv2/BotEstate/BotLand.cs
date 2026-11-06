@@ -32,20 +32,52 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotLand
 {
+    /// <summary>Whether halls make land at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// How far a hall's claim reaches, in tiles.
+    ///
+    /// <para>
+    /// Forty. A hall stands somewhere between eighty and a hundred and eighty tiles from home and the halls
+    /// are kept <c>BotPlot.Apart</c> from each other, so forty is a yard a guild can plausibly keep an eye
+    /// on and small enough that the island does not become wholly spoken for. Chebyshev, like every other
+    /// distance on this shard, because that is how a bot walks.
+    /// </para>
+    /// </summary>
     public static int Reach { get; set; } = 40;
 
+    /// <summary>What work on your own guild's ground is worth, as a multiplier.</summary>
     public static double Home { get; set; } = 1.25;
 
+    /// <summary>
+    /// And on another guild's.
+    ///
+    /// <para>
+    /// Seven tenths — a discount a bot will happily ignore for work worth doing, which is the point. It is
+    /// well above the floor the other factors use, because the ground belonging to a neighbour is a much
+    /// weaker objection than a full pack or an empty purse.
+    /// </para>
+    /// </summary>
     public static double Abroad { get; set; } = 0.7;
 
+    /// <summary>Times work was weighed on its own guild's land.</summary>
     public static long AtHome { get; private set; }
 
+    /// <summary>Times work was weighed on somebody else's.</summary>
     public static long Away { get; private set; }
 
+    /// <summary>Times the ground belonged to nobody, which is most of the island.</summary>
     public static long Open { get; private set; }
 
+    /// <summary>
+    /// Which guild claims this ground, or nothing.
+    ///
+    /// <para>
+    /// The nearest hall wins where two claims overlap, so a tile is only ever one guild's and the answer
+    /// does not depend on the order the halls happen to be stored in.
+    /// </para>
+    /// </summary>
     public static string Holder(Map map, Point3D where)
     {
         if (!Running || map == null || map == Map.Internal)
@@ -53,6 +85,12 @@ public static class BotLand
             return null;
         }
 
+        // <b>A held square first, and a hall's yard only where nobody holds the square</b> (06.10.2026). The yard of a raised or
+        // adopted hall is written into the claims as its guild's (BotClaim.Seat), so the two answers agree everywhere but in one
+        // place: a hall standing in a square another guild holds. There the hall used to win — "a hall is a stronger claim than a
+        // flag" (10.09.2026) — and that was the loophole by which a hall took ground without a claim and without a war. The
+        // square stays its holder's, and the hall is carried off it (BotBounds). One dictionary lookup before the loop of halls,
+        // so the hot path is no dearer.
         var claimed = BotClaim.Owner(map, where);
 
         if (claimed != null)
@@ -62,6 +100,13 @@ public static class BotLand
 
         string held = null;
 
+        // <b>The yard is the square the hall stands in, and nothing more.</b> Patrick's order of 26.09.2026: "the yard is
+        // only the square with the guild's hall; everything else is the zone of influence" — ground a guild holds by
+        // claiming it, and loses the moment it no longer reaches the hall (BotClaim.Connect). Until then the yard was every
+        // tile within Reach of a hall, and it outranked the claims round it.
+        //
+        // <b>Answered as a name, and that is a hot-path decision rather than a stylistic one.</b> The register is keyed by
+        // guild name, and this runs inside the appraisal a few thousand times a second.
         var here = BotQuad.Key(map, where);
 
         foreach (var (name, hall) in BotEstate.Held)
@@ -74,6 +119,7 @@ public static class BotLand
             }
         }
 
+        // And an outpost's square: a guild's second house holds the ground it stands on as its hall does. See BotOutpost.
         if (held == null)
         {
             foreach (var (name, post) in BotOutpost.Held)
@@ -90,8 +136,15 @@ public static class BotLand
         return held;
     }
 
+    /// <summary>The same question when the guild itself is wanted rather than its name. Never on a hot path.</summary>
     public static Guild Holding(Map map, Point3D where) => BaseGuild.FindByName(Holder(map, where)) as Guild;
 
+    /// <summary>
+    /// What this ground does to what a piece of work is worth to this bot.
+    ///
+    /// One on ground nobody claims, which is nearly all of it — so a shard with no halls behaves exactly as
+    /// it did before this existed, and the factor costs nothing until a guild builds.
+    /// </summary>
     public static double Worth(Mobile bot, Map map, Point3D where)
     {
         if (!Running || bot == null)
@@ -120,6 +173,7 @@ public static class BotLand
         return Abroad;
     }
 
+    /// <summary>Whether this bot is standing on ground belonging to a guild that is not its own.</summary>
     public static bool Trespassing(Mobile bot, out string whose)
     {
         whose = bot == null ? null : Holder(bot.Map, bot.Location);
@@ -129,6 +183,8 @@ public static class BotLand
             return false;
         }
 
+        // An ally on the yard is a guest. Asked of the engine, and only here - this is the cold side of the
+        // land, called when work finishes and when the bailiff looks, not in the appraisal.
         return !BotRegard.AreAllied(bot.Guild?.Name, whose);
     }
 

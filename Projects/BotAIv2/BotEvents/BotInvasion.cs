@@ -38,63 +38,96 @@ public static class BotInvasion
 
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often a town is invaded. Three hours, jittered by <see cref="Jitter"/> either way.</summary>
     public static int EveryMs { get; set; } = 10800000;
 
     public static double Jitter { get; set; } = 0.25;
 
+    /// <summary>How long after a boot the first invasion may come.</summary>
     public static int FirstMs { get; set; } = 2700000;
 
+    /// <summary>What the city holds out of its purse for one invasion's heads, and the least worth calling one for.</summary>
     public static int Purse { get; set; } = 1500;
 
     public static int LeastPurse { get; set; } = 300;
 
+    /// <summary>The share of the militia company's strength one wave is priced at. Never above one (company16: ×1.0).</summary>
     public static double Odds { get; set; } = 0.8;
 
+    /// <summary>No single creature priced above this share of the company's strength.</summary>
     public static double SingleShare { get; set; } = 0.4;
 
+    /// <summary>Waves at most, and creatures in one wave at most.</summary>
     public static int Waves { get; set; } = 3;
 
     public static int MostHeads { get; set; } = 8;
 
+    /// <summary>
+    /// How far out of the town's square the place lies when no road gives one (the fallback ring). life18a: the road's place is measured
+    /// from where the road leaves guarded ground (<see cref="PastEdge"/>–<see cref="PastEdgeMost"/>), not from the square.
+    /// </summary>
     public static int Near { get; set; } = 60;
 
     public static int Far { get; set; } = 100;
 
+    /// <summary>
+    /// life18a, 07.10.2026: how far along the road past the town's guards the place lies. Britain's square is 300 tiles from the east
+    /// edge of its region and Yew's guards reach 275 tiles out, so a band measured from the square fell inside the guards.
+    /// </summary>
     public static int PastEdge { get; set; } = 20;
 
     public static int PastEdgeMost { get; set; } = 70;
 
+    /// <summary>The farthest from the square a place may lie (straight), so the militia that lives round the square can march to it.</summary>
     public static int MostOut { get; set; } = 400;
 
+    /// <summary>Tiles between the places tried along a road (the road's points are a walk's turning points, ~20 tiles apart).</summary>
     public static int RoadStep { get; set; } = 4;
 
+    /// <summary>Lines at most a forced call (<see cref="CallNow"/>) writes about the candidates it refused.</summary>
     public static int MostProbeLines { get; set; } = 60;
 
+    /// <summary>How far round a town's square its fighters are counted and offered the militia.</summary>
     public static int TownReach { get; set; } = 120;
 
+    /// <summary>The fewest free fighters near a town for it to be invaded.</summary>
     public static int LeastMilitia { get; set; } = 4;
 
+    /// <summary>How long the town waits for a militia company to reach the place before the creatures go back underground.</summary>
     public static int MusterMs { get; set; } = 1200000;
 
+    /// <summary>How long after the first wave anything still standing is taken off the island. Forty minutes.</summary>
     public static int LifeMs { get; set; } = 2400000;
 
+    /// <summary>How long the militia may be away from the field before the raid is called off and the field cleared.</summary>
     public static int GoneMs { get; set; } = 120000;
 
+    /// <summary>The quiet between waves.</summary>
     public static int RestMs { get; set; } = 20000;
 
+    /// <summary>How near the place a militia captain must stand for a wave to come out; how far beyond it the creatures appear.</summary>
     public static int ArriveReach { get; set; } = 20;
 
     public static int Spread { get; set; } = 10;
 
+    /// <summary>How near the field a bot's death is counted as the invasion's.</summary>
     public static int DeathReach { get; set; } = 30;
 
+    /// <summary>Militia companies at most for one invasion, and the wait after a captain's call failed before another is offered.</summary>
     public static int MostCompanies { get; set; } = 1;
 
     public static int CallRetryMs { get; set; } = 60000;
 
+    /// <summary>
+    /// Captains one invasion may call at most. A captain whose call raises fewer than a patrol's least fails its work, and a failure
+    /// is a failure on the work line: three, and the town stops asking.
+    /// </summary>
     public static int MostCalls { get; set; } = 3;
 
+    /// <summary>What the militia is reckoned at per minute before the ledger has seen one: a hunt's.</summary>
     public static double MilitiaPrior { get; set; } = 60.0;
+
+    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long Called { get; private set; }
 
@@ -102,8 +135,10 @@ public static class BotInvasion
 
     public static long NoPlace { get; private set; }
 
+    /// <summary>life18a: towns passed over for want of a place while another town took the invasion (was: the call failed).</summary>
     public static long PassedOver { get; private set; }
 
+    /// <summary>life18a: tiles tried for a place, and refused, since the boot; the refusals by reason in <see cref="_refusals"/>.</summary>
     public static long PlacesTried { get; private set; }
 
     public static long PlacesRefused { get; private set; }
@@ -148,6 +183,7 @@ public static class BotInvasion
 
     public static long GoldBack { get; private set; }
 
+    /// <summary>The share of the company's strength the waves were actually priced at, summed, for the mean.</summary>
     private static double _pricedShare;
 
     /// <summary>One invasion: the town, the place, the hold, the militia and the creatures.</summary>
@@ -210,10 +246,13 @@ public static class BotInvasion
 
     private static readonly Dictionary<string, long> _lastAt = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The invasion standing now, or null.</summary>
     public static Raid Now => _raid;
 
+    /// <summary>The invasion a town is calling its militia to now: one with no wave finished yet, not over.</summary>
     public static Raid Calling => _raid is { Over: false } r && (r.Wave < Waves || r.Alive.Count > 0) ? r : null;
 
+    /// <summary>The creatures of the standing raid, for the store: so a restart takes them off the island.</summary>
     public static IEnumerable<BaseCreature> Standing()
     {
         if (_raid == null)
@@ -227,6 +266,7 @@ public static class BotInvasion
         }
     }
 
+    /// <summary>What the standing raid still holds of the city's purse, for the store.</summary>
     public static int Holding => _raid == null ? 0 : Math.Max(0, _raid.Pool - _raid.Paid);
 
     public static void Beat(long now)
@@ -260,6 +300,7 @@ public static class BotInvasion
         _nextTick = now + (long)(Math.Max(600000, EveryMs) * jitter);
     }
 
+    /// <summary>Calls one now, by the clock or by hand (<c>dial BotInvasion.CallNow true</c>). Returns what happened.</summary>
     public static string Begin(long now)
     {
         if (_raid != null)
@@ -288,6 +329,9 @@ public static class BotInvasion
             return "no town could answer";
         }
 
+        // life18a: every town that can answer is tried in turn, the one invaded longest ago first. Until now only the first was
+        // tried, and since a town is stamped only when invaded, Britain (the strongest, never invaded) was chosen and refused at
+        // every call of the night.
         BotTowns.Town town = null;
         var fighters = 0;
         var strength = 0.0;
@@ -369,6 +413,7 @@ public static class BotInvasion
         return $"an invasion of {town.Name} out of {from}, {_raid.Bearing}, {pool}gp held";
     }
 
+    /// <summary>Set by hand to call one at the next beat. A forced call writes every candidate place it refuses, and why.</summary>
     public static bool CallNow
     {
         get => false;
@@ -404,6 +449,10 @@ public static class BotInvasion
 
     private static readonly List<Candidate> _ranked = [];
 
+    /// <summary>
+    /// The towns with <see cref="LeastMilitia"/> free fighters near, the one invaded longest ago first, the stronger on a tie
+    /// (life18a: a list, so a town with no place passes the call to the next).
+    /// </summary>
     private static List<Candidate> Choose(Map map)
     {
         _ranked.Clear();
@@ -441,6 +490,7 @@ public static class BotInvasion
                 continue;
             }
 
+            // A town never invaded since the boot is the oldest of all.
             var last = _lastAt.TryGetValue(towns[t].Name, out var at) ? at : long.MinValue;
 
             _ranked.Add(new Candidate(towns[t], counts[t], powers[t], last));
@@ -453,6 +503,11 @@ public static class BotInvasion
 
     private static readonly List<Point3D> _spots = [];
 
+    /// <summary>
+    /// Open ground on one of the town's roads, <see cref="PastEdge"/>–<see cref="PastEdgeMost"/> tiles walked past where the road
+    /// leaves guarded ground and at most <see cref="MostOut"/> from the square; or, when no road gives one, anywhere
+    /// <see cref="Near"/>–<see cref="Far"/> out of the square that the square can reach. A forced call writes each refusal.
+    /// </summary>
     private static bool Place(Map map, BotTowns.Town town, bool forced, out Point3D site)
     {
         site = Point3D.Zero;
@@ -476,6 +531,7 @@ public static class BotInvasion
 
             roadsOut++;
 
+            // Walk the road out of this town: from its first point when it starts here, from its last when it ends here.
             var count = road.Points.Count;
             var walked = 0.0;
             var left = -1.0;
@@ -498,6 +554,7 @@ public static class BotInvasion
 
                     if (Region.Find(new Point3D(x, y, a.Z), map)?.IsPartOf<GuardedRegion>() == true)
                     {
+                        // Inside a town's (or a field's) guards: the road has not left them yet.
                         left = -1.0;
 
                         continue;
@@ -647,6 +704,7 @@ public static class BotInvasion
         return sum;
     }
 
+    /// <summary>A refused candidate: counted by its reason and, on a forced call, written out, one line each.</summary>
     private static void Refuse(BotTowns.Town town, BotRoadbook.Road road, int x, int y, int distance, string why, bool forced)
     {
         PlacesRefused++;
@@ -689,6 +747,7 @@ public static class BotInvasion
 
     private static readonly List<KeyValuePair<string, int>> _tallySort = [];
 
+    /// <summary>"12 guarded ground, 3 no ground to stand on": the commonest refusals first.</summary>
     private static string Tally(Dictionary<string, int> tally, int most)
     {
         if (tally.Count == 0)
@@ -717,6 +776,7 @@ public static class BotInvasion
         return text;
     }
 
+    /// <summary>A dungeon to come out of: one the survey found creatures in, or the hills.</summary>
     private static string Dungeon()
     {
         var deeps = BotDungeon.All;
@@ -733,6 +793,9 @@ public static class BotInvasion
         return named.Count > 0 ? named[Utility.Random(named.Count)] : "the hills";
     }
 
+    // ---- the militia ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>A captain took the town's call. Counted; another is not offered until this one's call has come to something.</summary>
     internal static void Took(Raid raid, Mobile captain)
     {
         Captains++;
@@ -753,6 +816,7 @@ public static class BotInvasion
         }
     }
 
+    /// <summary>The captain's company exists: watched for arrival and for leaving the field.</summary>
     internal static void Mustered(Raid raid, BotSquad squad)
     {
         if (squad == null || squad.Disbanded || raid.Squads.Contains(squad))
@@ -764,6 +828,7 @@ public static class BotInvasion
         Companies++;
     }
 
+    /// <summary>A captain's militia deed ended. A failed call before the company marched frees the town to offer another.</summary>
     internal static void Ended(Raid raid, Mobile captain, BotDoing how)
     {
         if (how.Kind == BotDoingKind.Failed)
@@ -776,6 +841,7 @@ public static class BotInvasion
         logger.Information("{Name}'s militia for {Town} ended: {How} — {Note}", captain?.Name, raid.Town?.Name, how.Kind, how.Note);
     }
 
+    /// <summary>Whether the town may offer its call to another captain now.</summary>
     internal static bool Offers(Raid raid, long now)
     {
         Prune(raid);
@@ -785,6 +851,7 @@ public static class BotInvasion
             return false;
         }
 
+        // A call taken is waited on: the company is being raised, or the captain's failure is a minute old.
         return raid.LastCall == 0 || now - raid.LastCall >= CallRetryMs;
     }
 
@@ -802,6 +869,8 @@ public static class BotInvasion
             }
         }
     }
+
+    // ---- the field ---------------------------------------------------------------------------------------------------------------
 
     private static void Run(Raid raid, long now)
     {
@@ -905,6 +974,7 @@ public static class BotInvasion
 
     private static readonly List<(Type Kind, double Priced)> _kinds = [];
 
+    /// <summary>One wave, sized to the company that stands at the place. False when not even one creature fits its strength.</summary>
     private static bool Raise(Raid raid, BotSquad company, long now)
     {
         var able = company.Able();
@@ -954,6 +1024,7 @@ public static class BotInvasion
         Heads += made;
         _pricedShare += able > 0.0 ? priced / able : 0.0;
 
+        // The head's price set at the first wave: the hold over the heads the raid may yet put up.
         if (raid.HeadPay == 0)
         {
             raid.HeadPay = Math.Max(10, raid.Pool / Math.Max(1, made * Math.Max(1, Waves)));
@@ -988,6 +1059,7 @@ public static class BotInvasion
         return true;
     }
 
+    /// <summary>The kinds that may come out, each priced: the dungeon's own when the survey knows them, else the waves' list.</summary>
     private static void Kinds(Raid raid, double single)
     {
         _kinds.Clear();
@@ -1019,6 +1091,7 @@ public static class BotInvasion
         typeof(Ettin), typeof(Ogre), typeof(Lizardman), typeof(Gnaw), typeof(Ghoul)
     ];
 
+    /// <summary>A kind is asked once per wave on a probe that never enters the world: what it is, and its price.</summary>
     private static void Try(Type kind, double single)
     {
         if (kind == null || !typeof(BaseCreature).IsAssignableFrom(kind) || kind.IsAbstract)
@@ -1042,6 +1115,7 @@ public static class BotInvasion
         }
         catch
         {
+            // A kind with no plain constructor is not one the island can put on a road.
         }
 
         if (probe == null)
@@ -1066,6 +1140,7 @@ public static class BotInvasion
         Point3D at = Point3D.Zero;
         var found = false;
 
+        // Round the lair first, beyond the company; round the place itself when the lair's ground will not hold them.
         for (var tries = 0; tries < 24 && !found; tries++)
         {
             var from = tries < 12 ? raid.Lair : raid.Site;
@@ -1096,6 +1171,8 @@ public static class BotInvasion
             return null;
         }
 
+        // On a short lead round the lair: a wave that wanders into Britain is the guards' fight, and one that wanders off along
+        // the road is somebody else's death.
         creature.Home = raid.Lair;
         creature.RangeHome = Spread;
         creature.MoveToWorld(at, raid.Map);
@@ -1104,6 +1181,7 @@ public static class BotInvasion
         return creature;
     }
 
+    /// <summary>Whatever fell since the last beat: its killer paid by the head if it was one of ours, or its pet's master.</summary>
     private static void Fallen(Raid raid)
     {
         for (var i = raid.Alive.Count - 1; i >= 0; i--)
@@ -1254,6 +1332,7 @@ public static class BotInvasion
         return sum;
     }
 
+    /// <summary>Called off by a reload or a stop: the creatures taken away and the hold handed back.</summary>
     public static void Stand()
     {
         if (_raid != null)

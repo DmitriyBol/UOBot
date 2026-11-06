@@ -95,6 +95,17 @@ public sealed class BotTradesSettings
     public int? RagSafeSlack { get; set; }
 
     public int? RagmanPurse { get; set; }
+
+    /// <summary>Whether dice are played at tavern tables. See BotDice.Running.</summary>
+    public bool? DiceGames { get; set; }
+
+    /// <summary>The chance a table's line is a new game. See BotDice.GameChance.</summary>
+    public double? DiceChance { get; set; }
+
+    /// <summary>The stake's bounds, in gold. See BotDice.StakeMin and BotDice.StakeMax.</summary>
+    public int? DiceStakeMin { get; set; }
+
+    public int? DiceStakeMax { get; set; }
 }
 
 /// <summary>
@@ -107,8 +118,10 @@ public sealed class BotTradesModule : BotModule
 
     private const string ConfigPath = "Configuration/bot-trades.json";
 
+    /// <summary>The clock's period. A second: the table talk's own grain; the lien and the lenders' call keep their own clocks.</summary>
     public static int TickMs { get; set; } = 1000;
 
+    /// <summary>How often the lenders' call is looked for. Thirty seconds.</summary>
     public static int CryMs { get; set; } = 30000;
 
     private static Timer _timer;
@@ -285,6 +298,10 @@ public sealed class BotTradesModule : BotModule
         BotRagmen.PostFar = settings.RagPostFar ?? BotRagmen.PostFar;
         BotRagmen.SafeSlack = settings.RagSafeSlack ?? BotRagmen.SafeSlack;
         BotRagmen.LeastPurse = settings.RagmanPurse ?? BotRagmen.LeastPurse;
+        BotDice.Running = settings.DiceGames ?? BotDice.Running;
+        BotDice.GameChance = settings.DiceChance ?? BotDice.GameChance;
+        BotDice.StakeMin = settings.DiceStakeMin ?? BotDice.StakeMin;
+        BotDice.StakeMax = settings.DiceStakeMax ?? BotDice.StakeMax;
     }
 
     public override void Reset()
@@ -312,6 +329,7 @@ public sealed class BotTradesModule : BotModule
                 BotTaverns.Talk(now);
                 BotInfirmaries.Scan(now);
 
+                // The lien runs with the switch off too: a debt made before it was thrown is still owed.
                 BotLoans.Collect(now);
 
                 if (now - _cryTick >= CryMs)

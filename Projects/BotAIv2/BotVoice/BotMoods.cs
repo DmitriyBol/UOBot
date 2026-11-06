@@ -53,14 +53,19 @@ public static class BotMoods
 
     public const string Glum = "glum";
 
+    /// <summary>Need (how short the purse is of what the bot's own plans want) at or above which a bot says it is poor, besides the hunter's gold line.</summary>
     public static double PoorNeed { get; set; } = 0.5;
 
+    /// <summary>Boredom at or above which a bot with no company and no guild (or nothing at all to do) says it is lonely.</summary>
     public static double LonelyFrom { get; set; } = 0.3;
 
+    /// <summary>How long after a death — its own, or one in its guild — a bot grieves. Twenty minutes.</summary>
     public static int GrieveMs { get; set; } = 1200000;
 
+    /// <summary>How long after finishing something that paid well a bot is proud of it. Ten minutes.</summary>
     public static int ProudMs { get; set; } = 600000;
 
+    /// <summary>What a finished piece of work must have paid a minute to be worth being proud of.</summary>
     public static double ProudPerMinute { get; set; } = 40.0;
 
     private static readonly Dictionary<Serial, long> _fell = [];
@@ -75,6 +80,7 @@ public static class BotMoods
 
     private static bool _swept;
 
+    /// <summary>A bot died. Its own grief, and its guild's. From <see cref="BotVoice.Died"/>.</summary>
     public static void Fell(BotMobile who)
     {
         if (who == null)
@@ -92,6 +98,7 @@ public static class BotMoods
         }
     }
 
+    /// <summary>A bot finished something. Pride, when it paid. From <see cref="BotVoice.Ended"/>.</summary>
     public static void Won(Mobile who, double perMinute)
     {
         if (who != null && perMinute >= ProudPerMinute)
@@ -100,8 +107,10 @@ public static class BotMoods
         }
     }
 
+    /// <summary>Whether this tag is one of the seven that ask for something.</summary>
     public static bool Asks(string tag) => tag is Hurt or Tired or Grieving or Poor or Lonely or Bored or Proud;
 
+    /// <summary>The bot's mood now: the tag, and the occasion the voice says it under.</summary>
     public static (string Tag, string Occasion) Read(BotMobile who, long now)
     {
         if (who == null)
@@ -109,6 +118,7 @@ public static class BotMoods
             return (Content, "mood:high");
         }
 
+        // A bot in a fight cries rather than complains; see BotVoice.Struck.
         if (BotMend.Wants(who) && !BotMend.Embattled(who))
         {
             return (Hurt, "mood:hurt");
@@ -164,6 +174,7 @@ public static class BotMoods
         return who.Guild is Guild guild && guild.Name != null && _guildFell.TryGetValue(guild.Name, out var lost) && now - lost < GrieveMs;
     }
 
+    /// <summary>Records long run out are forgotten once a minute, so the two dictionaries stay the size of the living.</summary>
     public static void Sweep(long now)
     {
         if (_swept && now - _sweptTick < 60000)

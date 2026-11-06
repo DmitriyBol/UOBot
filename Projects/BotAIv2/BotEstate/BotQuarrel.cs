@@ -30,32 +30,59 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotQuarrel : BotDeed
 {
+    /// <summary>The ledger key.</summary>
     public const string Trade = "quarrel";
 
+    /// <summary>
+    /// What fighting a guild's enemy is reckoned at per minute before experience corrects it.
+    ///
+    /// <para>
+    /// High, and for the same reason <c>BotEvict.Prior</c> had to be raised: this errand is rare by its
+    /// conditions — a declared war, an enemy within sight, both out of a guarded region — and an errand that
+    /// is rare by conditions and also loses every auction is an errand that never runs at all. Below a
+    /// company's hunt, so a bot with an ogre in front of it keeps the ogre.
+    /// </para>
+    /// </summary>
     public static double Prior { get; set; } = 400.0;
 
+    /// <summary>
+    /// What defending the guild's own ground is reckoned at per minute.
+    ///
+    /// Above a company's hunt and above everything else a bot is offered, by Patrick's order of 13.09.2026:
+    /// an enemy on the yard is the one thing worth dropping an ogre for. Still a price rather than a command
+    /// — the floor that protects work already paid for still holds, and so does the health check.
+    /// </summary>
     public static double DefendPrior { get; set; } = 700.0;
 
+    /// <summary>Quarrels taken up to defend the guild's own ground.</summary>
     public static long Defences { get; private set; }
 
+    /// <summary>How long a quarrel is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 2.0;
 
+    /// <summary>How near the enemy the bot must be to swing. The engine's own weapon reach at melee.</summary>
     public static int Reach { get; set; } = 1;
 
+    /// <summary>How long one may run before it is given up as a chase that will not end.</summary>
     public static int FightMs { get; set; } = 120000;
 
+    /// <summary>Enemies brought down.</summary>
     public static long Felled { get; private set; }
 
+    /// <summary>Quarrels the bot lost.</summary>
     public static long Fallen { get; private set; }
 
+    /// <summary>Quarrels given up because the enemy got away or the war ended under it.</summary>
     public static long Broken { get; private set; }
 
     private readonly BotMobile _them;
 
     private readonly string _ours;
 
+    /// <summary>The guild this quarrel is fought for, by name. See <c>BotWar.Involved</c>.</summary>
     public string Ours => _ours;
 
+    /// <summary>Whether this is the yard being defended rather than a quarrel happened upon.</summary>
     private readonly bool _defending;
 
     private long _began;
@@ -82,6 +109,7 @@ public sealed class BotQuarrel : BotDeed
 
     public override string Kind => Trade;
 
+    /// <summary>The guild's war, standing in front of the bot. See <see cref="BotDeed.Summons"/>.</summary>
     public override bool Summons => true;
 
     public override Map Map => _them?.Map;
@@ -98,14 +126,29 @@ public sealed class BotQuarrel : BotDeed
 
     public override double Coin => 0.0;
 
+    /// <summary>
+    /// Not about money, and saying so is what lets it happen at all.
+    ///
+    /// A guild's war earns the bot nothing, and an errand judged on takings that has none is an errand the
+    /// ledger learns to refuse within the hour. See <c>BotBaron</c>, where a bot stood twelve minutes because
+    /// unpaid work was being marked down for being unpaid.
+    /// </summary>
     public override bool Unpaid => true;
 
     public override string Stage =>
         (_defending ? "defending our ground: " : "")
         + (_struck ? $"fighting {_them?.Name} of the enemy" : $"closing with {_them?.Name} of the enemy");
 
+    /// <summary>One named bot. If the way to it is shut, the quarrel is over rather than re-routed.</summary>
     public override bool Bend(IBotWilful bot) => false;
 
+    /// <summary>
+    /// Defending the yard jumps the work in hand; an ordinary quarrel waits its turn.
+    ///
+    /// Patrick's order of 13.09.2026 said "priority", and a price alone is not one: the floor that keeps a
+    /// bot on work it has already paid for held a miner at its seam while the enemy stood on the hall's
+    /// step. Pressing is what a rescue and a company's call already have, for the same reason.
+    /// </summary>
     public override bool Pressing(IBotWilful bot) => _defending;
 
     public override void Drop(IBotWilful bot)
@@ -140,6 +183,7 @@ public sealed class BotQuarrel : BotDeed
             Felled++;
             body.Combatant = null;
 
+            // The guild is done with this one. Anything still walking at them is walking at a corpse.
             BotFeud.Drop(body.Guild as Guild);
 
             return BotDoing.Done($"{_them.Name} of the enemy is down");
@@ -152,6 +196,8 @@ public sealed class BotQuarrel : BotDeed
             return BotDoing.Failed($"went down fighting {_them.Name}");
         }
 
+        // Asked every beat and not only at the start: a war can end under a fight — see BotRegard.Amity —
+        // and a bot that goes on swinging after the peace is a bot committing a crime in front of a guard.
         if (!BotFeud.Quarrel(body, _them))
         {
             Broken++;
@@ -168,10 +214,14 @@ public sealed class BotQuarrel : BotDeed
             return BotDoing.Failed($"{_them.Name} was not brought down inside {FightMs / 1000}s");
         }
 
+        // Renewed while somebody is actually standing in the fight, which is the only evidence the call is
+        // still worth anybody answering. See BotFeud.CallMs.
         BotFeud.Call(body.Guild as Guild, _them);
 
         if (!body.InRange(_them.Location, Reach))
         {
+            // Followed rather than aimed at: an enemy moves, and a walk order to the tile it stood on a
+            // moment ago is a walk order replaced every beat. The same lesson BotEvict carries.
             return BotDoing.Walk(_them.Map, _them, BotArrival.Within(Reach), $"at {_them.Name} of the enemy");
         }
 

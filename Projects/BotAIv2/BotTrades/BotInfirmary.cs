@@ -34,16 +34,24 @@ public sealed class BotInfirmary
 
     public bool Shut { get; internal set; }
 
+    /// <summary>Patients standing by, in the order they came.</summary>
     internal readonly List<BotMobile> Waiting = [];
 
+    /// <summary>Patients seen and charged, until their own errand reads it.</summary>
     internal readonly HashSet<Serial> Seen = [];
 
+    /// <summary>The fallen guildmate the healer has gone out to raise, and the death it is raising it from.</summary>
     public BotMobile Call { get; internal set; }
 
     public long CallFell { get; internal set; }
 
+    /// <summary>The fee agreed for the call: the raise fee, or more when the healer reads a scroll that costs more (life18b).</summary>
     public int CallFee { get; internal set; }
 
+    /// <summary>
+    /// The healer was called away for a moment — a meeting, a duel — and the infirmary waits for it rather than shutting (07.10.2026,
+    /// life18b): on build 416 140 of 142 shifts were shut "called away" after 2.1 minutes on average, and reopened as new ones.
+    /// </summary>
     public bool Away { get; internal set; }
 
     public long AwayTick { get; internal set; }
@@ -52,8 +60,10 @@ public sealed class BotInfirmary
 
     public int Raised { get; internal set; }
 
+    /// <summary>Opened on demand (life19): shut after <see cref="BotInfirmaries.IdleMs"/> with nobody to see, once <see cref="BotInfirmaries.DemandMinutes"/> are kept.</summary>
     public bool OnDemand { get; internal set; }
 
+    /// <summary>The last moment somebody needed it: opened, a patient sent or standing by, a body claimed, a fresh want of its guild.</summary>
     public long BusyTick { get; internal set; }
 
     public int Takings { get; internal set; }
@@ -81,59 +91,124 @@ public static class BotInfirmaries
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotInfirmaries));
 
+    // ---- Dials ------------------------------------------------------------------------------------------------------------
+
+    /// <summary>Infirmaries at all. Off, none opens, no patient is sent and no body is claimed.</summary>
     public static bool Running { get; set; } = true;
 
     public static bool On => BotTrades.Running && Running;
 
+    /// <summary>How long a healer keeps its infirmary, in minutes. Twenty.</summary>
     public static double ShiftMinutes { get; set; } = 20.0;
 
+    /// <summary>How long after a shift the same healer may keep another. Twenty minutes.</summary>
     public static int RestMs { get; set; } = 1200000;
 
+    /// <summary>How far a healer may be from its guild's seat and be offered the shift. A hundred and fifty tiles.</summary>
     public static int KeeperReach { get; set; } = 150;
 
+    /// <summary>The fewest bandages a healer without a heal spell must carry to keep an infirmary. Ten.</summary>
     public static int LeastBandages { get; set; } = 10;
 
+    /// <summary>
+    /// How far a wounded guildmate may be from the infirmary and be sent to it. A hundred and sixty tiles (life18b; 120 before): the
+    /// walk is priced by the appraisal's own nearness, so a far patient is offered and weighs it.
+    /// </summary>
     public static int PatientReach { get; set; } = 160;
 
+    /// <summary>How long an infirmary waits for a healer called away before it shuts. Three minutes (life18b).</summary>
     public static int AwayMs { get; set; } = 180000;
 
+    /// <summary>
+    /// Whether a healer keeping an open infirmary is left at it by a company's call (<c>BotSquads.Pressable</c>, <c>BotBand.LevyMedic</c>):
+    /// on build 416, 104 of 142 shifts ended "pressed to enlist". The company calls the next healer. A switch (life18b).
+    /// </summary>
     public static bool SpareKeepers { get; set; } = true;
 
+    /// <summary>
+    /// The raise fee over a resurrection scroll's market price, when the healer raises with one: a quarter over (life18b). A scroll
+    /// costs 75–88gp on build 416, so a raise at 60 lost the healer money every time; the fee is the larger of this and <see cref="RaiseFee"/>.
+    /// </summary>
     public static double RaiseMarkup { get; set; } = 1.25;
 
+    /// <summary>
+    /// What a guild's Healer that reads a resurrection scroll keeps after buying one for its infirmary (life18b): a hundred, against the
+    /// 300gp in the pack every other reader keeps (<c>BotRaise.StockReserve</c>). Read in <c>BotLifeline</c> through <see cref="Stocks"/>.
+    /// </summary>
     public static int ScrollKeep { get; set; } = 100;
 
+    /// <summary>The most patients waiting at one infirmary. Six.</summary>
     public static int MostWaiting { get; set; } = 6;
 
+    /// <summary>The fee for each hit point healed. A half: a bandage at the shopkeeper's five gold binds some twenty points.</summary>
     public static double FeePerHit { get; set; } = 0.5;
 
+    /// <summary>The least fee for a visit that healed anything. Five.</summary>
     public static int FeeLeast { get; set; } = 5;
 
+    /// <summary>Tries at one patient before it is sent away with what it got.</summary>
     public static int HealTries { get; set; } = 6;
 
+    /// <summary>
+    /// The fee for raising a fallen guildmate where it fell. Sixty: a third of the 186gp a death costs on this shard (an-money14 §3.2),
+    /// most of which a raising where it fell gives back.
+    /// </summary>
     public static int RaiseFee { get; set; } = 60;
 
+    /// <summary>
+    /// How far from the infirmary a body may lie for its healer to go out to it. A hundred and fifty tiles (life18b; 60 before): of 386
+    /// guild deaths on build 416 two fell within 60 tiles of their seat and fourteen within 200. A mounted healer covers it inside
+    /// the hold.
+    /// </summary>
     public static int RaiseReach { get; set; } = 150;
 
+    /// <summary>How soon after the death a body must be claimed: later, the ordinary revival is close and the healer would only race it.</summary>
     public static int ClaimWithinMs { get; set; } = 30000;
 
+    /// <summary>
+    /// The longest after a death the ordinary revival is held for an infirmary's healer. Three minutes (life18b; two before): the walk
+    /// out of <see cref="RaiseReach"/> and a scroll read at a fifth's chance.
+    /// </summary>
     public static int RaiseHoldMs { get; set; } = 180000;
 
+    /// <summary>How often an open infirmary looks for a fallen guildmate. Three seconds; a walk of the population list, no spatial query.</summary>
     public static int ScanMs { get; set; } = 3000;
 
+    /// <summary>
+    /// <b>The shift on demand, not standing (07.10.2026, life19).</b> On build 419 (2.3 h) 14 infirmaries opened and 13 shut with 0 patients and
+    /// 0 raised: of 699 wounded looks 341 were in a fight, a company or a delve and 358 could heal themselves, and of 88 guild deaths 66 fell
+    /// with none open and 18 farther than 150 tiles from it. Nobody who could not mend itself came, because almost every bot carries
+    /// bandages. With this on, a guild's healer is offered the shift only while somebody of its guild needs it within reach of the seat — a
+    /// wounded bot that cannot mend itself (<see cref="BotPatienter"/>), or a fresh death the healer can raise — and the shift is short:
+    /// <see cref="DemandMinutes"/>, shut after <see cref="IdleMs"/> with nobody to see. Off: the standing twenty-minute shift.
+    /// </summary>
     public static bool OnDemand { get; set; } = true;
 
+    /// <summary>How long a want (a wounded bot that cannot mend itself, a body near the seat) stands for a healer to answer. Two minutes.</summary>
     public static int DemandMs { get; set; } = 120000;
 
+    /// <summary>The least an on-demand shift is kept before it may shut idle. Three minutes.</summary>
     public static double DemandMinutes { get; set; } = 3.0;
 
+    /// <summary>How long an on-demand infirmary stays open with nobody waiting, nobody sent and no body to go to. Two minutes.</summary>
     public static int IdleMs { get; set; } = 120000;
 
+    /// <summary>How long after an on-demand shift the same healer may keep another. Two minutes: the shift was for somebody.</summary>
     public static int DemandRestMs { get; set; } = 120000;
 
+    /// <summary>
+    /// How long the ordinary revival is held for a guild death near the seat while no infirmary is open but a healer of the guild could raise
+    /// it (life19): the healer's walk to the seat and the claim. Ninety seconds after the death; once claimed, <see cref="RaiseHoldMs"/> holds.
+    /// </summary>
     public static int DemandHoldMs { get; set; } = 90000;
 
+    /// <summary>
+    /// life19c: a log line at each step of the path from a guild death to a healer pressed into a shift ("death seen", "seat", "healer",
+    /// "pressed"), so the trigger is seen to run. Deaths are some forty an hour: four lines each.
+    /// </summary>
     public static bool TraceTrigger { get; set; } = true;
+
+    // ---- Counters ---------------------------------------------------------------------------------------------------------
 
     public static long Opened { get; private set; }
 
@@ -161,6 +236,9 @@ public static class BotInfirmaries
 
     public static long Beaten { get; private set; }
 
+    // The fallen, judged once a death when its claim window closes: why no infirmary's healer went out to it (life18b).
+
+    /// <summary>Deaths of guilded bots looked at by the scan, while infirmaries were on.</summary>
     public static long Fell { get; private set; }
 
     public static long FellGuildless { get; private set; }
@@ -185,24 +263,31 @@ public static class BotInfirmaries
 
     public static long FellPoor { get; private set; }
 
+    /// <summary>Times the healer was called away and the infirmary waited for it; came back; and shut for not coming back.</summary>
     public static long Aways { get; private set; }
 
     public static long Returns { get; private set; }
 
     public static long AwayShut { get; private set; }
 
+    /// <summary>Times a company's call passed over a healer keeping an open infirmary. See <see cref="SpareKeepers"/>.</summary>
     public static long Spared { get; private set; }
 
+    // life19: the shift on demand.
+
+    /// <summary>Wants raised with no infirmary of the guild's open: a wounded bot that cannot mend itself near its seat; a death near its seat.</summary>
     public static long WantsHurt { get; private set; }
 
     public static long WantsFallen { get; private set; }
 
+    /// <summary>Deaths with none open, by where: within <see cref="RaiseReach"/> of the seat with a healer able to raise; near it with none; far.</summary>
     public static long FellNoneNear { get; private set; }
 
     public static long FellNoneNoRaiser { get; private set; }
 
     public static long FellNoneFar { get; private set; }
 
+    /// <summary>life19b: deaths with none open near the seat whose able healers were all busy; and the far ones by distance to the seat.</summary>
     public static long FellNoneBusy { get; private set; }
 
     public static long FarTo300 { get; private set; }
@@ -211,6 +296,7 @@ public static class BotInfirmaries
 
     public static long FarBeyond { get; private set; }
 
+    /// <summary>life19b: calls to open a shift (a death or a wound near the seat), by outcome.</summary>
     public static long Triggers { get; private set; }
 
     public static long TriggerCalled { get; private set; }
@@ -227,16 +313,19 @@ public static class BotInfirmaries
 
     public static long TriggerNoHealer { get; private set; }
 
+    /// <summary>Deaths whose revival was held for an on-demand healer; of them claimed after; the rest lapsed to the ordinary revival.</summary>
     public static long Held { get; private set; }
 
     public static long HeldClaimed { get; private set; }
 
     public static long HeldLapsed { get; private set; }
 
+    /// <summary>Infirmaries opened on demand, and shut idle.</summary>
     public static long OpenedOnDemand { get; private set; }
 
     public static long IdleShut { get; private set; }
 
+    /// <summary>Minutes kept open by all shifts, and by those that saw nobody: the healer's time the shifts cost.</summary>
     public static double MinutesOpen { get; private set; }
 
     public static double MinutesEmpty { get; private set; }
@@ -266,10 +355,12 @@ public static class BotInfirmaries
 
         public string Cause;
 
+        /// <summary>Where a death with none open lay against its seat (life19), judged once: "none open near" / "none open no raiser" / "none open far".</summary>
         public string NoneCause;
 
         public long Window = ClaimWithinMs;
 
+        /// <summary>Whether the trace said why no call was made for this death (life19c), once.</summary>
         public bool Traced;
     }
 
@@ -285,6 +376,9 @@ public static class BotInfirmaries
 
     public static IReadOnlyList<BotInfirmary> Open => _open;
 
+    // ---- Opening and shutting ----------------------------------------------------------------------------------------------
+
+    /// <summary>The infirmary of this guild open now, or null.</summary>
     public static BotInfirmary Of(Guild guild)
     {
         if (guild == null)
@@ -303,9 +397,11 @@ public static class BotInfirmaries
         return null;
     }
 
+    /// <summary>Whether a bot of <paramref name="guild"/> is treated at <paramref name="infirmary"/>: its own guild's, or an ally's.</summary>
     public static bool Treats(BotInfirmary infirmary, Guild guild) =>
         infirmary?.Guild != null && guild != null && (ReferenceEquals(infirmary.Guild, guild) || infirmary.Guild.IsAlly(guild));
 
+    /// <summary>Where a guild's infirmary stands: its seat, the house in a town first. Zero when it has none.</summary>
     public static Point3D Seat(Guild guild) => BotSeat.Of(guild);
 
     internal static BotInfirmary OpenAt(BotMobile healer, Guild guild, Map map, bool onDemand = false, Point3D stand = default)
@@ -389,6 +485,12 @@ public static class BotInfirmaries
         );
     }
 
+    // ---- Wants (life19) -----------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Somebody of <paramref name="guild"/> needs its infirmary within reach of the seat: a wounded bot that cannot mend itself, or a body.
+    /// An open one is kept from shutting idle; with none open, the want stands <see cref="DemandMs"/> for a healer (<see cref="BotInfirmarer"/>).
+    /// </summary>
     internal static void Wanted(Guild guild, int worth, bool fallen, long now)
     {
         if (guild == null)
@@ -415,6 +517,7 @@ public static class BotInfirmaries
         want.Fallen |= fallen;
     }
 
+    /// <summary>Whether a want of this guild stands now, and what it is worth in fees, for the hurt and for the fallen.</summary>
     public static bool Wanting(Guild guild, long now, out int worth, out bool hurt, out bool fallen)
     {
         worth = 0;
@@ -433,6 +536,7 @@ public static class BotInfirmaries
         return true;
     }
 
+    /// <summary>An infirmary somebody is on the way to or standing by: kept from shutting idle.</summary>
     internal static void Busy(BotInfirmary infirmary)
     {
         if (infirmary != null)
@@ -441,6 +545,13 @@ public static class BotInfirmaries
         }
     }
 
+    /// <summary>
+    /// <b>A want opens the shift (07.10.2026, life19b).</b> A guild death within <see cref="RaiseReach"/> of the seat, or a wounded guildmate
+    /// that cannot mend itself within <see cref="PatientReach"/> of it, with no hall of the guild's open: the nearest Healer of the guild
+    /// within <see cref="KeeperReach"/> of the seat that can serve it (raise the body; bandages or a heal for the wound) and whose work a
+    /// company's call could put down (<c>BotSquads.Pressable</c>) is pressed into an on-demand shift there and then. One call a guild per
+    /// <see cref="DemandMs"/>. Returns "called", "already called", "open", "no healer" or "busy"; every call logged and counted.
+    /// </summary>
     internal static string Call(Guild guild, Point3D seat, Map map, BotMobile cause, bool fallen, int worth, long now)
     {
         Triggers++;
@@ -464,6 +575,7 @@ public static class BotInfirmaries
         string busy = null;
         var bots = BotPopulation.Bots;
 
+        // life19c: every Healer of the guild counted by why it is not the one, for the trace.
         int healers = 0, dead = 0, elsewhere = 0, far = 0, company = 0, tired = 0, meansless = 0, busied = 0;
 
         for (var i = 0; i < bots.Count; i++)
@@ -646,6 +758,10 @@ public static class BotInfirmaries
 
     private static readonly Dictionary<string, long> _busyKinds = [];
 
+    /// <summary>
+    /// Whether a guild healer could go out to a body near the seat (life19): a Healer of the guild, alive, out of any company, within
+    /// <see cref="KeeperReach"/> of the seat, with the means to raise. A walk of the population list, once a death.
+    /// </summary>
     private static bool Raiser(Guild guild, Point3D seat, Map map)
     {
         var bots = BotPopulation.Bots;
@@ -662,6 +778,9 @@ public static class BotInfirmaries
         return false;
     }
 
+    // ---- Patients -----------------------------------------------------------------------------------------------------------
+
+    /// <summary>The open infirmary of this bot's guild or an ally's nearest it within reach, on joined ground; null with why not.</summary>
     public static BotInfirmary For(BotMobile patient, out string refusal)
     {
         refusal = "none";
@@ -698,6 +817,7 @@ public static class BotInfirmaries
                 continue;
             }
 
+            // Its healer is away for a moment: not sent a patient that would wait on an empty hall (life18b).
             if (infirmary.Away)
             {
                 refusal = "away";
@@ -737,6 +857,9 @@ public static class BotInfirmaries
         }
     }
 
+    /// <summary>
+    /// The visit is over: the fee for what was healed, coin hand to hand, and the patient told. Returns the fee taken.
+    /// </summary>
     internal static int Settle(BotInfirmary infirmary, BotMobile healer, BotMobile patient, int healed)
     {
         infirmary.Waiting.Remove(patient);
@@ -787,6 +910,12 @@ public static class BotInfirmaries
         return fee;
     }
 
+    // ---- The fallen -------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Whether the ordinary revival keeps its hands off this ghost because an infirmary's healer is on its way to it. One hook in
+    /// <c>BotRaise.Holding</c>; at most <see cref="RaiseHoldMs"/> after the death, so a healer that never comes costs a minute.
+    /// </summary>
     public static bool Holding(BotMobile ghost)
     {
         if (ghost == null)
@@ -794,6 +923,7 @@ public static class BotInfirmaries
             return false;
         }
 
+        // life19: a death near the seat with none open and a healer of the guild able to raise: held while one comes to open the hall.
         if (!_claims.ContainsKey(ghost.Serial) && _held.TryGetValue(ghost.Serial, out var fell))
         {
             return On && OnDemand && fell == ghost.FellTick && !ghost.Alive && Core.TickCount - fell < DemandHoldMs;
@@ -815,6 +945,10 @@ public static class BotInfirmaries
         return true;
     }
 
+    /// <summary>
+    /// Each open infirmary with no body to go to looks at the population once for a guildmate or ally fallen within
+    /// <see cref="RaiseReach"/>, lately, that no company is raising, and that can pay. From the module's clock.
+    /// </summary>
     internal static void Scan(long now)
     {
         if (!On || now - _scanTick < ScanMs)
@@ -830,6 +964,7 @@ public static class BotInfirmaries
             logger.Information("Infirmaries at boot (life19c): {Raisers}", Raisers());
         }
 
+        // A healer called away that has not come back in AwayMs: the infirmary shuts after all (life18b).
         for (var k = _open.Count - 1; k >= 0; k--)
         {
             var infirmary = _open[k];
@@ -841,6 +976,9 @@ public static class BotInfirmaries
             }
         }
 
+        // <b>Every fresh death looked at, whether or not an infirmary is open (life18b).</b> On build 416 the scan ran only while one
+        // was open and walked away from any body it could not take without a word: 0 claimed in nine hours and no line saying why. Each
+        // death is judged on every scan inside its claim window and its last reason counted once when the window closes.
         var bots = BotPopulation.Bots;
 
         for (var i = 0; i < bots.Count; i++)
@@ -855,6 +993,7 @@ public static class BotInfirmaries
 
             if (!_judging.TryGetValue(ghost.Serial, out var judging) || judging.Fell != ghost.FellTick)
             {
+                // A new death: the last one's verdict, if it was never settled, is settled now.
                 if (judging != null)
                 {
                     Tally(judging.Cause);
@@ -919,6 +1058,7 @@ public static class BotInfirmaries
             BotVoice.Say(healer, "guild", $"{ghost.Name} is down at ({ghost.X}, {ghost.Y}). I'm going out to raise it.");
         }
 
+        // Windows closed: each death's last verdict counted once.
         _settled.Clear();
 
         foreach (var (serial, judging) in _judging)
@@ -942,6 +1082,7 @@ public static class BotInfirmaries
             }
         }
 
+        // Wants nobody answered in time are forgotten.
         _stale.Clear();
 
         foreach (var (guild, want) in _wants)
@@ -963,6 +1104,10 @@ public static class BotInfirmaries
     private static bool HeldFor(BotMobile ghost) =>
         _held.TryGetValue(ghost.Serial, out var fell) && fell == ghost.FellTick;
 
+    /// <summary>
+    /// Why the nearest open infirmary of this ghost's guild or an ally's will not go out to it, or "claimed" with the infirmary and the
+    /// fee when it will. The order is the order the reasons are worth reading in: whose it is, where, then the healer's means and the purse.
+    /// </summary>
     private static string Judge(BotMobile ghost, long now, Judging judging, out BotInfirmary chosen, out int fee)
     {
         chosen = null;
@@ -1053,6 +1198,11 @@ public static class BotInfirmaries
         return "claimed";
     }
 
+    /// <summary>
+    /// A death with no infirmary of its guild's or an ally's open (life19): the reasons a hall could not raise it read first; then where it
+    /// lies against its own seat, judged once a death. Near the seat with a healer able to raise: the guild's want is raised and the
+    /// ordinary revival held <see cref="DemandHoldMs"/> while the healer comes (<see cref="OnDemand"/>).
+    /// </summary>
     private static string NoneOpen(BotMobile ghost, Guild guild, long now, Judging judging)
     {
         var early = NoneOpenEarly(ghost);
@@ -1129,6 +1279,7 @@ public static class BotInfirmaries
             {
                 judging.NoneCause = "none open far";
 
+                // How far, so the clause says whether a wider reach would change anything (life19b).
                 var away = seat == Point3D.Zero ? int.MaxValue : Math.Max(Math.Abs(seat.X - ghost.X), Math.Abs(seat.Y - ghost.Y));
 
                 if (away <= 300)
@@ -1150,6 +1301,9 @@ public static class BotInfirmaries
             }
             else
             {
+                // <b>The death is the trigger (life19b).</b> On build 420 no shift ever opened on demand: the want waited for a healer's
+                // own auction. Now the nearest guild healer able to raise is pressed into the shift at once, opens the hall from where
+                // it stands, and the scan claims this body for it; the ordinary revival is held DemandHoldMs meanwhile.
                 var outcome = Call(guild, seat, ghost.Map, ghost, true, RaiseFee, now);
 
                 if (outcome == "called" || outcome == "already called")
@@ -1174,6 +1328,7 @@ public static class BotInfirmaries
         return judging.NoneCause;
     }
 
+    /// <summary>What a raising costs the raised: <see cref="RaiseFee"/>, or a scroll's market price and <see cref="RaiseMarkup"/> when it is read off one.</summary>
     public static int FeeFor(BotRaise.Means means)
     {
         if (means != BotRaise.Means.Scroll)
@@ -1218,6 +1373,7 @@ public static class BotInfirmaries
         }
     }
 
+    /// <summary>Whether a company's call leaves this deed's bot at its infirmary. See <see cref="SpareKeepers"/>; one hook in <c>BotSquads.Pressable</c>.</summary>
     public static bool Spares(BotDeed deed)
     {
         if (!On || !SpareKeepers || deed is not BotKeepInfirmary { Open: true })
@@ -1230,9 +1386,14 @@ public static class BotInfirmaries
         return true;
     }
 
+    /// <summary>Whether this bot keeps an open infirmary now: passed over by a company's search for a medic (<c>BotBand.LevyMedic</c>).</summary>
     public static bool Keeping(Mobile body) =>
         On && SpareKeepers && body is BotMobile { Resolve.Deed: BotKeepInfirmary { Open: true } };
 
+    /// <summary>
+    /// Whether this bot stocks a resurrection scroll for its guild's infirmary on the lower keep (<see cref="ScrollKeep"/>, read against all
+    /// it may spend rather than its pocket): a Healer of a guild, with the infirmaries on. One hook in <c>BotLifeline</c>.
+    /// </summary>
     public static bool Stocks(Mobile body) =>
         On && body is BotMobile { Class.Name: "Healer" } healer && healer.Guild is Guild && !BotUnderworld.Member(healer);
 
@@ -1262,6 +1423,7 @@ public static class BotInfirmaries
         }
     }
 
+    /// <summary>The healer is done with its call, raised or not.</summary>
     internal static void EndCall(BotInfirmary infirmary, bool gaveUp)
     {
         if (infirmary?.Call == null)
@@ -1286,6 +1448,7 @@ public static class BotInfirmaries
         infirmary.Call = null;
     }
 
+    /// <summary>The body is up, its corpse gone through: the fee, coin hand to hand, and the tally.</summary>
     internal static void Rose(BotInfirmary infirmary, BotMobile healer, BotMobile ghost, BotRaise.Means means)
     {
         Raised++;
@@ -1297,6 +1460,7 @@ public static class BotInfirmaries
         {
             BotMarket.Pay(healer, fee);
 
+            // The raised bot's work in hand did not lose the fee, the healer's shift earned it.
             BotYield.Aside(ghost, fee);
             RaiseGold += fee;
             infirmary.Takings += fee;
@@ -1324,6 +1488,8 @@ public static class BotInfirmaries
         BotCampTalk.Say(ghost, "infirmary:raised", null, healer, fill);
     }
 
+    // ---- Words --------------------------------------------------------------------------------------------------------------
+
     public static Dictionary<string, string[]> Phrases() =>
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -1345,6 +1511,7 @@ public static class BotInfirmaries
         + $"{Demand()}; raisers: {Raisers()}; "
         + $"{BotInfirmarer.Describe()}; {BotPatienter.Describe()}";
 
+    /// <summary>The shift on demand's clause (life19): wants, the deaths with none open by where, holds, shifts and the healer's time.</summary>
     private static string Demand() =>
         !OnDemand
             ? $"shifts standing, not on demand; {MinutesOpen:F0} minutes kept open, {MinutesEmpty:F0} of them by shifts that saw nobody"
@@ -1355,6 +1522,10 @@ public static class BotInfirmaries
               + $"{Held} revivals held up to {DemandHoldMs / 1000}s for a healer: {HeldClaimed} claimed, {HeldLapsed} lapsed; "
               + $"{MinutesOpen:F0} minutes kept open, {MinutesEmpty:F0} of them by shifts that saw nobody";
 
+    /// <summary>
+    /// life19c: how many guilds have a Healer able to raise at all (a resurrection scroll and the Magery for it, the book and herbs, or a
+    /// bandage at 80 Healing and 80 Anatomy). Zero makes the whole raising path moot, and the line says so. A walk of the population.
+    /// </summary>
     public static string Raisers()
     {
         var bots = BotPopulation.Bots;
@@ -1514,6 +1685,7 @@ public sealed class BotKeepInfirmary : BotDeed
 
     private long _openedTick;
 
+    // The patient in hand.
     private BotMobile _patient;
 
     private int _startHits;
@@ -1526,6 +1698,7 @@ public sealed class BotKeepInfirmary : BotDeed
 
     private bool _awaiting;
 
+    // The body gone out to.
     private BotRaise.Means _means;
 
     private double _chance;
@@ -1540,6 +1713,7 @@ public sealed class BotKeepInfirmary : BotDeed
 
     private readonly bool _onDemand;
 
+    /// <summary>Called out by a death (life19b): the hall is opened at the seat from where the healer stands, so the body is claimed at once.</summary>
     private readonly bool _atOnce;
 
     public BotKeepInfirmary(Map map, Guild guild, Point3D seat, double claim, bool onDemand = false, bool atOnce = false)
@@ -1552,6 +1726,7 @@ public sealed class BotKeepInfirmary : BotDeed
         _atOnce = atOnce;
     }
 
+    /// <summary>The shift's length: the standing twenty minutes, or the on-demand few (life19).</summary>
     private double Shift => _onDemand ? Math.Max(1.0, BotInfirmaries.DemandMinutes) : BotInfirmaries.ShiftMinutes;
 
     public override string Kind => Trade;
@@ -1574,6 +1749,7 @@ public sealed class BotKeepInfirmary : BotDeed
 
     public override bool Steadfast => true;
 
+    /// <summary>Open and its healer at it: what a company's call leaves alone (<see cref="BotInfirmaries.Spares"/>).</summary>
     public bool Open => _infirmary is { Shut: false, Away: false };
 
     public override double HoldsFor => _infirmary != null ? Math.Max(1.0, Shift - OpenMinutes(Core.TickCount)) + 1.0 : 0.0;
@@ -1620,6 +1796,7 @@ public sealed class BotKeepInfirmary : BotDeed
             _infirmary = null;
         }
 
+        // Back from whatever called it away: the infirmary it left waiting is open again (life18b).
         if (_infirmary is { Away: true })
         {
             BotInfirmaries.CameBack(_infirmary);
@@ -1671,6 +1848,7 @@ public sealed class BotKeepInfirmary : BotDeed
             return End(now, "the shift is over");
         }
 
+        // life19: an on-demand shift shuts once nobody needs it: kept its few minutes, nobody waiting or in hand, nobody sent lately.
         if (_onDemand && OpenMinutes(now) >= BotInfirmaries.DemandMinutes && _patient == null && _infirmary.Waiting.Count == 0
             && now - _infirmary.BusyTick >= BotInfirmaries.IdleMs)
         {
@@ -1715,6 +1893,8 @@ public sealed class BotKeepInfirmary : BotDeed
         _awaiting = false;
         _tried = false;
     }
+
+    // ---- A patient --------------------------------------------------------------------------------------------------------
 
     private BotDoing Healing(BotMobile body, long now)
     {
@@ -1762,6 +1942,7 @@ public sealed class BotKeepInfirmary : BotDeed
             return BotDoing.Work(Stage);
         }
 
+        // The click a bot has no client to make: a heal of ours come round to its target. See BotSalve.
         if (_awaiting && body.Target != null)
         {
             _awaiting = false;
@@ -1803,15 +1984,19 @@ public sealed class BotKeepInfirmary : BotDeed
             return BotDoing.Work($"casting on {patient.Name}");
         }
 
+        // Nothing left to give it: what it got is what it pays for.
         _tries = BotInfirmaries.HealTries;
 
         return BotDoing.Work($"healing {patient.Name}");
     }
 
+    // ---- The fallen -------------------------------------------------------------------------------------------------------
+
     private BotDoing Raising(BotMobile body, long now)
     {
         var ghost = _infirmary.Call;
 
+        // Up already — the ordinary revival, or a company — or the hold is over: back to the infirmary.
         if (ghost is not { Deleted: false } || ghost.Alive || ghost.FellTick != _infirmary.CallFell || !BotInfirmaries.Holding(ghost)
             || ghost.Map != _map)
         {
@@ -1848,6 +2033,7 @@ public sealed class BotKeepInfirmary : BotDeed
             return BotDoing.Walk(_map, ghost.Location, BotArrival.Beside, $"to raise {ghost.Name}");
         }
 
+        // A ghost is seen by the living only when it manifests (Mobile.CanSee): what a player does to be raised, the bot does too.
         ghost.Warmode = true;
 
         if (_means == BotRaise.Means.Bandage)
@@ -1855,6 +2041,7 @@ public sealed class BotKeepInfirmary : BotDeed
             return Wind(body, ghost, now);
         }
 
+        // The cursor is up: aimed, and the engine's spending read for whether it took (BotSquad.Work's reading).
         if (body.Target is { } cursor && body.Spell is ResurrectionSpell cast)
         {
             var used = cast.Scroll;
@@ -1918,6 +2105,7 @@ public sealed class BotKeepInfirmary : BotDeed
         return BotDoing.Work($"raising {ghost.Name}");
     }
 
+    /// <summary>The bandage of a master: one used, the engine's wait, the engine's roll (BotSquad.Wind's reading).</summary>
     private BotDoing Wind(BotMobile body, BotMobile ghost, long now)
     {
         if (!_wounding)
@@ -1990,6 +2178,7 @@ public sealed class BotKeepInfirmary : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+        // A body that cannot be walked to is given up to the ordinary revival; the shift goes on.
         if (_infirmary?.Call != null)
         {
             BotInfirmaries.EndCall(_infirmary, true);
@@ -2005,6 +2194,9 @@ public sealed class BotKeepInfirmary : BotDeed
     {
         Release();
 
+        // <b>Waited for, not shut (07.10.2026, life18b).</b> Shut on every call away, the infirmaries of build 416 were open 2.1 minutes a
+        // shift; the hall now waits <see cref="BotInfirmaries.AwayMs"/> for its healer, sends no new patient meanwhile, and gives a body
+        // it had gone out to back to the ordinary revival.
         if (_infirmary != null)
         {
             BotInfirmaries.WentAway(_infirmary);
@@ -2037,6 +2229,7 @@ public sealed class BotInfirmarer : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>What a shift is worth a minute until this healer's own shifts say otherwise.</summary>
     public static double Prior { get; set; } = 20.0;
 
     public static long Looks { get; private set; }
@@ -2053,6 +2246,7 @@ public sealed class BotInfirmarer : IBotProposer
 
     public static long Offered { get; private set; }
 
+    /// <summary>life19: healers passed over for want of anybody needing the infirmary; and over a want of the fallen they could not raise.</summary>
     public static long NoWant { get; private set; }
 
     public static long CannotRaise { get; private set; }
@@ -2083,6 +2277,7 @@ public sealed class BotInfirmarer : IBotProposer
             return null;
         }
 
+        // Only a healer by trade: the class whose kit is the bandage and the heal. Everybody else binds its own.
         if (body.Class?.Name != "Healer")
         {
             return null;
@@ -2113,6 +2308,7 @@ public sealed class BotInfirmarer : IBotProposer
             return null;
         }
 
+        // life19: on demand, only while somebody of the guild needs the hall within reach of the seat.
         var worth = 0;
         var wantsHurt = false;
 
@@ -2157,6 +2353,7 @@ public sealed class BotInfirmarer : IBotProposer
             return new BotKeepInfirmary(map, guild, seat, Prior);
         }
 
+        // The claim: the shift's prior and the fees the want is worth over the short shift (a raise's fee, a wound's points).
         OfferedOnDemand++;
 
         return new BotKeepInfirmary(map, guild, seat, Prior + worth / Math.Max(1.0, BotInfirmaries.DemandMinutes), true);
@@ -2273,6 +2470,8 @@ public sealed class BotTend : BotDeed
             return BotDoing.Done($"whole again before {healer.Name} could see it");
         }
 
+        // <b>The hall, not the healer, while the healer is out (life18b).</b> A patient followed the healer itself, so one sent while it
+        // went out to a body, or was called away, walked after it across the country. It waits at the infirmary instead.
         var home = !_infirmary.Away && _infirmary.Call == null && healer.InRange(_infirmary.Stand, 4);
 
         if (!home)
@@ -2335,6 +2534,7 @@ public sealed class BotTend : BotDeed
             body.Journey.Finish();
         }
 
+        // In the queue whenever it stands by the healer: a patient that stepped off and came back is queued again.
         BotInfirmaries.Arrive(_infirmary, body);
 
         if (now - _queuedTick >= BotPatienter.WaitMs)
@@ -2379,10 +2579,19 @@ public sealed class BotPatienter : IBotProposer
 
     public static double Prior { get; set; } = 25.0;
 
+    /// <summary>What a wound adds a minute, times the share of hits missing.</summary>
     public static double HurtWorth { get; set; } = 80.0;
 
+    /// <summary>
+    /// The share of its hits under which a bot is sent. Seven tenths (life18b; six before): of 719 wounded looked at on build 416, 205 could
+    /// not heal themselves, and a bot at two thirds of its hits regains the rest at a point every eleven seconds.
+    /// </summary>
     public static double HurtUnder { get; set; } = 0.7;
 
+    /// <summary>
+    /// The least Healing at which a bot's own bandages count as mending itself (life19): thirty, a bandage that takes four tries in ten. Zero
+    /// restores trades17's rule (one bandage in the pack is enough).
+    /// </summary>
     public static double SelfBindSkill { get; set; } = 30.0;
 
     public static int EveryMs { get; set; } = 600000;
@@ -2411,16 +2620,21 @@ public sealed class BotPatienter : IBotProposer
 
     public static long Tired { get; private set; }
 
+    /// <summary>Wounded passed over for a fight, a company or a delve in hand; and those whose infirmary's healer was away (life18b).</summary>
     public static long Engaged { get; private set; }
 
     public static long Away { get; private set; }
 
+    // life19: the looks split finer.
+
+    /// <summary>Of <see cref="Engaged"/>: at a fight, in a company, delving.</summary>
     public static long InFight { get; private set; }
 
     public static long InCompany { get; private set; }
 
     public static long InDelve { get; private set; }
 
+    /// <summary>Of <see cref="SelfHealing"/>: by a spell, by bandages and the skill, by a potion; and of all of them, those with a hall of theirs open within reach.</summary>
     public static long SelfSpell { get; private set; }
 
     public static long SelfCloth { get; private set; }
@@ -2429,18 +2643,21 @@ public sealed class BotPatienter : IBotProposer
 
     public static long SelfInReach { get; private set; }
 
+    /// <summary>The wounded that could not mend themselves, by why: no bandage and no heal; bandages under the skill; poisoned with no cure.</summary>
     public static long Bare { get; private set; }
 
     public static long Unskilled { get; private set; }
 
     public static long Uncured { get; private set; }
 
+    /// <summary>Of <see cref="None"/>: none of theirs open anywhere with the seat within reach (a want raised); none open and the seat far; open but too far.</summary>
     public static long NoneNearSeat { get; private set; }
 
     public static long NoneFarSeat { get; private set; }
 
     public static long OpenFar { get; private set; }
 
+    /// <summary>Offers not taken: what the bot held at its next look instead ("nothing" = refused at the auction: a veto, a zero, or less than the rest).</summary>
     private static readonly Dictionary<string, long> _lostTo = [];
 
     private static readonly Dictionary<Serial, long> _offers = [];
@@ -2461,6 +2678,10 @@ public sealed class BotPatienter : IBotProposer
 
     internal static void NoteTired() => Tired++;
 
+    /// <summary>
+    /// How this bot can mend itself now, or null with why it cannot (life19): a spell ready (Cure first when poisoned), a potion for what ails
+    /// it, or bandages with <see cref="SelfBindSkill"/> Healing — 60 Healing and 60 Anatomy for a poison.
+    /// </summary>
     public static string Mends(BotMobile who, out string cannot)
     {
         cannot = null;
@@ -2524,6 +2745,7 @@ public sealed class BotPatienter : IBotProposer
             return null;
         }
 
+        // An offer at the last look not taken: counted by what the bot holds instead.
         if (_offers.Count > 0 && _offers.Remove(who.Serial))
         {
             var instead = who.Resolve?.Deed is { } held ? held.Kind : "nothing";
@@ -2633,6 +2855,7 @@ public sealed class BotPatienter : IBotProposer
                 }
                 else
                 {
+                    // None of its guild's or an ally's open: near its own seat, the want that opens an on-demand shift (life19).
                     var seat = BotInfirmaries.Seat(guild);
 
                     if (seat != Point3D.Zero && Utility.InRange(seat, who.Location, BotInfirmaries.PatientReach) && BotGates.Joined(who.Map, who.Location, seat))
@@ -2644,6 +2867,7 @@ public sealed class BotPatienter : IBotProposer
                             BotInfirmaries.NoteWantHurt();
                             BotInfirmaries.Wanted(guild, Fee(who), false, now);
 
+                            // life19b: the wound is a trigger too: the nearest able healer of the guild is called to open the hall.
                             BotInfirmaries.Call(guild, seat, who.Map, who, false, Fee(who), now);
                         }
                     }
@@ -2664,9 +2888,11 @@ public sealed class BotPatienter : IBotProposer
         return new BotTend(infirmary, Prior + HurtWorth * (1.0 - (double)who.Hits / who.HitsMax));
     }
 
+    /// <summary>What a visit would take in fees: the points missing at the fee a point, never under the least.</summary>
     private static int Fee(BotMobile who) =>
         Math.Max(BotInfirmaries.FeeLeast, (int)Math.Ceiling(Math.Max(0, who.HitsMax - who.Hits) * Math.Max(0.0, BotInfirmaries.FeePerHit)));
 
+    /// <summary>"lost to: hunt 3, nothing 2" — offers not taken by what the bot held instead, the commonest first; and stale offers dropped.</summary>
     private static string LostTo()
     {
         var now = Core.TickCount;

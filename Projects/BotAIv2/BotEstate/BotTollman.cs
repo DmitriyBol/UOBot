@@ -23,16 +23,20 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotTollman : IBotProposer
 {
+    /// <summary>How far a warden walks to a stranger.</summary>
     public static int Reach { get; set; } = 160;
 
+    /// <summary>How long a stranger stays spoken for by the warden walking to it.</summary>
     public static int ClaimMs { get; set; } = 30000;
 
+    /// <summary>How long a warden leaves a stranger it could not reach.</summary>
     public static int ShunMs { get; set; } = 300000;
 
     public static long Asked { get; private set; }
 
     public static long Offered { get; private set; }
 
+    /// <summary>Asked of a fighter whose guild patrols and had no stranger on its land.</summary>
     public static long Nobody { get; private set; }
 
     public static long Far { get; private set; }

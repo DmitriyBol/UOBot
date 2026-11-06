@@ -20,6 +20,7 @@ public sealed class BotQuestStore : GenericPersistence
     {
     }
 
+    /// <summary>Errands read back at the last load. For the summary.</summary>
     public static int Restored { get; private set; }
 
     public override void Serialize(IGenericWriter writer)

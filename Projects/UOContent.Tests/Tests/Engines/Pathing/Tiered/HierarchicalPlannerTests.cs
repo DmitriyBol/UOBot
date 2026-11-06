@@ -21,6 +21,7 @@ public class HierarchicalPlannerTests
         return graph;
     }
 
+    /// <summary>Every leg of a route — start, the points, the goal — must be walkable on its own, and cost no more in all than the route says.</summary>
     private static void AssertWalkable(GridNavTerrain terrain, Point3D start, List<Point3D> points, Point3D goal, int cost)
     {
         var at = start;
@@ -114,11 +115,16 @@ public class HierarchicalPlannerTests
         Assert.Equal(0, planner.LastExpanded);
     }
 
+    /// <summary>
+    /// A bridge deck at 20 runs east and west over a river; a road at 0 runs north and south under it, walled in by
+    /// water. The road passes under the deck, the deck passes over the road, and neither can reach the other.
+    /// </summary>
     [Fact]
     public void BridgeOverARoad_TheTwoLevelsStayApart()
     {
         var terrain = new GridNavTerrain(64, 64, '~');
 
+        // The banks, west and east, and the approaches up to the deck: 0, 5, 10, 15, 20.
         terrain.Fill(0, 18, 7, 22, '.');
         terrain.Fill(56, 18, 63, 22, '.');
         terrain.Fill(8, 18, 8, 22, '/');
@@ -134,6 +140,7 @@ public class HierarchicalPlannerTests
 
         terrain.Fill(11, 18, 52, 22, '=');
 
+        // The road, north to south, under the deck.
         terrain.Fill(30, 0, 34, 63, '.');
         terrain.Fill(30, 18, 34, 22, '+');
 
@@ -158,6 +165,7 @@ public class HierarchicalPlannerTests
         Assert.Equal(NavStatus.Unreachable, planner.Route(graph, 2, 20, 0, 32, 2, 0, points));
     }
 
+    /// <summary>High ground drops to the ground beside it and cannot be climbed back: the graph is directed.</summary>
     [Fact]
     public void OneWayDrop_IsWalkedDownButNotUp()
     {
@@ -175,6 +183,10 @@ public class HierarchicalPlannerTests
         Assert.Equal(NavStatus.Unreachable, planner.Route(graph, 10, 30, 0, 50, 30, 10, points));
     }
 
+    /// <summary>
+    /// A goal walled in on every side, as a herb on a table or a fire in a closed corner is: unreachable to stand on, and
+    /// reached all the same by a walker that arrives within two tiles of it.
+    /// </summary>
     [Fact]
     public void GoalInAPocket_ReachSettlesOnACellBeside()
     {
@@ -208,6 +220,7 @@ public class HierarchicalPlannerTests
         Assert.Equal(NavStatus.Pending, new HierarchicalPlanner().Route(graph, 2, 3, 0, 60, 57, 0, new List<Point3D>()));
     }
 
+    /// <summary>A house raised across the field, then taken down: the graph follows, and leaks no node either way.</summary>
     [Fact]
     public void MarkDirty_RebuildsAndLeaksNothing()
     {
@@ -229,6 +242,7 @@ public class HierarchicalPlannerTests
 
         Assert.Equal(NavStatus.Ok, planner.Route(graph, 5, 5, 0, 40, 5, 0, points));
 
+        // The gap lies inside a cluster, so no waypoint need stand in it; the route must go round by it all the same.
         Assert.True(planner.LastCost >= 2 * 35 * NavCost.Step, $"{planner.LastCost} does not go round by the gap");
         Assert.True(planner.LastCost >= open);
         AssertWalkable(terrain, new Point3D(5, 5, 0), points, new Point3D(40, 5, 0), planner.LastCost);
@@ -243,6 +257,7 @@ public class HierarchicalPlannerTests
         Assert.True(planner.LastCost <= terrain.Oracle(5, 5, 0, 40, 5, 0) * 1.1 + 2 * NavCost.Step);
     }
 
+    /// <summary>Random pairs on a field of random walls: never a route cheaper than the oracle, never a false "unreachable".</summary>
     [Fact]
     public void RandomObstacles_AgreeWithTheOracle()
     {

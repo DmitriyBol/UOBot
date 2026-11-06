@@ -54,48 +54,83 @@ public sealed class BotDelveParty
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDelveParty));
 
+    /// <summary>How long a fallen delver lies before its own party puts it back up.</summary>
     public static int RaiseMs { get; set; } = 10000;
 
+    /// <summary>
+    /// Resurrections a party has between them.
+    ///
+    /// Three, by order. It is the number that makes a delve a run of attrition rather than a fight that
+    /// either goes well or ends: a party can afford to lose the line twice and still finish, and the third
+    /// loss is the one that starts costing it members.
+    /// </summary>
     public static int Raisings { get; set; } = 3;
 
+    /// <summary>
+    /// <b>Whether a party's raisings cost nothing (02.10.2026).</b> Until today a raising was ten seconds face down and up, with no
+    /// scroll, no spell and nobody casting either; Patrick's word of 02.10, "the group should carry resurrection scrolls for such
+    /// cases", is the era's own answer, and false makes it the rule: a party's three raisings are spent by a member that raises with a
+    /// resurrection scroll, the spell from its book or a bandage, exactly as any company raises its fallen (<c>BotSquadRaise</c>,
+    /// <see cref="BotRaise"/>), and a delver nobody down there can raise goes home with its raisings unspent. True puts back the free
+    /// raising, its corpse now gone through at once.
+    /// </summary>
     public static bool FreeRaisings { get; set; } = false;
 
+    /// <summary>Members that went home with raisings left to the party, nobody down there able to raise them. See <see cref="FreeRaisings"/>.</summary>
     public static long Unraised { get; private set; }
 
+    /// <summary>The leader's share of everything the party takes, as a fraction.</summary>
     public static double LeadersShare { get; set; } = 0.5;
 
+    /// <summary>How long after its delve has ended a party is lifted out regardless. See the note above.</summary>
     public static int GraceMs { get; set; } = 60000;
 
+    /// <summary>
+    /// How long a settled party's members are given to walk out by the mouth before whoever is still down there is lifted
+    /// out. Ten minutes: the rooms lie a few hundred tiles from a mouth. See <see cref="Settle(string, bool)"/> (29.09.2026).
+    /// </summary>
     public static int LeaveMs { get; set; } = 600000;
 
+    /// <summary>Members that walked out by the mouth after their delve settled, and those the watchdog had to lift after all.</summary>
     public static long WalkedOut { get; private set; }
 
     private long _settledTick;
 
+    /// <summary>Parties that have gone down.</summary>
     public static long Delves { get; private set; }
 
+    /// <summary>Gold swept into pots, all told.</summary>
     public static long Taken { get; private set; }
 
+    /// <summary>Gold handed back out at the end.</summary>
     public static long Paid { get; private set; }
 
+    /// <summary>Members put back on their feet where they fell.</summary>
     public static long Raised { get; private set; }
 
+    /// <summary>Members who ran the party out of resurrections and went home.</summary>
     public static long Lost { get; private set; }
 
+    /// <summary>Members lifted out by the watchdog rather than by their own delve. See <see cref="GraceMs"/>.</summary>
     public static long Stranded { get; private set; }
 
+    /// <summary>Every party currently underground.</summary>
     private static readonly List<BotDelveParty> _parties = [];
 
     private sealed class Share
     {
         public BotMobile Who;
 
+        /// <summary>What it had in its pack when the sweep last looked. Anything above it is the party's.</summary>
         public int Floor;
 
+        /// <summary>What the pot owes it.</summary>
         public int Credit;
 
+        /// <summary>Whether it is still down there and still earning.</summary>
         public bool Down = true;
 
+        /// <summary>The death last counted as gone home unraised, so a ghost asked about every beat is counted once.</summary>
         public long Unraised;
     }
 
@@ -117,12 +152,16 @@ public sealed class BotDelveParty
 
     public BotMobile Leader { get; }
 
+    /// <summary>Resurrections left to the party.</summary>
     public int Left { get; private set; }
 
+    /// <summary>What the pot holds and has already promised out.</summary>
     public int Pot { get; private set; }
 
+    /// <summary>Whether the delve that owns this party has finished with it.</summary>
     public bool Ended { get; private set; }
 
+    /// <summary>How many are still down there.</summary>
     public int Down
     {
         get
@@ -141,6 +180,7 @@ public sealed class BotDelveParty
         }
     }
 
+    /// <summary>Takes a member on, noting what it already had so that the sweep never takes its own money.</summary>
     public void Add(BotMobile bot)
     {
         if (bot is not { Deleted: false } || Holds(bot))
@@ -164,6 +204,15 @@ public sealed class BotDelveParty
         return false;
     }
 
+    /// <summary>
+    /// Sweeps whatever the party has picked up into the pot and credits it.
+    ///
+    /// <para>
+    /// Anything a member is carrying <i>above</i> what it walked in with. The floor follows a purse
+    /// downwards as well as up, so a bot that spends or is robbed does not spend the rest of the delve
+    /// owing the pot money it never had.
+    /// </para>
+    /// </summary>
     public void Sweep()
     {
         var took = 0;
@@ -172,6 +221,8 @@ public sealed class BotDelveParty
         {
             var share = _shares[i];
 
+            // Only those still down there (02.10.2026): a member sent home — by the fourth death, or with nobody down there able to
+            // raise it — keeps what it earns from then on, as the rule says it does. Until today its purse went on being swept.
             if (share.Who is not { Deleted: false } body || !share.Down)
             {
                 continue;
@@ -208,6 +259,16 @@ public sealed class BotDelveParty
         Credit(took);
     }
 
+    /// <summary>
+    /// Half to the leader and the rest evenly between whoever is still down there.
+    ///
+    /// <para>
+    /// A leader that is itself dead and gone still takes its half: the party is its, the pot exists because
+    /// it called for one, and a rule that moved the half about would make killing the leader the most
+    /// profitable thing that can happen to the other four. What a fallen <i>member</i> stops taking is its
+    /// quarter, which is the rule as given.
+    /// </para>
+    /// </summary>
     private void Credit(int coins)
     {
         var leaders = (int)Math.Round(coins * LeadersShare, MidpointRounding.AwayFromZero);
@@ -225,6 +286,8 @@ public sealed class BotDelveParty
 
         var each = sharers == 0 ? 0 : rest / sharers;
 
+        // What the division could not split goes to the leader with its own half rather than being dropped:
+        // a remainder thrown away is gold leaving the world, quietly, a few coins at a time.
         var leftover = rest - each * sharers;
 
         for (var i = 0; i < _shares.Count; i++)
@@ -245,6 +308,11 @@ public sealed class BotDelveParty
         }
     }
 
+    /// <summary>
+    /// One of ours is dead. Raised where it lies while the party has a resurrection, and let go when it has
+    /// not.
+    /// </summary>
+    /// <returns>True when this party has dealt with it and the ordinary revival is to keep its hands off.</returns>
     public bool Fell(BotMobile bot)
     {
         var share = Of(bot);
@@ -256,6 +324,8 @@ public sealed class BotDelveParty
 
         if (Left <= 0)
         {
+            // Out of the party, and out of the pot: it keeps every coin already credited to it and earns
+            // nothing after this moment. Handed over to the ordinary revival, which will carry it home.
             share.Down = false;
             Lost++;
 
@@ -269,6 +339,9 @@ public sealed class BotDelveParty
             return false;
         }
 
+        // <b>With a member's own means, or not at all (02.10.2026).</b> Held while the company is at the body — a member with a scroll,
+        // the spell or a bandage walking to it or rolling for it (BotRaise.Holding) — and spent when it stands up (Spent). A party with
+        // nobody down there able to raise it lets it go home with the raisings unspent, out of the pot as a fourth death would be.
         if (!FreeRaisings)
         {
             if (BotRaise.Holding(bot))
@@ -296,9 +369,13 @@ public sealed class BotDelveParty
 
         if (Core.TickCount - (bot.FellTick + RaiseMs) < 0)
         {
+            // Still too soon. Held rather than handed over: the ordinary revival would carry it home, and
+            // being carried home is the one thing a raising is supposed to prevent.
             return true;
         }
 
+        // And its own corpse gone through where it lies, before it stands (02.10.2026): see BotRaise.Rise for why before. The floor
+        // follows the purse up so the sweep does not take back into the pot the coin the delver walked in with.
         if (bot.Remains is { Deleted: false } corpse)
         {
             BotReclaim.Strip(bot, corpse, out _, out _);
@@ -313,6 +390,8 @@ public sealed class BotDelveParty
 
         if (!bot.Alive)
         {
+            // The engine refused — it does that silently, and in a dungeon it is worth knowing about. Let
+            // the ordinary revival have it rather than leaving a ghost underground for ever.
             share.Down = false;
 
             return false;
@@ -333,13 +412,23 @@ public sealed class BotDelveParty
         return true;
     }
 
-    public void Settle(string why) => Settle(why, true);
+    /// <summary>
+    /// The delve is over: everything still in the pot is handed out, and everybody still down there is put
+    /// back on the island.
+    /// </summary>
+    public int Settle(string why) => Settle(why, true);
 
-    public void Settle(string why, bool lift)
+    /// <summary>
+    /// The same; with <paramref name="lift"/> false, everybody still down there is left to walk out by the mouth — the delve
+    /// leads them (BotDelve.Leaving) — and the watchdog lifts whoever is still below <see cref="LeaveMs"/> later. Patrick's
+    /// order of 29.09.2026: the way out is the entrance, as the way in is. Returns how many bodies it surfaced: nought when
+    /// walking them out, or when the party had settled already.
+    /// </summary>
+    public int Settle(string why, bool lift)
     {
         if (Ended)
         {
-            return;
+            return 0;
         }
 
         Ended = true;
@@ -348,6 +437,7 @@ public sealed class BotDelveParty
         Sweep();
 
         var handed = 0;
+        var surfaced = 0;
 
         for (var i = 0; i < _shares.Count; i++)
         {
@@ -365,9 +455,15 @@ public sealed class BotDelveParty
                 Paid += share.Credit;
             }
 
+            // Only those still down there. A member sent home at nine minutes has been living its own life
+            // since; yanking it back to the home ground to be paid would be the delve reaching out of the
+            // dungeon to interrupt work it has nothing to do with.
+            // Whoever is still down there comes up, whatever the book says about them: a member the
+            // squad let go underground had Down cleared and stayed in the cave. See BotSquad.Release.
             if (lift && (share.Down || (_deep != null && _deep.Holds(body.Location))))
             {
                 Surface(body);
+                surfaced++;
             }
 
             if (lift)
@@ -390,8 +486,14 @@ public sealed class BotDelveParty
         {
             _parties.Remove(this);
         }
+
+        return surfaced;
     }
 
+    /// <summary>
+    /// Lifts out whoever of a settled party is still down there, and takes the party off the list. Returns how many were
+    /// lifted; the rest walked out on their own. See <see cref="LeaveMs"/>.
+    /// </summary>
     public int Lift()
     {
         var lifted = 0;
@@ -418,6 +520,7 @@ public sealed class BotDelveParty
         return lifted;
     }
 
+    /// <summary>Puts one body back where the population lives, whatever it was doing.</summary>
     private static void Surface(BotMobile bot)
     {
         if (bot is not { Deleted: false })
@@ -429,6 +532,7 @@ public sealed class BotDelveParty
         bot.Journey?.Finish();
     }
 
+    /// <summary>What the pot owes this member so far. The leader's own is what a delve pays its caller.</summary>
     public int Owed(Mobile bot) => Of(bot)?.Credit ?? 0;
 
     private Share Of(Mobile bot)
@@ -446,6 +550,10 @@ public sealed class BotDelveParty
 
     private static int Purse(Mobile bot) => bot?.Backpack?.GetAmount(typeof(Gold)) ?? 0;
 
+    /// <summary>
+    /// Asked by <c>BotPopulation.Revive</c> before it does anything of its own: is this bot somebody's
+    /// delver, and has its party taken care of it?
+    /// </summary>
     public static bool Raise(BotMobile bot)
     {
         for (var i = 0; i < _parties.Count; i++)
@@ -459,12 +567,18 @@ public sealed class BotDelveParty
         return false;
     }
 
+    /// <summary>
+    /// One of a party was raised where it fell by a member's own means (<c>BotSquadRaise</c>): one of the party's raisings spent, and
+    /// the member back down there and earning. Its floor follows its purse, which now holds what came back off its corpse — the coin
+    /// it walked in with, not the party's to sweep.
+    /// </summary>
     public static void Spent(BotMobile bot)
     {
         for (var i = 0; i < _parties.Count; i++)
         {
             var party = _parties[i];
 
+            // Raised where it fell: a delver sent home that dies on the island is not the party's to raise or count.
             if (party.Ended || party.Of(bot) is not { } share || !BotUndertaker.Below(bot.Location))
             {
                 continue;
@@ -486,6 +600,7 @@ public sealed class BotDelveParty
         }
     }
 
+    /// <summary>Whether a company may raise this bot: not one of a party whose raisings are spent, which goes home by the rule.</summary>
     public static bool MayRaise(BotMobile bot)
     {
         for (var i = 0; i < _parties.Count; i++)
@@ -499,6 +614,7 @@ public sealed class BotDelveParty
         return true;
     }
 
+    /// <summary>Whether this bot is still down there with a party that has not ended — not one its party sent home. See <c>BotUndertaker</c>.</summary>
     public static bool Below(Mobile bot)
     {
         for (var i = 0; i < _parties.Count; i++)
@@ -512,6 +628,7 @@ public sealed class BotDelveParty
         return false;
     }
 
+    /// <summary>Whether this bot is underground with a party right now.</summary>
     public static bool Delving(Mobile bot)
     {
         for (var i = 0; i < _parties.Count; i++)
@@ -525,6 +642,17 @@ public sealed class BotDelveParty
         return false;
     }
 
+    /// <summary>
+    /// How many parties are down this dungeon right now.
+    ///
+    /// <para>
+    /// <b>Because a dungeon has a spawn rate and it is the ceiling on everybody in it.</b> The ladder picks
+    /// the richest dungeon a band can survive, which is the same answer for every band of about the same
+    /// strength, so on the evening of 11.09.2026 all five guilds went into the Orc Caves at once: twenty-five
+    /// bots in ten rooms, and between them they killed seventy things in twenty minutes where one party
+    /// alone had killed twenty in eight. Nothing was wrong with any of them. They had eaten the cave.
+    /// </para>
+    /// </summary>
     public static int Inside(BotDungeon.Deep deep)
     {
         var count = 0;
@@ -540,6 +668,11 @@ public sealed class BotDelveParty
         return count;
     }
 
+    /// <summary>
+    /// The watchdog. Walked on the delve module's own clock, and it exists for one failure: a delve whose
+    /// errand was cancelled, whose leader was deleted, or which ended in some way nobody thought of, leaving
+    /// bots in a place with no road out.
+    /// </summary>
     public static void Watch()
     {
         var now = Core.TickCount;
@@ -548,6 +681,7 @@ public sealed class BotDelveParty
         {
             var party = _parties[i];
 
+            // A party that settled and is walking out: whoever is still below after LeaveMs is lifted, the rest walked.
             if (party.Ended)
             {
                 if (now - (party._settledTick + LeaveMs) >= 0)
@@ -570,6 +704,10 @@ public sealed class BotDelveParty
                 continue;
             }
 
+            // Two ways a party can be left behind, and neither of them is anything the delve itself does.
+            // The leader was deleted, so nothing is advancing the errand; or the errand stopped being
+            // advanced for some reason nobody thought of, and the party has outlived the longest delve the
+            // shard allows by a clear margin.
             var gone = party.Leader is not { Deleted: false };
             var overrun = now - (party._bornTick + BotDelve.CapMs + GraceMs) >= 0;
 

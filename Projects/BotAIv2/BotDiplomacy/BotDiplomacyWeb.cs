@@ -34,6 +34,7 @@ public static class BotDiplomacyWeb
         w.WriteEndObject();
     }
 
+    /// <summary>Every pair of standing guilds that has an opinion, an agreement, an alliance or a war between them.</summary>
     private static void Relations(Utf8JsonWriter w)
     {
         w.WritePropertyName("relations");
@@ -97,6 +98,7 @@ public static class BotDiplomacyWeb
         w.WriteEndArray();
     }
 
+    /// <summary>Each guild's standing in each town it has dealt with: prices, failures, exile, and the task in hand.</summary>
     private static void Standing(Utf8JsonWriter w)
     {
         w.WritePropertyName("standing");

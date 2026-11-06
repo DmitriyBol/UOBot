@@ -26,10 +26,13 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotEarnings
 {
+    /// <summary>Classes whose coin is not counted. See the class note.</summary>
     public static string[] Excluded { get; set; } = ["Baron", "Captain", "Architect", "Sage"];
 
+    /// <summary>The window the rates are taken over.</summary>
     public static int WindowMs { get; set; } = 3600000;
 
+    /// <summary>How often purses and banks are sampled.</summary>
     public static int SampleMs { get; set; } = 60000;
 
     private static readonly Queue<(long Tick, string Name, string Class, int Coin, int Made)> _recent = new();
@@ -40,6 +43,7 @@ public static class BotEarnings
 
     private static long _firstTick;
 
+    /// <summary>Whether anything has been counted yet; a tick is never its own sentinel (CLAUDE.md rule 20).</summary>
     private static bool _started;
 
     private static long _sampledTick;
@@ -48,6 +52,7 @@ public static class BotEarnings
 
     public static bool Counts(string cls) => cls != null && Array.IndexOf(Excluded, cls) < 0;
 
+    /// <summary>A settled undertaking's takings. From <c>BotWill.Settle</c>.</summary>
     public static void Note(Mobile body, int coin, int made)
     {
         if (body is not BotMobile bot || !Counts(bot.Class?.Name))
@@ -87,6 +92,7 @@ public static class BotEarnings
 
     private static long WealthOf(BotMobile bot) => (bot.Backpack?.GetAmount(typeof(Gold)) ?? 0) + Banker.GetBalance(bot);
 
+    /// <summary>Purses and banks, once a minute at most. From the page's snapshot, on the loop.</summary>
     public static void Sample()
     {
         var now = Core.TickCount;
@@ -136,6 +142,7 @@ public static class BotEarnings
         Trim(now);
     }
 
+    /// <summary>The "money" object of the page's snapshot.</summary>
     public static void Write(Utf8JsonWriter w)
     {
         Sample();
@@ -144,6 +151,7 @@ public static class BotEarnings
 
         Trim(now);
 
+        // The rate is over what has been watched: an hour, or less since the boot.
         var watchedMs = !_started ? 0 : Math.Min(WindowMs, now - _firstTick);
         var hours = Math.Max(watchedMs, 60000) / 3600000.0;
 
@@ -155,6 +163,8 @@ public static class BotEarnings
         long spentAll = 0;
         long madeAll = 0;
 
+        // Coin in and coin out apart: an ending's coin is what the pack gained over the undertaking, and a restock's is the
+        // price it paid. Earned is what came in; spent at work is what went out on the work itself.
         foreach (var (_, name, cls, c, m) in _recent)
         {
             if (c >= 0)
@@ -236,6 +246,7 @@ public static class BotEarnings
 
             if (sampledHours > 0 && then.Bots > 0 && bots.Bots > 0)
             {
+                // Per bot, so a class that grew or shrank in the hour is not read as having got richer or poorer.
                 w.WriteNumber("netPerBotPerHour", Math.Round(((double)bots.Wealth / bots.Bots - (double)then.Wealth / then.Bots) / sampledHours, 1));
             }
             else

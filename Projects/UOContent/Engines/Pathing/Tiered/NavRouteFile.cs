@@ -18,7 +18,7 @@ namespace Server.Engines.Pathing.Tiered;
 /// </summary>
 public static class NavRouteFile
 {
-    private const uint Magic = 0x5256414E;
+    private const uint Magic = 0x5256414E; // "NAVR"
 
     private const int Format = 1;
 
@@ -73,6 +73,7 @@ public static class NavRouteFile
         File.Move(temp, path, true);
     }
 
+    /// <summary>The roads in a file, or null when there is none, it is of another format, or of other map files.</summary>
     public static List<NavRouteRecord> Read(string path, ulong fingerprint, int width, int height)
     {
         if (!File.Exists(path))
@@ -154,6 +155,7 @@ public static class NavRouteFile
         return routes;
     }
 
+    /// <summary>A file's roads, or an empty list with the reason when it cannot be read. For the worker that reads it at boot.</summary>
     public static List<NavRouteRecord> TryRead(string path, ulong fingerprint, int width, int height, out string error)
     {
         error = null;

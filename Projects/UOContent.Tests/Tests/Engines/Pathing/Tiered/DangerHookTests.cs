@@ -47,6 +47,11 @@ public class DangerHookTests
         return false;
     }
 
+    /// <summary>
+    /// The shard's danger moves: quarantines are declared and lifted, blood fades. The strategic planner caches a region's
+    /// internal edges (<c>Ensure</c>) and adds the hook's cost on top at relaxation, so a band that moves between routes
+    /// makes the cached edges disagree with the costs the search sees. This is the shard's case, not the constant band's.
+    /// </summary>
     [Theory]
     [InlineData(60 * NavCost.Step)]
     [InlineData(800 * NavCost.Step)]
@@ -85,6 +90,12 @@ public class DangerHookTests
         }
     }
 
+    /// <summary>
+    /// The hang itself: a route whose start and goal lie in one region, forced onto the long tier (a medium budget too small
+    /// to finish, which is what a heavy danger penalty does to it). The strategic search handed the goal a border node as
+    /// its parent without relaxing that node, and the corridor walk ran from the goal into the array's default parent,
+    /// node 0, whose parent is 0. Fixed on 29.09.2026 (build 308): the node is relaxed from the start first.
+    /// </summary>
     [Fact]
     public void SameRegionOnTheLongTier_ComesBack()
     {
@@ -98,6 +109,7 @@ public class DangerHookTests
 
         for (var i = 0; i < 40; i++)
         {
+            // Both ends inside the region of 128 tiles at the origin, far enough apart to need more than one expansion.
             var sx = random.Next(2, 60);
             var sy = random.Next(2, 60);
             var gx = random.Next(70, 126);
@@ -127,6 +139,7 @@ public class DangerHookTests
 
         try
         {
+            // A band across the whole field, both banks, that costs `penalty` a node to enter.
             NavigationService.Danger = penalty == 0 ? null : (x, _) => x is >= 300 and <= 450 ? penalty : 0;
 
             for (var i = 0; i < 120; i++)
@@ -143,6 +156,7 @@ public class DangerHookTests
 
                 if (i % 3 == 0)
                 {
+                    // The medium tier on its own, as the walk asks it first.
                     came = Within(() => medium.Route(graph, sx, sy, 0, gx, gy, 0, points), 10000, out status);
                     Assert.True(came, $"medium route {i} with a penalty of {penalty} did not come back");
                 }

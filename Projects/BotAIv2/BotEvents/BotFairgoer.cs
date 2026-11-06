@@ -11,6 +11,7 @@ public sealed class BotFairCall : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>The least of the fair that must be left for the walk to be offered.</summary>
     public static int LeastLeftMs { get; set; } = 1800000;
 
     public BotDeed Propose(IBotWilful bot)

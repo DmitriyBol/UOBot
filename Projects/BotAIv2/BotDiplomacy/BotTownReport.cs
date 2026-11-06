@@ -21,6 +21,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotTownReport
 {
+    /// <summary>How far round the town's hall its ground is read, in tiles. Ninety: three squares each way.</summary>
     public static int Reach { get; set; } = 90;
 
     public string Town { get; init; }
@@ -29,8 +30,10 @@ public sealed class BotTownReport
 
     public int Residents { get; init; }
 
+    /// <summary>What the island is short of and no shop in this town has on its shelf now, commonest shortage first.</summary>
     public List<Type> Out { get; } = [];
 
+    /// <summary>The squares within <see cref="Reach"/> reading unsafe or worse, how many of the population died in them, and the worst.</summary>
     public int Unsafe { get; init; }
 
     public int Dead { get; init; }
@@ -41,10 +44,13 @@ public sealed class BotTownReport
 
     public bool Quarantined { get; init; }
 
+    /// <summary>The market's board in one phrase.</summary>
     public string Market { get; init; }
 
+    /// <summary>The whole of it for the model.</summary>
     public string Facts { get; set; }
 
+    /// <summary>The rule's report, one or two plain sentences.</summary>
     public string Said { get; set; }
 
     public static BotTownReport Of(BotTowns.Town town, Point3D hall, Guild guild)
@@ -113,6 +119,7 @@ public sealed class BotTownReport
             Market = BotMarket.Board(4)
         };
 
+        // The island's shortages that this town's shelves cannot answer either: the ones the town would be glad of.
         var dry = BotShops.Dry();
 
         for (var i = 0; i < dry.Count && report.Out.Count < 3; i++)
@@ -154,6 +161,7 @@ public sealed class BotTownReport
         return string.Join(", ", names);
     }
 
+    /// <summary>The rule's words for the town: its shelves and its ground, in two sentences at most.</summary>
     private static string Plain(BotTownReport r)
     {
         var shelves = r.Out.Count > 0

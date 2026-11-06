@@ -32,26 +32,40 @@ public static class BotSeasons
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeasons));
 
+    /// <summary>The one switch for all five. Each has its own as well.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often the events' clock turns. Five seconds: a kill is paid within that of the creature falling.</summary>
     public static int EveryMs { get; set; } = 5000;
 
+    /// <summary>How often the <c>Events:</c> line is written. The population's own five minutes.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
+    /// <summary>The least the city's purse keeps after anything here is held out of it.</summary>
     public static int CityReserve { get; set; } = 1000;
 
+    /// <summary>The hue of an announcement broadcast to every client.</summary>
     public static int Hue { get; set; } = 0x35;
 
+    /// <summary>
+    /// Argus's herald: stands at the place for a while and calls the line in the world channel. Filled by the debugger's assembly;
+    /// null when it is off, and then the line is broadcast and logged here instead.
+    /// </summary>
     public static Action<Map, Point3D, string> Herald { get; set; }
 
+    /// <summary>The crown's purse (the revels'): takes up to the sum and says how much it gave. Null when the debugger is off.</summary>
     public static Func<int, int> CrownTake { get; set; }
 
+    /// <summary>Coin back into the crown's purse.</summary>
     public static Action<int> CrownGive { get; set; }
 
+    /// <summary>The championship called at the fair, if the hour allows; returns what the herald answered. Null with the debugger off.</summary>
     public static Func<string, string> CallTourney { get; set; }
 
+    /// <summary>Announcements made, all told.</summary>
     public static long Announced { get; private set; }
 
+    /// <summary>Coin handed to bots by the events, all told, and the coin a payment could not put anywhere.</summary>
     public static long PaidOut { get; private set; }
 
     public static long Unpayable { get; private set; }
@@ -94,6 +108,7 @@ public static class BotSeasons
 
         var now = Core.TickCount;
 
+        // Each is its own guard against an exception: one event's mistake must not stop the other four for the session.
         Guard("night", () => BotNight.Beat(now));
         Guard("invasion", () => BotInvasion.Beat(now));
         Guard("fair", () => BotFair.Beat(now));
@@ -120,6 +135,10 @@ public static class BotSeasons
         }
     }
 
+    /// <summary>
+    /// A line to the island: Argus's herald at the place when the debugger is on, else broadcast to every client; always on the
+    /// dashboard's event stream (kind <c>event</c>) and in the log.
+    /// </summary>
     public static void Announce(string what, Map map, Point3D at, string line)
     {
         if (string.IsNullOrWhiteSpace(line))
@@ -154,8 +173,13 @@ public static class BotSeasons
         }
     }
 
+    /// <summary>A bot's own line about an event, in a channel, the clock of its own voice ignored: these are rare and the point.</summary>
     public static void Say(Mobile who, string channel, string line) => BotVoice.Say(who, channel, line, true);
 
+    /// <summary>
+    /// Coin to a bot: into its account, opened if it never was; into its pack if the account will not take it. The coin is the
+    /// caller's to have taken from somewhere first. False when neither would hold it, and then nothing moved.
+    /// </summary>
     public static bool Pay(Mobile who, int gold)
     {
         if (gold <= 0)
@@ -194,6 +218,10 @@ public static class BotSeasons
         return false;
     }
 
+    /// <summary>
+    /// How much the city may hold out for an event: what was asked, never more than its purse leaves above
+    /// <see cref="CityReserve"/>, held at once. Nought, and nothing held, when that is under <paramref name="least"/>.
+    /// </summary>
     public static int Hold(int asked, int least)
     {
         if (!BotCity.Running || asked <= 0)
@@ -213,6 +241,7 @@ public static class BotSeasons
         return can;
     }
 
+    /// <summary>Held coin paid out to a bot by an event. False, and the coin still held, when it could not be put anywhere.</summary>
     public static bool Disburse(Mobile who, int gold)
     {
         if (gold <= 0 || !Pay(who, gold))
@@ -226,6 +255,7 @@ public static class BotSeasons
         return true;
     }
 
+    /// <summary>Held coin that was not paid, back into the city's purse.</summary>
     public static void Return(int gold)
     {
         if (gold <= 0)
@@ -237,12 +267,14 @@ public static class BotSeasons
         Returned += gold;
     }
 
+    /// <summary>Coin held out of the city's purse by the events, paid out of the hold, and handed back.</summary>
     public static long Held { get; private set; }
 
     public static long Released { get; private set; }
 
     public static long Returned { get; private set; }
 
+    /// <summary>A coin held before a restart, still owed to the purse: counted as held so its return balances. See <see cref="BotEventsStore"/>.</summary>
     internal static void HeldBefore(int gold)
     {
         if (gold > 0)
@@ -252,8 +284,18 @@ public static class BotSeasons
         }
     }
 
+    // ---- shared questions about the ground ----------------------------------------------------------------------------------------
+
+    /// <summary>Whether a tile is open ground out of town: standable, reachable from home, not guarded, not closed, not deadly.</summary>
     public static bool Open(Map map, int x, int y, out Point3D at) => Why(map, x, y, out at) == null;
 
+    /// <summary>
+    /// Why a tile is not open ground out of town, or null when it is (and <paramref name="at"/> is the spot). life18a, 07.10.2026: the
+    /// test no longer refuses everything inside a town's <i>box</i> (<see cref="BotTowns.Town.Bounds"/>, the union of the region's
+    /// rectangles): Britain's box is 648 × 500 tiles round its square, so every tile 60–100 out of the square lay in it and the
+    /// invasion found no place four times in nine hours. Whether a tile is in town is the region's own answer (a town region is a
+    /// guarded region), asked below.
+    /// </summary>
     public static string Why(Map map, int x, int y, out Point3D at)
     {
         at = Point3D.Zero;
@@ -305,6 +347,7 @@ public static class BotSeasons
         return null;
     }
 
+    /// <summary>"80 tiles north-east of Britain": where a place lies from a town, for a sentence.</summary>
     public static string Bearing(BotTowns.Town town, Point3D at)
     {
         if (town == null)
@@ -322,6 +365,7 @@ public static class BotSeasons
         return far < 12 ? $"in {town.Name}" : $"{far} tiles {(way.Length > 0 ? way : "out")} of {town.Name}";
     }
 
+    /// <summary>A fighter the town may call: alive, in the world, fit, able, not of the neutral class.</summary>
     public static bool Fighter(Mobile m) =>
         m is BotMobile { Deleted: false, Alive: true } bot && bot.Map != null && bot.Map != Map.Internal
         && bot is IBotAlly { AbleToFight: true } && !BotTrading.Neutral(bot) && bot.HitsMax > 0
@@ -344,6 +388,22 @@ public static class BotSeasons
         _faults.Clear();
     }
 
+    /// <summary>
+    /// <b>Patrick's reset (07.10.2026, reset26): every event called off and its calendar started over, so the save writes the events
+    /// empty.</b> The reset of 20:56 that night left <c>Saves/BotEvents</c> whole: an invasion's hold and creatures, a caravan's
+    /// hold, an open fair's tickets, the rumoured chest and the fair's turn among the towns — kept for a reload, and wrong for a new
+    /// world. This is the module's own reload (<see cref="BotEventsModule.Reset"/>) without stopping the clock, which the shard needs
+    /// until it is restarted, and with the rumour and the fair's calendar let go as well.
+    ///
+    /// <para>
+    /// <b>Money first, then the counters.</b> Each event hands its coin back through its own path before anything is forgotten:
+    /// the invasion's pool and the caravan's hold and late guards' wages back into the city's purse (<see cref="Return"/>, so the
+    /// purse's held count falls with them), the fair's tickets back to their holders, and the rumoured chest's coin back to the
+    /// crown that filled it. A ticket's coin was the buyer's, never the purse's, and the reset has already deleted the buyers with
+    /// everything they carried, so a refund that finds nobody is counted lost with them (<c>BotFair.PotLost</c>) and the purse is
+    /// untouched either way. Returns the gold handed back to the purse and the crown.
+    /// </para>
+    /// </summary>
     public static int Wipe()
     {
         var before = Returned;

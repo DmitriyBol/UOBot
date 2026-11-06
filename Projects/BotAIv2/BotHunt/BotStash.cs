@@ -27,20 +27,28 @@ public sealed class BotStash : BotDeed
 
     public const string Trade = "stash";
 
+    /// <summary>The least coin in a member's pack worth the walk out to the hideout.</summary>
     public static int Least { get; set; } = 200;
 
+    /// <summary>What the walk is held at against other work, a minute: the band's own priority, as robbery and practice are.</summary>
     public static double Prior { get; set; } = 350.0;
 
+    /// <summary>How often a member is looked over for a pack worth stashing.</summary>
     public static int EveryMs { get; set; } = 120000;
 
+    /// <summary>Walks begun.</summary>
     public static long Runs { get; private set; }
 
+    /// <summary>Walks that put something down.</summary>
     public static long Done { get; private set; }
 
+    /// <summary>Walks that arrived with nothing worth putting down after all.</summary>
     public static long Empty { get; private set; }
 
+    /// <summary>Walks that found no chest to put anything in.</summary>
     public static long Chestless { get; private set; }
 
+    /// <summary>Coin and things put down in all.</summary>
     public static long Gold { get; private set; }
 
     public static long Things { get; private set; }
@@ -63,10 +71,12 @@ public sealed class BotStash : BotDeed
 
     public override bool Unpaid => true;
 
+    /// <summary>The walk is long and the chest does not move; an interruption should give it back, not throw it away.</summary>
     public override bool Steadfast => true;
 
     public override bool Repeats(BotDeed other) => other is BotStash;
 
+    /// <summary>The walk is the thief's own and ends at the fire, far outside every town; it goes on foot as a thief does.</summary>
     public override bool Hurries => true;
 
     public override Map Map => _map;
@@ -109,6 +119,8 @@ public sealed class BotStash : BotDeed
 
         _at = chest.GetWorldLocation();
 
+        // Beside the chest, never onto it: a chest on the ground is impassable and a walk aimed at its own tile finds
+        // no way in. See BotLair.Doorstep.
         if (!body.InRange(_at, 2))
         {
             var step = BotLair.Doorstep();
@@ -136,10 +148,14 @@ public sealed class BotStash : BotDeed
             }
             else
             {
+                // The chest would not take it: the coin goes back where it was rather than out of the world.
                 body.AddToBackpack(new Gold(spare));
             }
         }
 
+        // <b>The fence's pack is the band's shop window.</b> It carries the chest's goods out to a shopkeeper
+        // (BotFetch) and would otherwise put them straight back in on arrival, which is a bot walking a circle: the
+        // fence puts down coin and nothing else.
         var kept = BotUnload.Keeps(bot);
         List<Item> spared = [];
         var goods = !BotFence.Is(body);
@@ -148,6 +164,7 @@ public sealed class BotStash : BotDeed
         {
             var item = pack.Items[i];
 
+            // What the bot carries for itself stays with it: its bound gear, its kit, anything its trade asks for.
             if (item is not { Deleted: false, Movable: true } || item is Gold || BotBinding.IsBound(item, bot.Bond)
                 || kept.ContainsKey(item.GetType()))
             {
@@ -165,10 +182,17 @@ public sealed class BotStash : BotDeed
             }
         }
 
+        // <b>The other half of the keeper.</b> The fence's pack is the band's shop window and the loop above puts
+        // none of it down — but a thing the band's own kit asked for was bought for the chest, not for a counter. See
+        // BotFence.Wants, and BotShopper.Wanting, which is where it was bought.
         var stocked = 0;
 
         if (BotFence.Is(body) && BotFence.Wants() is { Count: > 0 } asked)
         {
+            // By kind and not by stack. Its own kit stays in its own pack — a keeper that tips its bandages into the
+            // chest is short of bandages, is sent to buy more, and walks the same circle for ever — but the allowance
+            // is for the kind, and a dyed bound pile will not merge with a bought one, so the bandages are in two
+            // piles and neither is bigger than the allowance. See BotFence.Spare, which is where that cost a day.
             var owed = BotFence.Spare(body as BotMobile, asked);
             List<(Item Stack, int Give)> parcels = [];
 
@@ -195,6 +219,8 @@ public sealed class BotStash : BotDeed
                 var (stack, give) = parcels[i];
                 var held = Math.Max(1, stack.Amount);
 
+                // LiftItemDupe leaves the original holding what it is passed and hands back the rest, so the fence
+                // keeps its own and the band gets the surplus in one item.
                 var parcel = give >= held ? stack : Mobile.LiftItemDupe(stack, held - give);
 
                 if (parcel != null && chest.TryDropItem(body, parcel, false))
@@ -206,6 +232,10 @@ public sealed class BotStash : BotDeed
 
             BotFence.Stocked(stocked);
 
+            // <b>Named, because twice now this has arrived and put nothing down.</b> "finished stash: nothing worth
+            // putting down" says only that the sum came to nought; which of the four steps it came to nought at — the
+            // band asking for nothing, the pack holding nothing spare, the stacks refusing to split, the chest
+            // refusing to take — is what this line answers. See DECISIONS 145.
             logger.Information(
                 "{Name} at the chest: the band asked for {Kinds} kinds, it held {Owed} of them spare, made up {Parcels} parcels and put down {Stocked}",
                 body.Name,

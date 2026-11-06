@@ -38,43 +38,72 @@ public sealed class BotDebugModule : BotModule
         BotDebugLog.Open(BotVigil.Name);
         BotHand.Open(BotVigil.Name);
 
+        // After every other module has loaded its configuration, which is what makes the values this reads
+        // the ones the shard is actually running with rather than the ones the source is written with.
         BotDials.Open();
 
         BotVigil.Start();
         BotHail.Listen();
         BotConsole.Open();
 
+        // The two seams through which a revel touches the population. Both live in BotAIv2 and are filled
+        // from here, never called from there: the minds depend on the bots and must not be depended on. See
+        // BotAppraisal.Revelry.
         BotAppraisal.Revelry = BotRevel.Worth;
 
+        // The other half of the same seam: the price goes out through Revelry, and what the notice says goes
+        // out through here, so the dashboard can show a revel without this assembly being referenced back.
         BotCrier.Posted = BotRevel.Notice;
 
+        // Where the squad stands, for the dashboard's teleport buttons. Patrick's order of 13.09.2026: the
+        // helpers reachable the way the watcher is.
         BotCrier.Watchers = BotVigil.Standing;
         BotWill.Completed = BotRevel.Did;
 
+        // What the watcher finds under the island goes into the watcher's own file. See BotHalls: the chart
+        // is the bots' knowledge and lives with them, and only the telling of it belongs here.
         BotHalls.Noted = BotDebugLog.Write;
 
+        // The squad as witness to the guilds' meetings, and the model as the duke's and the towns' voice: three hooks in
+        // BotParley, filled from here as the revel's are. Patrick's order of 29.09.2026, evening. See BotWitness.
         BotWitness.Open();
 
+        // The squad as the zones' walkers: who is free to go, and how they get there. Patrick's order of 30.09.2026, evening:
+        // Argus and the other debuggers walk the world and look at every mob zone. See BotZoneTour.
         BotZoneTour.Walkers = BotVigil.TourWalkers;
         BotZoneTour.Move = BotVigil.Carry;
 
+        // One of them wholly on the zones while the zone watch runs, and the watch's verdicts in the lead's feed (07.10.2026).
+        // See BotZoneWatch.
         BotZoneTour.KeeperHook = BotVigil.KeeperName;
         BotZoneWatch.Noted = line => BotDebugLog.Write($"{BotVigil.Name}: {line}");
 
+        // And a debugger stands on each tile the reach map's check examines (01.10.2026). See BotReachCheck.
         BotReachCheck.Walkers = BotVigil.Walkers;
         BotReachCheck.Move = BotVigil.Carry;
 
+        // The squad on the dashboard's live window: where each stands, what it is doing and thinking (02.10.2026). See BotDebugWeb.
         BotWebHooks.Debuggers = BotDebugWeb.Report;
 
+        // The events of the world (07.10.2026, events17): Argus's herald calls them, the crown's purse fills a rumour's chest, and
+        // the championship is held at the fair. See BotEventsArgus.
         BotEventsArgus.Open();
 
+        // The model as a town's steward, when it is free (07.10.2026, steward20). See BotStewardArgus.
         BotStewardArgus.Open();
+        // The guilds' bouts, called by their heralds, announced by Argus's (07.10.2026, officers20). See BotOfficersArgus.
         BotOfficersArgus.Open();
 
         _timer?.Stop();
         _timer = new VigilSummaryTimer(TimeSpan.FromMilliseconds(SayEveryMs));
         _timer.Start();
 
+        // The numbers it is actually running with, said once, because a belief about what the debugger is
+        // watching for that was formed from the defaults in the source can be wrong by a factor of two
+        // without anything looking odd. This shard's rule, and it applies to the thing that enforces it too.
+        // Whether anything else is thinking is read rather than asserted. The line used to say "the
+        // population thinks with something else", which stopped being true the moment the minds were stood
+        // down — and a fact that goes stale in the first line anybody reads is worse than no fact.
         logger.Information(
             "{Name} the debugger is watching, thinking with {Model} ({Others}) held for {Hold} after each answer: measuring every {Sample}ms, moving every {Hover}ms, reporting every {Report}ms and reflecting every {Reflect}ms. Frozen after {Frozen}s of standing while walking, silent work after {Silent}m, no-progress judged after {Settled}m. Its thinking goes to {Log}",
             BotVigil.Name,
@@ -93,6 +122,9 @@ public sealed class BotDebugModule : BotModule
             BotDebugLog.Path ?? "nowhere"
         );
 
+        // What it may do to the population as well as what it watches for. A revel moves prices and puts
+        // camps on the ground, so the numbers behind it belong in a startup line like every other threshold
+        // on this shard.
         logger.Information(
             "It may also declare a revel every {Every}m: one trade worth ×{Bonus} for {Holds}m with a prize up to {Prize}gp, out of a treasury of {Treasury}gp for the session",
             BotRevel.EveryMs / 60000,
@@ -112,6 +144,18 @@ public sealed class BotDebugModule : BotModule
         }
     }
 
+    /// <summary>
+    /// How often the debugger says what it has been doing, in its own line in the shard's log.
+    ///
+    /// <para>
+    /// <b>It never said any of it.</b> <see cref="Summarise"/> has existed since the debugger did, composing
+    /// a line that carries the only numbers by which this observer can be judged - how many bots it reminded
+    /// and shook, and of those, how many were going again by the next window. Nothing called it. The Baron
+    /// and the captain print theirs on a clock; the thing whose whole purpose is measurement printed nothing,
+    /// so eleven hundred interventions accumulated with no record anywhere of whether one of them helped.
+    /// A number nobody prints is a number nobody has.
+    /// </para>
+    /// </summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _timer;
@@ -125,10 +169,12 @@ public sealed class BotDebugModule : BotModule
         protected override void OnTick() => logger.Information("The debugger: {What}", Summarise());
     }
 
+    /// <summary>What it has done, for whoever is reading the session log.</summary>
     public static string Summarise() => $"{BotVigil.Describe()}; {BotRevel.Describe()}; {BotVenues.Describe()}; {BotWitness.Describe()}";
 
     public override void Reset()
     {
+        // The population is about to be replaced, so nothing it did counts towards a contest.
         BotAppraisal.Revelry = null;
         BotCrier.Posted = null;
         BotCrier.Watchers = null;

@@ -35,6 +35,7 @@ public static class BotWebServer
 
     public static int Port { get; set; } = 2599;
 
+    /// <summary>Where the page lives, under the Distribution folder.</summary>
     public static string Folder { get; set; } = "Data/bot-web";
 
     public static bool Running { get; private set; }
@@ -105,6 +106,7 @@ public static class BotWebServer
         }
         catch
         {
+            // Stopping is best effort.
         }
     }
 
@@ -183,6 +185,7 @@ public static class BotWebServer
                     return;
                 case "/api/zones":
                     {
+                        // The JSON and its tag are read together, once: a page that already holds this version is told so.
                         var zones = BotZones.Page;
 
                         response.Headers["ETag"] = zones.ETag;
@@ -224,6 +227,8 @@ public static class BotWebServer
 
                     return;
 
+                // The live window (02.10.2026): the newest frame of one bot, which also marks it watched; the same as server-sent
+                // events; and the debugger squad. All three strings the loop wrote. See BotWebLive.
                 case "/api/live":
                     Live(response, request.QueryString["bot"]);
 
@@ -237,11 +242,15 @@ public static class BotWebServer
 
                     return;
 
+                // The live picture (02.10.2026): the ground and what is built on it round a watched bot, cut on the loop when the
+                // bot walks off the last square; the frame's pic.scene says which. See BotWebLivePicture.
                 case "/api/live/scene":
                     LiveScene(response, request.QueryString["bot"]);
 
                     return;
 
+                // The reach map (01.10.2026): its summary as the loop wrote it; the classes of a rectangle, a byte a tile or a
+                // square, from the immutable snapshot; and one tile in words. See BotReachWeb.
                 case "/api/reach":
                     Text(response, BotReachWeb.Json, "application/json; charset=utf-8");
 
@@ -254,8 +263,24 @@ public static class BotWebServer
                     Text(response, BotReachWeb.Tile(request), "application/json; charset=utf-8");
 
                     return;
+
+                // The stories (PLAN-life A3, 13.10.2026): one bot's chapters, or the index of stories when no bot is named; and the
+                // island's Chronicle. Both are strings the loop wrote; asking for a story posts its name to the loop. See BotStory.
+                case "/api/story":
+                    Story(response, request.QueryString["bot"], request.QueryString["poll"] == "1");
+
+                    return;
+                case "/api/chronicle":
+                    Text(
+                        response,
+                        BotStory.Running ? BotChronicle.Json : "{\"days\":[],\"note\":\"the stories are off: bot-story.json says Running is false\"}",
+                        "application/json; charset=utf-8"
+                    );
+
+                    return;
             }
 
+            // The client's own pictures, decoded on this thread from the client's files and kept. See BotWebArt.
             if (path.StartsWith("/api/art/", StringComparison.Ordinal) || path.StartsWith("/api/anim/", StringComparison.Ordinal))
             {
                 BotWebArt.Serve(request, response, path);
@@ -281,6 +306,7 @@ public static class BotWebServer
                 return;
             }
 
+            // Anything else under the folder: a stylesheet or a script the page was split into.
             var safe = path.TrimStart('/').Replace('\\', '/');
 
             if (safe.Length > 0 && !safe.Contains("..", StringComparison.Ordinal))
@@ -309,6 +335,7 @@ public static class BotWebServer
             }
             catch
             {
+                // The client has gone.
             }
         }
     }
@@ -355,6 +382,7 @@ public static class BotWebServer
             _ => "application/octet-stream"
         };
 
+    /// <summary>The page, re-read when its file changes so that editing it needs no restart.</summary>
     private static string Page()
     {
         var file = Path.Combine(FolderPath, "index.html");
@@ -405,6 +433,7 @@ public static class BotWebServer
         return text.ToString();
     }
 
+    /// <summary>Server-sent events: every event as it is posted, and a comment every few seconds so a proxy keeps the line open.</summary>
     private static void Stream(HttpListenerResponse response)
     {
         var queue = new BlockingCollection<string>(new ConcurrentQueue<string>(), 1000);
@@ -413,6 +442,7 @@ public static class BotWebServer
         {
             if (!queue.TryAdd(e.Json))
             {
+                // A reader that cannot keep up loses events rather than stalling the loop.
             }
         }
 
@@ -443,6 +473,7 @@ public static class BotWebServer
         }
         catch
         {
+            // The browser closed the tab; nothing to say about it.
         }
         finally
         {
@@ -456,6 +487,7 @@ public static class BotWebServer
             }
             catch
             {
+                // Already gone.
             }
         }
     }
@@ -494,6 +526,49 @@ public static class BotWebServer
         );
     }
 
+    private static void Story(HttpListenerResponse response, string bot, bool poll)
+    {
+        if (!BotStory.Running)
+        {
+            response.StatusCode = 503;
+            Text(response, "{\"error\":\"the stories are off: bot-story.json says Running is false\"}", "application/json; charset=utf-8");
+
+            return;
+        }
+
+        if (BotStory.Sealed && !string.IsNullOrWhiteSpace(bot))
+        {
+            response.StatusCode = 503;
+            Text(response, "{\"error\":\"the stories are sealed by do reset until the restart\"}", "application/json; charset=utf-8");
+
+            return;
+        }
+
+        var json = BotStory.Story(bot, poll);
+
+        if (json != null)
+        {
+            Text(response, json, "application/json; charset=utf-8");
+
+            return;
+        }
+
+        // Not in the snapshot yet: the name has been posted to the loop, which builds the story within a tick if it is a bot's.
+        response.StatusCode = 404;
+        Text(
+            response,
+            BotJson.Object(
+                w =>
+                {
+                    w.WriteString("bot", bot.Trim());
+                    w.WriteBoolean("pending", true);
+                    w.WriteString("note", "no story in the snapshot yet; if this is a bot, it is built on the loop within a few seconds");
+                }
+            ),
+            "application/json; charset=utf-8"
+        );
+    }
+
     private static void LiveScene(HttpListenerResponse response, string bot)
     {
         if (!BotWebLive.Enabled || !BotWebLive.Picture)
@@ -520,6 +595,7 @@ public static class BotWebServer
         );
     }
 
+    /// <summary>The live frames of one bot as server-sent events: each new frame once, a comment every few seconds between.</summary>
     private static void LiveStream(HttpListenerResponse response, string bot)
     {
         if (!BotWebLive.Enabled || string.IsNullOrWhiteSpace(bot))
@@ -545,6 +621,7 @@ public static class BotWebServer
 
             while (Running && !_stopping.IsCancellationRequested)
             {
+                // Asking is what keeps the bot watched, so the stream asks four times a second and writes only a new frame.
                 var (seq, json) = BotWebLive.Ask(bot);
 
                 if (json != null && seq != shown)
@@ -563,6 +640,7 @@ public static class BotWebServer
         }
         catch
         {
+            // The browser closed the tab; nothing to say about it.
         }
         finally
         {
@@ -574,6 +652,7 @@ public static class BotWebServer
             }
             catch
             {
+                // Already gone.
             }
         }
     }
@@ -586,6 +665,7 @@ public static class BotWebServer
         output.Flush();
     }
 
+    /// <summary>The tail of the current session log, filtered if asked.</summary>
     private static string Log(HttpListenerRequest request)
     {
         var n = int.TryParse(request.QueryString["n"], out var lines) ? Math.Clamp(lines, 1, 5000) : 300;
@@ -601,6 +681,8 @@ public static class BotWebServer
         {
             using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
 
+            // The last megabyte or so is enough for a few hundred lines of this log, and reading the whole
+            // file every refresh would be reading a hundred megabytes for nothing by the end of a day.
             var take = Math.Min(stream.Length, Math.Max(256 * 1024, (long)n * 400));
 
             stream.Seek(stream.Length - take, SeekOrigin.Begin);

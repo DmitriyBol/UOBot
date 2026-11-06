@@ -58,32 +58,47 @@ public readonly struct BotAvoid
         HasSquare = x2 >= x1 && x1 >= 0;
     }
 
+    /// <summary>Nothing excluded. The ordinary case, and the only one that may teach the reach ledger.</summary>
     public static BotAvoid None => new(-1, -1, -1, -1, -1, -1);
 
     public bool HasTile { get; }
 
     public bool HasSquare { get; }
 
+    /// <summary>True when this plan is unconstrained, and therefore its refusal means something.</summary>
     public bool Empty => !HasTile && !HasSquare && _towns == null && _reaches == null;
 
+    /// <summary>Whether this plan prices the reach of creatures the walker has seen. See <see cref="Reaches"/>.</summary>
     public bool HasReaches => _reaches != null;
 
+    /// <summary>Whether this plan keeps out of the guarded towns. See <see cref="Towns"/>.</summary>
     public bool HasTowns => _towns != null;
 
+    /// <summary>The tile somebody is standing on.</summary>
     public static BotAvoid Tile(Point3D where) => new(where.X, where.Y, -1, -1, -1, -1);
 
+    /// <summary>A patch of ground to route around, inclusive of its edges.</summary>
     public static BotAvoid Square(int x1, int y1, int x2, int y2) => new(-1, -1, x1, y1, x2, y2);
 
+    /// <summary>This exclusion plus a tile, for a plan that has both reasons.</summary>
     public BotAvoid And(Point3D tile) => new(tile.X, tile.Y, _x1, _y1, _x2, _y2, _towns, _reaches);
 
+    /// <summary>This exclusion plus a square.</summary>
     public BotAvoid And(int x1, int y1, int x2, int y2) => new(_tileX, _tileY, x1, y1, x2, y2, _towns, _reaches);
 
+    /// <summary>This exclusion plus the reach of creatures the walker has seen, priced per step. See <see cref="BotSight"/>.</summary>
     public BotAvoid Reaches(BotReaches reaches) => new(_tileX, _tileY, _x1, _y1, _x2, _y2, _towns, reaches);
 
+    /// <summary>What a step onto (x, y) costs over the ground's own price, in the search's units; nought off every reach.</summary>
     public int Penalty(int x, int y) => _reaches?.Penalty(x, y) ?? 0;
 
+    /// <summary>Whether (x, y) lies in the reach of a creature this plan prices.</summary>
     public bool InReach(int x, int y) => _reaches?.Within(x, y, 0) == true;
 
+    /// <summary>
+    /// This exclusion plus every guarded town on the map: the road of a red, whom the guards kill on sight. Asked of the
+    /// engine's regions tile by tile, so the road bends where a ward's edge really is. See <c>BotOutlaw.Road</c>.
+    /// </summary>
     public BotAvoid Towns(Map map) => new(_tileX, _tileY, _x1, _y1, _x2, _y2, map, _reaches);
 
     public bool Blocks(int x, int y)

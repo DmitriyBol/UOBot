@@ -77,22 +77,28 @@ public static class BotZoneBuild
 
     private const byte Passive = 4;
 
+    /// <summary>The sea's grouping: a wide disc round each sea creature, so a school is one zone, never painted as danger itself.</summary>
     private const byte SeaGroup = 8;
 
     private static byte[] _mark;
 
     private static int[] _label;
 
+    /// <summary>Per cell, the comp painting it last: the dedupe of one comp's cell list, which another comp may share.</summary>
     private static int[] _owner;
 
+    /// <summary>The comp being painted into, whose cell list the paint appends to; null for a plane painted for labelling.</summary>
     private static Comp _painting;
 
+    /// <summary>The guarded cells of the build under way, and how many a patrol or fringe would have covered.</summary>
     private static byte[] _guarded;
 
     private static int _guardedKept;
 
+    /// <summary>Cells that took the land's bit for the first time in this build: the measure a wanderer's trail is capped by.</summary>
     private static int _marked;
 
+    /// <summary>The fight raster's scratch: the sum and the worst of the living within reach of a cell, stamped per build.</summary>
     private static float[] _fightSum;
 
     private static float[] _fightMax;
@@ -113,6 +119,11 @@ public static class BotZoneBuild
 
     private static double Ms(long from, long to) => (to - from) * 1000.0 / Stopwatch.Frequency;
 
+    /// <summary>
+    /// The outlines of the last build by the shape they were traced from, and those of this one. A zone whose cells did not
+    /// change between two builds — most of them: declared discs and sleeping creatures — is not traced again; its rings are
+    /// copied as the JSON they already were. Kept only for the shapes the last build used, so the cache never outgrows a map.
+    /// </summary>
     private static Dictionary<ulong, byte[]> _rings = [];
 
     private static Dictionary<ulong, byte[]> _ringsNext = [];
@@ -121,6 +132,7 @@ public static class BotZoneBuild
 
     private static int _ringsReused;
 
+    /// <summary>A mask's rings written as a JSON array, traced only when this exact shape was not traced last time.</summary>
     private static void RingsJson(Utf8JsonWriter json, byte[] mask, int w, int h, int ox, int oy, BotZoneSettings s, int most)
     {
         var key = Fingerprint(mask, w, h, ox, oy, s, most);
@@ -149,6 +161,7 @@ public static class BotZoneBuild
         json.WriteRawValue(fragment, true);
     }
 
+    /// <summary>FNV-1a over the mask, its place and the numbers the tracing uses.</summary>
     private static ulong Fingerprint(byte[] mask, int w, int h, int ox, int oy, BotZoneSettings s, int most)
     {
         var hash = 14695981039346656037UL;
@@ -221,16 +234,25 @@ public static class BotZoneBuild
 
         public double VsBot;
 
+        /// <summary>The fight promised at one place by its spawners when full. See <see cref="BotZone.Declared"/>.</summary>
         public double Declared;
 
         public bool Empty;
 
+        /// <summary>Wanderers' ground: attackers away from any spawner's range. See <see cref="BotZone.Stray"/>.</summary>
         public bool Stray;
 
+        /// <summary>The event its creatures belong to, in words; null for a camp or a wanderer. See <see cref="BotZone.Event"/>.</summary>
         public string Event;
 
+        /// <summary>The farthest a spawner of it paints past its declaration on what was seen; nought when none grew.</summary>
         public int Grown;
 
+        /// <summary>
+        /// Every attacker of it is rooted (a reaper, a whipping vine, a corpser): it stands where it grew, guarded ground or not —
+        /// the vine at (1852, 2759) inside Trinsic killed six bots on 388 with no zone over it — so its cell and its reach are
+        /// painted wherever they fall.
+        /// </summary>
         public bool Rooted = true;
 
         public int Reach;
@@ -334,6 +356,10 @@ public static class BotZoneBuild
         }
     }
 
+    /// <summary>
+    /// A sea camp (07.10.2026, second reviews): a spawner standing in the water that keeps an attacker of the sea alone (cannot
+    /// walk, can swim: krakens, serpents). Its swimmers that could walk are the sea's with it; without one, they are the land's.
+    /// </summary>
     private static bool SeaCamp(BotZoneHauntIn haunt, BotZoneKindIn[] kinds)
     {
         if (!haunt.Wet)
@@ -375,6 +401,9 @@ public static class BotZoneBuild
             {
                 var kind = kinds[haunt.Kinds[e]];
 
+                // A swimmer kept by a spawner in the water beside a creature of the sea alone is the sea's, whether or not it
+                // could walk (07.10.2026): a camp of krakens and water elementals out at sea is no land zone, and water elementals
+                // alone in an inland lake walk ashore and stay the land's. See BotZoneKind.Swims and SeaCamp.
                 var wet = kind.WaterAt(SeaCamp(haunt, kinds));
 
                 if (!wet)
@@ -404,6 +433,9 @@ public static class BotZoneBuild
             rooted[i] = hostileLand[i] && allRooted;
         }
 
+        // How far each spawner's creatures are met (08.10.2026): the declared range, grown to what was seen when a high share of
+        // the sightings fall past it, never more than ReachBeyond past it. Its living count as its patrol out to here, and the
+        // observed cells it claims too; the camps are still grouped by the declaration.
         var range = new int[haunts.Length];
         var grownHaunts = 0;
 
@@ -417,6 +449,7 @@ public static class BotZoneBuild
             }
         }
 
+        // The land's attackers, by camp: each group of spawners paints its own ground and nothing else (see the class note).
         var hauntComp = new int[haunts.Length];
         var liveComp = new int[live.Length];
         var landGroups = Group(haunts, hostileLand, rooted, s);
@@ -437,6 +470,7 @@ public static class BotZoneBuild
             }
         }
 
+        // The living of a spawner within its range (and a few steps) are its patrol; farther off they are wanderers (below).
         for (var i = 0; i < live.Length; i++)
         {
             var c = live[i];
@@ -454,6 +488,7 @@ public static class BotZoneBuild
             }
         }
 
+        // An observed cell belongs to the nearest spawner whose range covers it; one no range covers is a chase, and paints nothing.
         Attribute(input, haunts, range, hostileLand, groupOf, observedOf, s, w, h);
 
         for (var g = 0; g < landGroups.Count; g++)
@@ -464,6 +499,11 @@ public static class BotZoneBuild
             comps.Add(comp);
             _painting = comp;
 
+            // Declared discs until observation wins. Once it wins, the disc shrinks to the farthest its creatures were seen awake
+            // from home and a margin — never past the declaration: a shape learned in ten minutes of waking may not have seen the
+            // whole walk, and the envelope keeps a road from being laid through the part nobody happened to watch. Past the
+            // declaration a camp grows only by the observed cells it claims out to its reach (08.10.2026, Attribute): where its
+            // creatures were seen walking calm, in that direction, and not a disc the size of the reach all round.
             for (var k = 0; k < group.Count; k++)
             {
                 var i = group[k];
@@ -518,6 +558,9 @@ public static class BotZoneBuild
             _painting = null;
         }
 
+        // Events (08.10.2026): an invasion's waves, a relic's warden, The Shadow on a quay, each a zone of its own for as long as
+        // any of its creatures lives — its field, the living where they stand and where they walked. The gather hands in only
+        // events with someone alive, so the zone is gone the build after the last of them falls.
         var events = input.Events;
         var eventZones = 0;
         var trailCells = 0;
@@ -558,6 +601,9 @@ public static class BotZoneBuild
             _painting = null;
         }
 
+        // Wanderers: attackers of no spawner, or away from theirs. Standing in a camp's paint they are that camp's; elsewhere they
+        // are drawn where they stand and along where they walked in the last minutes (08.10.2026), and what that paint joins
+        // into, eight ways, is a zone of its own.
         var strayFrom = comps.Count;
 
         for (var i = 0; i < live.Length; i++)
@@ -612,6 +658,8 @@ public static class BotZoneBuild
             }
         }
 
+        // The sea: only its living, only where they are. Grouped wide, so a school is one zone; its patrol is the narrow disc
+        // round each creature, so a coast is not called a sea serpent's because one swims forty tiles off it.
         for (var i = 0; i < live.Length; i++)
         {
             var c = live[i];
@@ -625,6 +673,7 @@ public static class BotZoneBuild
 
         Label(SeaGroup, Sea, comps, w, h);
 
+        // The hunting grounds, by camp as well, only where no attacker patrols.
         var passiveGroups = Group(haunts, passive, null, s);
 
         for (var g = 0; g < passiveGroups.Count; g++)
@@ -673,6 +722,7 @@ public static class BotZoneBuild
 
         var painted = Stopwatch.GetTimestamp();
 
+        // Who belongs where: the sea's by where they swim, the land's rest by what they stand in.
         for (var i = 0; i < live.Length; i++)
         {
             var c = live[i];
@@ -690,6 +740,7 @@ public static class BotZoneBuild
             }
             else if (!c.Aggressive && !c.Water)
             {
+                // A sheep in an orc camp is the camp's; otherwise the hunting ground it stands in, or its own spawner's.
                 number = At(c.X, c.Y, Land, comps, w, h);
 
                 if (number == 0)
@@ -711,6 +762,7 @@ public static class BotZoneBuild
             comps[number - 1].Live.Add(i);
             liveComp[i] = number;
 
+            // A sea spawner stands on the shore, outside its creatures' water: it joins where they swim.
             if (c.Haunt >= 0 && hauntComp[c.Haunt] == 0 && c.Aggressive)
             {
                 hauntComp[c.Haunt] = number;
@@ -739,6 +791,7 @@ public static class BotZoneBuild
 
         var reckoned = Stopwatch.GetTimestamp();
 
+        // The fringe: every patrol dilated by the reach of what patrols it.
         for (var k = 0; k < comps.Count; k++)
         {
             var comp = comps[k];
@@ -761,6 +814,7 @@ public static class BotZoneBuild
             }
         }
 
+        // The raster: hunting grounds first, then fringes weakest first, then patrols weakest first — the stronger claim wins a cell.
         var cells = input.Buffer;
 
         Array.Clear(cells);
@@ -809,6 +863,7 @@ public static class BotZoneBuild
             WriteCore(ranked[k], cells, (ushort)(ranked[k].Index + 1));
         }
 
+        // The fight at every painted cell, and how local the map is.
         var fightBuffer = input.FightBuffer is { } given && given.Length == w * h ? given : new ushort[w * h];
 
         Array.Clear(fightBuffer);
@@ -869,6 +924,7 @@ public static class BotZoneBuild
             }
         }
 
+        // The dead: counted where they fell, and a zone that keeps killing is read as deadlier than its arithmetic.
         var deaths = input.Deaths;
 
         for (var i = 0; i < deaths.Length; i++)
@@ -933,6 +989,7 @@ public static class BotZoneBuild
             Describe(kept[k], input, s);
         }
 
+        // The outlines and the JSON, off the same numbers.
         var shapesBegan = Stopwatch.GetTimestamp();
 
         _ringsTicks = 0;
@@ -981,6 +1038,7 @@ public static class BotZoneBuild
         var shapesMs = Stopwatch.GetElapsedTime(shapesBegan).TotalMilliseconds;
         var ringsMs = _ringsTicks * 1000.0 / Stopwatch.Frequency;
 
+        // What this build traced or reused is what the next one may reuse; the rest is dropped.
         (_rings, _ringsNext) = (_ringsNext, _rings);
         _ringsNext.Clear();
         var phases = string.Create(
@@ -1033,6 +1091,14 @@ public static class BotZoneBuild
         };
     }
 
+    // ---------------------------------------------------------------------------------------------------------------------
+    // Painting and labelling
+    // ---------------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Marks every cell whose middle lies within <paramref name="radius"/> tiles (and half a cell) of the tile, and always the
+    /// cell under it, unless a cell already carries a <paramref name="skip"/> bit.
+    /// </summary>
     private static void Paint(int x, int y, int radius, byte bit, byte skip, int w, int h, bool force = false)
     {
         var reach = Math.Max(0, radius) + BotZoneState.Cell / 2;
@@ -1060,6 +1126,7 @@ public static class BotZoneBuild
         }
     }
 
+    /// <summary>The cell and the square of <paramref name="margin"/> cells round it.</summary>
     private static void Block(int cx, int cy, int margin, byte bit, int w, int h)
     {
         for (var y = Math.Max(0, cy - margin); y <= Math.Min(h - 1, cy + margin); y++)
@@ -1071,10 +1138,17 @@ public static class BotZoneBuild
         }
     }
 
+    /// <summary>
+    /// Marks a cell with a bit and, when a comp is being painted (<see cref="_painting"/>), claims it for that comp's cell list —
+    /// once per comp, though two comps may claim the same cell. Guarded ground takes no land paint — the guards kill what
+    /// attacks there, and a town is never a patrol's — unless <paramref name="force"/>: a rooted creature's own cell, which is
+    /// where it grew, whatever the region.
+    /// </summary>
     private static void Set(int i, byte bit, byte skip, bool force)
     {
         if (!force && _guarded != null && bit != Sea && bit != SeaGroup && _guarded[i] != 0)
         {
+            // Counted once a cell: the owner mark is borrowed for it, and cleared with the rest.
             if (_owner[i] != -1)
             {
                 if (_mark[i] == 0 && _owner[i] == 0)
@@ -1133,11 +1207,27 @@ public static class BotZoneBuild
         comp.MaxY = Math.Max(comp.MaxY, y);
     }
 
+    /// <summary>The raster's width, for <see cref="Set"/> to place a cell; set by the build before any paint.</summary>
     private static int _width;
 
+    // ---------------------------------------------------------------------------------------------------------------------
+    // Camps, wanderers and the observed
+    // ---------------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// How far past its declaration a spawner's patrol grows on what was seen (08.10.2026): to the high percentile of its
+    /// creatures' distance from home, at most <see cref="BotZoneSettings.ReachBeyond"/> past the declared range; nought when it
+    /// does not grow — nothing seen, the percentile inside the declaration, or a creature that stands where it grew.
+    /// </summary>
     private static int Grown(BotZoneHauntIn haunt, bool rooted, BotZoneSettings s) =>
         rooted || s.ReachBeyond <= 0 || haunt.Reach <= haunt.Radius ? 0 : Math.Min(haunt.Reach, haunt.Radius + s.ReachBeyond);
 
+    /// <summary>
+    /// A wanderer's last places painted as the line it walked, newest first from where it stands now, until
+    /// <paramref name="most"/> cells have taken the land's bit for the first time (08.10.2026). A line between two sightings is a
+    /// guess at the way between them, and the reason for the cap: a chase seen twice forty tiles apart paints the road between.
+    /// Returns the cells it added.
+    /// </summary>
     private static int Trail(BotZoneInput input, BotZoneLiveIn c, int radius, int most, int w, int h)
     {
         var trail = input.Trail;
@@ -1176,6 +1266,12 @@ public static class BotZoneBuild
         return _marked - start;
     }
 
+    /// <summary>
+    /// The spawners of one layer as camps: two are one camp when their discs touch within <see cref="BotZoneSettings.JoinGap"/>
+    /// tiles and the camp they make stays within <see cref="BotZoneSettings.ZoneMostTiles"/> across — nearest pairs first, so a
+    /// fort is one zone and a chain of camps along a road is a chain of zones. A disc wider than
+    /// <see cref="BotZoneSettings.DeclaredMost"/> joins as if it were that wide. Each haunt of the layer is in exactly one camp.
+    /// </summary>
     private static List<List<int>> Group(BotZoneHauntIn[] haunts, bool[] member, bool[] rooted, BotZoneSettings s)
     {
         var n = haunts.Length;
@@ -1319,6 +1415,11 @@ public static class BotZoneBuild
         return groups;
     }
 
+    /// <summary>
+    /// Gives each observed cell to the camp of the nearest attackers' spawner whose range (grown on what was seen, 08.10.2026)
+    /// plus <see cref="BotZoneSettings.ObservedSlack"/> covers the cell's middle, as an index into the input's observed arrays. A
+    /// cell no range covers is where a creature was seen on a chase or a lure, and goes to nobody.
+    /// </summary>
     private static void Attribute(
         BotZoneInput input, BotZoneHauntIn[] haunts, int[] range, bool[] member, int[] groupOf, List<int>[] observedOf, BotZoneSettings s,
         int w, int h
@@ -1399,6 +1500,12 @@ public static class BotZoneBuild
         }
     }
 
+    /// <summary>
+    /// The fight at every painted cell: round each cell, the strongest living land attacker within
+    /// <see cref="BotZoneSettings.ConvergeTiles"/> in full and the rest at the secondary weight — whatever zone they are of — and
+    /// never below the owning zone's promised fight at one place weighed by <see cref="BotZoneSettings.EmptyWeight"/>. Nought
+    /// on a hunting ground. Written in units of <see cref="BotZoneState.FightUnit"/>.
+    /// </summary>
     private static void FightRaster(ushort[] cells, ushort[] fight, List<Comp> kept, BotZoneLiveIn[] live, BotZoneKindIn[] kinds, BotZoneSettings s, int w, int h)
     {
         var gen = ++_fightGen;
@@ -1489,6 +1596,11 @@ public static class BotZoneBuild
         }
     }
 
+    /// <summary>
+    /// Connected patches of the cells carrying <paramref name="bit"/>, eight ways, appended to the list as zones of
+    /// <paramref name="layer"/>; each cell's patch number is left in the layer's labels. When the grouping bit is not the layer's
+    /// own (the sea), each patch keeps as its patrol only the cells carrying the layer's bit.
+    /// </summary>
     private static void Label(byte bit, byte layer, List<Comp> comps, int w, int h)
     {
         var count = _touched.Count;
@@ -1561,6 +1673,7 @@ public static class BotZoneBuild
         }
     }
 
+    /// <summary>Keeps at the front of a patch's cells only those carrying the layer's bit, and draws its box round them.</summary>
     private static void Narrow(Comp comp, byte layer, int w)
     {
         var kept = comp.Start;
@@ -1592,6 +1705,7 @@ public static class BotZoneBuild
         comp.Count = kept - comp.Start;
     }
 
+    /// <summary>The patch of a layer under a tile, or nought.</summary>
     private static int At(int x, int y, byte layer, List<Comp> comps, int w, int h)
     {
         var cx = x >> BotZoneState.Shift;
@@ -1623,6 +1737,15 @@ public static class BotZoneBuild
         }
     }
 
+    // ---------------------------------------------------------------------------------------------------------------------
+    // What a zone holds, and how strong it is
+    // ---------------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// How far round its patrol a creature attacks a bot: what it sees, or a caster's or an archer's blow where that lands
+    /// farther (08.10.2026). Not the two added: a creature picks a target only within its sight (<c>MageAI</c>), so it casts at
+    /// nothing past it. A creature that cannot move reaches as far as it strikes; a sea creature from the water's edge.
+    /// </summary>
     private static int ReachOf(bool water, bool rooted, bool caster, int perception, int strike, BotZoneSettings s)
     {
         var sight = Math.Clamp(perception, 1, Math.Max(1, s.PerceptionMost));
@@ -1726,6 +1849,8 @@ public static class BotZoneBuild
             declaredTotal += sum;
             declaredWorst = Math.Max(declaredWorst, worst);
 
+            // At one place, not over the whole disc: a convergence disc holds that share of the spawner's range, so of ten
+            // reapers kept over a radius of 150 a walker meets one or two at once, and of ten orcs in a camp of radius 10, all.
             var share = Math.Min(1.0, Math.Pow(s.ConvergeTiles / (double)Math.Max(1, haunt.Radius), 2.0));
 
             declared = Math.Max(declared, worst + s.Secondary * Math.Max(0.0, sum - worst) * share);
@@ -1740,6 +1865,8 @@ public static class BotZoneBuild
             comp.Samples = (long)Math.Round(comp.ObservedWeight);
         }
 
+        // Kept or dropped. A patch of the land with no spawner and nobody alive is an old sighting of creatures now dead; a camp
+        // whose spawners paint nothing (all stopped, or wide and with nobody alive and nothing seen) has no ground to be a zone of.
         comp.Kept = comp.Count > 0 && comp.Layer switch
         {
             Land => comp.Haunts.Count > 0 || comp.Aggressive > 0,
@@ -1757,6 +1884,7 @@ public static class BotZoneBuild
             comp.Level = BotZoneLevel.Clear;
             comp.Threat = comp.Worst;
 
+            // Their strength if set upon: the strongest of the living, whether or not it would ever come first.
             for (var k = 0; k < comp.Live.Count; k++)
             {
                 var c = live[comp.Live[k]];
@@ -1777,6 +1905,7 @@ public static class BotZoneBuild
         }
         else
         {
+            // Nobody alive now, and the spawner fills it again within minutes: the declared fight, weighed down.
             comp.Empty = true;
             comp.Total = declaredTotal;
             comp.Worst = declaredWorst;
@@ -1790,6 +1919,7 @@ public static class BotZoneBuild
             comp.Reach = Math.Min(16, s.PerceptionMost);
         }
 
+        // Kinds, the strongest share first: attackers before the rest.
         List<BotZoneKindCount> list = [];
 
         foreach (var (index, count) in byKind)
@@ -1825,6 +1955,7 @@ public static class BotZoneBuild
 
         comp.Kinds = list.ToArray();
 
+        // The middle, the box, and where the tour stands: the spawner nearest the middle, whose tile is real floor.
         long sx = 0, sy = 0;
 
         for (var k = comp.Start; k < comp.Start + comp.Count; k++)
@@ -1855,6 +1986,10 @@ public static class BotZoneBuild
         }
     }
 
+    /// <summary>
+    /// The worst fight in a set of attackers: round each of the strongest (at most 96), everyone within reach of it — that one's
+    /// worst in full and the rest at the secondary weight. The largest such crowd comes back with it.
+    /// </summary>
     private static (double Threat, int Crowd) Converging(List<(int X, int Y, double Power)> attackers, BotZoneSettings s)
     {
         attackers.Sort((a, b) => b.Power.CompareTo(a.Power));
@@ -1892,6 +2027,10 @@ public static class BotZoneBuild
         return (threat, crowd);
     }
 
+    /// <summary>
+    /// The aggro fringe round a patrol: every cell within its reach, by a chamfer distance (three a step, four a diagonal) over
+    /// the patrol's box widened by the reach. Kept as a local mask for the raster and the outline.
+    /// </summary>
     private static void Fringe(Comp comp, int w, int h)
     {
         var reachTiles = comp.Reach + BotZoneState.Cell / 2;
@@ -1976,6 +2115,7 @@ public static class BotZoneBuild
             }
         }
 
+        // Three chamfer units a cell, four tiles a cell. Guarded ground is no fringe: the guards meet what comes.
         var limit = (int)Math.Round(reachTiles * 3.0 / BotZoneState.Cell);
         var mask = new byte[aw * ah];
         var count = 0;
@@ -2006,6 +2146,15 @@ public static class BotZoneBuild
         comp.AggroCount = count;
     }
 
+    // ---------------------------------------------------------------------------------------------------------------------
+    // Numbers that last, and words
+    // ---------------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Gives each zone the number of the zone it most overlaps in the previous build, of the same family (the sea, the land's
+    /// attackers, the hunting grounds), largest overlap first so a zone that split keeps its number in its larger half. Returns
+    /// the next unused number; how many kept one comes back in <paramref name="matched"/>.
+    /// </summary>
     private static int Match(List<Comp> kept, BotZoneState previous, int w, out int matched)
     {
         matched = 0;
@@ -2015,9 +2164,13 @@ public static class BotZoneBuild
 
         if (previous?.Zones != null && previous.Width == w)
         {
+            // Matched on each zone's own cells rather than on the raster, where a stronger neighbour's patrol or fringe may have
+            // overwritten a weaker zone's ground: family by family, the old owners laid into the scratch labels (free by now),
+            // counted under the new zones, and taken out again.
             Dictionary<int, int> overlap = [];
             byte[] families = [Land, Sea, Passive];
 
+            // This build's own labels are done with; cleared so only the old owners are read below.
             for (var k = 0; k < _touched.Count; k++)
             {
                 _label[_touched[k]] = 0;
@@ -2058,6 +2211,8 @@ public static class BotZoneBuild
                     {
                         var owner = _label[_cells[c]];
 
+                        // An event's zone takes only an event's number and a camp only a camp's (08.10.2026): an invasion laid over a
+                        // small camp must not walk off with the camp's number.
                         if (owner > 0 && old[owner - 1].Event == (comp.Event != null))
                         {
                             var id = old[owner - 1].Id;
@@ -2089,6 +2244,8 @@ public static class BotZoneBuild
             }
         }
 
+        // Largest overlap first; on a tie the permanent camp before an event, then by order and number, so the same input always
+        // gives the same numbers.
         pairs.Sort(
             (a, b) =>
             {
@@ -2178,10 +2335,12 @@ public static class BotZoneBuild
         }
     }
 
+    /// <summary>Numbers with a point, whatever the machine's culture: the page and the log read "×1.7", never "×1,7".</summary>
     private static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
 
     private static string Plural(int n, string word) => n == 1 ? $"1 {word}" : $"{n} {word}s";
 
+    /// <summary>The two kinds that make the zone what it is, in words: "orcs and orcish mages".</summary>
     private static string Who(Comp comp)
     {
         var first = -1;
@@ -2218,6 +2377,7 @@ public static class BotZoneBuild
         return second < 0 ? one : $"{one} and {Words(comp.Kinds[second].Kind)}";
     }
 
+    /// <summary>A type name as plural words: OrcishMage to "orcish mages", Ratman to "ratmen", Wolf to "wolves".</summary>
     public static string Words(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -2270,6 +2430,7 @@ public static class BotZoneBuild
         return words + "s";
     }
 
+    /// <summary>"in Shame", "by Britain", "NE of Minoc", "off Jhelom".</summary>
     private static string Place(int x, int y, bool water, BotZoneInput input)
     {
         var deeps = input.Deeps;
@@ -2319,6 +2480,7 @@ public static class BotZoneBuild
 
     private static string Compass(int dx, int dy)
     {
+        // Screen y grows southward.
         var angle = Math.Atan2(-dy, dx) * 180.0 / Math.PI;
         var sector = (int)Math.Round((angle + 360.0) % 360.0 / 45.0) % 8;
 
@@ -2380,6 +2542,10 @@ public static class BotZoneBuild
             CellList = _cells.GetRange(comp.Start, comp.Count).ToArray()
         };
 
+    // ---------------------------------------------------------------------------------------------------------------------
+    // The JSON of one zone
+    // ---------------------------------------------------------------------------------------------------------------------
+
     private static void Write(Utf8JsonWriter json, Comp comp, BotZone zone, BotZoneSettings s, int w)
     {
         json.WriteStartObject();
@@ -2424,6 +2590,7 @@ public static class BotZoneBuild
             _ => s.ClearMostPoints
         };
 
+        // The patrol's outline off its own cells, in its own box.
         var cw = comp.MaxX - comp.MinX + 1;
         var ch = comp.MaxY - comp.MinY + 1;
         var core = new byte[cw * ch];
@@ -2498,6 +2665,7 @@ public static class BotZoneBuild
 
         json.WriteNumber("aggroRange", zone.AggroRange);
 
+        // The farthest a spawner of it paints past its declaration on what was seen (08.10.2026); nought when none grew.
         json.WriteNumber("grown", comp.Grown);
         json.WriteEndObject();
 

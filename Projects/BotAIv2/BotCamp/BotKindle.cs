@@ -30,30 +30,50 @@ public sealed class BotKindle : BotDeed
 {
     public const string Trade = "camp";
 
+    /// <summary>
+    /// What making camp is worth a minute before tiredness and boredom are added (<c>BotCamp.Claim</c>). Eighteen: above a
+    /// journey's eight and a shopping trip's twelve, below every trade, so a bot makes camp when it has nothing better to do
+    /// or is tired and bored enough for the fire to outweigh the work.
+    /// </summary>
     public static double Prior { get; set; } = 18.0;
 
+    /// <summary>How many sticks a keeper wants before it lays a fire: a stick a minute and change for a six-minute evening.</summary>
     public static int KindlingWant { get; set; } = 5;
 
+    /// <summary>How far round itself a keeper with a blade looks for a tree. Twelve tiles; further, and the camp would be a trip.</summary>
     public static int TreeReach { get; set; } = 12;
 
+    /// <summary>Cuts at trees before the keeper lays the fire with whatever it has. Twelve.</summary>
     public static int MostCuts { get; set; } = 12;
 
+    /// <summary>Kindling made from logs before the keeper lays the fire with whatever it has. Eight swings.</summary>
     public static int MostFletches { get; set; } = 8;
 
+    /// <summary>A cut at a tree, a second and a bit, as a player swings.</summary>
     public static int CutMs { get; set; } = 1200;
 
+    /// <summary>A swing at the fletcher's kit; the stick arrives on the craft system's timer, and is counted on a later beat.</summary>
     public static int FletchMs { get; set; } = 2500;
 
+    /// <summary>How long gathering may take before the keeper lays the fire with what it has. Two minutes.</summary>
     public static int GatherMs { get; set; } = 120000;
 
+    /// <summary>A strike at the kindling, a second and a half.</summary>
     public static int StrikeMs { get; set; } = 1500;
 
+    /// <summary>
+    /// Strikes before the keeper gives up. Sixty: from nought Camping the engine's roll catches within twenty-five strikes
+    /// half the time and within sixty ninety-nine times in a hundred, since every strike under ten points gains.
+    /// </summary>
     public static int MostFumbles { get; set; } = 60;
 
+    /// <summary>How far from where it stands a keeper looks for a hearth when its own tile will not do.</summary>
     public static int PickReach { get; set; } = 6;
 
+    /// <summary>How many other tiles it tries.</summary>
     public static int PickTries { get; set; } = 8;
 
+    /// <summary>The fewest seats round a hearth for it to be one: the keeper and two guests.</summary>
     public static int LeastSeats { get; set; } = 3;
 
     public static long Camps { get; private set; }
@@ -130,6 +150,7 @@ public sealed class BotKindle : BotDeed
         _sleep = sleep;
     }
 
+    /// <summary>The fire this keeper has laid, once it has laid one.</summary>
     public BotCamp.Fire Fire => _fire;
 
     public override string Kind => Trade;
@@ -142,20 +163,26 @@ public sealed class BotKindle : BotDeed
 
     public override double Minutes => BotCamp.SitMinutes;
 
+    /// <summary>Nobody's trade: the engine trains Camping on every strike, and the auction reads it as anybody's work.</summary>
     public override SkillName? Trains => null;
 
     public override int Outlay => 0;
 
+    /// <summary>Counted as coin, like a journey: a bot born poor may still sit by a fire.</summary>
     public override double Coin => 1.0;
 
     public override int Made => 0;
 
+    /// <summary>Not about money, and not to be refused for earning none. See <c>BotDeed.Unpaid</c>; the proposer asks every reason it can fail first.</summary>
     public override bool Unpaid => true;
 
+    /// <summary>Held for the evening, put down for a rescue or a flight and taken up again.</summary>
     public override bool Steadfast => true;
 
+    /// <summary>Sitting still is what a camp looks like when it is going well.</summary>
     public override bool Still => _stage == Sitting;
 
+    /// <summary>A walk into the woods, not a run.</summary>
     public override bool Hurries => false;
 
     public override string Stage =>
@@ -206,10 +233,12 @@ public sealed class BotKindle : BotDeed
         };
     }
 
+    /// <summary>Kindling enough, from the pack, from logs, or off a tree.</summary>
     private BotDoing Gather(BotMobile body, long now)
     {
         var have = BotCamp.Sticks(body);
 
+        // What the last swing or cut brought, counted on the beat after it: crafting arrives on a timer.
         if (have > _had)
         {
             if (_tree != null)
@@ -234,6 +263,7 @@ public sealed class BotKindle : BotDeed
             return BotDoing.Work(_tree != null ? "cutting kindling" : "making kindling");
         }
 
+        // From logs, with a fletcher's kit: one log, one stick, no skill asked.
         var kit = BotFletching.Kit(body);
 
         if (kit != null && BotFletching.Logs(body) > 0 && _fletches < MostFletches && Recipe() is { } recipe)
@@ -246,6 +276,7 @@ public sealed class BotKindle : BotDeed
             return BotDoing.Work("making kindling from logs");
         }
 
+        // Off a tree, with a blade.
         _blade ??= BotCamp.Blade(body);
 
         if (_blade is { Deleted: false } && _cuts < MostCuts && !_noTree)
@@ -274,6 +305,7 @@ public sealed class BotKindle : BotDeed
 
             new BladedItemTarget(_blade).Invoke(body, _tree);
 
+            // The blade's work is not on a timer: the stick is in the pack now, or the tree had no wood left to give.
             var after = BotCamp.Sticks(body);
 
             if (after > before)
@@ -313,6 +345,7 @@ public sealed class BotKindle : BotDeed
         }
     }
 
+    /// <summary>A hearth: this tile if it will do, else one of a few near it.</summary>
     private BotDoing Pick(BotMobile body)
     {
         if (!BotCamp.Hearth(body, _map, PickReach, PickTries, out var centre, out var seats, out var why))
@@ -332,6 +365,7 @@ public sealed class BotKindle : BotDeed
         return BotDoing.Work("laying a fire");
     }
 
+    /// <summary>At the hearth, striking until it catches or the fumbles run out.</summary>
     private BotDoing Strike(BotMobile body, long now)
     {
         if (!Beside(body))
@@ -379,6 +413,7 @@ public sealed class BotKindle : BotDeed
         return BotDoing.Work("keeping a fire");
     }
 
+    /// <summary>Beside the fire until the evening is over, it is scattered, or the keeper is tired enough to sleep by it.</summary>
     private BotDoing Sit(BotMobile body, long now)
     {
         if (!Beside(body))
@@ -412,6 +447,7 @@ public sealed class BotKindle : BotDeed
 
     public override bool Bend(IBotWilful bot)
     {
+        // The tree could not be got at: another one, once or twice.
         if (_stage == Gathering && _tree != null)
         {
             _shunned.Add((_tree.X, _tree.Y));
@@ -420,6 +456,7 @@ public sealed class BotKindle : BotDeed
             return _shunned.Count <= 3;
         }
 
+        // The keeper's seat could not be got at: another seat round the same hearth.
         if (_fire != null && bot?.Self is BotMobile body)
         {
             var next = -1;
@@ -455,6 +492,7 @@ public sealed class BotKindle : BotDeed
         }
     }
 
+    /// <summary>Within two tiles of the hearth — the reach the engine's kindling asks of whoever strikes it — and not on it.</summary>
     private bool Beside(Mobile body)
     {
         var away = BotCamp.Tiles(body.Location, _fire.Centre);
@@ -462,6 +500,10 @@ public sealed class BotKindle : BotDeed
         return away is >= 1 and <= 2 && Math.Abs(body.Z - _fire.Centre.Z) < BotArrival.PersonHeight;
     }
 
+    /// <summary>
+    /// Beside the hearth, the walk to the seat is finished once: a keeper that struck from a tile short of its seat would
+    /// otherwise walk on under the striking, since work leaves the journey alone.
+    /// </summary>
     private void StandStill(BotMobile body)
     {
         if (_still)
@@ -477,6 +519,7 @@ public sealed class BotKindle : BotDeed
         }
     }
 
+    /// <summary>Whether the clock set by the last swing or strike is still running. A flag rather than a zero tick.</summary>
     private bool Ticks(long now, int ms) => _ticked && now - _tick < ms;
 
     private static void Face(Mobile body, Point3D at)
@@ -489,6 +532,7 @@ public sealed class BotKindle : BotDeed
         }
     }
 
+    /// <summary>The fletcher's recipe for a stick of kindling out of one log.</summary>
     private static CraftItem Recipe()
     {
         var items = BotFletching.System?.CraftItems;
@@ -509,6 +553,10 @@ public sealed class BotKindle : BotDeed
         return null;
     }
 
+    /// <summary>
+    /// The nearest tree within reach that is not shunned, as the target the engine wants, or null. Rings outward, as the
+    /// woodsman's own search does, but twelve rings rather than eighty: a camp is where the bot is.
+    /// </summary>
     internal static IPoint3D FindTree(Mobile bot, int reach, HashSet<(int X, int Y)> shun)
     {
         var map = bot?.Map;
@@ -550,6 +598,7 @@ public sealed class BotKindle : BotDeed
         return null;
     }
 
+    /// <summary>Whether this bot has anything to make a fire of: sticks, logs and a kit, or a blade (the tree is asked later).</summary>
     public static bool Means(Mobile bot) =>
         BotCamp.Sticks(bot) > 0
         || BotFletching.Kit(bot) != null && BotFletching.Logs(bot) > 0
@@ -585,14 +634,19 @@ public sealed class BotKindle : BotDeed
 /// </summary>
 public sealed class BotCamper : IBotProposer
 {
+    /// <summary>How long one bot waits between camps. Forty-five minutes.</summary>
     public static int EveryMs { get; set; } = 2700000;
 
+    /// <summary>How long a look round for trees and hostiles is kept. Twenty seconds: at most one spatial look per bot that often.</summary>
     public static int LookMs { get; set; } = 20000;
 
+    /// <summary>How long a bot must have had nothing to do before a camp is offered on that account alone. A minute.</summary>
     public static double IdleMinutes { get; set; } = 1.0;
 
+    /// <summary>How near a provisioner a fire-lighter in town must be to be offered a trip for kindling. Forty tiles.</summary>
     public static int ShopReach { get; set; } = 40;
 
+    /// <summary>Sticks bought on such a trip. Five, a fire's worth.</summary>
     public static int KindlingBuy { get; set; } = 5;
 
     public static long Asked { get; private set; }
@@ -643,6 +697,7 @@ public sealed class BotCamper : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>A camp was taken: this bot's clock starts. From <c>BotKindle.Taken</c>, never at the offer.</summary>
     public static void Went(Mobile who)
     {
         if (who != null)
@@ -693,6 +748,7 @@ public sealed class BotCamper : IBotProposer
 
         var land = BotCamp.LandOf(map, who.Location);
 
+        // In town a fire-lighter with no kindling is offered the provisioner's; nobody lights a fire in the square.
         if (land == BotCamp.Land.Town)
         {
             return Buy(bot, who);
@@ -755,6 +811,7 @@ public sealed class BotCamper : IBotProposer
             return null;
         }
 
+        // The two spatial looks, kept for LookMs: something hostile near, and — for a bot with only a blade — a tree.
         if (!_looked.TryGetValue(who.Serial, out var look) || now - look.Tick >= LookMs)
         {
             var needsTree = BotCamp.Sticks(who) <= 0 && !(BotFletching.Kit(who) != null && BotFletching.Logs(who) > 0);
@@ -782,6 +839,7 @@ public sealed class BotCamper : IBotProposer
         return new BotKindle(map, who.Location, BotCamp.Claim(who, BotKindle.Prior), false);
     }
 
+    /// <summary>Tired, bored, or with nothing to do for a minute: the three reasons Patrick's order gives a bot to sit down.</summary>
     private static bool Wants(BotMobile who, long now)
     {
         var urges = who.Resolve?.Urges;
@@ -790,6 +848,7 @@ public sealed class BotCamper : IBotProposer
                || urges != null && (urges.IsRestless || who.Resolve.Deed == null && urges.BarrenMinutes(now) >= IdleMinutes);
     }
 
+    /// <summary>A trip to the nearest provisioner for a fire's worth of kindling, for a fire-lighter in town with none.</summary>
     private static BotDeed Buy(IBotWilful bot, BotMobile who)
     {
         if (BotCamp.Sticks(who) > 0)
@@ -799,6 +858,7 @@ public sealed class BotCamper : IBotProposer
             return null;
         }
 
+        // The shops are walked at most once per LookMs per bot: an idle bot in town is asked every two seconds.
         var now = Core.TickCount;
 
         if (!_shopLooked.TryGetValue(who.Serial, out var look) || now - look.Tick >= LookMs)

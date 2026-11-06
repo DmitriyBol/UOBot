@@ -14,6 +14,7 @@ public sealed class BotSprite
 
     public int Height;
 
+    /// <summary>For a mobile, the feet; for a static, the bottom of its middle column; for land, its top-left corner.</summary>
     public int AnchorX;
 
     public int AnchorY;
@@ -53,6 +54,7 @@ public enum BotAnimType : byte
 /// </summary>
 public sealed class BotArtFiles : IDisposable
 {
+    /// <summary>Where a client file is: the server's own data folders unless a harness says otherwise.</summary>
     public static Func<string, string> Locate { get; set; } = name => Core.FindDataFile(name, false);
 
     private static readonly object _openLock = new();
@@ -61,10 +63,13 @@ public sealed class BotArtFiles : IDisposable
 
     private static volatile bool _tried;
 
+    /// <summary>Why the files could not be opened, for the health page; null when they were.</summary>
     public static string Problem { get; private set; }
 
+    /// <summary>The files if something has opened them already, else null; never opens them. For the health page.</summary>
     public static BotArtFiles Opened => _tried ? _instance : null;
 
+    /// <summary>The files, opened on the first call from whichever thread asks; null without a client folder.</summary>
     public static BotArtFiles Instance
     {
         get
@@ -98,6 +103,7 @@ public sealed class BotArtFiles : IDisposable
         }
     }
 
+    /// <summary>The highest group a body may have; the UOP packages number theirs up to here.</summary>
     public const int MostActions = 80;
 
     private readonly struct Entry
@@ -118,16 +124,20 @@ public sealed class BotArtFiles : IDisposable
 
     private readonly List<SafeFileHandle> _handles = [];
 
+    // ---- art and land textures
     private readonly SafeFileHandle _art;
     private readonly Dictionary<int, Entry> _artIndex;
     private readonly SafeFileHandle _tex;
     private readonly Entry[] _texIndex;
 
+    // ---- hues: 32 colours each, the first hue is number 1
     private readonly ushort[][] _hues;
 
+    // ---- tiledata, the parts the server's own table does not keep
     private readonly ushort[] _landTexture = new ushort[0x4000];
     private readonly ushort[] _itemAnim = new ushort[0x10000];
 
+    // ---- animations
     private readonly SafeFileHandle[] _animIdx = new SafeFileHandle[6];
     private readonly SafeFileHandle[] _animMul = new SafeFileHandle[6];
     private readonly long[] _animIdxLength = new long[6];
@@ -139,8 +149,10 @@ public sealed class BotArtFiles : IDisposable
     private readonly Dictionary<int, (int Body, int Hue)> _bodyDef = new();
     private readonly Dictionary<(int Body, int Anim), (int Anim, int Hue)> _equipConv = new();
 
+    /// <summary>What was found, for the health page: art entries, textures, hues, UOP frame files, bodies converted.</summary>
     public string Summary { get; }
 
+    /// <summary>A fingerprint of the files, so the page's cached pictures are thrown away when the client is patched.</summary>
     public string Stamp { get; }
 
     private BotArtFiles()
@@ -170,6 +182,7 @@ public sealed class BotArtFiles : IDisposable
             return handle;
         }
 
+        // ---- art: the old pair first, as the server's own ArtData looks, else the UOP package
         var artMul = Find("art.mul");
         var artIdx = Find("artidx.mul");
 
@@ -203,6 +216,7 @@ public sealed class BotArtFiles : IDisposable
             throw new FileNotFoundException("no art.mul or artLegacyMUL.uop in the client folders");
         }
 
+        // ---- land textures
         if (Find("texmaps.mul") is { } texMul && Find("texidx.mul") is { } texIdx)
         {
             _tex = Open(texMul);
@@ -219,13 +233,16 @@ public sealed class BotArtFiles : IDisposable
             }
         }
 
+        // ---- hues
         _hues = Find("hues.mul") is { } hues ? ReadHues(hues) : [];
 
+        // ---- tiledata: the land's texture and the item's animation, which the server's table does not keep
         if (Find("tiledata.mul") is { } tiledata)
         {
             ReadTileData(tiledata);
         }
 
+        // ---- animations: the pairs, the packages, and the tables that say which body is drawn from where
         string[] names = ["anim", "anim2", "anim3", "anim4", "anim5", "anim6"];
 
         for (var i = 0; i < names.Length; i++)
@@ -282,6 +299,8 @@ public sealed class BotArtFiles : IDisposable
         _handles.Clear();
     }
 
+    // ---- reading ---------------------------------------------------------------------------------------------
+
     private static Dictionary<int, Entry> ReadMulIndex(string path)
     {
         var bytes = File.ReadAllBytes(path);
@@ -302,6 +321,7 @@ public sealed class BotArtFiles : IDisposable
         return index;
     }
 
+    /// <summary>Every entry of a UOP package by its name's hash: where its data starts, how long it is stored and unpacked.</summary>
     private static Dictionary<ulong, Entry> ReadUop(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -313,8 +333,8 @@ public sealed class BotArtFiles : IDisposable
             throw new FileLoadException($"{path} is not a UOP package");
         }
 
-        reader.ReadInt32();
-        reader.ReadUInt32();
+        reader.ReadInt32(); // version
+        reader.ReadUInt32(); // signature
 
         var next = reader.ReadInt64();
         var length = stream.Length;
@@ -333,7 +353,7 @@ public sealed class BotArtFiles : IDisposable
                 var stored = reader.ReadInt32();
                 var unpacked = reader.ReadInt32();
                 var hash = reader.ReadUInt64();
-                reader.ReadUInt32();
+                reader.ReadUInt32(); // adler32
                 var flag = reader.ReadInt16();
 
                 if (offset == 0 || stored <= 0)
@@ -373,6 +393,7 @@ public sealed class BotArtFiles : IDisposable
         return bytes;
     }
 
+    /// <summary>An entry's bytes, unpacked when the package stored them packed (1 is zlib, 3 is zlib then Mythic's BWT).</summary>
     private static byte[] Load(SafeFileHandle handle, in Entry entry)
     {
         var raw = ReadAt(handle, entry.Offset, entry.Length);
@@ -418,6 +439,7 @@ public sealed class BotArtFiles : IDisposable
 
     private static ushort[][] ReadHues(string path)
     {
+        // Blocks of a four-byte header and eight hues; a hue is 32 colours, a table start and end, and a 20-byte name.
         var bytes = File.ReadAllBytes(path);
         var blocks = bytes.Length / 708;
         var hues = new ushort[blocks * 8][];
@@ -444,11 +466,12 @@ public sealed class BotArtFiles : IDisposable
     private void ReadTileData(string path)
     {
         var bytes = File.ReadAllBytes(path);
-        var wide = bytes.Length >= 3188736;
+        var wide = bytes.Length >= 3188736; // 7.0.9.0 and later: 64-bit flags
         var flagSize = wide ? 8 : 4;
         var landSize = flagSize + 2 + 20;
         var at = 0;
 
+        // The land: groups of 32 with a four-byte header; a flags word, the texture, a name.
         for (var i = 0; i < 0x4000 && at + landSize <= bytes.Length; i++)
         {
             if ((i & 0x1F) == 0)
@@ -460,6 +483,7 @@ public sealed class BotArtFiles : IDisposable
             at += landSize;
         }
 
+        // The items: a flags word, weight, layer, a count, the animation, a hue, a light, the height, a name.
         var itemSize = flagSize + 1 + 1 + 4 + 2 + 2 + 2 + 1 + 20;
         var items = wide ? 0x10000 : bytes.Length >= 1644544 ? 0x8000 : 0x4000;
 
@@ -543,6 +567,7 @@ public sealed class BotArtFiles : IDisposable
 
     private void ReadBodyConv(string path)
     {
+        // A body, then its number in anim2, anim3, anim4, anim5 and anim6; -1 where it has none. The last file that has it wins.
         foreach (var parts in DefLines(path))
         {
             if (parts.Length < 2 || !Int(parts[0], out var body))
@@ -562,6 +587,7 @@ public sealed class BotArtFiles : IDisposable
 
     private void ReadBodyDef(string path)
     {
+        // A body, a list of bodies to use instead in braces, a hue: the client takes the last of the list.
         foreach (var raw in path == null ? [] : File.ReadLines(path))
         {
             var line = raw;
@@ -594,6 +620,7 @@ public sealed class BotArtFiles : IDisposable
 
     private void ReadEquipConv(string path)
     {
+        // A body, the animation worn, the animation to draw instead on that body, a gump, a hue.
         foreach (var parts in DefLines(path))
         {
             if (parts.Length >= 3 && Int(parts[0], out var body) && Int(parts[1], out var worn) && Int(parts[2], out var drawn))
@@ -606,6 +633,7 @@ public sealed class BotArtFiles : IDisposable
 
     private void ReadSequences(string path)
     {
+        // One entry per body: which of its groups are drawn from another group of the same body.
         using var handle = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read);
 
         foreach (var (_, entry) in ReadUop(path))
@@ -651,6 +679,8 @@ public sealed class BotArtFiles : IDisposable
         }
     }
 
+    // ---- colours ---------------------------------------------------------------------------------------------
+
     public static uint Argb(ushort c)
     {
         var r = (c >> 10) & 0x1F;
@@ -660,6 +690,10 @@ public sealed class BotArtFiles : IDisposable
         return 0xFF000000u | (uint)(((r << 3) | (r >> 2)) << 16) | (uint)(((g << 3) | (g >> 2)) << 8) | (uint)((b << 3) | (b >> 2));
     }
 
+    /// <summary>
+    /// The colours of a hue, or null for none. The client's rule: the top bit asks for a partial hue, which colours only the grey
+    /// pixels; the number counts from one; past the table there is no hue.
+    /// </summary>
     public ushort[] Hue(int hue, out bool partial)
     {
         partial = (hue & 0x8000) != 0;
@@ -668,6 +702,7 @@ public sealed class BotArtFiles : IDisposable
         return hue > 0 && hue <= _hues.Length ? _hues[hue - 1] : null;
     }
 
+    /// <summary>One colour through a hue: a full hue takes the red channel as its index, a partial one only greys.</summary>
     public static ushort Through(ushort c, ushort[] hue, bool partial)
     {
         if (hue == null || c == 0)
@@ -688,8 +723,11 @@ public sealed class BotArtFiles : IDisposable
         return hue[r];
     }
 
+    // ---- tiledata as the client has it -------------------------------------------------------------------------
+
     public int LandTexture(int land) => land is >= 0 and < 0x4000 ? _landTexture[land] : 0;
 
+    /// <summary>Whether this land tile has a texture the client can stretch over a slope.</summary>
     public bool HasTexture(int land)
     {
         var tex = LandTexture(land);
@@ -697,8 +735,12 @@ public sealed class BotArtFiles : IDisposable
         return _texIndex != null && tex > 0 && tex < _texIndex.Length && _texIndex[tex].Length > 0;
     }
 
+    /// <summary>The body an item is drawn with when worn or ridden: tiledata's animation number.</summary>
     public int ItemAnim(int item) => item is >= 0 and < 0x10000 ? _itemAnim[item] : 0;
 
+    // ---- art ---------------------------------------------------------------------------------------------------
+
+    /// <summary>The 44 by 44 land diamond, hued not at all, as the client draws flat ground.</summary>
     public BotSprite Land(int id)
     {
         if (id is < 0 or >= 0x4000 || !_artIndex.TryGetValue(id, out var entry))
@@ -716,6 +758,7 @@ public sealed class BotArtFiles : IDisposable
         var pixels = new uint[44 * 44];
         var at = 0;
 
+        // Rows widen by two from the top point to the middle, then narrow again.
         for (var row = 0; row < 44; row++)
         {
             var start = row < 22 ? 21 - row : row - 22;
@@ -731,6 +774,7 @@ public sealed class BotArtFiles : IDisposable
         return new BotSprite { Width = 44, Height = 44, AnchorX = 0, AnchorY = 0, Pixels = pixels };
     }
 
+    /// <summary>The land texture a slope is drawn with: 64 or 128 pixels square, opaque.</summary>
     public BotSprite Texture(int land)
     {
         var tex = LandTexture(land);
@@ -759,6 +803,10 @@ public sealed class BotArtFiles : IDisposable
         return new BotSprite { Width = side, Height = side, Pixels = pixels };
     }
 
+    /// <summary>
+    /// A static or an item, through its hue. The anchor is where the client puts it on its tile: the middle column, the bottom
+    /// row, so the picture's bottom sits on the tile's bottom point.
+    /// </summary>
     public BotSprite Static(int id, int hue, bool partialByTile)
     {
         if (id is < 0 or >= 0x10000 || !_artIndex.TryGetValue(0x4000 + id, out var entry))
@@ -821,9 +869,12 @@ public sealed class BotArtFiles : IDisposable
         return new BotSprite { Width = width, Height = height, AnchorX = width / 2, AnchorY = height, Pixels = pixels };
     }
 
+    // ---- animations --------------------------------------------------------------------------------------------
+
     /// <summary>What a body is drawn as: from which file, under which number, laid out how.</summary>
     public readonly struct AnimSource
     {
+        /// <summary>The <c>anim*.mul</c> file (0 for anim.mul), or -1 for the UOP packages.</summary>
         public readonly int File;
 
         public readonly int Body;
@@ -832,6 +883,7 @@ public sealed class BotArtFiles : IDisposable
 
         public readonly uint Flags;
 
+        /// <summary>The hue Body.def gives a body drawn as another, or 0.</summary>
         public readonly int Hue;
 
         public AnimSource(int file, int body, BotAnimType type, uint flags, int hue)
@@ -884,6 +936,10 @@ public sealed class BotArtFiles : IDisposable
         return new AnimSource(file, drawn, type, flags, 0);
     }
 
+    /// <summary>
+    /// How a body is drawn, with Body.def's stand-in taken when the body itself has nothing in any file. Body.def speaks of
+    /// creatures, so a worn item's animation, whose numbers share the range, is never stood in for.
+    /// </summary>
     public AnimSource Resolve(int body, bool worn = false)
     {
         var source = Source(body);
@@ -898,6 +954,7 @@ public sealed class BotArtFiles : IDisposable
         return source;
     }
 
+    /// <summary>The worn animation for an item on a body, through Equipconv.def; 0 when the item is not drawn.</summary>
     public int WornAnim(int item, int wearer, out int hue)
     {
         hue = 0;
@@ -982,6 +1039,7 @@ public sealed class BotArtFiles : IDisposable
         return source.Body * 110L;
     }
 
+    /// <summary>The idx entry of one group and file direction of a MUL body: where its frames are, or false.</summary>
     private bool MulEntry(in AnimSource source, int group, int fileDir, out Entry entry)
     {
         entry = default;
@@ -1051,8 +1109,10 @@ public sealed class BotArtFiles : IDisposable
     public bool Exists(in AnimSource source, int group) =>
         source.Uop ? UopEntry(source, group, out _, out _) : MulEntry(source, group, 0, out _);
 
+    /// <summary>The five file directions and the three mirrored: the client keeps five and flips the rest.</summary>
     public static int FileDirection(int dir, out bool mirror)
     {
+        // The files hold Down (toward the viewer), South, Left, West and Up; North, Right and East are their mirrors.
         switch (dir & 7)
         {
             case 0:
@@ -1100,6 +1160,11 @@ public sealed class BotArtFiles : IDisposable
         Die
     }
 
+    /// <summary>
+    /// The group the client shows for a body that is not moving, by its kind: a person stands in group 4 (7 or 8 holding a
+    /// weapon in war mode, 25 on a mount); a monster in 1 (8 for those that idle on it, 25 in the packages); an animal in 2; a
+    /// sea creature in 2. The dying groups are 21, 2 and 8.
+    /// </summary>
     public int Group(in AnimSource source, Pose pose)
     {
         var type = source.Type;
@@ -1173,6 +1238,11 @@ public sealed class BotArtFiles : IDisposable
         return (flags & FlagUop) != 0 && !war ? 25 : 1;
     }
 
+    /// <summary>
+    /// One frame of a body in a direction: the first of the group the pose asks for, or the last when dying (a corpse lies as
+    /// the last frame of its death), mirrored where the client mirrors, through the hue. Falls back to the walk's first frame
+    /// when the body has no such group, as a body standing still on the walk is what the client shows in that case too.
+    /// </summary>
     public BotSprite Anim(int body, int dir, int hue, Pose pose, bool worn = false)
     {
         var source = Resolve(body, worn);
@@ -1210,6 +1280,7 @@ public sealed class BotArtFiles : IDisposable
             data = Load(_animUop[file], entry);
             frame = UopFrame(data, fileDir, last);
 
+            // A UOP frame keeps its own palette in front of its pixels.
             palette = frame;
             frame += 512;
         }
@@ -1223,12 +1294,14 @@ public sealed class BotArtFiles : IDisposable
             data = ReadAt(_animMul[source.File], entry.Offset, entry.Length);
             frame = MulFrame(data, last);
 
+            // A MUL group has one palette, the block's first 512 bytes.
             palette = 0;
         }
 
         return frame < 0 || palette < 0 ? null : Decode(data, palette, frame, hue);
     }
 
+    /// <summary>Where a MUL group's frame begins: past the palette, the count and the offsets, which count from the palette's end.</summary>
     private static int MulFrame(byte[] data, bool last)
     {
         if (data == null || data.Length < 520)
@@ -1248,6 +1321,10 @@ public sealed class BotArtFiles : IDisposable
         return offset > 0 && 512 + offset + 8 <= data.Length ? 512 + offset : -1;
     }
 
+    /// <summary>
+    /// Where a UOP group's frame for one direction begins. The package holds all five directions one after another; each frame
+    /// header names its frame number, so a missing frame leaves a gap rather than shifting the directions.
+    /// </summary>
     private static int UopFrame(byte[] data, int fileDir, bool last)
     {
         if (data == null || data.Length < 40)
@@ -1303,6 +1380,11 @@ public sealed class BotArtFiles : IDisposable
         return best + pixels + 512 + 8 <= data.Length ? best + pixels : -1;
     }
 
+    /// <summary>
+    /// One frame: the centre, the size, then runs of palette indices, each placed by a header whose top ten bits are x and next
+    /// ten y, both signed and counted from the centre, y from the bottom; the 256 colours of the palette are at
+    /// <paramref name="paletteAt"/>.
+    /// </summary>
     private BotSprite Decode(byte[] data, int paletteAt, int at, int hue)
     {
         if (at + 8 > data.Length || paletteAt + 512 > data.Length)
@@ -1367,9 +1449,11 @@ public sealed class BotArtFiles : IDisposable
             }
         }
 
+        // The client draws the frame at the feet less the centre, and up by the height and the centre's y.
         return new BotSprite { Width = width, Height = height, AnchorX = centreX, AnchorY = height + centreY, Pixels = pixels };
     }
 
+    /// <summary>The frame flipped, with its feet where the client puts them when it flips: the width less the centre.</summary>
     private static BotSprite Mirror(BotSprite s)
     {
         var pixels = new uint[s.Pixels.Length];

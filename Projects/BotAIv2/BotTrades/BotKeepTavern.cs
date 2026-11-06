@@ -171,6 +171,8 @@ public sealed class BotKeepTavern : BotDeed
     {
         var pack = BotTaverns.MealsIn(body.Backpack);
 
+        // <b>The meals out of the box first.</b> A cook banks what it cooks with everything else it carries (BotUnload), and the
+        // inn has no bank to reach into: the box is opened at the bank on the way, as a keeper of a shop by the bank would.
         if (!_fetched && pack < BotTaverns.StockMeals && _bank != Point3D.Zero && (body.FindBankNoCreate()?.Items.Count ?? 0) > 0)
         {
             if (!BotMarket.AtBank(body))
@@ -303,6 +305,7 @@ public sealed class BotTaverner : IBotProposer
 
     private static readonly Dictionary<Serial, long> _last = [];
 
+    /// <summary>A shift was taken: this cook rests from taverns for <see cref="BotTaverns.RestMs"/>.</summary>
     internal static void Went(Mobile cook)
     {
         if (cook != null)
@@ -325,6 +328,7 @@ public sealed class BotTaverner : IBotProposer
             return null;
         }
 
+        // Keeping one already.
         if (body.Resolve?.Deed is BotKeepTavern)
         {
             return null;
@@ -365,6 +369,7 @@ public sealed class BotTaverner : IBotProposer
             return null;
         }
 
+        // A red name in a town is a fight with the guards, not a supper.
         if (body.Kills >= 5 || body.Criminal || BotUnderworld.Member(body))
         {
             Outlawed++;

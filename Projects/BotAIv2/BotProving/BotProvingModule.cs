@@ -11,8 +11,10 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotProvingSettings
 {
+    /// <summary>Whether fights are held.</summary>
     public bool? Enabled { get; set; }
 
+    /// <summary>Whether the delve reads proven strength.</summary>
     public bool? Judges { get; set; }
 
     public int? Rings { get; set; }
@@ -31,8 +33,10 @@ public sealed class BotProvingSettings
 
     public int? Keep { get; set; }
 
+    /// <summary>Whether bots wake the ground round them as a client would (<see cref="BotWake"/>). Off unless said.</summary>
     public bool? Wake { get; set; }
 
+    /// <summary>Only inside dungeons.</summary>
     public bool? WakeDeepsOnly { get; set; }
 }
 
@@ -58,6 +62,7 @@ public sealed class BotProvingModule : BotModule
 
     public override string[] Requires => ["Population", "Delve"];
 
+    /// <summary>How often the ground is summed up in the log.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _beat;
@@ -89,6 +94,7 @@ public sealed class BotProvingModule : BotModule
         _say = new SayTimer(TimeSpan.FromMilliseconds(SayEveryMs));
         _say.Start();
 
+        // The rings are woken before every fight (BotProving.Wake); whether the bots' own ground is woken is the wake's.
         BotWake.Start();
 
         logger.Information("The wake {State}", BotWake.Describe());

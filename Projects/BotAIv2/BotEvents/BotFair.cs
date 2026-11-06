@@ -31,29 +31,40 @@ public static class BotFair
 
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often a fair is held: once a day.</summary>
     public static int EveryMs { get; set; } = 86400000;
 
+    /// <summary>How long after a boot the first fair opens, if none was held within <see cref="EveryMs"/> before it.</summary>
     public static int FirstMs { get; set; } = 5400000;
 
+    /// <summary>How long before it opens a fair is announced, and how long it is open.</summary>
     public static int AheadMs { get; set; } = 3600000;
 
     public static int LastsMs { get; set; } = 7200000;
 
+    /// <summary>What a bot pays at an NPC's counter in the fair's town, as a share of the shelf.</summary>
     public static double Discount { get; set; } = 0.9;
 
+    /// <summary>The fewest shopkeepers a town needs to hold a fair.</summary>
     public static int LeastShops { get; set; } = 3;
 
+    /// <summary>A lottery ticket, and the least a bot must have to spare to buy one.</summary>
     public static int Ticket { get; set; } = 10;
 
     public static int LotteryLeast { get; set; } = 200;
 
+    /// <summary>How often the bots in the fair's town are offered a ticket.</summary>
     public static int TicketEveryMs { get; set; } = 60000;
 
+    /// <summary>How far from the fair traders and crafters are offered the walk to it; how long a fairgoer stays.</summary>
     public static int Reach { get; set; } = 300;
 
     public static int StayMs { get; set; } = 180000;
 
+    /// <summary>What going to the fair is reckoned at per minute before the ledger has seen it pay.</summary>
     public static double Prior { get; set; } = 15.0;
+
+    // ---- state -------------------------------------------------------------------------------------------------------------
 
     public enum Phase
     {
@@ -64,22 +75,32 @@ public static class BotFair
 
     public static Phase State { get; private set; }
 
+    /// <summary>The town of the fair announced or open, or null.</summary>
     public static BotTowns.Town Town { get; private set; }
 
+    /// <summary>The fair's town while it is open, for the championship's ring; null otherwise.</summary>
     public static string TownName => State == Phase.Open ? Town?.Name : null;
 
     public static bool Open => State == Phase.Open && Town != null;
 
+    /// <summary>
+    /// The fair standing is the Great Fair, called by a town relic's holder (07.10.2026, relics20): the same fair with twice the
+    /// rebate at its counters, outside the turn of the towns and the day's calendar. See <see cref="CallGreat"/>.
+    /// </summary>
     public static bool Great { get; private set; }
 
+    /// <summary>The guild that called the Great Fair standing, and with which relic.</summary>
     public static string Patron { get; private set; }
 
     public static string PatronRelic { get; private set; }
 
+    /// <summary>Great Fairs held.</summary>
     public static long GreatHeld { get; private set; }
 
+    /// <summary>The ordinary fair's clock while a Great Fair stands: put back at its close, so the day's fair keeps its day.</summary>
     private static long _resumeTick;
 
+    /// <summary>What a bot pays at the fair's counters as a share of the shelf: <see cref="Discount"/>, its rebate twice at a Great Fair.</summary>
     public static double Rate => Math.Clamp(Great ? 1.0 - 2.0 * (1.0 - Discount) : Discount, 0.5, 1.0);
 
     private static int Off => 100 - (int)Math.Round(Rate * 100);
@@ -94,10 +115,16 @@ public static class BotFair
 
     private static long _nextTick;
 
+    /// <summary>When the last fair opened, in UTC; kept by the store so a restart does not hold a second fair the same day.</summary>
     public static DateTime LastUtc { get; internal set; } = DateTime.MinValue;
 
+    /// <summary>The turn of the towns, kept by the store.</summary>
     public static int Turn { get; internal set; }
 
+    /// <summary>
+    /// A town whose steward declared a holiday (07.10.2026, steward20): the next fair announced goes there if it has the shops,
+    /// and the turn's town otherwise. Set with <see cref="CallNow"/> by <c>BotStewardship</c>; cleared when read.
+    /// </summary>
     public static string Asked { get; set; }
 
     private static readonly Dictionary<Serial, int> _tickets = [];
@@ -105,6 +132,8 @@ public static class BotFair
     private static readonly HashSet<Serial> _came = [];
 
     public static int Pot { get; private set; }
+
+    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long Held { get; private set; }
 
@@ -148,6 +177,7 @@ public static class BotFair
         {
             _seeded = true;
 
+            // The next opening: a day after the last one, never sooner than FirstMs after this boot.
             var sinceLast = LastUtc == DateTime.MinValue ? long.MaxValue : (long)(DateTime.UtcNow - LastUtc).TotalMilliseconds;
             var wait = sinceLast >= EveryMs ? FirstMs : Math.Max(FirstMs, EveryMs - sinceLast);
 
@@ -194,6 +224,7 @@ public static class BotFair
         }
     }
 
+    /// <summary>Set by hand to announce a fair at the next beat, opening <see cref="AheadMs"/> later.</summary>
     public static bool CallNow
     {
         get => false;
@@ -207,6 +238,12 @@ public static class BotFair
         }
     }
 
+    /// <summary>
+    /// The Great Fair, called by the guild holding a town's relic (07.10.2026, relics20; Patrick: "the right to call the Great
+    /// Fair"): announced now in that town and opened <see cref="AheadMs"/> later, its counters at twice the rebate. Refused while
+    /// another fair is announced or open, or when the town has fewer than <see cref="LeastShops"/> shopkeepers. Outside the turn and
+    /// the day's calendar: the ordinary fair's clock is put back when it closes. See <c>BotRelics</c>.
+    /// </summary>
     public static bool CallGreat(BotTowns.Town town, string guild, string relic)
     {
         if (!Running || State != Phase.None || town == null || ShopsIn(town) < LeastShops)
@@ -252,6 +289,7 @@ public static class BotFair
 
     private static void Announce(long now)
     {
+        // A steward's holiday first (07.10.2026, steward20). See Asked.
         var town = Asked != null && BotTowns.Find(Asked) is { FromHome: true } asked && Shops(asked) >= LeastShops ? asked : Next();
 
         Asked = null;
@@ -297,6 +335,7 @@ public static class BotFair
         Pot = 0;
         Held++;
 
+        // A Great Fair is outside the calendar and the turn: the day's fair is still owed (relics20).
         if (Great)
         {
             GreatHeld++;
@@ -360,12 +399,14 @@ public static class BotFair
         _tickets.Clear();
         _came.Clear();
 
+        // The day's fair keeps its day after a Great Fair: its clock is put back as it stood when the Great Fair was called (relics20).
         _nextTick = Great ? _resumeTick : now + Math.Max(3600000, EveryMs);
         Great = false;
         Patron = null;
         PatronRelic = null;
     }
 
+    /// <summary>Shopkeepers in a town, up to <see cref="LeastShops"/>. For a steward's holiday (steward20).</summary>
     private static int Shops(BotTowns.Town town)
     {
         var shops = BotShops.Shops;
@@ -382,6 +423,7 @@ public static class BotFair
         return count;
     }
 
+    /// <summary>The next town of the turn that is reached from home and has <see cref="LeastShops"/> shopkeepers.</summary>
     private static BotTowns.Town Next()
     {
         var towns = BotTowns.All;
@@ -407,6 +449,7 @@ public static class BotFair
         return null;
     }
 
+    /// <summary>The shopkeepers standing in a town, counted up to <see cref="LeastShops"/>.</summary>
     internal static int ShopsIn(BotTowns.Town town) => ShopsIn(town, BotShops.Shops);
 
     private static int ShopsIn(BotTowns.Town town, IReadOnlyList<BaseVendor> shops)
@@ -424,6 +467,9 @@ public static class BotFair
         return count;
     }
 
+    // ---- the counter -----------------------------------------------------------------------------------------------------------
+
+    /// <summary>What a bot pays at this counter as a share of the shelf: <see cref="Discount"/> at the fair's town while it is open.</summary>
     public static double Counter(Mobile buyer, BaseVendor vendor)
     {
         if (!Open || buyer is not BotMobile || vendor == null || !Town.Bounds.Contains(vendor.Location))
@@ -436,6 +482,7 @@ public static class BotFair
         return Rate;
     }
 
+    /// <summary>A rebate settled at a counter: counted as the fair's when it is open and the buyer stands in its town.</summary>
     public static void Rebated(Mobile buyer, int back)
     {
         if (Open && back > 0 && buyer != null && Town.Bounds.Contains(buyer.Location))
@@ -445,6 +492,9 @@ public static class BotFair
         }
     }
 
+    // ---- the lottery --------------------------------------------------------------------------------------------------------
+
+    /// <summary>A ticket for one bot, if it has none and can spare the price. True when bought.</summary>
     public static bool Buy(Mobile bot)
     {
         if (!Open || bot is not BotMobile { Deleted: false, Alive: true } || Ticket <= 0 || _tickets.ContainsKey(bot.Serial))
@@ -537,6 +587,7 @@ public static class BotFair
             return;
         }
 
+        // Nobody holding a ticket can be found: the coin was taken and has nowhere to go. Said and counted, never quietly.
         PotLost += Pot;
 
         logger.Warning("The lottery of the fair in {Town} found no ticket holder to pay: {Pot}gp on {Tickets} tickets is lost", town?.Name, Pot, _tickets.Count);
@@ -544,6 +595,7 @@ public static class BotFair
         Pot = 0;
     }
 
+    /// <summary>Every ticket of a fair cut short by a restart, back to its holder. Called by the store after the world is read.</summary>
     internal static void Refund(List<(Serial Who, int Paid)> tickets)
     {
         for (var i = 0; i < tickets.Count; i++)
@@ -559,6 +611,7 @@ public static class BotFair
         }
     }
 
+    /// <summary>The tickets of an open fair, for the store.</summary>
     internal static IEnumerable<(Serial Who, int Paid)> Holders()
     {
         foreach (var (serial, _) in _tickets)
@@ -567,6 +620,9 @@ public static class BotFair
         }
     }
 
+    // ---- the fairgoers ----------------------------------------------------------------------------------------------------------
+
+    /// <summary>Whether this bot has come to this fair already, or is on its way.</summary>
     internal static bool Came(Mobile bot) => bot != null && _came.Contains(bot.Serial);
 
     internal static void Going(Mobile bot)
@@ -591,6 +647,7 @@ public static class BotFair
 
     internal static void Late() => Missed++;
 
+    /// <summary>When the open fair closes, for a fairgoer judging whether the walk is still worth it.</summary>
     internal static long ClosesTick => _closesTick;
 
     public static string Describe() =>
@@ -606,6 +663,7 @@ public static class BotFair
               + $"{GreatHeld} Great Fairs held at {Math.Clamp(1.0 - 2.0 * (1.0 - Discount), 0.5, 1.0):P0}; {Priced} counter prices at {Discount:P0} (or the Great Fair's), {Rebates} rebates for {RebateGold}gp; {Offered} walks offered to traders and crafters, {Goers} taken, {Arrived} arrived, {Missed} too late; "
               + $"lottery: {Tickets} tickets for {TicketGold}gp, {Draws} draws, {PotsPaid} pots paid for {PotGold}gp, {Refunded}gp refunded after a restart, {PotLost}gp lost for want of a holder; championships at the fair: {Tourneys} called, {TourneysRefused} refused by its hour";
 
+    /// <summary>A fair cut short by a reload: every ticket handed back, the fair closed.</summary>
     public static void Stand()
     {
         if (_tickets.Count > 0)

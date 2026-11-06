@@ -30,6 +30,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHaul));
 
+    /// <summary>The ledger's word for a haul.</summary>
     public const string Trade = "haul";
 
     private enum Step
@@ -60,8 +61,10 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
     private Step _step;
 
+    /// <summary>What one unit in hand cost the trader: what it paid, or what its own stock is reckoned at.</summary>
     private int _cost;
 
+    /// <summary>Units this haul has in hand for its orders: bought or taken from stock, not yet handed over.</summary>
     private int _held;
 
     private int _handed;
@@ -98,8 +101,10 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
     private IBotWilful _bot;
 
+    /// <summary>Where the trader stood when it took the haul: a hand-over down the dungeon block from outside it clears that ground (<see cref="BotUnreached.Reached"/>).</summary>
     private Point3D _setOut;
 
+    /// <summary>Whether this haul's own want is standing at the bank (a gathering): withdrawn whenever the haul ends.</summary>
     private bool _asking;
 
     private int _gatherFrom;
@@ -108,6 +113,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
     private long _gatherBegun;
 
+    /// <summary>The trader's own want for the kind, as it stood before the gathering topped it up; said again when the gathering ends. See Gather.</summary>
     private int _ownUnits;
 
     private int _ownOffer;
@@ -123,13 +129,20 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         _minutes = Math.Max(0.5, plan.After);
         _total = Math.Max(0.5, plan.ToSource + plan.After);
 
+        // Profit a minute of the work once at the source: the appraisal adds the walk there itself (nearness), so the claim is
+        // stated over what follows it and the two together come back to the whole haul's profit a minute.
+        // The expected profit, not the most it could make: a gathering is reckoned at its yield (BotTrading.GatherYield), and
+        // the plan's rate already says so over the whole haul.
         _claim = Math.Clamp(plan.Rate * _total / _minutes, BotTrading.LeastClaim, BotTrading.MostClaim);
 
+        // Seeded from a real tick, never left at nought; Taken seeds it again.
         _resumedTick = Core.TickCount;
     }
 
+    /// <summary>The kind this haul carries. Read by the porter's keep list (<see cref="BotTrading.Keep"/>).</summary>
     public Type Goods => _kind;
 
+    /// <summary>Units still owed to the orders open in the book.</summary>
     public int Owed
     {
         get
@@ -177,22 +190,27 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
     public override double Minutes => _minutes;
 
+    /// <summary>The merchant's eye: a check on every lot bought and every lot handed over. See <see cref="BotTrader"/>.</summary>
     public override SkillName? Trains => SkillName.ArmsLore;
 
     public override int Outlay => _spend;
 
+    /// <summary>A shopkeeper's counter is paid out of the pack.</summary>
     public override bool AtCounter => _source.From == BotHaulFrom.Counter;
 
     public override double Coin => 1.0;
 
+    /// <summary>Goods bought for orders that ended unfulfilled, kept as stock: worth what they cost, not a loss.</summary>
     public override int Made => _leftWorth;
 
     public override bool Steadfast => true;
 
+    /// <summary>The book is the trader's word: no better price takes it off the road. See the remarks.</summary>
     public override bool Committed => true;
 
     public override double HoldsFor => _total;
 
+    /// <summary>Afloat, or standing at the bank while the island brings what it asked for: both have their own clocks.</summary>
     public override bool Still => _asking || _sea is { Still: true };
 
     public override string Stage
@@ -220,6 +238,8 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         }
     }
 
+    // ---- The market's sweep ---------------------------------------------------------------------------------------------
+
     public bool Carries(BotWant want)
     {
         for (var i = 0; i < _orders.Count; i++)
@@ -234,6 +254,8 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
     }
 
     public bool Stale => _paused && Core.TickCount - _pausedTick >= BotDeliver.GiveUpMs;
+
+    // ---- Taken, put down, taken up, let go ------------------------------------------------------------------------------
 
     public override void Taken(IBotWilful bot)
     {
@@ -262,6 +284,9 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
             units = Math.Min(units, want.Payable);
 
+            // <b>The buyer's word to the trader is held from the moment the book is written (03.10.2026, build next).</b> Read again
+            // here, because another trader may have written carriage against the same free money since this one planned: the units
+            // its free money still carries at this price, and the carriage on them held with the want (BotWant.Premium).
             units = Math.Min(units, BotMarket.Affords(want, price));
 
             if (units <= 0)
@@ -280,6 +305,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         }
     }
 
+    /// <summary>The order said aloud: the trader's word, and — when it asked carriage over the buyer's offer — the buyer's.</summary>
     private void Promise(Mobile body, Mobile buyer, BotTradeOrder order)
     {
         var fill = new Dictionary<string, string>
@@ -339,16 +365,23 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         {
             if (!_orders[i].Closed && BotMarket.Stands(_orders[i].Want))
             {
+                // What the buyer's money still carries at the agreed price: a pause past the sweep released the carriage held for
+                // it, and the buyer may have spent it since (review of build next, F6). The meeting hands what is paid for.
                 var held = Math.Min(_orders[i].Units, BotMarket.Affords(_orders[i].Want, _orders[i].Price, bot));
 
                 if (held > 0)
                 {
+                    // The same trader holding its order again, not another take (03.10.2026, build next). See BotWant.Reserve.
                     _orders[i].Want.Reserve(bot, held, _orders[i].Price, true);
                 }
             }
         }
     }
 
+    /// <summary>
+    /// Let go, however it ended: the reservations released, and — when it ended from outside the haul, by a death, a watchdog or
+    /// a drop — every line still open struck with that reason. A haul that ended by its own word has already closed its book.
+    /// </summary>
     public override void Drop(IBotWilful bot)
     {
         Settle(bot);
@@ -357,6 +390,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         {
             _orders[i].Want?.Release(bot);
 
+            // A meeting still standing with any of the buyers is a meeting missed. See BotRendezvous.Gone.
             BotRendezvous.Gone(bot, _orders[i].Want?.Buyer);
         }
 
@@ -383,6 +417,10 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         }
     }
 
+    /// <summary>
+    /// The way it asked for turned out not to exist. To a counter: that counter is passed over and the next tried. To a buyer:
+    /// that order is struck and the haul goes on to the next. Nothing left: the haul fails, its book closed here.
+    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -409,6 +447,8 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         {
             ledger?.Beware(Trade, _map, order.Buyer?.Location ?? Where);
 
+            // A buyer down the dungeon block is marked for every trader and carrier, not only this trader's ledger (03.10.2026,
+            // build next): seven traders learned Edith's pocket one by one on live 396. See BotUnreached.
             BotUnreached.NoWay(_map, order.Buyer, _setOut, body);
 
             BotOrders.Of(body)?.Strike(body, order, "no way through to the buyer");
@@ -451,6 +491,8 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         }
     }
 
+    // ---- The work ---------------------------------------------------------------------------------------------------------
+
     public override BotDoing Advance(IBotWilful bot)
     {
         _bot = bot;
@@ -472,6 +514,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
             return End(bot, body, $"the road took longer than {BotTrading.MostHaulMs / 60000} minutes");
         }
 
+        // A voyage in progress answers first; it hands the haul back on landing.
         if (_sea != null)
         {
             var sailing = Sail(bot, out var lost);
@@ -497,6 +540,8 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
             }
         }
 
+        // The road to the source, which may hand on to another source (a shop shut, a counter empty, a gathering topped up at a
+        // counter) and ask again in the same beat; on to the buyers once the goods are in hand.
         for (var pass = 0; pass < 3 && _step == Step.ToSource; pass++)
         {
             var going = ToSource(bot, body);
@@ -515,10 +560,13 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return Deliver(bot, body);
     }
 
+    /// <summary>The road to the source and the purchase there. None when the goods are in hand and the buyers come next.</summary>
     private BotDoing ToSource(IBotWilful bot, BotMobile body)
     {
         Prune(bot, body);
 
+        // Every buyer gone while the bank was still buying for them: what was brought so far is in hand, and goes to whoever
+        // else wants it (Adopt, once the haul's own want is withdrawn) or to the shop.
         if (OpenCount == 0 && _asking)
         {
             Gathered(bot, body);
@@ -546,6 +594,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                 }
             case BotHaulFrom.Box:
                 {
+                    // Out of the box at the bank the haul was offered at, like a carrier's (BotDeliver): the box is reached only there.
                     var carried = BotHandover.Carried(bot, _kind);
                     var need = Math.Max(0, Owed - carried);
 
@@ -606,6 +655,13 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return Buy(bot, body);
     }
 
+    /// <summary>
+    /// The gathering: at its town's bank the trader says a want of its own for what its far buyers asked, at their offer less its
+    /// least markup, and stands while the island's carriers bring it (each meeting a <see cref="BotDeliver"/> of theirs, paid
+    /// hand to hand). It stops at <see cref="BotTrading.GatherMs"/> — later while a carrier is still on its way, up to twice that
+    /// — or as soon as the orders are covered; withdraws its want; tops up at a counter if one sells the rest under the orders'
+    /// prices; and sets out with what it has.
+    /// </summary>
     private BotDoing Gather(IBotWilful bot, BotMobile body)
     {
         var carried = BotHandover.Carried(bot, _kind);
@@ -627,6 +683,12 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                 return default;
             }
 
+            // <b>The trader's own standing want is not a refusal (02.10.2026, build 389).</b> Every trader that cooks keeps a want
+            // for raw ribs open, and raw ribs is what the island asks for most: all 38 gatherings refused here on build 388 were
+            // "could not say the want" for a trader that already wanted ribs for its own pan — 48 % of every failed haul, and the
+            // haul share 79.8 % against 88.6 % without them. The standing want is topped up by what the orders need, at the price
+            // the trader has learned (BotMarket.Ask tops rather than overwrites), and said again at its own size when the
+            // gathering ends (StopAsking), so the pan is not left wanting what the buyer paid for.
             var own = BotMarket.Wanted(bot, _kind);
 
             _ownUnits = own?.Amount ?? 0;
@@ -676,6 +738,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return TopUp(bot, body, got > 0 ? null : "nobody brought any");
     }
 
+    /// <summary>The gathering closed: the want withdrawn, what was brought taken into hand at what it came to. Returns how many.</summary>
     private int Gathered(IBotWilful bot, BotMobile body)
     {
         if (!_asking)
@@ -692,6 +755,9 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         {
             BotTrading.GatherEmpty++;
 
+            // Nobody in this town holds the kind: no trader gathers for it again for a while, and this trader leaves these
+            // buyers' wants alone (01.10.2026, build 386: Liftrasa stood for the same lightning scroll nine times in four hours,
+            // because Trim struck the lines without shunning the want and the next look took it again).
             BotHauler.ShunGathering(_kind);
 
             for (var i = 0; i < _orders.Count; i++)
@@ -713,6 +779,8 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         BotTrading.GatheredUnits += got;
         BotTrading.GatheredGold += paid;
 
+        // Each meeting at the bank booked the trader's payment aside, as a buyer's purchase in the middle of other work
+        // (BotDeliver → BotHandover.Exchange); here the purchase is this haul's own cost, so it is put back into the haul's takings.
         BotYield.Aside(body, -paid);
 
         Checked(body);
@@ -720,12 +788,18 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return got;
     }
 
+    /// <summary>
+    /// After a gathering, or instead of one: the rest of what the orders want bought at the nearest counter when it sells under
+    /// the orders' own prices, else the orders brought down to what is in hand. On to the buyers either way.
+    /// </summary>
     private BotDoing TopUp(IBotWilful bot, BotMobile body, string why)
     {
         var need = Owed - _held;
 
         if (need > 0)
         {
+            // The top-up at a shopkeeper's counter is passed over into a glut, as the proposer passes the counter over (01.10.2026,
+            // build 385 review): what the gathering did not bring, the orders are brought down to.
             var glutted = BotGlut.Glutted(_kind);
             var vendor = glutted ? null : BotShops.Nearest(bot, _kind);
             var price = vendor == null ? 0 : BotShops.Price(vendor, _kind);
@@ -752,6 +826,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                 return default;
             }
 
+            // Struck for what happened: twelve empty gatherings on build 386 read "the counter ran short" in the book.
             Trim(bot, body, need, why ?? "the counter ran short");
         }
 
@@ -765,6 +840,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return default;
     }
 
+    /// <summary>The lowest price an open order was agreed at.</summary>
     private int LeastPrice()
     {
         var least = int.MaxValue;
@@ -780,6 +856,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return least;
     }
 
+    /// <summary>A gathering cut short from outside: what was brought taken into hand (so it is kept as stock), the want withdrawn.</summary>
     private void Settle(IBotWilful bot)
     {
         if (bot?.Self is BotMobile body)
@@ -792,6 +869,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         }
     }
 
+    /// <summary>The haul's own want at the bank taken back. Nothing was held for it, so nothing is refunded.</summary>
     private void StopAsking(IBotWilful bot)
     {
         if (!_asking)
@@ -802,6 +880,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         _asking = false;
         BotMarket.Withdrawn(bot, _kind, BotWithdraw.Closed);
 
+        // The trader's own want, said again at its own size and price. See Gather.
         if (_ownUnits > 0 && _ownOffer > 0)
         {
             BotMarket.Ask(bot, _kind, _ownUnits, _ownOffer);
@@ -811,6 +890,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         _ownOffer = 0;
     }
 
+    /// <summary>At the counter or the shop: buy what the open orders want, try another counter if this one has none.</summary>
     private BotDoing Buy(IBotWilful bot, BotMobile body)
     {
         var need = Owed - _held;
@@ -850,6 +930,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
             return Resource(bot, _source.Vendor) ? ToSource(bot, body) : End(bot, body, $"could not buy {_label}: {refused ?? "nobody sold it"}");
         }
 
+        // What it actually came to, read off the purse: a town's standing moves a shopkeeper's price a little either way.
         var paid = Math.Max(0, before - BotYield.Wealth(body));
         var had = _held;
 
@@ -871,6 +952,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
             OpenCount
         );
 
+        // Short: the last orders written give way first, each brought down or struck.
         if (got < need)
         {
             Trim(bot, body, need - got);
@@ -881,6 +963,10 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return default;
     }
 
+    /// <summary>
+    /// Another counter for the same kind, after this one could not be reached or had none: <see cref="BotShops.Next"/>, at most
+    /// twice a haul. A shop that shut sends the haul to the nearest shopkeeper instead.
+    /// </summary>
     private bool Resource(IBotWilful bot, BaseVendor emptied)
     {
         if (_tries >= 2 || _source.From is BotHaulFrom.Stock or BotHaulFrom.Box)
@@ -922,10 +1008,12 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return true;
     }
 
+    /// <summary>The buyers, nearest first: walked to while far, followed once near, handed their goods at the meeting.</summary>
     private BotDoing Deliver(IBotWilful bot, BotMobile body)
     {
         var book = BotOrders.Of(body);
 
+        // At most one ending a beat per order, and a guard against a loop that strikes and adopts the same want forever.
         for (var guard = 0; guard < 8; guard++)
         {
             Prune(bot, body);
@@ -934,6 +1022,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
             if (order == null)
             {
+                // Every buyer left is lying dead and waited for (Prune): the trader stands where it is until one rises.
                 if (OpenCount > 0)
                 {
                     _current = null;
@@ -981,6 +1070,8 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                 {
                     _chasing = false;
 
+                    // Walked to where the buyer was, and aimed again only when it has gone well away from there or the trader
+                    // arrived without finding it: a walk order must stay the same from beat to beat (BotDoing.Matches).
                     if (!_aiming || !Utility.InRange(_aim, buyer.Location, BotTrading.NearTiles) || body.InRange(_aim, BotTrading.NearTiles / 2))
                     {
                         _aim = buyer.Location;
@@ -1006,6 +1097,8 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                     continue;
                 }
 
+                // <b>A meeting, once near (02.10.2026).</b> The buyer is told and comes to the trader; on unsafe ground both go to the
+                // guarded place the meeting names. The same as a carrier's delivery: see BotDeliver and BotRendezvous.
                 if (BotRendezvous.Running && order.Want?.Buyer is { } wanting && BotRendezvous.Call(bot, wanting, order.Want, order.Units) is { Place: var place } && place != Point3D.Zero)
                 {
                     return body.InRange(place, 2)
@@ -1013,7 +1106,8 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                         : BotDoing.Walk(_map, place, BotArrival.Within(2), $"to the meeting place for {order.BuyerName} with {order.Units} {_label}");
                 }
 
-                return BotDoing.Walk(_map, buyer, BotArrival.Within(BotHandover.MeetTiles), $"after {order.BuyerName} with {order.Units} {_label}");
+                // Kept up with (12.10.2026, w7): a plan that reaches the buyer is a way however far it walks on; ChaseMs ends the chase.
+                return BotDoing.WalkAfter(_map, buyer, BotArrival.Within(BotHandover.MeetTiles), $"after {order.BuyerName} with {order.Units} {_label}");
             }
 
             Hand(bot, body, order);
@@ -1022,6 +1116,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return BotDoing.Work($"settling the book with {_held} {_label} in hand");
     }
 
+    /// <summary>The meeting: goods for coin at the price agreed, the want brought down, the line struck as delivered.</summary>
     private void Hand(IBotWilful bot, BotMobile body, BotTradeOrder order)
     {
         var book = BotOrders.Of(body);
@@ -1049,6 +1144,10 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         {
             BotRendezvous.Gone(bot, order.Want?.Buyer);
 
+            // A buyer that cannot pay at the meeting cannot honour the want either: it stands down, as at a carrier's meeting —
+            // when it cannot pay for one at its own offer (build next). A buyer whose free money will not carry the carriage over the
+            // offer still honours the want at the offer, for a carrier that asks that; only this order is struck. See
+            // BotMarket.Affords.
             var unpaid = order.Want != null ? BotMarket.Affords(order.Want, order.Want.Offer) <= 0 : BotYield.Spendable(buyer) < order.Price;
             var carriage = !unpaid && order.Want != null && BotMarket.Affords(order.Want, order.Price, bot) <= 0;
 
@@ -1075,8 +1174,10 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         BotMarket.Received(order.Want, given, paid, body, BotRoute.Trader);
         order.Want?.Release(bot);
 
+        // Handed down the dungeon block by a haul taken outside it: the way exists. See BotUnreached.
         BotUnreached.Reached(_map, buyer, _setOut);
 
+        // The meeting, if one was called, is met. See BotRendezvous.Handed.
         BotRendezvous.Handed(order.Want?.Buyer);
 
         var cost = given * _cost;
@@ -1093,6 +1194,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         BotTrading.HandedGold += paid;
         BotTrading.HandedCost += cost;
 
+        // Paid, and the takings above the pocket float go into the account at once (build 388). See BotTrading.PutAway.
         BotTrading.PutAway(body);
 
         if (order.Price > order.Offered)
@@ -1104,6 +1206,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         Checked(body);
     }
 
+    /// <summary>Lines whose want or buyer is gone, struck; their units released.</summary>
     private void Prune(IBotWilful bot, BotMobile body)
     {
         var book = BotOrders.Of(body);
@@ -1117,6 +1220,9 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                 continue;
             }
 
+            // <b>A dead buyer is waited for, a while.</b> A bot rises about a minute after it falls (61 s from death to its next
+            // work on 384, at 0.96 deaths an online hour), and its want stands meanwhile: striking the line at the first beat it
+            // lay dead would have thrown away one order in five on a quarter-hour haul. Struck after DeadWaitMs.
             if (order.Buyer is { Deleted: false, Alive: false })
             {
                 if (!order.DeadSeen)
@@ -1143,6 +1249,9 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
                 _ => !BotMarket.Stands(order.Want) ? "the want was met or withdrawn" : null
             };
 
+            // <b>And a buyer whose pack will not take the goods, before they are bought and before the walk (06.10.2026, work17).</b>
+            // Another carrier's refusal may mark it while this haul is on the road; the hand-over would be refused at the meeting
+            // and the buyer's walk to it (a meet) fail with it. Struck here, the goods go to another want (Adopt) or stay as stock.
             if (why == null && order.Buyer is { Alive: true } full && (BotRoom.Shut(full) || !BotRoom.Receives(full, _kind)))
             {
                 BotRoom.Note(full);
@@ -1175,6 +1284,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         {
             var order = _orders[i];
 
+            // A buyer lying dead is gone back to when it has risen. See Prune.
             if (order.Closed || order.Buyer is not { Alive: true })
             {
                 continue;
@@ -1192,6 +1302,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return best;
     }
 
+    /// <summary>The purchase came up short: the last orders written are brought down, or struck when nothing is left for them.</summary>
     private void Trim(IBotWilful bot, BotMobile body, int short_, string why = "the counter ran short")
     {
         var book = BotOrders.Of(body);
@@ -1219,11 +1330,17 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
             if (BotMarket.Stands(order.Want))
             {
+                // The same trader holding fewer, not another take (review of build next, F8). See BotWant.Reserve.
                 order.Want.Reserve(bot, order.Units, order.Price, true);
             }
         }
     }
 
+    /// <summary>
+    /// Another open want for the same kind, answered from what this haul has in hand — or, before buying, from the same source:
+    /// a buyer died or got its goods elsewhere, and the goods (or the walk to them) need not go to waste. Never under cost once
+    /// bought. The nearest worth most a minute, one at a time.
+    /// </summary>
     private bool Adopt(IBotWilful bot, BotMobile body)
     {
         if (body == null)
@@ -1266,6 +1383,9 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
 
             var buyer = want.Buyer.Self;
 
+            // <b>Leftovers taken up from inside the dungeon block go nowhere outside its land (03.10.2026, build next).</b> On live
+            // 396 nine orders were written by traders standing down there — most in the pocket at (6139, 1432) they had walked into
+            // after a buyer — for buyers on the island, and eight were struck "no way through". See BotUnreached.
             if (BotUnreached.Refuses(_map, buyer, bought ? body.Location : _source.Where))
             {
                 BotTrading.Unreached++;
@@ -1337,6 +1457,13 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return true;
     }
 
+    // ---- The sea --------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// A voyage begun to a place no road or gate reaches, for a trader well off enough to sail (<see cref="BotTrading.CanSail"/>):
+    /// the ordinary one (<see cref="BotVoyage"/> — the ship bought if it has none, the dock, the lane, the landing), run inside
+    /// the haul until it lands. Null when it cannot sail.
+    /// </summary>
     private BotDoing? SetSail(IBotWilful bot, BotMobile body, Point3D to, string why)
     {
         if (!BotTrading.CanSail(body))
@@ -1376,6 +1503,7 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return lost == null ? BotDoing.Work($"landed at {dock.Name}") : null;
     }
 
+    /// <summary>The voyage's own answer while it sails; none once it has landed or was lost (and then why).</summary>
     private BotDoing Sail(IBotWilful bot, out string lost)
     {
         lost = null;
@@ -1406,6 +1534,12 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         }
     }
 
+    // ---- Endings --------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The haul's own ending: every line still open struck with <paramref name="why"/>, what is left over kept as stock. Finished
+    /// when at least one order was handed over — the work a trader exists for happened — failed when none was.
+    /// </summary>
     private BotDoing End(IBotWilful bot, BotMobile body, string why)
     {
         _closed = true;
@@ -1444,6 +1578,12 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         }
     }
 
+    /// <summary>
+    /// What the haul bought and could not hand over, kept as stock and counted as made (<see cref="Made"/>) — at what it cost, or
+    /// at the balance's reading of the kind when that is lower (<see cref="BotGlut.Yield"/>, 01.10.2026, build 385 review): a
+    /// leftover of a glutted kind is one more on the pile, and a ledger that read it at cost would have learned that a haul
+    /// which buys eighty and hands over twenty pays as well as one that hands over eighty.
+    /// </summary>
     private int Keep(IBotWilful bot)
     {
         if (_held <= 0 || _source.From is BotHaulFrom.Stock or BotHaulFrom.Box)
@@ -1460,5 +1600,6 @@ public sealed class BotHaul : BotDeed, IBotWantCarrier
         return left;
     }
 
+    /// <summary>The merchant's eye on a lot. See <see cref="BotTrader"/>.</summary>
     private static void Checked(Mobile body) => body?.CheckSkill(SkillName.ArmsLore, 0.0, 100.0);
 }

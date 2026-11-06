@@ -43,29 +43,43 @@ public static class BotGuildStore
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuildStore));
 
+    /// <summary>Whether the guilds keep stores at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>The most a store holds of one stacking kind.</summary>
     public static int MostUnits { get; set; } = 120;
 
+    /// <summary>The most a store holds of one draught (they do not stack, and a store of seventy is the courier's hoard again).</summary>
     public static int MostBottles { get; set; } = 30;
 
+    /// <summary>How near the store a porter must stand for its capped surplus to go in instead of the bank box.</summary>
     public static int TakeReach { get; set; } = 40;
 
+    /// <summary>Whether the porter puts surplus into the store at all. See <see cref="Take"/>.</summary>
     public static bool PorterGives { get; set; } = true;
 
+    /// <summary>Whether a gift counts as dues given in the guild's elections.</summary>
     public static bool GiftsCount { get; set; } = true;
 
+    /// <summary>What a member's spendable must be under to be issued a kit as poor. The moneylender's bar and a half.</summary>
     public static int PoorBelow { get; set; } = 150;
 
+    /// <summary>The most a member may owe the store and still be issued another kit.</summary>
     public static int MostOwed { get; set; } = 0;
 
+    /// <summary>The share of every rise in a debtor's wealth that goes to the chest. The moneylender's half.</summary>
     public static double LienShare { get; set; } = 0.5;
 
+    /// <summary>Hours of the debtor's own play before an unpaid kit is written off.</summary>
     public static double DefaultHours { get; set; } = 6.0;
 
+    /// <summary>The guess at a unit's price when the market has learned none.</summary>
     public static int PriceGuess { get; set; } = 5;
 
+    /// <summary>How often the lien is taken.</summary>
     public static int CollectMs { get; set; } = 60000;
+
+    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long GiftsIn { get; private set; }
 
@@ -107,8 +121,11 @@ public static class BotGuildStore
 
     public static long ShelvedGold { get; private set; }
 
+    // ---- state -------------------------------------------------------------------------------------------------------------
+
     private static readonly Dictionary<string, Dictionary<Type, int>> _stores = new(StringComparer.Ordinal);
 
+    /// <summary>When each guild last issued each kind, for the surplus rule.</summary>
     private static readonly Dictionary<(string, Type), long> _lastIssued = [];
 
     public sealed class Debt
@@ -136,6 +153,12 @@ public static class BotGuildStore
 
     private static readonly List<string> _ended = [];
 
+    // ---- where -------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Where the store stands: the heart of the guild's town house first, the door of its hall second; nothing without either.
+    /// The same order a member is born and walks home by (<see cref="BotSeat.Home"/>).
+    /// </summary>
     public static bool At(Guild guild, out Map map, out Point3D at)
     {
         map = BotPopulation.Home;
@@ -165,15 +188,19 @@ public static class BotGuildStore
         return false;
     }
 
+    /// <summary>Whether this kind may be kept in a store.</summary>
     public static bool Storable(Type kind) => kind != null && BotProvision.Consumable(kind);
 
     private static bool Bottle(Type kind) => kind != null && typeof(BasePotion).IsAssignableFrom(kind);
 
+    /// <summary>The most a store holds of this kind.</summary>
     public static int Most(Type kind) => Bottle(kind) ? MostBottles : MostUnits;
 
+    /// <summary>What this guild's store holds of this kind.</summary>
     public static int Held(string guild, Type kind) =>
         guild != null && kind != null && _stores.TryGetValue(guild, out var store) && store.TryGetValue(kind, out var n) ? n : 0;
 
+    /// <summary>What this guild's store holds, by kind. Never null; read only.</summary>
     public static IReadOnlyDictionary<Type, int> Of(string guild) =>
         guild != null && _stores.TryGetValue(guild, out var store) ? store : _empty;
 
@@ -189,6 +216,7 @@ public static class BotGuildStore
         return store;
     }
 
+    /// <summary>The store's goods at the market's price.</summary>
     public static int Worth(string guild)
     {
         var worth = 0L;
@@ -203,8 +231,10 @@ public static class BotGuildStore
 
     public static int Price(Type kind) => Math.Max(1, BotMarket.Worth(kind, PriceGuess));
 
+    /// <summary>Room left for this kind in this guild's store.</summary>
     public static int Room(string guild, Type kind) => Math.Max(0, Most(kind) - Held(guild, kind));
 
+    /// <summary>The stock in a few words, for the speech: "80 bandages, 12 lesser heal potions".</summary>
     public static string Stock(string guild, int most = 4)
     {
         var store = Of(guild);
@@ -237,6 +267,13 @@ public static class BotGuildStore
         return shown == 0 ? "nothing yet" : say.ToString();
     }
 
+    // ---- in ----------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The porter's door into the store (from <c>BotUnload.Store</c>, before the bank box): a whole lot of a member's capped
+    /// surplus goes into its guild's store when the member stands within <see cref="TakeReach"/> of it and the store has room
+    /// for all of it. True when the lot went in and is gone; false leaves it untouched for the box.
+    /// </summary>
     public static bool Take(Mobile body, Item lot)
     {
         if (!Running || !PorterGives || body is not BotMobile bot || bot.Guild is not Guild guild || lot is not { Deleted: false })
@@ -261,6 +298,7 @@ public static class BotGuildStore
         return true;
     }
 
+    /// <summary>A member's surplus handed to the quartermaster at the store. Whole lots only; true when it went in.</summary>
     internal static bool Hand(BotMobile member, Guild guild, Item lot)
     {
         var units = Math.Max(1, lot?.Amount ?? 0);
@@ -321,6 +359,10 @@ public static class BotGuildStore
         return true;
     }
 
+    /// <summary>
+    /// Goods the guild bought: the quartermaster's want delivered, put into the store from its pack. Reimbursed by the caller
+    /// at the want's price. Returns the units that went in.
+    /// </summary>
     internal static int Bought(BotMobile qm, Guild guild, Type kind, int most)
     {
         var pack = qm?.Backpack;
@@ -357,6 +399,9 @@ public static class BotGuildStore
         return units;
     }
 
+    // ---- out ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>Whether this member may be issued a kit at all: short of it, poor or new, owing nothing, never a defaulter.</summary>
     public static string Unfit(BotMobile member)
     {
         if (member?.Name == null)
@@ -387,6 +432,7 @@ public static class BotGuildStore
         return null;
     }
 
+    /// <summary>Whether the store holds anything of what this member lacks.</summary>
     public static bool Lacks(BotMobile member, string guild)
     {
         var pack = member?.Backpack;
@@ -398,6 +444,8 @@ public static class BotGuildStore
 
         foreach (var (kind, n) in Of(guild))
         {
+            // The doors' floor, not the shopper's: the store never issues a healer's attack herbs as a debt (08.10.2026, cast30
+            // review A2/B F3; see BotProvision.Armed).
             if (n > 0 && BotProvision.DoorFloor(member, kind) > pack.GetAmount(kind))
             {
                 return true;
@@ -407,6 +455,10 @@ public static class BotGuildStore
         return false;
     }
 
+    /// <summary>
+    /// The quartermaster hands a member what it lacks of its kit from the store, and the member owes the guild's chest what it
+    /// was worth. Returns the units handed over; nought when the store had nothing it lacked or the pack took nothing.
+    /// </summary>
     public static int Issue(BotMobile qm, BotMobile member, out string what, out int owed)
     {
         what = null;
@@ -425,6 +477,7 @@ public static class BotGuildStore
 
         foreach (var (kind, n) in store)
         {
+            // The doors' floor: see Lacks (08.10.2026, cast30).
             var lack = BotProvision.DoorFloor(member, kind) - pack.GetAmount(kind);
 
             if (n > 0 && lack > 0)
@@ -490,6 +543,7 @@ public static class BotGuildStore
         return given;
     }
 
+    /// <summary>Makes <paramref name="units"/> of a kind in a pack, one item at a time for a kind that does not stack. Returns what went in.</summary>
     private static int Give(Mobile member, Container pack, Type kind, int units)
     {
         var put = 0;
@@ -523,8 +577,12 @@ public static class BotGuildStore
         return put;
     }
 
+    // ---- debts -------------------------------------------------------------------------------------------------------------
+
+    /// <summary>What this bot owes its guild's store, nought for nothing.</summary>
     public static int Owes(string name) => name != null && _debts.TryGetValue(name, out var debt) ? debt.Left : 0;
 
+    /// <summary>The lien's look at every debtor, on its clock. From the module's timer.</summary>
     internal static void Collect(long now)
     {
         if (_debts.Count == 0 || now - _lastCollect < CollectMs)
@@ -620,6 +678,7 @@ public static class BotGuildStore
             return false;
         }
 
+        // Out of the debtor's work by a decision outside it, into the chest: booked aside, as the moneylender's lien is.
         BotYield.Aside(debtor, take);
         BotChest.Put(debt.Guild, take);
 
@@ -665,12 +724,22 @@ public static class BotGuildStore
         );
     }
 
+    // ---- surplus -------------------------------------------------------------------------------------------------------------
+
+    /// <summary>How long a kind must go unissued before what the store holds over <see cref="KeepShare"/> of its most is surplus.</summary>
     public static int SurplusAfterMs { get; set; } = 10800000;
 
+    /// <summary>The share of a kind's most the store keeps whatever happens.</summary>
     public static double KeepShare { get; set; } = 0.6;
 
+    /// <summary>The most units of one kind put on the shelf at one shift.</summary>
     public static int ShelfLot { get; set; } = 40;
 
+    /// <summary>
+    /// One lot of the store's surplus onto the guild's merchant at the hall, at the market's price: a stacking kind no member has
+    /// drawn for <see cref="SurplusAfterMs"/>, above <see cref="KeepShare"/> of its most. The merchant's takings come back to the
+    /// chest by the quartermaster's hand (<see cref="BotQuartermaster"/>). Returns the units shelved.
+    /// </summary>
     internal static int Shelve(BotMobile qm, Guild guild)
     {
         if (!_stores.TryGetValue(guild.Name, out var store) || BotShelf.Of(guild) is not { Deleted: false } merchant)
@@ -741,6 +810,8 @@ public static class BotGuildStore
 
         return 0;
     }
+
+    // ---- telling -----------------------------------------------------------------------------------------------------------
 
     public static string Tell(string guild)
     {
@@ -823,6 +894,8 @@ public static class BotGuildStore
         w.WriteNumber("debtors", debtors);
         w.WriteNumber("owed", owed);
     }
+
+    // ---- persistence -----------------------------------------------------------------------------------------------------
 
     internal static void Save(IGenericWriter writer)
     {
@@ -937,6 +1010,7 @@ public static class BotGuildStore
         return (_stores.Count, _debts.Count);
     }
 
+    /// <summary>A reload: the counters only. The goods and the debts are the store's to keep.</summary>
     public static void Forget()
     {
         GiftsIn = 0;
@@ -962,6 +1036,19 @@ public static class BotGuildStore
         _lastCollect = 0;
     }
 
+    /// <summary>
+    /// <b>Patrick's reset (07.10.2026, reset26): every guild's store emptied and every kit debt struck off, so the save writes them
+    /// empty.</b> <see cref="Forget"/> keeps the goods and the debts for a reload; a new world founds its guilds again, and an old
+    /// name's store would have handed its old stock to a guild that never gathered it, and a newcomer under an old name would have
+    /// been born owing for a kit it never drew. This empties exactly what <see cref="Save"/> writes — the stores, the debts, the
+    /// defaulters — and when each kind was last issued.
+    ///
+    /// <para>
+    /// <b>No coin is held here.</b> A store's stock is goods counted by kind, given or carried in or bought from a counter with the
+    /// buyer's coin at the time; a kit debt is a line in the book, repaid out of the debtor's takings into the guild's chest as it
+    /// was earned. Emptying them moves no gold. Returns the stores emptied.
+    /// </para>
+    /// </summary>
     public static int Wipe()
     {
         var stores = _stores.Count;

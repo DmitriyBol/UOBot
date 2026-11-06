@@ -30,6 +30,7 @@ public sealed class BotEnlarge : BotDeed
 
     public static int Reach => BotHall.Reach;
 
+    /// <summary>How long the office stays held by the member walking to the new ground.</summary>
     public static int ClaimMs { get; set; } = 180000;
 
     public static long Done { get; private set; }
@@ -110,6 +111,7 @@ public sealed class BotEnlarge : BotDeed
             return BotDoing.Walk(_map, _plot, BotArrival.Within(Reach), $"to the ground for {_kind} at {_plot.X},{_plot.Y}");
         }
 
+        // Ground that changed hands while the bot walked: not raised on another guild's. See BotBounds.
         if (BotBounds.Refuse(BotBounds.Placing.Bigger, _guild.Name, _map, _plot, _kind.Multi, out var foreign))
         {
             BotPlot.Spend();
@@ -138,6 +140,7 @@ public sealed class BotEnlarge : BotDeed
             }
         }
 
+        // The price, before anything comes down: a guild that cannot pay keeps its hall.
         var paid = new List<BotEstate.Contribution>();
         var got = BotEstate.Levy(_guild, _kind.Price, paid, body);
 
@@ -171,6 +174,8 @@ public sealed class BotEnlarge : BotDeed
 
         if (house == null || house.Deleted)
         {
+            // Not expected — the engine's check has just passed — but a guild must not end this errand homeless and out of
+            // pocket: its money back, and its old size put up again where the old one stood.
             BotEstate.Refund(paid, body);
             Refused++;
 
@@ -282,8 +287,10 @@ public sealed class BotEnlarger : IBotProposer
 {
     public const string Office = "enlarger";
 
+    /// <summary>How close to its hall's room a guild must be before it moves into a bigger one.</summary>
     public static int Fullness { get; set; } = 2;
 
+    /// <summary>How often one guild's ground is looked for.</summary>
     public static int LookMs { get; set; } = 60000;
 
     public static long Asked { get; private set; }
@@ -340,6 +347,7 @@ public sealed class BotEnlarger : IBotProposer
             return null;
         }
 
+        // Fund counts the chest since 29.09.2026; it was added here by hand before that, and would now count twice.
         if (BotEstate.Fund(ours) < next.Price)
         {
             Poor++;

@@ -27,26 +27,48 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotBarrier
 {
+    /// <summary>
+    /// Whether the hunt reads this at all. Off, darts are thrown exactly as they were before it existed.
+    ///
+    /// <para>
+    /// <b>Off, because replayed it caught as many good walks as bad ones.</b> Over build 43's first seventeen minutes,
+    /// judging every prowl taken from home against the stops recorded before it, the rule as written would have passed
+    /// over 2 of the 23 walks that stopped closing — and 2 of the 189 that finished; wider or looser settings caught 2
+    /// to 4 against 3 to 4. A river is a line hundreds of tiles long and these are points on it: a dart that crosses the
+    /// same river somewhere else is not near any of them. The stops are still written down, so the line can be drawn
+    /// from them later; switch this on through the door to try it.
+    /// </para>
+    /// </summary>
     public static bool Running { get; set; } = false;
 
+    /// <summary>How close to the line to a candidate a stopping place must lie to count against it, in tiles.</summary>
     public static int Near { get; set; } = 16;
 
+    /// <summary>Stops near one place, heading the same way, before that place counts as a barrier.</summary>
     public static int Enough { get; set; } = 2;
 
+    /// <summary>How long a stop is remembered. Forty minutes.</summary>
     public static int KeepMs { get; set; } = 2400000;
 
+    /// <summary>The most stops kept at once; the oldest goes first.</summary>
     public static int Most { get; set; } = 128;
 
+    /// <summary>
+    /// How closely two headings must agree to be the same way: the cosine of the angle between them. About 45 degrees.
+    /// </summary>
     public static double SameWay { get; set; } = 0.7;
 
+    /// <summary>Walks written down as having stopped closing.</summary>
     public static long Stops { get; private set; }
 
+    /// <summary>Hunting grounds passed over for lying beyond a place walks that way have stopped at.</summary>
     public static long Behind { get; private set; }
 
     private readonly record struct Stop(Map Map, int X, int Y, double Dx, double Dy, long Tick);
 
     private static readonly List<Stop> _stops = [];
 
+    /// <summary>A walk from <paramref name="at"/> towards <paramref name="toward"/> stopped getting any nearer.</summary>
     public static void Stopped(Map map, Point3D at, Point3D toward)
     {
         if (map == null || map == Map.Internal)
@@ -72,6 +94,10 @@ public static class BotBarrier
         Stops++;
     }
 
+    /// <summary>
+    /// Whether a walk from <paramref name="from"/> to <paramref name="to"/> would run past a place walks heading that way
+    /// have stopped at, with <paramref name="to"/> lying beyond it.
+    /// </summary>
     public static bool Beyond(Map map, Point3D from, Point3D to)
     {
         if (!Running || map == null || _stops.Count == 0)
@@ -101,6 +127,7 @@ public static class BotBarrier
                 continue;
             }
 
+            // Along the line: between the start and the candidate, with the candidate well past it.
             var along = (stop.X - from.X) * ux + (stop.Y - from.Y) * uy;
 
             if (along <= 0.0 || along >= length - Near)
@@ -108,6 +135,7 @@ public static class BotBarrier
                 continue;
             }
 
+            // Across the line: close enough to be on the way.
             var across = Math.Abs((stop.X - from.X) * uy - (stop.Y - from.Y) * ux);
 
             if (across > Near || Neighbours(stop, now) < Enough)
@@ -123,6 +151,7 @@ public static class BotBarrier
         return false;
     }
 
+    /// <summary>Stops within <see cref="Near"/> of this one, heading the same way, itself included.</summary>
     private static int Neighbours(Stop stop, long now)
     {
         var found = 0;
@@ -145,6 +174,7 @@ public static class BotBarrier
         return found;
     }
 
+    /// <summary>Everything back to nothing, for a world that has just been replaced.</summary>
     public static void Forget()
     {
         _stops.Clear();

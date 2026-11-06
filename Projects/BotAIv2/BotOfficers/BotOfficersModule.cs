@@ -60,8 +60,10 @@ public sealed class BotOfficersModule : BotModule
 
     private const string ConfigPath = "Configuration/bot-officers.json";
 
+    /// <summary>The clock: bouts read every beat, the appointments and the lien on their own minutes. A second.</summary>
     public static int TickMs { get; set; } = 1000;
 
+    /// <summary>How long after the start before the first appointments, while the population is raised.</summary>
     public static int SettleMs { get; set; } = 180000;
 
     private static Timer _timer;

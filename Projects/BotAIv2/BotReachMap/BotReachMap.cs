@@ -42,32 +42,47 @@ public static class BotReachMap
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotReachMap));
 
+    /// <summary>Whether the reach map is drawn and asked at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>The most one tick of drawing may spend on the game loop, in milliseconds.</summary>
     public static double SliceMs { get; set; } = 6.0;
 
+    /// <summary>How often a tick runs, in milliseconds.</summary>
     public static int EveryMs { get; set; } = 50;
 
+    /// <summary>Whether the clusters are kept on disk between boots.</summary>
     public static bool Persist { get; set; } = true;
 
+    /// <summary>Cores the machine needs for the solve to run off the loop (CLAUDE.md rule 10); fewer, and it runs inline.</summary>
     public static int OffLoopCores { get; set; } = 3;
 
+    /// <summary>How near a sampled place an open tile must be for a walker to be sent there. Two: the planner's own anchorage.</summary>
     public static int SampleReach { get; set; } = 2;
 
+    /// <summary>How often an idle map looks at whether the gates or home have changed since the last solve.</summary>
     public static int IdleCheckMs { get; set; } = 10000;
 
+    /// <summary>How often the dashboard's summary is written, in milliseconds.</summary>
     public static int JsonEveryMs { get; set; } = 2000;
 
+    /// <summary>Steps onto ground the map calls unreachable, in one cluster, after which the cluster is drawn again.</summary>
     public static int RedrawAfter { get; set; } = 3;
 
+    /// <summary>How many of those steps are said in the log a session, with their tiles.</summary>
     public static int SayContradictions { get; set; } = 25;
 
     private static volatile BotReachSnapshot _snapshot;
 
+    /// <summary>The map as last solved; null until the first solve. Immutable, safe from any thread.</summary>
     public static BotReachSnapshot Snapshot => _snapshot;
 
     public static bool Ready => _snapshot != null;
 
+    /// <summary>
+    /// Set while the check's oracles ask the walker's own search, so the map does not answer its own examination
+    /// (<see cref="BotReachCheck"/>). The loop is single-threaded; a flag is enough.
+    /// </summary>
     public static bool Bypass { get; set; }
 
     private enum Stage
@@ -135,10 +150,12 @@ public static class BotReachMap
 
     public static Map Map => _map;
 
+    /// <summary>Clusters on the map, and clusters drawn.</summary>
     public static int Clusters => _clusters?.Length ?? 0;
 
     public static int ClustersDrawn { get; private set; }
 
+    /// <summary>Clusters drawn from the ground, drawn again for a change, and checked against the houses and items at a boot.</summary>
     public static long Drawn { get; private set; }
 
     public static long Redrawn { get; private set; }
@@ -147,6 +164,7 @@ public static class BotReachMap
 
     public static long SignChanged { get; private set; }
 
+    /// <summary>The loop's milliseconds spent drawing, checking signatures and handing the solve its input; the worst tick.</summary>
     public static double DrawMs { get; private set; }
 
     public static double SignMs { get; private set; }
@@ -157,6 +175,7 @@ public static class BotReachMap
 
     public static long Ticks { get; private set; }
 
+    /// <summary>Solves run, their milliseconds (off the loop unless <see cref="LastSolveInline"/>), the last one's.</summary>
     public static int Solves { get; private set; }
 
     public static double SolveMs { get; private set; }
@@ -165,26 +184,31 @@ public static class BotReachMap
 
     public static bool LastSolveInline { get; private set; }
 
+    /// <summary>The file: what became of reading it, its size, and times written.</summary>
     public static string FileState { get; private set; } = "not read";
 
     public static long FileBytes { get; private set; }
 
     public static int FileWrites { get; private set; }
 
+    /// <summary>Questions put to the map by the walkers, and what it refused.</summary>
     public static long Asked { get; private set; }
 
     public static long Refused { get; private set; }
 
     public static long RefusedAboard { get; private set; }
 
+    /// <summary>Places refused to the population's samplers, and routes the planner was not asked for.</summary>
     public static long SamplerRefused { get; private set; }
 
     public static long PlannerRefused { get; private set; }
 
+    /// <summary>Steps the walkers took that the map was asked about; steps from open ground onto ground it calls anything else.</summary>
     public static long StepsSeen { get; private set; }
 
     public static long Contradicted { get; private set; }
 
+    /// <summary>Steps taken on ground no walk from home reaches (bots on islands and in pockets), and clusters drawn again for contradictions.</summary>
     public static long StepsAway { get; private set; }
 
     public static long RedrawnForSteps { get; private set; }
@@ -206,6 +230,7 @@ public static class BotReachMap
         ClustersDrawn = 0;
         _began = Core.TickCount;
 
+        // Seeded from a real tick (CLAUDE.md rule 20): the clocks below are compared by subtraction only.
         _jsonAt = _began - JsonEveryMs;
         _idleChecked = _began;
 
@@ -263,6 +288,7 @@ public static class BotReachMap
         );
     }
 
+    /// <summary>Everything dropped, for a reload of the world.</summary>
     public static void Forget()
     {
         _timer?.Stop();
@@ -302,6 +328,7 @@ public static class BotReachMap
             BotReachWeb.Build();
         }
 
+        // A solve finished on the worker: said once, and the check told.
         if (_snapshot is { } snap && snap.Version != _seenVersion)
         {
             _seenVersion = snap.Version;
@@ -363,6 +390,7 @@ public static class BotReachMap
                         var c = _signNext--;
                         var cluster = _clusters[c];
 
+                        // Water and rock hold nothing an item or a house could take a step away from.
                         if (cluster == null)
                         {
                             MarkDirty(c);
@@ -397,6 +425,7 @@ public static class BotReachMap
 
                         _stage = Stage.Drawing;
 
+                        // Nothing to draw: the map as read is the map.
                         if (_dirty.Count == 0)
                         {
                             _changed = true;
@@ -512,6 +541,7 @@ public static class BotReachMap
                         AuditDocks(audited);
                     }
 
+                    // The gates are read from the world a little after the boot; home can move. Either is a new solve.
                     if (!_solving && (GateCount() != _gatesSolved || BotPopulation.Where != _homeSolved))
                     {
                         Solve();
@@ -526,6 +556,10 @@ public static class BotReachMap
 
     private static int GateCount() => BotGates.Surveyed ? BotGates.All.Count : 0;
 
+    /// <summary>
+    /// Hands the clusters, the gates and home to a solve: on a worker when the machine has the cores, inline otherwise. The
+    /// clusters array is copied (the references only: the clusters themselves never change).
+    /// </summary>
     private static void Solve()
     {
         if (_clusters == null || _map == null)
@@ -542,6 +576,8 @@ public static class BotReachMap
 
         var started = Stopwatch.GetTimestamp();
 
+        // The gates are the world's teleporters and moongates: asked for here, once they are read (BotGates surveys on its
+        // first question).
         BotGates.Ensure(_map);
 
         var gates = new List<BotReachGate>();
@@ -620,6 +656,7 @@ public static class BotReachMap
         }
     }
 
+    /// <summary>A solve has landed: counted, said, and the check started the first time.</summary>
     private static void Solved(BotReachSnapshot snap)
     {
         Solves++;
@@ -649,10 +686,16 @@ public static class BotReachMap
         BotReachCheck.Solved(snap);
     }
 
+    /// <summary>Berths the map calls anything but water, and shores with no ground a walk reaches within two tiles, at the last audit.</summary>
     public static int BerthsAground { get; private set; }
 
     public static int ShoresUnreached { get; private set; }
 
+    /// <summary>
+    /// The docks set against the map (01.10.2026): a ship's berth must be water — the one ground a ship may be on — and the shore
+    /// a walker boards from and lands on must be ground a walk reaches (or, at an island's dock, the isle). A dock that fails is
+    /// said by name; nothing is changed.
+    /// </summary>
     private static void AuditDocks(BotReachSnapshot snap)
     {
         var aground = 0;
@@ -690,6 +733,7 @@ public static class BotReachMap
         );
     }
 
+    /// <summary>The clusters written to disk on a worker, when they have changed and the world is not being saved.</summary>
     private static void Keep()
     {
         if (!Persist || _writing || World.Saving || _clusters == null)
@@ -730,6 +774,7 @@ public static class BotReachMap
         );
     }
 
+    /// <summary>A cluster to draw again, with the four whose links point into it (west, north, north-west, north-east).</summary>
     private static void MarkDirty(int c)
     {
         if (_builder == null || c < 0 || c >= _clusters.Length)
@@ -762,6 +807,7 @@ public static class BotReachMap
         }
     }
 
+    /// <summary>A house raised, moved or taken down: its clusters and the ring round them are drawn again.</summary>
     private static void OnGroundChanged(Map map, Rectangle2D bounds)
     {
         if (map != _map || _builder == null)
@@ -787,6 +833,7 @@ public static class BotReachMap
 
     public static long GroundChanges { get; private set; }
 
+    /// <summary>Draws a square of the map again, by hand: <c>reach redraw x y [r]</c> at the door.</summary>
     public static int Redraw(int x, int y, int radius)
     {
         if (_builder == null)
@@ -808,12 +855,21 @@ public static class BotReachMap
         return marked;
     }
 
+    // ------------------------------------------------------------------ the questions
+
+    /// <summary>What a tile is, by its best standing place; <see cref="BotReachClass.Unknown"/> before the first solve or on another map.</summary>
     public static BotReachClass Class(Map map, int x, int y) =>
         _snapshot is { } snap && snap.Holds(map) ? snap.ClassAt(x, y) : BotReachClass.Unknown;
 
+    /// <summary>What a tile is at a height: where a tile's standing places differ, the one nearest <paramref name="z"/>.</summary>
     public static BotReachClass Class(Map map, int x, int y, int z) =>
         _snapshot is { } snap && snap.Holds(map) ? snap.ClassAt(x, y, z) : BotReachClass.Unknown;
 
+    /// <summary>
+    /// Whether a tile is out of reach: for a walker, anything but open ground; for a walker aboard a ship
+    /// (<paramref name="aboard"/>), anything but water — the land stays unreachable to a ship, the water does not. False while
+    /// the map cannot say.
+    /// </summary>
     public static bool Unreachable(Map map, int x, int y, bool aboard = false)
     {
         var k = Class(map, x, y);
@@ -821,11 +877,22 @@ public static class BotReachMap
         return k != BotReachClass.Unknown && (aboard ? k != BotReachClass.Water : k != BotReachClass.Open);
     }
 
+    /// <summary>The same for a body: aboard when a ship stands under it.</summary>
     public static bool Unreachable(Mobile walker, int x, int y) =>
         walker?.Map != null && Unreachable(walker.Map, x, y, Afloat(walker.Map, walker.Location));
 
+    /// <summary>
+    /// Whether the walkers' own searches leave out every step onto ground the map says the walker cannot reach: from open
+    /// ground, anything but open ground; from a deck, anything but water. Patrick's plan v2, point 6 (01.10.2026, build 388).
+    /// See <see cref="Standing"/> and <c>BotPath.Find</c>.
+    /// </summary>
     public static bool PrunesSearch { get; set; } = true;
 
+    /// <summary>
+    /// What ground a walker standing at <paramref name="from"/> can reach by the map: open ground for one on open ground, water
+    /// for one aboard a ship. False — nothing can be said — while the map cannot say, during the map's own check
+    /// (<see cref="Bypass"/>), and for a walker standing anywhere else (an isle, a pocket it was carried into).
+    /// </summary>
     public static bool Standing(Map map, Point3D from, out BotReachClass want)
     {
         want = BotReachClass.Unknown;
@@ -854,6 +921,7 @@ public static class BotReachMap
         return false;
     }
 
+    /// <summary>Whether the map says a walker at <paramref name="from"/> cannot reach the standing place at <paramref name="to"/>: a point no route, retreat or muster is built on.</summary>
     public static bool RefusesTile(Map map, Point3D from, Point3D to)
     {
         if (!Standing(map, from, out var want))
@@ -866,10 +934,18 @@ public static class BotReachMap
         return kind != BotReachClass.Unknown && kind != want;
     }
 
+    /// <summary>Whether a ship's deck is under this point.</summary>
     public static bool Afloat(Map map, Point3D at) => map != null && map != Map.Internal && BaseBoat.FindBoatAt(at, map) != null;
 
+    /// <summary>Whether a ship could be where this tile is: water, by the map. See <see cref="BotSeaChart"/> for whether a hull fits.</summary>
     public static bool Sailable(Map map, int x, int y) => Class(map, x, y) == BotReachClass.Water;
 
+    /// <summary>
+    /// Whether the map proves a walk from <paramref name="from"/> to within <paramref name="reach"/> of <paramref name="goal"/>
+    /// impossible: the walker stands on open ground and no open tile lies within reach of the goal — or the walker is aboard a
+    /// ship and no water does. Counted when it refuses. A walker standing anywhere else is never refused: the map says what a
+    /// walk from home reaches, and one standing off it is not walking from home.
+    /// </summary>
     public static bool Refuses(Map map, Point3D from, Point3D goal, int reach)
     {
         if (!Running || Bypass || _snapshot is not { } snap || !snap.Holds(map) || !snap.Homed)
@@ -885,6 +961,7 @@ public static class BotReachMap
 
         if (here == BotReachClass.Water)
         {
+            // A deck over the water. Anything else standing on a water tile — a swimmer, a pier made of items — gets no answer.
             if (!Afloat(map, from) || snap.Any(goal.X, goal.Y, reach, BotReachClass.Water))
             {
                 return false;
@@ -905,6 +982,12 @@ public static class BotReachMap
         return true;
     }
 
+    /// <summary>
+    /// Whether the map says a walk joins the two places: the walker stands on open ground and the goal's own standing place, at
+    /// its height, is open ground too — both reached from home, over the ground and through every gate (01.10.2026, build next).
+    /// The goal's own tile and not its surroundings, so a creature on a crypt's roof beside an open street is not "joined". Read
+    /// by <c>BotReach.Ask</c> before the pocket ledger, whose floods do not go through teleporters.
+    /// </summary>
     public static bool Joins(Map map, Point3D from, Point3D goal)
     {
         if (!Running || Bypass || _snapshot is not { } snap || !snap.Holds(map) || !snap.Homed)
@@ -915,10 +998,17 @@ public static class BotReachMap
         return snap.ClassAt(from.X, from.Y, from.Z) == BotReachClass.Open && snap.ClassAt(goal.X, goal.Y, goal.Z) == BotReachClass.Open;
     }
 
+    /// <summary>A sampler's place refused by the map. See <see cref="BotPopulation.Reachable"/>.</summary>
     public static void NoteSampler() => SamplerRefused++;
 
+    /// <summary>A route not asked of the planner because the map refused its goal. See <see cref="BotJourney"/>.</summary>
     public static void NotePlanner() => PlannerRefused++;
 
+    /// <summary>
+    /// A walker took a step. Stepping from open ground onto ground the map calls anything else is the map wrong about that
+    /// tile — or the ground changed under it — and is counted, said the first <see cref="SayContradictions"/> times, and after
+    /// <see cref="RedrawAfter"/> in one cluster the cluster is drawn again. The population itself is the map's widest check.
+    /// </summary>
     public static void Stepped(Mobile walker, Point3D before, Point3D after)
     {
         if (_snapshot is not { } snap || walker?.Map == null || !snap.Holds(walker.Map))
@@ -971,6 +1061,8 @@ public static class BotReachMap
         }
     }
 
+    // ------------------------------------------------------------------ the words
+
     public static string Label(BotReachClass k) =>
         k switch
         {
@@ -991,9 +1083,11 @@ public static class BotReachMap
         _ => _solving ? "solving" : "ready"
     };
 
+    /// <summary>How far the first drawing has got, nought to one.</summary>
     public static double Progress =>
         _clusters == null ? 0.0 : _stage == Stage.Drawing && _next >= 0 ? (Clusters - 1 - _next) / (double)Clusters : _stage == Stage.Loading ? 0.0 : 1.0;
 
+    /// <summary>What a tile is, for the door: its class, its standing places where they differ, its land and the ground round it.</summary>
     public static string TellAt(int x, int y)
     {
         if (_snapshot is not { } snap)

@@ -50,10 +50,14 @@ public sealed class BotScribe : IBotProposer
             return null;
         }
 
+        // Every answer from here on is counted (03.10.2026): "took on inscribe" 0 times in 85 minutes said that nothing was
+        // written and nothing about why. See BotScribes.Describe, in the Needs: line.
         BotScribes.Looked();
 
         if (BotGrimoire.Book(body) == null)
         {
+            // A pen and no book. Nothing stops it writing for the market, but the choice of what to write
+            // leans on what its own book is short of, and there is no honest answer without one.
             BotScribes.Bookless();
 
             return null;
@@ -61,6 +65,8 @@ public sealed class BotScribe : IBotProposer
 
         if (BotQuill.System == null)
         {
+            // Content initialisation builds the craft systems, and anything that asks before that gets null.
+            // Said once: a scribe that never writes is otherwise indistinguishable from an idle one.
             if (!_saidNoSystem)
             {
                 _saidNoSystem = true;
@@ -70,6 +76,8 @@ public sealed class BotScribe : IBotProposer
 
             return null;
         }
+
+        // Asked after the paper is priced, below, so the choice can weigh what a scroll costs to make.
 
         BotShops.Survey(map, body.Location);
 
@@ -101,6 +109,8 @@ public sealed class BotScribe : IBotProposer
             return null;
         }
 
+        // What to write and what to buy for it, priced at this counter: a want first, its own book or scrolls next, practice
+        // last. See BotQuill.Plan.
         var plan = BotQuill.Plan(bot, shop, price);
 
         if (plan == null)
@@ -110,11 +120,13 @@ public sealed class BotScribe : IBotProposer
             return null;
         }
 
+        // Counted here and refused by the auction, which asks the same question of every work: BotAppraisal.Weigh.
         BotScribes.Offered(plan, BotYield.Spendable(body) < plan.Outlay);
 
         return new BotInscribe(shop, price, plan, body);
     }
 
+    /// <summary>Lets the complaints be made again after a world reload.</summary>
     public static void Forget()
     {
         _saidNoPaper = false;

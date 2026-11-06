@@ -25,10 +25,12 @@ namespace Server.BotAI.V2;
 [SerializationGenerator(0)]
 public partial class BotRelicItem : Item
 {
+    /// <summary>Which relic this is: <c>crown</c>, <c>bell</c>, <c>banner:The Hammer</c>. See <see cref="BotRelics"/>.</summary>
     [SerializableField(0)]
     [SerializedCommandProperty(AccessLevel.GameMaster)]
     private string _key;
 
+    /// <summary>The relics read back from the save, waiting to be linked to the registry. Emptied at the module's start.</summary>
     public static readonly List<BotRelicItem> Loaded = [];
 
     [Constructible]

@@ -27,22 +27,30 @@ public sealed class BotRelicSnatch : IBotProposer
 
     public static bool Running { get; set; } = true;
 
+    /// <summary>The least Stealing a thief brings to be offered a relic.</summary>
     public static double Bar { get; set; } = 30.0;
 
+    /// <summary>The chance of a lift is Stealing / 100 × this, at most <see cref="Most"/>.</summary>
     public static double Odds { get; set; } = 0.6;
 
     public static double Most { get; set; } = 0.6;
 
+    /// <summary>The chance a lift is seen anyway.</summary>
     public static double SeenChance { get; set; } = 0.5;
 
+    /// <summary>How far a thief goes after a carrier.</summary>
     public static int Reach { get; set; } = 150;
 
+    /// <summary>The least time between two relic thefts tried on the island.</summary>
     public static int EveryMs { get; set; } = 1800000;
 
+    /// <summary>How long a thief closes on a carrier before it gives up.</summary>
     public static int CloseMs { get; set; } = 120000;
 
+    /// <summary>What a relic's theft is reported as having taken: it raises the bounty on the thief's head.</summary>
     public static int Worth { get; set; } = 300;
 
+    /// <summary>What the try is reckoned at per minute before the ledger has measured one.</summary>
     public static double Prior { get; set; } = 60.0;
 
     public static long Offered { get; private set; }
@@ -180,6 +188,10 @@ public sealed class BotRelicTheft : BotDeed
 
     public override SkillName? Trains => SkillName.Stealing;
 
+    /// <summary>
+    /// Half what the fence asks for it: takings in their own right, as a lifted purse's goods are at the fence's share — and half,
+    /// because a relic is sold only if some guild's chest can pay before the thief is caught.
+    /// </summary>
     public override int Made => _lifted ? BotRelics.RelicRansom / 2 : 0;
 
     public override bool Committed => _done;

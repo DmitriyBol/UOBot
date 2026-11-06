@@ -34,6 +34,7 @@ public sealed class BotMarketSettings
 
     public int? SayWantMs { get; set; }
 
+    /// <summary>A risen buyer's grace before its wants are asked whether it can pay; a want's longest stand at a price it cannot raise (02.10.2026, build 391).</summary>
     public int? RisenGraceMs { get; set; }
 
     public int? MostAgeMs { get; set; }
@@ -48,6 +49,7 @@ public sealed class BotMarketSettings
 
     public int? DeliverGiveUpMs { get; set; }
 
+    /// <summary>The balance of supply against spoken demand (01.10.2026, Patrick's point 8). See <see cref="BotGlut"/>.</summary>
     public bool? GlutEnabled { get; set; }
 
     public int? GlutWindowMs { get; set; }
@@ -58,6 +60,7 @@ public sealed class BotMarketSettings
 
     public double? GlutShunned { get; set; }
 
+    /// <summary>The meeting between buyer and carrier (02.10.2026, Patrick's order). See <see cref="BotRendezvous"/>.</summary>
     public bool? Meetings { get; set; }
 
     public int? MeetingCallTiles { get; set; }
@@ -69,6 +72,16 @@ public sealed class BotMarketSettings
     public int? MeetingSafeReach { get; set; }
 
     public double? MeetingExpects { get; set; }
+
+    /// <summary>The buyer that stands for its carrier (12.10.2026, w7). See <see cref="BotRendezvous.StandTiles"/>.</summary>
+    public int? MeetingStandTiles { get; set; }
+
+    public int? MeetingStandMs { get; set; }
+
+    public int? MeetingStandMostMs { get; set; }
+
+    /// <summary>How long a carrier walks after its buyer coming no nearer before it lets it go (12.10.2026, w7). See <see cref="BotDeliver.LosingMs"/>.</summary>
+    public int? DeliverLosingMs { get; set; }
 }
 
 public static class BotMarketConfig
@@ -97,6 +110,7 @@ public static class BotMarketConfig
         BotMarket.BriskMs = settings.BriskMs ?? BotMarket.BriskMs;
         BotMarket.StaleMs = settings.StaleMs ?? BotMarket.StaleMs;
 
+        // Only when the file gives it: read back as "?? RaiseMs" it would freeze today's StaleMs into it for good.
         if (settings.RaiseMs is { } raiseMs)
         {
             BotMarket.RaiseMs = raiseMs;
@@ -126,5 +140,9 @@ public static class BotMarketConfig
         BotRendezvous.WaitMs = settings.MeetingWaitMs ?? BotRendezvous.WaitMs;
         BotRendezvous.SafeReach = settings.MeetingSafeReach ?? BotRendezvous.SafeReach;
         BotRendezvous.Prior = settings.MeetingExpects ?? BotRendezvous.Prior;
+        BotRendezvous.StandTiles = settings.MeetingStandTiles ?? BotRendezvous.StandTiles;
+        BotRendezvous.StandMs = settings.MeetingStandMs ?? BotRendezvous.StandMs;
+        BotRendezvous.StandMostMs = settings.MeetingStandMostMs ?? BotRendezvous.StandMostMs;
+        BotDeliver.LosingMs = settings.DeliverLosingMs ?? BotDeliver.LosingMs;
     }
 }

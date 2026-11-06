@@ -43,18 +43,25 @@ public static class BotChart
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotChart));
 
+    /// <summary>Whether the chart is drawn and consulted at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>The side of a square of the chart, in tiles. Read when the chart is drawn.</summary>
     public static int Side { get; set; } = 16;
 
+    /// <summary>The most one slice of drawing may spend on the game loop.</summary>
     public static double SliceMs { get; set; } = 8.0;
 
+    /// <summary>A run of crossings longer than this across one edge is two gates, one near each end.</summary>
     public static int LongGate { get; set; } = 8;
 
+    /// <summary>Most nodes one route may expand before it gives up.</summary>
     public static int MostExpanded { get; set; } = 80000;
 
+    /// <summary>How far round a place the chart looks for a tile its flood reached, when the place itself was not.</summary>
     public static int Anchorage { get; set; } = 3;
 
+    /// <summary>How long a gate a leg could not pass is shunned, and what shunning it costs a route.</summary>
     public static int ShunMs { get; set; } = 600000;
 
     public static int ShunCost { get; set; } = 400;
@@ -75,6 +82,7 @@ public static class BotChart
 
     private static int _per;
 
+    /// <summary>Per node: the tile's index in the road map's square, and the square of the chart it is in.</summary>
     private static readonly List<int> _tile = [];
 
     private static readonly List<int> _cellOf = [];
@@ -99,6 +107,7 @@ public static class BotChart
 
     private static readonly Dictionary<int, long> _shunned = [];
 
+    /// <summary>Whether the chart is drawn and may be asked.</summary>
     public static bool Ready { get; private set; }
 
     public static int Nodes => _tile.Count;
@@ -113,10 +122,13 @@ public static class BotChart
 
     public static long Routed { get; private set; }
 
+    /// <summary>Asks answered with no route because the two places are joined inside one square.</summary>
     public static long Near { get; private set; }
 
+    /// <summary>Asks the chart could not place: off its ground, or no tile its flood reached near enough.</summary>
     public static long Unplaced { get; private set; }
 
+    /// <summary>Asks with no way between the two places on the chart.</summary>
     public static long Apart { get; private set; }
 
     public static long Expanded { get; private set; }
@@ -125,6 +137,7 @@ public static class BotChart
 
     public static long ShunnedGates { get; private set; }
 
+    /// <summary>Begins drawing the chart from the finished road map. Called by <c>BotRoads</c> when its flood is done.</summary>
     public static void Begin()
     {
         Forget();
@@ -140,8 +153,10 @@ public static class BotChart
         _begunTick = Core.TickCount;
     }
 
+    /// <summary>One slice of the drawing. Called on the road map's timer until <see cref="Ready"/>.</summary>
     public static bool Slice()
     {
+        // Nothing begun (the chart is off, or the road map lent nothing): nothing to draw, and the clock may stop.
         if (Ready || _cellNodes == null)
         {
             return true;
@@ -181,6 +196,7 @@ public static class BotChart
         return Ready;
     }
 
+    /// <summary>Every gate across every edge between two squares: runs of tiles a body can step across both ways.</summary>
     private static void DrawGates()
     {
         for (var cy = 0; cy < _per; cy++)
@@ -190,11 +206,13 @@ public static class BotChart
                 var x1 = Math.Min((cx + 1) * _side, _span) - 1;
                 var y1 = Math.Min((cy + 1) * _side, _span) - 1;
 
+                // East: from the square's last column into the next square's first.
                 if (x1 + 1 < _span)
                 {
                     Runs(x1, cy * _side, 0, 1, y1 - cy * _side + 1, (int)Direction.East, (int)Direction.West, 1, 0);
                 }
 
+                // South: from the square's last row into the next square's first.
                 if (y1 + 1 < _span)
                 {
                     Runs(cx * _side, y1, 1, 0, x1 - cx * _side + 1, (int)Direction.South, (int)Direction.North, 0, 1);
@@ -203,6 +221,11 @@ public static class BotChart
         }
     }
 
+    /// <summary>
+    /// Walks one edge, <paramref name="length"/> tiles from (<paramref name="x"/>, <paramref name="y"/>) along
+    /// (<paramref name="ax"/>, <paramref name="ay"/>), and makes a gate of each run of tiles that step across it (direction
+    /// <paramref name="over"/>, offset <paramref name="ox"/>, <paramref name="oy"/>) and back (<paramref name="back"/>).
+    /// </summary>
     private static void Runs(int x, int y, int ax, int ay, int length, int over, int back, int ox, int oy)
     {
         var start = -1;
@@ -278,6 +301,7 @@ public static class BotChart
         return node;
     }
 
+    /// <summary>Which of one square's nodes reach which, inside the square, and in how many steps.</summary>
     private static void Join(int cell, int[] bfs)
     {
         var nodes = _cellNodes[cell];
@@ -318,6 +342,7 @@ public static class BotChart
 
     private static readonly Queue<int> _queue = new();
 
+    /// <summary>Steps from one tile to every tile of its square, staying inside the square; -1 for a tile not reached.</summary>
     private static void Flood(int cell, int from, int[] steps)
     {
         Array.Fill(steps, -1);
@@ -415,6 +440,12 @@ public static class BotChart
         );
     }
 
+    /// <summary>
+    /// The way from <paramref name="from"/> to <paramref name="to"/> over the chart, as one point a square, into
+    /// <paramref name="points"/> (cleared first), the last of them in the destination's square. False when the chart is not
+    /// drawn or cannot place either end, when the two are joined inside one square (the planner needs no help), and when
+    /// the chart knows no way between them.
+    /// </summary>
     public static bool Route(Map map, Point3D from, Point3D to, List<Point3D> points)
     {
         points?.Clear();
@@ -444,6 +475,7 @@ public static class BotChart
         return found;
     }
 
+    /// <summary>A tile at or near (x, y) of the square that the road map's flood reached, or -1.</summary>
     private static int Anchor(int x, int y)
     {
         for (var r = 0; r <= Anchorage; r++)
@@ -539,6 +571,8 @@ public static class BotChart
                 return true;
             }
 
+            // Popped once for good: every way to a node costs at least the straight steps between its ends, so the first
+            // time a node leaves the queue its cost is its least.
             if (_closed[node] == _search)
             {
                 continue;
@@ -635,6 +669,7 @@ public static class BotChart
         return ShunCost;
     }
 
+    /// <summary>The nodes from the start to the goal, one point a square: of a gate's two nodes, the one on the far side.</summary>
     private static void Unwind(int g, int s, List<Point3D> points)
     {
         var path = new List<int>();
@@ -648,6 +683,7 @@ public static class BotChart
 
         for (var i = 0; i < path.Count; i++)
         {
+            // The near side of a gate is one step from its far side, and the far side is the one worth walking to.
             if (i + 1 < path.Count && _cellOf[path[i]] != _cellOf[path[i + 1]])
             {
                 continue;
@@ -659,6 +695,10 @@ public static class BotChart
         }
     }
 
+    /// <summary>
+    /// A leg to <paramref name="point"/> could not be walked: the gate there is shunned for <see cref="ShunMs"/>, so the next
+    /// route goes round it if it can.
+    /// </summary>
     public static void Shun(Map map, Point3D point)
     {
         if (!Ready || map != _map)

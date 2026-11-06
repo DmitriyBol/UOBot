@@ -15,6 +15,7 @@ public sealed class BotMilitiaCall : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>How often the free fighters round the invaded town are counted for the offer.</summary>
     public static int CountEveryMs { get; set; } = 30000;
 
     private static long _countedTick;
@@ -134,6 +135,7 @@ public sealed class BotMilitia : BotDeed
     {
         var member = bot as IBotSquadMember;
 
+        // The raid is over and nothing stands in front of the company: the town's call is answered.
         if (_raid.Over && member?.Squad is not { Stance: BotSquadStance.Fighting })
         {
             _sweep.Drop(bot);

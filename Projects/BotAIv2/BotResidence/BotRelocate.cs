@@ -46,30 +46,49 @@ public static class BotRelocate
         Deaths
     }
 
+    /// <summary>How often the population is looked over. A minute: every rule here is about hours.</summary>
     public static int LookEveryMs { get; set; } = 60000;
 
+    /// <summary>The stretch a bot's living is judged over, in hours. Two: a novice's trade moves a hundredth in less, and a grown bot's purse shows a day's work.</summary>
     public static double StretchHours { get; set; } = 2.0;
 
+    /// <summary>
+    /// Gold a bot must gain over the stretch — pack, bank and what it has on the board (<c>BotYield.Standing</c>) — not to be
+    /// earning poorly. A hundred and fifty: the middling purse of the population read 66gp at 18:58 on 29.09.2026 and 145gp
+    /// twenty minutes before, so a bot that put less than that by in two hours is living below the middle.
+    /// </summary>
     public static int PoorGold { get; set; } = 150;
 
+    /// <summary>
+    /// The share of its trade (<c>BotMobile.Progress</c>) a bot must gain over the stretch not to be earning poorly, whatever
+    /// its purse did. A hundredth: a novice learning its trade is doing well by it wherever it lives, and a grown bot, whose
+    /// share no longer moves, is judged by its purse alone.
+    /// </summary>
     public static double PoorProgress { get; set; } = 0.01;
 
+    /// <summary>Deaths within the bot's leash of home that make it think of moving. Three — the count a killing field is declared at (BotBarred.KillingDeaths).</summary>
     public static int DeathsToMove { get; set; } = 3;
 
+    /// <summary>How far back those deaths are counted, in hours. Two.</summary>
     public static double DeathHours { get; set; } = 2.0;
 
+    /// <summary>The least time between settling in a town and moving on, in hours. Four: "at most once per few hours", Patrick's order.</summary>
     public static double MoveEveryHours { get; set; } = 4.0;
 
+    /// <summary>The chance a bot with a reason to move is marked to move at this look. A half: see the class.</summary>
     public static double MoveOdds { get; set; } = 0.5;
 
+    /// <summary>How long a marked move stays on offer before it is let go, in minutes. An hour: a bot that has had something better to do for an hour is not moving.</summary>
     public static double PendingMinutes { get; set; } = 60.0;
 
+    /// <summary>How old a newborn of the boot may be and still be moved into its town when the towns are read, in minutes. Ten.</summary>
     public static double NewbornMinutes { get; set; } = 10.0;
 
     public static long Filed { get; private set; }
 
     public static long FirstChoices { get; private set; }
 
+    /// <summary>First choices of the town the bot was already standing in, filed there without a walk.</summary>
     public static long StoodIn { get; private set; }
 
     public static long Judged { get; private set; }
@@ -78,12 +97,16 @@ public static class BotRelocate
 
     public static long Deadly { get; private set; }
 
+    /// <summary>Bots found living in a town not fit to live in, at the end of a stretch, and asked to choose again.</summary>
     public static long Misplaced { get; private set; }
 
+    /// <summary>Bots with a reason to move that the draw kept where they are. See <see cref="MoveOdds"/>.</summary>
     public static long Stayed { get; private set; }
 
+    /// <summary>Bots with a reason to move and no town to go to: every road too strong for them, or nowhere fit.</summary>
     public static long Nowhere { get; private set; }
 
+    /// <summary>Choices, first or later, in which at least one town was passed over for a road too strong for the bot.</summary>
     public static long Outmatched { get; private set; }
 
     public static long Marked { get; private set; }
@@ -94,10 +117,13 @@ public static class BotRelocate
 
     public static long MarkedDeaths { get; private set; }
 
+    /// <summary>Marked moves let go after <see cref="PendingMinutes"/> untaken, or because the town was barred meanwhile.</summary>
     public static long Expired { get; private set; }
 
+    /// <summary>Bots that moved to their guild's seat abroad, or home for a class that stays home, at once.</summary>
     public static long Followed { get; private set; }
 
+    /// <summary>Newborns of the boot moved into their towns once the towns were read, and those found too late or gone.</summary>
     public static long MovedIn { get; private set; }
 
     public static long Late { get; private set; }
@@ -106,6 +132,7 @@ public static class BotRelocate
 
     private static bool _said;
 
+    /// <summary>The module's clock: the towns judged once, the boot's newborns moved in once, and the population looked over every minute.</summary>
     internal static void Tick()
     {
         var map = BotPopulation.Home;
@@ -148,8 +175,16 @@ public static class BotRelocate
         BotResidence.Refresh();
     }
 
+    /// <summary>
+    /// The classes whose work is the whole population's and is done at home, so they live in the home town whatever the
+    /// choice would say. The Baron — his stroll is "the town at home" (BotStroll, 16.09.2026) and his harrow is mustered from
+    /// home — and the Captain, whose drill field is fixed in Britain (<c>BotSchool.Ground</c>, 1479,1629). And the Trader
+    /// (01.10.2026, build 385): Britain is the market (Patrick, 30.09: "all trade lives in Britain"), its shop opens by Britain's
+    /// bank, and its hauls go out from there to every other town; a trader settled in Yew would keep its shop in Yew.
+    /// </summary>
     public static string[] StayHome { get; set; } = ["Baron", "Captain", "Trader"];
 
+    /// <summary>Whether this bot's class lives at home. See <see cref="StayHome"/>.</summary>
     public static bool Pinned(BotMobile bot)
     {
         var name = bot?.Class?.Name;
@@ -170,6 +205,10 @@ public static class BotRelocate
         return false;
     }
 
+    /// <summary>
+    /// The town a bot must live in, or null when it chooses: the home town for a class that stays home
+    /// (<see cref="StayHome"/>); else the town its guild is seated by, when that is not the home town. Null for The Shadow.
+    /// </summary>
     public static BotTowns.Town Forced(BotMobile bot)
     {
         if (bot == null || BotUnderworld.Member(bot))
@@ -187,6 +226,10 @@ public static class BotRelocate
             return null;
         }
 
+        // <b>A guild with a house lives in the house's town, Britain included</b> (29.09.2026, evening): a house bought in
+        // Britain is the guild's home, so its members live there even if they had chosen another town, as the members of a
+        // guild housed abroad live abroad. See BotGuildHouses.
+        // Not a town that has put the guild out (merged as build 332): the exile outranks the house. See BotBurgh.
         if (BotGuildHouses.TownOf(guild) is { } housed && !BotBurgh.Bars(guild, housed))
         {
             return housed;
@@ -201,6 +244,8 @@ public static class BotRelocate
 
         var town = BotTowns.Nearest(seat);
 
+        // A town that has put the guild out is not forced on its members, even while the seat still stands there (29.09.2026):
+        // they choose elsewhere until the guild is seated by another town. See BotBurgh.
         return town == null || ReferenceEquals(town, BotSettle.HomeTown) || BotBurgh.Bars(guild, town) ? null : town;
     }
 
@@ -228,11 +273,14 @@ public static class BotRelocate
             return;
         }
 
+        // The Shadow lives at its hideout whatever its record says (BotResidence.Home), so it is never moved.
         if (BotUnderworld.Member(bot))
         {
             return;
         }
 
+        // A gap of more than two looks is a rest out of the world or a stretch dead: the stretch starts again from here, so
+        // hours spent resting are not read as hours of earning nothing.
         if (!rec.Watched || now - rec.SeenTick > 2L * LookEveryMs)
         {
             Restart(bot, rec, now);
@@ -266,6 +314,8 @@ public static class BotRelocate
         var cause = Cause.Settling;
         string why = null;
 
+        // A bot whose guild the town has put out moves now, without the draw or the clock, as from a town not fit to live in
+        // (29.09.2026). See BotBurgh.
         if (bot.Guild is Guild guild && BotBurgh.Bars(guild, town))
         {
             why = $"{guild.Name} was put out of {town.Name}";
@@ -283,6 +333,8 @@ public static class BotRelocate
             var learned = bot.Progress - rec.WindowProgress;
             var info = BotSettle.Of(town);
 
+            // <b>A town nobody would choose is left, whatever the living there.</b> A bot that left The Needle still lives at
+            // Cove, which has no bank; one filed at the boot in a town since barred from the list is the same.
             if (info is { Fit: false } && !ReferenceEquals(town, BotSettle.HomeTown))
             {
                 cause = Cause.Settling;
@@ -328,6 +380,7 @@ public static class BotRelocate
                 }
         }
 
+        // The draw and the clock are for a reason to move, not for a town that is no place to live.
         if (cause != Cause.Settling
             && ((Core.Now - rec.Since).TotalHours < MoveEveryHours || Utility.RandomDouble() >= MoveOdds))
         {
@@ -356,6 +409,10 @@ public static class BotRelocate
         Mark(bot, rec, to, cause, why, now);
     }
 
+    /// <summary>
+    /// A bot with no record: filed where home was until now, then asked to choose — and a choice elsewhere is a move it may
+    /// take when it has nothing better to do.
+    /// </summary>
     private static void FirstSight(BotMobile bot, BotTowns.Town forced, long now)
     {
         var was = forced ?? BotTowns.Nearest(BotSeat.Home(bot)) ?? BotSettle.HomeTown;
@@ -392,6 +449,7 @@ public static class BotRelocate
             return;
         }
 
+        // Chosen where it already stands — a traveller that was in Vesper at the boot: nothing to walk.
         if (ReferenceEquals(to, from) && to.Bounds.Contains(bot.Location))
         {
             BotResidence.File(bot, to);
@@ -403,6 +461,7 @@ public static class BotRelocate
         Mark(bot, rec, to, Cause.Settling, $"settling: chose {to.Name} over {was.Name}", now);
     }
 
+    /// <summary>The guild lives by another town now: so does the member, at once.</summary>
     private static void Follow(BotMobile bot, BotResidence.Record rec, BotTowns.Town town, BotTowns.Town forced)
     {
         var left = town?.Name;
@@ -466,6 +525,7 @@ public static class BotRelocate
         }
     }
 
+    /// <summary>A marked move: let go when it has stood untaken too long or its town has been barred meanwhile.</summary>
     private static void Pending(BotMobile bot, BotResidence.Record rec, long now)
     {
         var stale = now - rec.PendingTick > (long)(PendingMinutes * 60000);
@@ -481,6 +541,7 @@ public static class BotRelocate
         Restart(bot, rec, now);
     }
 
+    /// <summary>The stretch starts again: the purse and the trade as they stand, and no deaths counted.</summary>
     private static void Restart(BotMobile bot, BotResidence.Record rec, long now)
     {
         rec.WindowTick = now;
@@ -489,6 +550,11 @@ public static class BotRelocate
         rec.Deaths.Clear();
     }
 
+    /// <summary>
+    /// The boot's newborns, put down at home before the towns could be read, moved into the towns they were born to — before
+    /// they have done anything worth keeping. A newborn older than <see cref="NewbornMinutes"/>, dead, resting or in a
+    /// company is left where it is and counted <see cref="Late"/>; the first look files it where it stands.
+    /// </summary>
     internal static void MoveIn()
     {
         var unhomed = BotResidence.Unhomed;
@@ -523,6 +589,7 @@ public static class BotRelocate
 
             var home = BotPopulation.HomeOf(bot);
 
+            // Born to the home town, or already in its own: it was put down where it lives.
             if (ReferenceEquals(town, BotSettle.HomeTown) || town.Bounds.Contains(bot.Location)
                 || Utility.InRange(bot.Location, home, BotHomeward.Away))
             {

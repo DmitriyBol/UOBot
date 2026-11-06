@@ -15,8 +15,10 @@ public sealed class BotEvent
 
     public DateTime At { get; init; }
 
+    /// <summary>say, work, path, death, war, alarm, market, craft.</summary>
     public string Kind { get; init; }
 
+    /// <summary>For speech: world, trade, guild, local, mood, cry. Null otherwise.</summary>
     public string Channel { get; init; }
 
     public string Bot { get; init; }
@@ -31,8 +33,10 @@ public sealed class BotEvent
 
     public string Text { get; init; }
 
+    /// <summary>A JSON object, already serialised, or null.</summary>
     public string Data { get; init; }
 
+    /// <summary>The whole event as one JSON object, serialised once.</summary>
     public string Json { get; init; }
 }
 
@@ -75,10 +79,13 @@ public static class BotEvents
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEvents));
 
+    /// <summary>How many events are kept in memory for the page to page through.</summary>
     public static int Keep { get; set; } = 3000;
 
+    /// <summary>How many failed searches are kept for the paths page.</summary>
     public static int KeepPaths { get; set; } = 2000;
 
+    /// <summary>How many alarm lines are kept for the header.</summary>
     public static int KeepAlarms { get; set; } = 50;
 
     public static bool Running { get; private set; }
@@ -107,8 +114,21 @@ public static class BotEvents
 
     public static string Path { get; private set; }
 
+    /// <summary>
+    /// The live window's ear (02.10.2026): told every event on the loop, after the streams, and null while nobody watches a
+    /// bot. Kept apart from <see cref="Subscribe"/> so that a watched bot is not counted as a live stream. See BotWebLive.
+    /// </summary>
     public static Action<BotEvent> Live { get; set; }
 
+    /// <summary>
+    /// The stories' ear (PLAN-life A3, 13.10.2026): told every event on the loop, after the live window, so that a bot's book and
+    /// the island's Chronicle are written from the events as they happen rather than read back off the file. Null while the
+    /// stories are off. Kept apart from <see cref="Subscribe"/> for the reason <see cref="Live"/> is: it is not a stream a person
+    /// is reading. See BotStory.
+    /// </summary>
+    public static Action<BotEvent> Heard { get; set; }
+
+    /// <summary>The newest sequence number handed out.</summary>
     public static long Seq
     {
         get
@@ -160,6 +180,7 @@ public static class BotEvents
             }
             catch
             {
+                // Closing is best effort.
             }
 
             _file = null;
@@ -167,6 +188,7 @@ public static class BotEvents
         }
     }
 
+    /// <summary>Posts an event about a bot. Game loop only.</summary>
     public static BotEvent Post(string kind, Mobile who, string text, string channel = null, string data = null)
     {
         var guild = (who?.Guild as Guilds.Guild)?.Name;
@@ -176,6 +198,7 @@ public static class BotEvents
         return Post(kind, who?.Name, klass, guild, at.X, at.Y, text, channel, data);
     }
 
+    /// <summary>Posts an event about somebody or something named, without a body to read. Game loop only.</summary>
     public static BotEvent Post(string kind, string bot, string klass, string guild, int x, int y, string text, string channel, string data)
     {
         if (kind == null)
@@ -255,6 +278,7 @@ public static class BotEvents
             }
             catch
             {
+                // A stream that throws is a stream that has gone; it unsubscribes itself.
             }
         }
 
@@ -266,12 +290,26 @@ public static class BotEvents
             }
             catch
             {
+                // The live window answers for itself; an event is never lost to it.
+            }
+        }
+
+        if (Heard is { } heard)
+        {
+            try
+            {
+                heard(e);
+            }
+            catch
+            {
+                // The stories count and log their own faults (BotStory.Fault); a story never stops an event being posted.
             }
         }
 
         return e;
     }
 
+    /// <summary>A search that did not reach its goal. Kept for the paths page, and posted as an event.</summary>
     public static void PathFailed(
         Mobile bot, string work, string reason, string outcome, Point3D from, Point3D to, double ms, long tiles, int plans,
         bool chase, bool flight
@@ -310,6 +348,7 @@ public static class BotEvents
         Post("path", bot, $"{outcome.ToLowerInvariant()} to ({to.X},{to.Y}): {reason}", null, data);
     }
 
+    /// <summary>A line of the alarm channel, mirrored here so the page sees it without reading the file.</summary>
     public static void Alarm(string state, string kind, string say, long n, long of, string window)
     {
         lock (_lock)
@@ -359,6 +398,7 @@ public static class BotEvents
         return found;
     }
 
+    /// <summary>The newest events that pass the test, oldest first.</summary>
     public static List<BotEvent> Latest(int limit, Func<BotEvent, bool> where)
     {
         List<BotEvent> found = [];
@@ -414,6 +454,7 @@ public static class BotEvents
         }
     }
 
+    /// <summary>A live reader, fed every event on the game loop's thread. It must not block.</summary>
     public static void Subscribe(Action<BotEvent> sink)
     {
         lock (_lock)

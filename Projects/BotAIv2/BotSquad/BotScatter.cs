@@ -32,12 +32,29 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotScatter
 {
+    /// <summary>
+    /// How many bots make a knot. Three, which for a squad of five means two knots — one of three and one of
+    /// two — and neither is alone.
+    /// </summary>
     public static int KnotSize { get; set; } = 3;
 
+    /// <summary>
+    /// How far a knot goes from the anchor.
+    ///
+    /// <para>
+    /// Ten as first specified, matching what the first version arrived at from the other direction: a square
+    /// of the danger map is thirty tiles, and three across is ten. <b>Raised to twenty-four on 24.08.2026 by
+    /// order</b> — a company is meant to cover ground, and at ten the three knots sat inside one screen and
+    /// swept the patch they were already standing in. Still well inside the reach a company can be called
+    /// across, so a knot that finds something can still gather the rest.
+    /// </para>
+    /// </summary>
     public static int Spread { get; set; } = 24;
 
+    /// <summary>Tiles between the members of one knot. Close enough to be one fight, far enough to see past each other.</summary>
     private const int WithinKnot = 2;
 
+    /// <summary>The eight compass lines, which is how knots are placed apart from one another.</summary>
     private static readonly (int X, int Y)[] Compass =
     [
         (0, -1),
@@ -58,6 +75,16 @@ public static class BotScatter
 
     private static int _orderedAt;
 
+    /// <summary>
+    /// The patch of ground that belongs to this member while the squad is sweeping.
+    ///
+    /// <para>
+    /// A share-out rather than a search, and worked out identically by everybody: the squad is ordered by
+    /// serial, cut into knots of <see cref="KnotSize"/>, and knot <c>k</c> takes a compass line chosen so the
+    /// knots end up as far from each other as the count allows. Two bots can never pick the same patch and
+    /// nobody has to be told which is theirs.
+    /// </para>
+    /// </summary>
     public static Point3D PatchFor(BotSquad squad, IBotSquadMember member)
     {
         if (squad == null || member?.Self == null)
@@ -72,6 +99,8 @@ public static class BotScatter
             return Point3D.Zero;
         }
 
+        // <b>The order is worked out once a roster, not once a member (01.10.2026):</b> at twenty to a company (BotSquad.MaxSize)
+        // sorting the whole company for each member's patch is four hundred sorts' worth a round. See BotFormation.File.
         if (!ReferenceEquals(_orderedFor, squad) || _orderedAt != squad.Roster)
         {
             _orderedFor = squad;
@@ -109,11 +138,14 @@ public static class BotScatter
 
         var anchor = squad.Anchor;
 
+        // Knots as far apart as the count allows: with two they end up opposite, with three at the thirds.
         var line = Compass[knot * Compass.Length / Math.Max(1, knots) % Compass.Length];
 
         var x = anchor.X + line.X * Spread;
         var y = anchor.Y + line.Y * Spread;
 
+        // And the members of a knot a couple of tiles off each other, along the line they came out on, so a
+        // knot is a short file rather than a pile.
         if (within > 0)
         {
             var side = within % 2 == 1 ? 1 : -1;

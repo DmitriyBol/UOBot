@@ -34,6 +34,7 @@ public sealed class BotCommonsStore : GenericPersistence
     {
     }
 
+    /// <summary>Patches read back at the last load. For the summary.</summary>
     public static int Restored { get; private set; }
 
     public override void Serialize(IGenericWriter writer)

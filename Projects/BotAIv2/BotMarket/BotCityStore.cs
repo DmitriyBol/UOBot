@@ -23,6 +23,7 @@ public sealed class BotCityStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCityStore));
 
+    /// <summary>Shape 2 since 02.10.2026 (build 389) adds the heads' purse and the prices on kinds; a shape-1 save is read as before. See BotCity.Load.</summary>
     private const int Shape = 2;
 
     private static BotCityStore _store;
@@ -33,6 +34,7 @@ public sealed class BotCityStore : GenericPersistence
     {
     }
 
+    /// <summary>What the purse held when it was read back. For the summary.</summary>
     public static int Restored { get; private set; }
 
     public override void Serialize(IGenericWriter writer)

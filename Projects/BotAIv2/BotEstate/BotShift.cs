@@ -138,6 +138,7 @@ public sealed class BotShift : BotDeed
                 continue;
             }
 
+            // Things lying there may only be the old hall's own, released when it came down; anybody else's is not a building site.
             var foreign = false;
 
             for (var j = 0; j < toMove.Count && !foreign; j++)
@@ -220,6 +221,7 @@ public sealed class BotShift : BotDeed
 
         BotBounds.Shifted(_guild.Name, _hall, plot, own);
 
+        // The guild lives here now: the seat follows the hall, or the seat would carry it back.
         BotSeat.Set(_guild.Name, plot, false);
 
         return BotDoing.Done($"the hall of {_guild.Name} now stands at {plot.X},{plot.Y}, {(own ? "within its own square" : "on another square it holds")}, {fitted} things inside");

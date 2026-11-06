@@ -28,8 +28,10 @@ public sealed class BotTinkerer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTinkerer));
 
+    /// <summary>Fewest ingots worth beginning a stint with: enough for one tool and a miss.</summary>
     public static int LeastMetal { get; set; } = 8;
 
+    /// <summary>Fewest of a tool on the stalls before making more is offered.</summary>
     public static int LeastOnMarket { get; set; } = 2;
 
     private static bool _saidNoSystem;
@@ -48,6 +50,8 @@ public sealed class BotTinkerer : IBotProposer
 
     public static long Stocked { get; private set; }
 
+    /// <summary>Stints offered with the iron to be bought off a stall first. See the class note.</summary>
+    /// <summary>Iron on a stall this tinker could not pay a batch's worth of, and the fattest purse among them.</summary>
     public string Name => "Tinkerer";
 
     public BotStanding Rung => BotStanding.Free;
@@ -88,6 +92,8 @@ public sealed class BotTinkerer : IBotProposer
             return null;
         }
 
+        // Its own iron out of its own bank box, standing at a bank; another bot's iron comes by a carrier to the metal its trade
+        // has asked for (BotBullion), since the stalls it was bought off from anywhere went on 01.10.2026.
         if (BotTinkering.Ingots(body) < LeastMetal)
         {
             BotMarket.FromBank(bot, BotTinkering.Metal, LeastMetal * 2);
@@ -119,6 +125,7 @@ public sealed class BotTinkerer : IBotProposer
             return new BotTinker(map, body.Location, order.Kind, order);
         }
 
+        // A tool nobody ordered needs a place in the pack (06.10.2026, work17). See BotRoom.SpecShut.
         if (BotRoom.SpecShut(body))
         {
             return null;
@@ -151,6 +158,8 @@ public sealed class BotTinkerer : IBotProposer
                 continue;
             }
 
+            // Only an order a carrier from here could deliver, and not one already made and waiting in the pack for the walk
+            // (01.10.2026, build 384 review). See BotCourier.Answerable and BotCourier.Holding.
             if (!BotCourier.Answerable(bot, want) || BotCourier.Holding(bot, want))
             {
                 continue;

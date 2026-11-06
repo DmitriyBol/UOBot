@@ -17,6 +17,7 @@ public sealed class BotWarriorArcher : BotClass
 
     public override BotRole Role => BotRole.Ranged;
 
+    /// <summary>Archery outright. The dagger is an admission, not a second trade.</summary>
     public override SkillName? MainSkill => SkillName.Archery;
 
     protected override void Defaults()
@@ -32,6 +33,7 @@ public sealed class BotWarriorArcher : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        // The bow leaned into, under the option's own target of seventy-five (01.10.2026, Patrick's point 7). See BotLeaning.
         Leanings =
         [
             new BotLeaning("marksman", null, 4, 56.0, 70.0, Weapon: true),

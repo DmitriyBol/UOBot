@@ -8,40 +8,58 @@ namespace Server.BotAI.V2;
 /// <summary>The numbers of <c>Configuration/bot-residence.json</c>. A missing key keeps the code's value.</summary>
 public sealed class BotResidenceSettings
 {
+    /// <summary>Whether bots have towns of their own. See BotResidence.Running.</summary>
     public bool? Running { get; set; }
 
+    /// <summary>The home town's (Britain's) share of the population. See BotSettle.HomeShare.</summary>
     public double? HomeShare { get; set; }
 
+    /// <summary>How hard a town already full of its share is passed over. See BotSettle.SpreadWeight.</summary>
     public double? SpreadWeight { get; set; }
 
+    /// <summary>How much a town where the bot's guildmates live weighs more. See BotSettle.GuildPull.</summary>
     public double? GuildPull { get; set; }
 
+    /// <summary>The least shopkeepers a town must have to be lived in. See BotSettle.LeastShops.</summary>
     public int? LeastShops { get; set; }
 
+    /// <summary>Whether a town without a bank is passed over. See BotSettle.NeedsBank.</summary>
     public bool? NeedsBank { get; set; }
 
+    /// <summary>Whether a town reached only through a gate may be lived in. See BotSettle.GateTowns.</summary>
     public bool? GateTowns { get; set; }
 
+    /// <summary>How far round a town's bank a bot is born or rises. See BotResidence.TownScatter.</summary>
     public int? TownScatter { get; set; }
 
+    /// <summary>Hours a bot's living is judged over. See BotRelocate.StretchHours.</summary>
     public double? StretchHours { get; set; }
 
+    /// <summary>Gold under which a stretch was a poor living. See BotRelocate.PoorGold.</summary>
     public int? PoorGold { get; set; }
 
+    /// <summary>Share of the trade under which a stretch was a poor living. See BotRelocate.PoorProgress.</summary>
     public double? PoorProgress { get; set; }
 
+    /// <summary>Deaths where it lives that make a bot think of moving. See BotRelocate.DeathsToMove.</summary>
     public int? DeathsToMove { get; set; }
 
+    /// <summary>Hours those deaths are counted over. See BotRelocate.DeathHours.</summary>
     public double? DeathHours { get; set; }
 
+    /// <summary>The least hours between settling and moving on. See BotRelocate.MoveEveryHours.</summary>
     public double? MoveEveryHours { get; set; }
 
+    /// <summary>The chance a bot with a reason to move is marked to. See BotRelocate.MoveOdds.</summary>
     public double? MoveOdds { get; set; }
 
+    /// <summary>Minutes a marked move stays on offer. See BotRelocate.PendingMinutes.</summary>
     public double? PendingMinutes { get; set; }
 
+    /// <summary>What moving house is worth a minute. See BotResettle.Prior.</summary>
     public double? Prior { get; set; }
 
+    /// <summary>The classes that live in the home town whatever the choice. See BotRelocate.StayHome.</summary>
     public string[] StayHome { get; set; }
 }
 
@@ -62,6 +80,7 @@ public sealed class BotResidenceModule : BotModule
 
     private const string ConfigPath = "Configuration/bot-residence.json";
 
+    /// <summary>How often the module's clock looks: the towns until they are judged, then the population once a <c>BotRelocate.LookEveryMs</c>.</summary>
     public static int SliceMs { get; set; } = 5000;
 
     private static Timer _timer;
@@ -76,6 +95,8 @@ public sealed class BotResidenceModule : BotModule
     {
         Load();
 
+        // The towns read off the regions now, so a bot that came back from the save in its town has that town from the first
+        // beat; which of them can be walked to waits for the gates. See BotTowns.Ensure.
         BotTowns.Ensure(BotPopulation.Home);
         BotResidence.Start();
 

@@ -24,6 +24,7 @@ public sealed class BotColonyStore : GenericPersistence
 
     private static BotColonyStore _store;
 
+    /// <summary>After <c>BotCore.Configure</c> (priority 40), which reads whether the bots are on at all.</summary>
     [CallPriority(41)]
     public static void Configure()
     {

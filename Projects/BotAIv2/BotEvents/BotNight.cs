@@ -21,32 +21,43 @@ public static class BotNight
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotNight));
 
+    /// <summary>Whether the night changes anything.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>The game hour the night begins, and the hour it ends.</summary>
     public static int From { get; set; } = 22;
 
     public static int To { get; set; } = 6;
 
+    /// <summary>What the danger on a road is multiplied by at night.</summary>
     public static double NightDanger { get; set; } = 1.25;
 
+    /// <summary>What carriage pays at night, as a multiple of the day's.</summary>
     public static double NightPay { get; set; } = 1.25;
 
+    /// <summary>Whether it is night now, as the last beat read it.</summary>
     public static bool Dark { get; private set; }
 
+    /// <summary>The game hour at the last beat.</summary>
     public static int Hour { get; private set; }
 
+    /// <summary>The road's danger factor now: <see cref="NightDanger"/> at night, one by day. Read on every node the planner prices.</summary>
     public static double Danger { get; private set; } = 1.0;
 
+    /// <summary>Carriage's factor now.</summary>
     public static double Pay => Running && Dark ? Math.Max(1.0, NightPay) : 1.0;
 
+    /// <summary>Nights begun, and the real minutes spent in them.</summary>
     public static long Nights { get; private set; }
 
     public static double DarkMinutes { get; private set; }
 
+    /// <summary>Nodes priced dearer for the night, roads judged in the dark, and of them refused.</summary>
     public static long DarkNodes { get; private set; }
 
     public static long DarkRoads { get; private set; }
 
+    /// <summary>Haul quotes whose carriage was raised for the night, and the gold that added.</summary>
     public static long Quotes { get; private set; }
 
     public static long QuoteGold { get; private set; }
@@ -116,6 +127,7 @@ public static class BotNight
 
     private static bool Within(int hour) => From <= To ? hour >= From && hour < To : hour >= From || hour < To;
 
+    /// <summary>A node's extra cost, raised for the night. Asked by <c>BotDanger.Cost</c> on every node with a price; cheap.</summary>
     public static int Node(int tiles)
     {
         if (tiles <= 0 || !Dark)
@@ -128,6 +140,7 @@ public static class BotNight
         return (int)Math.Ceiling(tiles * Danger);
     }
 
+    /// <summary>The road's dare at night: what a walker dares, divided by the night's danger. Asked by <c>BotDanger.Road</c>.</summary>
     public static double Dare(double dare)
     {
         if (!Dark || dare <= 0.0)
@@ -140,6 +153,10 @@ public static class BotNight
         return dare / Danger;
     }
 
+    /// <summary>
+    /// A trader's carriage at night: the part of the quote over its least price, raised by <see cref="Pay"/>, never past the
+    /// buyer's ceiling. Asked by <c>BotTrading.Quote</c>.
+    /// </summary>
     public static int Carriage(int least, int price, int ceiling)
     {
         if (!Dark || price <= least || ceiling <= price)

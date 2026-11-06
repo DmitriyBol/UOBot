@@ -17,10 +17,13 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotReposer : IBotProposer
 {
+    /// <summary>How bored a bot must be before home is worth the walk.</summary>
     public static double Bored { get; set; } = 0.4;
 
+    /// <summary>How far from home a bot may be and still be offered the walk.</summary>
     public static int Reach { get; set; } = 400;
 
+    /// <summary>How long after one visit home the next may be offered. An hour.</summary>
     public static int AgainMs { get; set; } = 3600000;
 
     public static long Asked { get; private set; }
@@ -39,6 +42,7 @@ public sealed class BotReposer : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>A visit home was taken: the next one waits <see cref="AgainMs"/>.</summary>
     public static void Went(Mobile bot)
     {
         if (bot != null)
@@ -122,26 +126,37 @@ public sealed class BotRepose : BotDeed
 {
     public const string Trade = "home";
 
+    /// <summary>What an evening at home is reckoned at per minute. Leisure is not pay; it is set to be chosen by a bored bot.</summary>
     public static double Prior { get; set; } = 150.0;
 
+    /// <summary>How long a bot stays once it is in.</summary>
     public static int StayMs { get; set; } = 480000;
 
+    /// <summary>How much every minute at home is worth against boredom, in the urges' own coin (<c>BotUrges.Paid</c>).</summary>
     public static double Cheer { get; set; } = 100.0;
 
+    /// <summary>The most things put away in one visit.</summary>
     public static int MostStowed { get; set; } = 10;
 
     public static long Arrived { get; private set; }
 
     public static long Stayed { get; private set; }
 
+    /// <summary>Tired bots sent home to rest there, and those that got there.</summary>
     public static long SentToRest { get; private set; }
 
     public static long RestedAtHome { get; private set; }
 
+    /// <summary>How long a bot that could not get home is left to rest where it stands before it is sent home again.</summary>
     public static int RestRetryMs { get; set; } = 600000;
 
     private static readonly Dictionary<Serial, long> _sentHome = [];
 
+    /// <summary>
+    /// A tired bot with a house of its own is walked home before it leaves the world, so it leaves — and comes back — under its
+    /// own roof. True when a walk home was pressed; false when it is home already, has no house in reach, or was sent lately
+    /// and did not get there (it then rests where it stands). From <c>BotRest</c>, when a tired bot is free.
+    /// </summary>
     public static bool HomeToRest(BotMobile bot)
     {
         if (!BotAbode.Running || bot == null || BotAbode.Of(bot) is not { } house || house.Map != bot.Map)
@@ -192,6 +207,8 @@ public sealed class BotRepose : BotDeed
     {
     }
 
+    /// <param name="house">The bot's own.</param>
+    /// <param name="resting">Walked home to leave the world from there: done on arrival, no stay.</param>
     public BotRepose(BaseHouse house, bool resting)
     {
         _house = house;
@@ -246,6 +263,7 @@ public sealed class BotRepose : BotDeed
                 return BotDoing.Walk(_house.Map, _spot, BotArrival.Within(1), "home");
             }
 
+            // Home to rest: in at the door, and the rest itself is BotRest's, which takes it out of the world from here.
             if (_resting)
             {
                 _house.RefreshDecay();
@@ -266,6 +284,7 @@ public sealed class BotRepose : BotDeed
             BotAbode.Stow(stowed);
         }
 
+        // Every minute in, the day's boredom falls; the mood follows (BotMobile.Mood).
         if (now - _cheeredTick >= 60000)
         {
             _cheeredTick = now;
@@ -286,6 +305,7 @@ public sealed class BotRepose : BotDeed
         return BotDoing.Work("at home, resting");
     }
 
+    /// <summary>Puts away what the bot owns and does not wear. Returns how many things.</summary>
     private static int Stow(Mobile body)
     {
         var chest = BotAbode.Chest(BotAbode.Of(body));

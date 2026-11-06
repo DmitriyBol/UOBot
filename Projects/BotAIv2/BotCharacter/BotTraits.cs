@@ -64,40 +64,56 @@ public static class BotTraits
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTraits));
 
+    /// <summary>Whether a bot's nature moves its auction and its fighting at all. Off: every factor is one, every number standing.</summary>
     public static bool On { get; set; } = true;
 
+    /// <summary>How far one trait leans a price: ×(1 + Lean) on its side, ×(1 − Lean) on the other's. 0.15.</summary>
     public static double Lean { get; set; } = 0.15;
 
+    /// <summary>The least the whole nature may multiply a price by. 0.8.</summary>
     public static double Least { get; set; } = 0.8;
 
+    /// <summary>The most the whole nature may multiply a price by. 1.25.</summary>
     public static double Most { get; set; } = 1.25;
 
+    /// <summary>A walk this many tiles long or longer is a far walk for a homebody and a wanderer. 120.</summary>
     public static int FarTiles { get; set; } = 120;
 
+    /// <summary>A cautious bot's daring, as a share of the standing one (company16's choice gate, for the lone bot). 0.85.</summary>
     public static double CautiousDaring { get; set; } = 0.85;
 
+    /// <summary>A reckless bot's daring, as a share of the standing one; capped at the flight rule's tolerance. 1.1.</summary>
     public static double RecklessDaring { get; set; } = 1.1;
 
+    /// <summary>A cautious bot's flight share, as a share of the standing one: gives up a losing fight earlier. 1.1.</summary>
     public static double CautiousFlee { get; set; } = 1.1;
 
+    /// <summary>A reckless bot's flight share, as a share of the standing one: gives up later. 0.9.</summary>
     public static double RecklessFlee { get; set; } = 0.9;
 
+    /// <summary>The lowest share of health any bot fights on to before giving a losing fight up. 0.3, whatever the trait.</summary>
     public static double FleeFloor { get; set; } = 0.3;
 
+    /// <summary>Kills (a company's split among its members) that make a bot a veteran. 100.</summary>
     public static int VeteranKills { get; set; } = 100;
 
+    /// <summary>The word a veteran wears after its name in the world and on the page.</summary>
     public static string VeteranTitle { get; set; } = "the Veteran";
 
+    /// <summary>Offers whose price a nature raised, and lowered.</summary>
     public static long Raised { get; private set; }
 
     public static long Lowered { get; private set; }
 
+    /// <summary>Lone hunts weighed at a nature's daring, and losing fights judged at a nature's flight share.</summary>
     public static long Dared { get; private set; }
 
     public static long Fled { get; private set; }
 
+    /// <summary>Veterans made in this run.</summary>
     public static long Veterans { get; private set; }
 
+    /// <summary>Bots born (raised afresh, not read back) in this run, and told their nature in the log.</summary>
     public static long Births { get; private set; }
 
     private static readonly BotTrait[][] Pairs =
@@ -109,6 +125,10 @@ public static class BotTraits
         [BotTrait.Sociable, BotTrait.Solitary]
     ];
 
+    /// <summary>
+    /// Two or three traits, one side of each of two or three pairs, from the name: FNV-1a over the characters, then a seeded
+    /// <see cref="System.Random"/>, whose seeded sequence .NET keeps the same from run to run.
+    /// </summary>
     public static BotTrait Draw(string name)
     {
         var hash = 2166136261u;
@@ -144,12 +164,18 @@ public static class BotTraits
         return traits;
     }
 
+    /// <summary>This bot's traits, or none.</summary>
     public static BotTrait Of(Mobile m) => BotLives.Of(m)?.Traits ?? BotTrait.None;
 
     public static bool Has(Mobile m, BotTrait trait) => (Of(m) & trait) != 0;
 
+    /// <summary>
+    /// Whether this bot has the kills of a veteran: the right to lead a clearing past the novice bar and to call a company past
+    /// the island's ceiling, a title after its name, and a weight in its guild's elections. Public for BotPolitics.
+    /// </summary>
     public static bool Veteran(Mobile m) => On && BotLives.Of(m) is { Veteran: true };
 
+    /// <summary>What the trade a deed is in says to each pair: +1 the first trait's side, −1 the second's, 0 not touched.</summary>
     private static int Greed(string kind) =>
         kind switch
         {
@@ -166,6 +192,10 @@ public static class BotTraits
 
     private static bool Company(string kind) => kind is "camp" or "fireside" or "chat" or "meet" or "band" or "enlist";
 
+    /// <summary>
+    /// The nature's multiplier on one offer, and which traits bit (for the take line). One when the dial is off, for anything
+    /// not a bot, and for work none of its traits touches, which is most of it.
+    /// </summary>
     public static double Nature(Mobile body, BotDeed deed, out BotTrait bit)
     {
         bit = BotTrait.None;
@@ -274,6 +304,10 @@ public static class BotTraits
 
     private static bool Far(Point3D from, Point3D to) => Math.Max(Math.Abs(from.X - to.X), Math.Abs(from.Y - to.Y)) >= FarTiles;
 
+    /// <summary>
+    /// How much stronger than itself this bot will set out after alone: <c>BotQuarry.Daring</c> leaned by caution or recklessness,
+    /// never past the flight rule's tolerance.
+    /// </summary>
     public static double Daring(Mobile bot)
     {
         var standing = BotQuarry.Daring;
@@ -298,8 +332,16 @@ public static class BotTraits
         return Math.Min(standing * lean, Math.Max(standing, BotThreat.Tolerance));
     }
 
+    /// <summary>
+    /// The share of its health at which this bot gives a losing fight up: <c>BotSlay.FleeAt</c> leaned by caution or
+    /// recklessness, never under <see cref="FleeFloor"/> and never over nine tenths.
+    /// </summary>
     public static double FleeAt(Mobile bot) => FleeAt(bot, true);
 
+    /// <summary>
+    /// The same share, with <paramref name="count"/> false for a caller that only asks which side of it a bot stands on (the
+    /// defender's offer, every look) and must not swell the "flight judged by nature" count (07.10.2026, loops18).
+    /// </summary>
     public static double FleeAt(Mobile bot, bool count)
     {
         var standing = BotSlay.FleeAt;
@@ -327,6 +369,10 @@ public static class BotTraits
         return Math.Clamp(standing * lean, Math.Min(FleeFloor, standing), 0.9);
     }
 
+    /// <summary>
+    /// The suffix after a veteran's name, in the shape the engine writes it (a leading space, then whatever was there): "Ragnar
+    /// the Veteran [BLD]". Everything else is handed back untouched.
+    /// </summary>
     public static string Suffix(Mobile m, string suffix)
     {
         if (!Veteran(m) || string.IsNullOrEmpty(VeteranTitle))
@@ -339,6 +385,10 @@ public static class BotTraits
         return rest.Length == 0 ? $" {VeteranTitle}" : $" {VeteranTitle} {rest}";
     }
 
+    /// <summary>
+    /// Counts a kill to this bot's credit and makes it a veteran when it crosses <see cref="VeteranKills"/>: a line in the log,
+    /// a word to its guild and a tale it will tell. Called by <see cref="BotBiography"/>.
+    /// </summary>
     public static void Credit(BotMobile bot, double share)
     {
         if (bot == null || share <= 0.0 || BotLives.Of(bot) is not { } life)
@@ -381,6 +431,7 @@ public static class BotTraits
         }
     }
 
+    /// <summary>Names of traits, lower case, joined: "greedy, cautious".</summary>
     public static string Words(BotTrait traits)
     {
         if (traits == BotTrait.None)
@@ -409,6 +460,7 @@ public static class BotTraits
         return sb.ToString();
     }
 
+    /// <summary>Each trait's name, for the page.</summary>
     public static IEnumerable<string> List(BotTrait traits)
     {
         foreach (var pair in Pairs)
@@ -423,6 +475,7 @@ public static class BotTraits
         }
     }
 
+    /// <summary>A newcomer's nature, said once when it is raised after the boot. See <c>BotPopulation.Raise</c>.</summary>
     public static void Born(BotMobile bot, bool afterBoot)
     {
         if (BotLives.Of(bot) is not { Fresh: true } life)
@@ -442,6 +495,10 @@ public static class BotTraits
         logger.Information("{Name} the {Class} is born {Traits}", bot.Name, bot.Class?.Name, Words(life.Traits));
     }
 
+    /// <summary>
+    /// How the living population's natures fall, trait by trait, and the mean multiplier each group of work gets across all of
+    /// them — the number that must stay near one for the island's totals not to swing.
+    /// </summary>
     public static string Distribution()
     {
         var counts = new int[10];

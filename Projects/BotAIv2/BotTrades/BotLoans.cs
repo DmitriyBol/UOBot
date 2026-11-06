@@ -48,8 +48,10 @@ public static class BotLoans
 
         public int Repaid;
 
+        /// <summary>Minutes the debtor has been in the world since it borrowed: the default clock, which does not run while it sleeps.</summary>
         public double Played;
 
+        /// <summary>The debtor's wealth after the last take: the lien takes a share of what rises above it.</summary>
         public int Mark;
 
         public DateTime Taken;
@@ -57,35 +59,53 @@ public static class BotLoans
         public int Left => Math.Max(0, Owed - Repaid);
     }
 
+    // ---- Dials ------------------------------------------------------------------------------------------------------------
+
+    /// <summary>The most a loan may be. A hundred and fifty, Patrick's figure: a kit's worth of bandages, bottles and herbs.</summary>
     public static int Sum { get; set; } = 150;
 
+    /// <summary>The least a loan is made for: below it the kit is nearly in reach and the bot hunts for the rest.</summary>
     public static int Least { get; set; } = 30;
 
+    /// <summary>What is repaid on top of the principal. A fifth.</summary>
     public static double Interest { get; set; } = 0.2;
 
+    /// <summary>The share of every rise in the borrower's wealth the lien takes until the debt is paid. A half.</summary>
     public static double LienShare { get; set; } = 0.5;
 
+    /// <summary>Hours of the borrower's own play after which a debt still owed is a default. Four.</summary>
     public static double DefaultHours { get; set; } = 4.0;
 
+    /// <summary>The wealth a shop's keeper must hold, spendable, to lend from its shop. Twelve hundred.</summary>
     public static int LenderWealth { get; set; } = 1200;
 
+    /// <summary>What a lender keeps after a loan: it never lends itself poor. Eight hundred.</summary>
     public static int LenderKeeps { get; set; } = 800;
 
+    /// <summary>A bot under this much, spendable, is poor enough to borrow. A hundred.</summary>
     public static int PoorBar { get; set; } = 100;
 
+    /// <summary>The most loans one lender has standing at once. Five.</summary>
     public static int PerLender { get; set; } = 5;
 
+    /// <summary>The most loans standing on the island at once. Forty.</summary>
     public static int MostStanding { get; set; } = 40;
 
+    /// <summary>How often the lien looks at every debtor. A minute.</summary>
     public static int CollectMs { get; set; } = 60000;
 
+    /// <summary>The default rate assumed until <see cref="LeastSettled"/> loans have been repaid or defaulted. A quarter.</summary>
     public static double DefaultGuess { get; set; } = 0.1;
 
+    /// <summary>Whether a lender refuses while the measured default rate makes a loan's expected return nought or less.</summary>
     public static bool MindsRisk { get; set; } = true;
 
+    /// <summary>Loans refused at the counter because the default rate made them a loss.</summary>
     public static long Risky { get; private set; }
 
     public static int LeastSettled { get; set; } = 5;
+
+    // ---- Counters ---------------------------------------------------------------------------------------------------------
 
     public static long Made { get; private set; }
 
@@ -97,18 +117,23 @@ public static class BotLoans
 
     public static long TakenGold { get; private set; }
 
+    /// <summary>Of the gold taken by the lien, what was over the principal: the lenders' interest.</summary>
     public static long InterestGold { get; private set; }
 
     public static long Defaulted { get; private set; }
 
+    /// <summary>Principal the lenders lost to defaults.</summary>
     public static long LostGold { get; private set; }
 
     public static long Gone { get; private set; }
 
+    /// <summary>Takes refused because the borrower's money was held for its wants on the board.</summary>
     public static long Held { get; private set; }
 
+    /// <summary>Lien takes with no lender to pay — it left the island — so nothing was taken and the debt was forgiven.</summary>
     public static long Forgiven { get; private set; }
 
+    /// <summary>Settled loans read back from the save, for the default rate across restarts.</summary>
     private static long _settledBefore;
 
     private static long _defaultedBefore;
@@ -127,6 +152,7 @@ public static class BotLoans
 
     public static int Marked => _marked.Count;
 
+    /// <summary>The share of settled loans that defaulted, with a guess until there are enough.</summary>
     public static double DefaultRate
     {
         get
@@ -137,6 +163,7 @@ public static class BotLoans
         }
     }
 
+    /// <summary>What a loan of this sum is expected to earn its lender: the interest, less the measured default rate of the whole.</summary>
     public static int Expected(int sum) =>
         (int)Math.Round(sum * Math.Max(0.0, Interest) * (1.0 - DefaultRate) - sum * DefaultRate);
 
@@ -146,6 +173,7 @@ public static class BotLoans
 
     public static Loan Of(Mobile bot) => bot?.Name != null && _loans.TryGetValue(bot.Name, out var loan) ? loan : null;
 
+    /// <summary>How many loans this lender has standing.</summary>
     public static int Lending(Mobile lender)
     {
         if (lender?.Name == null)
@@ -166,10 +194,15 @@ public static class BotLoans
         return n;
     }
 
+    /// <summary>Whether this bot could lend <paramref name="sum"/> now: rich enough to keep its keep after it, and under its count.</summary>
     public static bool CanLend(Mobile lender, int sum) =>
         lender is BotMobile { Deleted: false, Alive: true } && BotYield.Spendable(lender) >= Math.Max(LenderWealth, sum + LenderKeeps)
         && Lending(lender) < PerLender && !IsMarked(lender) && !InDebt(lender);
 
+    /// <summary>
+    /// The loan itself, with the two standing together: the principal out of the lender's pack and account, into the borrower's
+    /// pack as coin. Returns whether it was made; <paramref name="why"/> says why not.
+    /// </summary>
     public static bool Lend(BotMobile lender, BotMobile borrower, int sum, string trade, double pays, out string why)
     {
         why = null;
@@ -233,6 +266,7 @@ public static class BotLoans
 
         BotMarket.Pay(borrower, sum);
 
+        // Decided outside the work of each: the shop shift did not lose the principal, the errand did not earn it.
         BotYield.Aside(lender, sum);
         BotYield.Aside(borrower, -sum);
 
@@ -282,6 +316,9 @@ public static class BotLoans
         return true;
     }
 
+    // ---- The lien ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>The lien's look at every debtor, on its clock. From the module's timer.</summary>
     internal static void Collect(long now)
     {
         if (_loans.Count == 0)
@@ -322,6 +359,7 @@ public static class BotLoans
 
             if (debtor == null)
             {
+                // Gone from the island, not resting: the lender has lost it.
                 if (!BotRest.Records.ContainsKey(name))
                 {
                     (ended ??= []).Add(name);
@@ -332,6 +370,7 @@ public static class BotLoans
                 continue;
             }
 
+            // Asleep: neither the lien nor the default clock runs.
             if (debtor.Map == null || debtor.Map == Map.Internal)
             {
                 continue;
@@ -362,6 +401,7 @@ public static class BotLoans
         }
     }
 
+    /// <summary>The lien's share of whatever the debtor gained since the last look. Returns whether the debt is now paid.</summary>
     private static bool Take(Loan loan, BotMobile debtor)
     {
         var wealth = BotYield.Wealth(debtor);
@@ -384,6 +424,7 @@ public static class BotLoans
 
         if (lender == null && !BotRest.Records.ContainsKey(loan.Lender))
         {
+            // The lender left the island: coin paid to nobody would be coin destroyed. The debt goes with it.
             Forgiven++;
 
             logger.Information(
@@ -441,6 +482,7 @@ public static class BotLoans
         return true;
     }
 
+    /// <summary>The debt is not going to be paid: the lender has lost what is left of the principal, and the borrower is marked.</summary>
     private static void Default(Loan loan, BotMobile debtor, string why)
     {
         var lost = Math.Max(0, loan.Principal - loan.Repaid);
@@ -468,6 +510,8 @@ public static class BotLoans
             BotCampTalk.Say(lender, "loan:default", null, debtor, fill);
         }
     }
+
+    // ---- Saved --------------------------------------------------------------------------------------------------------------
 
     internal static void Save(IGenericWriter writer)
     {
@@ -541,6 +585,8 @@ public static class BotLoans
         return _loans.Count;
     }
 
+    // ---- Words --------------------------------------------------------------------------------------------------------------
+
     public static Dictionary<string, string[]> Phrases() =>
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -569,6 +615,7 @@ public static class BotLoans
         return owed;
     }
 
+    /// <summary>Counters only: the book itself is the save's, and a reload reads it back.</summary>
     public static void Forget()
     {
         Made = 0;
@@ -587,6 +634,19 @@ public static class BotLoans
         _collected = false;
     }
 
+    /// <summary>
+    /// <b>Patrick's reset (07.10.2026, reset26): the moneylenders' book closed, so the save writes it empty.</b> <see cref="Forget"/>
+    /// keeps the book for a reload, and the reset of 20:56 that night left <c>Saves/BotLoans</c> whole: a newcomer born under an
+    /// old name would have been born owing an old lender, its takings liened from the first sale, or marked a defaulter and lent
+    /// nothing. This empties exactly what <see cref="Save"/> writes — the loans, the marked names and the totals carried across
+    /// restarts that the default rate is read from — and the borrowers' memory with it.
+    ///
+    /// <para>
+    /// <b>No coin is held here.</b> A loan's principal went from the lender's purse to the borrower's when it was made, and every
+    /// take since went back the same way; the book only says who owes whom. Both are bodies the reset deletes with everything they
+    /// carry, so striking the debt makes and destroys nothing. Returns the loans struck off.
+    /// </para>
+    /// </summary>
     public static int Wipe()
     {
         var standing = _loans.Count;

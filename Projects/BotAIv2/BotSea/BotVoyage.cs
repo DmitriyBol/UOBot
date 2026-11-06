@@ -40,14 +40,23 @@ public sealed class BotVoyage : BotDeed
 
     public const string HomeTrade = "sailhome";
 
+    /// <summary>What a voyage to another town is worth a minute. Eight, the journey's (<see cref="BotTravel.Prior"/>).</summary>
     public static double Prior { get; set; } = 8.0;
 
+    /// <summary>What the voyage home is worth a minute. Six: above the walk home's five, which cannot be walked from an island.</summary>
     public static double HomeWorth { get; set; } = 6.0;
 
+    /// <summary>
+    /// How long a bot waits at the dock for another ship to leave its berth, when no other berth there is free. Two minutes:
+    /// a ship putting out clears its berth in three or four strokes, one coming in is dry-docked the stroke it anchors. Only a
+    /// ship is waited for; anything else in a berth is there for good (<see cref="BotBerthBlock"/>).
+    /// </summary>
     public static int BerthWaitMs { get; set; } = 120000;
 
+    /// <summary>How long the walk from the far dock into the town may take before the voyage is called done anyway. Ten minutes.</summary>
     public static int AshoreMs { get; set; } = 600000;
 
+    /// <summary>How near the town's square counts as arriving, as for the journey.</summary>
     public static int Arrival { get; set; } = 10;
 
     public static long Voyages { get; private set; }
@@ -66,8 +75,10 @@ public sealed class BotVoyage : BotDeed
 
     public static long Berthless { get; private set; }
 
+    /// <summary>Voyages that went to another berth of their dock because the one they walked to was taken.</summary>
     public static long Shifted { get; private set; }
 
+    /// <summary>Voyages that waited for a ship to leave a berth.</summary>
     public static long Waited { get; private set; }
 
     public static long Landed { get; private set; }
@@ -76,8 +87,13 @@ public sealed class BotVoyage : BotDeed
 
     public static long Lost { get; private set; }
 
+    /// <summary>Ships bought for the way home from an island, of <see cref="Bought"/>. See <see cref="BotSea.Owns"/>.</summary>
     public static long BoughtHome { get; private set; }
 
+    /// <summary>
+    /// Voyages that reached the shipwright with no ship and were not let buy one: a journey or a trader's haul pays nothing that
+    /// buys a ship back (<see cref="BotSea.Owns"/>). Nought while the choosers ask first; a number here names one that does not.
+    /// </summary>
     public static long BuyRefused { get; private set; }
 
     private enum Step
@@ -109,6 +125,7 @@ public sealed class BotVoyage : BotDeed
 
     private readonly IReadOnlyList<Mobile> _company;
 
+    /// <summary>Whether this voyage may buy the ship it lacks: the way home from an island and an order by hand. See <see cref="BotSea.Owns"/>.</summary>
     private readonly bool _mayBuy;
 
     private Step _step;
@@ -119,10 +136,13 @@ public sealed class BotVoyage : BotDeed
 
     private long _waiting;
 
+    /// <summary>The berth at <see cref="_from"/> this voyage walks to and puts to sea from: the dock's first until it is taken.</summary>
     private BotBerth _berth;
 
+    /// <summary>Berths of the dock already found taken by this voyage, as bits by index.</summary>
     private int _tried;
 
+    /// <summary>What was in the berth the last time it was asked, for the stage line.</summary>
     private string _blocked;
 
     private bool _counted;
@@ -133,6 +153,11 @@ public sealed class BotVoyage : BotDeed
 
     private long _began;
 
+    /// <summary>
+    /// A voyage from one dock to another. <paramref name="town"/> is where it is bound when it is a journey, null when it
+    /// is the way home to <paramref name="goal"/>. <paramref name="company"/> is carried aboard with the captain.
+    /// <paramref name="mayBuy"/>: whether a bot with no ship may buy one for this voyage (<see cref="BotSea.Owns"/>).
+    /// </summary>
     public BotVoyage(
         Map map, BotDock from, BotDock to, BotSeaLane lane, BotTowns.Town town, Point3D goal, string whence, bool home,
         IReadOnlyList<Mobile> company = null, bool mayBuy = false
@@ -168,12 +193,14 @@ public sealed class BotVoyage : BotDeed
 
     public override double Expects => _home ? HomeWorth : Prior;
 
+    /// <summary>The voyage's own length, the sailing and the walk ashore. See <see cref="BotHomeward.Minutes"/> for why a walk that is the errand says so.</summary>
     public override double Minutes => _minutes;
 
     public override SkillName? Trains => null;
 
     public override int Outlay => 0;
 
+    /// <summary>Counted as coin, like the journey and for its reason: a bot born poor must still be able to go.</summary>
     public override double Coin => 1.0;
 
     public override int Made => 0;
@@ -182,14 +209,22 @@ public sealed class BotVoyage : BotDeed
 
     public override bool Resumes => true;
 
+    /// <summary>The way home is not about money, as the walk home is not (<see cref="BotHomeward.Unpaid"/>).</summary>
     public override bool Unpaid => _home;
 
     private bool Afloat => _voyage is { State: BotSeaVoyage.Tide.Sailing or BotSeaVoyage.Tide.Rerouting or BotSeaVoyage.Tide.Landing };
 
+    /// <summary>
+    /// At sea the ship is in the water and the bot is on it: nothing but what will not wait takes it off. <b>And from the
+    /// moment the ship is in the pack (29.09.2026, build 322):</b> the first voyage of 321 was bought a ship, walked two
+    /// minutes towards the dock at Vesper and was "outbid by restock at 147/min" — the ship paid for, the voyage thrown away
+    /// for a bolt of cloth. The walk to the dock is the voyage's own first leg.
+    /// </summary>
     public override bool Committed => Afloat || _step is Step.ToDock or Step.Board;
 
     public override double HoldsFor => _minutes;
 
+    /// <summary>At sea the helm keeps the clocks: headway, the voyage's time. The labour clock is not asked.</summary>
     public override bool Still => Afloat;
 
     public override string Stage =>
@@ -328,6 +363,16 @@ public sealed class BotVoyage : BotDeed
         return BotDoing.Walk(_map, _goal, BotArrival.Within(near), _home ? "home from the sea" : $"into {_town?.Name} from the sea");
     }
 
+    /// <summary>
+    /// The berth would not take the ship. Another berth of the dock that is free now is walked to; failing that a ship in the
+    /// way is waited for, up to <see cref="BerthWaitMs"/>; anything else ends the voyage, with what was in the berth named.
+    ///
+    /// <para>
+    /// <b>Build 322 waited for nothing.</b> Rhiannel stood two minutes at Vesper's dock on 29.09.2026 "waiting for the berth"
+    /// and failed "the berth at Vesper is taken" — the berth was empty and could never take the ship (see
+    /// <c>BotDocks.Try</c>), and the wait was granted to any refusal worded "taken". Now the kind of obstruction decides.
+    /// </para>
+    /// </summary>
     private BotDoing Refused(BotMobile body, string why, BotBerthBlock block)
     {
         _blocked = why;
@@ -386,6 +431,7 @@ public sealed class BotVoyage : BotDeed
                 Waited++;
             }
 
+            // Every berth is asked again while waiting: the ship in the first may have gone by the next beat.
             _tried = 0;
 
             return BotDoing.Work($"waiting at {_from.Name}: {why}");
@@ -396,15 +442,23 @@ public sealed class BotVoyage : BotDeed
         return BotDoing.Failed($"could not put to sea from {_from.Name}: {why}");
     }
 
+    /// <summary>
+    /// A small ship from the nearest shopkeeper who sells one — a shipwright, or a provisioner, who sells them in this era —
+    /// paid from the bot's own purse and, short of it, the guild's (<see cref="BotProvision.Fund"/>). The price is booked
+    /// aside (<see cref="BotYield.Aside"/>): the ship sails again and again, as a horse does, and one voyage is not its cost.
+    /// </summary>
     private BotDoing Buy(IBotWilful bot, BotMobile body)
     {
         var wanted = typeof(SmallBoatDeed);
 
+        // A trial hands the ship over before anybody's purse is touched, the guild's least of all.
         if (BotSea.Grant)
         {
             return Grant(body);
         }
 
+        // No voyage on this island pays a ship back (06.10.2026, money15): only the way home from an island and an order by
+        // hand buy one. See BotSea.Owns.
         if (!_mayBuy)
         {
             BuyRefused++;
@@ -475,6 +529,7 @@ public sealed class BotVoyage : BotDeed
         return BotDoing.Walk(_map, _berth?.Shore ?? _from.Shore, BotArrival.Within(1), $"to the dock at {_from.Name}");
     }
 
+    /// <summary>A ship handed over for nothing, when <see cref="BotSea.Grant"/> says so: for proving the voyage on a world too young to afford one.</summary>
     private BotDoing Grant(BotMobile body)
     {
         var deed = new SmallBoatDeed();

@@ -20,6 +20,7 @@ public sealed class BotRuneBuy : BotDeed
 {
     public const string Trade = "blanks";
 
+    /// <summary>What a trip for blanks is reckoned at a minute. Twelve, a restock's: an errand, not a trade.</summary>
     public static double Prior { get; set; } = 12.0;
 
     public static long Undertaken { get; private set; }
@@ -106,6 +107,7 @@ public sealed class BotRuneBuy : BotDeed
 
         Bought += got;
 
+        // The runes just bought are the mage's own, before the unloading can reach them.
         foreach (var rune in body.Backpack.FindItemsByType<RecallRune>())
         {
             if (rune is { Deleted: false, Marked: false } && !BotBinding.IsBound(rune, body.Bond))
@@ -129,6 +131,7 @@ public sealed class BotRuneBuy : BotDeed
 /// <summary>Offers a rune-mage short of blanks a trip to the nearest shop that sells them. See <see cref="BotRuneBuy"/>.</summary>
 public sealed class BotRuneBuyer : IBotProposer
 {
+    /// <summary>How long a mage that failed to buy blanks is left alone before it is offered the trip again. Ten minutes.</summary>
     public static int RestMs { get; set; } = 600000;
 
     public static long Asked { get; private set; }
@@ -149,6 +152,7 @@ public sealed class BotRuneBuyer : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>A trip that failed rests the offer for <see cref="RestMs"/>: an empty purse or an empty shelf is not mended by asking again.</summary>
     public static void Rest(Mobile body)
     {
         if (body != null)
@@ -178,6 +182,7 @@ public sealed class BotRuneBuyer : IBotProposer
             return null;
         }
 
+        // A rune is for marking and for copies; a mage that can cast none of the three has no use for one yet.
         if (!BotRunes.Knows(body, BotRunes.Mark) && !BotRunes.Knows(body, BotRunes.Recall) && !BotRunes.Knows(body, BotRunes.Gate))
         {
             NoSpell++;

@@ -54,32 +54,58 @@ public static class BotHalls
 
     private const string ConfigPath = "Configuration/bot-dungeon-halls.json";
 
+    /// <summary>Whether the survey runs at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often one probe is made.</summary>
     public static int EveryMs { get; set; } = 1000;
 
+    /// <summary>How many probes one turn makes.</summary>
     public static int Probes { get; set; } = 2;
 
+    /// <summary>What one probe may cost. The same ceiling the far-side look uses, for the same reason.</summary>
     public static double CeilingMs { get; set; } = 30.0;
 
+    /// <summary>How far beside a room a body may be planted when the room's own tile will not take one.</summary>
     public static int Spread { get; set; } = 3;
 
+    /// <summary>How near a probe has to get to count as having arrived.</summary>
     public static int Within { get; set; } = 2;
 
+    /// <summary>Probes made.</summary>
     public static long Asked { get; private set; }
 
+    /// <summary>Probes that found a way.</summary>
     public static long Joined { get; private set; }
 
+    /// <summary>Rooms that started a hall of their own.</summary>
     public static long Opened { get; private set; }
 
+    /// <summary>Rooms no body will stand in or beside. They are on nobody's map.</summary>
     public static long Footless { get; private set; }
 
+    /// <summary>Dungeons whose map was read back out of the file rather than walked again.</summary>
     public static long Remembered { get; private set; }
 
+    /// <summary>
+    /// The ground being probed this moment, or nothing.
+    ///
+    /// Exposed so that the watcher can stand there while it happens. That is not decoration: Patrick's order
+    /// was to send Argus down, and a survey nobody is standing in is a survey whose progress can only be read
+    /// off a counter. With him there, <c>near</c> and <c>tile</c> answer about the room being charted.
+    /// </summary>
     public static Point3D Probing { get; private set; }
 
+    /// <summary>Which dungeon is being charted this moment, for the watcher's own line.</summary>
     public static string Charting { get; private set; }
 
+    /// <summary>
+    /// Somewhere to say what a finished chart came to, set from outside this assembly.
+    ///
+    /// <b>A hook rather than a call, because the watcher's log lives in the assembly that depends on this
+    /// one.</b> The same arrangement <c>BotWill.Completed</c> uses, and for the same reason: the survey is
+    /// the bots' own knowledge about the map, and it must not need a debugger to exist.
+    /// </summary>
     public static Action<string> Noted { get; set; }
 
     /// <summary>One group of rooms that can all be walked between.</summary>
@@ -96,10 +122,13 @@ public static class BotHalls
 
         public readonly List<Hall> Halls = [];
 
+        /// <summary>The next room of the dungeon to be placed.</summary>
         public int Next;
 
+        /// <summary>Which hall the room being placed is currently being tried against.</summary>
         public int Trying;
 
+        /// <summary>Where the room being placed would actually stand.</summary>
         public Point3D Footing;
 
         public bool Done;
@@ -113,6 +142,7 @@ public static class BotHalls
 
     private static long _beatTick;
 
+    /// <summary>Whether every dungeon has been charted.</summary>
     public static bool Charted
     {
         get
@@ -134,6 +164,10 @@ public static class BotHalls
         }
     }
 
+    /// <summary>
+    /// One turn of the survey. Called from the watcher's own beat; costs two tick comparisons once the map
+    /// is finished, which is nearly always.
+    /// </summary>
     public static void Beat(Map map, long now)
     {
         if (!Running || map == null || map == Map.Internal || !BotDungeon.Surveyed)
@@ -162,6 +196,7 @@ public static class BotHalls
         }
     }
 
+    /// <summary>Sets a chart up for every surveyed dungeon, and reads back whatever was charted before.</summary>
     private static void Begin(Map map)
     {
         var known = Read();
@@ -196,6 +231,9 @@ public static class BotHalls
         );
     }
 
+    /// <summary>
+    /// One probe, or one room placed without needing any. Returns false when there is nothing left to do.
+    /// </summary>
     private static bool Step(Map map)
     {
         var chart = Pending();
@@ -216,6 +254,9 @@ public static class BotHalls
 
         Charting = chart.Deep.Name;
 
+        // A room whose own tile will not take a body, and no tile beside it either, is a room nobody can
+        // ever be in. It is left off every hall rather than made into one of its own: a hall of one room
+        // nobody can stand in is a place the party would be sent and could not arrive at.
         if (chart.Footing == Point3D.Zero)
         {
             chart.Footing = Footed(map, rooms[chart.Next]);
@@ -232,6 +273,7 @@ public static class BotHalls
 
         Probing = chart.Footing;
 
+        // Tried against the halls in turn, one search a turn. The first that answers yes takes it.
         if (chart.Trying < chart.Halls.Count)
         {
             var hall = chart.Halls[chart.Trying];
@@ -255,6 +297,7 @@ public static class BotHalls
             return true;
         }
 
+        // Nothing it could reach: a hall of its own.
         var opened = new Hall { Rep = chart.Footing };
         opened.Rooms.Add(chart.Footing);
         chart.Halls.Add(opened);
@@ -267,6 +310,7 @@ public static class BotHalls
         return true;
     }
 
+    /// <summary>The chart being worked on, in turn so that no dungeon is charted last for ever.</summary>
     private static Chart Pending()
     {
         for (var i = 0; i < _charts.Count; i++)
@@ -317,6 +361,13 @@ public static class BotHalls
         Save();
     }
 
+    /// <summary>
+    /// Somewhere at or beside this room that a body will stand on and can step off.
+    ///
+    /// <b>Both halves, and the second is the one that matters here.</b> A spawner can sit in a niche in the
+    /// wall: a body fits, and there is nowhere to go from it. The planner would then answer that nothing can
+    /// reach the room — correctly — and the room would open a hall of its own that nobody could ever use.
+    /// </summary>
     private static Point3D Footed(Map map, Point3D room)
     {
         for (var ring = 0; ring <= Spread; ring++)
@@ -351,6 +402,7 @@ public static class BotHalls
         return Point3D.Zero;
     }
 
+    /// <summary>Which hall of this dungeon holds the ground somebody is standing on, or nothing.</summary>
     public static Hall Holding(BotDungeon.Deep deep, Point3D where)
     {
         var chart = Of(deep);
@@ -384,6 +436,7 @@ public static class BotHalls
         return nearest;
     }
 
+    /// <summary>The hall with the most rooms in it: where a party is put down when it has no other reason.</summary>
     public static Hall Largest(BotDungeon.Deep deep)
     {
         var chart = Of(deep);
@@ -406,11 +459,13 @@ public static class BotHalls
         return best;
     }
 
+    /// <summary>One room of a hall, by number. Already settled on the ground.</summary>
     public static Point3D Room(Hall hall, int which) =>
         hall == null || hall.Rooms.Count == 0
             ? Point3D.Zero
             : hall.Rooms[Math.Abs(which) % hall.Rooms.Count];
 
+    /// <summary>Whether this dungeon has been charted well enough to be relied on.</summary>
     public static bool Ready(BotDungeon.Deep deep) => Of(deep) is { Done: true, Halls.Count: > 0 };
 
     private static Chart Of(BotDungeon.Deep deep)
@@ -431,6 +486,7 @@ public static class BotHalls
         return null;
     }
 
+    /// <summary>How far along the whole survey is, in one phrase, for the watcher and for the summary.</summary>
     public static string Describe()
     {
         if (!Running)
@@ -467,6 +523,8 @@ public static class BotHalls
             + $"{Opened} opened a hall of their own, {Footless} rooms will take no body at all";
     }
 
+    // ---- what is written down -------------------------------------------------------------------------
+
     public sealed class HallsFile
     {
         public DeepChart[] Deeps { get; set; }
@@ -476,8 +534,10 @@ public static class BotHalls
     {
         public string Name { get; set; }
 
+        /// <summary>How many rooms the dungeon had when this was charted. A different count means a new map.</summary>
         public int Rooms { get; set; }
 
+        /// <summary>One entry per hall: the rooms in it, as x, y, z triples laid end to end.</summary>
         public int[][] Halls { get; set; }
     }
 
@@ -487,6 +547,8 @@ public static class BotHalls
         {
             return JsonConfig.Deserialize<HallsFile>(Path.Combine(Core.BaseDirectory, ConfigPath));
         }
+        // A file somebody has edited by hand is not a reason to take the shard down; it is a reason to walk
+        // the dungeons again, which costs minutes and is the thing this file is a cache of.
         catch (Exception)
         {
             return null;
@@ -509,6 +571,9 @@ public static class BotHalls
                 continue;
             }
 
+            // <b>The room count is the whole of the cache's honesty.</b> The rooms are the world's own
+            // spawners; if somebody re-imports the spawn files the dungeon is a different place, and a map
+            // drawn of the old one would send parties to rooms that are not there.
             if (saved.Rooms != chart.Deep.Rooms.Count)
             {
                 return false;
@@ -591,6 +656,12 @@ public static class BotHalls
         }
     }
 
+    /// <summary>
+    /// A world reload is a different world, and the rooms are items in it.
+    ///
+    /// The file stays: it is keyed by the dungeon's name and its room count, and both of those survive a
+    /// reload. What is thrown away is the charts built against the old room objects.
+    /// </summary>
     public static void Forget()
     {
         _charts.Clear();

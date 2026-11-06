@@ -133,6 +133,7 @@ public sealed class BotSup : BotDeed
             BotTaverns.Say(body, "tavern:greet", keeper, _tavern);
         }
 
+        // Taken up again after a flight or a rescue somewhere else: back to the table.
         if (!body.InRange(_tavern.Stand, 4))
         {
             return BotDoing.Walk(_tavern.Map, keeper, BotArrival.Within(3), $"back to {_tavern.Name}");
@@ -174,18 +175,25 @@ public sealed class BotSupperer : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>What supper is worth a minute before tiredness, boredom, a wound and hunger are added. Twenty-six: the fireside's 24 and a plate.</summary>
     public static double Prior { get; set; } = 26.0;
 
+    /// <summary>What a wound adds a minute, times the share of hits missing.</summary>
     public static double HurtWorth { get; set; } = 30.0;
 
+    /// <summary>What having nothing cooked in the pack adds a minute.</summary>
     public static double HungryWorth { get; set; } = 6.0;
 
+    /// <summary>How long one bot waits between suppers. Forty minutes.</summary>
     public static int EveryMs { get; set; } = 2400000;
 
+    /// <summary>The weariness — share of the session played — from which a bot counts as tiring. Two fifths.</summary>
     public static double WearyFrom { get; set; } = 0.4;
 
+    /// <summary>The boredom from which a bot counts as bored.</summary>
     public static double BoredFrom { get; set; } = 0.3;
 
+    /// <summary>The share of its hits under which a bot counts as hurt.</summary>
     public static double HurtUnder { get; set; } = 0.8;
 
     public static long Asked { get; private set; }
@@ -316,6 +324,7 @@ public sealed class BotSupperer : IBotProposer
             return null;
         }
 
+        // <b>A poor bot hunts; it does not buy suppers</b> (Patrick's standing rule). What is left after the plate must be its keep.
         var price = BotTaverns.Price(BotTaverns.MostHeld(tavern.Keeper, out _));
 
         if (price <= 0 || BotYield.Spendable(who) < price + BotTaverns.GuestKeeps)

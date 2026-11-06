@@ -23,6 +23,7 @@ public sealed class BotSeizureStore : GenericPersistence
 
     private static BotSeizureStore _store;
 
+    /// <summary>Registered from <c>BotCore.Configure</c>: a persistence must exist before the world loads.</summary>
     public static void Configure() => _store ??= new BotSeizureStore();
 
     public BotSeizureStore() : base("BotSeizures", 16)

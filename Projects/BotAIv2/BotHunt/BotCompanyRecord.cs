@@ -62,16 +62,25 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotCompanyRecord
 {
+    /// <summary>Whether a company prices a kind by companies' own fights. Off, every company weighs every kind at the island's price, as before.</summary>
     public static bool Prices { get; set; } = true;
 
+    /// <summary>Kills, as the hour weighs them, by companies no stronger than the one asking before the record may lower its price. Three.</summary>
     public static double Vouch { get; set; } = 3.0;
 
+    /// <summary>How much stronger than a company that lost a company must be before that death stops counting against it. Half again.</summary>
     public static double Margin { get; set; } = 1.5;
 
+    /// <summary>
+    /// How long after a company's fight against a kind a member's death to that kind is still that fight's. Two minutes: on 396, 8 of
+    /// the 12 enlisted deaths to a Reaper within ten minutes of the company's last Reaper fell inside two — the field's next one.
+    /// </summary>
     public static int FightMs { get; set; } = 120000;
 
+    /// <summary>How long a kind's company figure stands before it is worked out again from its record.</summary>
     public static int CacheMs { get; set; } = 5000;
 
+    /// <summary>The most fights a kind's record holds; the oldest go first.</summary>
     public static int MostEvents { get; set; } = 256;
 
     private struct Fight
@@ -87,6 +96,7 @@ public static class BotCompanyRecord
     {
         public readonly List<Fight> Fights = [];
 
+        /// <summary>The lowest odds the record lets a company in at; infinity while it vouches for none.</summary>
         public double Needed = double.PositiveInfinity;
 
         public double Kills;
@@ -100,20 +110,28 @@ public static class BotCompanyRecord
 
     private static readonly Dictionary<Type, Book> _books = [];
 
+    /// <summary>Company kills and deaths in companies' own fights recorded; deaths in a company to a kind it was not fighting, left to the island.</summary>
     public static long Kills { get; private set; }
 
     public static long Deaths { get; private set; }
 
     public static long Elsewhere { get; private set; }
 
+    /// <summary>
+    /// Creatures a company chose, joined, kept or answered on the company record where the island's price would have put them
+    /// beyond it (<c>BotSquad.Beyond</c>), once a company a creature; withdrawals the island's price would have made and the record
+    /// did not (<c>BotSquad.Overmatched</c>), once a company a creature.
+    /// </summary>
     public static long LetIn { get; private set; }
 
     public static long Stood { get; private set; }
 
+    /// <summary>Creatures a look for a company's quarry, and zones a hunter's look for company ground, let in on the record.</summary>
     public static long LookLetIn { get; private set; }
 
     public static long ZoneLetIn { get; private set; }
 
+    /// <summary>Let-ins and withdrawals not made, by kind, for the summary.</summary>
     private static readonly Dictionary<Type, (long LetIn, long Stood)> _byKind = [];
 
     internal static void Let(Mobile foe)
@@ -150,6 +168,7 @@ public static class BotCompanyRecord
         _byKind[kind] = letIn ? (had.LetIn + 1, had.Stood) : (had.LetIn, had.Stood + 1);
     }
 
+    /// <summary>A company of two or more put one of these down, having taken it on at <paramref name="odds"/> (its strength over the creature's).</summary>
     public static void Killed(Type kind, double odds)
     {
         if (kind == null || !(odds > 0.0) || double.IsInfinity(odds))
@@ -161,6 +180,7 @@ public static class BotCompanyRecord
         Add(kind, odds, false);
     }
 
+    /// <summary>One of ours fell to one of these in its company's fight against the kind, the company having taken it on at <paramref name="odds"/>.</summary>
     public static void Fell(Type kind, double odds)
     {
         if (kind == null || !(odds > 0.0) || double.IsInfinity(odds))
@@ -172,6 +192,7 @@ public static class BotCompanyRecord
         Add(kind, odds, true);
     }
 
+    /// <summary>One of ours fell in a company to a kind the company was not fighting: the island's record only. See the class note.</summary>
     public static void FellElsewhere() => Elsewhere++;
 
     private static void Add(Type kind, double odds, bool death)
@@ -196,8 +217,14 @@ public static class BotCompanyRecord
         book.Stale = true;
     }
 
+    /// <summary>The company's yardstick: what a company withdraws past and chooses within (<c>BotSquad.WithdrawOdds</c>).</summary>
     private static double Yardstick => Math.Max(0.1, BotSquad.WithdrawOdds);
 
+    /// <summary>
+    /// What a kind's strength is multiplied by when a company weighs it: the island's price (<see cref="BotQuarry.Price"/>), lowered
+    /// to the company yardstick times the lowest odds the companies' record lets a company in at, never under one. See the class
+    /// note. The island's price wherever the record is off, empty or vouches for no odds.
+    /// </summary>
     public static double Price(Type kind)
     {
         var island = BotQuarry.Price(kind);
@@ -212,6 +239,7 @@ public static class BotCompanyRecord
         return double.IsInfinity(needed) ? island : Math.Clamp(Yardstick * needed, 1.0, island);
     }
 
+    /// <summary>The strength a company must bring to choose this creature: its own, times its kind's company price.</summary>
     public static double Priced(BaseCreature creature) =>
         creature == null ? 0.0 : BotThreat.Power(creature) * Price(creature.GetType());
 
@@ -219,6 +247,11 @@ public static class BotCompanyRecord
 
     private static readonly List<(double Odds, bool Death, double Weight)> _weighed = [];
 
+    /// <summary>
+    /// The lowest odds the record lets a company in at, worked out at most every <see cref="CacheMs"/>: over the breakpoints of the
+    /// record (every kill's odds, every death's odds times <see cref="Margin"/>), the first span where at least <see cref="Vouch"/>
+    /// kills by companies no stronger stand and the odds carry the island's formula of what is left.
+    /// </summary>
     private static double Needed(Book book)
     {
         var now = Core.TickCount;
@@ -240,6 +273,8 @@ public static class BotCompanyRecord
         var half = Math.Max(1, BotQuarry.RiskHalfMs);
         var margin = Math.Max(1.0, Margin);
 
+        // Forgotten past a hundredth of their weight (six and two-thirds half-lives), so the record does not grow without end.
+        // Compacted in place: this is asked from every company's beat, and a predicate capturing the clock is a new delegate a call.
         var kept = 0;
 
         for (var i = 0; i < book.Fights.Count; i++)
@@ -339,6 +374,7 @@ public static class BotCompanyRecord
         return book.Needed;
     }
 
+    /// <summary>Everything forgotten with the world. See <c>BotQuarry.Forget</c>.</summary>
     public static void Forget()
     {
         _books.Clear();
@@ -352,6 +388,7 @@ public static class BotCompanyRecord
         ZoneLetIn = 0;
     }
 
+    /// <summary>The company record's clause of the Companies line.</summary>
     public static string Describe()
     {
         if (!Prices)

@@ -24,16 +24,29 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotSweepRecord
 {
+    /// <summary>How long it takes half of what a square's sweeps came to to fade. An hour, as the island's own board.</summary>
     public static int HalfLifeMs { get; set; } = 3600000;
 
+    /// <summary>
+    /// What a sweep of a square nobody has swept lately is reckoned to bring, in coin. One: a prowl of one square is then
+    /// offered at one a minute, which is what the corrections made of the old flat eight on build 400 (the median score of the
+    /// 2709 prowls taken on 06.10, 06:12–09:42), so untried ground is offered exactly as before.
+    /// </summary>
     public static double SquarePrior { get; set; } = 1.0;
 
+    /// <summary>How many sweeps' worth of evidence the prior counts as. Two: a square swept empty five times reads two sevenths of it.</summary>
     public static double PriorWeight { get; set; } = 2.0;
 
+    /// <summary>
+    /// How long after a sweep found a fight the hunt that ends is credited to the square it was found in. Three minutes:
+    /// a hunt runs a median of 0.4 minutes, and the hunter is offered it at the next review.
+    /// </summary>
     public static int CreditMs { get; set; } = 180000;
 
+    /// <summary>How long the squares a sweep had still to walk wait for the bot to come back from the fight it found. Five minutes.</summary>
     public static int ResumeMs { get; set; } = 300000;
 
+    /// <summary>Most squares remembered at once. Beyond this the faintest are forgotten.</summary>
     public static int MostSquares { get; set; } = 8192;
 
     private sealed class Entry
@@ -46,13 +59,21 @@ public static class BotSweepRecord
 
         public long Tick;
 
+        /// <summary>When a sweep's walk to this square's waypoint was last refused or given up; nought never. See <see cref="Wayless"/>.</summary>
         public long WaylessTick;
     }
 
+    /// <summary>
+    /// How long a square whose waypoint a sweep could not walk to is left out of every sweep (07.10.2026, work18). An hour: the
+    /// quadrant's own rest (BotQuad.BaulkMs) is ten minutes a refusal, and on build 411 "no way through to (x, y)" was 62 of the
+    /// first 76 minutes' 1160 prowl endings, the next dart landing on the square the rest had just let go. Nought: off.
+    /// </summary>
     public static int WaylessMs { get; set; } = 3600000;
 
+    /// <summary>Squares filed as wayless after a sweep's walk to them was refused or given up.</summary>
     public static long WaylessFiled { get; private set; }
 
+    /// <summary>A sweep could not walk to this square's waypoint (refused or given up): it is left out of sweeps for <see cref="WaylessMs"/>.</summary>
     public static void Wayless(Map map, Point3D where)
     {
         if (WaylessMs <= 0)
@@ -69,6 +90,7 @@ public static class BotSweepRecord
         }
     }
 
+    /// <summary>Whether a sweep's walk to this square failed within <see cref="WaylessMs"/>. One dictionary lookup.</summary>
     public static bool NoWay(Map map, Point3D where)
     {
         if (WaylessMs <= 0 || map == null || map == Map.Internal)
@@ -86,6 +108,7 @@ public static class BotSweepRecord
 
     private static readonly Dictionary<Serial, (Map Map, Point3D[] Legs, long Tick)> _left = [];
 
+    /// <summary>Hunts credited to the square a sweep found them in, and the coin and goods they came to.</summary>
     public static long Credited { get; private set; }
 
     public static long CreditedWorth { get; private set; }
@@ -142,6 +165,7 @@ public static class BotSweepRecord
         entry.Tick = now;
     }
 
+    /// <summary>The faintest half forgotten, when the table is full. Rare: a square is a thousand tiles.</summary>
     private static void Trim(long now)
     {
         List<(int Map, int X, int Y)> faint = [];
@@ -167,6 +191,7 @@ public static class BotSweepRecord
         }
     }
 
+    /// <summary>A sweep reached this square: walked to its waypoint, or found a fight in it.</summary>
     public static void Walked(Map map, Point3D where)
     {
         var entry = Touch(map, where, true);
@@ -177,6 +202,7 @@ public static class BotSweepRecord
         }
     }
 
+    /// <summary>A sweep found a fight in this square, and this bot is the one that will fight it.</summary>
     public static void Found(Mobile body, Map map, Point3D where)
     {
         var entry = Touch(map, where, true);
@@ -195,6 +221,10 @@ public static class BotSweepRecord
         }
     }
 
+    /// <summary>
+    /// A hunt this bot was on has ended, coming to <paramref name="worth"/> in coin and goods. Credited to the square a sweep
+    /// found a fight in, when it found one for this bot within <see cref="CreditMs"/>. See <c>BotSlay.Drop</c>.
+    /// </summary>
     public static void Hunted(Mobile body, int worth)
     {
         if (body == null || !_finds.TryGetValue(body.Serial, out var find))
@@ -221,6 +251,10 @@ public static class BotSweepRecord
         CreditedWorth += worth;
     }
 
+    /// <summary>
+    /// What a sweep of this square has brought lately, in coin and goods, blended with <see cref="SquarePrior"/> by
+    /// <see cref="PriorWeight"/>: what the hunts found there came to, over how many sweeps walked it.
+    /// </summary>
     public static double Worth(Map map, Point3D where)
     {
         var entry = Touch(map, where, false);
@@ -233,8 +267,10 @@ public static class BotSweepRecord
         return (SquarePrior * PriorWeight + entry.Gold) / (PriorWeight + entry.Walked);
     }
 
+    /// <summary>How many sweeps walked this square lately, faded. For the log.</summary>
     public static double Sweeps(Map map, Point3D where) => Touch(map, where, false)?.Walked ?? 0.0;
 
+    /// <summary>The squares a sweep had still to walk when a fight took the bot off it, kept for it to come back to.</summary>
     public static void Leave(Mobile body, Map map, List<Point3D> legs, int from)
     {
         if (body == null || map == null || legs == null || from >= legs.Count)
@@ -252,6 +288,7 @@ public static class BotSweepRecord
         _left[body.Serial] = (map, left, Core.TickCount);
     }
 
+    /// <summary>The squares this bot's last sweep still had to walk, if it left them within <see cref="ResumeMs"/> on this map.</summary>
     public static Point3D[] Left(Mobile body, Map map)
     {
         if (body == null || !_left.TryGetValue(body.Serial, out var left))
@@ -269,6 +306,7 @@ public static class BotSweepRecord
         return left.Legs;
     }
 
+    /// <summary>A sweep was taken: whatever an earlier one left is either being walked now or given up.</summary>
     public static void Taken(Mobile body)
     {
         if (body != null)

@@ -12,6 +12,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public readonly record struct BotBuild(int Skills, int Stats, int Armour, string Weapon, int Damage)
 {
+    /// <summary>The skills a fight is decided by. Weapon, the arts beside it, and the book.</summary>
     private static readonly SkillName[] Fighting =
     [
         SkillName.Swords, SkillName.Macing, SkillName.Fencing, SkillName.Archery, SkillName.Wrestling,
@@ -33,6 +34,14 @@ public readonly record struct BotBuild(int Skills, int Stats, int Armour, string
             skills += m.Skills[Fighting[i]]?.Base ?? 0.0;
         }
 
+        // The arms it fights with, not the one in its hand and not everything in its pack. A bot that closes with a blade and
+        // shoots with a bow swaps them all day (BotArms), and the double carries the whole pack and draws as the bot does, so a
+        // reading of one hand is a reading of both: read off the hand, Wystan and Ysolt were each tried three times in three
+        // minutes at 03:50 on 26.09.2026. Read off everything carried (build 251), a looted scimitar on its way to a stall was a
+        // new build too (Quill, three times in four minutes at 04:20). So: the best blade and the best bow, by average hit.
+        // What is in the quiver is not part of it: a bow with fewer than ten shots was "dry" in build 253, and Cassia, buying
+        // and spending around ten, was tried four times in four minutes (04:34–04:38). The quiver comes and goes by the hour;
+        // a reading is taken with whatever it holds and is taken again on the clock (RetestMs).
         BaseWeapon blade = null;
         BaseRanged bow = null;
 
@@ -145,6 +154,7 @@ public sealed class BotTrial
 
     public BotRole Role { get; }
 
+    /// <summary>The creature, by the name its spawners give it.</summary>
     public string Kind { get; }
 
     public int Ring { get; }
@@ -153,34 +163,44 @@ public sealed class BotTrial
 
     public Point3D Middle { get; }
 
+    /// <summary>Who called it: the schedule, or somebody at the door.</summary>
     public string By { get; }
 
     public BotBuild Build { get; }
 
+    /// <summary>The bot's strength on the old formula when the fight was held, kept to calibrate estimates by.</summary>
     public double PowerThen { get; }
 
+    /// <summary>The creature's strength on the old formula. See <see cref="BotDungeon.Might"/>.</summary>
     public double Might { get; }
 
     public BotStandIn Double { get; private set; }
 
+    /// <summary>What the double held when the fight began, read off the double itself.</summary>
     public string Held { get; private set; }
 
     public BaseCreature Foe { get; private set; }
 
     public long Began { get; private set; }
 
+    /// <summary>Won, lost or called; null while it is being fought.</summary>
     public string Verdict { get; private set; }
 
+    /// <summary>The share of the creature that was killed: one for a win.</summary>
     public double Killed { get; private set; }
 
+    /// <summary>The bot's health pool, the double's being the same.</summary>
     public int HitsMax { get; private set; }
 
     public int ManaMax { get; private set; }
 
+    /// <summary>Damage the creature took, read off its health a beat at a time.</summary>
     public int Dealt { get; private set; }
 
+    /// <summary>Health the creature gave itself back.</summary>
     public int Mended { get; private set; }
 
+    /// <summary>Mana the double spent.</summary>
     public int Spent { get; private set; }
 
     public int Casts => _driver?.Casts ?? 0;
@@ -193,14 +213,18 @@ public sealed class BotTrial
 
     public int Steps => _driver?.Steps ?? 0;
 
+    /// <summary>How long the fight took, in seconds.</summary>
     public double Seconds { get; private set; }
 
+    /// <summary>What the double took net of what it healed, floored. See <see cref="BotProving.NetFloor"/>.</summary>
     public double Net { get; private set; }
 
     public double R { get; private set; }
 
+    /// <summary>The bot's strength as this fight measured it: <see cref="R"/> × <see cref="Might"/>.</summary>
     public double Strength => R * Might;
 
+    /// <summary>Why the fight could not be set up, when it could not.</summary>
     public string Refused { get; private set; }
 
     private int _foeLast;
@@ -213,12 +237,17 @@ public sealed class BotTrial
 
     private BotDriver _driver;
 
+    /// <summary>Beats the double spent paralysed or frozen: a mage creature's Paralyze holds for up to 7 + a fifth of its Magery
+    /// in seconds in this era (Spells/Fifth/Paralyze.cs), until the next damage breaks it (Mobile.Damage). Read so a fight that
+    /// was lost standing still says so.</summary>
     private int _heldBeats;
 
+    /// <summary>What the double's first ranged weapon fires and how much of it it carried in; -1 for a double with no bow.</summary>
     private Type _ammo;
 
     private int _ammoStart = -1;
 
+    /// <summary>Ammunition the double spent, or -1 when it carried no bow.</summary>
     public int Shots { get; private set; } = -1;
 
     public double HeldSeconds => _heldBeats * (double)BotProving.TickMs / 1000.0;
@@ -227,6 +256,11 @@ public sealed class BotTrial
 
     private long _traceTick;
 
+    /// <summary>
+    /// Once a second, for the first <see cref="BotProving.TraceRanged"/> fights of a double holding a bow: what the engine's
+    /// swing is waiting on. Archers with a full quiver were losing to an awake orcish mage having dealt next to nothing, and
+    /// nothing in the source said why (26.09.2026, 04:24).
+    /// </summary>
     private void Trace(BotStandIn me, BaseCreature foe, long now)
     {
         if (!_tracing || me is not { Deleted: false } || foe is not { Deleted: false } || now - _traceTick < 1000)
@@ -260,9 +294,14 @@ public sealed class BotTrial
         );
     }
 
+    /// <summary>Where each of the two is put down: either side of the ring's middle.</summary>
     private Point3D Side(int sign) =>
         new(Middle.X + sign * BotProving.Apart, Middle.Y, Middle.Z);
 
+    /// <summary>
+    /// Puts the double and the creature down and sets them on each other. False, with <see cref="Refused"/> said, when either
+    /// could not be made; nothing is left standing in that case.
+    /// </summary>
     public bool Begin()
     {
         if (Original is not { Deleted: false } || Map == null || Map == Map.Internal)
@@ -356,6 +395,7 @@ public sealed class BotTrial
         return true;
     }
 
+    /// <summary>One beat of the referee: read the fight, answer for the double, decide. True when it is over.</summary>
     public bool Drive()
     {
         if (Verdict != null)
@@ -394,6 +434,7 @@ public sealed class BotTrial
         return false;
     }
 
+    /// <summary>What happened since the last beat: the creature's health either way, the double's mana spent.</summary>
     private void Read(BotStandIn me, BaseCreature foe, long now)
     {
         if (foe is { Deleted: false })
@@ -420,6 +461,8 @@ public sealed class BotTrial
                 _heldBeats++;
             }
 
+            // Only while it stands: at death the unbound arrows go to the corpse, and build 252 counted them as shots
+            // (Cassia "fired 13" in 28 s with a bow that fires once in four and a half).
             if (_ammo != null && me.Alive)
             {
                 Shots = Math.Max(0, _ammoStart - (me.Backpack?.GetAmount(_ammo) ?? 0));
@@ -445,6 +488,7 @@ public sealed class BotTrial
         }
     }
 
+    /// <summary>Settles the reading. See the class note for what R is.</summary>
     private bool Decide(string verdict)
     {
         Verdict = verdict;
@@ -466,6 +510,9 @@ public sealed class BotTrial
 
         var health = Killed * Math.Max(1, HitsMax) / Net;
 
+        // A caster's mana is the other half of its health: a mage that spends its whole pool on one troll kills one troll,
+        // however little the troll hurt it. Only for a class that fights by the book, and only when it spent a real share —
+        // a warrior-mage out of mana still swings, and a pool barely touched is no limit.
         var mana = double.MaxValue;
 
         if (Role == BotRole.Caster && ManaMax > 0 && Spent >= ManaMax * BotProving.ManaShare)
@@ -478,6 +525,10 @@ public sealed class BotTrial
         return true;
     }
 
+    /// <summary>
+    /// Takes everything the fight left off the field: the creature or its corpse, the double and its corpse, and anything
+    /// the creature brought into the world with it — a summon, a spawn — within the ring.
+    /// </summary>
     public void End()
     {
         var map = Map;
@@ -504,6 +555,7 @@ public sealed class BotTrial
         BotProving.Sweep(map, Middle, BotProving.Leash + BotProving.Apart + 4);
     }
 
+    /// <summary>One line for the log and the door.</summary>
     public string Say()
     {
         var what = Verdict == "won"

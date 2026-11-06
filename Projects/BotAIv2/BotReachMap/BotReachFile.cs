@@ -24,7 +24,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotReachFile
 {
-    private const uint Magic = 0x31484352;
+    private const uint Magic = 0x31484352; // "RCH1"
 
     private const int Format = 1;
 
@@ -41,6 +41,7 @@ public static class BotReachFile
     public static string PathFor(Map map) =>
         Path.Combine(Core.BaseDirectory, "Data", $"bot-reach-{map.Name.ToLowerInvariant()}.bin");
 
+    /// <summary>Writes the clusters. Off the loop: the clusters are never changed once made, and nothing here reads the world.</summary>
     public static long Write(string path, int mapId, ulong fingerprint, int width, int height, int clustersX, int clustersY, BotReachCluster[] clusters)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -131,6 +132,10 @@ public static class BotReachFile
         return new FileInfo(path).Length;
     }
 
+    /// <summary>
+    /// Reads the clusters, or null with the reason when the file is missing, of another format, of another map, or of map files
+    /// that have changed since. Off the loop.
+    /// </summary>
     public static BotReachCluster[] Read(string path, int mapId, ulong fingerprint, int width, int height, out string why)
     {
         why = null;

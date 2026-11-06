@@ -33,13 +33,23 @@ public sealed class BotSpellsModule : BotModule
     {
         BotSpellsConfig.Load();
 
+        // <b>A bot scribe writes by its Inscribe, not by its own book.</b> Patrick's order of 25.09.2026: "the higher the
+        // Inscribe, the stronger the scrolls they can write". The engine refuses a scroll whose spell is not in the
+        // scribe's book, and above the third circle no shop sells one, so a spell came into the population only off a
+        // corpse: 358 wants for Lightning in two days and one filled. The circle's own skill gate stays the engine's
+        // (DefInscription: -25, -10.8, 3.5, 17.8, 32.1, 46.4, 60.7 and 75 for the eight circles, no chance at the
+        // bottom of each band), so a green scribe writes the first circles and a grandmaster the eighth.
         Server.Engines.Craft.DefInscription.Knows = static (mobile, _) => mobile is BotMobile;
 
+        // Needs the world, because it reads the answer off one of each scroll rather than guessing it.
         BotGrimoire.Read();
 
         BotWill.Offer(new BotScribe());
         BotWill.Offer(new BotSeeker());
 
+        // Scrolls for everybody else. Until this, the only bot that ever asked for one was a mage filling a
+        // book — one want per spell, once, for ever — so the scribes had no customers and the board of what
+        // the population needs stayed empty. See BotArmoury.
         BotWill.Offer(new BotArmoury());
 
         logger.Information(

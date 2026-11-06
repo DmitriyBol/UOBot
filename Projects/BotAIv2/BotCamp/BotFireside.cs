@@ -23,16 +23,26 @@ public sealed class BotFireside : BotDeed
 {
     public const string Trade = "fireside";
 
+    /// <summary>
+    /// What a seat at a fire is worth a minute before tiredness and boredom are added (<c>BotCamp.Claim</c>). Twenty-four:
+    /// a third more than making camp, because the fire is already burning and the company already there — still below every
+    /// trade's prior, so it takes a bot with nothing better to do, or a tired or bored one.
+    /// </summary>
     public static double Prior { get; set; } = 24.0;
 
+    /// <summary>How long a guest sits, in minutes. Four.</summary>
     public static double GuestMinutes { get; set; } = 4.0;
 
+    /// <summary>How far either way a guest's sitting is spread, in minutes. A minute and a half.</summary>
     public static double GuestSpread { get; set; } = 1.5;
 
+    /// <summary>How long a guest may take to walk over before it gives up. Three minutes: forty tiles is under one.</summary>
     public static int WalkMs { get; set; } = 180000;
 
+    /// <summary>How long a guest may stand near the ring unable to step onto its seat before it sits where it stands. Ten seconds.</summary>
     public static int SeatPatienceMs { get; set; } = 10000;
 
+    /// <summary>Seats tried when the way to one is refused.</summary>
     public static int MostBends { get; set; } = 2;
 
     public static long Walked { get; private set; }
@@ -87,6 +97,7 @@ public sealed class BotFireside : BotDeed
         _sitMs = (long)(Math.Max(0.5, GuestMinutes + (Utility.RandomDouble() * 2.0 - 1.0) * spread) * 60000);
     }
 
+    /// <summary>The fire this bot is going to or sitting at.</summary>
     public BotCamp.Fire Fire => _fire;
 
     public override string Kind => Trade;
@@ -108,12 +119,14 @@ public sealed class BotFireside : BotDeed
 
     public override int Made => 0;
 
+    /// <summary>Not about money. See <c>BotDeed.Unpaid</c>; <see cref="BotBeckon"/> asks every reason it fails first.</summary>
     public override bool Unpaid => true;
 
     public override bool Steadfast => true;
 
     public override bool Still => _sat;
 
+    /// <summary>A stroll over to the fire, not a run: it is where a bot goes to stop hurrying.</summary>
     public override bool Hurries => false;
 
     public override string Stage =>
@@ -123,6 +136,7 @@ public sealed class BotFireside : BotDeed
                 ? $"sitting by {_fire.Name}, {_fire.SeatedCount()} round it"
                 : $"walking to {_fire.Name}";
 
+    /// <summary>A second offer of the same fire is this walk already, and must not start it over.</summary>
     public override bool Repeats(BotDeed other) => other is BotFireside fireside && ReferenceEquals(fireside._fire, _fire);
 
     public override void Taken(IBotWilful bot)
@@ -172,6 +186,7 @@ public sealed class BotFireside : BotDeed
             return BotDoing.Failed($"{_fire.Name} was out before it got there: {_fire.Ended}");
         }
 
+        // A seat lost while the walk was put down, or never had: the nearest free one, else give up.
         if (_seat < 0 || _seat >= _fire.Places.Length || !ReferenceEquals(_fire.Places[_seat].Bot, body))
         {
             _seat = _fire.Free(body.Location);
@@ -191,6 +206,7 @@ public sealed class BotFireside : BotDeed
 
         if (_sat && fromHearth > 3)
         {
+            // Taken up again after a rescue or a flight, somewhere else: back to the seat.
             _sat = false;
             _near = false;
         }
@@ -226,6 +242,7 @@ public sealed class BotFireside : BotDeed
             Sat++;
             BotCamp.Sat(_fire, body);
 
+            // Sat down short of the seat, the walk to it would go on under the sitting; it is finished here, once.
             body.Journey.Finish();
         }
 
@@ -239,6 +256,7 @@ public sealed class BotFireside : BotDeed
             return BotDoing.Done($"secure by {_fire.Name}, and asleep there");
         }
 
+        // A guest's evening ends on its own clock; a guest who has been handed the fire keeps it till it is out.
         if (!_sleep && !ReferenceEquals(_fire.Keeper, body) && now - _satTick >= _sitMs)
         {
             Rose++;
@@ -319,6 +337,7 @@ public sealed class BotFireside : BotDeed
 /// </summary>
 public sealed class BotBeckon : IBotProposer
 {
+    /// <summary>How long one bot waits between fires. Twenty minutes.</summary>
     public static int EveryMs { get; set; } = 1200000;
 
     public static long Asked { get; private set; }
@@ -341,6 +360,7 @@ public sealed class BotBeckon : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>A walk to a fire was taken: this bot's clock starts. From <c>BotFireside.Taken</c>.</summary>
     public static void Went(Mobile who)
     {
         if (who != null)
@@ -351,6 +371,7 @@ public sealed class BotBeckon : IBotProposer
 
     public BotDeed Propose(IBotWilful bot)
     {
+        // Nothing lit anywhere is not a refusal: nobody is asked.
         if (!BotCamp.Running || BotCamp.Fires.Count == 0)
         {
             return null;
@@ -368,6 +389,7 @@ public sealed class BotBeckon : IBotProposer
             return null;
         }
 
+        // Already at a fire, or keeping one: not asked to another.
         if (who.Resolve?.Deed is BotFireside or BotKindle)
         {
             return null;

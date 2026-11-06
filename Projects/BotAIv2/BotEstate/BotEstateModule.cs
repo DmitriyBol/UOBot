@@ -1,4 +1,5 @@
-﻿using Server.Logging;
+using System;
+using Server.Logging;
 
 namespace Server.BotAI.V2;
 
@@ -27,37 +28,59 @@ public sealed class BotEstateModule : BotModule
         BotEstateConfig.Load();
         BotTownGround.Load();
 
+        // The world first: whatever was raised on a previous evening is standing out there right now with a
+        // deleted owner, and every minute before this runs is a minute it is decaying.
         BotEstate.Adopt();
 
+        // And whatever wars the engine still holds from last night, which have no score and no clock
+        // here: ended, so the session starts at peace. See BotWar.Reconcile.
         BotWar.Reconcile();
 
         BotWill.Offer(new BotSteward());
 
+        // The guild's own company for the guild's own dire ground. See BotReeve: Patrick's fourth Quad idea of
+        // 16.09.2026.
         BotWill.Offer(new BotReeve());
 
+        // The second half of an estate: a hall is bought once, and then fitted out one bench at a time for
+        // as long as the guild can afford it. See BotFitter.
         BotWill.Offer(new BotFitter());
 
+        // And the third: a shopkeeper of the guild's own, once the workshop is finished. See BotHirer.
         BotWill.Offer(new BotHirer());
 
+        // And the fourth, which is what makes the third worth 1,252gp: something on the shopkeeper's shelf.
+        // See BotSupplier.
         BotWill.Offer(new BotSupplier());
 
+        // And the yard round the hall, which is what a hall makes of the ground. See BotLand and BotBailiff:
+        // the claim is a preference and the eviction it makes possible is deliberately almost nothing.
         BotWill.Offer(new BotBailiff());
 
+        // The toll's patrol: a fighter of a patrolling guild walks to a stranger hunting its land and tells it the hunting is
+        // tolled. See BotToll and BotTollman, Patrick's order of 26.09.2026.
         BotWill.Offer(new BotTollman());
 
+        // The bailiff's second half, and it only ever fires where a war has been declared. See BotFeud.
         BotWill.Offer(new BotFeuder());
 
+        // What a lost war costs: the beaten guild's hall goes outside the winner's yard. See BotExile.
         BotWill.Offer(new BotRemover());
 
+        // A guild that has filled its hall moves into a bigger one. See BotHallKind and BotEnlarger (26.09.2026).
         BotWill.Offer(new BotEnlarger());
 
+        // Houses of the population's own: bought by a bot that has done well, gone home to when bored. See BotAbode —
+        // Patrick's order of 26.09.2026. The houses already standing are found by their signs first.
         BotAbode.Adopt();
         BotWill.Offer(new BotAbodeBuyer());
         BotWill.Offer(new BotReposer());
 
+        // A guild's second house on its far land: a place to rise, and a yard for the toll. See BotOutpost (26.09.2026).
         BotOutpost.Adopt();
         BotWill.Offer(new BotOutposter());
 
+        // Claiming squares of the island, and standing in one until it is yours. See BotClaim.
         BotWill.Offer(new BotHolder());
 
         logger.Information(
@@ -109,6 +132,10 @@ public sealed class BotEstateModule : BotModule
             BotSeat.Tell(),
             BotSeat.Settled
         );
+
+        _furnishTimer?.Stop();
+        _furnishTimer = new FurnishTimer(TimeSpan.FromSeconds(60));
+        _furnishTimer.Start();
     }
 
     public override void Reset()
@@ -149,5 +176,21 @@ public sealed class BotEstateModule : BotModule
         BotOutposter.Forget();
         BotShelf.Forget();
         BotFittings.Forget();
+        BotFurnish.Forget();
+
+        _furnishTimer?.Stop();
+        _furnishTimer = null;
+    }
+
+    /// <summary>The furnishing clock: one house looked at a minute. See <see cref="BotFurnish"/>.</summary>
+    private static Timer _furnishTimer;
+
+    private sealed class FurnishTimer : Timer
+    {
+        public FurnishTimer(TimeSpan interval) : base(interval, interval)
+        {
+        }
+
+        protected override void OnTick() => BotFurnish.Tick(Core.TickCount);
     }
 }

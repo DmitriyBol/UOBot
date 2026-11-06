@@ -26,18 +26,24 @@ public static class BotBoot
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBoot));
 
+    /// <summary>The share of the best boot's mobiles below which the world is read as truncated. A half.</summary>
     public static double Least { get; set; } = 0.5;
 
+    /// <summary>Mobiles this boot loaded.</summary>
     public static int Mobiles { get; private set; }
 
+    /// <summary>Items this boot loaded.</summary>
     public static int Items { get; private set; }
 
+    /// <summary>The most mobiles any boot on record loaded.</summary>
     public static int Best { get; private set; }
 
+    /// <summary>Whether this boot's world is read as truncated.</summary>
     public static bool Truncated { get; private set; }
 
     private static string File => Path.GetFullPath(Path.Combine(Core.BaseDirectory, "..", "logs", "bot-boot.txt"));
 
+    /// <summary>Reads the counts, compares them with the record, raises or clears the alarm, and writes the record.</summary>
     public static void Check()
     {
         Mobiles = World.Mobiles.Count;

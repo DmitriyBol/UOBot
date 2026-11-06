@@ -27,32 +27,52 @@ public sealed class BotFeuder : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFeuder));
 
+    /// <summary>How far a member looks for somebody of the enemy on its own account.</summary>
     public static int Watch { get; set; } = 20;
 
+    /// <summary>
+    /// The least health a bot will start a fight at, as a share of its own maximum.
+    ///
+    /// A bot that opens a quarrel at a tenth of its hits is a bot handing the enemy a kill and the guild a
+    /// resurrection to pay for. Not a veto on defending itself — nothing here touches what happens when
+    /// somebody swings first — only on choosing to begin one.
+    /// </summary>
     public static double Fit { get; set; } = 0.5;
 
+    /// <summary>Members sent to defend their own ground rather than to a quarrel they happened upon.</summary>
     public static long Defended { get; private set; }
 
+    /// <summary>Bots looked at.</summary>
     public static long Asked { get; private set; }
 
+    /// <summary>Quarrels offered.</summary>
     public static long Offered { get; private set; }
 
+    /// <summary>Times the bot's guild was at war with nobody.</summary>
     public static long Peaceful { get; private set; }
 
+    /// <summary>Times it was at war and no enemy was within sight or call.</summary>
     public static long Unseen { get; private set; }
 
+    /// <summary>Times the bot was in no condition to start one.</summary>
     public static long Unfit { get; private set; }
 
+    /// <summary>Times the bot's trade was not fighting.</summary>
     public static long Unarmed { get; private set; }
 
+    /// <summary>Members kept out of a fight on somebody else's ground for want of their supplies. See <see cref="BotProvision"/>.</summary>
     public static long Unsupplied { get; private set; }
 
+    /// <summary>Times a guarded region stood between the two, which is most of Britain.</summary>
     public static long Sheltered { get; private set; }
 
+    /// <summary>Members sent out after an enemy nobody had seen. See <c>BotFeud.Sortie</c>.</summary>
     public static long Sallied { get; private set; }
 
+    /// <summary>Looks at a member back from rest on its guild's call, which answers the call from any distance.</summary>
     public static long Summoned { get; private set; }
 
+    /// <summary>Looks at a member whose guild had fewer in its war than the score asks for, which answers from any distance too.</summary>
     public static long Mustered { get; private set; }
 
     public string Name => "feuder";
@@ -77,6 +97,8 @@ public sealed class BotFeuder : IBotProposer
             return null;
         }
 
+        // The Shadow keeps no house, no counter and no hired hands: its home is a fire and a chest far outside every
+        // town, and a band with a signboard has stopped being secret. See BotUnderworld.Band.
         if (BotUnderworld.Band(ours))
         {
             return null;
@@ -84,6 +106,18 @@ public sealed class BotFeuder : IBotProposer
 
         Asked++;
 
+        // <b>A bandit in sight is answered by whoever sees it, and nobody is called for it.</b> The Shadow is every guild's
+        // enemy (Patrick's order of 26.09.2026, BotUnderworld.EnemyOfAll) but never a war: no ledger, no muster, no company
+        // of fifteen raised at the seat for one thief. A fighter fit for it that can see one of the band — not one hiding —
+        // within its watch, and is not the weaker of the two, sets on it alone. Asked of the band's own roll, five names,
+        // before the cheap peace test below, which the band does not change.
+        //
+        // <b>Only a bandit standing where the fighter can get to it (07.10.2026, loops18).</b> On build 418's first 35 minutes all 19
+        // quarrels taken were against two recruits of the band going about honest work - Lyrindel, mounted, carrying a scroll to
+        // Nesta, and Ilyrana walking in a company - and none was finished: 15 failed "could not get nearer to Lyrindel at (...)" at a
+        // new place each time, 2 "no quarrel any more", Brunhild died in six seconds closing with one in its company. A bandit
+        // walking, in a company, or about steadfast work is not offered (not failed: not offered), nor one the reach ledger says
+        // cannot be reached from here; each refusal counted by its cause (BanditsLeft).
         if (BotUnderworld.Near(body, Watch) is { } bandit)
         {
             var why = BanditLeft(bot, body, bandit);
@@ -98,12 +132,15 @@ public sealed class BotFeuder : IBotProposer
 
             _banditsLeft[why] = _banditsLeft.GetValueOrDefault(why) + 1;
 
+            // A member of a company was never offered anything here (the quarrel went through Alone): unchanged.
             if (bot is IBotSquadMember { Squad: not null })
             {
                 return null;
             }
         }
 
+        // The cheapest question first, and it is false for nearly every bot on nearly every beat: this
+        // whole proposer costs one guild lookup while the island is at peace.
         if (!AnyWar(ours))
         {
             Peaceful++;
@@ -127,8 +164,15 @@ public sealed class BotFeuder : IBotProposer
             return null;
         }
 
+        // <b>Our own ground first, before the guild's call and before anything this bot can see.</b>
+        // Patrick's order of 13.09.2026: an enemy on the yard is answered ahead of everything else, from
+        // most of the island away and at a higher price. See BotFeud.Watch for how a threat is seen.
         var threat = BotFeud.Threat(ours);
 
+        // <b>A member called back from its rest for this fight answers from wherever it came back.</b> Patrick's order of
+        // 24.09.2026 (see BotRest.Calls): the first five The Blade called back at 09:52:29 came back at their own logout
+        // tiles, out of reach of the guild's call, and took on cooking, an order and a harrowing. The reach below is how far
+        // an ordinary member's attention runs; a called one came for nothing else.
         var summoned = string.Equals(BotRest.CalledBy(body), ours.Name, System.StringComparison.OrdinalIgnoreCase);
 
         if (summoned)
@@ -136,6 +180,11 @@ public sealed class BotFeuder : IBotProposer
             Summoned++;
         }
 
+        // <b>And a member its guild draws into the war answers from anywhere above ground.</b> Patrick's order of
+        // 24.09.2026: the lower the losing side's score, the more of its bots are drawn in (BotWar.Wanted). Reach was the
+        // one thing that kept them out: the side losing fought with two to seven of its fifteen while the rest stood
+        // further than BotFeud.Answer from the fight. Who is drawn is chosen once a look by the war (BotWar.Mustered) —
+        // the nearest of the free, as many as are wanted — not by each bot for itself. Below ground is left out there.
         var mustered = !summoned && BotWar.Mustered(body);
 
         if (mustered)
@@ -153,12 +202,15 @@ public sealed class BotFeuder : IBotProposer
                 Defended++;
                 Offered++;
 
+                // As a company, by Patrick's order of 13.09.2026; alone only when no company can be had.
                 return BotFeud.Rally(bot, ours, threat, true) ?? Alone(bot, new BotQuarrel(threat, ours.Name, true));
             }
 
             Sheltered++;
         }
 
+        // <b>Past its own door, nobody goes without its supplies.</b> Patrick's order of 26.09.2026 (BotProvision). The
+        // defence of its own ground, above, is answered whatever a bot carries.
         if (!BotProvision.Fit(body, out _))
         {
             Unsupplied++;
@@ -166,6 +218,7 @@ public sealed class BotFeuder : IBotProposer
             return null;
         }
 
+        // What the guild is already on, before what this bot can see. See the note at the top.
         var called = BotFeud.On(ours);
 
         if (called != null && called != body && (anywhere || body.InRange(called.Location, BotFeud.Answer)))
@@ -193,6 +246,7 @@ public sealed class BotFeuder : IBotProposer
                 continue;
             }
 
+            // The band is answered above, one bot at a time, and never with the war's call.
             if (theirs.Name == BotUnderworld.GuildName)
             {
                 continue;
@@ -215,6 +269,9 @@ public sealed class BotFeuder : IBotProposer
             break;
         }
 
+        // <b>Nobody seen, nobody called, nobody on our ground, and the war has stood a while: go and find
+        // them.</b> See BotFeud.Sortie. The call is raised on the enemy found so that whoever is near it
+        // answers, and everybody else reaches this line on its own review and rallies to the same company.
         if (enemy == null && !sheltered && BotFeud.Sortie(ours))
         {
             var foe = BotFeud.Foe(ours, body.Location, body.Map);
@@ -232,6 +289,9 @@ public sealed class BotFeuder : IBotProposer
 
         if (enemy == null)
         {
+            // Told apart on purpose: "nobody of theirs was about" and "they were about and a town was
+            // between us" are different facts, and a war fought entirely inside Britain would otherwise
+            // report as a war nobody turned up to.
             if (sheltered)
             {
                 Sheltered++;
@@ -250,6 +310,11 @@ public sealed class BotFeuder : IBotProposer
         return BotFeud.Rally(bot, ours, enemy, false) ?? Alone(bot, new BotQuarrel(enemy, ours.Name));
     }
 
+    /// <summary>Whether this guild is at war with anybody at all. The engine holds the list.</summary>
+    /// <summary>
+    /// The quarrel a bot fights on its own account when no company will have it — unless it is in a company
+    /// already, whose business it is. A member of a hunt is not offered a private war on top of the hunt.
+    /// </summary>
     private static BotDeed Alone(IBotWilful bot, BotQuarrel quarrel) =>
         bot is IBotSquadMember { Squad: not null } ? null : quarrel;
 
@@ -260,9 +325,16 @@ public sealed class BotFeuder : IBotProposer
             return false;
         }
 
+        // The Shadow on the engine's list is not a war: it has no page in the ledger on purpose (BotUnderworld.EnemyOfAll),
+        // and counting it would put every guild on the island at war for good and wake this proposer on every beat.
         var engine = Warring(ours);
         var ledger = BotWar.Fighting(ours.Name) > 0;
 
+        // <b>The two books disagreeing is the finding, not a detail.</b> At 04:31 on 14.09.2026 the ledger
+        // held the Crown's war on the Hammer, read back off the save, and the engine listed no enemy for
+        // either — so every review said "at war with nobody", 1,720 times in five minutes, while the war
+        // stood. Counted here and said once a while, because the feud needs both: the ledger for the rules
+        // and the engine for the blow to be lawful.
         if (engine != ledger)
         {
             Disagreeing++;
@@ -286,6 +358,7 @@ public sealed class BotFeuder : IBotProposer
         return engine || ledger;
     }
 
+    /// <summary>Enemies on the engine's list other than The Shadow.</summary>
     private static bool Warring(Guild ours)
     {
         var enemies = ours.Enemies;
@@ -306,6 +379,11 @@ public sealed class BotFeuder : IBotProposer
         return false;
     }
 
+    /// <summary>
+    /// Why a fighter that sees a bandit is not offered the quarrel, or null when it is. In this order: its company, its health, the
+    /// odds, the law (a guarded town, no lawful blow), the bandit's company, the bandit walking (unless already beside it), its
+    /// steadfast work, and no way to it on the reach ledger. See <see cref="Propose"/>.
+    /// </summary>
     private static string BanditLeft(IBotWilful bot, BotMobile body, BotMobile bandit)
     {
         if (bot is IBotSquadMember { Squad: not null })
@@ -356,8 +434,10 @@ public sealed class BotFeuder : IBotProposer
         return null;
     }
 
+    /// <summary>Whether a bandit must be standing, out of a company and reachable to be set on (07.10.2026, loops18). Off: as before.</summary>
     public static bool BanditStands { get; set; } = true;
 
+    /// <summary>How near a walking bandit must already be to be set on all the same: beside the fighter.</summary>
     public static int BanditBeside { get; set; } = 2;
 
     private static readonly Dictionary<string, long> _banditsLeft = new(System.StringComparer.Ordinal);
@@ -379,14 +459,18 @@ public sealed class BotFeuder : IBotProposer
         return said;
     }
 
+    /// <summary>How much of a bandit's strength a fighter must have to set on it alone. Four fifths: a thief is a thief.</summary>
     public static double BanditOdds { get; set; } = 0.8;
 
+    /// <summary>Bandits of The Shadow set on by a fighter who saw one.</summary>
     public static long Bandits { get; private set; }
 
+    /// <summary>Reviews where the war ledger and the engine's enemy list disagreed. See <see cref="AnyWar"/>.</summary>
     public static long Disagreeing { get; private set; }
 
     private static long _disagreedTick;
 
+    /// <summary>How often the disagreement is said aloud, in milliseconds.</summary>
     public static int DisagreeSayMs { get; set; } = 60000;
 
     public static string Describe() =>

@@ -36,8 +36,10 @@ public static class BotDebugLog
 
     private static bool _broken;
 
+    /// <summary>Lines written this session.</summary>
     public static long Lines { get; private set; }
 
+    /// <summary>Where the file is, once it is known.</summary>
     public static string Path => _path;
 
     public static void Open(string who)
@@ -54,6 +56,8 @@ public static class BotDebugLog
             _path = System.IO.Path.Combine(folder, "bot-debugger.log");
 
             Rule();
+            // The debugger's own model, not the population's. They have been different since 01.09.2026,
+            // and a header naming the wrong one is a fact that goes stale where it is read first.
             Write($"{who} is awake, thinking with {BotVigil.Model} at {BotOllama.Endpoint}");
             Rule();
         }
@@ -67,14 +71,17 @@ public static class BotDebugLog
 
     public static void Rule() => Write(new string('=', 96));
 
+    /// <summary>One line, stamped. A failure switches the file off rather than complaining every minute.</summary>
     public static void Write(string line)
     {
+        // The live window's feed first, and apart from the file: a log that has stopped taking lines still has a squad thinking.
         try
         {
             BotDebugWeb.Heard(line);
         }
         catch
         {
+            // The window answers for itself; the log is never switched off for its sake.
         }
 
         if (_broken || _path == null || line == null)
@@ -95,6 +102,10 @@ public static class BotDebugLog
         }
     }
 
+    /// <summary>
+    /// A block of several lines under a heading, indented so that a paragraph is obviously one entry.
+    /// Used for the measurements a finding was made from, which are the point of keeping this file at all.
+    /// </summary>
     public static void Block(string heading, string body)
     {
         Write(heading);

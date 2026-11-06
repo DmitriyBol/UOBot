@@ -21,12 +21,16 @@ public sealed class NavWindow
 
     public const int Side = ClusterSide + 2;
 
+    /// <summary>Surfaces kept per cell. More are rare (a tall building's floors) and are dropped, highest first.</summary>
     public const int MaxStrata = 4;
 
+    /// <summary>How far from a surface a step's landing height may be and still land on it.</summary>
     public const int MatchTolerance = 3;
 
+    /// <summary>States of the inner cluster: cell by stratum.</summary>
     public const int States = ClusterSide * ClusterSide * MaxStrata;
 
+    // North, NE, East, SE, South, SW, West, NW: the engine's Direction order.
     private static readonly int[] _dx = [0, 1, 1, 1, 0, -1, -1, -1];
 
     private static readonly int[] _dy = [-1, -1, 0, 1, 1, 1, 0, -1];
@@ -55,14 +59,18 @@ public sealed class NavWindow
 
     private readonly PriorityQueue<int, int> _open = new();
 
+    /// <summary>Cells probed through this window, for the cost of the bake.</summary>
     public long Probes { get; private set; }
 
+    /// <summary>The world x of the cluster's first column, and y of its first row.</summary>
     public int X0 { get; private set; }
 
     public int Y0 { get; private set; }
 
+    /// <summary>The cluster this window holds, or -1.</summary>
     public int Cluster { get; set; } = -1;
 
+    /// <summary>When a query last used it, for the planners' small cache.</summary>
     public long Used { get; set; }
 
     public void Reset(INavTerrain terrain, int cluster, int x0, int y0)
@@ -82,6 +90,7 @@ public sealed class NavWindow
 
     private int CellAt(int x, int y) => (y - _oy) * Side + (x - _ox);
 
+    /// <summary>The state index of (x, y) on stratum s, for a cell inside the cluster.</summary>
     public int State(int x, int y, int s) => (((y - Y0) << 4) | (x - X0)) * MaxStrata + s;
 
     public int StateX(int state) => X0 + (state / MaxStrata & 15);
@@ -128,6 +137,7 @@ public sealed class NavWindow
         }
     }
 
+    /// <summary>How many surfaces (x, y) has; nought outside the window or the map.</summary>
     public int Count(int x, int y)
     {
         if (!InWindow(x, y))
@@ -145,8 +155,10 @@ public sealed class NavWindow
         return _count[c];
     }
 
+    /// <summary>The height of stratum <paramref name="s"/> of (x, y). Ask <see cref="Count"/> first.</summary>
     public sbyte Z(int x, int y, int s) => _z[CellAt(x, y) * MaxStrata + s];
 
+    /// <summary>The stratum of (x, y) nearest <paramref name="z"/> within <see cref="MatchTolerance"/>, or -1.</summary>
     public int Match(int x, int y, int z)
     {
         var n = Count(x, y);
@@ -168,6 +180,7 @@ public sealed class NavWindow
         return best;
     }
 
+    /// <summary>The stratum of (x, y) nearest <paramref name="z"/> at any distance, or -1 when the cell has none.</summary>
     public int Nearest(int x, int y, int z)
     {
         var n = Count(x, y);
@@ -189,6 +202,10 @@ public sealed class NavWindow
         return best;
     }
 
+    /// <summary>
+    /// Whether a body on stratum <paramref name="s"/> of (x, y) may step in direction <paramref name="d"/>, and the cell
+    /// and stratum it lands on. Both ends must lie in the window.
+    /// </summary>
     public bool Step(int x, int y, int s, int d, out int nx, out int ny, out int ns)
     {
         nx = x + _dx[d];
@@ -223,6 +240,11 @@ public sealed class NavWindow
         return ns >= 0;
     }
 
+    /// <summary>
+    /// The cheapest cost, in <see cref="NavCost"/> ticks, from stratum <paramref name="s"/> of (x, y) to every state of
+    /// the cluster, never leaving it — or, <paramref name="backward"/>, from every state to it. -1 for a state not
+    /// reached. The array is the window's own and is overwritten by the next flood.
+    /// </summary>
     public int[] Flood(int x, int y, int s, bool backward)
     {
         Array.Fill(_dist, -1);
@@ -264,6 +286,7 @@ public sealed class NavWindow
                 }
                 else
                 {
+                    // Who steps onto this state: the cell behind it in direction d, on whichever of its strata lands here.
                     tx = cx - _dx[d];
                     ty = cy - _dy[d];
                     ts = -1;

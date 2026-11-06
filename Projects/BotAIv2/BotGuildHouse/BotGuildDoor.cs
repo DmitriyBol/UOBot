@@ -33,6 +33,7 @@ namespace Server.BotAI.V2;
 [SerializationGenerator(0, false)]
 public partial class BotGuildDoor : BaseDoor
 {
+    /// <summary>The guild whose door this is, by name: the name outlives the guild object a world reload replaces.</summary>
     [SerializableField(0)]
     [SerializedCommandProperty(AccessLevel.GameMaster)]
     private string _guild;
@@ -50,7 +51,8 @@ public partial class BotGuildDoor : BaseDoor
     {
         if (from != null && !Open && !BotGuildHouses.MayOpen(this, from))
         {
-            from.LocalOverheadMessage(MessageType.Regular, 0x3B2, 502503);
+            // The engine's own words for a locked door, said the engine's way.
+            from.LocalOverheadMessage(MessageType.Regular, 0x3B2, 502503); // That is locked.
             BotGuildHouses.Refused(from);
 
             return;

@@ -46,54 +46,108 @@ public static class BotProving
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotProving));
 
+    /// <summary>Whether fights are held at all. Off, nothing is fought; what was measured is still read.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>Whether the delve judges a band by proven strength (on) or by the old formula alone (off).</summary>
     public static bool Judges { get; set; } = true;
 
+    /// <summary>How many fights are held at once, one to a ring. At most as many as there are <see cref="Middles"/>.</summary>
     public static int Rings { get; set; } = 2;
 
+    /// <summary>The referee's beat.</summary>
     public static int TickMs { get; set; } = 200;
 
+    /// <summary>The longest a fight may run before it is called on what it came to. Three minutes.</summary>
     public static int CapMs { get; set; } = 180000;
 
+    /// <summary>How long a fight may stand with nobody hurt before it is called: a creature nothing can reach, a double that cannot hurt it.</summary>
     public static int StillMs { get; set; } = 45000;
 
+    /// <summary>The pause between one fight's end and the next in the same ring.</summary>
     public static int PauseMs { get; set; } = 5000;
 
+    /// <summary>How often the double steps when it has to close: the pace of a running bot.</summary>
     public static int StepMs { get; set; } = 200;
 
+    /// <summary>How many more fights of a double holding a bow are traced once a second (see <c>BotTrial.Trace</c>).</summary>
     public static int TraceRanged { get; set; } = 3;
 
+    /// <summary>How old a reading may be before the bot is tried again on the same rung, build unchanged. Ninety minutes.</summary>
     public static int RetestMs { get; set; } = 5400000;
 
+    /// <summary>
+    /// The largest R a fight may read. A fight the bot was never hurt in says "a great many", not "infinitely many".
+    ///
+    /// <para>
+    /// <b>Five, from twenty, within two minutes of the first boot (26.09.2026, 01:36).</b> Doran the Captain killed the
+    /// Orc Caves' orcish mage in 25 seconds without a scratch and read R 20 — "112185 of strength" — and that number, taken
+    /// at face value against every higher rung, sent four bands' offers to Terathan Keep. A fight the bot was never hurt
+    /// in is a lower bound, and five of the creature in a row is all a delve needs to know about that creature.
+    /// </para>
+    /// </summary>
     public static double RMax { get; set; } = 5.0;
 
+    /// <summary>The R a reading must lie under to say anything about the formula's worth (<see cref="Calibration"/>): a walkover is only a lower bound.</summary>
     public static double CalibrateUnder { get; set; } = 3.0;
 
+    /// <summary>How many such readings the calibration wants before it moves off one.</summary>
     public static int CalibrateLeast { get; set; } = 5;
 
+    /// <summary>The calibration's bounds: the formula is wrong, but not by more than this either way.</summary>
     public static double CalibrateLow { get; set; } = 0.25;
 
     public static double CalibrateHigh { get; set; } = 4.0;
 
+    /// <summary>The least net damage a fight is read as having cost, as a share of the bot's health. See <see cref="RMax"/>.</summary>
     public static double NetFloor { get; set; } = 0.02;
 
+    /// <summary>The share of a caster's pool it must have spent before its mana counts as a limit on it.</summary>
     public static double ManaShare { get; set; } = 0.1;
 
+    /// <summary>The R at which a rung counts as beaten and the next one is tried.</summary>
     public static double Pass { get; set; } = 1.0;
 
+    /// <summary>
+    /// What a bot proven only on lower rungs is taken to be worth against a higher one: this share of the strongest
+    /// creature it has beaten — never more, however easily it beat it.
+    ///
+    /// <para>
+    /// <b>Nothing is extrapolated upwards, and that is the lesson of the first two minutes.</b> Scaling a walkover by the
+    /// ratio of two creatures' formula numbers assumes the formula is right about how much worse the bigger one is, which is
+    /// the one thing this subsystem exists because it is not: an orcish mage beaten at R 20 read as a Balron beaten at R 1.4.
+    /// So a rung nobody in the band has been tried on is only reached by bodies strong enough on the rung below it to add
+    /// up past it, and the ladder — which tries every bot that beats its rung on the next one first — is how the band proves
+    /// the rest.
+    /// </para>
+    /// </summary>
     public static double Reach { get; set; } = 0.75;
 
+    /// <summary>How long a creature the field could not be set up with is left off the schedule. Ten minutes.</summary>
     public static int UnfitMs { get; set; } = 600000;
 
+    /// <summary>How far either side of the ring's middle the two are put down.</summary>
     public static int Apart { get; set; } = 3;
 
+    /// <summary>How far a creature may be drawn from its ring before it wants to go back; also the sweep's measure of a ring.</summary>
     public static int Leash { get; set; } = 12;
 
+    /// <summary>How many fights one reading is averaged over; the oldest fades as a new one comes.</summary>
     public static int Keep { get; set; } = 4;
 
+    /// <summary>The build moves that make a reading stale: skill points in the fighting skills, stat points, armour, weapon damage.</summary>
     public static int SkillDrift { get; set; } = 5;
 
+    /// <summary>
+    /// The same drift in the fighting skills as a share of their sum, whichever is the larger: 6%.
+    ///
+    /// <para>
+    /// <b>Five points alone made a novice's reading stale within the hour.</b> A bot with 170 points across its fighting
+    /// skills gains five in a hunt or two, and on the first hour of the board 22 of 36 bots measured read "nothing fresh" —
+    /// tried again and again at the bottom rung while the ladder never settled. Five points on 170 is three per cent of what
+    /// decides its fights, which is not a different bot.
+    /// </para>
+    /// </summary>
     public static double SkillDriftShare { get; set; } = 0.06;
 
     public static int StatDrift { get; set; } = 5;
@@ -102,27 +156,41 @@ public static class BotProving
 
     public static int DamageDrift { get; set; } = 2;
 
+    /// <summary>
+    /// The rings: flat grass east of where staff characters are made (5445, 1153), forty tiles apart so that no creature can
+    /// see into the next ring, and clear of every dungeon's box by more than its margin. Each point checked through the door
+    /// (<c>do tile</c>) before it was written here: a body fits at z 0, region Green Acres, nothing lying on it.
+    /// </summary>
     public static readonly Point3D[] Middles =
     [
         new(5510, 1150, 0), new(5550, 1150, 0), new(5510, 1190, 0), new(5550, 1190, 0)
     ];
 
+    /// <summary>How many of the rings, counted from the last, are kept for a company against a room. See BotRoomTrial.</summary>
     public static int PartyRings { get; set; } = 1;
 
+    /// <summary>How many of a guild's fighters make its company on the ring.</summary>
     public static int PartySize { get; set; } = 5;
 
+    /// <summary>Doubles in the company for each creature of the room: how far the company outnumbers it. See <see cref="PartySize"/>.</summary>
     public static int PartyMultiple { get; set; } = 2;
 
+    /// <summary>The fewest fighters a guild needs in the world to be tried as a company at all.</summary>
     public static int PartyLeast { get; set; } = 3;
 
+    /// <summary>The most creatures a room is made of on the ring.</summary>
     public static int MostFoes { get; set; } = 6;
 
+    /// <summary>The longest a company's fight may run. Five minutes.</summary>
     public static int RoomCapMs { get; set; } = 300000;
 
+    /// <summary>How long a cleared room stays proof for the guild. Two hours.</summary>
     public static int RoomValidMs { get; set; } = 7200000;
 
+    /// <summary>How long a guild waits after a room it did not clear before it is tried on that dungeon again.</summary>
     public static int RoomRetryMs { get; set; } = 1800000;
 
+    /// <summary>Whether the delve sends a guild past the easiest dungeon only where its company has cleared the worst room lately.</summary>
     public static bool RoomGate { get; set; } = true;
 
     public static long Rooms { get; private set; }
@@ -153,10 +221,12 @@ public static class BotProving
 
     private static readonly Dictionary<string, DateTime> _roomTried = new(StringComparer.Ordinal);
 
+    /// <summary>Whether this guild's company has cleared this dungeon's worst room within the last <see cref="RoomValidMs"/>.</summary>
     public static bool RoomCleared(string guild, BotDungeon.Deep deep) =>
         guild != null && deep != null && _rooms.TryGetValue((guild, deep.Name), out var mark) && mark.Cleared
         && (DateTime.UtcNow - mark.When).TotalMilliseconds < RoomValidMs;
 
+    /// <summary>Fights held, and how they ended.</summary>
     public static long Held { get; private set; }
 
     public static long Won { get; private set; }
@@ -165,18 +235,25 @@ public static class BotProving
 
     public static long Called { get; private set; }
 
+    /// <summary>Fights that could not be set up: the creature would not build, the bot was gone.</summary>
     public static long Unset { get; private set; }
 
+    /// <summary>Fights asked for through the door.</summary>
     public static long ByHand { get; private set; }
 
+    /// <summary>Fights that threw on a beat and were taken off the field.</summary>
     public static long Faults { get; private set; }
 
+    /// <summary>Things taken off the field that a fight had left there: creatures, corpses, doubles.</summary>
     public static long Swept { get; private set; }
 
+    /// <summary>Strengths asked of a bot that had been measured on the creature asked about.</summary>
     public static long Proved { get; private set; }
 
+    /// <summary>Asked of a bot measured only on other rungs.</summary>
     public static long Neighboured { get; private set; }
 
+    /// <summary>Asked of a bot never measured: the old formula, calibrated.</summary>
     public static long Formula { get; private set; }
 
     /// <summary>One bot's reading against one creature.</summary>
@@ -190,6 +267,7 @@ public static class BotProving
 
         public int Wins;
 
+        /// <summary>R, averaged over the last <see cref="Keep"/> fights of this build.</summary>
         public double R;
 
         public double LastR;
@@ -231,8 +309,10 @@ public static class BotProving
 
     private static readonly List<Rung> _rungs = [];
 
+    /// <summary>Each dungeon's worst creature, by the dungeon's name.</summary>
     private static readonly Dictionary<string, string> _worst = new(StringComparer.Ordinal);
 
+    /// <summary>Kinds that could not be put on the field, and when they were last refused.</summary>
     private static readonly Dictionary<string, long> _unfit = new(StringComparer.Ordinal);
 
     private static bool _laddered;
@@ -243,6 +323,21 @@ public static class BotProving
 
     private static bool _calibrated;
 
+    /// <summary>
+    /// Keeps the rings' part of the map awake: the sectors round every ring's middle, activated if they are not.
+    ///
+    /// <para>
+    /// <b>The engine sleeps a creature that has no client near it, and the proving ground has none.</b> A sector comes awake
+    /// only when a mobile with a connection walks into it (<c>Map.Sector.OnEnter</c>: <c>mob.NetState != null</c>), and a
+    /// creature in a sleeping sector has its mind switched off (<c>BaseCreature.OnSectorDeactivate</c>, <c>CheckAIActive</c>):
+    /// it does not walk, cast, breathe or run — it swings only when something stands next to it, because the swing is the
+    /// engine's combat timer and not the mind. For the first two hours of the proving ground every creature on it was asleep:
+    /// the melee doubles that walked up to it were hit, the archers shooting from six tiles off were never touched (Brannoc
+    /// "beat" a lich lord and a poison elemental at R 5 on 26.09.2026, taking nothing), and no mage creature ever cast. This
+    /// wakes the rings the way a player walking by would; the engine puts them back to sleep only when a client leaves, so it is
+    /// asked again before every fight.
+    /// </para>
+    /// </summary>
     public static void Wake(Map map)
     {
         if (map == null || map == Map.Internal)
@@ -256,6 +351,7 @@ public static class BotProving
         }
     }
 
+    /// <summary>The referee's beat: every ring is driven, and a free ring is given its next fight.</summary>
     public static void Tick()
     {
         var map = BotPopulation.Home ?? Map.Felucca;
@@ -330,6 +426,7 @@ public static class BotProving
         }
     }
 
+    /// <summary>A ring kept for companies: drives the one on it, or sets the next guild's company against the next room.</summary>
     private static void TickRoom(int i, Map map, long now)
     {
         var room = _roomRings[i];
@@ -432,6 +529,11 @@ public static class BotProving
         }
     }
 
+    /// <summary>
+    /// The next company to try: of the guilds with <see cref="PartyLeast"/> fighters in the world, the one tried longest ago
+    /// that has a dungeon to be tried on — the lowest above the easiest its company has not cleared lately, and not failed
+    /// within <see cref="RoomRetryMs"/>. The company is its <see cref="PartySize"/> fighters strongest against that dungeon.
+    /// </summary>
     private static (string Guild, List<BotMobile> Party, BotDungeon.Deep Deep, List<string> Room)? NextRoom(Map map)
     {
         Ladder(map);
@@ -467,6 +569,7 @@ public static class BotProving
 
             BotDungeon.Deep target = null;
 
+            // The easiest is where a band learns and needs no proof; the next one up that is not cleared is the question.
             for (var d = 1; d < deeps.Count; d++)
             {
                 if (RoomCleared(guild.Name, deeps[d]))
@@ -511,6 +614,11 @@ public static class BotProving
 
         var room = BotRoomTrial.Worst(map, pickDeep, MostFoes);
 
+        // <b>The company outnumbers the room (30.09.2026, build 356; Patrick: "a multiple above the mobs in the dungeon").</b> Five
+        // doubles went against every room whatever it held, and five against Wrong's four golem controllers never won — with
+        // the leader's target struck by all of them (355) the first controller went down in four trials of five, and the room
+        // was still the company's grave. PartyMultiple doubles for each creature of the room, never fewer than PartySize, as
+        // many as the guild has fighters.
         var size = Math.Max(PartySize, room.Count * PartyMultiple);
 
         if (fighters.Count > size)
@@ -521,6 +629,7 @@ public static class BotProving
         return room.Count == 0 ? null : (pick, fighters, pickDeep, room);
     }
 
+    /// <summary>A guild's members in the world who fight. Read by the delve too, to ask for the company the ring fields (<c>BotDelver.RingCompany</c>).</summary>
     internal static List<BotMobile> Fighters(Guilds.Guild guild)
     {
         List<BotMobile> list = [];
@@ -548,6 +657,7 @@ public static class BotProving
         {
             if (trial.Verdict == null)
             {
+                // Taken off the field before it was decided: proving stopped, the ring closed, or a fault. Nothing read.
                 logger.Information("Proving: the fight of {Bot}'s double against the {Kind} was taken off the field undecided", trial.Bot, trial.Kind);
             }
             else
@@ -591,6 +701,7 @@ public static class BotProving
             _marks[trial.Bot] = marks = new Dictionary<string, Mark>(StringComparer.Ordinal);
         }
 
+        // A reading of another build, or of another class wearing the same name, describes somebody else: begin again.
         if (!marks.TryGetValue(trial.Kind, out var mark) || mark.Class != trial.Class || !Close(mark.Build, trial.Build))
         {
             marks[trial.Kind] = mark = new Mark { Class = trial.Class, Kind = trial.Kind };
@@ -610,8 +721,13 @@ public static class BotProving
         mark.When = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Each bot's build as last read, and when: the delve asks <see cref="Against"/> for every body of every band against
+    /// every dungeon on every ask — some nine hundred times a second on the first boot — and a build moves over hours.
+    /// </summary>
     private static readonly Dictionary<Serial, (long Tick, BotBuild Build)> _builds = [];
 
+    /// <summary>How long a bot's build is taken as read.</summary>
     public static int BuildMs { get; set; } = 10000;
 
     private static BotBuild BuildOf(BotMobile bot)
@@ -630,6 +746,7 @@ public static class BotProving
         return build;
     }
 
+    /// <summary>Whether two builds are near enough that a fight of one still describes the other.</summary>
     public static bool Close(BotBuild a, BotBuild b) =>
         Math.Abs(a.Skills - b.Skills) < Math.Max(SkillDrift, (int)(Math.Max(a.Skills, b.Skills) * SkillDriftShare))
         && Math.Abs(a.Stats - b.Stats) < StatDrift
@@ -637,13 +754,16 @@ public static class BotProving
         && Math.Abs(a.Damage - b.Damage) < DamageDrift
         && a.Weapon == b.Weapon;
 
+    /// <summary>Whether a reading still describes this bot as it stands.</summary>
     private static bool Fresh(Mark mark, BotMobile bot, BotBuild now) =>
         mark != null && mark.Class == bot?.Class?.Name && Close(mark.Build, now);
 
+    /// <summary>Whether a reading still describes this bot as it stands. For whoever else wants to ask.</summary>
     public static bool Fresh(BotMobile bot, string kind) =>
         bot != null && kind != null && _marks.TryGetValue(bot.Name, out var marks) && marks.TryGetValue(kind, out var mark)
         && Fresh(mark, bot, BuildOf(bot));
 
+    /// <summary>The next fight: somebody at the door first, then whoever the ladder most wants tried.</summary>
     private static (BotMobile Bot, string Kind, string By) Next(Map map)
     {
         while (_asked.Count > 0)
@@ -695,6 +815,10 @@ public static class BotProving
         return best == null ? default : (best, bestKind, "the schedule");
     }
 
+    /// <summary>
+    /// How much the ladder wants this bot tried, on what, and how old its reading there is: 3 for a rung it has never been
+    /// tried on, 2 for one whose reading is of another build, 1 for one grown old, 0 for nothing wanted.
+    /// </summary>
     private static (int Score, string Kind, double Age) Wants(BotMobile bot)
     {
         var build = BuildOf(bot);
@@ -717,6 +841,7 @@ public static class BotProving
             var kind = _rungs[top + 1].Kind;
             Mark next = null;
 
+            // A creature the field refused a moment ago is not offered again straight away: that is a loop, not a ladder.
             if (_unfit.TryGetValue(kind, out var refused) && Core.TickCount - refused < UnfitMs)
             {
                 return (0, null, 0);
@@ -758,6 +883,7 @@ public static class BotProving
         return (0, null, 0);
     }
 
+    /// <summary>The rung this bot would be tried on next, for a fight asked for by name without a creature.</summary>
     private static string Aim(BotMobile bot)
     {
         Ladder(bot.Map);
@@ -767,6 +893,10 @@ public static class BotProving
         return kind ?? (_rungs.Count > 0 ? _rungs[0].Kind : "OrcishLord");
     }
 
+    /// <summary>
+    /// Reads the ladder off the dungeons: each one's worst creature, weakest first, one rung per creature. Done once the
+    /// dungeons have been surveyed, and again if a kind is refused by the field.
+    /// </summary>
     private static void Ladder(Map map)
     {
         if (_laddered || map == null || map == Map.Internal)
@@ -847,6 +977,10 @@ public static class BotProving
         }
     }
 
+    /// <summary>
+    /// This bot's strength against the worst of this dungeon, on the scale the dungeon is ranked by. See the class note for
+    /// the three ways it is answered.
+    /// </summary>
     public static double Against(BotMobile bot, BotDungeon.Deep deep)
     {
         if (bot == null || deep == null)
@@ -871,6 +1005,7 @@ public static class BotProving
         return Against(bot, kind, deep.Worst);
     }
 
+    /// <summary>This bot's strength against one kind of creature, whose might on the old scale is given.</summary>
     public static double Against(BotMobile bot, string kind, double might)
     {
         var build = BuildOf(bot);
@@ -907,6 +1042,8 @@ public static class BotProving
             {
                 Neighboured++;
 
+                // Upwards: at most what it beat, discounted (see Reach). Downwards: what it proved against something worse is
+                // at least what it is worth against something better, and it is not scaled up either.
                 return near.Might < might
                     ? Math.Min(Math.Min(near.R, RMax), Pass) * near.Might * Reach
                     : Math.Min(near.R, RMax) * near.Might;
@@ -918,6 +1055,11 @@ public static class BotProving
         return BotThreat.Power(bot) * Calibration();
     }
 
+    /// <summary>
+    /// What the old formula has turned out to be worth, across every reading on the ground: the middle of proven strength
+    /// over the formula's number for the same bot when it fought. One when nothing has been measured. Recomputed once a
+    /// minute.
+    /// </summary>
     public static double Calibration()
     {
         if (_calibrated && Core.TickCount - _calibratedTick < 60000)
@@ -934,6 +1076,7 @@ public static class BotProving
         {
             foreach (var mark in marks.Values)
             {
+                // A walkover is a lower bound, not a measurement of worth: only fights that were fights say anything.
                 if (mark.PowerThen > 0.0 && mark.Might > 0.0 && mark.R < CalibrateUnder)
                 {
                     ratios.Add(mark.Strength / mark.PowerThen);
@@ -959,6 +1102,10 @@ public static class BotProving
         return _calibration;
     }
 
+    /// <summary>
+    /// The strength this bot proved on the highest rung it has a fresh reading for — the most demanding thing it has been
+    /// measured against. Zero if it has none.
+    /// </summary>
     public static double Proven(BotMobile bot)
     {
         if (bot == null || !_marks.TryGetValue(bot.Name, out var marks))
@@ -980,6 +1127,11 @@ public static class BotProving
         return top?.Strength ?? 0.0;
     }
 
+    /// <summary>
+    /// For the dashboard: the deepest dungeon whose worst creature this bot has beaten alone on the proving ground (R at least
+    /// <see cref="Pass"/>, a reading of its present build), its name cut to fit; a dash when it has been tried and beat none;
+    /// a question mark when it has never been tried.
+    /// </summary>
     public static string Beats(BotMobile bot)
     {
         if (bot == null || !_marks.TryGetValue(bot.Name, out var marks) || marks.Count == 0)
@@ -1012,6 +1164,7 @@ public static class BotProving
         return name.Length > 8 ? name[..8] : name;
     }
 
+    /// <summary>Takes creatures, corpses and doubles off a ring. Nothing that belongs to a player is touched.</summary>
     public static int Sweep(Map map, Point3D middle, int range)
     {
         if (map == null || map == Map.Internal)
@@ -1023,6 +1176,7 @@ public static class BotProving
 
         foreach (var mobile in map.GetMobilesInRange<Mobile>(middle, range))
         {
+            // A player's pet is a player's; everything else on a ring is a fight's leftover.
             if (mobile is BotStandIn
                 || mobile is BaseCreature { Deleted: false } creature
                 && (creature.ControlMaster is not PlayerMobile || creature.ControlMaster is BotStandIn))
@@ -1054,6 +1208,7 @@ public static class BotProving
         return gone.Count;
     }
 
+    /// <summary>Clears every ring of whatever a stop left standing on it. Called at boot.</summary>
     public static void SweepAll()
     {
         var map = BotPopulation.Home ?? Map.Felucca;
@@ -1085,6 +1240,7 @@ public static class BotProving
         return null;
     }
 
+    /// <summary>A fight asked for by hand: the named bot, against the named creature or the rung it is due.</summary>
     public static string Prove(string name, string kind, string by)
     {
         var bot = Find(name);
@@ -1106,6 +1262,7 @@ public static class BotProving
             + "the fight is in the log as \"Proving:\" and in \"proof <bot>\" when it is over.";
     }
 
+    /// <summary>Everything measured of one bot, for the door.</summary>
     public static string Tell(string name)
     {
         var bot = Find(name);
@@ -1156,6 +1313,7 @@ public static class BotProving
         return sb.ToString().TrimEnd(' ', ';') + ".";
     }
 
+    /// <summary>Every bot measured, strongest first, and the ladder: for the door.</summary>
     public static string Board()
     {
         using var sb = ValueStringBuilder.Create(4096);
@@ -1272,6 +1430,7 @@ public static class BotProving
             + $"from a neighbouring rung, {Formula} by the formula ×{Calibration():F2}; the ladder: {(rungs.Length == 0 ? "not read yet" : rungs.ToString())}";
     }
 
+    /// <summary>Takes every fight off the field. For a reload or a stop.</summary>
     public static void Halt()
     {
         for (var i = 0; i < _rings.Length; i++)
@@ -1292,6 +1451,7 @@ public static class BotProving
         _busy.Clear();
     }
 
+    /// <summary>The world was wiped: nobody measured is the same body any more.</summary>
     public static void Forget()
     {
         Halt();
@@ -1320,6 +1480,7 @@ public static class BotProving
         Formula = 0;
     }
 
+    /// <summary>A world reload: the ladder is re-read off the new world's spawners; the readings stand.</summary>
     public static void Rewind()
     {
         Halt();
@@ -1329,8 +1490,11 @@ public static class BotProving
         _laddered = false;
     }
 
+    // 2 from 1: the companies' rooms are kept too, so a deploy does not send every guild back to proving itself.
+    // 3 from 2 (build 249): everything measured before it was measured against sleeping creatures (see Wake) and is dropped.
     private const int Shape = 3;
 
+    /// <summary>The oldest shape still read. Readings of an older one were made against creatures that could not fight.</summary>
     private const int OldestShape = 3;
 
     public static void Save(IGenericWriter writer)
@@ -1385,11 +1549,15 @@ public static class BotProving
 
         if (shape < 1 || shape > Shape)
         {
+            // A shape this build has never written: nothing of it can be read, and the engine refuses a store that is not
+            // read to the end (it stops the boot to ask). Unknown shapes are not expected; the file is left to be overwritten.
             logger.Warning("The saved proving ground is shape {Found} and this build reads {Wanted}; every bot is measured afresh", shape, Shape);
 
             return 0;
         }
 
+        // An older shape is read to the end and then thrown away (see OldestShape): the engine's store insists on every byte
+        // being read, and stopped the boot of build 249 to ask when this returned early.
         var stale = shape < OldestShape;
 
         _marks.Clear();

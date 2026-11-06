@@ -33,18 +33,25 @@ public sealed class BotTutor : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>Whether lessons are offered at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>What a lesson is offered at, a minute. High on purpose; see the class summary.</summary>
     public static double Prior { get; set; } = 300.0;
 
+    /// <summary>How many bots may be on the road to a teacher at once.</summary>
     public static int AtOnce { get; set; } = 3;
 
+    /// <summary>A bot below this in the skill is a beginner a shopkeeper can help.</summary>
     public static double Below { get; set; } = 20.0;
 
+    /// <summary>Gold a bot keeps after paying for a lesson.</summary>
     public static int Reserve { get; set; } = 100;
 
+    /// <summary>How far off a teacher may be.</summary>
     public static int Reach { get; set; } = 300;
 
+    /// <summary>How much a teacher must know: the engine teaches a third of it and nothing under twenty points.</summary>
     public static double Knows { get; set; } = 60.0;
 
     public static long Asked { get; private set; }
@@ -59,6 +66,10 @@ public sealed class BotTutor : IBotProposer
 
     public static long Crowded { get; private set; }
 
+    /// <summary>
+    /// Bots on the road to a teacher now, counted off the population rather than kept: a count kept by the deed's own
+    /// endings is one death on the road away from closing the lessons for good.
+    /// </summary>
     internal static int Walking
     {
         get
@@ -86,6 +97,9 @@ public sealed class BotTutor : IBotProposer
             return null;
         }
 
+        // Two trades whose whole chain stands still for want of a first step: cooking, for a bot holding meat, and
+        // tinkering, for the class that targets it — every tool recipe wants five to forty points, and a crafter is
+        // born with none. Nothing else is taught: the rest of the trades begin at the bench.
         var wanted = Wanted(body);
 
         if (wanted == null)
@@ -134,6 +148,8 @@ public sealed class BotTutor : IBotProposer
         return new BotTutoring(teacher, skill, points);
     }
 
+    /// <summary>The nearest known shopkeeper who can teach this skill, within <see cref="Reach"/>.</summary>
+    /// <summary>The first-step trade this bot is short of, if any: cooking when it holds meat, tinkering when its class targets it.</summary>
     private static SkillName? Wanted(BotMobile body)
     {
         var cooking = body.Skills[SkillName.Cooking];
@@ -194,12 +210,14 @@ public sealed class BotTutoring : BotDeed
 
     public const string Trade = "tutor";
 
+    /// <summary>How long the road to a teacher may take.</summary>
     public static int CapMs { get; set; } = 300000;
 
     public static long Taught { get; private set; }
 
     public static long Failed { get; private set; }
 
+    /// <summary>Skill taught, in tenths of a point, and the gold it cost.</summary>
     public static long Points { get; private set; }
 
     public static long Paid { get; private set; }
@@ -233,6 +251,7 @@ public sealed class BotTutoring : BotDeed
 
     public override double Minutes => 3.0;
 
+    /// <summary>A lesson pays in skill, and what it cost is not a verdict on the trade; see BotDeed.Unpaid.</summary>
     public override bool Unpaid => true;
 
     public override SkillName? Trains => _skill;
@@ -240,6 +259,7 @@ public sealed class BotTutoring : BotDeed
     public override int Outlay => _price;
 
     public override string Stage => $"to {_teacher?.Name ?? "a teacher"} to be taught {_skill}";
+
 
     public override BotDoing Advance(IBotWilful bot)
     {
@@ -289,6 +309,8 @@ public sealed class BotTutoring : BotDeed
 
         if (!_teacher.Teach(_skill, body, points, true))
         {
+            // The engine checks again as it teaches, and the one thing that changes between the two asks is the
+            // total of the bot's skills; the coin goes back rather than to a lesson that was not given.
             body.Backpack?.DropItem(new Gold(points));
             Failed++;
 

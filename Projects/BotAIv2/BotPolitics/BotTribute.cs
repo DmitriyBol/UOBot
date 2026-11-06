@@ -39,26 +39,36 @@ public static class BotTribute
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTribute));
 
+    /// <summary>The word a meeting ends with when the host pays tribute. See <c>BotDuke.Apply</c>.</summary>
     public const string Word = "tribute";
 
+    /// <summary>Whether the strong demand tribute before a war on the weak.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How many times the other's might a guild must be to send an ultimatum. Two: Patrick's "several times".</summary>
     public static double Odds { get; set; } = 2.0;
 
+    /// <summary>The tribute ends when the payee falls under this many times the payer's might: the balance has turned.</summary>
     public static double EndOdds { get; set; } = 1.5;
 
+    /// <summary>How long a tribute stands, in hours of running time.</summary>
     public static double Hours { get; set; } = 24.0;
 
+    /// <summary>How often an instalment is paid: an hour.</summary>
     public static int EveryMs { get; set; } = 3600000;
 
+    /// <summary>The share of the weak chest demanded a day.</summary>
     public static double Share { get; set; } = 0.25;
 
+    /// <summary>The least and the most demanded a day.</summary>
     public static int Least { get; set; } = 240;
 
     public static int Most { get; set; } = 4800;
 
+    /// <summary>How long after a refusal no new ultimatum goes between the same pair: six hours, so the war may follow.</summary>
     public static int RefuseMs { get; set; } = 21600000;
 
+    /// <summary>What a tribute left unpaid costs of the payee's regard of the payer.</summary>
     public static double LapseRegard { get; set; } = -30.0;
 
     /// <summary>One tribute standing.</summary>
@@ -85,6 +95,7 @@ public static class BotTribute
 
     private static readonly Dictionary<(string Strong, string Weak), long> _refused = [];
 
+    /// <summary>Ultimatums sent, paid and refused; wars or seizures spared by a tribute already standing.</summary>
     public static long Sent { get; private set; }
 
     public static long Accepted { get; private set; }
@@ -93,10 +104,12 @@ public static class BotTribute
 
     public static long Spared { get; private set; }
 
+    /// <summary>Instalments paid and their gold, the first ones included.</summary>
     public static long Instalments { get; private set; }
 
     public static long Gold { get; private set; }
 
+    /// <summary>Tributes ended, by how.</summary>
     public static long Served { get; private set; }
 
     public static long Turned { get; private set; }
@@ -105,6 +118,7 @@ public static class BotTribute
 
     public static long Gone { get; private set; }
 
+    /// <summary>Declarations refused because a tribute stood between the two. See <see cref="Forbids"/>.</summary>
     public static long Forbade { get; private set; }
 
     private static int Instalment(int daily) => Math.Max(1, (int)Math.Ceiling(daily * (Math.Max(60000, EveryMs) / 86400000.0)));
@@ -122,6 +136,7 @@ public static class BotTribute
         return null;
     }
 
+    /// <summary>Whether this guild is paying tribute to anybody. Asked by <c>BotPurpose</c> for the war chest.</summary>
     public static bool Pays(string guild)
     {
         for (var i = 0; i < _pacts.Count; i++)
@@ -135,6 +150,10 @@ public static class BotTribute
         return false;
     }
 
+    /// <summary>
+    /// Whether a tribute standing between the two forbids <paramref name="mine"/> declaring on <paramref name="theirs"/>. Asked
+    /// by <c>BotWar.MayDeclare</c>; counted when it refuses.
+    /// </summary>
     public static bool Forbids(string mine, string theirs, out string why)
     {
         why = null;
@@ -159,6 +178,12 @@ public static class BotTribute
 
     private static int Left(Pact p, long now) => (int)Math.Max(0L, ((long)(Hours * 3600000) - (now - p.Began)) / 3600000);
 
+    /// <summary>
+    /// The ultimatum: <paramref name="strong"/> is about to make war on <paramref name="weak"/> over <paramref name="over"/>. True
+    /// when a tribute stands between them now — already, or because the weak has just agreed and paid the first instalment — and
+    /// the war or the seizure does not happen; <paramref name="terms"/> says so. False, and the caller goes on as before, when
+    /// the strong is not <see cref="Odds"/> times the weak's might, or the weak refused (or refused lately).
+    /// </summary>
     public static bool Demand(Guild strong, Guild weak, string over, out string terms)
     {
         terms = null;
@@ -247,6 +272,7 @@ public static class BotTribute
         Instalments++;
         Gold += paid;
 
+        // The tribute settles the quarrel: both opinions back to nought, as a war's end does. See BotRegard.Settle.
         BotRegard.Settle(strong.Name, weak.Name);
 
         logger.Warning(
@@ -276,6 +302,7 @@ public static class BotTribute
         return true;
     }
 
+    /// <summary>Once a minute: instalments due, and tributes that have run out, turned or gone unpaid.</summary>
     public static void Look(long now)
     {
         for (var i = _pacts.Count - 1; i >= 0; i--)
@@ -367,6 +394,8 @@ public static class BotTribute
         BotVoice.ToGuild(p.Payer, "politics:tribute-end", fill);
     }
 
+    // ---- telling -----------------------------------------------------------------------------------------------------------
+
     public static void Write(Utf8JsonWriter w, string guild)
     {
         w.WritePropertyName("tribute");
@@ -397,6 +426,7 @@ public static class BotTribute
         w.WriteEndArray();
     }
 
+    /// <summary>The <c>Diplomacy:</c> line's clause.</summary>
     public static string Describe()
     {
         if (!Running)
@@ -427,6 +457,8 @@ public static class BotTribute
 
         return say.ToString();
     }
+
+    // ---- the store ---------------------------------------------------------------------------------------------------------
 
     internal static void Save(IGenericWriter writer)
     {
@@ -539,6 +571,11 @@ public static class BotTribute
         Forbade = 0;
     }
 
+    /// <summary>
+    /// Every tribute and every remembered refusal forgotten, for Patrick's reset (07.10.2026, reset26): exactly what
+    /// <see cref="Save"/> writes. A tribute is paid instalment by instalment chest to chest (<c>BotChest.Pay</c>), nothing held
+    /// between them, so ending it moves no gold. See <see cref="BotPolitics.Wipe"/>. Returns the tributes ended.
+    /// </summary>
     public static int Wipe()
     {
         var pacts = _pacts.Count;

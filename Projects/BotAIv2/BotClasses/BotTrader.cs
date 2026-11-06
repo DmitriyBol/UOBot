@@ -38,6 +38,7 @@ public sealed class BotTrader : BotClass
 
     public override SkillName? MainSkill => SkillName.ArmsLore;
 
+    /// <summary>Stands outside every war. See <see cref="BotClass.Neutral"/> and <c>BotTrading.Neutral</c>.</summary>
     public override bool Neutral => true;
 
     protected override void Defaults()
@@ -46,6 +47,8 @@ public sealed class BotTrader : BotClass
         Dex = 40;
         Int = 15;
 
+        // Declared in the order the opening points should go: the road first (the rolled weapon takes its own fifty in
+        // BotMobile.LearnWeapon), then the trade, then the bandage.
         Skills =
         [
             (SkillName.Tactics, 100.0),

@@ -36,28 +36,39 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotTreadmill
 {
+    /// <summary>Whether the two rules run at all. Off, offers are made as before.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How long a fight is rested against the foe it was just judged to be losing to. Fifteen seconds.</summary>
     public static int LosingRestMs { get; set; } = 15000;
 
+    /// <summary>A failure this soon after the deed was taken is an instant failure. Two seconds: one or two of the bot's turns.</summary>
     public static int InstantMs { get; set; } = 2000;
 
+    /// <summary>How close together two instant failures against one target must fall to rest it.</summary>
     public static int TwiceMs { get; set; } = 2000;
 
+    /// <summary>How long a deed is rested against a target after failing at once twice. Fifteen seconds.</summary>
     public static int RestMs { get; set; } = 15000;
 
+    /// <summary>Fights rested against one foe after a losing judgement.</summary>
     public static long LosingRests { get; private set; }
 
+    /// <summary>Deeds rested against one target after two instant failures inside <see cref="TwiceMs"/>.</summary>
     public static long InstantRests { get; private set; }
 
+    /// <summary>Flights that failed at once twice and were not rested, because running away never is.</summary>
     public static long FlightsSpared { get; private set; }
 
+    /// <summary>Offers refused while a rest stood, by the rule that rested them. Appraisals, not decisions.</summary>
     public static long RefusedLosing { get; private set; }
 
     public static long RefusedInstant { get; private set; }
 
+    /// <summary>Fights carried on to the end let through a losing judgement's rest. See the class note.</summary>
     public static long StandsLetThrough { get; private set; }
 
+    /// <summary>Flights offered to a bot as on the failing rung, because its fight had just judged itself lost. Counted by BotFugitive when taken.</summary>
     public static long FlightsAfterLosing { get; set; }
 
     private static readonly Dictionary<string, long> _restsByKind = new(StringComparer.Ordinal);
@@ -79,6 +90,7 @@ public static class BotTreadmill
 
     private static readonly Dictionary<(Serial Bot, string Kind, long Target), long> _instants = [];
 
+    /// <summary>The last losing judgement of each bot: when, and against whom.</summary>
     private static readonly Dictionary<Serial, (long Tick, Serial Foe)> _lost = [];
 
     private static readonly List<(Serial Bot, string Kind, long Target)> _stale = [];
@@ -87,6 +99,7 @@ public static class BotTreadmill
 
     private static bool _swept;
 
+    /// <summary>What a deed is aimed at: the serial of what it fights, or its place on its map.</summary>
     private static long Target(BotDeed deed)
     {
         if (deed.Foe is { } foe)
@@ -97,11 +110,14 @@ public static class BotTreadmill
         var where = deed.Where;
         var map = deed.Map?.MapID ?? 0;
 
+        // Bit 62 set: never equal to a serial. 16 bits a coordinate, 8 for z and 8 for the map.
         return (1L << 62) | ((long)(where.X & 0xFFFF) << 32) | ((long)(where.Y & 0xFFFF) << 16) | ((long)(where.Z & 0xFF) << 8) | (long)(map & 0xFF);
     }
 
+    /// <summary>Whether a failure's reason is the fight's losing judgement. The sentence <c>BotSlay</c> writes when the bot's health is under its own flight share.</summary>
     public static bool LosingJudgement(string why) => why != null && why.EndsWith(" was winning", StringComparison.Ordinal);
 
+    /// <summary>A deed has just failed. Called once by <c>BotWill.Settle</c>, with how long it was held and what it made.</summary>
     public static void Failed(Mobile bot, BotDeed deed, string why, long heldMs, int made, double skill)
     {
         if (!Running || bot == null || deed == null || string.IsNullOrEmpty(deed.Kind))
@@ -153,6 +169,7 @@ public static class BotTreadmill
 
     private static void Count(string kind) => _restsByKind[kind] = _restsByKind.GetValueOrDefault(kind) + 1;
 
+    /// <summary>Whether this offer is rested for this bot against its target, and for how much longer. Counted as a refusal.</summary>
     public static bool Resting(Mobile bot, BotDeed deed, out bool losing, out long leftMs)
     {
         losing = false;
@@ -182,6 +199,7 @@ public static class BotTreadmill
 
         losing = rest.Losing;
 
+        // The fight to the end gives nothing up for health, so a losing judgement is no reason to refuse it. See the class note.
         if (losing && deed is BotRescue { Own: true, ToTheEnd: true })
         {
             StandsLetThrough++;
@@ -201,6 +219,7 @@ public static class BotTreadmill
         return true;
     }
 
+    /// <summary>Whether this bot's own fight judged itself lost inside <see cref="LosingRestMs"/>. Asked by <c>BotFugitive</c>'s early flight.</summary>
     public static bool Losing(Mobile bot)
     {
         if (!Running || bot == null || LosingRestMs <= 0 || !_lost.TryGetValue(bot.Serial, out var lost))
@@ -218,6 +237,7 @@ public static class BotTreadmill
         return false;
     }
 
+    /// <summary>A bot that is gone takes its rests with it.</summary>
     public static void Forget(Mobile bot)
     {
         if (bot == null)
@@ -252,6 +272,7 @@ public static class BotTreadmill
         _stale.Clear();
     }
 
+    /// <summary>Lapsed rests and lone instant failures are dropped, at most once a minute.</summary>
     private static void Sweep(long now)
     {
         if (_swept && now - _sweptTick < 60000)
@@ -298,8 +319,10 @@ public static class BotTreadmill
         }
     }
 
+    /// <summary>Whether anything has happened worth a clause in the Will line.</summary>
     public static bool Any => LosingRests + InstantRests + FlightsSpared > 0;
 
+    /// <summary>The clause, for the Will line.</summary>
     public static string Describe()
     {
         var kinds = "";

@@ -60,6 +60,7 @@ public sealed class BotCrimeSettings
 
     public int? TracesToPost { get; set; }
 
+    /// <summary>life18a: the share of the road's carriers worth an ambush (the bar follows their cargo), and the bar's floor.</summary>
     public double? CargoShare { get; set; }
 
     public int? CargoFloor { get; set; }

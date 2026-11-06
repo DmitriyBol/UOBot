@@ -38,6 +38,7 @@ public static class BotConsole
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotConsole));
 
+    /// <summary>How often the door is tried. A file that is almost always absent costs nothing to look for.</summary>
     public static int ListenMs { get; set; } = 2000;
 
     private static string _in;
@@ -48,6 +49,7 @@ public static class BotConsole
 
     private static bool _broken;
 
+    /// <summary>Questions taken through the door this session.</summary>
     public static long Asked { get; private set; }
 
     public static void Open()
@@ -73,6 +75,7 @@ public static class BotConsole
         }
     }
 
+    /// <summary>Called from the vigil's own beat. Cheap when there is nothing there, which is almost always.</summary>
     public static void Listen(long now)
     {
         if (_broken || _in == null || now - _triedTick < ListenMs)
@@ -98,6 +101,7 @@ public static class BotConsole
                 return;
             }
 
+            // Emptied before anything is answered, so a question that throws is not asked again for ever.
             File.WriteAllText(_in, "");
 
             lines = text.Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -126,6 +130,8 @@ public static class BotConsole
             }
             catch (Exception e)
             {
+                // One bad question must not take the door down. Said in the answer file, where whoever asked
+                // is looking, rather than only in the session log.
                 Say($"that question threw: {e.Message}");
             }
         }
@@ -200,6 +206,9 @@ public static class BotConsole
 
                 return;
 
+            // Reading and writing are two words rather than one with a flag: "dials" can never change
+            // anything, whatever is typed after it, and that is worth being true of a whole word rather
+            // than of an argument somebody has to get right at two in the morning.
             case "dials":
                 Say(BotDials.Show(rest));
 
@@ -221,6 +230,8 @@ public static class BotConsole
                 return;
 
             case "think":
+                // Consider now answers true for a question it has merely taken in hand, and says so itself;
+                // the line below is only for a question it could not take at all.
                 if (BotVigil.Consider(rest, Say))
                 {
                     Say($"thinking about: {rest} — the answer will follow here and in the log.");
@@ -251,6 +262,7 @@ public static class BotConsole
             : (line[..space].ToLowerInvariant(), line[(space + 1)..].Trim());
     }
 
+    /// <summary>Everything the door says goes to both files: the answer file to be read, the log to be kept.</summary>
     public static void Say(string what)
     {
         if (_broken || _out == null || what == null)

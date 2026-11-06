@@ -41,24 +41,38 @@ public sealed class BotCraftFirst : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>Whether mining gives way to asked work for a crafter. Off: the auction as it was.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How long a crafter remembers the material an order it passed over lacked. Ten minutes, the smith's own memory.</summary>
     public static int ShortMs { get; set; } = 600000;
 
+    /// <summary>How far a crafter walks to a bank for its own material.</summary>
     public static int DrawReach { get; set; } = 400;
 
+    /// <summary>
+    /// What the walk to the bank box is claimed at a minute. Above digging's prior (45) and a restock's (12), under a rescue (200):
+    /// the errand that unblocks an order with money down.
+    /// </summary>
     public static double DrawClaim { get; set; } = 120.0;
 
     private static readonly Dictionary<Serial, (Type Kind, int Need, long Tick)> _short = [];
 
     private static readonly Dictionary<string, long> _yielded = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Choices where a crafter's winning dig gave way to asked work, by the kind of work taken instead.</summary>
     public static long Yielded { get; private set; }
 
+    /// <summary>Choices where a crafter's dig won with no asked work worth anything on offer.</summary>
     public static long Dug { get; private set; }
 
+    /// <summary>Orders a crafter passed over for want of material it then remembered, by trade.</summary>
     public static long Remembered { get; private set; }
 
+    /// <summary>
+    /// Looks that offered the walk to the bank box (one a review while it stands unchosen), walks taken, looks that found none of
+    /// the material in the box (the memory is then let go) or no bank in reach, and units taken out.
+    /// </summary>
     public static long Draws { get; private set; }
 
     public static long DrawsTaken { get; private set; }
@@ -69,12 +83,21 @@ public sealed class BotCraftFirst : IBotProposer
 
     public static long Drawn { get; private set; }
 
+    /// <summary>Walks that reached the bank and took nothing out (the pack would not take it, or the box was emptied on the way).</summary>
     public static long DrawsEmpty { get; private set; }
 
+    // ---- Who, and what ------------------------------------------------------------------------------------------------------
+
+    /// <summary>A crafter: the Crafter and the Architect. Never a gatherer, whose living is the dig (half its gold).</summary>
     public static bool Crafter(IBotWilful bot) => bot?.Self is BotMobile { Class: BotCrafter or BotArchitect };
 
+    /// <summary>Whether this work is the dig this rule puts behind asked work: mining, or prospecting for a seam.</summary>
     public static bool Mining(BotDeed deed) => deed is BotDig or BotProspect;
 
+    /// <summary>
+    /// Work somebody asked of this crafter: a piece for an order, a delivery to a want (or the meeting with a carrier bringing its
+    /// own), its own trade's material bought for the trade, or out of its bank box for an order.
+    /// </summary>
     public static bool Asked(BotDeed deed) =>
         deed switch
         {
@@ -91,12 +114,14 @@ public sealed class BotCraftFirst : IBotProposer
             _ => false
         };
 
+    /// <summary>What a crafter's trades are made of: metal, hide, cloth, feathers and wood.</summary>
     public static bool Material(Type kind) =>
         kind != null && (typeof(BaseIngot).IsAssignableFrom(kind) || typeof(BaseLeather).IsAssignableFrom(kind)
                          || typeof(BaseHides).IsAssignableFrom(kind) || kind == typeof(Cloth) || kind == typeof(UncutCloth)
                          || kind == typeof(BoltOfCloth) || kind == typeof(Feather) || kind == typeof(Shaft) || kind == typeof(Log)
                          || kind == typeof(Board));
 
+    /// <summary>The auction put asked work before a crafter's dig. Counted by what was taken instead.</summary>
     internal static void Gave(BotDeed taken)
     {
         Yielded++;
@@ -106,8 +131,14 @@ public sealed class BotCraftFirst : IBotProposer
         _yielded[kind] = _yielded.GetValueOrDefault(kind) + 1;
     }
 
+    /// <summary>A crafter's dig won with nothing asked of it worth anything.</summary>
     internal static void Kept() => Dug++;
 
+    /// <summary>
+    /// A craft's look passed an order over for want of <paramref name="need"/> of <paramref name="kind"/>: remembered for
+    /// <see cref="ShortMs"/>, so the walk to the bank box can be offered. The smith's metal, the tailor's leather, the fletcher's
+    /// feathers.
+    /// </summary>
     public static void Short(Mobile body, Type kind, int need)
     {
         if (body == null || kind == null || need <= 0)
@@ -124,6 +155,10 @@ public sealed class BotCraftFirst : IBotProposer
         Remembered++;
     }
 
+    /// <summary>
+    /// The walk reached the bank: what it took out, and the memory let go either way, so a box the pack cannot take from is not
+    /// walked to again on the next review (the review of this build). A walk that took nothing is counted (<see cref="DrawsEmpty"/>).
+    /// </summary>
     internal static void Served(Mobile body, int units)
     {
         if (body != null)
@@ -142,6 +177,8 @@ public sealed class BotCraftFirst : IBotProposer
     }
 
     internal static void Walked() => DrawsTaken++;
+
+    // ---- The walk to the bank box ---------------------------------------------------------------------------------------------
 
     public BotDeed Propose(IBotWilful bot)
     {
@@ -163,6 +200,7 @@ public sealed class BotCraftFirst : IBotProposer
 
         var lack = known.Need - (body.Backpack?.GetAmount(known.Kind) ?? 0);
 
+        // Enough in the pack now, or standing at a bank, where the craft's own look takes it out itself.
         if (lack <= 0 || BotMarket.AtBank(body))
         {
             return null;
@@ -195,6 +233,8 @@ public sealed class BotCraftFirst : IBotProposer
 
         return new BotDraw(map, bank, known.Kind, Math.Min(lack, boxed));
     }
+
+    // ---- Said ------------------------------------------------------------------------------------------------------------------
 
     public static string Describe()
     {

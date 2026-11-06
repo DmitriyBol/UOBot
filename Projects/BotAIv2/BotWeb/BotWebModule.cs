@@ -16,6 +16,7 @@ public sealed class BotWebModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWebModule));
 
+    /// <summary>How often the clock looks. The snapshot, the pages and the map slices each keep their own cadence off it.</summary>
     public static int TickMs { get; set; } = 250;
 
     private static WebTimer _timer;
@@ -30,6 +31,7 @@ public sealed class BotWebModule : BotModule
     {
         BotWebConfig.Load();
 
+        // The stream is opened even when the listener is off: the file is the record, the page is a window.
         BotEvents.Open();
 
         if (!BotWebConfig.Enabled)

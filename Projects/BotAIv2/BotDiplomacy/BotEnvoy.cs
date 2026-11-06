@@ -25,6 +25,10 @@ public sealed class BotEnvoy : BotDeed
 {
     public const string Trade = "envoy";
 
+    /// <summary>
+    /// What going is worth a minute. A hundred and fifty: above an ordinary trade, below the reeve's three hundred and the
+    /// calls that will not wait — a guild's word is its business, but not before a guildmate bleeding in front of it.
+    /// </summary>
     public static double Prior { get; set; } = 150.0;
 
     public static long Began { get; private set; }
@@ -79,13 +83,19 @@ public sealed class BotEnvoy : BotDeed
 
     public override bool Still => _there;
 
+    /// <summary>
+    /// Once at the meeting, the walk is spent and a better-paid offer does not take it off the hearing — only what will not
+    /// wait does (<c>BotWill</c>'s rule for committed work). On the road it is merely held (<see cref="HoldsFor"/>).
+    /// </summary>
     public override bool Committed => _there;
 
     public override SkillName? Trains => null;
 
+    /// <summary>The walk, as the walk home declares it, and five minutes of meeting.</summary>
     public override double Minutes =>
         5.0 + Math.Max(0.2, Math.Sqrt(Math.Pow(_m.Place.X - _from.X, 2) + Math.Pow(_m.Place.Y - _from.Y, 2)) * BotWalk.StepDelayMs(BotMobile.Runs) / 60000.0);
 
+    /// <summary>Held for the walk and the meeting, whatever the ordinary cap says.</summary>
     public override double HoldsFor => Minutes + 10.0;
 
     public override string Stage =>
@@ -167,6 +177,7 @@ public sealed class BotEnvoy : BotDeed
             return BotDoing.Failed($"could not reach {_m.Town?.Name ?? "the seat"} in {BotParley.MarchMs / 60000} minutes");
         }
 
+        // Runes (29.09.2026): a mage holding a rune for the town recalls instead of walking.
         if (BotRecall.Instead(bot, _m.Map, _m.Place, BotParley.ArriveTiles, $"the meeting at {_m.Town?.Name}", ref _recall) is { } cast)
         {
             return cast;
@@ -175,6 +186,7 @@ public sealed class BotEnvoy : BotDeed
         return BotDoing.Walk(_m.Map, _m.Place, BotArrival.Within(Math.Max(1, BotParley.ArriveTiles - 1)), $"to the meeting at {_m.Town?.Name ?? "the seat"}");
     }
 
+    /// <summary>The road is refused: this bot is not asked to this meeting again, and the meeting may find another.</summary>
     public override bool Bend(IBotWilful bot)
     {
         _unreached = true;

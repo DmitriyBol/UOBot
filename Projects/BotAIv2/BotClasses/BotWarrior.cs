@@ -19,6 +19,7 @@ public sealed class BotWarrior : BotClass
 
     public override BotRole Role => BotRole.Melee;
 
+    /// <summary>Settled by the roll: this class's trade is fighting, and the blade is the roll's business.</summary>
     public override SkillName? MainSkill => null;
 
     protected override void Defaults()
@@ -34,6 +35,9 @@ public sealed class BotWarrior : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        // <b>A swordsman, a maceman or a fencer by the roll, and how much of one by temperament (01.10.2026, Patrick's point 7:
+        // "some may start with more Swordsmanship if they are swordsmen, but put fewer points into other talents").</b> Five in
+        // six lean into the weapon the roll handed them, paid for out of Tactics, Anatomy and Healing; one in six is born even.
         Leanings =
         [
             new BotLeaning("blade", null, 5, 56.0, 72.0, Weapon: true),

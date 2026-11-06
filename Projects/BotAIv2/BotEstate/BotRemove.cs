@@ -32,20 +32,34 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotRemove : BotDeed
 {
+    /// <summary>The ledger key.</summary>
     public const string Trade = "remove";
 
+    /// <summary>
+    /// What moving the hall is reckoned at per minute before experience corrects it.
+    ///
+    /// As high as raising one, and for the same reason <c>BotHall.Prior</c> is: it happens perhaps once in
+    /// the life of an island, the conditions are already as narrow as they get, and an errand that is rare
+    /// by its conditions and also loses every auction never runs at all.
+    /// </summary>
     public static double Prior { get; set; } = 400.0;
 
+    /// <summary>How long the whole thing is expected to take.</summary>
     public static double WorkMinutes { get; set; } = 2.0;
 
+    /// <summary>How near the plot the bot must stand to build.</summary>
     public static int Reach => BotHall.Reach;
 
+    /// <summary>Halls taken down and put up again.</summary>
     public static long Done { get; private set; }
 
+    /// <summary>Times the ground would not take the hall after all.</summary>
     public static long Refused { get; private set; }
 
+    /// <summary>Halls carried to their guild's seat rather than out of a winner's yard. See <c>BotSeat</c>.</summary>
     public static long Seated { get; private set; }
 
+    /// <summary>Merchants carried along with their hall, stock and all.</summary>
     public static long MerchantsCarried { get; private set; }
 
     private readonly Guild _guild;
@@ -54,10 +68,16 @@ public sealed class BotRemove : BotDeed
 
     private readonly Point3D _plot;
 
+    /// <summary>Whether this is a move to the seat rather than a sentence. The two are the same walk.</summary>
     private readonly bool _seating;
 
+    /// <summary>
+    /// Whether this is a move off another guild's held ground (06.10.2026, <see cref="BotBounds"/>): the same walk again, to the
+    /// nearest ground of the guild's own or open ground, and the seat follows the hall.
+    /// </summary>
     private readonly bool _off;
 
+    /// <summary>Halls carried off another guild's ground. See <see cref="BotBounds"/>.</summary>
     public static long Off { get; private set; }
 
     private int _fitted;
@@ -117,6 +137,9 @@ public sealed class BotRemove : BotDeed
             return BotDoing.Failed("no body");
         }
 
+        // The debt may have been settled or forgiven while this bot was walking - the winner's hall can
+        // burn down, and then there is nothing to be outside of. A seat, likewise, may have been moved
+        // back under the hall by a hand at the keyboard.
         if (_off ? !BotBounds.Owes(_guild, out _, out _) : _seating ? !BotSeat.Moving(_guild, out _, out _) : BotExile.Owed(_guild) is not { Deleted: false })
         {
             return BotDoing.Failed($"{_guild.Name} owes nobody a move any more");
@@ -136,8 +159,14 @@ public sealed class BotRemove : BotDeed
             return BotDoing.Walk(_map, _plot, BotArrival.Within(Reach), $"to the new ground at {_plot.X},{_plot.Y}");
         }
 
+        // Proved before anything is knocked down. HousePlacement refuses a plot that the old hall itself
+        // stands on or beside, which cannot happen here - the whole point is that it is far away - but it
+        // refuses plenty else, and finding out after the demolition would leave the guild homeless.
+        // A hall is carried at its own size: a guild that grew into a large house does not come back from a lost war in a
+        // small one. See BotHallKind.
         var kind = BotHallKind.Of(old);
 
+        // Ground that changed hands while the bot walked: not carried onto another guild's. See BotBounds.
         if (BotBounds.Refuse(BotBounds.Placing.Carry, _guild.Name, _map, _plot, kind.Multi, out var foreign))
         {
             BotPlot.Spend();
@@ -168,6 +197,12 @@ public sealed class BotRemove : BotDeed
 
         var price = old.Price;
 
+        // <b>The merchant comes too, stock and all, and it is taken off the old hall's roll before the hall
+        // falls.</b> A guild carried to its seat by order has lost no war, and its counter is the one thing
+        // in the hall worth anything — 64,000gp across four of them on 13.09.2026. The engine keeps a vendor
+        // on its house's list and a house on the vendor; setting the house to nothing takes it off the roll,
+        // and setting the new house puts it on that one. The one thing a homeless vendor does on its own is
+        // dismiss itself on deserialisation, which cannot happen between here and the next line.
         var merchant = BotShelf.Of(old);
 
         if (merchant is { Deleted: false })
@@ -176,6 +211,8 @@ public sealed class BotRemove : BotDeed
             merchant.Internalize();
         }
 
+        // Down it comes. Everything else inside goes with it - see the note at the top on what a lost war
+        // costs.
         old.Delete();
 
         BotPlot.Spend();
@@ -186,6 +223,9 @@ public sealed class BotRemove : BotDeed
         {
             Refused++;
 
+            // Not lost with the hall: put down where the hall was, on the ground, and re-homed by the engine
+            // if the hall goes up again there. A vendor in the open dismisses itself; that is the engine's
+            // rule and the whole loss of this branch.
             if (merchant is { Deleted: false })
             {
                 merchant.MoveToWorld(old.Location, _map);
@@ -233,6 +273,7 @@ public sealed class BotRemove : BotDeed
             Off++;
             BotBounds.Paid(_guild.Name, _plot);
 
+            // The guild lives here now, as after an exile: the seat follows the hall, or it would carry the hall back.
             BotSeat.Set(_guild.Name, _plot, false);
         }
         else if (_seating)
@@ -244,6 +285,8 @@ public sealed class BotRemove : BotDeed
         {
             BotExile.Paid(_guild);
 
+            // The guild lives here now. See BotSeat.Set: without this the seat would pull the hall straight
+            // back into the yard it was just carried out of.
             BotSeat.Set(_guild.Name, _plot, false);
         }
 
@@ -290,24 +333,37 @@ public sealed class BotRemove : BotDeed
 /// </summary>
 public sealed class BotRemover : IBotProposer
 {
+    /// <summary>Bots looked at.</summary>
     public static long Asked { get; private set; }
 
+    /// <summary>Removals offered.</summary>
     public static long Offered { get; private set; }
 
+    /// <summary>Times the guild owed nobody a move, which is nearly always.</summary>
     public static long Settled { get; private set; }
 
+    /// <summary>Times another member was already on it.</summary>
     public static long Claimed { get; private set; }
 
+    /// <summary>Times there was no ground outside the winner's yard to be had.</summary>
     public static long Groundless { get; private set; }
 
+    /// <summary>Times the hall stood too far from its seat and somebody was sent to carry it. See <c>BotSeat</c>.</summary>
     public static long Seating { get; private set; }
 
+    /// <summary>Times the nearest ground to the seat was no nearer than where the hall already stands.</summary>
     public static long NoNearer { get; private set; }
 
+    /// <summary>Times somebody was sent to carry a hall off another guild's held ground. See <see cref="BotBounds"/>.</summary>
     public static long Foreign { get; private set; }
 
+    /// <summary>Times somebody was sent to shift a hall off another guild's ground onto the guild's own. See <see cref="BotShift"/>.</summary>
     public static long Shifts { get; private set; }
 
+    /// <summary>
+    /// How much further from the winner's hall a beaten guild's new hall must stand than its old one, in tiles (the larger of the
+    /// two offsets, as the yard is measured). One quadrant.
+    /// </summary>
     public static int FartherBy { get; set; } = 30;
 
     public string Name => "remover";
@@ -336,8 +392,14 @@ public sealed class BotRemover : IBotProposer
 
         var winner = BotExile.Owed(ours);
 
+        // A sentence first, a seat second: the two are the same errand, and a guild that owes both walks
+        // once. See BotSeat.Moving for the seat's half of the question.
         if (winner == null)
         {
+            // <b>A hall on another guild's held ground before a hall far from its seat</b> (06.10.2026). First shifted within its own
+            // square or onto the guild's other squares near it, the standing hall's tiles free (BotShift; build 410: the spiral below
+            // never offers ground nearer than BotPlot.Near and the engine counted the standing hall in the way, so The Ash went 112
+            // tiles off). Then open ground within BotBounds.OpenReach, looked for from where the hall stands; then it stands.
             if (BotBounds.Owes(ours, out var under, out var whose))
             {
                 if (BotOffice.Busy(BotExile.Office, ours))
@@ -401,6 +463,9 @@ public sealed class BotRemover : IBotProposer
                 return null;
             }
 
+            // Only if it is actually nearer. Scarce ground can put the nearest plot to a seat further from
+            // it than the hall already is, and carrying a hall to be no nearer is an evening of moving
+            // house for nothing. The guild rests either way, so this is asked once a half hour.
             if (BotSeat.Gap(ground, seat) >= BotSeat.Gap(hall.Location, seat))
             {
                 NoNearer++;
@@ -423,6 +488,13 @@ public sealed class BotRemover : IBotProposer
             return null;
         }
 
+        // Looked for from the loser's own seat, shunning the winner's hall — so a beaten guild goes home,
+        // not merely away.
+        //
+        // <b>And further from the winner than it stood, not merely out of its yard.</b> Patrick's order of 10.09.2026 was "further
+        // from the winner's house". Kept out of the yard alone, the plot nearest the seat can lie towards the winner — and the seat
+        // follows the hall — so on 26.09.2026 The Lantern, beaten by The Blade, was carried 163 → 121 → 109 tiles from The Blade's
+        // hall in two moves and went back to war over the ground by its new door each time (10:06, 10:22, 10:37).
         var losing = BotEstate.Hall(ours);
         var clear = BotExile.Clear;
 

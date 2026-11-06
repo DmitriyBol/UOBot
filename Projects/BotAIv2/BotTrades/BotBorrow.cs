@@ -118,14 +118,18 @@ public sealed class BotBorrower : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>What the walk to a lender is worth a minute: enough to beat idling and a poor bot's hunt for a few coins, not real work.</summary>
     public static double Prior { get; set; } = 40.0;
 
+    /// <summary>The least the bot's best work must have paid a minute, measured at least <see cref="LeastSettled"/> times.</summary>
     public static double LeastPays { get; set; } = 10.0;
 
     public static int LeastSettled { get; set; } = 2;
 
+    /// <summary>How far a borrower may be from a lender's shop. Two hundred tiles: a walk into Britain.</summary>
     public static int Reach { get; set; } = 200;
 
+    /// <summary>How long between one bot's walks to a lender, whatever came of the last. Half an hour.</summary>
     public static int EveryMs { get; set; } = 1800000;
 
     public static int WalkMs { get; set; } = 300000;
@@ -189,6 +193,7 @@ public sealed class BotBorrower : IBotProposer
 
         Asked++;
 
+        // Most answers: not poor. Asked first, because it is the cheapest and the commonest.
         var spendable = BotYield.Spendable(who);
 
         if (spendable >= BotLoans.PoorBar)
@@ -228,6 +233,7 @@ public sealed class BotBorrower : IBotProposer
             return null;
         }
 
+        // Short of the kit its trade takes into a fight, and unable to buy it with what it has.
         if (!BotProvision.Short(who))
         {
             Kitted++;
@@ -244,6 +250,7 @@ public sealed class BotBorrower : IBotProposer
             return null;
         }
 
+        // No loan without a trade: the bot's own record must show work that paid.
         string trade = null;
         var pays = who.Resolve?.Ledger is { } ledger ? ledger.Best(LeastSettled, out trade) : 0.0;
 
@@ -269,6 +276,7 @@ public sealed class BotBorrower : IBotProposer
         return new BotBorrow(front, sum, Prior, trade, pays);
     }
 
+    /// <summary>The nearest open shop by a bank whose keeper could lend this sum, within reach, welcome and on joined ground.</summary>
     private static BotStorefront Lender(BotMobile who, int sum)
     {
         var open = BotShopkeep.Open;
@@ -301,6 +309,7 @@ public sealed class BotBorrower : IBotProposer
 
     private static readonly HashSet<BotStorefront> _cried = [];
 
+    /// <summary>A rich keeper says once a shift, in the trade room, that it lends. From the module's clock.</summary>
     internal static void Cry()
     {
         if (!BotTrades.LendersOn)

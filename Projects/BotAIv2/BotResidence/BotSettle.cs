@@ -49,39 +49,64 @@ public static class BotSettle
 
         public int Healers;
 
+        /// <summary>Where home is in this town: the bank nearest the middle, settled on the ground; the middle when it has no bank.</summary>
         public Point3D Hearth;
 
+        /// <summary>Whether a bot may settle here. Decided by <see cref="Reckon"/>, once the gates and the roads have answered.</summary>
         public bool Fit;
 
+        /// <summary>Why not, in words, when not.</summary>
         public string Why;
     }
 
+    /// <summary>
+    /// The share of the population the home town (Britain) wants to keep. Thirty-five hundredths: the largest single share —
+    /// it has the most shops of any town, some eighty-five spawned against Vesper's fifty and Trinsic's forty — but not the
+    /// whole, which is the order. The rest is split evenly among the other fit towns.
+    /// </summary>
     public static double HomeShare { get; set; } = 0.35;
 
+    /// <summary>How hard a town that is already full of its share is passed over. Three: at its share it weighs a quarter of an empty town's. See the class.</summary>
     public static double SpreadWeight { get; set; } = 3.0;
 
+    /// <summary>How much more a town weighs for every whole guild living in it: a town holding half the bot's guild weighs half as much again. One.</summary>
     public static double GuildPull { get; set; } = 1.0;
 
+    /// <summary>
+    /// The least shopkeepers (bankers and healers apart) a town must have to be lived in. Five: a bot's kit is bought from an
+    /// armourer or a weaponsmith, a provisioner and a tailor or a tanner, and the smallest mainland town, Cove, spawns five.
+    /// </summary>
     public static int LeastShops { get; set; } = 5;
 
+    /// <summary>Whether a town without a bank is passed over. On: see the class for what a bank-less seat cost The Needle.</summary>
     public static bool NeedsBank { get; set; } = true;
 
+    /// <summary>
+    /// Whether a town the gates join to home but no road in the book reaches may be lived in. Off: nothing measures the
+    /// walk there, and on 29.09.2026 such towns were Serpent's Hold, Buccaneer's Den, Delucia and Papua — the last two in
+    /// the Lost Lands. Once the public moongates walk bots to the island towns (build 317), turning this on offers
+    /// Moonglow, Jhelom, Magincia and Skara Brae too; a bot walking there is then not measured against a road.
+    /// </summary>
     public static bool GateTowns { get; set; } = false;
 
     private static readonly Dictionary<string, Amenities> _towns = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Whether the towns have been judged fit or not. Until then nobody is given a town and every bot lives at home.</summary>
     public static bool Reckoned { get; private set; }
 
+    /// <summary>The population's home town: the one whose region holds <c>BotPopulation.Where</c>, else the nearest.</summary>
     public static BotTowns.Town HomeTown { get; private set; }
 
     public static int Fit { get; private set; }
 
+    /// <summary>Choices made, and what the choosing turned away. See <see cref="Choose"/>.</summary>
     public static long Chosen { get; private set; }
 
     public static long ChosenAway { get; private set; }
 
     public static long Barred { get; private set; }
 
+    /// <summary>What a town has in it, counted off its region the first time it is asked for and kept; null for no town.</summary>
     public static Amenities Of(BotTowns.Town town)
     {
         if (town == null)
@@ -105,6 +130,7 @@ public static class BotSettle
         var nearest = int.MaxValue;
         var bank = Point3D.Zero;
 
+        // One spatial query per town, once: shopkeepers are mobiles and the region's box is where the town is.
         foreach (var vendor in map.GetMobilesInBounds<BaseVendor>(town.Bounds))
         {
             if (vendor.Deleted)
@@ -137,6 +163,7 @@ public static class BotSettle
             info.Shops++;
         }
 
+        // Beside the banker rather than on it: the banker stands on its tile, and a body is put down where one fits.
         if (bank != Point3D.Zero && BotTowns.Place(map, bank.X, bank.Y, 8, out var spot))
         {
             info.Hearth = spot;
@@ -147,9 +174,11 @@ public static class BotSettle
         return info;
     }
 
+    /// <summary>Where home is in a town: the population's own home in the home town, the bank elsewhere. See <see cref="Amenities.Hearth"/>.</summary>
     public static Point3D Hearth(BotTowns.Town town) =>
         town == null ? BotPopulation.Where : town.Home || ReferenceEquals(town, HomeTown) ? BotPopulation.Where : Of(town).Hearth;
 
+    /// <summary>Whether this point is some town's home. For the spread of a placement (<see cref="BotResidence.Span"/>).</summary>
     public static bool IsHearth(Point3D at)
     {
         foreach (var (_, info) in _towns)
@@ -163,6 +192,10 @@ public static class BotSettle
         return false;
     }
 
+    /// <summary>
+    /// Judges every town fit to live in or not, once the gates have said which can be walked to and the roads are drawn.
+    /// Returns whether it has been done. Said once in the log, every town named with its reason.
+    /// </summary>
     public static bool Reckon(Map map)
     {
         if (Reckoned)
@@ -247,8 +280,20 @@ public static class BotSettle
         return info.Shops < LeastShops ? $"{info.Shops} shops" : null;
     }
 
+    /// <summary>
+    /// A town for this bot to live in, or null when none will do.
+    ///
+    /// <para>
+    /// <paramref name="walks"/>: the bot will walk there from <paramref name="from"/> (the town it stands in or nearest), so a
+    /// town other than that one needs a road from it in the book that the bot is strong enough for, and must lie on land the
+    /// gates join to where the bot stands. A newborn does not walk. <paramref name="except"/> is never chosen (the town it is
+    /// leaving); nor is <paramref name="avoid"/> (the one it last left). The weighing is the class's.
+    /// </para>
+    /// </summary>
+    /// <summary>How far round a town its ground is measured against a bot choosing it. See the note in <see cref="Choose"/>.</summary>
     public static int HinterlandTiles { get; set; } = 60;
 
+    /// <summary>Towns passed over in a choice because their ground asked more than the bot brings.</summary>
     public static long Hinterland { get; private set; }
 
     public static BotTowns.Town Choose(BotMobile bot, BotTowns.Town from, bool walks, BotTowns.Town except, string avoid, out int outmatched)
@@ -284,6 +329,7 @@ public static class BotSettle
                 continue;
             }
 
+            // A town under a quarantine or a standing bar is not somewhere to go and live today. See BotBarred.
             if (BotBarred.Holds(map, info.Hearth))
             {
                 Barred++;
@@ -291,11 +337,17 @@ public static class BotSettle
                 continue;
             }
 
+            // Nor a town that has put the bot's guild out for failing its tasks, until the time is up (29.09.2026). See BotBurgh.
             if (BotBurgh.Turns(bot, town))
             {
                 continue;
             }
 
+            // <b>Nor a town whose own ground is past the bot (29.09.2026, build 322).</b> The road was measured against the bot's
+            // strength and the town's hinterland was not: on 322, the first boot the residents of Minoc and Jhelom hunted from
+            // home, eight bots fell round Minoc (ettins, orcs, an orcish lord) and five round Jhelom in twelve minutes, where
+            // 319 had lost none there. A town whose squares within HinterlandTiles ask more than the bot brings (at the
+            // traveller's odds) is passed over, as a road that asks too much is. The home town is not: it is where the weak live.
             if (bot != null && own > 0.0 && !ReferenceEquals(town, HomeTown)
                 && BotQuad.MuscleNear(map, info.Hearth, HinterlandTiles) * BotTraveller.Odds > own)
             {
@@ -308,6 +360,7 @@ public static class BotSettle
             {
                 var road = from == null ? null : BotRoadbook.Between(from.Name, town.Name);
 
+                // No road in the book: only a town the gates reach, and only when those are let in. See GateTowns.
                 if (road is not { Steps: > 0 })
                 {
                     if (!GateTowns)

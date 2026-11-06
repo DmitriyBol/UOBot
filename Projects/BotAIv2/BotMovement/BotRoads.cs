@@ -49,22 +49,32 @@ public static class BotRoads
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRoads));
 
+    /// <summary>Whether the flood is run at all. Off, every answer is "unknown".</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// How far from home the flood goes, each way. The darts land within five hundred tiles of the asker; the rest is
+    /// room for a road that bends out past them and back.
+    /// </summary>
     public static int Reach { get; set; } = 640;
 
+    /// <summary>The most one slice may spend on the game loop.</summary>
     public static double SliceMs { get; set; } = 8.0;
 
+    /// <summary>How often a slice runs.</summary>
     public static int SliceEveryMs { get; set; } = 100;
 
+    /// <summary>How many expansions pass between two readings of the clock.</summary>
     private const int ClockEvery = 64;
 
+    /// <summary>How far round home the flood looks for somewhere to begin, when home itself will take nobody.</summary>
     private const int StartSweep = 8;
 
     private static Map _map;
 
     private static Point3D _home;
 
+    /// <summary>Where the flood started: the population's home as it was when the map was drawn.</summary>
     public static Point3D Home => _home;
 
     private static int _x0;
@@ -73,14 +83,27 @@ public static class BotRoads
 
     private static int _side;
 
+    /// <summary>Steps from home plus one, per tile of the square; nought for a tile the flood has not reached.</summary>
     private static ushort[] _steps;
 
+    /// <summary>The height each tile was first reached at.</summary>
     private static sbyte[] _heights;
 
+    /// <summary>
+    /// Per tile, at the height it was first reached, the steps a body may take from it: the engine's step mask, and a
+    /// diagonal only where both its flanks are open. Nought for a tile the flood did not reach. What <see cref="BotChart"/>
+    /// is drawn from, so the chart costs no look at the world of its own. Items standing in the way are not in it; the
+    /// planner walking each leg steps round them.
+    /// </summary>
     private static byte[] _exits;
 
+    /// <summary>A tile reached again at another height band, by cell, with its steps plus one.</summary>
     private static readonly Dictionary<int, ushort> _stacked = [];
 
+    /// <summary>
+    /// The ring being expanded and the ring it is making: a tile's index in the square shifted left eight bits, and its
+    /// height in the low byte.
+    /// </summary>
     private static List<int> _ring = [];
 
     private static List<int> _next = [];
@@ -93,22 +116,30 @@ public static class BotRoads
 
     private static long _begunTick;
 
+    /// <summary>Whether the flood has finished. Until then every answer is "unknown".</summary>
     public static bool Ready { get; private set; }
 
+    /// <summary>Whether the flood could not begin at all, for want of footing anywhere near home.</summary>
     public static bool Failed { get; private set; }
 
+    /// <summary>Tiles reached, a second height on one tile counted again.</summary>
     public static long Tiles { get; private set; }
 
+    /// <summary>Slices run.</summary>
     public static long Slices { get; private set; }
 
+    /// <summary>The game loop the slices cost, in milliseconds.</summary>
     public static double SpentMs { get; private set; }
 
+    /// <summary>From the first slice to the last, by the wall clock.</summary>
     public static long TookMs { get; private set; }
 
+    /// <summary>Questions asked of the map, and how many it had no answer to.</summary>
     public static long Asked { get; private set; }
 
     public static long Unknown { get; private set; }
 
+    /// <summary>One slice of the flood. Called on a timer until <see cref="Ready"/> or <see cref="Failed"/>.</summary>
     public static void Slice()
     {
         if (!Running || Ready || Failed)
@@ -163,6 +194,15 @@ public static class BotRoads
         }
     }
 
+    /// <summary>
+    /// Steps of road from home to a tile, or -1 when there is no answer: the flood has not finished, the tile lies outside
+    /// its square, or no road inside the square reaches it or the tiles beside it.
+    /// </summary>
+    /// <summary>
+    /// Whether the map has anything to say about this tile: the flood is finished and the tile lies inside its square.
+    /// Outside it <see cref="FromHome"/>'s -1 means "not looked at", inside it means "no road" — and a chooser that
+    /// refuses ground on -1 alone would refuse the whole island past <see cref="Reach"/>.
+    /// </summary>
     public static bool Covers(Map map, int x, int y) =>
         Ready && map != null && map == _map && x >= _x0 && y >= _y0 && x < _x0 + _side && y < _y0 + _side;
 
@@ -179,6 +219,8 @@ public static class BotRoads
 
         var best = int.MaxValue;
 
+        // The tile itself, or the nearest of the tiles beside it and one step more: a dart is settled on a tile, and a
+        // tile with a crate on it is still beside the road.
         for (var dy = -1; dy <= 1; dy++)
         {
             for (var dx = -1; dx <= 1; dx++)
@@ -217,6 +259,11 @@ public static class BotRoads
         return best;
     }
 
+    /// <summary>
+    /// How many steps, at least, the road from <paramref name="from"/> to <paramref name="to"/> runs past the straight line
+    /// between them, or -1 when the map cannot say. At least, because from anywhere but home this knows only the road
+    /// from home to each end.
+    /// </summary>
     public static int Detour(Map map, Point3D from, Point3D to)
     {
         var road = FromHome(map, to.X, to.Y);
@@ -238,6 +285,20 @@ public static class BotRoads
         return Math.Max(0, road - own - straight);
     }
 
+    /// <summary>
+    /// How much further round from home <paramref name="to"/> lies than <paramref name="from"/> — each end's road from home
+    /// less its straight line from home, the one taken from the other — or -1 when the map cannot say.
+    ///
+    /// <para>
+    /// <b>The question <see cref="Detour"/> cannot answer from anywhere but home.</b> Detour is a lower bound reckoned
+    /// through home, and a bot choosing from beside the river, or from the south, sees no detour to ground beyond it:
+    /// on 24.09.2026 (build 209, 11:01–11:37) ten prowls stopped on the bank at (1088–1091, 1617–1644) for destinations
+    /// at (928–1025, 1593–1696), whose road from home is 800 to 890 tiles for some 450 in a straight line — ground 350 to
+    /// 450 tiles "round", where the bank itself and the town are nought to a few dozen. Two places whose roundness differs
+    /// by that much have the river between them whichever side of it the asker stands on; two places on the far side
+    /// differ by little, so a bot over there still hunts over there.
+    /// </para>
+    /// </summary>
     public static int Behind(Map map, Point3D from, Point3D to)
     {
         var road = FromHome(map, to.X, to.Y);
@@ -254,6 +315,10 @@ public static class BotRoads
         return Math.Max(0, toRound - fromRound);
     }
 
+    /// <summary>
+    /// How much further round by road than each other two places lie — the larger of the two ways <see cref="Behind"/> can
+    /// be asked — or nought when the map cannot say. A river between them, whichever side the asker stands on.
+    /// </summary>
     public static int Farther(Map map, Point3D a, Point3D b)
     {
         var ra = FromHome(map, a.X, a.Y);
@@ -292,6 +357,7 @@ public static class BotRoads
         return $"the road map from {_home}: {Tiles} tiles reached within {(_side - 1) / 2} tiles each way, the farthest {_depth} steps of road, drawn in {Slices} slices and {SpentMs:F0}ms of the loop over {TookMs / 1000.0:F1}s; {Asked} questions asked of it, {Unknown} without an answer";
     }
 
+    /// <summary>Everything back to nothing, for a world that has just been replaced.</summary>
     public static void Forget()
     {
         Ready = false;
@@ -315,6 +381,7 @@ public static class BotRoads
     {
         var map = BotPopulation.Home;
 
+        // Not placed yet: asked again at the next slice.
         if (map == null || map == Map.Internal)
         {
             return false;
@@ -325,6 +392,7 @@ public static class BotRoads
         _map = map;
         _home = BotPopulation.Where;
 
+        // The navigation graph of the same map, drawn outward from the same home. See NavigationService.
         Server.Engines.Pathing.Tiered.NavigationService.Prepare(map, _home);
 
         var reach = Math.Clamp(Reach, 16, 2000);
@@ -374,6 +442,11 @@ public static class BotRoads
         return true;
     }
 
+    /// <summary>
+    /// Somewhere at or near home a body could stand. Home is a muster point, and a muster point is the one tile on the
+    /// island most likely to be refused for being crowded — so it is asked in rings, nearest first, as the far-side look
+    /// asks about a destination.
+    /// </summary>
     private static bool Footing(Map map, Point3D home, out int x, out int y, out sbyte z)
     {
         var homeZ = (sbyte)Math.Clamp(home.Z, sbyte.MinValue, sbyte.MaxValue);
@@ -419,6 +492,7 @@ public static class BotRoads
         return false;
     }
 
+    /// <summary>Whether a tile at a height has been reached already, at that height band.</summary>
     private static bool Seen(int index, int x, int y, sbyte z)
     {
         if (_steps[index] == 0)
@@ -450,6 +524,11 @@ public static class BotRoads
         _next.Add((index << 8) | (z + 128));
     }
 
+    /// <summary>
+    /// Every step a body could take from one tile of the ring, by the planner's own rules. See <c>BotPath.Enclose</c>,
+    /// whose flood this repeats: a flood stricter than the engine would call open ground far, and one looser would call
+    /// the far bank near.
+    /// </summary>
     private static void Expand(Map map, int node)
     {
         var index = node >> 8;
@@ -465,6 +544,7 @@ public static class BotRoads
             return;
         }
 
+        // The tile's ways out, for the chart, at the height the tile was first reached: a diagonal only with both flanks.
         if (z == _heights[index])
         {
             var exits = (int)walk;
@@ -500,6 +580,7 @@ public static class BotRoads
 
             var nz = mask.GetWalkZ((Direction)d);
 
+            // Asked before the items, which cost a look at the tile: most steps in a flood land on ground already reached.
             if (Seen((ny - _y0) * _side + (nx - _x0), nx, ny, nz))
             {
                 continue;
@@ -549,11 +630,17 @@ public static class BotRoads
             TookMs / 1000.0
         );
 
+        // Every guild's seat asked of the finished map. See BotSeat.Audit.
         BotSeat.Audit();
 
+        // And the coarse chart drawn from it, on the same timer. See BotChart.
         BotChart.Begin();
     }
 
+    /// <summary>
+    /// The finished flood, lent to <see cref="BotChart"/>: the map, the square's corner and side, each tile's ways out and
+    /// the height it was reached at. False until the flood is finished.
+    /// </summary>
     public static bool Lend(out Map map, out int x0, out int y0, out int side, out byte[] exits, out sbyte[] heights)
     {
         map = _map;

@@ -244,6 +244,7 @@ public sealed class NavGraphSnapshot
 
     public NavClusterSnapshot[] Clusters;
 
+    /// <summary>Clusters that had a multi in or beside them when the snapshot was taken.</summary>
     public int[] Housed = [];
 
     public long Gates;

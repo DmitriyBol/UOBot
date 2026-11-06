@@ -47,6 +47,10 @@ public static class BotDungeon
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDungeon));
 
+    /// <summary>One dungeon: a name, a box, the rooms found in it and what lives in them.</summary>
+    /// <summary>
+    /// How far past its box a body may be and still count as being down the dungeon. See <c>Deep.Holds</c>.
+    /// </summary>
     public static int Margin { get; set; } = 32;
 
     public sealed class Deep
@@ -61,22 +65,56 @@ public static class BotDungeon
 
         public Rectangle2D Bounds { get; }
 
+        /// <summary>Where a party can stand, taken from the spawners inside the box.</summary>
         public List<Point3D> Rooms { get; } = [];
 
+        /// <summary>What the spawners inside it name, once each.</summary>
         public List<string> Kinds { get; } = [];
 
+        /// <summary>The average of what one of its creatures is worth in <see cref="BotThreat.Power"/>.</summary>
         public double Power { get; set; }
 
+        /// <summary>And the worst of them, which is what actually kills a party.</summary>
         public double Worst { get; set; }
 
+        /// <summary>How many creatures its spawners are set to keep alive.</summary>
         public int Heads { get; set; }
 
+        /// <summary>Delves that ended in this one, for the summary.</summary>
         public long Runs;
 
+        /// <summary>The middle of the box, for a line of log.</summary>
         public Point2D Middle => new(Bounds.X + Bounds.Width / 2, Bounds.Y + Bounds.Height / 2);
 
         public bool Ready => Rooms.Count > 0 && Power > 0.0;
 
+        /// <summary>
+        /// Whether a body is still down this dungeon, which is a wider question than whether it is inside
+        /// the box.
+        ///
+        /// <para>
+        /// <b>The box is drawn round the spawners, and a dungeon is bigger than its spawners.</b> Its job
+        /// is to say which spawners belong to which name, and for that it wants to be tight. The question
+        /// here is a different one — "is this bot with its party, or is it back on the island" — and for
+        /// that the box is the wrong shape by a corridor's width.
+        /// </para>
+        ///
+        /// <para>
+        /// It cost five delves to find out. On the evening of 11.09.2026 every party's leader was ruled
+        /// out of the Orc Caves at least once, and every single one of them was standing at y 1294 — one
+        /// tile north of a box whose top edge is 1295. <c>Rectangle2D.Contains</c> is start-inclusive, so
+        /// the tile the orcs were on was outside the dungeon by arithmetic. Four delves the evening before
+        /// ended on it, and the reading it invited was that something on the island was pulling bodies out
+        /// of the ground, which nothing was.
+        /// </para>
+        ///
+        /// <para>
+        /// <see cref="Margin"/> is generous on purpose. There is no wrong answer between "a few tiles past
+        /// the spawners" and "the next dungeon along", because what this is really distinguishing is a bot
+        /// underground from a bot a few thousand tiles away in Britain, and nothing at all lives in
+        /// between.
+        /// </para>
+        /// </summary>
         public bool Holds(Point3D where) =>
             where.X >= Bounds.Start.X - Margin
             && where.X < Bounds.End.X + Margin
@@ -86,6 +124,12 @@ public static class BotDungeon
         public override string ToString() => $"{Name} ({Rooms.Count} rooms, {Power:F0} each, worst {Worst:F0})";
     }
 
+    /// <summary>
+    /// The twelve, with the boxes each one's spawners actually occupy.
+    ///
+    /// Felucca only, by the same rule the rest of the shard follows: the population lives there, and a
+    /// dungeon on a map nobody is on is a place nobody can be brought back from.
+    /// </summary>
     private static readonly Deep[] _deeps =
     [
         new("the Orc Caves", 5280, 1295, 5365, 1385),
@@ -104,6 +148,7 @@ public static class BotDungeon
 
     public static IReadOnlyList<Deep> All => _deeps;
 
+    /// <summary>The dungeon whose box, margin and all, holds this place; null on the island.</summary>
     public static Deep Holding(Point3D where)
     {
         for (var i = 0; i < _deeps.Length; i++)
@@ -117,6 +162,7 @@ public static class BotDungeon
         return null;
     }
 
+    /// <summary>Whether this place lies inside any dungeon's box, margin and all. Twelve comparisons; asked per appraisal.</summary>
     public static bool Under(Point3D where)
     {
         for (var i = 0; i < _deeps.Length; i++)
@@ -130,14 +176,19 @@ public static class BotDungeon
         return false;
     }
 
+    /// <summary>Whether the survey has been done since the world was loaded.</summary>
     public static bool Surveyed { get; private set; }
 
+    /// <summary>Rooms found, across every dungeon.</summary>
     public static int Rooms { get; private set; }
 
+    /// <summary>Creature kinds measured. See <see cref="Might"/>.</summary>
     public static int Measured { get; private set; }
 
+    /// <summary>Kinds named by a spawner that the engine could not build. Each is a room nobody can price.</summary>
     public static int Unknown { get; private set; }
 
+    /// <summary>What one creature of each kind is worth, measured once.</summary>
     private static readonly Dictionary<string, double> _might = [];
 
     /// <summary>
@@ -150,6 +201,7 @@ public static class BotDungeon
 
     private static readonly Dictionary<string, KindTraits> _traits = [];
 
+    /// <summary>The traits of a kind by the name a spawner uses; false when it could not be built. Builds it on first ask.</summary>
     public static bool Traits(string named, out KindTraits traits)
     {
         traits = default;
@@ -164,6 +216,10 @@ public static class BotDungeon
         return _traits.TryGetValue(named, out traits);
     }
 
+    /// <summary>
+    /// Walks every box and reads what is in it. Costs one pass over the spawners of twelve rectangles and
+    /// one construction per distinct creature kind, once per world load.
+    /// </summary>
     public static void Survey(Map map)
     {
         if (Surveyed || map == null || map == Map.Internal)
@@ -247,6 +303,20 @@ public static class BotDungeon
         deep.Power = counted == 0 ? 0.0 : total / counted;
     }
 
+    /// <summary>
+    /// What one of these is worth in a fight, built once to be asked and destroyed in the same breath.
+    ///
+    /// <para>
+    /// <b>It must not survive the question.</b> Constructing a creature puts a real mobile into the world;
+    /// leaving it there would be one monster in limbo per kind, for ever, and a world save full of them.
+    /// The same rule and the same shape as <c>BotHarness.Sample</c>, which measures armour.
+    /// </para>
+    ///
+    /// <para>
+    /// Anything that is not a creature — a treasure chest, a piece of scenery a spawner happens to place —
+    /// is worth nothing and is not counted, which is right: a party is not made safer by the barrels.
+    /// </para>
+    /// </summary>
     public static double Might(string named)
     {
         if (string.IsNullOrWhiteSpace(named))
@@ -293,6 +363,9 @@ public static class BotDungeon
         }
         catch (Exception)
         {
+            // A creature whose constructor wants arguments is a creature this cannot price, and that is a
+            // fact worth counting rather than an error worth throwing: the spawner will still make it and
+            // the party will still meet it, so the dungeon is simply reckoned off the kinds that did build.
             Unknown++;
         }
         finally
@@ -305,6 +378,7 @@ public static class BotDungeon
         return might;
     }
 
+    /// <summary>One dungeon by name, or nothing.</summary>
     public static Deep Find(string name)
     {
         for (var i = 0; i < _deeps.Length; i++)
@@ -318,6 +392,17 @@ public static class BotDungeon
         return null;
     }
 
+    /// <summary>
+    /// Somewhere inside it to be put down, and somewhere to walk to next.
+    ///
+    /// <para>
+    /// Settled against the map rather than taken as the spawner wrote it. A spawner's own Z is where the
+    /// spawner is, which in a dungeon is usually the floor and occasionally a shelf on the wall; a party
+    /// put down at a height nothing can stand at is a party that cannot take a step. See the rule this
+    /// project keeps relearning: a point whose Z came out of anything but the map is a place nothing can
+    /// stand on.
+    /// </para>
+    /// </summary>
     public static Point3D Room(Map map, Deep deep, int which)
     {
         if (map == null || deep == null || deep.Rooms.Count == 0)
@@ -332,14 +417,29 @@ public static class BotDungeon
             : room;
     }
 
+    /// <summary>
+    /// How often every dungeon spawner short of its count is made to put one more creature down. Nought turns it off.
+    ///
+    /// <para>
+    /// <b>Patrick's order of 25.09.2026: delves for everybody and more often — "and above all the monsters there must
+    /// come back, or there will be no fight".</b> A spawner puts one creature down per tick of its own clock, five to ten
+    /// minutes on every one of the Orc Caves' nineteen (Data/Spawns/shared/felucca/OrcCaves.json), so a room a party
+    /// emptied took twenty to forty minutes to fill again — about the time a band waited between delves, and a party
+    /// that now comes every ten minutes would find the cave empty. Once a minute each of them adds one more of what it
+    /// keeps, up to its own count and never past it; nothing about the spawners themselves is changed or saved.
+    /// </para>
+    /// </summary>
     public static int RestockMs { get; set; } = 60000;
 
+    /// <summary>Creatures put back by the restock. See <see cref="RestockMs"/>.</summary>
     public static long Restocked { get; private set; }
 
+    /// <summary>Every spawner inside a dungeon's box, from the survey.</summary>
     private static readonly List<BaseSpawner> _spawners = [];
 
     private static long _restockedTick;
 
+    /// <summary>One creature more from every dungeon spawner that is running and short, at most once a <see cref="RestockMs"/>.</summary>
     public static void Restock()
     {
         if (RestockMs <= 0 || !Surveyed || Core.TickCount - _restockedTick < RestockMs)
@@ -360,6 +460,7 @@ public static class BotDungeon
                 continue;
             }
 
+            // A group spawner fills all at once when its last is gone; its own clock does that, and it is left alone.
             if (!spawner.Running || spawner.Group || spawner.IsFull)
             {
                 continue;
@@ -398,6 +499,7 @@ public static class BotDungeon
             + $"{Restocked} creatures put back by the restock, one a spawner every {RestockMs / 1000}s";
     }
 
+    /// <summary>A world reload is a different world, and the rooms are items in it.</summary>
     public static void Forget()
     {
         for (var i = 0; i < _deeps.Length; i++)
@@ -410,6 +512,8 @@ public static class BotDungeon
             _deeps[i].Runs = 0;
         }
 
+        // The measurements are about types rather than about the world, but a reload is the one moment this
+        // shard has for putting everything back, and re-measuring twelve dozen creatures costs milliseconds.
         _might.Clear();
         _traits.Clear();
         _spawners.Clear();

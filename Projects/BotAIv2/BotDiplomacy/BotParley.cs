@@ -41,65 +41,133 @@ public static class BotParley
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotParley));
 
+    /// <summary>Whether wars and alliances wait for a meeting. Off, and <c>BotRegard</c> declares and allies at once, as before.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// Whether the module has started. Until it has — the first seconds of a boot, or a shard with the module switched off
+    /// (<c>bots.diplomacy.enabled</c>) — a grievance is declared as it always was, rather than held for a meeting nobody runs.
+    /// </summary>
     public static bool Active { get; internal set; }
 
+    /// <summary>
+    /// How many meetings between guilds may stand at once, and how many audiences with towns. Two and two: the debugger's squad
+    /// is three watchers and a marshal, one witness each, and a meeting spends most of its life on the road, not before one.
+    /// </summary>
     public static int MostMeetings { get; set; } = 2;
 
     public static int MostAudiences { get; set; } = 2;
 
+    /// <summary>How often the meetings are advanced, in milliseconds. Two seconds: a line every few seconds needs no finer clock.</summary>
     public static int BeatMs { get; set; } = 2000;
 
+    /// <summary>How often the guilds are looked over for a meeting worth calling, and the towns' tasks checked. A minute.</summary>
     public static int LookMs { get; set; } = 60000;
 
+    /// <summary>How long a called meeting waits for anybody of the guest guild to set out. Twenty minutes.</summary>
     public static int OfferMs { get; set; } = 1200000;
 
+    /// <summary>How long an envoy may walk before it gives up the road. Thirty minutes: Cove is some eight hundred tiles from Britain.</summary>
     public static int MarchMs { get; set; } = 1800000;
 
+    /// <summary>How long an envoy's or host's errand may go without saying it is still on it before the meeting looks for another.</summary>
     public static int ClaimMs { get; set; } = 180000;
 
+    /// <summary>How near the place the envoy must be before the host is asked to send somebody. See <see cref="BotHearing.HostWanted"/>.</summary>
     public static int HostCallTiles { get; set; } = 150;
 
+    /// <summary>How long after the envoy arrives the host is waited for before the meeting is heard without it. Four minutes.</summary>
     public static int HostWaitMs { get; set; } = 240000;
 
+    /// <summary>How long after the envoy arrives a witness is waited for before the meeting goes on unwitnessed. Three minutes.</summary>
     public static int WitnessWaitMs { get; set; } = 180000;
 
+    /// <summary>Between two lines of a hearing, in milliseconds. Five seconds: long enough to read, short enough to watch.</summary>
     public static int LineMs { get; set; } = 5000;
 
+    /// <summary>
+    /// How long after the last line the duke's word is waited for before the rule gives it. Two minutes: a cold load of the
+    /// model is half a minute, and the one slot may be held by a watcher's own question.
+    /// </summary>
     public static int JudgeWaitMs { get; set; } = 120000;
 
+    /// <summary>The longest a meeting may stand, from the call, before it lapses whatever stage it is at. Ninety minutes.</summary>
     public static int LongestMs { get; set; } = 5400000;
 
+    /// <summary>
+    /// How long two guilds wait after a meeting that ended in an agreement or a war before they may be called to another. Two
+    /// hours: the duke's word stands, and a grievance that crosses the line again meanwhile waits for it.
+    /// </summary>
     public static int MeetEveryMs { get; set; } = 7200000;
 
+    /// <summary>And after one that ended in nothing, or lapsed. Half an hour.</summary>
     public static int RetryMs { get; set; } = 1800000;
 
+    /// <summary>How near the place an envoy or host must stand to be at the meeting.</summary>
     public static int ArriveTiles { get; set; } = 4;
 
+    /// <summary>
+    /// The share of the war line (<c>BotRegard.Enmity</c>) at which a guild that is thought ill of goes to ask for peace. A half:
+    /// with the war line at −100, a guild asks at −50, before the other's grievance becomes a war.
+    /// </summary>
     public static double WaryShare { get; set; } = 0.5;
 
+    /// <summary>At or above this, both ways, two guilds on good terms go to agree trade. Twenty-five.</summary>
     public static double Cordial { get; set; } = 25.0;
 
+    /// <summary>The chance, per look, that a pair eligible for a peace or a trade meeting calls one. A fifth: on average in five minutes.</summary>
     public static double CallOdds { get; set; } = 0.2;
 
+    /// <summary>How far a guild's seat may lie from a town's square and still be that town's. Three hundred tiles.</summary>
     public static int SeatTownTiles { get; set; } = 300;
 
+    /// <summary>
+    /// Whether a guild whose seat stands inside its town's walls — a building of its own there — is met at its seat rather than
+    /// at the town's hall. Off, by the order's words ("the main building of the town"), and because a guild's own doors may
+    /// open to its members only: an envoy that cannot get through the door cannot be heard.
+    /// </summary>
     public static bool MeetAtSeat { get; set; } = false;
 
+    /// <summary>
+    /// The town's main building, by town name, as [x, y], where the file says one; everywhere else the town's bank. Configured
+    /// in <c>bot-diplomacy.json</c> as <c>"Halls": { "Britain": [1434, 1699] }</c>.
+    /// </summary>
     public static Dictionary<string, int[]> Halls { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The model the duke and the towns' voice are asked with. Empty means the population's own (<c>BotOllama.Model</c>,
+    /// qwen3.5:9b), which answers this kind of question in a couple of seconds warm and without thinking; the watchers' own
+    /// thinking model would hold the one card for minutes over a word that is half a sentence.
+    /// </summary>
     public static string JudgeModel { get; set; }
 
+    /// <summary>
+    /// How long that model is kept on the card after a word. Ten seconds, the watchers' own figure: a meeting is rare, and a
+    /// model held for half an hour would push the watchers' model off the card for every one of their questions meanwhile.
+    /// </summary>
     public static string JudgeKeepAlive { get; set; } = "10s";
 
+    /// <summary>How long one ask may take before the transport gives it up. Ninety seconds: a cold load is half a minute.</summary>
     public static int JudgeTimeoutMs { get; set; } = 90000;
 
+    // ---- the hooks the thinking assembly fills; this one may not reference it ------------------------------------------
+
+    /// <summary>
+    /// Puts a witness at the meeting and returns its body, or null when none is free. Filled by the debugger (<c>BotWitness</c>),
+    /// which teleports one of its watchers there and makes it visible; null when the debugger is not loaded.
+    /// </summary>
     public static Func<BotHearing, Mobile> Summon { get; set; }
 
+    /// <summary>The witness goes back to watching, hidden again. Filled by the debugger.</summary>
     public static Action<BotHearing> Dismiss { get; set; }
 
+    /// <summary>
+    /// Asks the model for the word: the duke for two guilds, the town's voice for a town. Returns whether it was asked; the
+    /// answer comes back on the game thread, or null. Filled by the debugger, which owns the one slot's queue.
+    /// </summary>
     public static Func<BotHearing, Action<BotVerdict>, bool> Judge { get; set; }
+
+    // ---- counters ------------------------------------------------------------------------------------------------------
 
     public static long Called { get; private set; }
 
@@ -113,6 +181,7 @@ public static class BotParley
 
     public static long HostsAbsent { get; private set; }
 
+    /// <summary>Meetings that lapsed, by why.</summary>
     public static long NoEnvoy { get; private set; }
 
     public static long Lost { get; private set; }
@@ -121,20 +190,24 @@ public static class BotParley
 
     public static long Vanished { get; private set; }
 
+    /// <summary>Grievances that found a meeting of the pair already called, or the duke's word still standing, or no room.</summary>
     public static long Pending { get; private set; }
 
     public static long Standing { get; private set; }
 
     public static long Queued { get; private set; }
 
+    /// <summary>Meetings that could not be called because the guest could not walk to the host's town at all.</summary>
     public static long Unreachable { get; private set; }
 
+    /// <summary>Wars declared at a meeting, wars the war's rules refused at the verdict, alliances sworn.</summary>
     public static long Wars { get; internal set; }
 
     public static long Forbidden { get; internal set; }
 
     public static long Alliances { get; internal set; }
 
+    /// <summary>Model answers that came back after the rule had already given the word, and that could not be read.</summary>
     public static long Late { get; private set; }
 
     public static long Unread { get; private set; }
@@ -153,13 +226,22 @@ public static class BotParley
 
     private static bool _everLooked;
 
+    /// <summary>The meetings standing, for the page, the proposer and Argus.</summary>
     public static IReadOnlyList<BotHearing> Meetings => _meetings;
 
+    /// <summary>The last few meetings' endings, newest last.</summary>
     public static IReadOnlyList<string> Recent => _recent;
 
     private static (string A, string B) Pair(string one, string other) =>
         string.CompareOrdinal(one, other) <= 0 ? (one, other) : (other, one);
 
+    // ---- where -----------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// A town's main building, where its meetings are held: the file's word for the town (<see cref="Halls"/>), else the bank
+    /// nearest its middle (<c>BotSettle.Amenities.Hearth</c>, settled on the ground beside the banker), else its square.
+    /// Asked once per town and kept.
+    /// </summary>
     public static Point3D Hall(BotTowns.Town town)
     {
         if (town == null)
@@ -191,6 +273,7 @@ public static class BotParley
             at = town.Square;
         }
 
+        // Kept only once the gates can say whether it is walked to; before that it is asked again next time.
         if (!BotGates.Ready)
         {
             return at;
@@ -203,12 +286,21 @@ public static class BotParley
         return at;
     }
 
+    /// <summary>How far from a hall standing in a pocket of its own its doorstep is looked for. See <see cref="Doorstep"/>.</summary>
     public static int DoorstepTiles { get; set; } = 16;
 
+    /// <summary>Halls moved to their doorstep; halls with no doorstep found joined to their town.</summary>
     public static long Doorsteps { get; private set; }
 
     public static long Doorless { get; private set; }
 
+    /// <summary>
+    /// <b>A hall no road reaches is met at its door (30.09.2026, build 340).</b> Britain's hall — the bank nearest its middle,
+    /// settled beside the banker — stood at (1427, 1686) in land 7648 of the gates' graph, a floor the walkers' graph keeps
+    /// apart from the street; <c>BotHerald</c> asks <see cref="BotGates.Joined"/> of every envoy, and 550 of 655 members asked
+    /// on 339 were refused "no walk there", so The Blade's audience with its own town stood called and never heard. The
+    /// nearest tile within <see cref="DoorstepTiles"/> that the gates join to the town's square is the meeting place instead.
+    /// </summary>
     private static Point3D Doorstep(Map map, BotTowns.Town town, Point3D at)
     {
         if (map == null || at == Point3D.Zero || town.Square == Point3D.Zero || BotGates.Joined(map, at, town.Square))
@@ -266,6 +358,17 @@ public static class BotParley
         return at;
     }
 
+    /// <summary>
+    /// Where a guild is to be met, and in which town: <b>the one question another patch may answer from a building later</b>.
+    ///
+    /// <para>
+    /// Today it asks what the shard already knows of where a guild lives. Its seat (<c>BotSeat.Of</c>: set by hand, in the
+    /// file, chosen at founding, or where its hall stands) names the town nearest it, when that is within
+    /// <see cref="SeatTownTiles"/>; a guild with no seat lives where most of its members do (<c>BotResidence</c>), else in the
+    /// home town. The place is that town's main building (<see cref="Hall"/>); a seat with no town near it is met at the seat.
+    /// When guilds come to own a house in a town, this is the function to teach it: return the house's door and its town.
+    /// </para>
+    /// </summary>
     public static bool Seat(Guild guild, out BotTowns.Town town, out Point3D at)
     {
         town = null;
@@ -308,6 +411,7 @@ public static class BotParley
         return at != Point3D.Zero;
     }
 
+    /// <summary>The town most of a guild's members live in, or null. Asked when a meeting is called, which is rare.</summary>
     public static BotTowns.Town LivesIn(Guild guild)
     {
         if (guild?.Members == null)
@@ -340,8 +444,19 @@ public static class BotParley
         return best;
     }
 
+    // ---- what calls a meeting ------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// A grievance has reached the war line and the war's rules would let it be declared: a meeting is called instead, or one
+    /// already stands, or the duke's last word between them still does. Returns false only when meetings are off, which leaves
+    /// <c>BotRegard</c> to declare as it did before. Called by <c>BotRegard.Reckon</c> and <c>BotRegard.Drift</c>.
+    /// </summary>
     public static bool Grieve(Guild mine, Guild theirs, string why) => Ask(BotTopic.Grievance, mine, theirs, why);
 
+    /// <summary>
+    /// Two guilds think well enough of each other to be allies: a meeting is called to swear it. Returns false only when
+    /// meetings are off, which leaves <c>BotRegard</c> to make the alliance at once, as before.
+    /// </summary>
     public static bool Befriend(Guild mine, Guild theirs, string why) => Ask(BotTopic.Friendship, mine, theirs, why);
 
     private static bool Ask(BotTopic topic, Guild mine, Guild theirs, string why)
@@ -351,6 +466,7 @@ public static class BotParley
             return false;
         }
 
+        // Nothing is ever agreed with The Shadow: it is every guild's enemy already, with no ledger page (BotWar.MayDeclare).
         if (mine == null || theirs == null || mine == theirs || mine.Name == BotUnderworld.GuildName || theirs.Name == BotUnderworld.GuildName)
         {
             return true;
@@ -363,6 +479,8 @@ public static class BotParley
             return true;
         }
 
+        // The first seconds of a boot, before the gates say which towns can be walked to: the grievance waits for the next
+        // drift rather than finding every town unreachable and being shut out for half an hour.
         if (!BotTowns.Ready)
         {
             Queued++;
@@ -389,6 +507,7 @@ public static class BotParley
         return true;
     }
 
+    /// <summary>The meeting standing between these two guilds, either way round, or null.</summary>
     public static BotHearing Between(string one, string other)
     {
         for (var i = 0; i < _meetings.Count; i++)
@@ -404,6 +523,11 @@ public static class BotParley
         return null;
     }
 
+    /// <summary>
+    /// The meeting standing between these two, if any, ended unheard because war has overtaken it: one of them laid claim to
+    /// the other's ground, which is war without negotiations (Patrick, 06.10.2026; <c>BotSeizure</c>). Ended before the war is
+    /// declared, so no word given at it can swear a peace or terms between two guilds at war. True when one was ended.
+    /// </summary>
     public static bool Overtake(string one, string other, string why)
     {
         var m = Between(one, other);
@@ -418,6 +542,7 @@ public static class BotParley
         return true;
     }
 
+    /// <summary>Whether this guild stands in a meeting with another guild now, either side.</summary>
     public static bool Busy(string guild)
     {
         for (var i = 0; i < _meetings.Count; i++)
@@ -433,6 +558,7 @@ public static class BotParley
         return false;
     }
 
+    /// <summary>Whether this guild has an envoy out to this town now.</summary>
     public static bool Treating(string guild, BotTowns.Town town)
     {
         for (var i = 0; i < _meetings.Count; i++)
@@ -448,6 +574,7 @@ public static class BotParley
         return false;
     }
 
+    /// <summary>Whether a guild has an envoy out to any town now. One audience at a time per guild.</summary>
     public static bool Treating(string guild)
     {
         for (var i = 0; i < _meetings.Count; i++)
@@ -461,8 +588,10 @@ public static class BotParley
         return false;
     }
 
+    /// <summary>Whether another meeting between guilds may be called now. See <see cref="MostMeetings"/>.</summary>
     public static bool Room => Running && Count(true) < MostMeetings;
 
+    /// <summary>Whether another audience with a town may be called now. See <see cref="MostAudiences"/>.</summary>
     public static bool AudienceRoom => BotBurgh.Running && Count(false) < MostAudiences;
 
     private static int Count(bool between)
@@ -492,6 +621,8 @@ public static class BotParley
 
         var map = BotPopulation.Home;
 
+        // The guest must be able to walk there at all. Asked of the gates from where the guest lives, once; each envoy is asked
+        // again from where it stands (BotHerald).
         Seat(guest, out _, out var from);
 
         if (from != Point3D.Zero && !BotGates.Joined(map, from, at))
@@ -527,6 +658,7 @@ public static class BotParley
         return m;
     }
 
+    /// <summary>A guild's envoy to a town. Called by <c>BotBurgh.Look</c>, which decides when.</summary>
     public static BotHearing Audience(Guild guild, BotTowns.Town town, string why)
     {
         if (guild == null || town == null || !AudienceRoom)
@@ -582,6 +714,12 @@ public static class BotParley
         return m;
     }
 
+    // ---- who goes --------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The meeting this bot's guild wants somebody at, and in which part: its envoy, or its answerer. Asked by the proposer for
+    /// every free bot, and answers from a list of a handful (<see cref="MostMeetings"/>, <see cref="MostAudiences"/>).
+    /// </summary>
     public static BotHearing Wanting(BotMobile bot, out bool asHost)
     {
         asHost = false;
@@ -621,6 +759,7 @@ public static class BotParley
     private static bool Held(BotMobile who, long tick, long now) =>
         who is { Deleted: false, Alive: true } && now - tick < ClaimMs;
 
+    /// <summary>A bot has taken the errand. Called from <c>BotEnvoy.Taken</c>, never at the offer (DECISIONS A7).</summary>
     public static void Took(BotHearing m, BotMobile bot, bool asHost)
     {
         if (m == null || bot == null)
@@ -657,6 +796,7 @@ public static class BotParley
         );
     }
 
+    /// <summary>The errand said it is still on it. Called on every beat of <c>BotEnvoy.Advance</c>.</summary>
     public static void Still(BotHearing m, BotMobile bot, bool asHost)
     {
         if (m == null || bot == null)
@@ -674,6 +814,7 @@ public static class BotParley
         }
     }
 
+    /// <summary>The errand is over. Its bot is let go of the meeting, and one that could not get there is not asked again.</summary>
     public static void Let(BotHearing m, BotMobile bot, bool asHost, bool couldNotReach)
     {
         if (m == null || bot == null)
@@ -710,9 +851,13 @@ public static class BotParley
         }
     }
 
+    /// <summary>Whether this bot stands at the meeting's place.</summary>
     public static bool There(BotHearing m, Mobile who) =>
         who is { Deleted: false, Alive: true } && who.Map == m.Map && who.InRange(m.Place, ArriveTiles);
 
+    // ---- the clock ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>Every meeting a step on. On the module's own timer, every <see cref="BeatMs"/>.</summary>
     public static void Beat()
     {
         var now = Core.TickCount;
@@ -724,6 +869,8 @@ public static class BotParley
             _everLooked = true;
             _lookedTick = now;
 
+            // Two switches: meetings between guilds (Running) and the towns' dealings (BotBurgh.Running). A meeting already
+            // called is seen through whichever is turned off meanwhile.
             if (Running)
             {
                 Look();
@@ -779,6 +926,7 @@ public static class BotParley
 
         if (m.Envoy != null && !Held(m.Envoy, m.EnvoyTick, now) && m.Stage < BotHearingStage.Hearing)
         {
+            // The envoy died, went to rest, or its errand was taken off it without a word: somebody else may go.
             m.Envoy = null;
             m.Stage = BotHearingStage.Called;
             m.StageTick = now;
@@ -882,10 +1030,12 @@ public static class BotParley
         }
     }
 
+    /// <summary>The envoy is there: the witness is sent for, the host is waited for, and when both are settled the hearing opens.</summary>
     private static void Gather(BotHearing m, long now)
     {
         if (!There(m, m.Envoy))
         {
+            // Walked off — a flight, a fight — and is on its way back, or is not: the walk stage decides which.
             m.Stage = BotHearingStage.Walking;
             m.StageTick = now;
 
@@ -926,6 +1076,7 @@ public static class BotParley
         Open(m, now);
     }
 
+    /// <summary>The hearing opens: the lines are written, the model is asked, and the first line is due.</summary>
     private static void Open(BotHearing m, long now)
     {
         m.Stage = BotHearingStage.Hearing;
@@ -959,6 +1110,7 @@ public static class BotParley
         );
     }
 
+    /// <summary>The model's answer, on the game thread. Used if it is in time and names something allowed.</summary>
     private static void Answered(BotHearing m, BotVerdict v)
     {
         if (m.Stage > BotHearingStage.Awaiting || m.Verdict != null)
@@ -981,6 +1133,7 @@ public static class BotParley
         BotDuke.Given(true);
     }
 
+    /// <summary>The word is given: carried out at once, then said, then the closing lines.</summary>
     private static void Pronounce(BotHearing m, long now)
     {
         var v = m.Verdict;
@@ -1034,8 +1187,10 @@ public static class BotParley
         );
     }
 
+    /// <summary>A long speech cut at sentences into lines the voice will carry. See <c>BotVoice.MostLetters</c>.</summary>
     private static void Words(BotHearing m, BotSpeaker who, string text, Dictionary<string, string> fill)
     {
+        // With no witness the envoy carries the word home in its own mouth: "The duke's word: …", or the town's.
         var speech = who == BotSpeaker.Envoy && m.Witness == null
             ? BotDuke.Phrase(m.Between ? "parley:relay" : "parley:relay-town", m.Envoy, new Dictionary<string, string>(fill) { ["speech"] = text })
             : text;
@@ -1071,6 +1226,7 @@ public static class BotParley
         }
     }
 
+    /// <summary>One line said aloud by whoever it belongs to, if they are there to say it; the event stream has it either way.</summary>
     private static void Speak(BotHearing m, BotSpeaker who, string line)
     {
         if (string.IsNullOrWhiteSpace(line))
@@ -1095,6 +1251,7 @@ public static class BotParley
         BotEvents.Post("parley", body?.Name ?? who.ToString(), null, m.Guest, m.Place.X, m.Place.Y, line, "unsaid", null);
     }
 
+    /// <summary>The meeting is over: the witness is sent back, the pair's clock is set, and the ending is written down.</summary>
     private static void End(BotHearing m, string ending, bool heard)
     {
         var now = Core.TickCount;
@@ -1150,6 +1307,12 @@ public static class BotParley
         BotEvents.Post("parley", m.Guest, null, m.Guest, m.Place.X, m.Place.Y, said, heard ? "heard" : "lapsed", null);
     }
 
+    // ---- the look: peace asked for, trade proposed ------------------------------------------------------------------------
+
+    /// <summary>
+    /// Once a look, over every pair of guilds: one that another has come to think ill of goes to ask it for peace, and two on
+    /// good terms go to agree trade. The pairs are the guilds squared — sixty-four at most — and each question is a lookup.
+    /// </summary>
     private static void Look()
     {
         BotPact.Sweep();
@@ -1185,6 +1348,7 @@ public static class BotParley
                 var theyOfUs = BotRegard.Of(theirs.Name, mine.Name);
                 var weOfThem = BotRegard.Of(mine.Name, theirs.Name);
 
+                // Peace, asked for by the guild that is thought ill of, while it is still above the line.
                 if (theyOfUs <= wary && theyOfUs > BotRegard.Enmity && !BotPact.Holds(mine.Name, theirs.Name, BotPact.Kind.Peace)
                     && Utility.RandomDouble() < CallOdds)
                 {
@@ -1193,6 +1357,7 @@ public static class BotParley
                     return;
                 }
 
+                // Trade, proposed by the smaller of two guilds on good terms, once.
                 if (weOfThem >= Cordial && theyOfUs >= Cordial && !mine.IsAlly(theirs) && !BotPact.Holds(mine.Name, theirs.Name, BotPact.Kind.Trade)
                     && !BotPact.Holds(mine.Name, theirs.Name, BotPact.Kind.Orders) && (mine.Members?.Count ?? 0) <= (theirs.Members?.Count ?? 0)
                     && Utility.RandomDouble() < CallOdds)
@@ -1205,6 +1370,13 @@ public static class BotParley
         }
     }
 
+    // ---- by hand ------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// <c>do meet &lt;guest&gt; ; &lt;host or town&gt; [; topic]</c> at Argus's door: a meeting called by hand, the pair's clock and the
+    /// grievance line ignored, so a person can watch one from the first step. Topics: grievance, safety, friendship, commerce;
+    /// a town's name calls an audience.
+    /// </summary>
     public static string ByHand(string tail)
     {
         var parts = (tail ?? "").Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -1263,6 +1435,7 @@ public static class BotParley
         return m == null ? "the meeting could not be called: no walk joins them, or the host has no town." : $"called: {m.Tell()}";
     }
 
+    /// <summary><c>do parley</c>: the meetings standing, the last few endings, the agreements, and the towns' favour.</summary>
     public static string Tell()
     {
         using var say = Server.Text.ValueStringBuilder.Create(512);
@@ -1281,6 +1454,8 @@ public static class BotParley
 
         return say.ToString();
     }
+
+    // ---- the summary ---------------------------------------------------------------------------------------------------------
 
     public static string Describe()
     {
@@ -1312,12 +1487,14 @@ public static class BotParley
         say.Append($"{BotDuke.Describe()}, {Late} of the model's answers late and {Unread} unreadable; {Wars} wars declared at a meeting, {Forbidden} refused by the war's rules at the word, {Alliances} alliances; ");
         say.Append($"{BotEnvoy.Describe()}; {BotHerald.Describe()}; {Doorsteps} halls met at their doorstep for standing where no road reaches, {Doorless} with none found; {BotPact.Describe()}; {BotGrievances.Describe()}");
 
+        // Ultimatums and the tribute paid instead of war (07.10.2026). See BotTribute.
         say.Append("; ");
         say.Append(BotTribute.Describe());
 
         return say.ToString();
     }
 
+    /// <summary>The pair clocks, for the store: who, and how long until they may meet again.</summary>
     public static IEnumerable<(string A, string B, long LeftMs)> Clocks()
     {
         var now = Core.TickCount;
@@ -1341,6 +1518,7 @@ public static class BotParley
         }
     }
 
+    /// <summary>A world reload: meetings in flight are dropped (their witnesses sent back) and the counters put back to nought.</summary>
     public static void Forget()
     {
         for (var i = 0; i < _meetings.Count; i++)
@@ -1353,6 +1531,7 @@ public static class BotParley
                 }
                 catch (Exception)
                 {
+                    // A witness that cannot be sent back is the debugger's to raise again.
                 }
             }
         }
@@ -1383,6 +1562,7 @@ public static class BotParley
         BotDuke.Forget();
     }
 
+    /// <summary>Patrick's reset: the clocks between guilds forgotten as well.</summary>
     public static void Wipe()
     {
         Forget();

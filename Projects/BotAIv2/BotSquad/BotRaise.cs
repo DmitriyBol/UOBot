@@ -48,44 +48,80 @@ public static class BotRaise
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRaise));
 
+    /// <summary>Whether a company raises its fallen at all. A switch: off, every death goes to the ordinary revival as before.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// How long after a death the ordinary revival is held for a company raising it. Two minutes: the revival's own minute, and a
+    /// minute more for a raiser that is walking, waiting for its mana or rolling for it. Never held for a company with nobody able.
+    /// </summary>
     public static int HoldMs { get; set; } = 120000;
 
+    /// <summary>How far from the body a member may be and still be the one to go to it. Eighteen tiles: a company's ring and its back ranks.</summary>
     public static int Reach { get; set; } = 18;
 
+    /// <summary>How long one member is given to get to the body and raise it before another is tried. Forty seconds.</summary>
     public static int ClaimMs { get; set; } = 40000;
 
+    /// <summary>Casts aimed or bandages wound by one member before another is tried. Twenty.</summary>
     public static int MaxTries { get; set; } = 20;
 
+    /// <summary>
+    /// How near the company's enemy may stand to the body before the raising waits for the fight to clear. Eight tiles: a body raised
+    /// with ten hits beside what killed it is a second corpse.
+    /// </summary>
     public static int ClearReach { get; set; } = 8;
 
+    /// <summary>
+    /// Raisings a company may spend in its life. Three — the delve's own number since Patrick's order of 11.09.2026, which a delve's
+    /// party still keeps as its own (<see cref="BotDelveParty.Raisings"/>). A company that has lost the line three times is losing.
+    /// </summary>
     public static int PerCompany { get; set; } = 3;
 
+    /// <summary>Whether a raised body gets up with the engine's ten hits and empty mana (true) or the bot's own full rising (false).</summary>
     public static bool EngineHealth { get; set; } = true;
 
+    /// <summary>The hits a body raised where it fell gets up with: the engine's <c>Mobile.Resurrect</c>.</summary>
     public static int RaisedHits { get; set; } = 10;
 
+    /// <summary>
+    /// How long a death waits for its company's first look before the ordinary revival may treat it as unclaimed. Three seconds: the
+    /// company beats once a second, and the ghost's own beat can come first.
+    /// </summary>
     public static int JudgeMs { get; set; } = 3000;
 
+    // ------------------------------------------------------------------------------------------------ stocking (BotLifeline)
+
+    /// <summary>Resurrection scrolls a bot that can read one keeps by it. One; nought turns the stocking off.</summary>
     public static int Stock { get; set; } = 1;
 
+    /// <summary>
+    /// The least chance a scroll gives this bot before it is worth carrying: one in ten, which the engine gives at 54 Magery. Under
+    /// it a scroll is an ornament — twenty tries would not raise anybody one time in eight.
+    /// </summary>
     public static double StockChance { get; set; } = 0.10;
 
+    /// <summary>Coin a bot keeps whatever the scroll costs. Three hundred: a scroll is about a hundred, and the purse is for the trade.</summary>
     public static int StockReserve { get; set; } = 300;
 
+    /// <summary>The spell. Eighth circle, id 58.</summary>
     public const int Spell = BotArsenal.SpellResurrection;
 
     public enum Means
     {
         None,
 
+        /// <summary>A resurrection scroll, read: Magery against 50–90.</summary>
         Scroll,
 
+        /// <summary>The spell from the book, with its herbs: Magery against 70–110.</summary>
         Book,
 
+        /// <summary>A bandage, by a healer of 80 Healing and 80 Anatomy: (Healing − 68) / 50.</summary>
         Bandage
     }
+
+    // ------------------------------------------------------------------------------------------------ the engine's numbers
 
     private static bool _read;
 
@@ -101,6 +137,11 @@ public static class BotRaise
 
     private static Type[] _herbs = [];
 
+    /// <summary>
+    /// The engine's own skill window and mana for the spell, read off two spells built once and never cast. The scroll's window is
+    /// the one the engine gives any spell built with an item in its scroll slot (<c>MagerySpell.GetCastSkills</c> asks only whether
+    /// there is one), so the caster's own pack stands in for it rather than a scroll made and thrown away.
+    /// </summary>
     private static void Read(Mobile caster)
     {
         if (_read || caster?.Backpack is not { } pack)
@@ -132,6 +173,7 @@ public static class BotRaise
     private static double Roll(double skill, double min, double max) =>
         max <= min ? (skill >= min ? 1.0 : 0.0) : Math.Clamp((skill - min) / (max - min), 0.0, 1.0);
 
+    /// <summary>The chance a resurrection scroll gives this bot, mana pool permitting; nought when its pool cannot hold the cast.</summary>
     public static double ScrollChance(Mobile body)
     {
         if (body == null)
@@ -144,8 +186,13 @@ public static class BotRaise
         return !_read || body.ManaMax < _mana ? 0.0 : Roll(body.Skills[SkillName.Magery].Value, _scrollMin, _scrollMax);
     }
 
+    /// <summary>Whether this bot reads a resurrection scroll well enough to carry one. See <see cref="StockChance"/>.</summary>
     public static bool Reads(Mobile body) => Stock > 0 && ScrollChance(body) >= StockChance;
 
+    /// <summary>
+    /// Whether this bot keeps its resurrection scroll to read rather than writing it into its book: the book would not cast it
+    /// (its Magery under the book's floor) while the scroll would. See <c>BotSeeker</c>.
+    /// </summary>
     public static bool KeepsScroll(Mobile body)
     {
         if (!Reads(body))
@@ -156,6 +203,11 @@ public static class BotRaise
         return body.Skills[SkillName.Magery].Value < _bookMin;
     }
 
+    /// <summary>
+    /// The best this bot has to raise a body with, and the engine's chance of it on one try; <see cref="Means.None"/> and nought
+    /// when it has nothing. A scroll before the book at equal odds, because the book burns herbs on every try and the scroll only
+    /// on the one that takes.
+    /// </summary>
     public static Means Best(Mobile body, out double chance, out Item scroll)
     {
         chance = 0.0;
@@ -238,14 +290,24 @@ public static class BotRaise
         return true;
     }
 
+    /// <summary>The mana a cast of the spell spends. Fifty.</summary>
     public static int Mana => _mana;
 
+    /// <summary>
+    /// Whether the ground under a body takes one standing up: the engine refuses a raising where a body does not fit, and anywhere in
+    /// Khaldun (<c>ResurrectionSpell.Target</c>, <c>BandageContext.EndHeal</c>).
+    /// </summary>
     public static bool Takes(Mobile ghost) =>
         ghost?.Map is { } map && map != Map.Internal && map.CanFit(ghost.Location, 16, false, false)
         && ghost.Region?.IsPartOf("Khaldun") != true;
 
+    /// <summary>A body nobody of ours lays a beneficial hand on: a criminal or a murderer, whose raiser the engine would mark for it.</summary>
     public static bool Unholy(Mobile ghost) => ghost is { Criminal: true } || ghost?.Kills >= 5;
 
+    /// <summary>
+    /// The bandage's wait for a raising: the engine's five seconds on top of a heal's, by Dexterity in this era
+    /// (<c>BandageContext.BeginHeal</c>, before AOS).
+    /// </summary>
     public static int BandageMs(Mobile healer)
     {
         var dex = healer?.Dex ?? 0;
@@ -254,12 +316,15 @@ public static class BotRaise
         return (int)((seconds + 5.0) * 1000);
     }
 
+    // ------------------------------------------------------------------------------------------------ the hold on the revival
+
     private sealed class Pending
     {
         public BotSquad Company;
 
         public long Fell;
 
+        /// <summary>The last beat on which somebody in the company could raise it, or nought.</summary>
         public long Hope;
 
         public bool Judged;
@@ -269,6 +334,7 @@ public static class BotRaise
 
     private static readonly Dictionary<Serial, Pending> _pending = [];
 
+    /// <summary>A member has fallen in a company that will look for somebody to raise it. See <c>BotSquad.Fallen</c>.</summary>
     internal static void Await(BotMobile ghost, BotSquad company)
     {
         if (ghost == null || company == null)
@@ -279,8 +345,10 @@ public static class BotRaise
         _pending[ghost.Serial] = new Pending { Company = company, Fell = ghost.FellTick };
     }
 
+    /// <summary>Whether a company has this ghost on its list of fallen to raise. Read only; asked by an infirmary before it claims a body.</summary>
     internal static bool Awaited(BotMobile ghost) => ghost != null && _pending.ContainsKey(ghost.Serial);
 
+    /// <summary>The company has looked: somebody able is near (<paramref name="hope"/>), or nobody is.</summary>
     internal static void Looked(BotMobile ghost, bool hope)
     {
         if (ghost != null && _pending.TryGetValue(ghost.Serial, out var pending))
@@ -294,6 +362,7 @@ public static class BotRaise
         }
     }
 
+    /// <summary>The company is done with this body, raised or not.</summary>
     internal static void Done(BotMobile ghost)
     {
         if (ghost != null)
@@ -302,8 +371,13 @@ public static class BotRaise
         }
     }
 
+    /// <summary>
+    /// Whether the ordinary revival keeps its hands off this ghost for now: its company is raising it, or has not yet had its first
+    /// look. Asked by <c>BotPopulation.Revive</c> and by a delve's party (<c>BotDelveParty.Fell</c>).
+    /// </summary>
     public static bool Holding(BotMobile ghost)
     {
+        // Or while its guild's infirmary has sent its healer out to it, two minutes at most (07.10.2026, trades17). See BotInfirmaries.
         if (BotInfirmaries.Holding(ghost))
         {
             return true;
@@ -318,6 +392,7 @@ public static class BotRaise
 
         if (pending.Company is not { Disbanded: false } || pending.Fell != ghost.FellTick || now - pending.Fell >= HoldMs)
         {
+            // A company that broke up with one of its fallen still waiting: counted here, the one place that still sees it.
             if (pending.Company is { Disbanded: true } && pending.Fell == ghost.FellTick)
             {
                 NoteUnraised(Unraised.Broken);
@@ -335,6 +410,7 @@ public static class BotRaise
 
         var holds = pending.Hope != 0 && now - pending.Hope < 2 * BotSquads.BeatMs + 500;
 
+        // Counted once a death, on the beat the ordinary revival would have carried it home.
         if (holds && !pending.Counted && now - pending.Fell >= BotPopulation.ReviveMs)
         {
             pending.Counted = true;
@@ -344,8 +420,15 @@ public static class BotRaise
         return holds;
     }
 
+    /// <summary>Revivals held for a company at its raising past the ordinary minute, counted once a death. See <see cref="Holding"/>.</summary>
     public static long Held { get; private set; }
 
+    // ------------------------------------------------------------------------------------------------ the raising itself
+
+    /// <summary>
+    /// The ghost answers the engine's gump: up, where it lies, with the engine's ten hits; its own corpse gone through at once; and the
+    /// tally. Returns whether it stood up — the engine can still refuse (a region that will not have it), and then nothing is taken.
+    /// </summary>
     internal static bool Rise(BotMobile ghost, Mobile raiser, Means means, double chance, int tries, BotSquad company)
     {
         if (ghost is not { Deleted: false } || ghost.Alive)
@@ -358,6 +441,9 @@ public static class BotRaise
         var taken = 0;
         var coins = 0;
 
+        // <b>Its corpse gone through before it stands, not after.</b> The bond hands a risen bot a new copy of anything issued it no
+        // longer holds (BotBinding.Restore, in OnAfterResurrect); gone through first, the pack already holds its own and nothing is
+        // handed twice. Should the engine still refuse to stand it up, what came off the corpse rides home in its pack.
         if (corpse is { Deleted: false })
         {
             BotReclaim.Strip(ghost, corpse, out taken, out coins);
@@ -436,8 +522,10 @@ public static class BotRaise
             )
         );
 
+        // A delver raised this way spends one of its party's raisings, as the party's own did. See BotDelveParty.Spent.
         BotDelveParty.Spent(ghost);
 
+        // A debt the risen one remembers, and a tale it tells (07.10.2026, traits17). See BotBiography.Raised.
         BotBiography.Raised(raiser, ghost, where);
 
         Done(ghost);
@@ -454,6 +542,9 @@ public static class BotRaise
             _ => "nothing"
         };
 
+    // ------------------------------------------------------------------------------------------------ the tally (Companies line)
+
+    /// <summary>Members fallen in a company that stood to look for somebody to raise them.</summary>
     public static long Fallen { get; private set; }
 
     public static long Raised { get; private set; }
@@ -464,20 +555,26 @@ public static class BotRaise
 
     public static long ByBandage { get; private set; }
 
+    /// <summary>Things and coin back off the raised bots' own corpses, at once.</summary>
     public static long Things { get; private set; }
 
     public static long Coin { get; private set; }
 
+    /// <summary>Casts aimed or bandages wound at a body, and those that did not take.</summary>
     public static long Tries { get; private set; }
 
     public static long Failed { get; private set; }
 
+    /// <summary>Casts begun at a body; a cast broken before its cursor came up is not a try.</summary>
     public static long Casts { get; private set; }
 
+    /// <summary>Raised bots pressed back into their company.</summary>
     public static long Rejoined { get; private set; }
 
+    /// <summary>The engine refused to stand a raised body up.</summary>
     public static long Refused { get; private set; }
 
+    /// <summary>Not raised, by why, counted once a body when the company lets it go.</summary>
     public static long NobodyAble { get; private set; }
 
     public static long NobodyNear { get; private set; }
@@ -496,10 +593,12 @@ public static class BotRaise
 
     public static long Broken { get; private set; }
 
+    /// <summary>Beats a raiser waited for its pool to hold the cast; beats a raising waited for the fight to clear.</summary>
     public static long ManaWaits { get; private set; }
 
     public static long FightWaits { get; private set; }
 
+    /// <summary>Members that went to a body and were given up on for another (walk, tries or the claim's forty seconds).</summary>
     public static long Handed { get; private set; }
 
     internal static void NoteFallen() => Fallen++;
@@ -657,6 +756,9 @@ public sealed class BotLifeline : IBotProposer
             return null;
         }
 
+        // <b>A guild's Healer stocks one for its infirmary on a lower keep (07.10.2026, life18b).</b> On build 416 no healer carried a
+        // scroll — the keep of 300gp in the pocket is more than any of 31 healers held — and no infirmary raised anybody. Read against all it
+        // may spend (pocket and account, less its wants), keeping BotInfirmaries.ScrollKeep. See BotInfirmaries.Stocks.
         var forInfirmary = BotInfirmaries.Stocks(body);
         var purse = forInfirmary ? BotYield.Spendable(body) : body.Backpack?.TotalGold ?? 0;
         var reserve = forInfirmary ? BotInfirmaries.ScrollKeep : BotRaise.StockReserve;
@@ -668,6 +770,7 @@ public sealed class BotLifeline : IBotProposer
             return null;
         }
 
+        // Its own first: one it wrote, or one a carrier brought, lying in its bank box. See BotArmoury.
         if (BotMarket.FromBank(bot, kind, BotRaise.Stock) > 0)
         {
             FromBank++;

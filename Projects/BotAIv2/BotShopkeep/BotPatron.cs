@@ -25,16 +25,21 @@ public sealed class BotPatron : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>Bots looked at while a shop was open.</summary>
     public static long Looks { get; private set; }
 
+    /// <summary>Of those, bots with an open want of their own.</summary>
     public static long Wanting { get; private set; }
 
+    /// <summary>A shop held the thing, and its price with the walk came to more than the want offers.</summary>
     public static long Dearer { get; private set; }
 
+    /// <summary>Walks to a shop offered.</summary>
     public static long Offered { get; private set; }
 
     public BotDeed Propose(IBotWilful bot)
     {
+        // Nothing to walk to: the ordinary answer, and it costs a count.
         if (!BotShopkeep.Running || BotShopkeep.OpenCount == 0)
         {
             return null;

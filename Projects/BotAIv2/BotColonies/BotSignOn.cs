@@ -78,12 +78,15 @@ public sealed class BotSignOn : BotDeed
 
     public const string Trade = "sign-on";
 
+    /// <summary>What a place in a party is reckoned at: a pick-holder's, and anybody else's.</summary>
     public static double Prior { get; set; } = 80.0;
 
     public static double HandsPrior { get; set; } = 40.0;
 
+    /// <summary>How long a member waits at the dock for a captain that has not come before it gives the passage up.</summary>
     public static int WaitMs { get; set; } = 900000;
 
+    /// <summary>How long the party stands on the square once ashore while its claim is open.</summary>
     public static int StandMs { get; set; } = 330000;
 
     public static long Offers { get; set; }
@@ -112,6 +115,7 @@ public sealed class BotSignOn : BotDeed
 
     private bool _atSide;
 
+    /// <summary>Standing at the dock for a captain still on its way: still on purpose, as the muster is.</summary>
     private bool _waiting;
 
     public BotSignOn(BotSailing passage, Mobile body)
@@ -141,6 +145,7 @@ public sealed class BotSignOn : BotDeed
 
     public override bool Resumes => true;
 
+    /// <summary>The guild's party calling: it gets through a member's hold as the guild's muster does.</summary>
     public override bool Summons => true;
 
     public override bool Committed => _atSide || _rode;
@@ -217,6 +222,7 @@ public sealed class BotSignOn : BotDeed
 
         var map = body.Map;
 
+        // Ashore at the far end: the passage landed (or is over), and the bot stands on its goal's land.
         if (_rode || (_passage.State is BotSailing.Tide.Landed or BotSailing.Tide.Over) && BotColonies.SameLand(map, body.Location, _passage.Goal))
         {
             if (!_rode)
@@ -259,6 +265,7 @@ public sealed class BotSignOn : BotDeed
                 Arrived++;
             }
 
+            // A founding party holds its square while the claim on it is open: three of them standing there is the claim's muster.
             if (_passage.Founding && BotClaim.On(map, _passage.Goal) is { } bid && bid.Guild == _passage.Guild?.Name && now - _ashore < StandMs)
             {
                 if (now - _ashore < 2000)
@@ -286,6 +293,7 @@ public sealed class BotSignOn : BotDeed
             return BotDoing.Failed("the captain is gone");
         }
 
+        // The captain at the berth: to its side, where the helm takes the party aboard.
         if (_passage.AtDock != 0)
         {
             _waiting = false;

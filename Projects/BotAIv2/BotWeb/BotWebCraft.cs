@@ -19,6 +19,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotWebCraft
 {
+    /// <summary>Recipes whose material is one of these are shown; the rest of a system is folded into "other".</summary>
     private static readonly (string Name, Func<CraftSystem> System, SkillName Skill)[] Systems =
     [
         ("Blacksmithy", () => DefBlacksmithy.CraftSystem, SkillName.Blacksmith),
@@ -40,6 +41,7 @@ public static class BotWebCraft
         Fighters
     }
 
+    /// <summary>Where a raw material comes from, for the ones the craft tables cannot say.</summary>
     private static (string From, string How, Gatherers Who, SkillName Skill) Source(Type material)
     {
         if (material == null)
@@ -90,6 +92,7 @@ public static class BotWebCraft
         return (material.Name, "bought or found", Gatherers.Nobody, SkillName.Alchemy);
     }
 
+    /// <summary>How many alive bots gather that way.</summary>
     private static int Gathering(Gatherers who, SkillName skill, Dictionary<SkillName, List<double>> able, int gatherers, int fighters) =>
         who switch
         {
@@ -110,6 +113,7 @@ public static class BotWebCraft
     {
         var bots = BotPopulation.Bots;
 
+        // Every alive bot's skills, by skill, sorted, so "how many can make this" is a binary search.
         Dictionary<SkillName, List<double>> able = [];
         var gatherers = 0;
         var fighters = 0;
@@ -156,6 +160,8 @@ public static class BotWebCraft
             list.Sort();
         }
 
+        // The market, by kind: what the bots' shops by the bank show and their cheapest ask (market change, 01.10.2026: the
+        // auction's stalls are gone; the JSON's "onMarket" and "cheapest" keep their names and read the shops now).
         Dictionary<Type, (int Units, int Cheapest)> stock = [];
 
         foreach (var front in BotShopkeep.Open)
@@ -190,6 +196,7 @@ public static class BotWebCraft
             wanted[want.Kind] = wanted.TryGetValue(want.Kind, out var n) ? n + left : left;
         }
 
+        // The recipes, grouped by system and first material.
         Dictionary<(string, Type), Chain> chains = [];
 
         foreach (var (name, get, _) in Systems)
@@ -339,6 +346,8 @@ public static class BotWebCraft
 
                     w.WriteStartObject();
                     w.WriteString("item", want.Kind.Name);
+                    // "lodged" was the escrow; a want holds no gold since 01.10.2026, so it is nought, and "coming" is what carriers
+                    // are bringing to it now. "amount" is what is still wanted (Amount comes down as goods are handed over).
                     w.WriteNumber("amount", Math.Max(0, want.Amount));
                     w.WriteNumber("price", want.Offer);
                     w.WriteNumber("lodged", 0);
@@ -407,6 +416,7 @@ public static class BotWebCraft
         return best;
     }
 
+    /// <summary>How many alive bots have at least that much of the skill.</summary>
     private static int Count(Dictionary<SkillName, List<double>> able, SkillName skill, double least)
     {
         if (!able.TryGetValue(skill, out var list) || list.Count == 0)

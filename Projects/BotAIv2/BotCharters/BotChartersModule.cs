@@ -47,8 +47,10 @@ public sealed class BotChartersModule : BotModule
 
     private const string ConfigPath = "Configuration/bot-charters.json";
 
+    /// <summary>How often the clock looks: a minute.</summary>
     public static int LookMs { get; set; } = 60000;
 
+    /// <summary>How often the <c>Charters:</c> line is written: five minutes, with every other summary.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _timer;
@@ -174,6 +176,7 @@ public sealed class BotChartersModule : BotModule
 /// <summary>The charters' way in: the module and the store registered from outside <c>BotCore</c>, after it has read its own switch.</summary>
 public static class BotChartersCore
 {
+    /// <summary>After <c>BotCore.Configure</c> (40), which sets <c>BotCore.Enabled</c>; before the world is read, which the store needs.</summary>
     [CallPriority(45)]
     public static void Configure()
     {

@@ -41,22 +41,30 @@ public static class BotSocial
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSocial));
 
+    /// <summary>Whether bots answer each other's moods at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How many of those in earshot answer one line: the nearest. Two.</summary>
     public static int MostListeners { get; set; } = 2;
 
+    /// <summary>How long after the line its answer is said, and up to how much more. Three seconds, and up to two and a half.</summary>
     public static int ReplyMs { get; set; } = 3000;
 
     public static int ReplySpreadMs { get; set; } = 2500;
 
+    /// <summary>How long one listener goes between answers. Two minutes.</summary>
     public static int AnswerEveryMs { get; set; } = 120000;
 
+    /// <summary>How long before the same two bots have another such exchange. Twenty minutes.</summary>
     public static int PairEveryMs { get; set; } = 1200000;
 
+    /// <summary>How long an offer waits for the listener's auction to take it before it lapses. A minute and a half.</summary>
     public static int InviteMs { get; set; } = 90000;
 
+    /// <summary>How far the speaker may have walked off, in tiles, and the offer still be handed out. Twenty-four: twice earshot.</summary>
     public static int InviteReach { get; set; } = 24;
 
+    /// <summary>The chance the one answered says thank you. A half.</summary>
     public static double ThanksChance { get; set; } = 0.5;
 
     public static bool OffersMending { get; set; } = true;
@@ -67,10 +75,13 @@ public static class BotSocial
 
     public static bool OffersCompany { get; set; } = true;
 
+    /// <summary>What laying a fire for a tired neighbour adds to the fire's own claim a minute. Twelve, about what a line of company lifts (<c>BotCampTalk.CheerPerLine</c>).</summary>
     public static double FellowWorth { get; set; } = 12.0;
 
+    /// <summary>Lines heard whose tag asks for something: the seven moods.</summary>
     public static long Asked { get; private set; }
 
+    /// <summary>Lines heard whose tag asks nothing: content, middling, glum.</summary>
     public static long Unasked { get; private set; }
 
     public static long Hostile { get; private set; }
@@ -137,6 +148,7 @@ public static class BotSocial
 
         public BotDeed Deed { get; } = deed;
 
+        /// <summary>The line that goes with the offer, said when the offer is taken up, not when it is made.</summary>
         public string Occasion { get; } = occasion;
 
         public Dictionary<string, string> Fill { get; } = fill;
@@ -161,10 +173,13 @@ public static class BotSocial
         public bool Thanks { get; } = thanks;
     }
 
+    /// <summary>The offer each listener undertook to make, by listener.</summary>
     private static readonly Dictionary<Serial, Invite> _invites = [];
 
+    /// <summary>The deed last handed to each listener's auction, so the take can be recognised.</summary>
     private static readonly Dictionary<Serial, BotDeed> _offered = [];
 
+    /// <summary>Offers taken and not yet ended, by kind.</summary>
     private static readonly Dictionary<BotDeed, string> _live = [];
 
     private static readonly Dictionary<Serial, long> _answered = [];
@@ -183,6 +198,10 @@ public static class BotSocial
 
     private static bool _swept;
 
+    /// <summary>
+    /// A mood line was said with somebody in earshot. From <see cref="BotVoice.MoodSaid"/>: the speaker, the tag the line carried,
+    /// the line, and everybody within earshot, hostile or not.
+    /// </summary>
     public static void Heard(BotMobile speaker, string tag, string line, List<BotMobile> audience)
     {
         if (!Running || speaker is not { Deleted: false, Alive: true } || audience == null || audience.Count == 0)
@@ -212,6 +231,7 @@ public static class BotSocial
                 continue;
             }
 
+            // Never across hostile guilds: at war, or thought of at or below the war line either way.
             if (BotRegard.Hostile(speaker, near))
             {
                 Hostile++;
@@ -219,6 +239,7 @@ public static class BotSocial
                 continue;
             }
 
+            // Nor a murderer or a criminal, in either direction: the engine's own word, as the fires ask it.
             if (!BotCamp.Welcome(speaker, near))
             {
                 Shunned++;
@@ -233,6 +254,7 @@ public static class BotSocial
                 continue;
             }
 
+            // Nor one that holds a grudge against the speaker (07.10.2026, traits17). Counted there. See BotTies.Spurns.
             if (BotTies.Spurns(near, speaker))
             {
                 continue;
@@ -270,8 +292,10 @@ public static class BotSocial
         _picked.Clear();
     }
 
+    /// <summary>Keeps the <see cref="MostListeners"/> nearest, nearest first.</summary>
     private static void Nearest(BotMobile speaker, BotMobile near)
     {
+        // A friend of the speaker's before anybody else, the nearest friend first (07.10.2026, traits17). See BotTies.SocialRank.
         var distance = BotTies.SocialRank(speaker, near, speaker.GetDistanceToSqrt(near));
         var at = _picked.Count;
 
@@ -303,6 +327,10 @@ public static class BotSocial
         var (occasion, kind, deed) = Offer(listener, speaker, tag, fill);
         var due = now + Math.Max(500, ReplyMs) + Utility.Random(Math.Max(1, ReplySpreadMs));
 
+        // <b>The word now; the offer's own line only when the offer is taken up.</b> "Hold still, I have bandages" said at the
+        // invitation would promise what the listener's auction may yet refuse, and a promise nobody keeps is the one thing a
+        // person at the log would read as a bot lying. So a deed is answered with the plain word for the mood here, and its line
+        // is said from Started, as the bot sets off.
         _replies.Add(new Reply(listener, speaker, deed == null ? occasion : $"fellow:{tag}", $"fellow:{tag}", fill, due, thanks: true));
 
         if (deed != null)
@@ -327,6 +355,11 @@ public static class BotSocial
         }
     }
 
+    /// <summary>
+    /// What this listener can offer this speaker for this mood: the occasion of the line, the kind, and the deed the proposer
+    /// hands out — null for words alone. A listener in a company calls the speaker in here and now; everything else waits for
+    /// the listener's auction.
+    /// </summary>
     private static (string Occasion, string Kind, BotDeed Deed) Offer(BotMobile listener, BotMobile speaker, string tag, Dictionary<string, string> fill)
     {
         var map = speaker.Map;
@@ -371,6 +404,13 @@ public static class BotSocial
 
                     break;
                 }
+            // <b>A grieving bot is offered company before a fire (01.10.2026, build 388).</b> On 387 grieving was the commonest mood
+            // heard — 74 of 141 lines in 65 minutes, 30 of 46 in the first quarter hour after the restart — and it was answered
+            // with words alone unless a fire happened to burn near: the offers stood at "fire 2 → 0 accepted". Patrick's point 4:
+            // "depending on the mood, other bots offer company or help". Company is what a grieving bot is offered now, as a lonely
+            // one is: a place in the listener's company, a walk to the speaker's, or a hunt together; the fire near stays the
+            // fallback. (Fable's review of 388: the labels had been put on the hunt-only block above, which left this block
+            // unreachable — the lonely and the bored lost their company offers and the grieving never gained one.)
             case BotMoods.Grieving:
             case BotMoods.Lonely:
             case BotMoods.Bored:
@@ -413,6 +453,7 @@ public static class BotSocial
         return ($"fellow:{tag}", "words", null);
     }
 
+    /// <summary>Whether this listener may be handed a deed at all: free or on work the auction may outbid, not tired, not in a company, nothing paused beneath it.</summary>
     private static bool Takes(BotMobile listener)
     {
         if (listener.Tired || listener.Squad != null || listener.Fallen || BotDelveParty.Delving(listener))
@@ -434,6 +475,7 @@ public static class BotSocial
                && deed is not (BotChat or BotFireside or BotKindle or BotSalve or BotAccompany or BotAwaitMend or BotBand or BotEnlist);
     }
 
+    /// <summary>Whether the speaker is not on paying work: nothing in hand, a guess (a prowl), or unpaid work. What may be called away.</summary>
     private static bool Idle(BotMobile speaker)
     {
         var resolve = speaker.Resolve;
@@ -463,6 +505,7 @@ public static class BotSocial
         return true;
     }
 
+    /// <summary>The camper's own gates, asked of a listener laying a fire for somebody else: a lighter, on wild ground, with the means, not hurt, no fire near.</summary>
     private static bool Kindles(BotMobile listener, Map map)
     {
         if (!BotCamp.Running || map == null || map == Map.Internal || listener.Map != map || !BotCamp.Lighter(listener) || !BotCamp.Lights(listener))
@@ -483,6 +526,7 @@ public static class BotSocial
         return BotKindle.Means(listener);
     }
 
+    /// <summary>A hunt for two: the biggest thing within the hunter's reach of the listener that it could take, called as a band the speaker is nearest to.</summary>
     private static bool Bands(BotMobile listener, BotMobile speaker, out BaseCreature quarry)
     {
         quarry = null;
@@ -495,6 +539,11 @@ public static class BotSocial
 
         quarry = BotQuarry.Best(listener, BotQuarry.Reach);
 
+        // <b>Only on something that fights whoever comes near (Fable's review of 387).</b> Best ranks what is hostile first but
+        // answers with whatever stands within thirty tiles, and round a town that is a cow; a band on a cow levies up to
+        // BotSquad.Usual bots off their work for nothing, against Patrick's rule of 01.10.2026 (hunters hit monsters, not cows;
+        // grazers last). A grazer at hand is words only — "coin comes to those who hunt" — and the speaker's own hunt applies
+        // grazers-last by itself (BotHunter.Propose).
         if (quarry == null || !BotQuarry.Fights(quarry))
         {
             quarry = null;
@@ -505,6 +554,7 @@ public static class BotSocial
         return true;
     }
 
+    /// <summary>A listener in a company asks the speaker in through the company's own door.</summary>
     private static bool CallsIn(BotSquad mine, BotMobile listener, BotMobile speaker, string tag)
     {
         if (mine.Disbanded || mine.Count >= mine.Ceiling || mine.Leader?.Self is not Mobile lead || mine.Map != speaker.Map
@@ -530,6 +580,7 @@ public static class BotSocial
         return true;
     }
 
+    /// <summary>Whether the listener may fall in with the speaker's company: room, near enough to its leader, nobody hostile.</summary>
     private static bool Enlists(BotMobile listener, BotSquad theirs, out Point3D where)
     {
         where = Point3D.Zero;
@@ -546,6 +597,7 @@ public static class BotSocial
         return true;
     }
 
+    /// <summary>A fire burning within the camp's joining reach of the speaker, or null. Six fires at most, so a loop.</summary>
     private static BotCamp.Fire FireNear(BotMobile speaker)
     {
         var fires = BotCamp.Fires;
@@ -561,6 +613,7 @@ public static class BotSocial
         return null;
     }
 
+    /// <summary>The proposer's question: the offer this listener undertook, if it still stands. See <see cref="BotFellow"/>.</summary>
     public static BotDeed Propose(IBotWilful bot)
     {
         if (!Running || _invites.Count == 0 || bot?.Self is not BotMobile body || !_invites.TryGetValue(body.Serial, out var invite))
@@ -608,6 +661,7 @@ public static class BotSocial
         _offered.Remove(listener);
     }
 
+    /// <summary>Work was taken on. If it is the offer this listener was handed, it is accepted. From <c>BotWill.Started</c>.</summary>
     public static void Started(Mobile who, BotDeed deed, string because)
     {
         if (who == null || deed == null || _offered.Count == 0 || !_offered.TryGetValue(who.Serial, out var offered) || !ReferenceEquals(offered, deed))
@@ -622,12 +676,14 @@ public static class BotSocial
         _live[deed] = kind;
         BotEvents.Post("fellow", who, $"took up {kind} for {invite?.Speaker?.Name ?? "somebody"}");
 
+        // The offer's own line, now that it is being kept. See Answer.
         if (invite != null && who is BotMobile listener)
         {
             _replies.Add(new Reply(listener, invite.Speaker, invite.Occasion, $"fellow:{invite.Mood}", invite.Fill, Core.TickCount + 500, thanks: false));
         }
     }
 
+    /// <summary>Work ended. If it was an accepted offer, how it ended is counted. From <c>BotWill.Ended</c>.</summary>
     public static void Ended(Mobile who, BotDeed deed, BotEnding ending, string why, double minutes, double perMinute, int coin)
     {
         if (deed == null || _live.Count == 0 || !_live.Remove(deed, out var kind))
@@ -670,6 +726,7 @@ public static class BotSocial
         }
     }
 
+    /// <summary>The layer's second: answers due are said; clocks run out are forgotten.</summary>
     public static void Tick(long now)
     {
         BotMoods.Sweep(now);
@@ -732,6 +789,7 @@ public static class BotSocial
         }
     }
 
+    /// <summary>Clocks long run out and offers long lapsed are forgotten once a minute.</summary>
     private static void Sweep(long now)
     {
         if (_swept && now - _sweptTick < 60000)

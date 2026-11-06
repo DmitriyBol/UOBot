@@ -28,12 +28,16 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotWayless
 {
+    /// <summary>Whether no-way places are shared at all. Off, each carrier learns alone, as before.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>The side of a cell, in tiles. Eight: the meeting places of the Britain row fell within a few tiles of each other.</summary>
     public static int Grain { get; set; } = 8;
 
+    /// <summary>How many "no way" answers in one cell strike it. Two: the third carrier is the one spared.</summary>
     public static int Strikes { get; set; } = 2;
 
+    /// <summary>How long a struck cell stays struck, and how long a first answer waits for a second. Thirty minutes.</summary>
     public static int RestMs { get; set; } = 1800000;
 
     private sealed class Cell
@@ -49,6 +53,9 @@ public static class BotWayless
 
     private static readonly List<(int Map, int X, int Y, bool Place)> _gone = [];
 
+    // ---- Counted ------------------------------------------------------------------------------------------------------------
+
+    /// <summary>"No way" answers filed, cells struck, cells cleared by a hand-over, and looks that found a cell struck, by who looked.</summary>
     public static long Filed { get; private set; }
 
     public static long Struck { get; private set; }
@@ -61,8 +68,13 @@ public static class BotWayless
 
     public static long HavenPassed { get; private set; }
 
+    /// <summary>Meeting walks that found no way and went to the buyer instead of failing. See <c>BotDeliver.Bend</c>.</summary>
     public static long Rejoined { get; private set; }
 
+    /// <summary>
+    /// A cell, kept apart for a place (a meeting place, a haven: <paramref name="place"/>) and for where a followed buyer stood, so
+    /// a struck meeting place does not turn carriers away from a buyer walking through the same tiles at another height.
+    /// </summary>
     private static (int, int, int, bool) Key(Map map, Point3D where, bool place)
     {
         var grain = Math.Max(1, Grain);
@@ -70,6 +82,7 @@ public static class BotWayless
         return (map.MapID, where.X / grain, where.Y / grain, place);
     }
 
+    /// <summary>A walk found no way to this place (a meeting place: <paramref name="place"/>; else where its buyer stood). The second answer within <see cref="RestMs"/> strikes its cell.</summary>
     public static void NoWay(Map map, Point3D where, bool place)
     {
         if (!Running || map == null || map == Map.Internal || where == Point3D.Zero)
@@ -103,6 +116,7 @@ public static class BotWayless
         }
     }
 
+    /// <summary>Whether this place's cell is struck now, for a place or for a buyer standing there. A dictionary lookup.</summary>
     public static bool Shut(Map map, Point3D where, bool place)
     {
         if (!Running || _cells.Count == 0 || map == null || map == Map.Internal)
@@ -127,6 +141,7 @@ public static class BotWayless
         return true;
     }
 
+    /// <summary>Goods changed hands here: whatever was filed against this cell is wrong. Proof from the far side.</summary>
     public static void Reached(Map map, Point3D where)
     {
         if (_cells.Count == 0 || map == null || map == Map.Internal)
@@ -171,6 +186,7 @@ public static class BotWayless
         }
     }
 
+    /// <summary>The clause of <c>The market:</c>.</summary>
     public static string Describe() =>
         !Running
             ? "no-way places are not shared (off)"

@@ -9,8 +9,10 @@ namespace Server.BotAI.V2;
 /// <summary>The numbers of <c>Configuration/bot-diplomacy.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotDiplomacySettings
 {
+    /// <summary>Whether wars and alliances wait for a meeting. See BotParley.Running.</summary>
     public bool? Running { get; set; }
 
+    /// <summary>Whether guilds deal with their towns. See BotBurgh.Running.</summary>
     public bool? Towns { get; set; }
 
     public int? MostMeetings { get; set; }
@@ -47,10 +49,13 @@ public sealed class BotDiplomacySettings
 
     public int? SeatTownTiles { get; set; }
 
+    /// <summary>Whether a guild seated inside its town's walls is met at its seat rather than the town's hall. See BotParley.MeetAtSeat.</summary>
     public bool? MeetAtSeat { get; set; }
 
+    /// <summary>A town's main building, by town name, as [x, y]. Everywhere else the bank.</summary>
     public Dictionary<string, int[]> Halls { get; set; }
 
+    /// <summary>The model the duke and the towns' voice are asked with; empty for the population's own (BotOllama.Model).</summary>
     public string JudgeModel { get; set; }
 
     public string JudgeKeepAlive { get; set; }
@@ -63,6 +68,7 @@ public sealed class BotDiplomacySettings
 
     public int? TradesForTerms { get; set; }
 
+    /// <summary>What going to a meeting is worth a minute. See BotEnvoy.Prior.</summary>
     public double? Prior { get; set; }
 
     public double? AudienceEveryMinutes { get; set; }
@@ -130,6 +136,7 @@ public sealed class BotDiplomacyModule : BotModule
         BotDuke.Phrases();
         BotWill.Offer(new BotHerald());
 
+        // A guard a town set is offered as work (30.09.2026, build 339). See BotTownWatch.
         BotWill.Offer(new BotTownWatch());
 
         BotParley.Active = BotParley.Running;
@@ -250,6 +257,7 @@ public sealed class BotDiplomacyModule : BotModule
 
     private static void Tick()
     {
+        // The tasks read back off the save are given their towns once the towns are read. See BotBurgh.Resolve.
         if (!_resolved && BotTowns.Surveyed)
         {
             _resolved = true;

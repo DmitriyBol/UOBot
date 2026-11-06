@@ -51,6 +51,10 @@ public static class BotHand
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHand));
 
+    /// <summary>
+    /// The verbs, and <c>none</c> heads them for the same reason <c>nothing</c> heads the kinds of finding:
+    /// a hand with no way to stay in its pocket is a hand that is used every time it is offered.
+    /// </summary>
     public static readonly string[] Verbs =
     [
         "none",
@@ -79,6 +83,7 @@ public static class BotHand
         "reach"
     ];
 
+    /// <summary>One clause each, for the prompt. Kept short because the prompt has a hard ceiling.</summary>
     public const string Manual =
         "none — do nothing, and it is the right answer most minutes. props <bot> — the engine's own view of it. "
         + "sight <bot> — whether it can see and lawfully strike what it is fighting, and from how far. "
@@ -116,14 +121,27 @@ public static class BotHand
         + "a tile (open to a walker from home, an isle only a ship reaches, a sealed pocket, water a ship sails, nowhere to "
         + "stand) and what the walker's own search finds there; reach — the map, and how its check of the borders came out.";
 
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "census", "tourney", "arena", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench", "go", "gates", "parley", "meet", "zones", "zone", "zonewatch", "charters", "charter", "relics", "relic", "steward", "decree", "officers", "appoint"];
+    /// <summary>
+    /// Verbs the console may use and the model may not. <see cref="Run"/> accepts one of these when, and
+    /// only when, it is told the order came in by hand.
+    ///
+    /// <para>
+    /// <b>The model's choice is bounded by <see cref="Verbs"/> — <c>BotDebugNote</c> writes that array into
+    /// its schema as an enumeration — so a verb left out of it is a verb no mind can reach.</b> That is
+    /// where anything permanent belongs: razing the halls destroys buildings that outlive the whole
+    /// population, and an idle thought at three in the morning is not a good enough reason for it.
+    /// </para>
+    /// </summary>
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "rearm", "census", "tourney", "arena", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench", "go", "gates", "parley", "meet", "zones", "zone", "zonewatch", "charters", "charter", "relics", "relic", "steward", "decree", "officers", "appoint"];
 
+    /// <summary>One clause each for the two above, for whoever is holding the keyboard.</summary>
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
         + "which is how an evening's building is undone. revel <trade> [<prize>] [<x> <y>] — declare one "
         + "this second instead of waiting a quarter of an hour for the watcher to think of it; naming a spot "
         + "raises a camp there, pulled into the ring around the population if it is too near or too far. "
         + "wars — every war standing, with its score and its clock. "
+        + "rearm — hand every bot a catch left bare the weapon it was born to back; asking twice hands nothing twice. "
         + "parley — the guilds' meetings standing and the last few ended, the agreements between guilds, and each guild's "
         + "standing in its towns with the task in hand. meet <guild> ; <guild or town> [; grievance|safety|friendship|commerce] — "
         + "call a meeting now, the pair's clock ignored: the envoy walks, the host answers, a watcher witnesses, the duke gives "
@@ -185,16 +203,24 @@ public static class BotHand
         + "clause. appoint <guild> <quartermaster|herald|scout> <bot> — give the post by hand, whatever the fit; the head's next review "
         + "may take it back. None is offered to the minds.";
 
+    /// <summary>How many of each verb this session. For the summary, and for reading the hand's own habits.</summary>
     private static readonly Dictionary<string, long> _used = [];
 
+    /// <summary>Times a verb was asked for and refused. A refusal is a measurement, so it is counted.</summary>
     public static long Refused { get; private set; }
 
+    /// <summary>Times a verb was carried out.</summary>
     public static long Used { get; private set; }
 
     private static string _path;
 
     private static bool _broken;
 
+    /// <summary>
+    /// How far a bot may be lifted in one go, in tiles. Wide enough to cross Britain and out of a pocket on
+    /// its far side, narrow enough that a hallucinated pair of coordinates moves somebody across a field
+    /// rather than across a continent.
+    /// </summary>
     public static int Reach { get; set; } = 600;
 
     public static void Open(string who)
@@ -243,6 +269,18 @@ public static class BotHand
         }
     }
 
+    /// <summary>
+    /// Runs one verb and says what came of it in one line.
+    ///
+    /// <para>
+    /// <b>Nothing happens unless the log is working.</b> The order is deliberate: a hand whose record can
+    /// fail open is a hand nobody can audit, and this file is the whole reason the hand is safe to have.
+    /// </para>
+    /// </summary>
+    /// <param name="who">Who asked — the model, the console, or the roll-call.</param>
+    /// <param name="verb">One of <see cref="Verbs"/>.</param>
+    /// <param name="tail">Whatever followed it.</param>
+    /// <param name="why">The reason given. Written beside the use, because a use without one is a twitch.</param>
     public static string Run(string who, string verb, string tail, string why, bool byHand = false)
     {
         verb = (verb ?? "").Trim().ToLowerInvariant();
@@ -253,6 +291,9 @@ public static class BotHand
             return null;
         }
 
+        // Two lists, and which one is consulted depends on who is asking. A mind may only ever pick out of
+        // Verbs — BotDebugNote writes that array into its schema as an enumeration — so anything that
+        // destroys something permanent lives in HandVerbs, where no model can reach it.
         if (Array.IndexOf(Verbs, verb) < 0 && !(byHand && (Array.IndexOf(HandVerbs, verb) >= 0 || Array.IndexOf(BotColonies.Verbs, verb) >= 0)))
         {
             Refused++;
@@ -337,9 +378,11 @@ public static class BotHand
             case "quests":
                 return $"{BotQuests.Describe()}.";
 
+            // The reach map (01.10.2026, Patrick's order of 30.09.2026, night): a tile, the map, its check. See BotReachMap.
             case "reach":
                 return ReachMap(tail);
 
+            // By hand only. See BotHand.ByHand: neither of these is in Verbs, so no mind can ask for them.
             case "halls":
                 return BotEstate.Describe();
 
@@ -349,6 +392,7 @@ public static class BotHand
             case "wars":
                 return BotWar.Describe();
 
+            // The guilds' meetings, agreements and towns (29.09.2026). See BotParley.
             case "relics":
                 return BotRelics.Report();
 
@@ -361,6 +405,7 @@ public static class BotHand
             case "meet":
                 return BotParley.ByHand(tail);
 
+            // Town charters: the list, and one town's craft auctioned now (07.10.2026, charters20). See BotCharters.
             case "charters":
                 return BotCharters.Tell();
 
@@ -373,12 +418,19 @@ public static class BotHand
             case "guilds":
                 return Guilds();
 
+            // With no name: every shooter on the island. With one, it falls through to the bot below.
             case "arms" when string.IsNullOrWhiteSpace(tail):
                 return Quivers();
+
+            // The bandits a catch left bare before 12.10.2026 get the weapon they were born to back. See BotOutlaw.ReturnWeapons.
+            case "rearm":
+                return BotOutlaw.ReturnWeapons();
 
             case "reset":
                 return ResetPopulation();
 
+            // Strikes out what the population has learned about one kind of work, so it is judged on its promise again. See
+            // BotCommons.Forgive: for a memory that was true of the captain and was filed against the school.
             case "forgive":
                 if (string.IsNullOrWhiteSpace(tail))
                 {
@@ -396,6 +448,9 @@ public static class BotHand
                         ? BotTourney.Describe()
                         : BotTourney.Start("the keyboard");
 
+            // The day's championship at the round arenas (07.10.2026, arena27): "arena" holds it if today's has not been held,
+            // "arena force" holds one anyway for a test (logged as forced, the day's not spent), "arena state" tells the bracket,
+            // "arena stop" calls it off. See BotTourney.ArenaByHand.
             case "arena":
                 return tail.StartsWith("stop", StringComparison.OrdinalIgnoreCase)
                     ? BotTourney.Stop()
@@ -406,15 +461,19 @@ public static class BotHand
             case "band":
                 return Band();
 
+            // The towns' stewards (07.10.2026, steward20): who governs a town and what it decreed, and a decree given by hand. See
+            // BotStewardship.Tell and BotStewardship.ByHand.
             case "steward":
                 return BotStewardship.Tell(tail);
 
             case "decree":
                 return BotStewardship.ByHand(tail);
 
+            // Argus's proving ground. See BotProving: Patrick's order of 26.09.2026, a bot's double against a creature on the green.
             case "proofs":
                 return BotProving.Board();
 
+            // Whether the creatures round the bots have their minds on at all: the engine sleeps every sector no client is in.
             case "awake":
                 return BotWake.Census();
 
@@ -460,15 +519,18 @@ public static class BotHand
             case "peril":
                 return Peril(tail);
 
+            // The danger zones and the debuggers' tour of them (30.09.2026). See BotZones.
             case "zones":
                 return Zones(tail);
 
             case "zone":
                 return Zone(tail);
 
+            // The zone watch by hand: on, off, or where it stands (07.10.2026). See BotZoneWatch.
             case "zonewatch":
                 return BotZoneWatch.Turn(tail.Trim());
 
+            // The guilds' officers (07.10.2026, officers20). See BotOfficers.
             case "officers":
                 return BotOfficers.Tell(tail);
 
@@ -481,6 +543,7 @@ public static class BotHand
             case "breaks":
                 return BotBreaker.List();
 
+            // The guilds' colonies on the islands (07.10.2026, sea20). See BotColonies.Verbs.
             case "expeditions":
                 return BotColonies.Tell();
 
@@ -496,6 +559,11 @@ public static class BotHand
 
                     World.Save();
 
+                    // <b>The save returns before the snapshot is on disk.</b> World.Save serialises and hands the
+                    // writing to a thread; on 16.09.2026 at 00:20 a shard stopped four seconds after this answer was
+                    // read, inside the engine's own autosave's write, and the world on disk was 83 mobiles. So the
+                    // answer that matters is written later, when the engine is Running again, and the deploy waits
+                    // for it.
                     Timer.DelayCall(TimeSpan.FromMilliseconds(500), Settled, 0);
 
                     return "the world is saved and the snapshot is being written; wait for \"the snapshot is on disk\" here before stopping the shard.";
@@ -542,6 +610,18 @@ public static class BotHand
         };
     }
 
+    /// <summary>
+    /// Puts in as many failures of one kind of work for one bot, all for one reason, as trip the breaker - the state a
+    /// loop leaves a bot in.
+    ///
+    /// <para>
+    /// <b>By hand only, and for the reason <see cref="Jam"/> exists: to make a state on purpose and watch what answers
+    /// it.</b> A loop happens on its own schedule, and a rule that only fires on one cannot be checked after every build
+    /// unless the loop can be made. The failures go through <see cref="BotBreaker.Failed"/> itself, so what is exercised
+    /// is the breaker's own counting, its rest and its veto; nothing else on the shard is touched, and the rest lapses on
+    /// its own clock or at the bot's next finish of that work.
+    /// </para>
+    /// </summary>
     private static string Trip(BotMobile bot, string rest)
     {
         var kind = (rest ?? "").Trim().Split(' ', 2)[0].ToLowerInvariant();
@@ -567,6 +647,19 @@ public static class BotHand
         return $"{bot.Name}: {times} failures of {kind} put in, the breaker tripped {BotBreaker.Trips - before} times, and {kind} rests {BotBreaker.RestLeftMs(bot, kind) / 1000}s more.";
     }
 
+    /// <summary>
+    /// Banks the coin in one bot's pack and fills the pack to the engine's item cap with oil cloths that weigh a tenth of
+    /// a stone, which is the state Hale was found in on 14.09.2026.
+    ///
+    /// <para>
+    /// <b>By hand only, and it exists to put a bot into a fault on purpose.</b> A pack reaches the cap after hours of
+    /// goods handed to it outside the engine's own test, so the rule that answers that state - work at a counter refused,
+    /// the trip that makes room offered unpaid, see <see cref="BotYield.Pocket"/> - cannot be watched unless the state
+    /// can be made. The cloths are light so that the bot is jammed rather than overloaded, and what follows is the jammed
+    /// branch rather than the immobile one. It creates things in one bot's pack and nowhere else, and they go with the
+    /// bot at the next restart.
+    /// </para>
+    /// </summary>
     private static string Jam(BotMobile bot)
     {
         var pack = bot.Backpack;
@@ -603,6 +696,43 @@ public static class BotHand
         return $"{bot.Name}: {banked}gp banked, {added} oil cloths added, {pack.TotalItems} of {most} things in the pack, room for a coin: {BotYield.Pocket(bot)}.";
     }
 
+    /// <summary>
+    /// Puts a vanquishing copy of the weapon a bot was born with into its pack: the state the right drop leaves a
+    /// fighter in.
+    ///
+    /// <para>
+    /// <b>By hand only, for the reason <see cref="Jam"/> exists.</b> <c>BotMobile.Rewield</c> wields a better weapon of
+    /// the bot's own kind, and after a boot nobody carries one — every bot is rebuilt with its kit, and loot of the right
+    /// kind is rare — so build 55 sat its whole first window without a candidate, and the refusal line that used to show
+    /// such a weapon riding in a pack was the one that build turned into a skip. The copy is the birth type itself at the
+    /// top damage level, so it is better by the engine's own arithmetic whatever the class. It is not bound: a death
+    /// leaves it on the corpse like any loot, and it goes with the bot at the next restart.
+    /// </para>
+    /// </summary>
+    /// <summary>
+    /// <c>census</c>: every bot on one line each — class, band, what it holds and how far into it, health, mana,
+    /// purse and account, where it stands and in what region, its company — appended to <c>logs/bot-census.log</c>.
+    ///
+    /// <para>
+    /// <b>The one instrument that shows the whole population at one instant.</b> The summaries are counters since
+    /// the boot and the per-bot lines are events; neither answers "who is doing what right now, and with what in
+    /// its pack" without reading a hundred lines backwards. Written on 15.09.2026 for the night watch, so that a
+    /// question like "did anybody hire a healer" or "who is red" is one grep on one stamp.
+    /// </para>
+    /// </summary>
+    /// <summary>
+    /// <c>guilds</c>: every guild in one paragraph — who leads it, how many it has in the world, at rest and dead, what its
+    /// members fight with, what it owns, and the war it stands in, with how many of it are in the fight against how many
+    /// its score asks for (<c>BotWar.Wanted</c>).
+    ///
+    /// <para>
+    /// <b>Patrick's order of 24.09.2026: an instrument of its own for reviewing the guilds.</b> The question that day was
+    /// why The Blade won every war it was in, and answering it took a census, three log scripts and the tourney's ranking
+    /// of that morning; the answer — the losing side fought with two to seven of its fifteen, not with weaker bots — sat
+    /// in numbers nothing printed side by side. This prints them side by side, for all the guilds at once, at rest and in
+    /// the world alike.
+    /// </para>
+    /// </summary>
     private static string Guilds()
     {
         List<Server.Guilds.Guild> guilds = [.. BotGuilds.Standing];
@@ -772,6 +902,8 @@ public static class BotHand
         var alive = 0;
         var idle = 0;
 
+        // Those at rest too, marked so: a census of the island that leaves out a third of the population cannot say what a
+        // guild could put in the field.
         for (var i = 0; i < bots.Count + away.Count; i++)
         {
             var resting = i >= bots.Count;
@@ -819,6 +951,17 @@ public static class BotHand
         return $"{bots.Count + away.Count} bots written to logs/bot-census.log at {stamp}: {alive} alive, {away.Count} of them at rest, {idle} holding nothing.";
     }
 
+    /// <summary>
+    /// What a bot brings to a fight, for the census: its strength by the population's own reckoning, the armour the
+    /// engine reads, the weapon in hand and what it hits for, the skills a fight turns on, and what it heals with.
+    ///
+    /// <para>
+    /// <b>Added on 24.09.2026, when the question was why one guild won every war it was in.</b> Health times damage
+    /// (<c>BotThreat.Power</c>) is what the tourney ranks by, and it could not tell two guilds apart whose fights ended
+    /// 25 to 3: armour, parrying and healing are not in it, and they are exactly what "its health has not moved"
+    /// under four blades is made of.
+    /// </para>
+    /// </summary>
     private static string Fighting(BotMobile bot)
     {
         var weapon = bot.Weapon as BaseWeapon;
@@ -830,14 +973,24 @@ public static class BotHand
         return $"power {BotThreat.Power(bot):F0} AR {bot.ArmorRating:F0} {held} ({arm} {skills[arm].Base:F0}) tactics {skills.Tactics.Base:F0} anatomy {skills.Anatomy.Base:F0} healing {skills.Healing.Base:F0} parry {skills.Parry.Base:F0} magery {skills.Magery.Base:F0} resist {skills.MagicResist.Base:F0} inscribe {skills.Inscribe.Base:F0} | str {bot.RawStr} dex {bot.RawDex} | bandages {pack?.GetAmount(typeof(Bandage)) ?? 0} potions {pack?.GetAmount(typeof(BasePotion)) ?? 0}";
     }
 
+    /// <summary>
+    /// <c>reset</c>: the population back to novices. Patrick's order of 16.09.2026 (and of 13.09 before it): the halls
+    /// razed, every claim let go, the hand-set seats forgotten, the wars and truces and opinions between guilds
+    /// forgotten, and everybody's learning wiped — then the world saved, so a restart raises the population fresh.
+    /// The world save itself, the guilds and the island's map are not touched. Nothing here deletes a file: the stores
+    /// write themselves empty at the save this makes.
+    /// </summary>
     private static string ResetPopulation()
     {
         var halls = BotEstate.Raze();
         var claims = BotClaim.Wipe();
 
+        // The chests were the claims' income; a reset takes them too. See BotChest.
         BotChest.Wipe();
         var seats = BotSeat.Wipe();
 
+        // And the guilds' houses in the towns: their doors and signs come down and the buildings stand empty for a new world
+        // (29.09.2026, evening). See BotGuildHouses.
         var houses = BotGuildHouses.Wipe();
 
         BotWar.Forget();
@@ -845,10 +998,22 @@ public static class BotHand
 
         var learned = BotProgress.Wipe();
 
+        // <b>And the bodies themselves, which is new since build 163.</b> A reset used to wipe the learning and
+        // leave the rest to the boot, because the boot deleted every bot in the save and raised the population
+        // afresh. It does not any more: bots come back with their place, their pack, their bank and their ledger, so
+        // a reset that did not take the bodies would hand a "population of novices" four hundred gold each and a
+        // full kit. Deleting them here, before the save, is what makes the next boot raise real novices.
         var bodies = BotPopulation.PurgeSaved();
 
+        // <b>Patrick's words of 18.09.2026: "when I say the bots forget everything, they literally begin a NEW
+        // world".</b> Everything below outlives a restart on purpose and so has to be said out loud here, one line
+        // each. The boards first — what is for sale, what is wanted, what errands stand — then the crime that was
+        // done to a population that no longer exists, then the guilds, and last the two records that are the whole
+        // of what the island had learned: the danger of its ground and what pays where on it.
         BotMarket.Reset();
 
+        // And the traders' books and counters (01.10.2026, build 385 review): the books themselves go with the packs above, but
+        // the pages held in memory are keyed by the serials of bots that no longer exist, and a look's quiet clock with them.
         BotTrading.Forget();
 
         BotQuests.Wipe();
@@ -858,37 +1023,77 @@ public static class BotHand
         BotGround.Reset();
         BotOre.Forget();
 
+        // <b>The island's danger map is kept (01.10.2026, build 379).</b> Patrick's order of the night of 30.09: «paths and what
+        // is known of the zones live on, and the bots can still improve them» — the paths and what is known of the zones live on through a wipe, and
+        // the bots go on improving them. BotQuad's blood by square is that knowledge, as the zones' own file is (BotZones).
         BotCommons.Forget();
 
+        // Everybody's play and rest, and the newcomers laid over the configured mix: a new world is raised from the
+        // configuration alone, and every bot in it starts a fresh session.
         BotRest.Forget();
         BotGrowth.Forget();
 
+        // And where everybody lived (29.09.2026): a new world chooses its towns again. See BotResidence.
         BotResidence.Wipe();
 
+        // And the guilds' dealings (29.09.2026): the agreements, the books of grievances, the clocks between pairs and every
+        // guild's standing in every town. See BotParley.
         BotParley.Wipe();
         BotPact.Wipe();
         BotGrievances.Wipe();
         BotBurgh.Wipe();
 
+        // <b>And the two records the reset of 16.09.2026 had not yet met, said at the wipe of 25.09.2026 — Patrick: "in
+        // short, a WIPE".</b> The city's wants, fair and the bounties on the heads of a population that no longer exists;
+        // and the championship's champion, whose yellow would otherwise pass to whichever novice is born with the name.
         BotCity.Forget();
         BotTourney.Forget();
 
+        // And what the proving ground measured: the bodies it measured are gone. See BotProving (26.09.2026).
         BotProving.Forget();
 
+        // And the houses of the population's own, which a wiped island does not keep, and the guilds' outposts. See BotAbode
+        // and BotOutpost (26.09.2026).
         BotAbode.Raze();
         BotOutpost.Raze();
 
+        // And who was told of which guild's toll, and how each guild charged. See BotToll (26.09.2026).
         BotToll.Forget();
         BotTollman.Forget();
 
+        // <b>And what the island learned of its roads, and who had been where (29.09.2026).</b> The roads themselves are the
+        // map's and are drawn again at the next boot; the walks along them are the population's knowledge and go with the
+        // rest of it. The towns, the gates and the inns are read from the world again at boot and keep nothing of their own
+        // but counters and the bank's dealing, which start over.
+        // The roads walked are kept with the danger map, by the same order (build 379); the travellers' own records go.
         BotTraveller.Forget();
         BotVenturer.Forget();
         BotInns.Forget();
         BotPeoples.Forget();
 
+        // <b>And the modules born since 06.10.2026, each with a store of its own under Saves/ (07.10.2026, reset26).</b> The reset
+        // of 20:56 that night wiped everything above and left these whole — the characters, the charters, the colonies, the books
+        // on crime, the events, the loans, the officers and the guilds' stores, the politics, the relics and the stewardships —
+        // and Patrick moved their folders away by hand before the restart. Each is emptied here by its own Wipe, exactly what its
+        // store writes, so the save below writes them empty. After the bodies are gone, so that whatever their deletion settles is
+        // settled before the books are read.
+        //
+        // Money first: the stewards' coffers and the wages of watches on duty (politics), and the invasion's and the caravan's
+        // holds (events), go back into the city's purse through BotCity.Refund, so the purse rises and its held count falls by the
+        // same coin; the rumoured chest's coin goes back to the crown that filled it. The errands' rewards went back above
+        // (BotQuests.Wipe). Whatever is still counted as held after all of them was held for nobody, and goes back last
+        // (BotCity.Unhold). The rest hold no coin: a charter, a loan, a kit debt, a tribute or a relic is a line in a book, and
+        // the coin it moved moved when it happened.
+        //
+        // BotRunes is emptied below too (the reset26 review). Four of the fifteen folders were already emptied above and are written
+        // again empty by this save: BotSeizures by BotWar.Forget, BotGuildSplits and BotGuildWiden by BotGuilds.Forget, BotTourney by
+        // BotTourney.Forget.
         var coffers = BotPolitics.Wipe();
         var held = BotSeasons.Wipe();
         var lives = BotLives.Wipe();
+
+        // And the timetables of the daily cycle (PLAN-life A1), kept by name in their own store as the characters are.
+        var timetables = BotTimetables.Wipe();
         var charters = BotCharters.Wipe();
         var colonies = BotColonies.Wipe();
         var wanted = BotCrime.Wipe();
@@ -897,7 +1102,13 @@ public static class BotHand
         var posts = BotOfficers.Wipe();
         var relics = BotRelics.Wipe();
 
+        // And the guilds' runes (reset26 review): kept by the guild's name, so a guild founded again under an old name inherited them.
+        // Guild property, not the island's map: the danger map, the zones and the roads stay. See BotRuneShelf.Wipe.
         var runes = BotRuneShelf.Wipe();
+
+        // And the stories and the island's Chronicle (PLAN-life A3, 13.10.2026): a new world has no history, and a name born again
+        // starts a new book. The store writes itself empty at the save below. See BotStory.Wipe.
+        var stories = BotStory.Wipe();
         var unheld = BotCity.Unhold();
 
         var saving = SaveWiped(0);
@@ -905,9 +1116,9 @@ public static class BotHand
         return $"reset: {halls} halls razed, {claims} claims let go, {seats} hand-set seats forgotten, {houses} guild houses emptied, wars, truces and opinions forgotten, "
                + $"{learned} bots' learning wiped and {bodies} bodies deleted with everything they were carrying, "
                + $"the market, the wants and the board of errands emptied, the city's wants and bounties and the championship's record forgotten, every crime and the band forgotten, the guilds disbanded, "
-               + $"{lives} bots' characters, ties and tales forgotten, {charters} charters let go, {colonies} colonies given up with their stores, {wanted} names struck off the books on crime, {loans} loans and {posts} officers' posts with the guilds' stores and kit debts, "
+               + $"{lives} bots' characters, ties and tales forgotten, {timetables} timetables forgotten, {charters} charters let go, {colonies} colonies given up with their stores, {wanted} names struck off the books on crime, {loans} loans and {posts} officers' posts with the guilds' stores and kit debts, "
                + $"the politics and the stewardships ({coffers}gp of coffers and watches' wages back into the treasury), the events ({held}gp of their holds back to the purse and the crown), "
-               + $"{relics} relic items taken out of the world (the town relics hidden again), {runes} guilds' runes forgotten, the seizures, the guild splits and widenings, {unheld}gp held for nobody back into the treasury; "
+               + $"{relics} relic items taken out of the world (the town relics hidden again), {runes} guilds' runes forgotten, {stories} bots' stories and the Chronicle forgotten, the seizures, the guild splits and widenings, {unheld}gp held for nobody back into the treasury; "
                + $"everything known about what pays where wiped (the island's danger map, the zones and the roads walked are kept); "
                + (saving
                    ? "the world is being saved"
@@ -915,6 +1126,20 @@ public static class BotHand
                + " — wait for \"the snapshot is on disk\", then restart the shard and the population rises as novices.";
     }
 
+    /// <summary>
+    /// The reset's own save, taken only when the engine can take it, and <see cref="Settled"/> started only once it has (07.10.2026,
+    /// reset26 review). True when the save was accepted at once.
+    ///
+    /// <para>
+    /// <b>Why not <c>World.Save()</c> behind <c>!World.Saving</c>, as before.</b> <c>World.Saving</c> is true only while the
+    /// snapshot is taken, which runs on the game loop and so is never seen by a command; while an autosave is <i>writing</i>
+    /// (<c>WorldState.WritingSave</c>) the loop runs on, <c>World.Save()</c> returns having done nothing (it saves only when
+    /// Running), and <see cref="Settled"/> then said "the snapshot is on disk" for the autosave's write — a snapshot taken before
+    /// the wipe, with every store and every body in it. A restart on that word raised the old world. So the save is asked for
+    /// only in <c>WorldState.Running</c>, it is known accepted when the state has left Running, and only then is the word waited
+    /// for; until then this looks again every half second, for two minutes, and says so if it never could.
+    /// </para>
+    /// </summary>
     private static bool SaveWiped(int tries)
     {
         if (World.WorldState == WorldState.Running)
@@ -946,6 +1171,7 @@ public static class BotHand
         return false;
     }
 
+    /// <summary>Says so through the door once the engine has finished writing, and keeps looking until it has.</summary>
     private static void Settled(int tries)
     {
         if (World.WorldState == WorldState.Running)
@@ -965,6 +1191,18 @@ public static class BotHand
         Timer.DelayCall(TimeSpan.FromMilliseconds(500), Settled, tries + 1);
     }
 
+    /// <summary>
+    /// <c>arms &lt;bot&gt;</c>: what is in its hand, every weapon in its pack, and what it has to fire — bound things
+    /// included, which is the whole reason this is not <c>pack</c>.
+    ///
+    /// <para>
+    /// <b>Written on 21.09.2026 because <c>pack</c> could not answer the question.</b> A warrior-archer was failing
+    /// every hunt with "100% of it left and not a scratch in 45s", the signature of a bow with nothing in it, and
+    /// <c>pack</c> listed no bolts and no blade — but <c>pack</c> leaves out whatever a bot is bound to, on purpose,
+    /// and a bot's birth ammunition and its sidearm are both bound. So the instrument said "nothing" about exactly
+    /// the things that were in doubt.
+    /// </para>
+    /// </summary>
     private static string Arms(BotMobile bot)
     {
         var pack = bot.Backpack;
@@ -1004,6 +1242,10 @@ public static class BotHand
                + $"; archery {bot.Skills.Archery.Base:F1}, fencing {bot.Skills.Fencing.Base:F1}, swords {bot.Skills.Swords.Base:F1}, macing {bot.Skills.Macing.Base:F1}.";
     }
 
+    /// <summary>
+    /// <c>arms</c> with no name: every bot whose class is issued a bow, one clause each, the ones holding a bow
+    /// they cannot fire said first and counted.
+    /// </summary>
     private static string Quivers()
     {
         var bots = BotPopulation.Bots;
@@ -1033,6 +1275,8 @@ public static class BotHand
 
             foreach (var item in pack.Items)
             {
+                // Not "and not BaseKnife", which is what this said on its first run: a Dagger is a BaseKnife in this
+                // engine, and the column read "no-blade" for all twenty-two shooters with a bound dagger each.
                 if (item is BaseWeapon and not BaseRanged and not SkinningKnife and not ButcherKnife and not Cleaver)
                 {
                     blade = true;
@@ -1090,6 +1334,31 @@ public static class BotHand
         return $"{bot.Name}: a vanquishing {kind.Name} is in the pack, holding {held?.GetType().Name ?? "nothing"}; the re-arm looks every {BotMobile.DressEveryMs / 1000}s.";
     }
 
+    /// <summary>
+    /// Puts an orc camp on the ground: three orcs, a captain, a chest, a locked crate and a prisoner.
+    ///
+    /// <para>
+    /// <b>The one verb here that adds to the world, and it earns that by being the only way to test two
+    /// whole subsystems.</b> Looting chests and freeing prisoners were written on 08.09.2026 against a
+    /// world that contains no camps unless somebody spawns one, and a camp spawned by hand is gone before
+    /// anybody can walk to it: <c>OrcCamp</c> sets its own decay to five minutes and, alone among the camps,
+    /// refuses to refresh that timer when somebody walks in. A camp 129 tiles from home therefore expires
+    /// while the population is still on its way, which is exactly what happened to Patrick's.
+    /// </para>
+    ///
+    /// <para>
+    /// So the camp this puts down is given <see cref="CampMinutes"/> instead — long enough for a bot to
+    /// notice it, walk to it, fight through it and walk a prisoner home. Everything else about it is the
+    /// engine's own: the same class the world spawns, with the same contents and the same rules.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Where it stands is <see cref="BotRevel.Footing"/>'s business and not this verb's</b>, so a camp
+    /// asked for by hand keeps out of the water by the same rule as one raised for a revel. The spot given
+    /// is a request: it is settled against the map, and moved inland if the camp's own footprint would
+    /// otherwise put half its garrison in the sea.
+    /// </para>
+    /// </summary>
     private static string Camp(string tail)
     {
         var here = BotVigil.Body;
@@ -1110,6 +1379,9 @@ public static class BotHand
             asked = new Point3D(x, y, 0);
         }
 
+        // Sited by the revel's own rule, water included, and never taken as given — not even the watcher's
+        // own tile. Argus hovers rather than walks, so "here" is wherever it last teleported to, which is
+        // a height it chose and a shore it never had to cross.
         if (!BotRevel.Footing(map, asked, out var found, out var floor))
         {
             Refused++;
@@ -1131,6 +1403,17 @@ public static class BotHand
             + "three orcs, a captain, an unlocked chest, a locked crate and a prisoner who wants to go to Britain.";
     }
 
+    /// <summary>
+    /// Everything alive around a spot: who it is, how hurt it is, and whether it would fight the population.
+    ///
+    /// <para>
+    /// <b>Written because "is the camp still garrisoned" had no answer.</b> The tile verb reports items and
+    /// floors; nothing reported creatures, so a chest standing unopened could not be told apart from a chest
+    /// nobody had reached — and on 08.09.2026 that was exactly the question, with 300 refusals filed under
+    /// "still held by a garrison" and no way to see what was holding it.
+    /// </para>
+    /// </summary>
+    /// <summary>The treasury, and what the city may do with it. See BotCity.</summary>
     private static string City(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -1214,6 +1497,7 @@ public static class BotHand
         }
     }
 
+    /// <summary>What pays where, best first, or for one trade only. Read off <see cref="BotCommons.Best"/>.</summary>
     private static string Post(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -1273,6 +1557,17 @@ public static class BotHand
         return BotQuests.Unpost(id, "the door");
     }
 
+    /// <summary>
+    /// The band, its hideout, and what is actually in its chest.
+    ///
+    /// <para>
+    /// <b>The one question about The Shadow the log cannot answer.</b> Every line the band writes is an event — a
+    /// robbery, a stash, a catch — and the state between the events is invisible: whether the chest holds anything,
+    /// whether the keeper is carrying the money it needs to buy a witness off, what the band has asked for and not
+    /// got. Those are exactly the numbers that decide whether any of this machinery does anything, and on 18.09.2026
+    /// they were being guessed at from the absence of log lines.
+    /// </para>
+    /// </summary>
     private static string Band()
     {
         if (!BotUnderworld.Exists)
@@ -1423,6 +1718,7 @@ public static class BotHand
         }
     }
 
+    /// <summary>Each trade's claim against what it paid, worst overstatement first. Read off <see cref="BotCommons.Gaps"/>.</summary>
     private static string Gaps()
     {
         var gaps = BotCommons.Gaps(24);
@@ -1460,6 +1756,8 @@ public static class BotHand
                     say.Append(" minded)");
                 }
 
+                // Red on the dashboard by the same rule: more than half again what the work pays, on enough outcomes
+                // to be believed. See BotCommons.TradeConfidence.
                 if (settled >= BotCommons.TradeConfidence && measured * 1.5 < claimed)
                 {
                     say.Append(" — OVERSTATED");
@@ -1547,16 +1845,31 @@ public static class BotHand
         }
     }
 
+    /// <summary>How far around a spot the near verb looks. A camp is about a dozen tiles across.</summary>
     public static int NearReach { get; set; } = 14;
 
+    /// <summary>How long a camp put down by hand lasts. The engine's own five minutes is shorter than the walk to it.</summary>
     public static int CampMinutes { get; set; } = 45;
 
+    /// <summary>Camps put on the ground.</summary>
     public static long Camps { get; private set; }
 
+    /// <summary>Bots brought to where the watcher stands.</summary>
     public static long Summoned { get; private set; }
 
+    /// <summary>Times Patrick was called over.</summary>
     public static long Called { get; private set; }
 
+    /// <summary>
+    /// Brings one bot to where the watcher is standing, so it can be watched doing whatever it is doing.
+    ///
+    /// The same lift <see cref="Tele"/> makes and with the same warning: it is not travel, nothing prices it,
+    /// and a bot moved this way has learned nothing about the road it did not walk.
+    /// </summary>
+    /// <summary>
+    /// Sends a bot walking to a point by the ordinary walk — gates, moongates and all — as its next work (29.09.2026): the way
+    /// to prove a road on demand instead of waiting for a traveller to choose it. "go &lt;bot&gt; &lt;x&gt; &lt;y&gt;".
+    /// </summary>
     private static string Go(BotMobile bot, string rest)
     {
         var words = (rest ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -1614,6 +1927,23 @@ public static class BotHand
         return $"there is no room beside me for {bot.Name}.";
     }
 
+    /// <summary>
+    /// Brings Patrick to the watcher, when he is logged in and there is something worth his own eyes.
+    ///
+    /// <para>
+    /// <b>Only a real person, and only one who is already here.</b> The population is made of PlayerMobiles
+    /// — that is what lets a bot die properly — so "a player" is not a test. What is a test is a network
+    /// connection: bots have none. Nothing is summoned, nothing is created; somebody already playing is
+    /// moved a few tiles, and told why.
+    /// </para>
+    /// </summary>
+    /// <summary>
+    /// Declares a revel by hand, on the same terms the model gets: the trade must be one the ledger knows,
+    /// and the prize comes out of the same treasury.
+    ///
+    /// It exists because the watcher thinks about this once a quarter of an hour, and a thing that can only
+    /// be watched every fifteen minutes cannot be debugged at all.
+    /// </summary>
     private static string Revelry(string tail)
     {
         var (kind, rest) = First(tail);
@@ -1633,6 +1963,9 @@ public static class BotHand
             return $"the {BotRevel.Kind} revel is still running; one at a time.";
         }
 
+        // "revel mine 500 1450 1500" — the prize, then optionally where the camp stands. Parsed
+        // positionally because that is how every other verb on this console reads its tail, and a spot
+        // without a camp is accepted and ignored rather than refused: the hand-called revel raises none.
         var parts = (rest ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var prize = parts.Length > 0 && int.TryParse(parts[0], out var asked) ? asked : BotRevel.MostPrize / 2;
         var camp = parts.Length >= 3;
@@ -1682,6 +2015,8 @@ public static class BotHand
         return "nobody is on the shard to call.";
     }
 
+    /// <summary>The engine's own view of a bot, which is what every argument about one eventually needs.</summary>
+    /// <summary>The skill this bot's class is actually measured in, and where it has got to.</summary>
     private static string Trade(BotMobile bot)
     {
         var wanted = bot.Class?.Skills;
@@ -1708,11 +2043,22 @@ public static class BotHand
             + $"warmode {bot.Warmode}, fighting {bot.Combatant?.Name ?? "nobody"}; "
             + $"{bot.TotalWeight} of {bot.MaxWeight} stones; alive {bot.Alive}, frozen {bot.Frozen}; "
             + $"at ({bot.X}, {bot.Y}, {bot.Z}) on {bot.Map} in {region?.Name ?? "no named region"}; "
+            // Its trade's own skill and the two everybody has. A claim that a population "knows how to
+            // appraise" is a claim until something reads it back off a living bot, and nothing here did.
             + $"skills: {Trade(bot)}, ItemID {bot.Skills[SkillName.ItemID].Base:F0}; "
             + $"rank {bot.BotRank ?? "none"}; "
             + $"guild {(bot.Guild == null ? "none" : $"{bot.Guild.Name} [{bot.Guild.Abbreviation}]")}.";
     }
 
+    /// <summary>
+    /// The one question that decides whether a bot standing next to something is fighting it or watching it.
+    ///
+    /// <para>
+    /// The engine gates every swing on <c>InLOS</c> and returns without so much as advancing the swing clock
+    /// when the line is broken — see <c>Mobile.CheckCombatTime</c>. So "adjacent" and "able to hit" are two
+    /// different facts, and until 03.09.2026 nothing on this shard could tell them apart from the outside.
+    /// </para>
+    /// </summary>
     private static string Sight(BotMobile bot)
     {
         var foe = bot.Combatant;
@@ -1739,6 +2085,23 @@ public static class BotHand
         return $"{bot.Name} against {foe.Name} at ({foe.X}, {foe.Y}, {foe.Z}): {verdict}.";
     }
 
+    /// <summary>
+    /// Everything in a bot's pack, beside what it is allowed to keep of each.
+    ///
+    /// <para>
+    /// <b>Written because the question could not be asked.</b> Patrick found a bot carrying ten sewing kits
+    /// and eight heal potions on 09.09.2026, and there was no way to see a pack from outside the shard at
+    /// all: <c>props</c> gives the weight and not what makes it up, and the table that decides what a bot
+    /// keeps lived private in one file. The cause turned out to be two lines of <c>int.MaxValue</c> where a
+    /// count belonged - and the only reason it survived a month is that nothing could print it.
+    /// </para>
+    ///
+    /// <para>
+    /// The surplus is marked rather than the total, because the total is not the interesting half. A pack
+    /// holding forty cloth is fine if forty is what the trade eats and a fault if the allowance is five, and
+    /// the two look identical in any list that gives only counts.
+    /// </para>
+    /// </summary>
     private static string Packed(BotMobile bot)
     {
         var pack = bot.Backpack;
@@ -1760,6 +2123,12 @@ public static class BotHand
                 continue;
             }
 
+            // <b>The same two exclusions the sale itself makes, and leaving them out made this lie on its
+            // first run.</b> It reported "Gold x340 (keeps 0, 340 surplus)" and a surplus spellbook on a
+            // mage - neither of which BotUnload would ever touch, because Sell skips coin outright and
+            // BotBinding protects what a bot is bound to. An instrument that reports surplus the seller
+            // will never take is an instrument that raises an alarm about nothing, which is the failure
+            // this shard has paid for more often than any other.
             if (item is Gold || BotBinding.IsBound(item, bot.Bond))
             {
                 continue;
@@ -1782,6 +2151,8 @@ public static class BotHand
         {
             var allowed = keep.TryGetValue(kind, out var cap) ? cap : 0;
 
+            // A kind with no entry is merchandise outright, and saying "keeps 0" of it reads as a fault
+            // rather than as the ordinary state of a thing a bot is carrying to sell.
             if (allowed >= int.MaxValue)
             {
                 lines.Add($"{kind.Name} x{many} (kept without limit)");
@@ -1831,6 +2202,11 @@ public static class BotHand
             + $"{(BotPopulation.Within(map, bot.Location) ? "inside" : "outside")} the ground the population may want anything on.";
     }
 
+    /// <summary>What is on a tile and whether anybody could be. The question behind every pocket on this shard.</summary>
+    /// <summary>
+    /// <c>seat &lt;guild&gt; &lt;x&gt; &lt;y&gt;</c>: the guild by name, with or without its "The", and the
+    /// last two words the place. See <c>BotSeat.Set</c>.
+    /// </summary>
     private static string Seat(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -1874,6 +2250,7 @@ public static class BotHand
 
         var seat = new Point3D(x, y, z);
 
+        // Not beside another guild's seat, however it is asked for. See BotSeat.TooNear.
         if (BotSeat.TooNear(found.Name, seat, out var other, out var gap))
         {
             Refused++;
@@ -1887,6 +2264,7 @@ public static class BotHand
             return $"{roadless}; a seat has to be ground with a road from home, or everybody put down there is carried home. {BotSeat.Tell()}";
         }
 
+        // Not on ground another guild holds, however it is asked for (06.10.2026). See BotBounds.
         if (BotBounds.Foreign(found.Name, map, seat, out var holder))
         {
             Refused++;
@@ -1900,6 +2278,7 @@ public static class BotHand
         return $"the seat of {found.Name} is {x},{y} now. {BotSeat.Tell()}";
     }
 
+    /// <summary>The zones in a paragraph, or the tour switched: <c>zones</c>, <c>zones tour on</c>, <c>zones tour off</c>.</summary>
     private static string Zones(string tail)
     {
         var words = tail.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -1919,6 +2298,11 @@ public static class BotHand
         return BotZones.Tell();
     }
 
+    /// <summary>
+    /// The reach map at the door: <c>reach</c> for the map and its check, <c>reach 1432 1690</c> for a tile (the map's word and
+    /// the walker's own), <c>reach check 200</c> to examine the borders, <c>reach check</c> for the tally and the misses,
+    /// <c>reach redraw 1432 1690 40</c> to draw a square again, <c>reach carry on|off</c>.
+    /// </summary>
     private static string ReachMap(string tail)
     {
         var words = tail.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
@@ -1973,6 +2357,7 @@ public static class BotHand
         return $"{BotReachMap.TellAt(x, y)} {BotReachCheck.Probe(x, y)}";
     }
 
+    /// <summary>What the zones say about one tile: <c>zone 1440 1690</c>.</summary>
     private static string Zone(string tail)
     {
         var words = tail.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
@@ -1987,6 +2372,17 @@ public static class BotHand
         return BotZones.TellAt(x, y);
     }
 
+    /// <summary>
+    /// <c>road &lt;x1&gt; &lt;y1&gt; &lt;x2&gt; &lt;y2&gt;</c>: the pathfinder's own answer between two tiles, with a
+    /// clock five times the ordinary ceiling, so "nobody can get into the graveyard" can be asked of the
+    /// thing that decides it rather than inferred from a hundred failed quarrels.
+    /// </summary>
+    /// <summary>
+    /// What the shard knows about the danger of one place: the death map, which learns from the boot, and the quadrant
+    /// record, which survives a restart. Written for the plague beast's field north-east of Britain, which killed nine bots
+    /// between 05:25 and 05:37 on build 49 on 15.09.2026 while nothing on this console could say what either map held
+    /// about it.
+    /// </summary>
     private static string Peril(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -2010,6 +2406,10 @@ public static class BotHand
         return $"{BotPeril.Tell(map, where)}; {BotQuad.Tell(map, where)}.";
     }
 
+    /// <summary>
+    /// The coarse chart (BotChart): <c>chart</c> for its state; <c>chart Ysolt 1084 1406</c> or <c>chart x1 y1 x2 y2</c> for
+    /// the route it gives, and whether the planner can walk the first legs of it.
+    /// </summary>
     private static string Chart(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -2080,6 +2480,7 @@ public static class BotHand
 
         length += Math.Max(Math.Abs(goal.X - last.X), Math.Abs(goal.Y - last.Y));
 
+        // The first legs, walked by the planner as the walker would walk them.
         var legs = new List<string>();
         var leg = from;
         var plan = new List<Point3D>();
@@ -2106,6 +2507,7 @@ public static class BotHand
             + $"expanded in {took:F2}ms; first points {string.Join(" ", shown)}{(points.Count > 12 ? " …" : "")}; legs: {string.Join("; ", legs)}.";
     }
 
+    /// <summary>The gates near a point: <c>gates 5134 1946</c> or <c>gates 5134 1946 40</c>. See <see cref="BotGates.Near"/>.</summary>
     private static string Gates(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -2116,6 +2518,7 @@ public static class BotHand
             return BotGates.Describe() + ".";
         }
 
+        // gates route x1 y1 x2 y2: the whole chain of gates a walk from one point to the other would take (build 330).
         if (words[0] == "route" && words.Length >= 5 && int.TryParse(words[1], out var rx1) && int.TryParse(words[2], out var ry1)
             && int.TryParse(words[3], out var rx2) && int.TryParse(words[4], out var ry2) && map != null && map != Map.Internal)
         {
@@ -2138,6 +2541,10 @@ public static class BotHand
         return BotGates.Near(map, new Point3D(x, y, z), radius) + ".";
     }
 
+    /// <summary>
+    /// The tiered navigation (NavigationService): <c>nav</c> for its state; <c>nav Ysolt 1084 1406</c> or
+    /// <c>nav x1 y1 x2 y2</c> for the route the graph gives, and whether the planner walks its first legs.
+    /// </summary>
     private static string Nav(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -2227,6 +2634,10 @@ public static class BotHand
             + $"in {took:F2}ms; first points {string.Join(" ", shown)}{(points.Count > 12 ? " \u2026" : "")}; legs: {string.Join("; ", legs)}.";
     }
 
+    /// <summary>
+    /// <c>navcells x y r</c>: every step the engine allows within r tiles of (x, y) whose landing height matches none of the
+    /// next cell's standable surfaces within the navigation graph's tolerance — the steps the graph drops — with the gap.
+    /// </summary>
     private static string NavCells(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -2314,6 +2725,13 @@ public static class BotHand
             + $"for example {string.Join("; ", shown)}.";
     }
 
+    /// <summary>
+    /// <c>navbench n [radius] [checked]</c>: n random pairs of standable tiles within radius of home, each routed over the
+    /// navigation graph; how many were found, direct, unreachable, over budget or handed to the long tier, the time each took
+    /// (mean, 95th percentile, worst) and the nodes expanded. For the first <c>checked</c> routed pairs the route is walked
+    /// leg by leg with the precise search, and its cost set against the precise search's own plan from end to end at five
+    /// times the ceiling — the nearest thing to an oracle the live map has.
+    /// </summary>
     private static string NavBench(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -2420,6 +2838,7 @@ public static class BotHand
             + $"{overP95:F1}% at the 95th percentile.";
     }
 
+    /// <summary>A random tile within <paramref name="radius"/> of home a body can stand on, at its lowest standing height.</summary>
     private static bool RandomStand(Map map, Point3D home, int radius, System.Random random, out Point3D at)
     {
         Span<sbyte> zs = stackalloc sbyte[16];
@@ -2451,6 +2870,11 @@ public static class BotHand
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
+        // <b>From a bot, where it really stands — <c>road Edda 1785 1455</c>.</b> The four-number form settles its
+        // origin on the land, and on 21.09.2026 that made it useless for the one question worth asking: Edda was
+        // inside her guild's hall at z 7, the land under the hall is at 0, and the answer came back "0 tiles of
+        // plan, nobody could be put down" — about a place she was not standing. A bot's own tile and height are
+        // the only origin the walker ever plans from, so they are the only origin worth asking about.
         if (words.Length >= 3 && !int.TryParse(words[0], out _)
             && int.TryParse(words[^2], out var gx) && int.TryParse(words[^1], out var gy))
         {
@@ -2496,6 +2920,8 @@ public static class BotHand
             return "the population has no map, so there is no road to look for.";
         }
 
+        // The land's own height where nobody could be put down - a crowded muster point or the enemy's own
+        // tile fail Settle for being occupied, and the question is about the road, not the footing.
         var stood1 = BotStep.Settle(map, x1, y1, out var z1);
         var stood2 = BotStep.Settle(map, x2, y2, out var z2);
 
@@ -2517,6 +2943,10 @@ public static class BotHand
             + $"; the far side says {BotPath.Enclose(map, to, BotArrival.Within(1))}.";
     }
 
+    /// <summary>
+    /// The road map's state, or the steps of road from home to each tile named against the straight line. The instrument
+    /// <c>BotHunter.Detour</c> is set with: a dart's ground either is far, or is only far round.
+    /// </summary>
     private static string Roads(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -2629,6 +3059,15 @@ public static class BotHand
         }
     }
 
+    /// <summary>
+    /// The GM's cure for a pocket: lift the bot out rather than argue with the pathfinder.
+    ///
+    /// <para>
+    /// Bounded three ways, and each bound is one way a wrong pair of coordinates could do harm. Only
+    /// somewhere a body actually fits, so nobody is posted into rock. Only within <see cref="Reach"/> of
+    /// where the bot already is. And only ever a bot of ours.
+    /// </para>
+    /// </summary>
     private static string Tele(string tail)
     {
         var (name, rest) = First(tail);
@@ -2676,6 +3115,8 @@ public static class BotHand
 
         bot.MoveToWorld(new Point3D(x, y, z), map);
 
+        // The plan it was holding was a plan from somewhere else. Left alone, the bot walks straight back
+        // into the pocket it has just been lifted out of.
         bot.Journey?.Discard();
 
         return $"{bot.Name} lifted from ({from.X}, {from.Y}, {from.Z}) to ({x}, {y}, {z}); its plan was torn up with it.";
@@ -2684,6 +3125,7 @@ public static class BotHand
     private static string Homeward(BotMobile bot)
     {
         var map = BotPopulation.Home;
+        // Where this bot lives (29.09.2026): its guild's hall or seat, or its town. See BotPopulation.HomeOf.
         var where = BotPopulation.HomeOf(bot);
 
         if (map == null)
@@ -2691,6 +3133,12 @@ public static class BotHand
             return "the population has no home to send anybody to.";
         }
 
+        // <b>The configured home tile is not necessarily a tile.</b> Asked on 04.09.2026 what was at
+        // (1440, 1470) — this shard's own home — the answer was "no body fits and the floor could not be
+        // found", while all eight of its neighbours held one: a static sitting on the exact point somebody
+        // typed into the config. The population never noticed because its own birth scatters over six tiles
+        // and takes the first spot that holds a body. Anything that walks to the literal point does notice,
+        // so this does the same scatter rather than trusting the number.
         var at = Point3D.Zero;
 
         for (var ring = 0; ring <= BotPopulation.Spread && at == Point3D.Zero; ring++)
@@ -2745,6 +3193,9 @@ public static class BotHand
 
     private static string Free(BotMobile bot)
     {
+        // The roll-call's own two steps, in the same order and for the same reason: the plan first, so that
+        // whatever the work has learned about where it was going is written down before the work is ended.
+        // Ending it first is how the debugger spent a night deleting the shard's own lessons. See BotAudit.
         var held = bot.Resolve?.Deed?.ToString() ?? "nothing";
 
         bot.Journey?.Discard();
@@ -2767,6 +3218,15 @@ public static class BotHand
         return $"{foe.Name} is left alone for a while; nobody of ours will be offered it.";
     }
 
+    /// <summary>
+    /// A bot of ours by name, and nothing else, ever.
+    ///
+    /// <para>
+    /// The whole safety of this file is one line long and it is this one: the roster is the only place a
+    /// target may come from. A player's character, a shopkeeper, a staff member and a spawned creature are
+    /// all simply not findable from here, whatever the model writes.
+    /// </para>
+    /// </summary>
     private static BotMobile Find(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -2797,6 +3257,10 @@ public static class BotHand
         return null;
     }
 
+    /// <summary>
+    /// First word and the rest — except that a name may hold a space now (see <c>BotPopulation.Christen</c>),
+    /// so the two-word reading is tried against the roster before the one-word split is trusted.
+    /// </summary>
     private static (string Head, string Tail) First(string text)
     {
         text = (text ?? "").Trim();

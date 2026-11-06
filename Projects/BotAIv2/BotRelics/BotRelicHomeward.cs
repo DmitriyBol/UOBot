@@ -51,8 +51,10 @@ public sealed class BotRelicHomeward : BotDeed
 
     public static bool Running { get; set; } = true;
 
+    /// <summary>What the walk home is reckoned at per minute: the guild's errand, unpaid, priced to be taken.</summary>
     public static double Prior { get; set; } = 50.0;
 
+    /// <summary>How near the hall's door counts as home.</summary>
     public static int Reach { get; set; } = 8;
 
     public static long Offered { get; private set; }

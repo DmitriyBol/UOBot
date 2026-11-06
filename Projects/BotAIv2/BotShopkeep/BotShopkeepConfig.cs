@@ -15,6 +15,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotShopkeepSettings
 {
+    /// <summary>Whether bots keep shops at all. Off, the market has no shops: goods go by carrier or to a shopkeeper.</summary>
     public bool? Running { get; set; }
 
     public double? ShiftMinutes { get; set; }
@@ -47,6 +48,7 @@ public sealed class BotShopkeepSettings
 
     public int? SeekTiles { get; set; }
 
+    /// <summary>What a minute's walk to a shop is worth in gold. Follows <c>BotRestock.Prior</c> unless given.</summary>
     public double? WalkGold { get; set; }
 
     public int? CryMs { get; set; }
@@ -94,6 +96,7 @@ public static class BotShopkeepConfig
         BotShopkeep.CryMs = settings.CryMs ?? BotShopkeep.CryMs;
         BotShopkeepModule.SayEveryMs = settings.SayEveryMs ?? BotShopkeepModule.SayEveryMs;
 
+        // Only when the file gives it: read back as "?? WalkGold" it would freeze today's BotRestock.Prior into it for good.
         if (settings.WalkGold is { } walk)
         {
             BotShopkeep.WalkGold = walk;

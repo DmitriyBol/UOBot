@@ -24,20 +24,28 @@ public sealed class BotFencer : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotFencer));
 
+    /// <summary>Whether stolen goods are fenced and resold at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>What the fence pays of a thing's worth. Patrick's half.</summary>
     public static double FenceShare { get; set; } = 0.5;
 
+    /// <summary>The least the stolen goods must be worth for the walk to the fence or the counter to be offered.</summary>
     public static int LeastLot { get; set; } = 20;
 
+    /// <summary>The chance one lot sold over a counter in another town is traced back to its seller.</summary>
     public static double TraceChance { get; set; } = 0.1;
 
+    /// <summary>The same in the town it was stolen in.</summary>
     public static double TraceAtHome { get; set; } = 0.5;
 
+    /// <summary>Traces that put the seller on the wanted list. Patrick's three.</summary>
     public static int TracesToPost { get; set; } = 3;
 
+    /// <summary>What the resale is reckoned at a minute over and above what the goods fetch: a walk to a far town.</summary>
     public static double Minutes { get; set; } = 6.0;
 
+    /// <summary>How long a chosen counter is kept for one seller before it is chosen again.</summary>
     public static int ChoiceMs { get; set; } = 60000;
 
     public static long ToFence { get; private set; }
@@ -93,6 +101,7 @@ public sealed class BotFencer : IBotProposer
             return null;
         }
 
+        // A thief with a fence free to buy walks to the fence; the fence, or a thief without one, walks to a counter.
         var fence = BotFence.Who;
 
         if (fence != null && fence != body && fence.Alive && fence.Map == map && !BotOutlaw.Jailed(fence)
@@ -123,6 +132,7 @@ public sealed class BotFencer : IBotProposer
             return null;
         }
 
+        // Outlaws keep out of guarded towns, and every counter stands in one: the goods wait in the pack until the grey lifts.
         if (BotOutlaw.Keeps(body, map, chosen.Vendor.Location))
         {
             return null;
@@ -133,6 +143,10 @@ public sealed class BotFencer : IBotProposer
         return new BotResell(chosen.Vendor, worth);
     }
 
+    /// <summary>
+    /// The counter a seller's stolen goods fetch most at, after the road: one in no town any of the goods were taken in, within the
+    /// seller's leash; or, failing every other, one in the town itself.
+    /// </summary>
     public static BaseVendor Counter(BotMobile body, out int paying)
     {
         paying = 0;
@@ -210,6 +224,7 @@ public sealed class BotFencer : IBotProposer
         return best;
     }
 
+    /// <summary>Stolen goods bought by the fence: counted, and said.</summary>
     public static void Fenced(int units, int gold)
     {
         Bought++;
@@ -219,6 +234,9 @@ public sealed class BotFencer : IBotProposer
 
     public static void Short() => Broke++;
 
+    /// <summary>
+    /// A lot of stolen goods sold over a counter: each kind may be traced back to the seller, and three traces post it.
+    /// </summary>
     public static void Resold(BotMobile seller, BaseVendor vendor, List<(Type Kind, int Amount)> sold, int gold)
     {
         Sold++;
@@ -444,6 +462,7 @@ public sealed class BotFenceSale : BotDeed
             }
             else
             {
+                // Gone from the pack by some other road — sold, banked, dropped at a death: off the book.
                 BotCrime.Cool(thief, kind, want);
             }
         }
@@ -549,6 +568,7 @@ public sealed class BotResell : BotDeed
 
         if (goods.Count == 0)
         {
+            // The stolen things are gone from the pack by some other road: off the book.
             for (var i = lots.Count - 1; i >= 0; i--)
             {
                 BotCrime.Cool(body, lots[i].Kind, lots[i].Amount);

@@ -24,22 +24,28 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotZoneScan
 {
+    /// <summary>Sectors to a side of one window. Eight: 128 tiles.</summary>
     public static int WindowSectors { get; set; } = 8;
 
+    /// <summary>Loop milliseconds the sweep may spend in one beat.</summary>
     public static double BudgetMs { get; set; } = 0.6;
 
+    /// <summary>Windows at most in one beat, whatever the clock says.</summary>
     public static int MostWindows { get; set; } = 48;
 
+    /// <summary>Whole sweeps finished, and windows passed, since the start.</summary>
     public static long Sweeps { get; private set; }
 
     public static long Windows { get; private set; }
 
+    /// <summary>Loop milliseconds the sweep has spent, all told, and on the tour's focus.</summary>
     public static double SpentMs { get; private set; }
 
     public static double FocusSpentMs { get; private set; }
 
     public static long Focused { get; private set; }
 
+    /// <summary>The last whole sweep: seconds it took, creatures passed, attackers among them, attackers awake, sea creatures, the towns' and the tame.</summary>
     public static double SweepSeconds { get; private set; }
 
     public static int Creatures { get; private set; }
@@ -92,6 +98,7 @@ public static class BotZoneScan
         _sweepBegan = now;
     }
 
+    /// <summary>Windows until the budget is spent. True when it passed any.</summary>
     public static bool Step(long now)
     {
         var map = _map;
@@ -142,6 +149,7 @@ public static class BotZoneScan
         return done > 0;
     }
 
+    /// <summary>One box passed now, for the tour's held ground. Counted apart from the sweep.</summary>
     public static void Focus(Map map, Rectangle2D box, long now)
     {
         if (map == null || map != _map)
@@ -186,6 +194,9 @@ public static class BotZoneScan
             var water = c.CantWalk && c.CanSwim;
             var attacks = BotHaunts.AttacksFirst(c.FightMode);
 
+            // A sea creature's patrol is not the land's: it is never written into the raster the land zones are drawn from. Nor is
+            // a creature in a fight (02.10.2026): one chasing a bot is where the bot led it, not where it patrols — the Sonnet
+            // analyst of 388 found 676 sighting cells inside Britain that matched no spawner, chasers recorded as patrols.
             if (attacks && awake && !water && c.Combatant == null)
             {
                 BotZoneRaster.Record(c.X, c.Y, now);

@@ -37,6 +37,7 @@ public static class BotSeaCourse
 
         public bool Found;
 
+        /// <summary>The turns of the course, first cell to last, as cell indices.</summary>
         public List<int> Turns;
 
         public int Tiles;
@@ -44,6 +45,7 @@ public static class BotSeaCourse
         public long Expanded;
     }
 
+    /// <summary>How long a cell a ship found blocked stays shut to new courses. Ten minutes: another ship moves on well before.</summary>
     public static int ShutMs { get; set; } = 600000;
 
     private static readonly Queue<Ask> _asks = new();
@@ -84,6 +86,7 @@ public static class BotSeaCourse
         }
     }
 
+    /// <summary>Shuts a cell to new courses for <see cref="ShutMs"/>. Courses already drawn are not redrawn by this.</summary>
     public static void Shut(int cell)
     {
         if (cell >= 0)
@@ -109,6 +112,7 @@ public static class BotSeaCourse
         return false;
     }
 
+    /// <summary>Works on the courses asked for until the deadline (a <see cref="Stopwatch"/> timestamp).</summary>
     public static void Step(long deadline)
     {
         if (!BotSeaChart.Ready)
@@ -166,6 +170,7 @@ public static class BotSeaCourse
         _heap.Enqueue(ask.From, Heuristic(ask.From, ask.To));
     }
 
+    /// <summary>True when the search in hand ended, false when it ran out of slice.</summary>
     private static bool Search(long deadline)
     {
         var ask = _current;
@@ -231,6 +236,7 @@ public static class BotSeaCourse
         return true;
     }
 
+    /// <summary>Octile distance in tenths of a cell, a hair over so that straight courses win ties.</summary>
     private static int Heuristic(int a, int b)
     {
         var h = BotSeaChart.Height;
@@ -269,6 +275,7 @@ public static class BotSeaCourse
 
         Found++;
 
+        // Walked back from the goal, then turned round; only the cells where the heading changes are kept.
         List<int> cells = [];
 
         for (var c = ask.To; c >= 0; c = _came[c])
@@ -287,6 +294,7 @@ public static class BotSeaCourse
         ask.Turns = Turns(cells);
     }
 
+    /// <summary>The first cell, every cell where the heading changes, and the last.</summary>
     public static List<int> Turns(List<int> cells)
     {
         List<int> turns = [];

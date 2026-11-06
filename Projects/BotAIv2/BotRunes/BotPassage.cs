@@ -42,14 +42,19 @@ public sealed class BotPassage
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPassage));
 
+    /// <summary>How long a captain waits for its company to stand round it before the gate is opened. A minute: a sweep's levy walks in from forty tiles.</summary>
     public static int GatherMs { get; set; } = 60000;
 
+    /// <summary>How near the leader a member stands to count as gathered for the gate. Twelve.</summary>
     public static int Assembly { get; set; } = 12;
 
+    /// <summary>When the leader crosses whatever is left. Twenty-two seconds: the engine's gate stands thirty in this era (<c>Core.T2A</c>).</summary>
     public static int CrossMs { get; set; } = 22000;
 
+    /// <summary>How long a cast waits for mana, or for a fight at the muster, before the company marches by road. A minute.</summary>
     public static int WaitMs { get; set; } = 60000;
 
+    /// <summary>How long a leader left on the near side walks to the members through before the passage is let go. Ten minutes.</summary>
     public static int RejoinMs { get; set; } = 600000;
 
     public static long Asked { get; private set; }
@@ -84,6 +89,7 @@ public sealed class BotPassage
 
     public static long Saved { get; private set; }
 
+    /// <summary>Members found back on the near side after going through: it should read nought. See <see cref="Crossing"/>.</summary>
     public static long Stepped { get; private set; }
 
     private static readonly Dictionary<string, int> _why = new(StringComparer.Ordinal);
@@ -162,6 +168,11 @@ public sealed class BotPassage
         }
     }
 
+    /// <summary>
+    /// A passage for this company to <paramref name="destination"/>, or null when it will march: nobody of it can cast Gate
+    /// Travel, nobody holds a rune near enough, or the rune saves too little. <paramref name="gather"/> waits for the company
+    /// to stand round the leader first, for a company raised a moment ago.
+    /// </summary>
     public static BotPassage Open(BotSquad squad, Mobile leader, Map map, Point3D destination, string toward, bool gather)
     {
         if (!BotRunes.Running || squad == null || leader is not { Deleted: false, Alive: true } || map == null || map == Map.Internal)
@@ -211,6 +222,7 @@ public sealed class BotPassage
 
             anyRune = true;
 
+            // Mana and the engine's recovery come back while the company stands; the rest will not.
             if (!BotRunes.Ready(one, BotRunes.Gate, out _, out var chance, out var refused) && refused is not ("too little mana" or "not recovered"))
             {
                 why ??= refused;
@@ -274,6 +286,10 @@ public sealed class BotPassage
         return passage;
     }
 
+    /// <summary>
+    /// The leader's beat. True while the passage has the leader, with what it does; false once the company is through or
+    /// the passage is given up, and the leader's own march goes on from wherever it now stands.
+    /// </summary>
     public bool Lead(Mobile body, out BotDoing doing)
     {
         doing = default;
@@ -301,6 +317,11 @@ public sealed class BotPassage
         };
     }
 
+    /// <summary>
+    /// A member's beat, asked by the enlistment's hold (<c>BotEnlist.Holding</c>). True when the passage says where this
+    /// member stands: the mage on its tile while it casts, the others at the gate while it is open, and those through at the
+    /// far side until the leader comes.
+    /// </summary>
     public static bool Steer(IBotSquadMember member, BotSquad squad, out BotDoing doing)
     {
         doing = default;
@@ -323,11 +344,14 @@ public sealed class BotPassage
         {
             case Stage.Cast:
                 {
+                    // Only while the spell is in the air: before it the mage closes up on the leader like anybody else.
                     if (!ReferenceEquals(self, _mage) || _spell == null)
                     {
                         return false;
                     }
 
+                    // Held on its tile by a walk rather than a stand, so that a re-station of the company is answered at the
+                    // next beat instead of walking the caster off mid-cast.
                     doing = BotDoing.Walk(_map, _castAt, BotArrival.Within(1), $"opening a gate to {Place}");
 
                     return true;
@@ -478,6 +502,7 @@ public sealed class BotPassage
             return true;
         }
 
+        // A fight at the muster is the company's first business; the gate waits for it, a while.
         if (_squad.Stance == BotSquadStance.Fighting)
         {
             if (now - _stageTick >= WaitMs)
@@ -537,6 +562,7 @@ public sealed class BotPassage
         return true;
     }
 
+    /// <summary>The gate this cast opened: one of the engine's travel gates within a tile of the caster, linked to the rune's spot.</summary>
     private bool Find()
     {
         foreach (var gate in _map.GetItemsInRange<GateTravelMoongate>(_mage.Location, 1))
@@ -554,6 +580,7 @@ public sealed class BotPassage
         return false;
     }
 
+    /// <summary>A tile a few steps off the far gate for the members through to stand on: standing on the gate, a step takes them back.</summary>
     private Point3D Aside(Point3D at)
     {
         ReadOnlySpan<int> offsets = [3, 0, 0, 3, -3, 0, 0, -3, 2, 2, -2, 2, 2, -2, -2, -2];
@@ -586,6 +613,7 @@ public sealed class BotPassage
                 return false;
             }
 
+            // The leader is on the near side with members through: it goes to them. See the class note.
             HalfThrough++;
             To(Stage.Rejoin, now);
 
@@ -600,6 +628,7 @@ public sealed class BotPassage
             return Rejoining(now, out doing);
         }
 
+        // Anybody standing at the gate is put through, whether or not its own beat has come.
         var waiting = 0;
         var members = _squad.Members;
 
@@ -610,6 +639,8 @@ public sealed class BotPassage
                 continue;
             }
 
+            // Through and still on the far side, or stepped back through the far gate (a re-station can walk a member onto
+            // it) and counted as waiting again.
             if (_through.Contains(self))
             {
                 if (self.Map == _map && self.InRange(_far, 12))
@@ -636,6 +667,7 @@ public sealed class BotPassage
             waiting++;
         }
 
+        // The leader last: when nobody is left to wait for, or the gate's time is nearly out.
         if (waiting == 0 || now - _stageTick >= CrossMs)
         {
             if (!_leader.InRange(_gate.Location, 1))
@@ -691,6 +723,10 @@ public sealed class BotPassage
         return true;
     }
 
+    /// <summary>
+    /// Puts one body through the gate by the engine's own use of it (<c>Moongate.EndConfirmation</c>: in range, the same map,
+    /// not casting). True when it landed on the far side.
+    /// </summary>
     private bool Step(Mobile who)
     {
         if (_gate is not { Deleted: false } || who.Spell != null)
@@ -713,6 +749,7 @@ public sealed class BotPassage
 
     private bool Landed(Mobile who) => who.Map == _map && _far != Point3D.Zero && who.InRange(_far, 2);
 
+    /// <summary>The company is through, the leader last.</summary>
     private void Finish(int left)
     {
         var through = _through.Count - (_through.Contains(_leader) ? 1 : 0);
@@ -755,6 +792,7 @@ public sealed class BotPassage
         _stageTick = now;
     }
 
+    /// <summary>The passage is let go: the company marches on by road from wherever it stands.</summary>
     public void Abort(string why)
     {
         if (_stage == Stage.Over)

@@ -28,16 +28,25 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotSurplus
 {
+    // ---- The box kept in order ----------------------------------------------------------------------------------------------
+
+    /// <summary>How long one bot's box is left before it is tidied again. A full box is looked at once in this time.</summary>
     public static int TidyMs { get; set; } = 600000;
 
+    /// <summary>Boxes in which stacks lying apart were joined, and the places that freed.</summary>
     public static long Tidied { get; private set; }
 
     public static long Joined { get; private set; }
 
+    /// <summary>Lots a miner put in a box at or over its count because the box held no stack of the metal to join (one place a metal).</summary>
     public static long Overfilled { get; private set; }
 
     private static readonly Dictionary<Serial, long> _tidiedAt = [];
 
+    /// <summary>
+    /// Joins the stacks of one kind lying apart in this bot's bank box, when the box is at its count of things and was not tidied
+    /// within <see cref="TidyMs"/>. Returns the places freed.
+    /// </summary>
     public static int TidyIfFull(Mobile body)
     {
         var box = body?.FindBankNoCreate();
@@ -64,6 +73,10 @@ public static class BotSurplus
         return Tidy(body, box);
     }
 
+    /// <summary>
+    /// Joins every stack in <paramref name="box"/> (top level only) onto the first stack of its kind, look and colour, by the
+    /// engine's <c>StackWith</c>, which adds the amount and deletes the joined pile. Nothing bound, no container. Returns the places freed.
+    /// </summary>
     public static int Tidy(Mobile body, Container box)
     {
         if (box == null || box.Deleted || box.Items.Count < 2)
@@ -101,6 +114,7 @@ public static class BotSurplus
                 continue;
             }
 
+            // The first pile is at the engine's sixty thousand, or named apart: this one becomes the pile to join.
             first[key] = item;
         }
 
@@ -113,6 +127,10 @@ public static class BotSurplus
         return joined;
     }
 
+    /// <summary>
+    /// Puts <paramref name="lot"/> in the box onto a stack of its kind if the box holds one (a full box takes it: the engine's
+    /// count is of things, and a joined pile is no new thing). Returns whether it joined; the lot is untouched when it did not.
+    /// </summary>
     public static bool Join(Mobile body, Container box, Item lot)
     {
         if (box == null || box.Deleted || lot == null || lot.Deleted || !lot.Stackable)
@@ -135,6 +153,7 @@ public static class BotSurplus
         return false;
     }
 
+    /// <summary>The miner's way into the box: onto a stack of the metal, else a new place, counted when the box was already full.</summary>
     public static void Put(Mobile body, Container box, Item lot)
     {
         if (Join(body, box, lot))
@@ -150,6 +169,10 @@ public static class BotSurplus
         box.DropItem(lot);
     }
 
+    /// <summary>
+    /// The kinds this box holds stacks of, by kind, look and colour: a lot of one of them joins a stack and needs no place. Read
+    /// once per walk of a pack, and only for a full box.
+    /// </summary>
     public static HashSet<(Type, int, int)> Piles(Container box)
     {
         HashSet<(Type, int, int)> piles = [];
@@ -174,6 +197,9 @@ public static class BotSurplus
         return piles;
     }
 
+    // ---- Where the surplus of capped kinds went, over the last hour -------------------------------------------------------
+
+    /// <summary>Routes of a capped kind's surplus, and the two ways it went nowhere.</summary>
     public const int Box = 0;
 
     public const int Shop = 1;
@@ -182,8 +208,10 @@ public static class BotSurplus
 
     public const int Ground = 3;
 
+    /// <summary>Units the box refused at the porter's store (it had no place and no stack to join).</summary>
     public const int Refused = 4;
 
+    /// <summary>Units over the allowance of a kind the box has no place for, that no shopkeeper in reach buys (the peddler's look).</summary>
     public const int Stranded = 5;
 
     private const int Routes = 6;
@@ -191,6 +219,7 @@ public static class BotSurplus
     private static readonly string[] _named =
         ["box", "shopkeeper", "a bot", "the ground", "refused by a full box", "no box and no buyer (counted once a bot and kind in five minutes)"];
 
+    /// <summary>The hour is kept in twelve slots of five minutes, the summary's own beat.</summary>
     public static int SlotMs { get; set; } = 300000;
 
     private const int Slots = 12;
@@ -201,6 +230,7 @@ public static class BotSurplus
 
     private static readonly long[] _total = new long[Routes];
 
+    /// <summary>Counts <paramref name="units"/> of a capped kind's surplus going by <paramref name="route"/>.</summary>
     public static void Count(int route, Type kind, int units)
     {
         if (kind == null || units <= 0 || route < 0 || route >= Routes)
@@ -217,6 +247,10 @@ public static class BotSurplus
 
     private static readonly Dictionary<(Serial, Type), long> _countedIn = [];
 
+    /// <summary>
+    /// Counts a standing state (not a movement) at most once a bot and kind in each five-minute slot: the peddler looks at a pack
+    /// every minute, and a surplus nobody takes would otherwise be counted at every look.
+    /// </summary>
     public static void CountOnce(int route, Mobile body, Type kind, int units)
     {
         if (body == null || kind == null || units <= 0)
@@ -241,6 +275,7 @@ public static class BotSurplus
         Count(route, kind, units);
     }
 
+    /// <summary>Counts what was moved of <paramref name="kind"/> only if it is a capped kind for this bot (a number kept, not all and not none).</summary>
     public static void CountIfCapped(IBotWilful bot, int route, Type kind, int units)
     {
         if (bot == null || kind == null || units <= 0)
@@ -295,6 +330,7 @@ public static class BotSurplus
         return sum;
     }
 
+    /// <summary>The `Packs:` clause: boxes tidied, and each route over the last hour by kind (the four largest), with the total since the load.</summary>
     public static string Describe()
     {
         List<string> parts = [];
@@ -326,6 +362,7 @@ public static class BotSurplus
         return $"capped surplus over the last hour (since the load): {string.Join(", ", parts)}; {Tidied} bank boxes tidied, {Joined} places freed by joining stacks lying apart, {Overfilled} lots a miner put in a box at its count for want of a stack to join";
     }
 
+    /// <summary>Whether this bot's bank box is at its count of things: for /api/state.</summary>
     public static bool BoxFull(Mobile body)
     {
         var box = body?.FindBankNoCreate();

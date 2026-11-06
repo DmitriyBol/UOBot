@@ -42,18 +42,23 @@ public static class BotTidy
 
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often a bot looks through what it wears and carries for something unidentified.</summary>
     public static int LookEveryMs { get; set; } = 5000;
 
+    /// <summary>How many bandages a death robe cut with scissors comes to.</summary>
     public static int RobeBandages { get; set; } = 4;
 
+    /// <summary>Things identified.</summary>
     public static long Identified { get; private set; }
 
+    /// <summary>Appraisals whose check did not pass. Nought at a hundred of skill; a number here means the skill is not.</summary>
     public static long Unsure { get; private set; }
 
     public static long RobesCut { get; private set; }
 
     public static long RobesThrown { get; private set; }
 
+    /// <summary>Asked on the bot's beat, with the other conditions. See <see cref="BotMobile.Beat"/>.</summary>
     public static void Keep(BotMobile bot)
     {
         if (!Running || bot is not { Deleted: false, Alive: true })
@@ -102,6 +107,7 @@ public static class BotTidy
     {
         var now = Core.TickCount;
 
+        // Seeded from a real tick rather than compared against a nought the field never held.
         if (!bot.Appraised)
         {
             bot.Appraised = true;
@@ -117,6 +123,7 @@ public static class BotTidy
 
         bot.AppraisedTick = now;
 
+        // What it wears first: a magic blade bought off a stall does not stay in the pack long enough to be found there.
         var worn = bot.Items;
 
         for (var i = 0; i < worn.Count; i++)
@@ -138,6 +145,10 @@ public static class BotTidy
         }
     }
 
+    /// <summary>
+    /// Identifies a magic weapon or armour nobody has identified, with the engine's own check: whether it is one, whether the
+    /// check passes, and the flag. Also asked of loot as it comes off a corpse, before it is listed. See <c>BotSlay.Rifle</c>.
+    /// </summary>
     public static bool Appraise(Mobile bot, Item thing, string where)
     {
         if (!Running || bot is not { Deleted: false, Alive: true } || !Unidentified(thing))
@@ -160,6 +171,7 @@ public static class BotTidy
         return true;
     }
 
+    /// <summary>Whether this is a magic weapon or armour the engine would still call unidentified.</summary>
     private static bool Unidentified(Item thing) =>
         thing switch
         {
@@ -168,6 +180,7 @@ public static class BotTidy
             _ => false
         };
 
+    /// <summary>The first magic weapon or armour in the container, or in a bag inside it, that nobody has identified.</summary>
     private static Item Search(Container container, int depth)
     {
         var items = container.Items;
@@ -198,12 +211,14 @@ public static class BotTidy
         return null;
     }
 
+    /// <summary>What makes the engine call a weapon unidentified: any magic level or a slayer. See <c>BaseWeapon.OnSingleClick</c>.</summary>
     private static bool Magic(BaseWeapon weapon) =>
         weapon.DamageLevel > WeaponDamageLevel.Regular
         || weapon.AccuracyLevel > WeaponAccuracyLevel.Regular
         || weapon.DurabilityLevel > WeaponDurabilityLevel.Regular
         || weapon.Slayer != SlayerName.None;
 
+    /// <summary>The same for armour: a protection or a durability level.</summary>
     private static bool Magic(BaseArmor armor) =>
         armor.ProtectionLevel > ArmorProtectionLevel.Regular || armor.Durability > ArmorDurabilityLevel.Regular;
 

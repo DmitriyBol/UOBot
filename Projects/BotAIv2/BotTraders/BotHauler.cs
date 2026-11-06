@@ -7,14 +7,22 @@ namespace Server.BotAI.V2;
 /// <summary>Where a haul buys its goods.</summary>
 public enum BotHaulFrom
 {
+    /// <summary>What the trader already carries: last haul's leftovers.</summary>
     Stock,
 
+    /// <summary>The trader's own bank box, standing at a bank.</summary>
     Box,
 
+    /// <summary>A bot's shop by a bank.</summary>
     Shop,
 
+    /// <summary>A shopkeeper's counter, in any town.</summary>
     Counter,
 
+    /// <summary>
+    /// The bots of the town the trader stands in: it says a want of its own at its town's bank and buys from whoever brings it,
+    /// for a buyer no carrier from here reaches. See <see cref="BotTrading.GatherMs"/>.
+    /// </summary>
     Gather
 }
 
@@ -29,8 +37,10 @@ public sealed class BotHaulSource
 
     public Point3D Where { get; init; }
 
+    /// <summary>What one costs there; for the trader's own stock, what it is reckoned at (<see cref="BotTrading.BookValue"/>).</summary>
     public int Cost { get; init; }
 
+    /// <summary>How many it holds.</summary>
     public int Shelf { get; init; }
 
     public bool Buys => From is BotHaulFrom.Shop or BotHaulFrom.Counter or BotHaulFrom.Gather;
@@ -55,8 +65,10 @@ public sealed class BotHaulPlan
 
     public List<(BotWant Want, int Units, int Price)> Orders { get; } = [];
 
+    /// <summary>Minutes of walking to the source.</summary>
     public double ToSource { get; set; }
 
+    /// <summary>Minutes from the source to the last buyer, the counter and the handings over included.</summary>
     public double After { get; set; }
 
     public int Profit { get; set; }
@@ -122,6 +134,8 @@ public sealed class BotHauler : IBotProposer
             return null;
         }
 
+        // A haul in hand, or put down to be taken up again, is the trader's word already given: the board is not read again
+        // under it (the review asks every proposer every time, and a haul is held anyway — BotHaul.Committed).
         if (bot.Resolve?.Deed is BotHaul || bot.Resolve?.Paused?.Deed is BotHaul)
         {
             return null;
@@ -137,6 +151,7 @@ public sealed class BotHauler : IBotProposer
         BotTrading.Looks++;
         BotTrading.Survey(map);
 
+        // The capital in the account, the float in the pocket (build 388). See BotTrading.PutAway.
         BotTrading.PutAway(body);
 
         var capital = BotYield.Spendable(body) - BotTrading.LeastCapital;
@@ -164,6 +179,8 @@ public sealed class BotHauler : IBotProposer
             }
         }
 
+        // A shopkeeper chosen off the cached list is asked once more through the shard's own chooser, which knows what the list
+        // does not: a counter the graph places nowhere, one this bot lately failed to reach, one beyond a way through.
         if (best is { Source.From: BotHaulFrom.Counter } && !Confirm(bot, body, map, best, capital))
         {
             best = null;
@@ -186,6 +203,7 @@ public sealed class BotHauler : IBotProposer
 
         BotTrading.Offered++;
 
+        // Each want in the book is offered a haul: a line that fails "offered, nothing brought" was offered here and nothing came (build 391).
         for (var i = 0; i < best.Orders.Count; i++)
         {
             best.Orders[i].Want?.Offered();
@@ -210,6 +228,7 @@ public sealed class BotHauler : IBotProposer
 
     private static readonly Dictionary<Type, long> _gatherShunned = [];
 
+    /// <summary>A gathering for this kind brought nothing: no trader gathers for it again for <see cref="BotTrading.GatherShunMs"/>. See <see cref="Gathering"/>.</summary>
     internal static void ShunGathering(Type kind)
     {
         if (kind == null || BotTrading.GatherShunMs <= 0)
@@ -225,6 +244,21 @@ public sealed class BotHauler : IBotProposer
         _gatherShunned[kind] = Core.TickCount + BotTrading.GatherShunMs;
     }
 
+    /// <summary>
+    /// Whether the straight road from one place to another crosses ground that asks more than this trader brings: the
+    /// quadrant record (<see cref="BotQuad.Muscle"/>, what lives and has killed there) sampled every <see cref="BotTrading.RoadStep"/>
+    /// tiles against the trader's own strength times <see cref="BotTrading.RoadDare"/>.
+    ///
+    /// <para>
+    /// <b>The road was never weighed, only its end (01.10.2026, build 386).</b> <see cref="Weigh"/> asks <c>BotPeril.Overwhelms</c>
+    /// and the ledger about the buyer's square, so a trader in Britain took a leather skirt to a hunter in Trinsic and walked
+    /// the jungle between: fourteen of the seventeen trader deaths of build 386 fell at x 1270–1800, y 2450–3150, twelve of
+    /// them inside hauls, and the thirty hauls with a Trinsic leg finished 47 % and lost 1,940gp against the rest's 73 %.
+    /// Patrick's rule (26.09.2026) is that bots go round ground several times their strength; a trader alone has nothing to go
+    /// round it with, so such a want is passed over, counted <c>DeadlyRoad</c>. The record learns from deaths, so a road that
+    /// stops killing opens again by itself.
+    /// </para>
+    /// </summary>
     internal static bool Deadly(BotMobile body, Map map, Point3D from, Point3D to)
     {
         var step = Math.Max(8, BotTrading.RoadStep);
@@ -260,6 +294,12 @@ public sealed class BotHauler : IBotProposer
         return false;
     }
 
+    /// <summary>
+    /// A want this trader struck an order on for the buyer's own doing — it walked away from the meeting, could not be reached,
+    /// refused at the meeting — left alone for <see cref="BotTrading.ShunMs"/>. The haul's strikes marked nothing (a Beware is
+    /// filed only for "no way through"), so the next look re-took the same want and chased the same buyer again for as long as
+    /// the want stood (01.10.2026, build 385 review). Keyed by the want's id, so a want said again later is a new want.
+    /// </summary>
     internal static void Shun(IBotWilful bot, BotWant want)
     {
         if (bot?.Self is not { } body || want == null || BotTrading.ShunMs <= 0)
@@ -275,6 +315,10 @@ public sealed class BotHauler : IBotProposer
         _shunned[(body.Serial, want.Id)] = Core.TickCount + BotTrading.ShunMs;
     }
 
+    /// <summary>
+    /// The kinds this bot has a want out for itself, read once per look: asking <see cref="BotMarket.Wanted"/> per want would be
+    /// a walk of the board for every entry on it.
+    /// </summary>
     internal static HashSet<Type> OwnKinds(IBotWilful bot)
     {
         _own.Clear();
@@ -292,6 +336,7 @@ public sealed class BotHauler : IBotProposer
         return _own;
     }
 
+    /// <summary>Whether a want is one this trader may take at all. Every refusal counted where it happens.</summary>
     internal static bool Answerable(IBotWilful bot, BotMobile body, Map map, BotWant want, long now, HashSet<Type> own)
     {
         if (want?.Kind == null || !want.IsOpen || !BotTrading.Goods(want.Kind) || ReferenceEquals(want.Buyer, bot))
@@ -311,6 +356,12 @@ public sealed class BotHauler : IBotProposer
             return false;
         }
 
+        // A kind the trader wants itself was not answerable at all; now only its own stock is kept out of it (build 386). See Weigh.
+
+        // <b>A buyer whose pack refused a hand-over lately, or is at its count, is no haul (06.10.2026, work17).</b> The carriers read
+        // the mark since deliver16 and the traders never did: on build 410 all 31 failed hauls were refused by a buyer's full pack,
+        // every one within ten minutes of that buyer's previous refusal (59 of 59 on 409), each after the goods were bought. See
+        // BotRoom.
         if (BotRoom.Shut(buyer) || !BotRoom.Receives(buyer, want.Kind))
         {
             BotRoom.Note(buyer);
@@ -337,6 +388,7 @@ public sealed class BotHauler : IBotProposer
         return true;
     }
 
+    /// <summary>The best way to answer this one want, or null.</summary>
     internal static BotHaulPlan Weigh(IBotWilful bot, BotMobile body, Map map, BotWant want, int capital, HashSet<Type> own)
     {
         var kind = want.Kind;
@@ -344,6 +396,10 @@ public sealed class BotHauler : IBotProposer
         var wanted = Math.Min(want.Payable, Math.Max(1, BotTrading.MostUnits));
         var weight = BotTrading.Weight(kind);
 
+        // <b>A kind the trader wants itself keeps its own stock, and nothing else (01.10.2026, build 386).</b> Every trader cooks,
+        // so every trader has a standing want for raw ribs — the board's largest want, 46 % of all units asked for — and the
+        // want shut the whole kind to it: 38,174 pass-overs "wanted by the trader itself" on build 386, and ribs hauled nine
+        // times. What it carries is its own supper; what a butcher, a bot's shop or the town's hunters sell it is a haul.
         var mine = own.Contains(kind);
 
         if (mine)
@@ -356,6 +412,7 @@ public sealed class BotHauler : IBotProposer
             wanted = Math.Min(wanted, (int)((body.MaxWeight - body.TotalWeight) / weight));
         }
 
+        // Each refusal below is also written on the want (02.10.2026, build 391). See BotWant.Passed.
         if (wanted <= 0)
         {
             BotTrading.Heavy++;
@@ -372,6 +429,10 @@ public sealed class BotHauler : IBotProposer
             return null;
         }
 
+        // <b>Known before anything is bought (03.10.2026, build next).</b> A buyer down the dungeon block that a walk or a haul from
+        // outside lately found no way to is left, for a bot that reaches it or for when it comes up; and a trader standing in the
+        // block hauls only inside its own land. On live 396 seven traders bought and walked for Edith in a pocket at (6139, 1432)
+        // in 26 minutes, each learning alone what the first had. See BotUnreached.
         if (BotUnreached.Refuses(map, buyer, body.Location))
         {
             BotTrading.Unreached++;
@@ -464,6 +525,10 @@ public sealed class BotHauler : IBotProposer
                 Better(ref best, Plan(bot, body, map, want, gather, wanted, capital));
             }
 
+            // <b>Not from a shopkeeper into a glut (01.10.2026, build 385 review).</b> The balance (BotGlut) reads the island's pile
+            // of a kind against what is asked for; while the pile stands, a trader's answer to a want is the pile — a bot's shop,
+            // its own stock, a gathering from the bots of its town — never a shopkeeper's shelf carried in on top of it. Counted
+            // once per want weighed.
             if (BotGlut.Glutted(kind))
             {
                 BotTrading.Glutted++;
@@ -486,6 +551,7 @@ public sealed class BotHauler : IBotProposer
             }
         }
 
+        // Nowhere at all to have it — told apart from a source with no margin, which Plan counts.
         if (!any && capital > 0)
         {
             BotTrading.NoSource++;
@@ -507,6 +573,13 @@ public sealed class BotHauler : IBotProposer
         }
     }
 
+    /// <summary>
+    /// The bots of this trader's own town as a source, for a buyer no carrier from here reaches (past
+    /// <see cref="BotCourier.Reach"/>, or on another land): the trader says a want at its town's bank at the buyer's offer less
+    /// its least markup, and the island's carriers bring what they hold — a hunter's ribs and hides, a maker's spare piece —
+    /// at a better price than a shopkeeper pays them. Null when the buyer is near enough for the carriers to serve directly
+    /// (the trader would add nothing), or the trader stands in no town with a bank.
+    /// </summary>
     private static BotHaulSource Gathering(BotMobile body, Map map, BotWant want)
     {
         if (BotTrading.GatherMs <= 0)
@@ -521,6 +594,11 @@ public sealed class BotHauler : IBotProposer
             return null;
         }
 
+        // <b>Only for a kind some bot is known to hold, and not again soon after one brought nothing (01.10.2026, build 386).</b>
+        // Twelve gatherings on build 386, twelve "nobody brought any": eleven for a lightning scroll no scribe writes, one for
+        // six iron. Each cost the trader five minutes at the bank and the buyer's want a reservation; the same want was
+        // taken again at the next look. The island's half hour is asked first (BotGlut.Seen), and a kind that brought nothing
+        // is left alone by every trader for GatherShunMs.
         if (BotGlut.Seen(want.Kind) <= 0)
         {
             BotTrading.GatherBarren++;
@@ -553,6 +631,10 @@ public sealed class BotHauler : IBotProposer
         return new BotHaulSource { From = BotHaulFrom.Gather, Where = bank, Cost = bid, Shelf = want.Payable };
     }
 
+    /// <summary>
+    /// The shopkeeper on this map selling the kind whose price and road together are cheapest for one haul — the trader's walk
+    /// to it and on to the buyer, at the shard's price of a minute.
+    /// </summary>
     private static BaseVendor Cheapest(BotMobile body, Map map, Type kind, Point3D buyer, int units, out int price, out int shelf)
     {
         price = 0;
@@ -574,6 +656,7 @@ public sealed class BotHauler : IBotProposer
 
             var n = Math.Min(units, entry.Amount);
             var road = BotAppraisal.Travel(body.Location, vendor.Location) + BotAppraisal.Travel(vendor.Location, buyer);
+            // At the counter's price to this trader, a town's tax on top: a dearer town sends the trader to another (steward20).
             var landed = BotBurgh.Dear(body, vendor, entry.Price) * (double)n + road * minute;
 
             if (landed < bestLanded)
@@ -588,11 +671,13 @@ public sealed class BotHauler : IBotProposer
         return best;
     }
 
+    /// <summary>One want from one source: units, price, margin and road, or null with the reason counted.</summary>
     private static BotHaulPlan Plan(IBotWilful bot, BotMobile body, Map map, BotWant want, BotHaulSource source, int wanted, int capital)
     {
         var buyer = want.Buyer.Self;
         var units = Math.Min(wanted, source.Shelf);
 
+        // A source dearer than the material is worth to anybody leaves no price the buyer may pay (build next). See BotWant.Ceiling.
         if (BotTrading.OverItsCeiling(want, source.Cost))
         {
             return null;
@@ -612,6 +697,8 @@ public sealed class BotHauler : IBotProposer
 
         var price = BotTrading.Quote(source.Cost, want.Offer, BotTrading.Alternative(buyer, want.Kind, units, want));
 
+        // What the buyer may pay at that price: the units' own reservation and its free money for the carriage (build next). See
+        // BotMarket.Affords.
         units = Math.Min(units, BotMarket.Affords(want, price));
 
         if (units <= 0)
@@ -637,6 +724,8 @@ public sealed class BotHauler : IBotProposer
             return null;
         }
 
+        // A counter down the dungeon block (Papua's, Delucia's) is a walk out of the block to any buyer outside its land, and a
+        // trader standing there reaches no counter outside its own. See BotUnreached.Shut.
         if (BotUnreached.Shut(map, body.Location, source.Where) || BotUnreached.Shut(map, source.Where, buyer.Location))
         {
             BotTrading.Stranded++;
@@ -644,6 +733,7 @@ public sealed class BotHauler : IBotProposer
             return null;
         }
 
+        // The road itself, both legs, against the quadrant record of what has killed along it. See Deadly.
         if (Deadly(body, map, body.Location, source.Where) || Deadly(body, map, source.Where, buyer.Location))
         {
             BotTrading.DeadlyRoad++;
@@ -661,6 +751,7 @@ public sealed class BotHauler : IBotProposer
 
         var after = onward + (source.Buys ? BotTrading.BuyMinutes : 0.0) + BotTrading.HandMinutes;
 
+        // A gathering waits for whoever brings it, and may bring less than asked: its minutes and its expected yield counted.
         var expected = (double)profit;
 
         if (source.From == BotHaulFrom.Gather)
@@ -685,6 +776,10 @@ public sealed class BotHauler : IBotProposer
         return plan;
     }
 
+    /// <summary>
+    /// Minutes of road from one place to another: walking where a road or a gate joins them, sailing where only the sea does and
+    /// the trader can sail (<see cref="BotTrading.CanSail"/>). False when neither.
+    /// </summary>
     internal static bool Road(BotMobile body, Map map, Point3D from, Point3D to, out double minutes)
     {
         minutes = 0.0;
@@ -714,11 +809,16 @@ public sealed class BotHauler : IBotProposer
             return false;
         }
 
+        // The ship makes about a walker's pace (BotSea.Plan counts walk and lane alike); the walk from the landing comes after.
         minutes = (tiles + BotHelm.Away(dock.Shore, to)) * (double)BotWalk.StepDelayMs(false) / 60000.0;
 
         return true;
     }
 
+    /// <summary>
+    /// The plan's shopkeeper put to <see cref="BotShops.Nearest(IBotWilful, Type, Point3D)"/>, which applies every test the
+    /// shard keeps about counters. The same shopkeeper back, or another near it at its own price, or none.
+    /// </summary>
     private static bool Confirm(IBotWilful bot, BotMobile body, Map map, BotHaulPlan plan, int capital)
     {
         var chosen = plan.Source.Vendor;
@@ -774,6 +874,11 @@ public sealed class BotHauler : IBotProposer
         return true;
     }
 
+    /// <summary>
+    /// More buyers of the same kind on the same purchase: open wants whose buyers stand within <see cref="BotTrading.BatchTiles"/>
+    /// of the first and on its land, while the source's shelf, the trader's capital and its back allow, up to
+    /// <see cref="BotTrading.MostOrders"/>. Each at its own price; each must clear a margin.
+    /// </summary>
     private static void Batch(IBotWilful bot, BotMobile body, Map map, BotHaulPlan plan, int capital, long now, HashSet<Type> own)
     {
         if (BotTrading.MostOrders <= 1)
@@ -809,6 +914,8 @@ public sealed class BotHauler : IBotProposer
                 continue;
             }
 
+            // The first buyer's own gates, for a rider (03.10.2026, build next): the way from the first buyer, or from the counter,
+            // into or out of the dungeon block. See BotUnreached.
             if (BotUnreached.Refuses(map, buyer, body.Location))
             {
                 BotTrading.Unreached++;

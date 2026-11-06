@@ -13,8 +13,10 @@ public sealed class BotSailing
 {
     public enum Way
     {
+        /// <summary>From the mainland out to an island: founding a colony or relieving one.</summary>
         Out,
 
+        /// <summary>From the colony's island home, with the goods and the colonists whose shift is over.</summary>
         Home
     }
 
@@ -32,6 +34,7 @@ public sealed class BotSailing
 
     public Way Heading;
 
+    /// <summary>Whether this passage founds the colony: the party stands on the square while its claim is made.</summary>
     public bool Founding;
 
     public Map Map;
@@ -40,30 +43,37 @@ public sealed class BotSailing
 
     public BotDock To;
 
+    /// <summary>Where the party walks once ashore: the colony's site going out, the guild's home coming back.</summary>
     public Point3D Goal;
 
     public BotColony Colony;
 
+    /// <summary>How many the captain wants aboard besides itself, and the fewest it sails with.</summary>
     public int Wanted;
 
     public int Least;
 
+    /// <summary>Members signed on, wherever they are.</summary>
     public readonly List<Mobile> Roster = [];
 
+    /// <summary>The members handed to the voyage when it put to sea: the company the helm carries.</summary>
     public readonly List<Mobile> Aboard = [];
 
     public Tide State;
 
     public long Began;
 
+    /// <summary>When the captain reached the berth and the muster's clock started; nought until then.</summary>
     public long AtDock;
 
     public string Why;
 
+    /// <summary>Whether a member is at the captain's side, near enough for the helm to take it aboard.</summary>
     public bool AtHand(Mobile m) =>
         m is { Deleted: false, Alive: true } && Captain is { Deleted: false } && m.Map == Captain.Map
         && m.InRange(Captain.Location, System.Math.Max(2, BotHelm.CrewReach - 2));
 
+    /// <summary>Signed members at the captain's side now.</summary>
     public int Present()
     {
         var count = 0;

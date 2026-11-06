@@ -59,18 +59,28 @@ public static class BotHaven
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHaven));
 
+    /// <summary>Whether beaten bots run for a town at all. A switch.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How far, straight, a guarded town may be for a run to be weighed at all. Three hundred tiles: a minute's running.</summary>
     public static int Reach { get; set; } = 300;
 
+    /// <summary>The most seconds of running a town may be off, at the runner's own pace now. Ninety.</summary>
     public static int MostSeconds { get; set; } = 90;
 
+    /// <summary>
+    /// A town this near is run for whatever the pursuer's pace: a thing a step behind for thirty tiles is a thing a step
+    /// behind at the gate, where the guards are.
+    /// </summary>
     public static int NearTiles { get; set; } = 40;
 
+    /// <summary>Tiles between two looks along the line to a town for its guarded edge.</summary>
     public static int Stride { get; set; } = 8;
 
+    /// <summary>How many of the nearest towns are tried for a guarded edge before giving up.</summary>
     public static int Towns { get; set; } = 3;
 
+    /// <summary>Havens weighed, and why each was turned down.</summary>
     public static long Asked { get; private set; }
 
     public static long Chosen { get; private set; }
@@ -85,6 +95,11 @@ public static class BotHaven
 
     public static long Unreachable { get; private set; }
 
+    /// <summary>
+    /// The nearest guarded ground a run from <paramref name="from"/> could reach: the first guarded, standable, reachable tile
+    /// along the straight line to each of the nearest reachable towns, the nearest such tile of all. Zero when none within
+    /// <see cref="Reach"/>. Not counted; the counting is <see cref="Choose"/>'s.
+    /// </summary>
     public static Point3D Nearest(Map map, Point3D from, out string town, out int tiles)
     {
         town = null;
@@ -98,6 +113,7 @@ public static class BotHaven
         var best = Point3D.Zero;
         var tried = 0;
 
+        // Nearest towns first, so the loop can stop after a few.
         Span<(int Away, int Index)> order = stackalloc (int, int)[Math.Min(32, BotTowns.All.Count)];
         var count = 0;
 
@@ -155,6 +171,12 @@ public static class BotHaven
         return best;
     }
 
+    /// <summary>
+    /// The first guarded tile along the line from <paramref name="from"/> towards <paramref name="square"/> a body can stand on
+    /// and the reach map lets this walker reach, one stride further in so the runner stops inside the line rather than on
+    /// it. Guarded regions are drawn as whatever shape somebody drew, so the edge is found by asking the engine along the
+    /// line, as <c>BotPopulation.Gate</c> does the other way round.
+    /// </summary>
     private static Point3D Edge(Map map, Point3D from, Point3D square, out int tiles)
     {
         tiles = 0;
@@ -187,6 +209,10 @@ public static class BotHaven
             var here = new Point3D(x, y, z);
             var guarded = standing && Guarded(map, here) && !BotReachMap.RefusesTile(map, from, here);
 
+            // <b>A tile two carriers' walks lately found no way to is passed by (06.10.2026, deliver16).</b> The edge of Britain's
+            // north side (x 1280-1440, y 1540-1555, z 20) is standable, guarded and not refused by the reach map, and the planner
+            // never reached it: 45 of 86 "no way through" deliveries on build 407 were meetings called there. The line goes on to
+            // the next guarded tile further in. See BotWayless.
             if (guarded && BotWayless.Shut(map, here, true))
             {
                 BotWayless.PassedByHaven();
@@ -206,6 +232,7 @@ public static class BotHaven
 
             if (guarded)
             {
+                // The edge first, then one stride inside it, so the runner stops within the line rather than on it.
                 var inside = found != Point3D.Zero;
 
                 found = here;
@@ -218,6 +245,7 @@ public static class BotHaven
             }
             else if (found != Point3D.Zero)
             {
+                // Left the guarded ground again (a road clipping a corner of it): the edge found stands.
                 break;
             }
 
@@ -232,9 +260,16 @@ public static class BotHaven
         return found;
     }
 
+    /// <summary>Whether <paramref name="where"/> stands on guarded ground whose guards are on duty.</summary>
     public static bool Guarded(Map map, Point3D where) =>
         map != null && Region.Find(where, map)?.GetRegion<GuardedRegion>() is { } guarded && !guarded.IsDisabled();
 
+    /// <summary>
+    /// A town to run for, when running for one is realistic: within <see cref="Reach"/>, under <see cref="MostSeconds"/> at the
+    /// runner's own pace now (a bot out of breath walks), the pursuer no quicker than that pace unless the town is within
+    /// <see cref="NearTiles"/>, and the straight road to it asking no more of the runner than <see cref="BotDanger.Road"/>
+    /// allows. Counted.
+    /// </summary>
     public static bool Choose(Mobile body, BaseCreature pursuer, out Point3D haven, out string town, out int tiles)
     {
         haven = Point3D.Zero;
@@ -248,6 +283,8 @@ public static class BotHaven
             return false;
         }
 
+        // No town is run for from under the ground: a dungeon is its own piece of the map, and the gates would say so at
+        // the cost of a look at every town. Elandor's forty-five partial plans in Covetous on 388 are the plain flight's.
         if (BotDungeon.Under(body.Location))
         {
             return false;
@@ -296,14 +333,34 @@ public static class BotHaven
         return true;
     }
 
+    /// <summary>
+    /// A running bot's step afoot and mounted, in milliseconds, for pricing the run to a town: the engine's own movement
+    /// delays. Its own dials since 12.10.2026 (w4, review B): they read <c>BotSlay.FootStepMs</c>, and the archer's move of that
+    /// one from 200 to the measured 225 would have made every "Fast" 0.2 s creature — air elementals, liches, wisps, the
+    /// things that actually kill archers — read as quicker than the runner, refusing the town beyond <see cref="NearTiles"/>
+    /// (<see cref="TooFast"/>) and shortening the farthest run (<see cref="TooFar"/>) from 225 to 200 tiles of a walk. The
+    /// flight's arithmetic stays as it was measured: 218 asked, 11 chosen, 0 too fast on the live log of 12.10.2026.
+    /// </summary>
+    public static int FootStepMs { get; set; } = 200;
+
+    public static int MountStepMs { get; set; } = 100;
+
+    /// <summary>A runner's step now, in milliseconds: the engine's own delays, at a walk when it has no breath to run.</summary>
     public static int StepMs(Mobile body)
     {
         var running = body is BotMobile { Running: true };
-        var step = body.Mounted ? BotSlay.MountStepMs : BotSlay.FootStepMs;
+        var step = body.Mounted ? MountStepMs : FootStepMs;
 
         return running ? step : step * 2;
     }
 
+    /// <summary>
+    /// Whether the creature's blows on <paramref name="bot"/> are not criminal by the engine's own record, two seals either of
+    /// which is enough: the bot stands in the creature's aggressors (it struck the creature; <c>Notoriety.CheckAggressor</c>),
+    /// or the creature's own record of attacking the bot is a lawful one (<c>Notoriety.CheckAggressed</c>), which every
+    /// lawful bite writes again. While either holds, no guard comes for the creature on the bot's account unless the shard
+    /// rule calls it a menace. Asked by the flight before it swings, and at every call for the guards.
+    /// </summary>
     public static bool Aggressed(Mobile bot, Mobile creature)
     {
         if (bot == null || creature == null)
@@ -338,14 +395,19 @@ public static class BotHaven
         return false;
     }
 
+    /// <summary>A run was turned back to the plain flight for a refused road.</summary>
     public static void Refused() => Unreachable++;
 
+    /// <summary>How often one bot may call the guards, and how often a refused call of one bot is counted. Three seconds.</summary>
     public static int CallEveryMs { get; set; } = 3000;
 
+    /// <summary>How long after a call, or after reaching a town, the outcome is watched for. Sixty seconds.</summary>
     public static int WatchMs { get; set; } = 60000;
 
+    /// <summary>The engine's reach for a call: <c>GuardedRegion.CallGuards</c> looks fourteen tiles round the caller.</summary>
     public const int CallReach = 14;
 
+    /// <summary>Calls said, by what they were answerable for.</summary>
     public static long Calls { get; private set; }
 
     public static long CallsOnCriminal { get; private set; }
@@ -354,6 +416,7 @@ public static class BotHaven
 
     public static long CallsOnAnother { get; private set; }
 
+    /// <summary>Calls not said because the region would not answer them, by why.</summary>
     public static long CallsRefused { get; private set; }
 
     public static long RefusedFar { get; private set; }
@@ -368,18 +431,22 @@ public static class BotHaven
 
     public static long RefusedOther { get; private set; }
 
+    /// <summary>Things called on that a guard then killed within <see cref="WatchMs"/>.</summary>
     public static long GuardKills { get; private set; }
 
+    /// <summary>Every kill by a guard of a creature, and those of them a bot was hunting at the time.</summary>
     public static long GuardKillsAll { get; private set; }
 
     public static long QuarryTaken { get; private set; }
 
+    /// <summary>Runners that reached a town with something still on them, and how many were alive <see cref="WatchMs"/> later.</summary>
     public static long Arrived { get; private set; }
 
     public static long Saved { get; private set; }
 
     public static long DiedInTown { get; private set; }
 
+    /// <summary>Bot deaths on guarded ground, run or no run, by the killer's kind.</summary>
     public static long DeathsGuarded { get; private set; }
 
     public static long DeathsGuardedToMenace { get; private set; }
@@ -413,6 +480,16 @@ public static class BotHaven
 
     public static void Configure() => BaseGuard.Killing += OnGuardKilling;
 
+    /// <summary>
+    /// Calls the guards the way a player does, <c>DoSpeech</c> with the <em>guards</em> keyword (0x0007), which is what the
+    /// client sends and what <c>GuardedRegion.OnSpeech</c> answers, when <paramref name="body"/> stands on guarded ground
+    /// with <paramref name="foe"/> on it. Said only when the region would answer it (<c>GuardedRegion.IsCallable</c>, for
+    /// the foe or for anything else within the call's fourteen tiles), at most every <see cref="CallEveryMs"/>. A call the
+    /// region would not answer is not said and does not use the bot's clock; it is counted, once per
+    /// <see cref="CallEveryMs"/> a bot, by why: the thing beyond fourteen tiles, a guard already on it, criminal from
+    /// elsewhere but not on this town's list nor inside it, blind (the engine's record says the bot's quarrel and it is no
+    /// menace), not criminal for another reason, or something the guards never take (a player, a pet). True when said.
+    /// </summary>
     public static bool CallGuards(Mobile body, Mobile foe, string why)
     {
         if (body?.Map == null || foe == null || foe.Deleted || !body.Alive
@@ -543,6 +620,7 @@ public static class BotHaven
         return Aggressed(body, foe) ? Found.Blind : Found.NotCriminal;
     }
 
+    /// <summary>Whether something other than <paramref name="foe"/> within the call's reach would bring a guard.</summary>
     private static bool Another(Mobile body, Mobile foe, GuardedRegion region)
     {
         foreach (var m in body.Map.GetMobilesInRange(body.Location, CallReach))
@@ -556,6 +634,10 @@ public static class BotHaven
         return false;
     }
 
+    /// <summary>
+    /// A guard is about to kill <paramref name="target"/> outright (<c>BaseGuard.Killing</c>), whole yet: counted as a kill
+    /// of a thing a bot called on, and as quarry taken from a bot that was hunting it.
+    /// </summary>
     private static void OnGuardKilling(BaseGuard guard, Mobile target)
     {
         if (target is not BaseCreature creature)
@@ -598,6 +680,10 @@ public static class BotHaven
         }
     }
 
+    /// <summary>
+    /// A runner reached guarded ground with something still on it: watched for <see cref="WatchMs"/> to say whether the
+    /// town saved it.
+    /// </summary>
     public static void Reached(Mobile body, string town)
     {
         if (body == null || _arrivals.ContainsKey(body))
@@ -610,6 +696,10 @@ public static class BotHaven
         Watch();
     }
 
+    /// <summary>
+    /// A bot died at <paramref name="at"/>. On guarded ground, counted with its killer's kind whatever the bot was doing; and
+    /// if it reached a town within <see cref="WatchMs"/> on a run, the town did not save it.
+    /// </summary>
     public static void Died(Mobile body, Point3D at, Map map)
     {
         if (body == null)
@@ -670,6 +760,7 @@ public static class BotHaven
 
         _sweep.Clear();
 
+        // A guard's kill is counted where it happens (OnGuardKilling); here only what is gone or past its watch is let go.
         foreach (var (foe, call) in _calledOn)
         {
             if (foe.Deleted || !foe.Alive || now - call.Tick >= WatchMs)
@@ -693,6 +784,7 @@ public static class BotHaven
             }
             else if (now - arrival.Tick >= WatchMs)
             {
+                // Died() takes out a bot that fell inside the watch, so one still here at its end lived.
                 Saved++;
                 _sweep.Add(body);
             }
@@ -753,6 +845,7 @@ public static class BotHaven
         return string.Join(", ", parts);
     }
 
+    /// <summary>The guards' half of the refuge, for the flight's line.</summary>
     public static string DescribeGuards() =>
         $"guards called by any bot on guarded ground: {Calls} calls said ({CallsOnCriminal} on a criminal, {CallsOnMenace} on a hostile creature on a bot, {CallsOnAnother} for another within {CallReach} tiles), "
         + $"{CallsRefused} not said as the guards would not come ({RefusedFar} the thing beyond {CallReach} tiles, {RefusedGuardOn} a guard already on it, {RefusedUnlisted} a criminal not on the town's list, {RefusedBlind} blind for the bot's own quarrel with something no menace, {RefusedNotCriminal} not criminal, {RefusedOther} something the guards never take), "

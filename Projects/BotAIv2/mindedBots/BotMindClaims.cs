@@ -23,14 +23,18 @@ namespace Server.BotAI.Mind;
 /// </summary>
 public static class BotMindClaims
 {
+    /// <summary>How long a claim stands without being made again. A quarter of an hour, the charter's own clock.</summary>
     public static int HoldsMs { get; set; } = 900000;
 
     private static readonly Dictionary<string, (string Who, long Tick)> _claims = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Claims made this session.</summary>
     public static long Made { get; private set; }
 
+    /// <summary>Claims that named a row somebody else was already holding.</summary>
     public static long Contested { get; private set; }
 
+    /// <summary>Puts this mind's name against the row. The row is the board's own label for it.</summary>
     public static bool Claim(string who, string row)
     {
         if (string.IsNullOrWhiteSpace(who) || string.IsNullOrWhiteSpace(row))
@@ -51,6 +55,7 @@ public static class BotMindClaims
         return true;
     }
 
+    /// <summary>Who holds this row and how many seconds ago they said so, or null and nought.</summary>
     public static (string Who, int SecondsAgo) Holder(string row)
     {
         if (string.IsNullOrWhiteSpace(row) || !_claims.TryGetValue(row.Trim(), out var claim))
@@ -70,6 +75,7 @@ public static class BotMindClaims
         return (claim.Who, (int)(since / 1000));
     }
 
+    /// <summary>The row this mind holds, if any, and how long ago it took it.</summary>
     public static (string Row, int SecondsAgo) Of(string who)
     {
         foreach (var (row, claim) in _claims)
@@ -90,6 +96,7 @@ public static class BotMindClaims
         return (null, 0);
     }
 
+    /// <summary>Rows held right now.</summary>
     public static int Standing()
     {
         var n = 0;

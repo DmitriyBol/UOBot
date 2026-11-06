@@ -37,12 +37,20 @@ public sealed class BotMendModule : BotModule
         BotWill.Offer(new BotMedic());
         BotWill.Offer(new BotSurgeon());
 
+        // What a healer does while nobody is hurt yet: stands by one of ours who is fighting. See BotAccompany.
         BotWill.Offer(new BotAttendant());
 
+        // And what a healer does when nobody of ours is fighting anywhere near it: goes to where they are. Six of
+        // eleven healers held nothing at 07:1x on 16.09.2026, three hundred tiles from the nearest fight.
         BotWill.Offer(new BotHouseCalls());
 
+        // The other half of looking after yourself, and it belongs here rather than with the hunt: a bot
+        // does not have to have gone looking for a fight to be in one. Registered from this module because
+        // this module owns <c>Failing</c>, and a rung whose two answers are handed out by two different
+        // subsystems is a rung that can be half switched off by accident.
         BotWill.Offer(new BotFugitive());
 
+        // The early flight, for a bot being hit and plainly outmatched before it is failing (build 323). See BotFugitive.
         BotWill.Offer(new BotFugitive(early: true));
 
         logger.Information(

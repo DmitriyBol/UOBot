@@ -11,6 +11,11 @@ public class StrategicPlannerTests
 
     public StrategicPlannerTests(ITestOutputHelper output) => _output = output;
 
+    /// <summary>
+    /// A river across the whole map with one ford far to the east, and two places a short way apart on either bank in the
+    /// west: the straight line says near, the road says far. The medium tier alone runs out of budget; the long tier finds
+    /// the corridor, and the medium tier's route inside it is walkable and close to the oracle's.
+    /// </summary>
     [Fact]
     public void RiverWithAFarFord_TheLongTierFindsTheCorridor()
     {

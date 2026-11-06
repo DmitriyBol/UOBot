@@ -5,28 +5,47 @@ namespace Server.BotAI.V2;
 /// <summary>Why a bot able to answer a want passed it over. Recorded on the want by whoever passed; see <see cref="BotWant.Passed"/>.</summary>
 public enum BotPass
 {
+    /// <summary>The buyer stands past a carrier's reach (<see cref="BotCourier.Reach"/>).</summary>
     Reach,
 
+    /// <summary>The buyer is on another land or another map: no gate joins the two.</summary>
     Land,
 
+    /// <summary>No way through to the buyer, or the carrier's ledger is wary of the buyer's place.</summary>
     Sealed,
 
+    /// <summary>The buyer could not pay for one at its own offer.</summary>
     Poor,
 
+    /// <summary>The delivery was worth less than <see cref="BotCourier.LeastGold"/>.</summary>
     Petty,
 
+    /// <summary>A maker with the recipe was short of the material.</summary>
     Material,
 
+    /// <summary>A trader found nowhere to have it.</summary>
     Source,
 
+    /// <summary>A trader found a source, and no plan that paid: margin, the buyer's purse, its pack, or the road.</summary>
     Margin,
 
+    /// <summary>A trader judged the buyer's ground or the road to it too dangerous.</summary>
     Peril,
 
+    /// <summary>The buyer was dead when a carrier holding the goods looked.</summary>
     Dead,
 
+    /// <summary>
+    /// The straight road from the carrier to the buyer asks more strength than the carrier brings (<see cref="BotDanger.Road"/>), the
+    /// same question its auction would refuse the walk on (06.10.2026, needs15). Asked by the carrier before it offers the walk, so
+    /// it offers the next want it can walk instead of one its own auction vetoes.
+    /// </summary>
     Road,
 
+    /// <summary>
+    /// The buyer's pack refused a hand-over lately and shows no room yet (<see cref="BotRoom"/>, 06.10.2026, deliver16): no carrier
+    /// walks to a pack that will refuse it again.
+    /// </summary>
     Room
 }
 
@@ -36,22 +55,29 @@ public enum BotRoute
 {
     None = 0,
 
+    /// <summary>A carrier's walk (<see cref="BotDeliver"/>).</summary>
     Carrier = 1,
 
+    /// <summary>A trader's book (<c>BotHaul</c>).</summary>
     Trader = 2,
 
+    /// <summary>The buyer at a bot's shop by the bank (<see cref="BotShopkeep"/>).</summary>
     Shop = 4
 }
 
 /// <summary>Why a buyer took its own want back. See <see cref="BotMarket.Withdrawn"/>.</summary>
 public enum BotWithdraw
 {
+    /// <summary>It has the thing now, some other way: its own bank box, its own make, a book, a counter.</summary>
     Have,
 
+    /// <summary>It waited for a carrier, nobody came, and it walks to a counter instead.</summary>
     Walked,
 
+    /// <summary>It could not pay at the meeting.</summary>
     Unpaid,
 
+    /// <summary>A trader's gathering at the bank closed.</summary>
     Closed,
 
     Other
@@ -60,12 +86,16 @@ public enum BotWithdraw
 /// <summary>Where a line stands.</summary>
 public enum BotLineState
 {
+    /// <summary>Inside its hour and not yet met.</summary>
     Open,
 
+    /// <summary>Met to the last unit inside its hour (<see cref="BotLines.WindowMs"/>).</summary>
     Met,
 
+    /// <summary>Not met inside its hour, or ended after its first ten minutes without being met.</summary>
     Failed,
 
+    /// <summary>Left out of the share, and printed: the buyer gone, or the line taken back or unpaid inside its first ten minutes.</summary>
     KeptOut
 }
 
@@ -88,6 +118,7 @@ public enum BotLineState
 /// </summary>
 public sealed class BotLine
 {
+    /// <summary>The most contributors told apart on one line; more than this is still "jointly".</summary>
     private const int MostHands = 4;
 
     private readonly Serial[] _hands = new Serial[MostHands];
@@ -100,44 +131,56 @@ public sealed class BotLine
         OpenedTick = opened;
         Procurement = procurement;
 
+        // A real tick, never the default: see FirstFillTick.
         FirstFillTick = opened;
         Snapshot();
     }
 
     public BotWant Want { get; }
 
+    /// <summary>Its number on the want: the first ask is 1.</summary>
     public int Seq { get; }
 
+    /// <summary>"12.1": want 12, line 1. The name the log and the page use.</summary>
     public string Name => $"{Want?.Id ?? 0}.{Seq}";
 
+    /// <summary>Units asked on this line.</summary>
     public int Units { get; private set; }
 
+    /// <summary>Units handed to the buyer against this line.</summary>
     public int Filled { get; private set; }
 
     public long OpenedTick { get; private set; }
 
+    /// <summary>When the first unit arrived; meaningful only once <see cref="AnyFill"/>.</summary>
     public long FirstFillTick { get; private set; }
 
     public bool AnyFill { get; private set; }
 
+    /// <summary>A trader's want: procurement for another line, counted apart and kept out of the share (as <see cref="BotGlut"/> keeps it out of demand).</summary>
     public bool Procurement { get; }
 
+    /// <summary>Read back from the save after a restart: its clock went on from where it stood.</summary>
     public bool Restored { get; internal set; }
 
     public BotLineState State { get; internal set; }
 
+    /// <summary>Failed its hour, and met to the last unit later.</summary>
     public bool MetLate { get; internal set; }
 
+    /// <summary>Why it failed or was kept out; null while open or met.</summary>
     public string Cause { get; internal set; }
 
     public BotRoute Routes { get; private set; }
 
+    /// <summary>Distinct bots that handed units against it (up to <see cref="MostHands"/> told apart).</summary>
     public int Hands { get; private set; }
 
     public bool Complete => Filled >= Units;
 
     public bool Settled => State != BotLineState.Open;
 
+    // The want's own counts as they stood when this line opened. See the class remarks.
     internal readonly int[] PassBase = new int[BotLines.PassKinds];
 
     internal int OffersBase;
@@ -166,6 +209,7 @@ public sealed class BotLine
         AwayBase = Want.AwayMs;
     }
 
+    /// <summary>More units asked on this line, inside <see cref="BotLines.NewLineMs"/> of its opening.</summary>
     internal void More(int units)
     {
         if (units > 0)
@@ -174,6 +218,7 @@ public sealed class BotLine
         }
     }
 
+    /// <summary>Units handed over against it, by whom and how.</summary>
     internal void Fill(int units, Mobile seller, BotRoute route, long now)
     {
         if (units <= 0)
@@ -218,6 +263,8 @@ public sealed class BotLine
     internal int OffersSince => Want == null ? 0 : Math.Max(0, Want.Offers - OffersBase);
 
     internal int TakesSince => Want == null ? 0 : Math.Max(0, Want.Takes - TakesBase);
+
+    // ---- Persistence: ages, never ticks (a tick belongs to the process that made it). See BotMarketStore. ----------------
 
     internal void Save(IGenericWriter writer, long now)
     {

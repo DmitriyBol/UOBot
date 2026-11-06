@@ -33,24 +33,54 @@ public sealed class BotArmoury : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotArmoury));
 
+    /// <summary>
+    /// How many attack scrolls a bot keeps by it.
+    ///
+    /// Few. These are an opening, not a career: enough to soften something on the way in or to buy the
+    /// seconds it takes to get away, and not so many that a warrior spends its purse arming itself with
+    /// somebody else's trade.
+    /// </summary>
     public static int Stock { get; set; } = 3;
 
+    /// <summary>
+    /// Coin a bot will not spend on somebody else's trade.
+    ///
+    /// <para>
+    /// Scrolls are bought one at a time and each one is cheap, which is exactly how a purse disappears
+    /// without anybody noticing: a warrior that keeps topping up to its limit spends its whole takings a few
+    /// coins at a time and then cannot afford a weapon, a bandage or a resurrection. Below this line the
+    /// shopping stops, whatever the stock.
+    /// </para>
+    /// </summary>
     public static int Reserve { get; set; } = 150;
 
+    /// <summary>
+    /// The least mana that makes any of this worth buying.
+    ///
+    /// <para>
+    /// A pool, not a skill. Casting from a scroll asks nothing of Magery beyond the engine's own roll, but it
+    /// does spend mana out of whatever the bot has — so a bot with a pool of four can throw one arrow and
+    /// then nothing, and buying five scrolls for it is buying four ornaments.
+    /// </para>
+    /// </summary>
     public static int LeastPool { get; set; } = 12;
 
+    /// <summary>What one of these is reckoned to be worth per minute, before the ledger corrects it.</summary>
     public static double Prior { get; set; } = 14.0;
 
     private static bool _said;
 
+    /// <summary>Bots asked, and how each answer went. No bucket called "other".</summary>
     public static long Asked { get; private set; }
 
     public static long NoPool { get; private set; }
 
     public static long Stocked { get; private set; }
 
+    /// <summary>Wanted one and would not spend the last of its purse on it.</summary>
     public static long Broke { get; private set; }
 
+    /// <summary>Casters not sent to buy a scroll they have on their own stall. See Propose.</summary>
     public static long Vending { get; private set; }
 
     public static long Offered { get; private set; }
@@ -59,6 +89,30 @@ public sealed class BotArmoury : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>
+    /// The attack scroll this bot keeps <see cref="Stock"/> of, or null. Asked by the shopping below and by the
+    /// seller's keep list alike.
+    ///
+    /// <para>
+    /// <b>One question for the buyer and the seller, because two answers to it were a round trip.</b> This proposer
+    /// topped a pack up to three harm scrolls and <c>BotUnload.Keeps</c> had no entry for a scroll at all, so the
+    /// next trip to a counter put all three on a stall as surplus and the bot went shopping again. Across four
+    /// sessions on 14.09.2026 that was 471 harm scrolls stocked, between 59 and 80 a session bought over a
+    /// shopkeeper's counter at 22gp — coin that leaves the world — and a dozen bots with no pen, Neriah, Orin
+    /// Ashdown and Lysa Ashdown the busiest, selling the scrolls they had just bought. Nessa Ashdown's pack read
+    /// "HarmScroll x3 (keeps 0, 3 surplus)".
+    /// </para>
+    ///
+    /// <para>
+    /// <b>The strongest attack this bot can actually use, not the cheapest one that exists.</b> This was a
+    /// constant — the magic arrow, for everybody, for ever — and the reasoning beside it was sound as far
+    /// as it went: a ladder that ignored what a bot can pay would have warriors shopping for energy bolts.
+    /// But the answer to that is to ask about the bot, which BotStrike.Stock does, weighing the pool
+    /// against the circle's mana and the bot's Magery against what the engine will roll when the scroll
+    /// goes off. Frozen at the bottom rung, a mage that had spent all day getting better at magic bought
+    /// exactly what it bought as a novice, and there was no rung above it to grow into.
+    /// </para>
+    /// </summary>
     public static Type Kept(Mobile body, out int spell)
     {
         spell = -1;
@@ -89,6 +143,7 @@ public sealed class BotArmoury : IBotProposer
 
         if (kind == null)
         {
+            // Too small a pool, or none that covers a circle twice. A spell with no scroll is neither.
             if (spell < 0)
             {
                 NoPool++;
@@ -106,6 +161,7 @@ public sealed class BotArmoury : IBotProposer
             return null;
         }
 
+        // Not with the last of the purse. See Reserve: one scroll is cheap and a habit of topping up is not.
         if ((body.Backpack?.TotalGold ?? 0) <= Reserve)
         {
             Broke++;
@@ -113,6 +169,11 @@ public sealed class BotArmoury : IBotProposer
             return null;
         }
 
+        // Somebody of ours may already be making these. Asking the market first is what turns a shopkeeper's
+        // price into a ceiling rather than the only option — see BotSeeker for the same order of preference.
+        // <b>Its own stock first.</b> A scribe with harm scrolls of its own was sent to buy harm scrolls, the deed took hers back
+        // off her stall and the peddler put them out again, three times a second (Brannoc, 06:13 on 14.09.2026). Its own scrolls lie
+        // in its bank box now (01.10.2026): standing at a bank, it takes them out instead of buying.
         if (BotMarket.FromBank(bot, kind, Stock) > 0)
         {
             Vending++;
@@ -131,6 +192,11 @@ public sealed class BotArmoury : IBotProposer
         Offered++;
         Once(body);
 
+        // <b>Whichever is cheaper, and one of ours wins a tie.</b> A shopkeeper's price stays the ceiling —
+        // no bot may charge more than the shelf for something the shelf has — but the two are not equivalent
+        // at the same number. Coin paid to a bot moves inside the population and comes round again; coin paid
+        // across a counter leaves the world for good, and a monster's purse is the only place new coin comes
+        // from. So an equal price is a reason to buy from the scribe who wrote it rather than from the shelf.
         if (front != null && (counter <= 0 || landed <= counter))
         {
             return BotAcquire.AtShop(kind, spell, front, ask, toCast: true);
@@ -146,6 +212,7 @@ public sealed class BotArmoury : IBotProposer
             return null;
         }
 
+        // A scribe that writes these for less than asking would cost writes its own (03.10.2026). See BotQuill.OwnPen.
         if (BotQuill.OwnPen(bot, kind))
         {
             BotScribes.LeftToPen(body, kind);
@@ -153,6 +220,8 @@ public sealed class BotArmoury : IBotProposer
             return null;
         }
 
+        // Nobody sells them and no bot's shop has one. Say so aloud: that is the signal a scribe reads to decide what to write
+        // next, and a carrier reads to walk one over.
         var offer = BotMarket.Worth(kind, BotGrimoire.ShopPrice(BotGrimoire.Circle(spell)));
 
         return BotAcquire.Board(kind, spell, map, body.Location, offer, toCast: true);

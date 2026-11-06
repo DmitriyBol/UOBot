@@ -11,6 +11,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotZonesSettings
 {
+    /// <summary>Whether the zones are kept at all.</summary>
     public bool? Enabled { get; set; }
 
     public int? TickMs { get; set; }
@@ -19,12 +20,14 @@ public sealed class BotZonesSettings
 
     public int? JsonEveryMs { get; set; }
 
+    /// <summary>The sweep: loop milliseconds a beat, sectors to a window's side, windows at most a beat.</summary>
     public double? ScanBudgetMs { get; set; }
 
     public int? ScanWindowSectors { get; set; }
 
     public int? ScanMostWindows { get; set; }
 
+    /// <summary>The model. See the properties of the same names on <see cref="BotZones"/>.</summary>
     public int? DeclaredMost { get; set; }
 
     public int? LiveRadius { get; set; }
@@ -59,6 +62,7 @@ public sealed class BotZonesSettings
 
     public int? ConvergeTiles { get; set; }
 
+    /// <summary>How local a zone is: see <see cref="BotZones.JoinGap"/> and the three beside it.</summary>
     public int? JoinGap { get; set; }
 
     public int? ZoneMostTiles { get; set; }
@@ -69,6 +73,7 @@ public sealed class BotZonesSettings
 
     public bool? TownsClear { get; set; }
 
+    /// <summary>A camp's patrol grown on what was seen, a caster's spell, wanderers' trails, events (08.10.2026). See <see cref="BotZones.ReachBeyond"/>.</summary>
     public int? ReachBeyond { get; set; }
 
     public double? ReachPercentile { get; set; }
@@ -109,12 +114,14 @@ public sealed class BotZonesSettings
 
     public int? SmoothPasses { get; set; }
 
+    /// <summary>Whether the build may run off the loop, and the cores the machine needs for it to.</summary>
     public bool? OffLoop { get; set; }
 
     public int? OffLoopCores { get; set; }
 
     public int? InlineRefreshMs { get; set; }
 
+    /// <summary>The tour. See <see cref="BotZoneTour"/>.</summary>
     public bool? Tour { get; set; }
 
     public int? TourHoldMs { get; set; }
@@ -131,6 +138,7 @@ public sealed class BotZonesSettings
 
     public bool? TourWater { get; set; }
 
+    /// <summary>The zone watch (07.10.2026): its keeper and its counter. See <see cref="BotZoneWatch"/>.</summary>
     public string TourKeeper { get; set; }
 
     public int? AccuracyWindowHours { get; set; }
@@ -151,6 +159,7 @@ public sealed class BotZonesSettings
 
     public int? ResumeAfterMinutes { get; set; }
 
+    /// <summary>Whether what was learned is kept across a restart, and how often it is written.</summary>
     public bool? Memory { get; set; }
 
     public int? MemorySaveMs { get; set; }
@@ -177,6 +186,7 @@ public sealed class BotZonesModule : BotModule
 
     public override string[] Requires => ["Population"];
 
+    /// <summary>How often the zones are summed up in the log.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _say;
@@ -335,6 +345,7 @@ public sealed class BotZonesModule : BotModule
         BotZoneMemory.Running = settings.Memory ?? BotZoneMemory.Running;
         BotZoneMemory.SaveEveryMs = settings.MemorySaveMs ?? BotZoneMemory.SaveEveryMs;
 
+        // A hold under a minute sees too little of a patrol to be worth the walk: Patrick's order says a minute at least.
         BotZoneTour.HoldMs = Math.Max(60000, BotZoneTour.HoldMs);
     }
 

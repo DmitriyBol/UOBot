@@ -47,42 +47,62 @@ public static partial class BotWebLive
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWebLive));
 
+    /// <summary>Whether the live window is built at all. <c>Live</c> in bot-web.json.</summary>
     public static bool Enabled { get; set; } = true;
 
+    /// <summary>
+    /// Whether the frame also carries the scene the page draws in the game's own pictures, and the pictures are served.
+    /// <c>LivePicture</c> in bot-web.json.
+    /// </summary>
     public static bool Picture { get; set; } = true;
 
+    /// <summary>How often a frame is built for each watched bot.</summary>
     public static int EveryMs { get; set; } = 1000;
 
+    /// <summary>How long a bot stays watched after the last time anybody asked for its frame.</summary>
     public static int KeepMs { get; set; } = 10000;
 
+    /// <summary>Most bots watched at once; a fifth asked for takes the place of the one asked about longest ago.</summary>
     public static int MostWatched { get; set; } = 4;
 
+    /// <summary>The square round the bot, in tiles each way: 20 gives the 41 by 41 the page draws.</summary>
     public static int Radius { get; set; } = 20;
 
+    /// <summary>How far the bot may walk from where the terrain was centred before it is centred again.</summary>
     public static int Slack { get; set; } = 4;
 
+    /// <summary>Most tiles of terrain read from the tile matrix in one beat, across every watched bot.</summary>
     public static int TerrainBudget { get; set; } = 1024;
 
+    /// <summary>Most terrain blocks kept; past it the cache is emptied and filled again from what is watched.</summary>
     public static int MostBlocks { get; set; } = 8192;
 
+    /// <summary>Most events and most log lines carried in a frame, and most mobiles and items.</summary>
     public static int FeedKeep { get; set; } = 40;
 
     public static int MostMobiles { get; set; } = 80;
 
     public static int MostItems { get; set; } = 60;
 
+    /// <summary>Most waypoints of the route ahead in a frame.</summary>
     public static int MostRoute { get; set; } = 48;
 
+    /// <summary>How far back in the session log a newly watched bot's lines are looked for.</summary>
     public static int TailBytes { get; set; } = 256 * 1024;
 
+    /// <summary>Most of the session log read in one pass.</summary>
     public static int MostLogBytes { get; set; } = 2 * 1024 * 1024;
 
+    // ---- the counts /api/health prints ----------------------------------------------------------------------
+
+    /// <summary>Frames built since boot.</summary>
     public static long Frames { get; private set; }
 
     public static double FramesMs { get; private set; }
 
     public static double WorstFrameMs { get; private set; }
 
+    /// <summary>What the last beat with anything to build cost in all: frames, terrain and the debuggers' page.</summary>
     public static double LastBeatMs { get; private set; }
 
     public static double WorstBeatMs { get; private set; }
@@ -93,6 +113,7 @@ public static partial class BotWebLive
 
     public static long TerrainTiles { get; private set; }
 
+    /// <summary>Times the block cache was emptied for being full.</summary>
     public static long Emptied { get; private set; }
 
     public static double TerrainMs { get; private set; }
@@ -105,10 +126,13 @@ public static partial class BotWebLive
 
     public static int Watched => _count;
 
+    // ---- state ----------------------------------------------------------------------------------------------
+
     private sealed class Watch
     {
         public string Name;
 
+        /// <summary>The bot's own spelling, once found; the log is searched for this.</summary>
         public string Real;
 
         public long AskedMs;
@@ -123,6 +147,7 @@ public static partial class BotWebLive
 
         public readonly Queue<(long Id, string Text)> Log = new();
 
+        /// <summary>The session-log offset this bot's lines have been looked for up to; -1 until the reader first sees it.</summary>
         public long LogUpTo = -1;
 
         public Map TerrainMap;
@@ -135,6 +160,7 @@ public static partial class BotWebLive
 
         public string Terrain;
 
+        // ---- the picture's scene: written on the loop; Scene and SceneVer also read by the listener under the lock
         public Map SceneMap;
 
         public int SceneX;
@@ -184,6 +210,12 @@ public static partial class BotWebLive
 
     private static readonly JsonWriterOptions Options = new() { Indented = false, SkipValidation = true };
 
+    // ---- the listener's side: any thread, reads only what the loop wrote ------------------------------------
+
+    /// <summary>
+    /// The latest frame for this bot, and its number, and marks it watched. Null until the loop has built the first one, which
+    /// is within a second. Any thread.
+    /// </summary>
     public static (long Seq, string Json) Ask(string name)
     {
         if (!Enabled || string.IsNullOrWhiteSpace(name))
@@ -193,6 +225,7 @@ public static partial class BotWebLive
 
         name = name.Trim();
 
+        // The radar colours read on this thread, once, so the loop never waits on the disk for them.
         BotWebMap.Radar();
 
         lock (_lock)
@@ -228,8 +261,10 @@ public static partial class BotWebLive
         }
     }
 
+    /// <summary>The debugger squad's page, and marks it wanted for the next ten seconds. Any thread.</summary>
     public static string Debuggers()
     {
+        // Switched off, the loop never builds the page, so the placeholder below would promise a page that never comes.
         if (!Enabled)
         {
             return "{\"at\":null,\"debuggers\":null,\"note\":\"the live window is off: bot-web.json says Live is false\"}";
@@ -243,6 +278,7 @@ public static partial class BotWebLive
                    : "{\"at\":null,\"debuggers\":[],\"note\":\"the first page is built on the loop within a second\"}");
     }
 
+    /// <summary>The names watched now, for the health page.</summary>
     public static string[] Names()
     {
         lock (_lock)
@@ -259,6 +295,9 @@ public static partial class BotWebLive
         }
     }
 
+    // ---- the loop's side ------------------------------------------------------------------------------------
+
+    /// <summary>Called a few times a second from the web module's timer. Game loop only.</summary>
     public static void Tick(long now)
     {
         if (!Enabled || now - _tick < EveryMs)
@@ -300,6 +339,7 @@ public static partial class BotWebLive
         }
         catch (Exception e)
         {
+            // Once, then every sixtieth: a builder that throws every second would bury the log.
             if (_throws++ % 60 == 0)
             {
                 logger.Error(e, "The live window threw; the page keeps the last frame");
@@ -369,6 +409,7 @@ public static partial class BotWebLive
             var started = Stopwatch.GetTimestamp();
             string json;
 
+            // One bot whose frame throws does not stop the others'; its own frame says what went wrong.
             try
             {
                 var bot = Find(watch);
@@ -413,6 +454,7 @@ public static partial class BotWebLive
 
         _due.Clear();
 
+        // The session log, read off the loop. One read in flight at a time; a slow disk skips a beat rather than queueing them.
         if (Interlocked.CompareExchange(ref _reading, 1, 0) == 0)
         {
             _ = Task.Run(ReadLog);
@@ -421,6 +463,7 @@ public static partial class BotWebLive
 
     private static readonly Action<BotEvent> _onEvent = OnEvent;
 
+    /// <summary>Every event about a watched bot, kept for its next frame. Called by <see cref="BotEvents.Post"/> on the loop.</summary>
     private static void OnEvent(BotEvent e)
     {
         if (e?.Bot == null || _count == 0)
@@ -442,6 +485,7 @@ public static partial class BotWebLive
         }
     }
 
+    /// <summary>The watched bot, by its serial once found, else by name among the population and those resting away.</summary>
     private static BotMobile Find(Watch watch)
     {
         if (watch.Serial != Serial.MinusOne && World.FindMobile(watch.Serial) is BotMobile { Deleted: false } known
@@ -512,6 +556,7 @@ public static partial class BotWebLive
             w.WriteNumber("z", bot.Z);
             w.WriteNumber("radius", Radius);
 
+            // ---- the body
             w.WriteString("class", bot.Class?.Name ?? "?");
             w.WriteString("role", bot.Class?.Role.ToString() ?? "?");
             w.WriteString("rank", bot.BotRank ?? "");
@@ -531,6 +576,7 @@ public static partial class BotWebLive
             Other(w, "combatant", bot, bot.Combatant);
             Other(w, "foe", bot, deed?.Foe);
 
+            // ---- the work, as the snapshot writes it
             w.WriteString("standing", away ? "Offline" : resolve?.Standing.ToString() ?? "?");
 
             if (away)
@@ -552,6 +598,7 @@ public static partial class BotWebLive
                 w.WriteString("stage", bot.Alive ? "nothing" : "dead");
             }
 
+            // ---- whose it is
             var guild = bot.Guild as Guild;
 
             if (guild == null)
@@ -591,6 +638,7 @@ public static partial class BotWebLive
             w.WriteNumber("weight", bot.TotalWeight);
             w.WriteNumber("weightMax", bot.MaxWeight);
 
+            // ---- where it is going
             var journey = bot.Journey;
 
             if (!away && journey is { Active: true })
@@ -619,6 +667,7 @@ public static partial class BotWebLive
                 Mobiles(w, bot, map);
                 Items(w, bot, map);
 
+                // The picture (02.10.2026): the bot and what lies about as the client would draw them, and the scene's number.
                 if (Picture)
                 {
                     WritePicture(w, watch, bot, map, ref blocks);
@@ -632,6 +681,7 @@ public static partial class BotWebLive
         return Encoding.UTF8.GetString(buffer.WrittenSpan);
     }
 
+    /// <summary>Somebody the bot is fighting or after: name, place, distance and health, or null.</summary>
     private static void Other(Utf8JsonWriter w, string name, BotMobile bot, Mobile other)
     {
         if (other is not { Deleted: false })
@@ -656,6 +706,7 @@ public static partial class BotWebLive
 
     private static int Percent(Mobile m) => m.HitsMax > 0 ? Math.Clamp(m.Hits * 100 / m.HitsMax, 0, 100) : 0;
 
+    /// <summary>The next waypoints of the walk, as <see cref="BotWebSnapshot"/> takes them, from the bot onwards.</summary>
     private static void Route(Utf8JsonWriter w, BotJourney journey, BotMobile bot, bool away)
     {
         w.WritePropertyName("route");
@@ -725,6 +776,13 @@ public static partial class BotWebLive
         w.WriteEndArray();
     }
 
+    // ---- terrain --------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The radar colours of the square round the bot plus <see cref="Slack"/>, as base64 of little-endian sixteen-bit colours
+    /// in rows, the same colours the map picture is drawn from. Centred again only when the bot has walked further than the
+    /// slack or the last square was not finished; 0xFFFF is a tile not read yet, left for the next beat's budget.
+    /// </summary>
     private static void Terrain(Utf8JsonWriter w, Watch watch, Map map, int x, int y, ref int budget)
     {
         var colours = BotWebMap.Radar();
@@ -734,6 +792,7 @@ public static partial class BotWebLive
         var moved = watch.Terrain == null || watch.TerrainMap != map
                     || Math.Max(Math.Abs(x - watch.TerrainX), Math.Abs(y - watch.TerrainY)) > Slack;
 
+        // Centred again when the bot has walked past the slack; filled in where it stands while the last square is unfinished.
         if (colours != null && (moved || !watch.TerrainComplete))
         {
             var cx = moved ? x : watch.TerrainX;
@@ -765,6 +824,7 @@ public static partial class BotWebLive
         w.WriteEndObject();
     }
 
+    /// <summary>Fills the window from the block cache, reading the blocks it lacks while the budget lasts. True when whole.</summary>
     private static bool Square(Map map, ushort[] colours, int x0, int y0, int side, ushort[] window, ref int budget)
     {
         var complete = true;
@@ -864,6 +924,8 @@ public static partial class BotWebLive
         return block;
     }
 
+    // ---- who and what is about ------------------------------------------------------------------------------
+
     private static void Mobiles(Utf8JsonWriter w, BotMobile bot, Map map)
     {
         w.WritePropertyName("mobiles");
@@ -883,6 +945,7 @@ public static partial class BotWebLive
                 continue;
             }
 
+            // Staff and the debuggers are hidden above Player; nobody in the world sees them, so neither does the window.
             if (m.Hidden && m.AccessLevel > AccessLevel.Player)
             {
                 continue;
@@ -1051,6 +1114,7 @@ public static partial class BotWebLive
             }
         }
 
+        // Its own shop by a bank, which is a place the bot stands rather than an item. See BotShopkeep.
         var open = BotShopkeep.Open;
 
         for (var i = 0; i < open.Count; i++)
@@ -1077,6 +1141,11 @@ public static partial class BotWebLive
         w.WriteEndArray();
     }
 
+    /// <summary>
+    /// The newest events about the bot and the newest session-log lines naming it, at most <see cref="FeedKeep"/> of each.
+    /// Every frame carries the newest, not only what came since the frame before, so a reader that misses a frame misses
+    /// nothing: the events have their sequence numbers and the lines their own, and the page keeps what it has not seen.
+    /// </summary>
     private static void Feed(Utf8JsonWriter w, Watch watch)
     {
         _eventScratch.Clear();
@@ -1115,6 +1184,13 @@ public static partial class BotWebLive
         _logScratch.Clear();
     }
 
+    // ---- the session log, off the loop ----------------------------------------------------------------------
+
+    /// <summary>
+    /// Reads what the session log gained since the last pass and hands each watched bot the lines that name it. Thread pool:
+    /// a file and the lock, never the world. A bot newly watched is given the lines naming it in the last
+    /// <see cref="TailBytes"/> of the file, so its window does not open empty.
+    /// </summary>
     private static void ReadLog()
     {
         try
@@ -1209,6 +1285,8 @@ public static partial class BotWebLive
                 return;
             }
 
+            // Lines are matched by where they start in the file, so each bot is given only what lies past its own mark; a line cut
+            // at the start of a fresh read is skipped rather than half-matched.
             List<(Watch Watch, string Text)> found = [];
             var at = 0;
 
@@ -1260,6 +1338,7 @@ public static partial class BotWebLive
         }
         catch
         {
+            // A log being rolled over or locked for a moment: the next beat reads it.
         }
         finally
         {
@@ -1267,6 +1346,7 @@ public static partial class BotWebLive
         }
     }
 
+    /// <summary>Whether the byte before <paramref name="start"/> is a line end, so the read begins on a whole line.</summary>
     private static bool Preceded(FileStream stream, long start)
     {
         var here = stream.Position;
@@ -1283,6 +1363,7 @@ public static partial class BotWebLive
         }
     }
 
+    /// <summary>The name as a whole word: "Ash" is not in "Ashford".</summary>
     private static bool Mentions(string line, string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -1313,12 +1394,15 @@ public static partial class BotWebLive
         }
     }
 
+    /// <summary>The line without the source tag the log ends every line with.</summary>
     private static string Shorten(string line)
     {
         var cut = line.LastIndexOf(" <s:", StringComparison.Ordinal);
 
         return cut > 0 ? line[..cut] : line;
     }
+
+    // ---- the debugger squad ---------------------------------------------------------------------------------
 
     private static void Squad()
     {
@@ -1332,6 +1416,7 @@ public static partial class BotWebLive
         }
         catch
         {
+            // The minds assembly answers for itself; a throw there is not the page's fault.
         }
 
         _debuggers = BotJson.Object(
@@ -1449,6 +1534,8 @@ public static partial class BotWebLive
         w.WriteEndArray();
         w.WriteEndObject();
     }
+
+    // ---- what it costs --------------------------------------------------------------------------------------
 
     public static void Health(Utf8JsonWriter w)
     {

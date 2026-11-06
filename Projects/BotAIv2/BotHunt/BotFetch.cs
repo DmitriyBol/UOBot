@@ -23,22 +23,30 @@ public sealed class BotFetch : BotDeed
 
     public const string Trade = "fetch";
 
+    /// <summary>The fewest things in the chest worth the walk.</summary>
     public static int Least { get; set; } = 3;
 
+    /// <summary>The most things carried away in one run.</summary>
     public static int Armful { get; set; } = 20;
 
+    /// <summary>What the run is held at against other work, a minute.</summary>
     public static double Prior { get; set; } = 300.0;
 
+    /// <summary>How often the fence is looked over for a run.</summary>
     public static int EveryMs { get; set; } = 300000;
 
+    /// <summary>Runs begun.</summary>
     public static long Runs { get; private set; }
 
+    /// <summary>Runs that carried something away, and what they came to.</summary>
     public static long Done { get; private set; }
 
     public static long Carried { get; private set; }
 
+    /// <summary>Runs that found the chest gone or empty by the time they arrived.</summary>
     public static long Empty { get; private set; }
 
+    /// <summary>Things drawn out of the chest by a thief for its own kit.</summary>
     public static long Drawn { get; private set; }
 
     private readonly Map _map;
@@ -49,6 +57,17 @@ public sealed class BotFetch : BotDeed
 
     private bool _counted;
 
+    /// <param name="map">Where.</param>
+    /// <param name="at">The chest.</param>
+    /// <param name="kit">
+    /// True when the walk is a thief drawing its own kit rather than the fence carrying the goods to market.
+    ///
+    /// <para>
+    /// <b>A red cannot shop.</b> The towns are shut to it (build 111b) and every shopkeeper on the island stands inside
+    /// one, so a thief out of bandages, arrows or reagents has nowhere to go and slowly stops working. The chest is the
+    /// one counter it can reach, and what the band stashed there is what it lives on.
+    /// </para>
+    /// </param>
     public BotFetch(Map map, Point3D at, bool kit = false)
     {
         _map = map;
@@ -106,6 +125,8 @@ public sealed class BotFetch : BotDeed
 
         _at = chest.GetWorldLocation();
 
+        // Beside the chest, never onto it: a chest on the ground is impassable and a walk aimed at its own tile finds
+        // no way in. See BotLair.Doorstep.
         if (!body.InRange(_at, 2))
         {
             var step = BotLair.Doorstep();
@@ -125,11 +146,13 @@ public sealed class BotFetch : BotDeed
 
         for (var i = 0; i < chest.Items.Count && taking.Count < Armful; i++)
         {
+            // The coin stays where it is: it is the band's, and the fence is carrying goods to market, not a purse.
             if (chest.Items[i] is not { Deleted: false, Movable: true } item || item is Gold)
             {
                 continue;
             }
 
+            // A thief takes only what its trade asks for and only while it is short of it; the fence takes the rest.
             if (kept != null && (!kept.TryGetValue(item.GetType(), out var wants) || pack.GetAmount(item.GetType()) >= wants))
             {
                 continue;
@@ -138,6 +161,10 @@ public sealed class BotFetch : BotDeed
             taking.Add(item);
         }
 
+        // <b>The band pays for its own keeper's silence.</b> A witness that catches the fence with a thief can be
+        // bought off on the spot, out of the pack — and the pack is exactly where a bot's money is not, because the
+        // unload machinery banks everything above the float. The one moment the keeper stands over the band's own coin
+        // is this one. Patrick's word of 17.09.2026: "they may buy the witness off, or kill it."
         var drew = 0;
 
         if (!_kit && BotFence.Is(body))

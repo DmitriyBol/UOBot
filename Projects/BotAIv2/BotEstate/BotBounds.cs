@@ -44,10 +44,13 @@ public static class BotBounds
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBounds));
 
+    /// <summary>Whether the rule is kept. Off, and placements ask the centre tile alone, as before.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often the standing halls, seats and houses are looked at for ground that changed hands.</summary>
     public static int LookMs { get; set; } = 30000;
 
+    /// <summary>How far round a bare seat on another guild's ground a point of its own or open ground is looked for.</summary>
     public static int SeatReach { get; set; } = 90;
 
     /// <summary>Why a building may not stand where it was asked to.</summary>
@@ -55,8 +58,10 @@ public static class BotBounds
     {
         None,
 
+        /// <summary>A square under it is another guild's.</summary>
         Foreign,
 
+        /// <summary>Its walls reach out of its own square onto open ground, which a hall would then hold without claiming.</summary>
         Straddling
     }
 
@@ -72,14 +77,19 @@ public static class BotBounds
 
     private static readonly long[] _refused = new long[5];
 
+    /// <summary>Seats refused (set at the door, chosen at founding, re-seated by a town) for lying on another guild's ground.</summary>
     public static long SeatsRefused { get; private set; }
 
+    /// <summary>Town buildings passed over for a guild because their heart lies on another guild's ground. Counts looks.</summary>
     public static long HousesRefused { get; private set; }
 
+    /// <summary>Halls raised or adopted in a square another guild holds, whose yard was not written over that guild's holding.</summary>
     public static long YardsKept { get; private set; }
 
+    /// <summary>Open squares another guild's hall stands partly in, passed over by a staker. Counts looks.</summary>
     public static long Spared { get; private set; }
 
+    /// <summary>Halls found standing on another guild's ground (a new finding, not every look), halls carried off it, looks that found no ground to carry one to.</summary>
     public static long HallsFound { get; private set; }
 
     public static long HallsMoved { get; private set; }
@@ -88,12 +98,15 @@ public static class BotBounds
 
     public static long HallsWaiting { get; private set; }
 
+    /// <summary>Bare seats moved off another guild's ground, and looks that found nowhere to move one.</summary>
     public static long SeatsMoved { get; private set; }
 
     public static long SeatsWaiting { get; private set; }
 
+    /// <summary>Guild town houses left for standing on another guild's ground.</summary>
     public static long HousesLeft { get; private set; }
 
+    /// <summary>Bots' own houses standing on the ground of a guild not their own nor allied, at the last look. Not moved: see <see cref="Look"/>.</summary>
     public static int AbodesAbroad { get; private set; }
 
     /// <summary>
@@ -109,39 +122,52 @@ public static class BotBounds
     {
         public string Whose;
 
+        /// <summary>Whether the shift within the guild's own ground has been tried and failed this stretch.</summary>
         public bool ShiftTried;
 
+        /// <summary>Offers that looked for open ground within reach and found none.</summary>
         public int OpenMisses;
 
+        /// <summary>Until when the hall is let stand (<see cref="TolerateMs"/>); nought while it owes.</summary>
         public long StandUntil;
     }
 
+    /// <summary>Who owes a move off whose ground.</summary>
     private static readonly Dictionary<string, Owing> _owed = [];
 
+    /// <summary>How many candidate plots a shift puts to the engine in one go, nearest first.</summary>
     public static int ShiftChecks { get; set; } = 150;
 
+    /// <summary>How many squares round the hall's own (Chebyshev) the guild's other held squares are searched for a shift.</summary>
     public static int ShiftSquares { get; set; } = 2;
 
+    /// <summary>How far from the hall open ground may be and still be carried to.</summary>
     public static int OpenReach { get; set; } = 90;
 
+    /// <summary>Offers that may find no open ground within reach before the hall is let stand.</summary>
     public static int OpenLooks { get; set; } = 40;
 
+    /// <summary>How long a hall nothing could be found for is let stand before the move is tried again; said once a stand.</summary>
     public static int TolerateMs { get; set; } = 3600000;
 
+    /// <summary>Halls shifted within their own square, and onto the guild's other squares; shifts that found nothing and put the hall back where it stood.</summary>
     public static long ShiftedOwn { get; private set; }
 
     public static long ShiftedHeld { get; private set; }
 
     public static long ShiftsFailed { get; private set; }
 
+    /// <summary>Open ground found but further than <see cref="OpenReach"/>; halls let stand for want of anything (once a stand).</summary>
     public static long OpenTooFar { get; private set; }
 
     public static long Stood { get; private set; }
 
+    /// <summary>Seats said to be waiting, so the waiting is said once a stretch.</summary>
     private static readonly HashSet<string> _waitingSaid = [];
 
     private static long _looked;
 
+    /// <summary>Whether this point lies on ground a guild other than <paramref name="guild"/> holds, and whose.</summary>
     public static bool Foreign(string guild, Map map, Point3D at, out string whose)
     {
         whose = null;
@@ -163,6 +189,7 @@ public static class BotBounds
         return true;
     }
 
+    /// <summary>The same for a building of <paramref name="multi"/> centred on <paramref name="centre"/>. See <see cref="Covers(string, Map, Point3D, Point2D, Point2D, bool, bool, out string)"/>.</summary>
     public static Breach Covers(string guild, Map map, Point3D centre, int multi, bool strict, bool alliesWelcome, out string whose)
     {
         var mcl = MultiData.GetComponents(multi);
@@ -170,6 +197,13 @@ public static class BotBounds
         return Covers(guild, map, centre, mcl.Min, mcl.Max, strict, alliesWelcome, out whose);
     }
 
+    /// <summary>
+    /// Whether a building whose tiles run from <paramref name="min"/> to <paramref name="max"/> about <paramref name="centre"/>
+    /// would stand on ground it may not. Every square its bounds touch is asked once (four for a small hall at most).
+    /// <paramref name="strict"/>, for a guild building: the centre's square open or the guild's own, and every other square the
+    /// guild's own. Not strict, for a hall already standing or a bot's house: no square another guild's, allies' ground welcome
+    /// when <paramref name="alliesWelcome"/>.
+    /// </summary>
     public static Breach Covers(string guild, Map map, Point3D centre, Point2D min, Point2D max, bool strict, bool alliesWelcome, out string whose)
     {
         whose = null;
@@ -220,6 +254,11 @@ public static class BotBounds
         return Breach.None;
     }
 
+    /// <summary>
+    /// The building about to go up on <paramref name="plot"/> may not, because the ground under it changed while the bot walked
+    /// there. Asked by each building errand at arrival, before the engine is asked and before anything is paid or knocked
+    /// down. True when refused; counted by what was being built and said.
+    /// </summary>
     public static bool Refuse(Placing what, string guild, Map map, Point3D plot, int multi, out string why)
     {
         why = null;
@@ -253,12 +292,19 @@ public static class BotBounds
             _ => "house of its own"
         };
 
+    /// <summary>A seat refused for lying on another guild's ground. Said by the caller where it has something to say.</summary>
     public static void SeatRefused() => SeatsRefused++;
 
+    /// <summary>A town building passed over for its heart lying on another guild's ground.</summary>
     public static void HouseRefused() => HousesRefused++;
 
+    /// <summary>An open square another guild's hall stands partly in, passed over by a staker.</summary>
     public static void Spare() => Spared++;
 
+    /// <summary>
+    /// A hall was raised or adopted in a square <paramref name="holder"/> holds: the square stays <paramref name="holder"/>'s, and the
+    /// hall owes a move off it, which the next look files. See <c>BotClaim.Seat</c>.
+    /// </summary>
     public static void YardKept(string guild, string holder, Point3D hall)
     {
         YardsKept++;
@@ -273,6 +319,10 @@ public static class BotBounds
         );
     }
 
+    /// <summary>
+    /// The guild of the hall that stands partly in this square, other than <paramref name="guild"/>'s, or nothing. A staker does
+    /// not claim open ground another guild's hall stands in: taking it would carry the hall off without a war.
+    /// </summary>
     public static string HallIn(string guild, Map map, (int Map, int X, int Y) key)
     {
         if (!Running || map == null)
@@ -299,6 +349,10 @@ public static class BotBounds
         return null;
     }
 
+    /// <summary>
+    /// Whether this guild's hall stands on another guild's ground and owes a move now, and the hall and whose ground. A hall let
+    /// stand (<see cref="TolerateMs"/>) owes nothing until its stand runs out; then the steps begin again from the shift.
+    /// </summary>
     public static bool Owes(Guild guild, out BaseHouse hall, out string whose)
     {
         hall = null;
@@ -335,10 +389,18 @@ public static class BotBounds
         return true;
     }
 
+    /// <summary>Whether the next step for this guild's hall is the shift within its own ground (true) or open ground (false).</summary>
     public static bool Shifting(string guild) => guild != null && _owed.TryGetValue(guild, out var owing) && !owing.ShiftTried;
 
+    /// <summary>The remover was sent to carry this guild's hall off.</summary>
     public static void Offered() => HallsOffered++;
 
+    /// <summary>
+    /// The candidates for a shift of <paramref name="old"/> (a building of <paramref name="multi"/>), nearest first: its own square,
+    /// every tile; then the guild's other squares within <see cref="ShiftSquares"/>, every other tile. Each stands wholly on the
+    /// guild's ground (<see cref="Covers(string, Map, Point3D, int, bool, bool, out string)"/>, strict) and passes our own tests
+    /// (<c>BotPlot.Suits</c>) with the standing hall not counted. The engine is asked by the shift itself, with the hall down.
+    /// </summary>
     public static List<(Point3D At, bool Own)> Shifts(string guild, Map map, BaseHouse old, int multi)
     {
         var found = new List<(Point3D At, bool Own, int Gap)>();
@@ -403,6 +465,7 @@ public static class BotBounds
         return list;
     }
 
+    /// <summary>The shift found no plot the engine would take; the hall was put back where it stood. Next: open ground.</summary>
     public static void ShiftFailed(string guild, string why)
     {
         ShiftsFailed++;
@@ -415,6 +478,7 @@ public static class BotBounds
         logger.Warning("The hall of {Guild} could not be shifted onto ground of its own: {Why}; open ground within {Reach} tiles is looked for next", guild, why, OpenReach);
     }
 
+    /// <summary>The hall has been shifted onto its own ground: within its own square (<paramref name="own"/>) or onto another square the guild holds.</summary>
     public static void Shifted(string guild, Point3D from, Point3D at, bool own)
     {
         if (own)
@@ -446,6 +510,10 @@ public static class BotBounds
         );
     }
 
+    /// <summary>
+    /// The remover's look for open ground found none, or found it further than <see cref="OpenReach"/>. After <see cref="OpenLooks"/>
+    /// misses, or at once for ground too far, the hall is let stand for <see cref="TolerateMs"/>, said once a stand.
+    /// </summary>
     public static void Missed(string guild, string whose, bool tooFar)
     {
         HallsWaiting++;
@@ -480,6 +548,7 @@ public static class BotBounds
         );
     }
 
+    /// <summary>The hall has been carried off another guild's ground to <paramref name="at"/>.</summary>
     public static void Paid(string guild, Point3D at)
     {
         if (guild == null || !_owed.Remove(guild, out var owing))
@@ -493,6 +562,10 @@ public static class BotBounds
         logger.Warning("The hall of {Guild} has been carried off {Whose}'s ground to {X},{Y}; its seat follows it", guild, owing.Whose, at.X, at.Y);
     }
 
+    /// <summary>
+    /// The look: halls on ground that is now another guild's are filed for the remover; bare seats are moved off it; town
+    /// houses on it are left. From <c>BotClaim.Look</c>, on its own clock.
+    /// </summary>
     public static void Look()
     {
         if (!Running || !BotEstate.HallsAdopted)
@@ -598,6 +671,7 @@ public static class BotBounds
                 continue;
             }
 
+            // A guild's house in a town: left, and the settler finds it a building that is not on anybody's ground.
             if (BotGuildHouses.Of(name) is { } house && Foreign(name, map, house.Heart, out var owner))
             {
                 if (BotGuildHouses.Leave(name, $"its house stands on {owner}'s held ground"))
@@ -619,6 +693,8 @@ public static class BotBounds
                 continue;
             }
 
+            // A guild with a hall owes its move to the remover, and the seat follows the hall when it is carried; a seat
+            // moved apart from its hall now would carry the hall towards it a second time.
             if (_owed.ContainsKey(name))
             {
                 continue;
@@ -649,6 +725,7 @@ public static class BotBounds
         }
     }
 
+    /// <summary>The nearest point to <paramref name="from"/> a body can stand on that is not another guild's ground, ring by ring.</summary>
     private static bool Nearest(string guild, Map map, Point3D from, out Point3D at)
     {
         at = Point3D.Zero;
@@ -682,6 +759,11 @@ public static class BotBounds
         return false;
     }
 
+    /// <summary>
+    /// Bots' own houses on the ground of a guild neither their own nor allied, counted and not moved. Decided: a house a bot
+    /// bought is its own, the engine has no way to move one but to knock it down and pay again, and nothing about a guild's
+    /// ground is worth that; the rule is kept where it can be, at the buying (<c>BotPlot.FindHome</c>, <c>BotAbode</c>).
+    /// </summary>
     private static void LookAbodes()
     {
         var abroad = 0;
@@ -704,6 +786,7 @@ public static class BotBounds
         AbodesAbroad = abroad;
     }
 
+    /// <summary>Part of the estate's line.</summary>
     public static string Describe() =>
         !Running
             ? "ground another guild holds is not kept from placement"

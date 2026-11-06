@@ -18,6 +18,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotGuardDuty : IBotProposer
 {
+    /// <summary>Watches taken, stood and paid, and ended without the wage (the purse could not hold it, or the watch was dropped).</summary>
     public static long Taken { get; private set; }
 
     public static long Stood { get; private set; }

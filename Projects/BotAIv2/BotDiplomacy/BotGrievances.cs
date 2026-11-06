@@ -32,14 +32,21 @@ public static class BotGrievances
         public double Moved;
     }
 
+    /// <summary>The cause <c>BotRegard</c> writes for time's own mending, which is not a grievance and is kept out of the book.</summary>
     public const string Forgetting = "time";
 
     private static readonly Dictionary<(string Of, string About), Dictionary<string, Entry>> _books = [];
 
+    /// <summary>Moves written into the books, all told.</summary>
     public static long Written { get; private set; }
 
+    /// <summary>Books closed by a settlement.</summary>
     public static long Closed { get; private set; }
 
+    /// <summary>
+    /// An opinion moved, and why. Called from <c>BotRegard.Move</c> after the opinion has changed, with the change actually
+    /// made (after the scale's floor and ceiling), so the book adds up to the opinion it explains.
+    /// </summary>
     public static void Noted(string of, string about, double moved, string why)
     {
         if (of == null || about == null || of == about || why == null || moved == 0.0 || why == Forgetting)
@@ -64,6 +71,7 @@ public static class BotGrievances
         Written++;
     }
 
+    /// <summary>A quarrel settled: both books of the pair closed. Called from <c>BotRegard.Settle</c>.</summary>
     public static void Settled(string one, string other)
     {
         if (one == null || other == null)
@@ -80,6 +88,7 @@ public static class BotGrievances
         }
     }
 
+    /// <summary>What <paramref name="of"/> holds against <paramref name="about"/>, worst first, or an empty list.</summary>
     public static List<(string Why, int Count, double Moved)> Of(string of, string about)
     {
         List<(string, int, double)> found = [];
@@ -99,11 +108,13 @@ public static class BotGrievances
         return found;
     }
 
+    /// <summary>How many times <paramref name="of"/> wrote <paramref name="why"/> against <paramref name="about"/>.</summary>
     public static int Count(string of, string about, string why) =>
         of != null && about != null && why != null && _books.TryGetValue((of, about), out var book) && book.TryGetValue(why, out var entry)
             ? entry.Count
             : 0;
 
+    /// <summary>One guild's book about another in one phrase, for the duke and the dashboard: "blood ×2 (−50), trade ×8 (+4)".</summary>
     public static string Tell(string of, string about)
     {
         var book = Of(of, about);
@@ -130,8 +141,10 @@ public static class BotGrievances
         return say.ToString();
     }
 
+    /// <summary>Every book, for the store.</summary>
     public static IEnumerable<KeyValuePair<(string Of, string About), Dictionary<string, Entry>>> Books => _books;
 
+    /// <summary>One cause read back off the save.</summary>
     public static void Restore(string of, string about, string why, int count, double moved)
     {
         if (string.IsNullOrEmpty(of) || string.IsNullOrEmpty(about) || of == about || string.IsNullOrEmpty(why) || count <= 0)
@@ -149,12 +162,14 @@ public static class BotGrievances
 
     public static string Describe() => $"{_books.Count} books of grievances open, {Written} moves written into them, {Closed} closed by a settlement";
 
+    /// <summary>The session's counters; the books are kept, being the store's.</summary>
     public static void Forget()
     {
         Written = 0;
         Closed = 0;
     }
 
+    /// <summary>Every book burnt, for Patrick's reset.</summary>
     public static int Wipe()
     {
         var gone = _books.Count;

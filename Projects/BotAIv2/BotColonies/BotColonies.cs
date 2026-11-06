@@ -45,59 +45,96 @@ public static class BotColonies
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotColonies));
 
+    /// <summary>Whether guilds send expeditions and keep colonies at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>The most a party is, the captain counted. Patrick: five to eight.</summary>
     public static int PartySize { get; set; } = 8;
 
+    /// <summary>The fewest an expedition that founds a colony sails with, the captain counted.</summary>
     public static int LeastParty { get; set; } = 5;
 
+    /// <summary>What the stores of an expedition cost the guild's chest, paid into the city's purse when the ship puts to sea.</summary>
     public static int Cost { get; set; } = 1500;
 
+    /// <summary>The stores of a relief. Nought: a relief carries the ship back and whoever musters.</summary>
     public static int RelieveCost { get; set; }
 
+    /// <summary>How long the captain waits at the berth for the party once it is there.</summary>
     public static int MusterMs { get; set; } = 240000;
 
+    /// <summary>How far from the dock a member is still asked to sign on.</summary>
     public static int MusterReach { get; set; } = 400;
 
+    /// <summary>The colonies' clock: the shift, the claim, the loss, the yield.</summary>
     public static int LookMs { get; set; } = 30000;
 
+    /// <summary>How often one guild is weighed for an expedition.</summary>
     public static int ConsiderMs { get; set; } = 600000;
 
+    /// <summary>How long a colonist works the island before the ship may take it home. Two hours.</summary>
     public static int ShiftMs { get; set; } = 7200000;
 
+    /// <summary>The least time between two runs home.</summary>
     public static int RunEveryMs { get; set; } = 2700000;
 
+    /// <summary>Units of goods in the store that make a run home worth sailing, shift or no shift.</summary>
     public static int CargoAt { get; set; } = 60;
 
+    /// <summary>How full the captain loads its pack with the store's goods, of the weight it can carry.</summary>
     public static double CargoLoad { get; set; } = 0.85;
 
+    /// <summary>The captain's share of what the goods fetch on the mainland.</summary>
     public static double CaptainShare { get; set; } = 0.1;
 
+    /// <summary>The share shared among the hands who came home with it, into their banks.</summary>
     public static double CrewShare { get; set; } = 0.3;
 
+    /// <summary>How far round the site the colony's ground runs: its seams are the population's ground (<see cref="Within"/>).</summary>
     public static int Reach { get; set; } = 45;
 
+    /// <summary>How many rings of squares round an island's dock are looked at for a site.</summary>
     public static int SiteRings { get; set; } = 5;
 
+    /// <summary>The fewest workable rock tiles a site's square must show, sampled every <see cref="SiteStride"/> tiles.</summary>
     public static int MinRocks { get; set; } = 4;
 
+    /// <summary>How finely a square is sampled for rock: every fourth tile, sixty-four looks a square.</summary>
     public static int SiteStride { get; set; } = 4;
 
+    /// <summary>The islands, by their docks' names, in the order Patrick named them.</summary>
     public static string Islands { get; set; } = "Nujel'm,Magincia,Moonglow,Ocllo";
 
+    /// <summary>How long a colony may stand with nobody of its guild on its land before it is given up. Three hours.</summary>
     public static int AbandonMs { get; set; } = 10800000;
 
+    /// <summary>Whether an expedition with no ship may buy one at the shipwright (the guild standing what the captain lacks).</summary>
     public static bool BuyShip { get; set; } = true;
 
+    /// <summary>Whether a guild with no ship may adopt one of the population's own lying at anchor with no owner.</summary>
     public static bool Salvage { get; set; } = true;
 
+    /// <summary>Whether the colony's square is priced at the claim's plain price rather than the step past ten squares.</summary>
     public static bool FlatClaim { get; set; } = true;
 
+    /// <summary>How often a colony whose square is not yet claimed tries again.</summary>
     public static int ClaimRetryMs { get; set; } = 300000;
 
+    /// <summary>
+    /// The door's verbs, by hand only (Argus's <c>BotHand</c> accepts them beside its own list): <c>expeditions</c> — every colony,
+    /// its store, its yield, its runs home and what The Shadow took, and every party at a dock or at sea (<see cref="Tell"/>);
+    /// <c>colony &lt;guild&gt;</c> — fit out an expedition for the guild now, its clock ignored and its money not, or a relief when it
+    /// has a colony and the ship is on the mainland (<see cref="Launch"/>).
+    /// </summary>
     public static readonly string[] Verbs = ["expeditions", "colony"];
 
+    /// <summary>
+    /// An order by hand, through the door: <c>dial BotColonies.Order The Hammer</c> (or <c>do colony The Hammer</c>) presses the
+    /// expedition on the guild now, its clock ignored, its money not. Read and cleared by the colonies' clock.
+    /// </summary>
     public static string Order { get; set; } = "";
+
+    // ---- Counters ------------------------------------------------------------------------------------------------------
 
     public static long Considered { get; private set; }
 
@@ -167,6 +204,7 @@ public static class BotColonies
 
     public static IReadOnlyList<BotSailing> Passages => _passages;
 
+    /// <summary>The colonies module's part of the sea's start: the proposers offered and the store's colonies resolved.</summary>
     public static void Start()
     {
         BotWill.Offer(new BotExpeditioner());
@@ -192,6 +230,9 @@ public static class BotColonies
         );
     }
 
+    // ---- Questions the rest of the shard asks --------------------------------------------------------------------------
+
+    /// <summary>This guild's colony, or null.</summary>
     public static BotColony Of(string guild)
     {
         if (guild == null)
@@ -210,6 +251,7 @@ public static class BotColonies
         return null;
     }
 
+    /// <summary>Whether two places are on the same land: the walkers' graph, one lookup each, cached.</summary>
     public static bool SameLand(Map map, Point3D a, Point3D b)
     {
         if (map == null || map == Map.Internal)
@@ -222,6 +264,7 @@ public static class BotColonies
         return la >= 0 && la == BotGates.LandOf(map, b);
     }
 
+    /// <summary>The colony of this bot's guild when the bot stands on its land, or null.</summary>
     public static BotColony OnLand(Mobile body)
     {
         if (!Running || _colonies.Count == 0 || body is not { Deleted: false } || body.Guild is not Guild guild)
@@ -234,6 +277,10 @@ public static class BotColonies
         return colony != null && colony.Map == body.Map && SameLand(body.Map, body.Location, colony.Site) ? colony : null;
     }
 
+    /// <summary>
+    /// Whether a place is colony ground: within <see cref="Reach"/> of a colony's site. Asked by <c>BotPopulation.Within</c>, so
+    /// that the seams round a colony are ground a colonist may be sent to though they lie two thousand tiles from home.
+    /// </summary>
     public static bool Within(Map map, Point3D where)
     {
         if (!Running || _colonies.Count == 0 || map == null)
@@ -254,6 +301,10 @@ public static class BotColonies
         return false;
     }
 
+    /// <summary>
+    /// The store a colonist puts its metal in instead of its bank: its colony's, when it stands on the colony's land and the
+    /// store stands. Asked by <c>BotDig</c>.
+    /// </summary>
     public static Container StoreOf(Mobile body)
     {
         var colony = OnLand(body);
@@ -261,8 +312,10 @@ public static class BotColonies
         return colony?.Store is { Deleted: false } store ? store : null;
     }
 
+    /// <summary>Whether this bot is a colonist on its colony's land: the way home by sea is not offered to it (<see cref="BotSeafarer"/>).</summary>
     public static bool OnShift(Mobile body) => OnLand(body) != null;
 
+    /// <summary>The colonies' sites as roots of their guilds' ground, for <c>BotClaim.Connect</c>.</summary>
     public static IEnumerable<(string Guild, Map Map, Point3D At)> Roots()
     {
         for (var i = 0; i < _colonies.Count; i++)
@@ -276,6 +329,7 @@ public static class BotColonies
         }
     }
 
+    /// <summary>Whether this square is a colony's, for the claim's flat price. See <see cref="FlatClaim"/>.</summary>
     public static bool Site(string guild, (int Map, int X, int Y) key)
     {
         if (!Running || !FlatClaim || guild == null)
@@ -294,6 +348,10 @@ public static class BotColonies
         return false;
     }
 
+    /// <summary>
+    /// The expedition this guild is mustering now, for a scout to join: its dock, its captain, where it is bound. Null when
+    /// there is none. Exposed for the officers' scout (officers20): see <see cref="Enlist"/>.
+    /// </summary>
     public static BotSailing Expedition(Guild guild)
     {
         for (var i = 0; i < _passages.Count; i++)
@@ -309,6 +367,10 @@ public static class BotColonies
         return null;
     }
 
+    /// <summary>
+    /// Signs a bot onto its guild's mustering expedition by the guild's order — a scout sent with it. True when it was pressed.
+    /// The party's ceiling still holds.
+    /// </summary>
     public static bool Enlist(BotMobile bot, string why)
     {
         if (bot?.Guild is not Guild guild || Expedition(guild) is not { } passage || passage.Signed(bot)
@@ -320,6 +382,7 @@ public static class BotColonies
         return BotWill.Press(bot, new BotSignOn(passage, bot), why ?? $"sent with {guild.Name}'s expedition");
     }
 
+    /// <summary>A passage of this guild in this heading that is not over, or null.</summary>
     public static BotSailing Passage(Guild guild, BotSailing.Way heading)
     {
         for (var i = 0; i < _passages.Count; i++)
@@ -353,6 +416,7 @@ public static class BotColonies
         _passages.Remove(passage);
     }
 
+    /// <summary>The guild may be weighed for an expedition now: its clock has run. Starts the clock.</summary>
     internal static bool Due(Guild guild)
     {
         var now = Core.TickCount;
@@ -437,6 +501,9 @@ public static class BotColonies
         ShipsGold += Math.Max(0, gold);
     }
 
+    // ---- The islands and the sites ---------------------------------------------------------------------------------------
+
+    /// <summary>The islands' docks named in <see cref="Islands"/>, in order.</summary>
     public static List<BotDock> IslandDocks()
     {
         List<BotDock> docks = [];
@@ -455,6 +522,7 @@ public static class BotColonies
         return docks;
     }
 
+    /// <summary>Whether a colony stands on this island already, whoever's.</summary>
     public static bool Taken(BotDock island)
     {
         for (var i = 0; i < _colonies.Count; i++)
@@ -468,6 +536,11 @@ public static class BotColonies
         return false;
     }
 
+    /// <summary>
+    /// The square to found a colony on, near an island's dock: walked to from the dock's shore, off the town's guarded ground,
+    /// held by nobody and claimed by nobody, with standing ground in its middle, and the most workable rock in it — the
+    /// island's untouched veins. Sampled every third tile; kept half an hour per island.
+    /// </summary>
     public static bool SiteOn(Map map, BotDock island, out Point3D site, out int rocks)
     {
         site = Point3D.Zero;
@@ -568,6 +641,10 @@ public static class BotColonies
         return best != Point3D.Zero;
     }
 
+    /// <summary>
+    /// The island a guild founds on: the first named with no colony, a site, and a lane from a dock its captain can walk to —
+    /// one no gate joins to home first (the sea is its only way, so its colonists stay), then the nearest by sea.
+    /// </summary>
     public static bool Island(BotMobile captain, out BotDock island, out Point3D site, out BotDock from, out BotSeaLane lane)
     {
         island = null;
@@ -604,6 +681,7 @@ public static class BotColonies
                 continue;
             }
 
+            // An island no gate joins to the captain's land first: its colonists cannot walk away from it.
             var cost = tiles + (BotGates.Joined(map, captain.Location, dock.Shore) ? 100000 : 0);
 
             if (cost < bestCost)
@@ -619,6 +697,10 @@ public static class BotColonies
         return island != null;
     }
 
+    /// <summary>
+    /// The way home from a colony: of the docks the guild's home is on the land of, the one that makes the lane and the walk
+    /// from it shortest, as the seafarer chooses.
+    /// </summary>
     public static bool HomeWay(BotMobile body, out BotDock from, out BotDock to, out BotSeaLane lane, out Point3D home)
     {
         from = null;
@@ -659,6 +741,7 @@ public static class BotColonies
         return to != null;
     }
 
+    /// <summary>The way out from the mainland to a colony's island, from a dock this bot can walk to.</summary>
     public static bool OutWay(BotMobile body, BotColony colony, out BotDock from, out BotDock to, out BotSeaLane lane)
     {
         from = null;
@@ -668,6 +751,9 @@ public static class BotColonies
         return body?.Map != null && to != null && BotSea.Plan(body.Map, body.Location, to, out from, out lane, out _, true);
     }
 
+    // ---- Ships: held, adopted, bought ------------------------------------------------------------------------------------
+
+    /// <summary>The member of this guild holding a ship, the given one first, or null.</summary>
     public static BotMobile ShipHolder(Guild guild, BotMobile first = null)
     {
         if (first != null && BotHelm.ShipOf(first) != null)
@@ -688,6 +774,7 @@ public static class BotColonies
         return null;
     }
 
+    /// <summary>Whether a ship this captain could adopt lies at anchor: asked when an expedition is weighed, nothing moved.</summary>
     public static bool Adoptable(BotMobile captain)
     {
         if (!Salvage || captain?.Map == null)
@@ -715,6 +802,12 @@ public static class BotColonies
         return false;
     }
 
+    /// <summary>
+    /// A ship of the population's own lying in the water with nobody to own it — its owner gone from the world, or of this
+    /// guild and not sailing it — dry-docked into the captain's pack with a key the harbour cuts for it. The thirteen ships
+    /// money15 found at anchor on the way to Nujel'm were exactly these: lost when the key went with a corpse. Nothing is paid
+    /// and nothing is made; a small ship only, anchored, its deck and hold empty. True with the ship in the pack.
+    /// </summary>
     public static bool Adopt(BotMobile captain, out string why)
     {
         why = null;
@@ -818,6 +911,9 @@ public static class BotColonies
         return false;
     }
 
+    // ---- Founding, the store, the loss --------------------------------------------------------------------------------------
+
+    /// <summary>The colony set down: its record, and its store on the site. Null when the guild has one already.</summary>
     public static BotColony Found(Guild guild, BotDock island, Map map, Point3D site, string by)
     {
         if (guild == null || island == null || map == null || Of(guild.Name) != null)
@@ -856,6 +952,7 @@ public static class BotColonies
         return colony;
     }
 
+    /// <summary>A chest on the site, fixed to the ground, named for the guild: what the colonists dig goes in, what the ship carries comes out.</summary>
     private static Container PlaceStore(BotColony colony)
     {
         var chest = new WoodenChest { Name = $"{colony.Guild} colony store", Movable = false };
@@ -865,6 +962,10 @@ public static class BotColonies
         return chest;
     }
 
+    /// <summary>
+    /// The colonist's metal, ore and wood out of its pack into the store, onto the store's own stacks. Says how many units of
+    /// each went in. Counted against the colony for its yield.
+    /// </summary>
     public static (int Bars, int Ore, int Wood) Deposit(Mobile body, Container store)
     {
         var pack = body?.Backpack;
@@ -945,6 +1046,7 @@ public static class BotColonies
         return (bars, ore, wood);
     }
 
+    /// <summary>The colony given up: its record gone, its store taken off the site with whatever was in it, said and counted.</summary>
     private static void End(BotColony colony, string why, bool lost)
     {
         _colonies.Remove(colony);
@@ -981,6 +1083,12 @@ public static class BotColonies
         BotVoice.Say(BotGuilds.Head(BotGuilds.Named(colony.Guild)), "guild", $"We have lost our colony on {colony.Island}: {why}.", true);
     }
 
+    // ---- The clock -------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The colonies' look, every <see cref="LookMs"/> from the sea's survey: the store read back after a restart, who is on
+    /// each colony's land and for how long, the claim made or retried, a colony lost or given up, and the order by hand.
+    /// </summary>
     public static void Look()
     {
         if (!Running || !BotSea.Ready)
@@ -1022,6 +1130,7 @@ public static class BotColonies
             }
         }
 
+        // A passage whose captain is gone or whose clock has long run out is closed, so its members are let go.
         for (var i = _passages.Count - 1; i >= 0; i--)
         {
             var passage = _passages[i];
@@ -1053,6 +1162,7 @@ public static class BotColonies
             return;
         }
 
+        // Who is on the land: the shift's clock starts when a member is first seen there.
         var here = 0;
         _gone.Clear();
 
@@ -1095,6 +1205,8 @@ public static class BotColonies
             return;
         }
 
+        // The ground: a square once the guild's and the guild's no more is a colony lost by the claim rules — taken, struck
+        // off, cut off, or swept. A square not yet claimed is claimed, again every ClaimRetryMs.
         var owner = BotClaim.Owner(colony.Map, colony.Site);
 
         if (owner == colony.Guild)
@@ -1126,11 +1238,13 @@ public static class BotColonies
         Claim(colony, guild);
     }
 
+    /// <summary>Lays the guild's claim to the colony's square, by the claim's own rules: free while the guild has free squares, then the price.</summary>
     internal static bool Claim(BotColony colony, Guild guild)
     {
         colony.ClaimTried = Core.TickCount;
         colony.ClaimTries++;
 
+        // Another guild's square is not claimed from here: a colony settles open ground. Taking held ground is a war's business.
         if (BotClaim.Owner(colony.Map, colony.Site) is { } other && other != colony.Guild)
         {
             ClaimsRefused++;
@@ -1155,6 +1269,7 @@ public static class BotColonies
         return true;
     }
 
+    /// <summary>After a restart: each colony's store found again by its serial, or the colony given up.</summary>
     private static void Resolve()
     {
         for (var i = _colonies.Count - 1; i >= 0; i--)
@@ -1175,6 +1290,7 @@ public static class BotColonies
 
             if (colony.Store is not { Deleted: false })
             {
+                // The site is the guild's still if the claim stands: a new store is set down rather than the colony lost.
                 colony.Store = PlaceStore(colony);
                 colony.StoreSerial = colony.Store.Serial;
 
@@ -1183,6 +1299,7 @@ public static class BotColonies
         }
     }
 
+    /// <summary>The order by hand, if one was written. See <see cref="Order"/>.</summary>
     private static void Obey()
     {
         var order = Order;
@@ -1196,6 +1313,10 @@ public static class BotColonies
         logger.Information("Colonies: the order \"{Order}\": {Answer}", order, Launch(order));
     }
 
+    /// <summary>
+    /// Presses an expedition on a guild now, the clock ignored and the money not: its ship holder, or its head when the guild
+    /// can buy or adopt one. Says what came of it. <c>do colony &lt;guild&gt;</c>.
+    /// </summary>
     public static string Launch(string name)
     {
         if (!Running || !BotSea.Ready)
@@ -1222,6 +1343,7 @@ public static class BotColonies
             return $"{guild.Name} has nobody alive to captain a ship";
         }
 
+        // The ship at the colony: the run home is what can be sailed now, its own clocks ignored.
         if (OnLand(captain) is { } colony && BotHelm.ShipOf(captain) != null)
         {
             if (Passage(guild, BotSailing.Way.Home) != null)
@@ -1262,6 +1384,7 @@ public static class BotColonies
         return $"{captain.Name} of {guild.Name} is ordered to fit out {deed.Describe()}";
     }
 
+    /// <summary>A guild by its name as typed at the door, case aside: the guilds the population belongs to.</summary>
     private static Guild GuildNamed(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -1287,9 +1410,13 @@ public static class BotColonies
         return null;
     }
 
+    /// <summary>Whether this guild's clock for an expedition has run, without starting it. See <see cref="Due"/>.</summary>
     internal static bool Ripe(Guild guild) =>
         !_considered.TryGetValue(guild.Name, out var at) || Core.TickCount - at >= ConsiderMs;
 
+    // ---- Lines, the page, the door ------------------------------------------------------------------------------------------
+
+    /// <summary>The colonies' clause of the <c>Sea:</c> line.</summary>
     public static string Describe()
     {
         if (!Running)
@@ -1321,6 +1448,7 @@ public static class BotColonies
         return sb.ToString();
     }
 
+    /// <summary>The colonies block of <c>/api/state</c>.</summary>
     public static void Web(Utf8JsonWriter w)
     {
         w.WritePropertyName("colonies");
@@ -1394,6 +1522,7 @@ public static class BotColonies
         w.WriteEndObject();
     }
 
+    /// <summary><c>do expeditions</c>: every colony and every party at a dock or at sea, with its numbers.</summary>
     public static string Tell()
     {
         var sb = new StringBuilder(1024);
@@ -1434,6 +1563,8 @@ public static class BotColonies
         return sb.ToString();
     }
 
+    // ---- The store's file ----------------------------------------------------------------------------------------------------
+
     internal static IReadOnlyList<BotColony> ForSave() => _colonies;
 
     internal static void Restore(BotColony colony)
@@ -1444,6 +1575,20 @@ public static class BotColonies
         }
     }
 
+    /// <summary>
+    /// <b>Patrick's reset (07.10.2026, reset26): every colony given up, its store taken off the site, so the save writes the colonies
+    /// empty.</b> <see cref="Forget"/> keeps <see cref="_colonies"/> for a reload, and the reset of 20:56 that night left
+    /// <c>Saves/BotColonies</c> whole: the next boot would have found every old guild's colony again by its store's serial and set an
+    /// empty store down where it was missing — a colony of a guild that no longer exists, on ground nobody claims. This empties
+    /// exactly what <see cref="BotColonyStore"/> writes and deletes each store chest from the world, with the ore, bars and logs in
+    /// it; the passages, the sign-ons, the runs and the piracy go with <see cref="Forget"/>.
+    ///
+    /// <para>
+    /// <b>No coin is held here.</b> An expedition's stores were paid out of the guild's chest into the city's purse when it set
+    /// out (<c>BotCity.Tax</c>); a run's cargo was sold for coin paid at once to the chest and the hands. What a store chest holds
+    /// is ore, bars and logs, so taking it away moves no gold and leaves nothing counted anywhere. Returns the colonies given up.
+    /// </para>
+    /// </summary>
     public static int Wipe()
     {
         var gone = _colonies.Count;

@@ -34,6 +34,7 @@ public sealed class BotHallKind
         MultiID = multiID;
     }
 
+    /// <summary>One for the smallest.</summary>
     public int Size { get; }
 
     public string Name { get; }
@@ -42,6 +43,7 @@ public sealed class BotHallKind
 
     public int MultiID { get; }
 
+    /// <summary>What it costs a guild. The smallest is the old hall price (<c>BotEstate.Price</c>), a dial of its own.</summary>
     public int Price =>
         Size switch
         {
@@ -51,12 +53,16 @@ public sealed class BotHallKind
             _ => MarblePrice
         };
 
+    /// <summary>What the sandstone patio house costs a guild.</summary>
     public static int PatioPrice { get; set; } = 15000;
 
+    /// <summary>What the large patio house costs.</summary>
     public static int LargePatioPrice { get; set; } = 35000;
 
+    /// <summary>What the large marble house costs.</summary>
     public static int MarblePrice { get; set; } = 60000;
 
+    /// <summary>The members a hall of each size holds, beyond the smallest's <c>BotGuilds.Most</c> (35): ten more a size, one widening each. 25/35/45 until 03.10.2026, when the ceiling went from fifteen to thirty-five.</summary>
     public static int PatioHolds { get; set; } = 45;
 
     public static int LargePatioHolds { get; set; } = 55;
@@ -71,12 +77,16 @@ public sealed class BotHallKind
         new(4, "a large marble house", typeof(LargeMarbleHouse), 0x0096)
     ];
 
+    /// <summary>The smallest: what a guild raises first.</summary>
     public static BotHallKind First => _kinds[0];
 
+    /// <summary>This size, one to four.</summary>
     public static BotHallKind Sized(int size) => _kinds[Math.Clamp(size, 1, _kinds.Length) - 1];
 
+    /// <summary>The size above this one, or null at the top.</summary>
     public BotHallKind Next => Size < _kinds.Length ? _kinds[Size] : null;
 
+    /// <summary>How many members it holds now, the dials read. The smallest holds <c>BotGuilds.Most</c>.</summary>
     public int Room =>
         Size switch
         {
@@ -86,6 +96,7 @@ public sealed class BotHallKind
             _ => MarbleHolds
         };
 
+    /// <summary>What size this house is: by its type, and a small house of any of the six fronts is the smallest.</summary>
     public static BotHallKind Of(BaseHouse house)
     {
         if (house == null)
@@ -106,10 +117,16 @@ public sealed class BotHallKind
         return First;
     }
 
+    /// <summary>How many members this guild's hall has room for; a guild with no hall has the smallest's room.</summary>
     public static int Holds(Guild guild) => Of(guild == null ? null : BotEstate.Hall(guild)).Room;
 
+    /// <summary>
+    /// The multi a house of this size is built from, for the plot search and the engine's check. The smallest uses the
+    /// front dialled on <c>BotPlot.MultiID</c>, as it always has.
+    /// </summary>
     public int Multi => Size == 1 ? BotPlot.MultiID : MultiID;
 
+    /// <summary>Builds one for this owner, not yet in the world. Only the small house takes a front.</summary>
     public BaseHouse Make(Mobile owner) =>
         Size == 1 ? new SmallOldHouse(owner, Multi) : Activator.CreateInstance(Type, owner) as BaseHouse;
 

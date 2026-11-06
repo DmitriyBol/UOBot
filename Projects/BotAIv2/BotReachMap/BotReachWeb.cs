@@ -19,16 +19,19 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotReachWeb
 {
+    /// <summary>The most tiles one picture may hold, so a request cannot ask for the whole map a tile a pixel.</summary>
     public static int MostCells { get; set; } = 2 * 1024 * 1024;
 
     private static volatile string _json = "{\"ready\":false,\"state\":\"starting\"}";
 
+    /// <summary>The summary as the loop last wrote it.</summary>
     public static string Json => _json;
 
     private sealed record Picture(int Version, string Key, byte[] Bytes, int Columns, int Rows);
 
     private static volatile Picture _last;
 
+    /// <summary>Writes the summary. On the loop, every couple of seconds (<see cref="BotReachMap"/>'s tick).</summary>
     public static void Build()
     {
         var snap = BotReachMap.Snapshot;
@@ -161,6 +164,11 @@ public static class BotReachWeb
         return b.ToString();
     }
 
+    /// <summary>
+    /// <c>/api/reach/tiles?x=&amp;y=&amp;w=&amp;h=&amp;s=</c>: the classes of a rectangle, one byte a tile or a square of
+    /// <c>s</c> tiles (1, 2, 4, 8 or 16), deflated, with the picture's size and the map's version in the headers. Off the loop,
+    /// from the snapshot only.
+    /// </summary>
     public static void Tiles(HttpListenerRequest request, HttpListenerResponse response)
     {
         var snap = BotReachMap.Snapshot;
@@ -232,6 +240,7 @@ public static class BotReachWeb
         response.Close();
     }
 
+    /// <summary><c>/api/reach/tile?x=&amp;y=</c>: one tile, in words and numbers. Off the loop, from the snapshot only.</summary>
     public static string Tile(HttpListenerRequest request)
     {
         var snap = BotReachMap.Snapshot;

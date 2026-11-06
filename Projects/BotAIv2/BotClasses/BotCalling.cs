@@ -41,17 +41,23 @@ public static class BotCalling
     /// <summary>Which of the three a piece of work is to one bot.</summary>
     public enum Fit
     {
+        /// <summary>Trains nothing, or a skill no class is for.</summary>
         Anybody,
 
+        /// <summary>Trains a skill this bot's class works towards.</summary>
         Own,
 
+        /// <summary>Trains a skill some other class is for and this one is not.</summary>
         Other
     }
 
+    /// <summary>What a bot's own trade is worth against its bare price. One switches the bonus off.</summary>
     public static double OwnTrade { get; set; } = 1.3;
 
+    /// <summary>What another class's trade is worth against its bare price. One switches the discount off.</summary>
     public static double OtherTrade { get; set; } = 0.6;
 
+    /// <summary>The floor under both, whatever they are dialled to: a multiplier that can reach nought is a veto.</summary>
     public static double LeastCalling { get; set; } = 0.1;
 
     private static readonly HashSet<SkillName> _claimed = [];
@@ -72,6 +78,7 @@ public static class BotCalling
 
     private static readonly Dictionary<string, Book> _books = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Whether this work is the bot's own trade, another's, or anybody's.</summary>
     public static Fit Of(Mobile body, BotDeed deed)
     {
         if (deed?.Trains is not { } skill || body is not BotMobile { Class: { } calling })
@@ -89,6 +96,7 @@ public static class BotCalling
         return _claimed.Contains(skill) ? Fit.Other : Fit.Anybody;
     }
 
+    /// <summary>The multiplier on this work's price for this bot. See the class note for why it sits outside the root.</summary>
     public static double Worth(Mobile body, BotDeed deed) =>
         Of(body, deed) switch
         {
@@ -97,9 +105,14 @@ public static class BotCalling
             _ => 1.0
         };
 
+    /// <summary>The words for a multiplier, for the take line.</summary>
     public static string Word(double calling) =>
         calling > 1.0 ? "its own trade" : calling < 1.0 ? "another's trade" : "anybody's work";
 
+    /// <summary>
+    /// Every skill some class works towards, gathered once. Classes are read at boot and never change afterwards,
+    /// so the survey is taken the first time it is needed and kept.
+    /// </summary>
     private static void Survey()
     {
         if (_surveyed)
@@ -125,6 +138,7 @@ public static class BotCalling
         }
     }
 
+    /// <summary>A piece of work ended; its minutes go into the book of the class that did it.</summary>
     public static void Worked(Mobile body, BotDeed deed, double minutes)
     {
         if (body is not BotMobile { Class: { } calling } || deed == null || minutes <= 0.0)
@@ -160,6 +174,10 @@ public static class BotCalling
         book.Kinds[deed.Kind ?? "?"] = spent + minutes;
     }
 
+    /// <summary>
+    /// How each class spends its working minutes: its own trade, anybody's work, another class's trade, and the
+    /// four kinds of work it spent most on. The census line <c>Roles:</c> and the debugger's <c>roles</c>.
+    /// </summary>
     public static string Describe()
     {
         if (_books.Count == 0)
@@ -206,10 +224,17 @@ public static class BotCalling
         return line.ToString();
     }
 
+    /// <summary>The trades a crafter makes things at, and the digging it does instead. See <see cref="Crafters"/>.</summary>
     private static readonly string[] _making = ["forge", "sew", "tinker", "fletch", "bowyer", "weave", "brew"];
 
     private static readonly string[] _digging = ["mine", "prospect"];
 
+    /// <summary>
+    /// <b>The crafters' own clause (03.10.2026, econ13; Patrick: "a crafter makes the order first, then goes to mine").</b> Their
+    /// working minutes making things against digging, by trade, and what the auction put before a crafter's dig
+    /// (<see cref="BotCraftFirst"/>). The class list above prints four kinds a class, and on build 396 a crafter's crafting was five
+    /// kinds under mining's one, so it was never on the line.
+    /// </summary>
     private static string Crafters()
     {
         double total = 0.0, making = 0.0, digging = 0.0;
@@ -258,5 +283,6 @@ public static class BotCalling
                + BotCraftFirst.Describe();
     }
 
+    /// <summary>A world reload is a different population; its minutes are not this one's.</summary>
     public static void Forget() => _books.Clear();
 }

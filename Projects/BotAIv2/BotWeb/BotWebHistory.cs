@@ -57,6 +57,7 @@ public static class BotWebHistory
         }
     }
 
+    /// <summary>Takes a sample when one is due. Game loop only.</summary>
     public static void Sample(long now, int alive, int stuck)
     {
         if (!_first)
@@ -78,6 +79,7 @@ public static class BotWebHistory
         var seconds = Math.Max(1.0, (now - _lastTick) / 1000.0);
         var spent = BotWill.SpentMs + BotWalk.SpentMs;
         var loopMs = (spent - _lastSpent) / seconds;
+        // The walkers' own count, beside counting as arriving (build 386, see BotWalk.WalkerSearches).
         var searches = BotWalk.WalkerSearches - _lastSearches;
         var reached = BotWalk.WalkerReached - _lastReached;
 
@@ -114,6 +116,7 @@ public static class BotWebHistory
         }
     }
 
+    /// <summary>The whole series as JSON. Any thread.</summary>
     public static string Json()
     {
         BotWebSample[] samples;

@@ -27,10 +27,12 @@ public sealed class BotStroll : IBotProposer
 
     public static long Asked { get; private set; }
 
+    /// <summary>Asked of somebody who is not a Baron. Not a refusal — nearly every answer is this.</summary>
     public static long NotABaron { get; private set; }
 
     public static long Held { get; private set; }
 
+    /// <summary>No counter has been surveyed yet, so nothing here knows where a town is.</summary>
     public static long Townless { get; private set; }
 
     public static long Offered { get; private set; }
@@ -54,6 +56,8 @@ public sealed class BotStroll : IBotProposer
 
         Asked++;
 
+        // A company is somewhere to be. Offering a walk to a Baron who is leading one would be offering him
+        // the chance to leave five bots standing in a wood.
         if (bot is not IBotSquadMember { Squad: null })
         {
             Held++;
@@ -61,6 +65,10 @@ public sealed class BotStroll : IBotProposer
             return null;
         }
 
+        // <b>The town at home, not the nearest counter to wherever he stands.</b> On 16.09.2026 at 18:06, after a
+        // muster at the north gate failed, the nearest counter to the Baron lay by the plague beast's bog; he walked
+        // its corners, fled and mended in the beast's reach, and died at 18:14 on no harrow at all. The stroll is
+        // "where you are when no ground is standing", and that is the town.
         var town = BotGround.Counter(map, BotPopulation.Where);
 
         if (town == Point3D.Zero)

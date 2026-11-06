@@ -30,6 +30,7 @@ public sealed class BotLibrary
 
     public bool Shut { get; internal set; }
 
+    /// <summary>The keeper's spare scrolls by kind at the last count: what is over its own keep list, in its pack.</summary>
     internal readonly Dictionary<Type, int> Stock = [];
 
     public long CountedTick { get; internal set; }
@@ -63,31 +64,47 @@ public static class BotLibraries
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLibraries));
 
+    // ---- Dials ------------------------------------------------------------------------------------------------------------
+
     public static bool On => BotTrades.LibrariesOn;
 
+    /// <summary>How long a scribe keeps its library, in minutes. Twenty.</summary>
     public static double ShiftMinutes { get; set; } = 20.0;
 
+    /// <summary>How long after a shift the same scribe may keep another. Twenty minutes.</summary>
     public static int RestMs { get; set; } = 1200000;
 
+    /// <summary>How far a scribe may be from its guild's seat and be offered the shift. A hundred and fifty tiles.</summary>
     public static int KeeperReach { get; set; } = 150;
 
+    /// <summary>The Inscription a bot needs to keep a library: a scribe by trade. Fifty.</summary>
     public static double LeastInscribe { get; set; } = 50.0;
 
+    /// <summary>The fewest spare scrolls of kinds its guild's and allies' casters lack a scribe must hold to open. Three.</summary>
     public static int LeastScrolls { get; set; } = 3;
 
+    /// <summary>The most scrolls taken out of the box for a shift. Thirty.</summary>
     public static int StockScrolls { get; set; } = 30;
 
+    /// <summary>How far a caster may be from a library and be sent to it. A hundred and fifty tiles.</summary>
     public static int ReaderReach { get; set; } = 150;
 
+    /// <summary>The price over the market's (<see cref="BotMarket.Worth"/>). One: the market's price.</summary>
     public static double Markup { get; set; } = 1.0;
 
+    /// <summary>The share of what is in demand reckoned to sell in a shift until the ledger knows better. A half.</summary>
     public static double SellThrough { get; set; } = 0.5;
 
+    /// <summary>How often the casters' wants are counted again, guild by guild. A minute: a walk of the population list.</summary>
     public static int DemandMs { get; set; } = 60000;
 
+    /// <summary>How often an open library counts its scrolls again.</summary>
     public static int CountMs { get; set; } = 15000;
 
+    /// <summary>How often a scribe's pack and box are read for a library. A minute.</summary>
     public static int LookMs { get; set; } = 60000;
+
+    // ---- Counters ---------------------------------------------------------------------------------------------------------
 
     public static long Opened { get; private set; }
 
@@ -115,6 +132,8 @@ public static class BotLibraries
 
     public static IReadOnlyList<BotLibrary> Open => _open;
 
+    // ---- Places and prices ------------------------------------------------------------------------------------------------
+
     public static BotLibrary Of(Guild guild)
     {
         if (guild == null)
@@ -133,9 +152,11 @@ public static class BotLibraries
         return null;
     }
 
+    /// <summary>Whether a bot of <paramref name="guild"/> buys at this guild's library: its own, or an ally's.</summary>
     public static bool Serves(Guild library, Guild guild) =>
         library != null && guild != null && (ReferenceEquals(library, guild) || library.IsAlly(guild));
 
+    /// <summary>What one scroll of this kind sells for: the market's price, the engine's shelf price for its circle until it has one.</summary>
     public static int Price(Type kind)
     {
         var spell = BotGrimoire.SpellOf(kind);
@@ -144,6 +165,10 @@ public static class BotLibraries
         return Math.Max(1, (int)Math.Round(BotMarket.Worth(kind, shelf) * Math.Max(0.1, Markup)));
     }
 
+    /// <summary>
+    /// A stand by the seat: a floor two to four tiles off it, so the scribe and the guild's healer do not stand on one tile; the seat
+    /// itself when none is found.
+    /// </summary>
     internal static Point3D StandBy(Map map, Point3D seat)
     {
         for (var r = 2; r <= 4; r++)
@@ -168,6 +193,12 @@ public static class BotLibraries
         return seat;
     }
 
+    // ---- What the casters lack --------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The scroll each caster's book needs next, counted by guild: the gap <c>BotSeeker</c> works on, so a library stocks what the
+    /// casters are already trying to buy. One walk of the population list every <see cref="DemandMs"/>.
+    /// </summary>
     private static void Count(long now)
     {
         if (now - _demandTick < DemandMs && _demand.Count > 0)
@@ -203,6 +234,7 @@ public static class BotLibraries
         }
     }
 
+    /// <summary>The scroll this bot's book needs next and it does not hold, or false. The resurrection scroll kept to read is not one.</summary>
     internal static bool Reading(Mobile bot, out Type kind)
     {
         kind = null;
@@ -224,6 +256,7 @@ public static class BotLibraries
         return kind != null && BotQuill.Held(bot, kind) <= 0;
     }
 
+    /// <summary>How many casters of this guild and its allies lack this kind, at the last count.</summary>
     public static int Demand(Guild guild, Type kind)
     {
         Count(Core.TickCount);
@@ -241,6 +274,10 @@ public static class BotLibraries
         return n;
     }
 
+    /// <summary>
+    /// The spare scrolls in a container whose kinds a caster of this guild or an ally lacks, by kind, with the keeper's own keep taken off
+    /// (<c>BotUnload.Keeps</c>: the book's first copy, a caster's attack scrolls). Returns the units, each capped at what is lacked.
+    /// </summary>
     internal static int Spare(Container from, Guild guild, Dictionary<Type, int> keep, Dictionary<Type, int> into)
     {
         into.Clear();
@@ -293,6 +330,7 @@ public static class BotLibraries
 
     private static readonly Dictionary<Type, int> _scratch = [];
 
+    /// <summary>Counts an open library's scrolls again: what the keeper's pack holds over its keep (every kind it holds, not only what is lacked).</summary>
     internal static void Recount(BotLibrary library, long now)
     {
         library.Stock.Clear();
@@ -337,6 +375,7 @@ public static class BotLibraries
         }
     }
 
+    /// <summary>What a shift is reckoned at a minute: the lacked scrolls in hand at the market's price, times the sell-through, over the shift.</summary>
     internal static double Claim(Dictionary<Type, int> spare)
     {
         var worth = 0.0;
@@ -348,6 +387,8 @@ public static class BotLibraries
 
         return Math.Clamp(worth * SellThrough / Math.Max(1.0, ShiftMinutes), 4.0, 120.0);
     }
+
+    // ---- Opening and shutting -----------------------------------------------------------------------------------------------
 
     internal static BotLibrary OpenAt(BotMobile keeper, Guild guild, Map map, Point3D stand)
     {
@@ -392,6 +433,7 @@ public static class BotLibraries
         return library;
     }
 
+    /// <summary>The kinds most held, in words, for the cry.</summary>
     private static string Listing(BotLibrary library, int most)
     {
         _ranked.Clear();
@@ -443,6 +485,9 @@ public static class BotLibraries
         );
     }
 
+    // ---- Readers ----------------------------------------------------------------------------------------------------------
+
+    /// <summary>The nearest open library of this caster's guild or an ally's holding <paramref name="kind"/>, within reach; null with why not.</summary>
     public static BotLibrary For(BotMobile reader, Type kind, out string refusal)
     {
         refusal = "none";
@@ -490,6 +535,7 @@ public static class BotLibraries
         return best;
     }
 
+    /// <summary>One scroll from the scribe's pack to the caster's, coin the other way. Returns the coin paid; <paramref name="refused"/> says why not.</summary>
     internal static int Serve(BotLibrary library, BotMobile reader, Type kind, out string refused)
     {
         refused = null;
@@ -559,6 +605,8 @@ public static class BotLibraries
     }
 
     internal static void NoteFetched(int units) => Fetched += Math.Max(0, units);
+
+    // ---- Words ------------------------------------------------------------------------------------------------------------
 
     public static Dictionary<string, string[]> Phrases() =>
         new(StringComparer.OrdinalIgnoreCase)
@@ -731,6 +779,7 @@ public sealed class BotKeepLibrary : BotDeed
 
     private BotDoing Opening(IBotWilful bot, BotMobile body, long now)
     {
+        // <b>Its scrolls out of the box first.</b> A scribe banks what it writes (BotUnload); the hall has no bank to reach into.
         if (!_fetched && _bank != Point3D.Zero && body.FindBankNoCreate() is { } box && box.Items.Count > 0)
         {
             if (!BotMarket.AtBank(body))
@@ -918,6 +967,7 @@ public sealed class BotLibrarian : IBotProposer
             return null;
         }
 
+        // The pack and the box are read at most once a minute for one scribe.
         if (_looked.TryGetValue(body.Serial, out var at) && now - at < BotLibraries.LookMs)
         {
             return null;
@@ -1092,6 +1142,7 @@ public sealed class BotReadAt : BotDeed
             learned = BotGrimoire.Write(body, scrolls[i], out why);
         }
 
+        // The spell is in the book: a want still standing for it is asking for nothing, and its money comes back.
         var answered = learned && BotMarket.Wanted(bot, _kind) != null;
 
         if (learned)
@@ -1123,12 +1174,16 @@ public sealed class BotReader : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    /// <summary>What the visit is reckoned at a minute: a little over an errand for a scroll (<c>BotAcquire.Prior</c>, 12), the scroll being in stock.</summary>
     public static double Prior { get; set; } = 16.0;
 
+    /// <summary>What a want already standing for the scroll adds: the caster is waiting on it.</summary>
     public static double WantWorth { get; set; } = 8.0;
 
+    /// <summary>How long one caster waits between visits. Five minutes.</summary>
     public static int EveryMs { get; set; } = 300000;
 
+    /// <summary>How long the walk may take. Four minutes.</summary>
     public static int WalkMs { get; set; } = 240000;
 
     public static long Asked { get; private set; }
@@ -1241,6 +1296,7 @@ public sealed class BotReader : IBotProposer
         var price = BotLibraries.Price(kind);
         var want = BotMarket.Wanted(bot, kind);
 
+        // The money a standing want holds for this very scroll pays for it at the library (BotHandover.Exchange reads it).
         if (BotYield.Spendable(who) + (want != null ? BotMarket.ReservedFor(who, kind) : 0) < price)
         {
             Poor++;

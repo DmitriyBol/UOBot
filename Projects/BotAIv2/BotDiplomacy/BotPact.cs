@@ -47,20 +47,29 @@ public static class BotPact
         Orders
     }
 
+    /// <summary>How long an agreement stands, in hours, once sworn. Twelve: an evening and a night of the shard.</summary>
     public static double Hours { get; set; } = 12.0;
 
+    /// <summary>
+    /// What trade terms take off a stall's asking price between the two guilds. A tenth: enough to turn a buyer from an
+    /// equal stall to a partner's, and to matter against a counter; small enough that a partner's stall at twice the market
+    /// is still passed over.
+    /// </summary>
     public static double TradeDiscount { get; set; } = 0.10;
 
+    /// <summary>Agreements sworn, by kind.</summary>
     public static long Peaces { get; private set; }
 
     public static long Trades { get; private set; }
 
     public static long Orders { get; private set; }
 
+    /// <summary>Purchases off a partner's stall at the terms, and the gold the buyers kept by them.</summary>
     public static long Discounted { get; private set; }
 
     public static long Saved { get; private set; }
 
+    /// <summary>Orders filled for a guild under standing orders with the filler's: served first by <c>BotMarket.Demand</c>.</summary>
     public static long Favoured { get; private set; }
 
     /// <summary>
@@ -81,6 +90,10 @@ public static class BotPact
     private static (string A, string B) Pair(string one, string other) =>
         string.CompareOrdinal(one, other) <= 0 ? (one, other) : (other, one);
 
+    /// <summary>
+    /// Swears an agreement between two guilds for <paramref name="ms"/>. Peace also stands up the war ledger's truce, which
+    /// is what actually refuses a declaration.
+    /// </summary>
     public static void Swear(string one, string other, Kind kind, long ms)
     {
         if (one == null || other == null || one == other || ms <= 0)
@@ -98,6 +111,8 @@ public static class BotPact
         var now = Core.TickCount;
         var ends = now + ms;
 
+        // Never shortened by a second oath: an agreement sworn again runs from now or from when it would have run out,
+        // whichever is later.
         if (!terms.Stands((int)kind, now) || ends - terms.Ends[(int)kind] > 0)
         {
             terms.Ends[(int)kind] = ends;
@@ -130,6 +145,7 @@ public static class BotPact
         logger.Information("{One} and {Other} have sworn {Kind} for {Hours:0.#} hours", one, other, Word(kind), ms / 3600000.0);
     }
 
+    /// <summary>Whether these two stand under this kind of agreement now.</summary>
     public static bool Holds(string one, string other, Kind kind)
     {
         if (_pacts.Count == 0 || one == null || other == null || one == other)
@@ -140,8 +156,14 @@ public static class BotPact
         return _pacts.TryGetValue(Pair(one, other), out var terms) && terms.Stands((int)kind, Core.TickCount);
     }
 
+    /// <summary>Agreements broken by a seizure (<c>BotSeizure</c>): one count per pair, whatever kinds it held.</summary>
     public static long Broken { get; private set; }
 
+    /// <summary>
+    /// Every agreement between these two let go at once, because one of them laid claim to the other's ground (Patrick,
+    /// 06.10.2026: war without negotiations). Returns what stood, as words ("trade terms and peace"), or null when nothing did.
+    /// The truce a peace stood up in the war ledger is the caller's to break (<c>BotWar.Untruce</c>).
+    /// </summary>
     public static string Break(string one, string other)
     {
         if (_pacts.Count == 0 || one == null || other == null || one == other)
@@ -177,6 +199,7 @@ public static class BotPact
         return said;
     }
 
+    /// <summary>Minutes an agreement has left, or nought.</summary>
     public static int MinutesLeft(string one, string other, Kind kind)
     {
         if (!Holds(one, other, kind))
@@ -187,11 +210,17 @@ public static class BotPact
         return (int)((_pacts[Pair(one, other)].Ends[(int)kind] - Core.TickCount) / 60000);
     }
 
+    /// <summary>Whether these two stand under any agreement.</summary>
     public static bool Any(string one, string other) =>
         Holds(one, other, Kind.Peace) || Holds(one, other, Kind.Trade) || Holds(one, other, Kind.Orders);
 
     private static string GuildOf(Mobile m) => (m?.Guild as Guild)?.Name;
 
+    /// <summary>
+    /// What one of a shop's units costs this buyer: the asking price, or less by the trade terms when the buyer's guild and the
+    /// keeper's have them. Never below one. Asked twice by the shops — choosing and paying — so the price a buyer chose by is the
+    /// price it pays.
+    /// </summary>
     public static int Price(Mobile buyer, Mobile seller, int asking)
     {
         if (_pacts.Count == 0 || asking <= 1 || TradeDiscount <= 0.0)
@@ -210,6 +239,7 @@ public static class BotPact
         return Math.Max(1, (int)Math.Round(asking * (1.0 - Math.Clamp(TradeDiscount, 0.0, 0.5))));
     }
 
+    /// <summary>A purchase was made at the terms: counted, and what the buyer kept by them.</summary>
     public static void Bought(int asking, int paid, int units)
     {
         if (units <= 0 || paid >= asking)
@@ -221,6 +251,10 @@ public static class BotPact
         Saved += (long)(asking - paid) * units;
     }
 
+    /// <summary>
+    /// Whether this supplier's guild has standing orders with this buyer's: its orders are then filled first. Asked by
+    /// <c>BotMarket.Demand</c> of each want of the kind; answers false at once when no agreement stands anywhere.
+    /// </summary>
     public static bool Serves(Mobile supplier, Mobile buyer)
     {
         if (_pacts.Count == 0)
@@ -234,6 +268,7 @@ public static class BotPact
         return ours != null && theirs != null && ours != theirs && Holds(ours, theirs, Kind.Orders);
     }
 
+    /// <summary>A want was answered; counted when the carrier's guild and the buyer's stand under standing orders. From <c>BotDeliver</c>.</summary>
     public static void Filled(Mobile supplier, Mobile buyer)
     {
         if (Serves(supplier, buyer))
@@ -250,6 +285,7 @@ public static class BotPact
             _ => "standing orders"
         };
 
+    /// <summary>The agreements standing, one clause each.</summary>
     public static string Tell()
     {
         using var say = Server.Text.ValueStringBuilder.Create(128);
@@ -279,6 +315,7 @@ public static class BotPact
         return say.Length == 0 ? "no agreements stand" : say.ToString();
     }
 
+    /// <summary>Every agreement, for the store and the page: the pair, the kind and the milliseconds left.</summary>
     public static IEnumerable<(string A, string B, Kind Kind, long LeftMs)> Standing()
     {
         var now = Core.TickCount;
@@ -295,6 +332,7 @@ public static class BotPact
         }
     }
 
+    /// <summary>An agreement read back off the save, with <paramref name="leftMs"/> still to run. Nothing is counted or said.</summary>
     public static void Restore(string a, string b, Kind kind, long leftMs)
     {
         if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b) || a == b || leftMs <= 0)
@@ -313,6 +351,7 @@ public static class BotPact
         terms.Sworn[(int)kind] = true;
     }
 
+    /// <summary>Agreements whose time is up are let go, so the table stays the size of what stands. Once a look.</summary>
     public static void Sweep()
     {
         if (_pacts.Count == 0)
@@ -363,6 +402,7 @@ public static class BotPact
         Favoured = 0;
     }
 
+    /// <summary>Every agreement let go, for Patrick's reset.</summary>
     public static int Wipe()
     {
         var gone = _pacts.Count;

@@ -20,20 +20,28 @@ public sealed class BotLieLow : BotDeed
 
     public const string Trade = "lielow";
 
+    /// <summary>How far from the body the killer goes before it hides.</summary>
     public static int AwayTiles { get; set; } = 12;
 
+    /// <summary>How many failed tries at hiding before the killer gives it up.</summary>
     public static int HideTries { get; set; } = 4;
 
+    /// <summary>How long it lies hidden and still. Three minutes.</summary>
     public static int StillMs { get; set; } = 180000;
 
+    /// <summary>What lying low is held at against other work, a minute: the robbery's own, as <see cref="BotSkulk.Prior"/> is, and for the same reason.</summary>
     public static double Prior { get; set; } = 400.0;
 
+    /// <summary>Killers pressed into lying low.</summary>
     public static long Begun { get; private set; }
 
+    /// <summary>Lay low to the end unfound.</summary>
     public static long Unfound { get; private set; }
 
+    /// <summary>Revealed while lying low.</summary>
     public static long FoundOut { get; private set; }
 
+    /// <summary>Could not hide in <see cref="HideTries"/> tries.</summary>
     public static long Unhidden { get; private set; }
 
     private readonly Map _map;
@@ -50,6 +58,9 @@ public sealed class BotLieLow : BotDeed
 
     private bool _counted;
 
+    /// <param name="map">Where.</param>
+    /// <param name="body">Where the body lies.</param>
+    /// <param name="from">Where the killer stands now; it goes on away from the body in that direction.</param>
     public BotLieLow(Map map, Point3D body, Point3D from)
     {
         _map = map;
@@ -77,8 +88,10 @@ public sealed class BotLieLow : BotDeed
 
     public override bool Unpaid => true;
 
+    /// <summary>Hidden and still is what this looks like once it has hidden, and it ends on its own clock.</summary>
     public override bool Still => _hid;
 
+    /// <summary>One lying low is enough: a second body found nearby would otherwise start the wait over.</summary>
     public override bool Repeats(BotDeed other) => other is BotLieLow;
 
     public override Map Map => _map;

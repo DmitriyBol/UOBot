@@ -148,6 +148,7 @@ public sealed class BotEventsStore : GenericPersistence
         _read = true;
     }
 
+    /// <summary>What was read back, settled: the hold back to the purse, the creatures away, the tickets back, the rumour open again.</summary>
     public static void Apply()
     {
         if (!_read)

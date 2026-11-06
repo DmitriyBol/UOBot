@@ -43,10 +43,13 @@ public static class BotVenues
     /// <summary>What a place is for.</summary>
     public enum Use
     {
+        /// <summary>A revel of a trade: called in a town's square.</summary>
         Feast,
 
+        /// <summary>A hunt's waves or an orc camp: in the countryside, out of town.</summary>
         Field,
 
+        /// <summary>The championship's ring.</summary>
         Ring
     }
 
@@ -65,35 +68,48 @@ public static class BotVenues
 
         public int Near { get; init; }
 
+        /// <summary>The old fixed place, because nothing else could be had. See <see cref="Fallbacks"/>.</summary>
         public bool Fallback { get; init; }
 
+        /// <summary>The place in a sentence: "at Minoc", "north-east of Yew", "in Trinsic", "at home".</summary>
         public string Phrase => Use == Use.Field && !Fallback ? Name : $"at {Name}";
 
         public override string ToString() => $"{Name} ({At.X}, {At.Y})";
     }
 
+    /// <summary>Whether places are chosen at all. Off: every event is held where it always was.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How many of a use's last places a new one may not repeat.</summary>
     public static int Recent { get; set; } = 3;
 
+    /// <summary>How near a recent place a candidate counts as the same place, in tiles.</summary>
     public static int RepeatApart { get; set; } = 40;
 
+    /// <summary>How far round a place the bots near it are counted, in tiles.</summary>
     public static int NearReach { get; set; } = 200;
 
+    /// <summary>The weight of a town nobody is near, for a feast (or the drill ground, for a ring): a quarter of a town with one bot near it.</summary>
     public static double EmptyWeight { get; set; } = 0.25;
 
+    /// <summary>How far from the bot it is pitched off a field lies: near enough for a hunter's look of fifty tiles.</summary>
     public static int FieldNear { get; set; } = 18;
 
     public static int FieldFar { get; set; } = 42;
 
+    /// <summary>How far round a place no deadly ground may lie.</summary>
     public static int SafeRadius { get; set; } = 12;
 
+    /// <summary>How many open tiles in sight of the middle a ring needs, in the fifteen-by-fifteen round it: a shop's floor is not a ring.</summary>
     public static int RingOpen { get; set; } = 60;
 
+    /// <summary>How long the herald stands at a place it has just called something at, before it goes back to watching.</summary>
     public static int HeraldHoldMs { get; set; } = 120000;
 
+    /// <summary>Places chosen, by use, and in all.</summary>
     public static long Chosen { get; private set; }
 
+    /// <summary>Candidates refused, one bucket per reason. A candidate is counted once, at the first test it fails.</summary>
     public static long Deadly { get; private set; }
 
     public static long Hostile { get; private set; }
@@ -108,20 +124,26 @@ public static class BotVenues
 
     public static long Unstood { get; private set; }
 
+    /// <summary>Choices that took a recent place again because every other candidate failed a test of its own.</summary>
     public static long Reused { get; private set; }
 
+    /// <summary>Choices that found nothing and held the event at the old fixed place.</summary>
     public static long Fallbacks { get; private set; }
 
+    /// <summary>The marshal's own spot for a camp, kept as it named it or moved to a fitting place.</summary>
     public static long ModelKept { get; private set; }
 
     public static long ModelMoved { get; private set; }
 
+    /// <summary>Times the herald went and stood at a place to call something there.</summary>
     public static long Heralded { get; private set; }
 
     private static readonly List<Venue>[] _recent = [[], [], []];
 
+    /// <summary>Where events were held, by use and name, since the boot: the summary's "where".</summary>
     private static readonly Dictionary<string, int>[] _where = [new(), new(), new()];
 
+    /// <summary>Whether a town's square holds a ring, asked once a session: the ground of a square does not change.</summary>
     private static readonly Dictionary<string, bool> _rings = new(StringComparer.OrdinalIgnoreCase);
 
     private static BotWatcher _herald;
@@ -134,6 +156,7 @@ public static class BotVenues
 
     private static string _heraldWhat;
 
+    /// <summary>The watcher standing, shown, as the referee of the arena championship, or null. See <see cref="Referee"/>.</summary>
     private static BotWatcher _referee;
 
     private static Map _refereeMap;
@@ -142,8 +165,13 @@ public static class BotVenues
 
     private static string _refereeWhat;
 
+    /// <summary>Times a watcher went to the arenas and showed itself as their referee.</summary>
     public static long Refereed { get; private set; }
 
+    /// <summary>
+    /// A place for this use. Never null: with nothing that passes, the old fixed place, flagged and counted. For a ring,
+    /// <paramref name="who"/> are the entrants, and the weight is theirs; otherwise every bot in the world counts.
+    /// </summary>
     public static Venue Choose(Use use, Map map, IReadOnlyList<Mobile> who = null)
     {
         Venue found = null;
@@ -159,6 +187,10 @@ public static class BotVenues
         return found;
     }
 
+    /// <summary>
+    /// The marshal's own spot for a camp, if it fits: outdoors, safe, reached, not a recent place, and near a bot. Null when it
+    /// does not, and the caller chooses one; counted either way.
+    /// </summary>
     public static Venue Accept(Map map, Point3D spot)
     {
         if (!Running || map == null || map == Map.Internal || spot == Point3D.Zero)
@@ -189,6 +221,10 @@ public static class BotVenues
         return null;
     }
 
+    /// <summary>
+    /// This use's place in one named town, or null when the town has none that fits: the fair's championship stands in the fair's
+    /// town (07.10.2026, events17). The same tests as the town's turn in <see cref="Choose"/>, without the turn.
+    /// </summary>
     public static Venue InTown(Use use, Map map, string name)
     {
         if (!Running || map == null || map == Map.Internal || string.IsNullOrEmpty(name) || !BotTowns.Ensure(map) || BotTowns.Find(name) is not { } town)
@@ -210,6 +246,7 @@ public static class BotVenues
         return venue;
     }
 
+    /// <summary>A place a person at the door named, taken exactly as named and only recorded.</summary>
     public static Venue Exact(Use use, Map map, Point3D spot)
     {
         BotTowns.Ensure(map);
@@ -222,6 +259,7 @@ public static class BotVenues
         return venue;
     }
 
+    /// <summary>The place moved after it was chosen — a camp's footing a few tiles off — so the record keeps where it stood.</summary>
     public static void Moved(Venue venue, Point3D at)
     {
         if (venue != null)
@@ -229,6 +267,8 @@ public static class BotVenues
             venue.At = at;
         }
     }
+
+    // ------------------------------------------------------------------ towns: feasts and rings
 
     private static Venue Town(Use use, Map map, IReadOnlyList<Mobile> who)
     {
@@ -246,6 +286,7 @@ public static class BotVenues
                 continue;
             }
 
+            // The drill ground is Britain's ring: proven ground, and the school's own. Any town holding the configured ring has it.
             var at = use == Use.Ring && town.Bounds.Contains(BotTourney.Ring) ? BotTourney.Ring : town.Square;
 
             if (!Safe(map, at) || !Reached(map, at))
@@ -255,6 +296,8 @@ public static class BotVenues
 
             var near = who != null ? Count(who, map, at) : Count(BotPopulation.Bots, map, at);
 
+            // A ring nobody of the entrants is near is a walk home across the island for every loser, through whatever lies
+            // between: only the drill ground is offered with nobody near it.
             if (use == Use.Ring && near == 0 && at != BotTourney.Ring)
             {
                 continue;
@@ -273,6 +316,8 @@ public static class BotVenues
             passed.Add((venue, near > 0 ? Math.Sqrt(near) : EmptyWeight));
         }
 
+        // A ring is asked whether its square holds one only once it is drawn, and a town that does not is drawn again without:
+        // the question reads two hundred tiles' sight lines, and is kept for the session once asked.
         while (passed.Count > 0)
         {
             var pick = Draw(passed);
@@ -285,6 +330,7 @@ public static class BotVenues
             passed.RemoveAll(p => ReferenceEquals(p.Venue, pick));
         }
 
+        // Every fitting place was used lately: the one used longest ago is better than the old constant.
         while (recent.Count > 0)
         {
             var pick = Oldest(use, recent);
@@ -302,6 +348,10 @@ public static class BotVenues
         return null;
     }
 
+    /// <summary>
+    /// Whether this square holds a ring: both fighters' marks found as <c>BotTourney.Spot</c> finds them, and at least
+    /// <see cref="RingOpen"/> tiles of the fifteen by fifteen round it standable and in sight of the middle. Asked once a town.
+    /// </summary>
     private static bool RingFits(Map map, string name, Point3D at)
     {
         if (_rings.TryGetValue(name, out var fits))
@@ -352,6 +402,12 @@ public static class BotVenues
         return fits;
     }
 
+    // ------------------------------------------------------------------ the countryside: waves and camps
+
+    /// <summary>
+    /// A field: a town drawn by the bots near it, a bot of those working in the open, and a spot <see cref="FieldNear"/> to
+    /// <see cref="FieldFar"/> tiles off it that passes every test; the town's own edge when nobody near it is out of doors.
+    /// </summary>
     private static Venue Field(Map map)
     {
         List<(BotTowns.Town Town, double Weight, List<BotMobile> Out)> towns = [];
@@ -445,6 +501,7 @@ public static class BotVenues
         return recent;
     }
 
+    /// <summary>Whether a spot fits its use, safe and reached; a field's spot is settled on the map's own floor first.</summary>
     private static bool Fits(Use use, Map map, ref Point3D spot)
     {
         if (use == Use.Field)
@@ -469,6 +526,7 @@ public static class BotVenues
         return Safe(map, spot) && Reached(map, spot);
     }
 
+    /// <summary>Where a walk from the town's square out along a random bearing leaves its guarded ground.</summary>
     private static bool Edge(Map map, BotTowns.Town town, out Point3D at)
     {
         var bearing = Utility.RandomDouble() * Math.PI * 2.0;
@@ -492,6 +550,12 @@ public static class BotVenues
         return false;
     }
 
+    // ------------------------------------------------------------------ the tests
+
+    /// <summary>
+    /// No hostile or deadly ground at the middle, and no deadly ground on two rings round it. Read from the zones' published
+    /// raster, and only read: the zones are BotZones' and nothing here writes to them.
+    /// </summary>
     private static bool Safe(Map map, Point3D at)
     {
         var middle = BotZones.LevelAt(map, at.X, at.Y);
@@ -530,6 +594,7 @@ public static class BotVenues
         return true;
     }
 
+    /// <summary>Open ground on the reach map; while the map cannot say, whether the gates join it to home; with neither, yes.</summary>
     private static bool Reached(Map map, Point3D at)
     {
         var kind = BotReachMap.Class(map, at.X, at.Y, at.Z);
@@ -558,6 +623,7 @@ public static class BotVenues
 
     private static bool Guarded(Map map, Point3D at) => map != null && Region.Find(at, map)?.IsPartOf<GuardedRegion>() == true;
 
+    /// <summary>Whether a place lies within <see cref="RepeatApart"/> of one of the last <see cref="Recent"/> of its use.</summary>
     private static bool Lately(Use use, Point3D at)
     {
         var list = _recent[(int)use];
@@ -572,6 +638,8 @@ public static class BotVenues
 
         return false;
     }
+
+    // ------------------------------------------------------------------ choosing and counting
 
     private static Venue Draw(List<(Venue Venue, double Weight)> passed)
     {
@@ -621,6 +689,7 @@ public static class BotVenues
         return towns[^1];
     }
 
+    /// <summary>Of candidates every one of which was used lately, the one whose last use is oldest.</summary>
     private static Venue Oldest(Use use, List<Venue> candidates)
     {
         var list = _recent[(int)use];
@@ -629,6 +698,7 @@ public static class BotVenues
 
         for (var c = 0; c < candidates.Count; c++)
         {
+            // Newest first in the list, so a later index is an older use.
             var age = list.Count;
 
             for (var i = 0; i < list.Count; i++)
@@ -666,12 +736,14 @@ public static class BotVenues
         return n;
     }
 
+    /// <summary>The town nearest a spot, and how many bots are within <see cref="NearReach"/> of the spot.</summary>
     private static void Nearest(Map map, Point3D spot, out BotTowns.Town town, out int near)
     {
         town = BotTowns.Surveyed ? BotTowns.Nearest(spot) : null;
         near = Count(BotPopulation.Bots, map, spot);
     }
 
+    /// <summary>"north-east of Minoc", "near Britain", "in Trinsic", or the coordinates when no town has been read.</summary>
     private static string Bearing(BotTowns.Town town, Point3D at)
     {
         if (town == null)
@@ -679,6 +751,7 @@ public static class BotVenues
             return $"at {at.X},{at.Y}";
         }
 
+        // Inside the town's box but out of its guarded streets, as a field always is: the edge of the town.
         if (town.Bounds.Contains(at))
         {
             return Guarded(BotPopulation.Home, at) ? $"in {town.Name}" : $"near {town.Name}";
@@ -693,6 +766,7 @@ public static class BotVenues
         return $"{(way.Length > 0 ? way : "outside")} of {town.Name}";
     }
 
+    /// <summary>The place every event used to have: the population's home for a feast or a field, the drill ground for a ring.</summary>
     private static Venue Default(Use use, Map map)
     {
         Fallbacks++;
@@ -711,6 +785,7 @@ public static class BotVenues
         };
     }
 
+    /// <summary>Into the recent list and the tally of where events were held.</summary>
     private static void Note(Venue venue)
     {
         if (venue == null)
@@ -735,8 +810,16 @@ public static class BotVenues
         tally[key] = tally.TryGetValue(key, out var had) ? had + 1 : 1;
     }
 
+    // ------------------------------------------------------------------ the herald
+
+    /// <summary>
+    /// The watcher who calls events: the marshal while one stands, else the lead. Null when neither has a body or both are
+    /// witnessing a meeting, or the lead is charting the dungeons.
+    /// </summary>
     private static BotWatcher Crier()
     {
+        // Never the arena's referee (07.10.2026, arena27): it stands at the rings for the whole championship, and a revel's call
+        // must not take it off them. See Referee.
         if (BotMarshal.Standing is { Body: { Deleted: false } } marshal && !BotWitness.Busy(marshal) && !BotZoneTour.Holding(marshal.Body)
             && !ReferenceEquals(marshal, _referee))
         {
@@ -752,6 +835,18 @@ public static class BotVenues
         return null;
     }
 
+    /// <summary>
+    /// A watcher goes to the arena and stands there <b>shown</b> as the referee until <see cref="Unreferee"/>: Argus himself when he
+    /// is free, else the first of the squad that is. Returns its name, or null when nobody of the squad could go.
+    ///
+    /// <para>
+    /// <b>Patrick, 07.10.2026: "Still NOT ONCE have I seen a championship where a champion is chosen in battle."</b> The herald stood
+    /// at a town ring hidden, for two minutes a bout, so a person at a client saw two bots hitting each other with nobody calling it.
+    /// The arena's referee stands at the main ring for the whole event and is visible — blessed and above Player, as a meeting's
+    /// witness is (<c>BotWitness</c>), so nothing fights it. Held by its own slot rather than the herald's, so the herald's two-minute
+    /// holds for revels and camps neither move it nor are blocked by it; <see cref="Holds"/> and <see cref="Keep"/> answer for both.
+    /// </para>
+    /// </summary>
     public static string Referee(Map map, Point3D at, string what)
     {
         if (map == null || map == Map.Internal)
@@ -770,6 +865,7 @@ public static class BotVenues
                 continue;
             }
 
+            // The lead charting the dungeons stands in the room being probed; it is not taken off that.
             if (i == 0 && !BotHalls.Charted && BotHalls.Probing != Point3D.Zero)
             {
                 continue;
@@ -798,6 +894,7 @@ public static class BotVenues
         return pick.Name;
     }
 
+    /// <summary>The referee put back on its mark and shown, if something moved or hid it. Asked by the arena each beat and by <see cref="Keep"/>.</summary>
     public static void ShowReferee()
     {
         if (_referee?.Body is not { Deleted: false } body || BotWitness.Busy(_referee))
@@ -807,6 +904,7 @@ public static class BotVenues
 
         if (body.Map != _refereeMap || body.Location != _refereeAt)
         {
+            // Hover hides the body again on purpose (BotDebugger.Hover); it is shown below.
             body.Hover(_refereeMap, _refereeAt);
         }
 
@@ -816,6 +914,7 @@ public static class BotVenues
         }
     }
 
+    /// <summary>The referee's watch is over: hidden again, and back to watching at the vigil's next move.</summary>
     public static void Unreferee()
     {
         if (_referee?.Body is { Deleted: false } body)
@@ -826,8 +925,10 @@ public static class BotVenues
         _referee = null;
     }
 
+    /// <summary>The referee's name, or null when nobody stands at the arenas.</summary>
     public static string RefereeName => _referee?.Name;
 
+    /// <summary>The body that speaks for the watchers: the herald's, or any of the squad's.</summary>
     public static Mobile Voice
     {
         get
@@ -849,6 +950,10 @@ public static class BotVenues
         }
     }
 
+    /// <summary>
+    /// The herald goes and stands beside the place for <paramref name="holdMs"/>, hidden as always, so a person at the place
+    /// sees who called it; the vigil and the zones' tour leave it there until the hold is over (<see cref="Keep"/>).
+    /// </summary>
     public static void Herald(Venue venue, int holdMs)
     {
         var crier = Crier();
@@ -870,11 +975,14 @@ public static class BotVenues
         Heralded++;
     }
 
+    /// <summary>The herald is let go before its hold is up.</summary>
     public static void Release() => _herald = null;
 
+    /// <summary>Whether this watcher stands at a place it called something at. No side effects: asked when listing the tour's walkers.</summary>
     public static bool Holds(BotWatcher w) =>
         w != null && (ReferenceEquals(w, _herald) && Core.TickCount < _heraldUntil || ReferenceEquals(w, _referee));
 
+    /// <summary>Where this watcher stands as herald and for how long yet, or null. For the live window (02.10.2026).</summary>
     public static string HeraldOf(BotWatcher w) =>
         w != null && ReferenceEquals(w, _referee)
             ? $"referee of {_refereeWhat ?? "the arena"} ({_refereeAt.X}, {_refereeAt.Y}), shown"
@@ -882,8 +990,13 @@ public static class BotVenues
                 ? $"herald at {_heraldWhat ?? "the place"} ({_heraldAt.X}, {_heraldAt.Y}), {Math.Max(0, _heraldUntil - Core.TickCount) / 1000}s more"
                 : null;
 
+    /// <summary>
+    /// The vigil's question before it moves a watcher on: true while the watcher holds a place, and the body put back there
+    /// if something else moved it meanwhile (a meeting it was summoned to and has left).
+    /// </summary>
     public static bool Keep(BotWatcher w)
     {
+        // The arena's referee: kept at the rings and shown for as long as the championship runs (07.10.2026, arena27).
         if (w != null && ReferenceEquals(w, _referee))
         {
             ShowReferee();
@@ -909,6 +1022,10 @@ public static class BotVenues
         return true;
     }
 
+    /// <summary>
+    /// A line to the island, in the world channel the bots' own voices use (<c>BotVoice</c>): shouted over the herald's head,
+    /// broadcast to every client, on the dashboard's stream and in the speech log. Overhead only when the voices are off.
+    /// </summary>
     public static void Announce(string line)
     {
         if (string.IsNullOrWhiteSpace(line))
@@ -931,6 +1048,9 @@ public static class BotVenues
         }
     }
 
+    // ------------------------------------------------------------------ record
+
+    /// <summary>The last places of each use, kept across a restart by <see cref="BotTourneyStore"/> so the rotation survives a deploy.</summary>
     public static void Save(IGenericWriter writer)
     {
         writer.WriteEncodedInt(_recent.Length);
@@ -977,6 +1097,7 @@ public static class BotVenues
         }
     }
 
+    /// <summary>A new world: no place has been used yet.</summary>
     public static void Forget()
     {
         for (var u = 0; u < _recent.Length; u++)
@@ -990,6 +1111,7 @@ public static class BotVenues
         Unreferee();
     }
 
+    /// <summary>Where events were held since the boot, and every reason a candidate was turned away. For the 5-minute summary.</summary>
     public static string Describe()
     {
         if (Chosen == 0)

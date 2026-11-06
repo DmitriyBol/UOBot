@@ -13,6 +13,11 @@ public sealed class BotPoliticsStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPoliticsStore));
 
+    /// <summary>
+    /// Shape 2 (07.10.2026, reset26 review) adds the watches' wages held at the save, after the tributes, handed back to the purse
+    /// at the module's start (<see cref="BotCouncil.Settle"/>). Shape 1 is still read, with nothing held. A build older than this
+    /// one drops a shape-2 save whole, as it says, and the guilds vote again.
+    /// </summary>
     private const int Shape = 2;
 
     private const int Oldest = 1;

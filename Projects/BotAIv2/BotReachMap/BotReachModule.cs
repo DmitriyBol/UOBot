@@ -11,22 +11,29 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotReachSettings
 {
+    /// <summary>Whether the reach map is drawn and asked at all.</summary>
     public bool? Enabled { get; set; }
 
+    /// <summary>The loop's milliseconds a tick of drawing may take, and how often a tick runs.</summary>
     public double? SliceMs { get; set; }
 
     public int? EveryMs { get; set; }
 
+    /// <summary>Whether the clusters are kept on disk between boots.</summary>
     public bool? Persist { get; set; }
 
+    /// <summary>Cores the machine needs for the solve to run off the loop.</summary>
     public int? OffLoopCores { get; set; }
 
+    /// <summary>How near a sampled place open ground must be.</summary>
     public int? SampleReach { get; set; }
 
+    /// <summary>Steps onto ground the map calls unreachable, in one cluster, before it is drawn again; and how many are said.</summary>
     public int? RedrawAfter { get; set; }
 
     public int? SayContradictions { get; set; }
 
+    /// <summary>The check: whether it runs at the first solve, how many tiles, its budget, clock, flood and whether a debugger stands on each.</summary>
     public bool? CheckOnBoot { get; set; }
 
     public int? CheckSamples { get; set; }
@@ -56,6 +63,7 @@ public sealed class BotReachModule : BotModule
 
     public override string[] Requires => ["Population", "Movement"];
 
+    /// <summary>How often the map is summed up in the log.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _say;

@@ -45,24 +45,32 @@ public sealed class BotQuestDeed : BotDeed
 {
     public const string Trade = "errand";
 
+    /// <summary>How long one kill of a kill errand is reckoned at, the looking, the walk to it and the fight together.</summary>
     public static double KillMinutes { get; set; } = 2.0;
 
+    /// <summary>How long handing goods over or looking at a place is reckoned at, once the taker is there.</summary>
     public static double StandMinutes { get; set; } = 2.0;
 
+    /// <summary>How often a kill errand's taker looks about for the next creature.</summary>
     public static int LookMs { get; set; } = 10000;
 
+    /// <summary>How near a lair its taker walks before it stands and looks.</summary>
     public static int LairWithin { get; set; } = 6;
 
+    /// <summary>Errands taken up again after being put down for something that would not wait.</summary>
     public static long Resumes { get; private set; }
 
+    /// <summary>Lairs given up empty for the next nearest one.</summary>
     public static long Hops { get; private set; }
 
+    /// <summary>Takes given up because nothing of the creature was seen at the place, or at the last lair tried.</summary>
     public static long Emptied { get; private set; }
 
     private readonly BotQuest _quest;
 
     private readonly SkillName _trains;
 
+    /// <summary>Whether the place is a lair this deed may leave for the next: the errand itself named none.</summary>
     private readonly bool _lairs;
 
     private readonly double _claim;
@@ -71,6 +79,7 @@ public sealed class BotQuestDeed : BotDeed
 
     private Point3D _place;
 
+    /// <summary>How far the lair it stands at lets its creatures wander. See <see cref="BotLairs"/>.</summary>
     private int _roam;
 
     private BotSlay _slay;
@@ -79,10 +88,12 @@ public sealed class BotQuestDeed : BotDeed
 
     private long _lookedTick;
 
+    /// <summary>When the taker first stood at the place, or last killed there. See <see cref="BotQuests.EmptyMs"/>.</summary>
     private long _emptyTick;
 
     private bool _arrived;
 
+    /// <summary>When the errand was last put down. See <see cref="Resumed"/>.</summary>
     private long _pausedTick;
 
     private bool _lost;
@@ -101,14 +112,20 @@ public sealed class BotQuestDeed : BotDeed
         _claim = Claim(quest, from, _place);
         _doneAtTake = quest.Done;
 
+        // Seeded from a real tick, never left at nought: these counters can start enormous and wrap.
         _lookedTick = Core.TickCount - LookMs;
         _emptyTick = Core.TickCount;
         _pausedTick = Core.TickCount;
     }
 
+    /// <summary>How long the errand's own work is reckoned at once the taker is there: a kill each, or one stand.</summary>
     internal static double Work(BotQuest quest) =>
         quest.Kind == BotQuestKind.Kill ? Math.Max(1, quest.Amount - quest.Done) * KillMinutes : StandMinutes;
 
+    /// <summary>
+    /// What an errand pays a minute to a taker setting out from <paramref name="from"/> for <paramref name="place"/>: the
+    /// reward the board holds over the walk and the work. The proposer ranks errands by exactly this.
+    /// </summary>
     internal static double Claim(BotQuest quest, Point3D from, Point3D place) =>
         quest.Held / Math.Max(1.0, BotAppraisal.Travel(from, place) + Work(quest));
 
@@ -132,10 +149,13 @@ public sealed class BotQuestDeed : BotDeed
 
     public override bool Braves => _quest.Kind == BotQuestKind.Kill;
 
+    /// <summary>A promise to the board is seen through. See the class notes and <see cref="BotDeed.Steadfast"/>.</summary>
     public override bool Steadfast => true;
 
+    /// <summary>The claim is the reward the board holds. See <see cref="BotDeed.Posted"/>.</summary>
     public override bool Posted => true;
 
+    /// <summary>What the errand is fighting, so hitting back at it is not offered as another piece of work. See <see cref="BotDeed.Foe"/>.</summary>
     public override Mobile Foe => _slay?.Foe;
 
     public override string Stage =>
@@ -242,6 +262,8 @@ public sealed class BotQuestDeed : BotDeed
         {
             _lookedTick = now;
 
+            // Round the place once the taker is in sight of it. On the way to a lair, round the taker as well: any of the
+            // creature will do. On the way to a place the errand named, nothing is looked for until the place.
             var near = body.InRange(_place, seek);
             var found = near || _lairs ? Nearest(body, map, near ? _place : body.Location, seek) : null;
 
@@ -257,6 +279,8 @@ public sealed class BotQuestDeed : BotDeed
 
         if (!body.InRange(_place, arrive))
         {
+            // The clock of an empty place starts when the taker first stands there; walking back after a chase does not
+            // wind it back, or a place whose creatures cannot be reached would never be given up.
             if (!_arrived)
             {
                 _emptyTick = now;
@@ -286,6 +310,7 @@ public sealed class BotQuestDeed : BotDeed
         );
     }
 
+    /// <summary>Moves a kill anywhere on from the lair it stands at to the next nearest, while it has lairs left to try.</summary>
     private bool NextLair(Mobile body, Map map, out Point3D was)
     {
         was = _place;
@@ -332,6 +357,7 @@ public sealed class BotQuestDeed : BotDeed
                 continue;
             }
 
+            // Not one another bot has set on, and not one a walk has just been refused to.
             if (!BotQuarry.Ours(body, creature) || BotQuarry.Shunned(creature))
             {
                 continue;
@@ -396,6 +422,10 @@ public sealed class BotQuestDeed : BotDeed
         return BotDoing.Failed(why);
     }
 
+    /// <summary>
+    /// A walk was refused. A chase gives its creature up and the errand looks for another; the walk to a lair gives the lair
+    /// up for the next; the walk to a place the errand named, or past the last lair, ends the take.
+    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
         var body = bot?.Self;
@@ -420,6 +450,7 @@ public sealed class BotQuestDeed : BotDeed
         return false;
     }
 
+    /// <summary>Put down for something that would not wait: the creature it had set on is let go, the errand is kept.</summary>
     public override void Paused(IBotWilful bot)
     {
         _pausedTick = Core.TickCount;
@@ -428,6 +459,17 @@ public sealed class BotQuestDeed : BotDeed
         _target = null;
     }
 
+    /// <summary>
+    /// Taken up again: the time it was put down is neither time without progress on the board nor time seeing nothing at
+    /// the place. See <see cref="BotDeed.Steadfast"/>.
+    ///
+    /// <para>
+    /// <b>Moved on by the pause, not started again.</b> Build 95 restarted the empty-place clock at every taking up, and a
+    /// fighter is put down often — Aric's orcs at (1244, 1374) were put down for a rescue of ten seconds and a hunt of
+    /// eleven between 21:56 and 21:58 on 16.09.2026, each handing the empty lair three fresh minutes, and the errand was
+    /// outbid at 9.5 minutes with nothing seen instead of giving the lair up.
+    /// </para>
+    /// </summary>
     public override void Resumed(IBotWilful bot)
     {
         var now = Core.TickCount;
@@ -452,6 +494,8 @@ public sealed class BotQuestDeed : BotDeed
             return;
         }
 
+        // A living taker that let it go with nothing done for it counts against the errand; one that died, or that did
+        // part of it, does not. See BotQuests.MostLetGo.
         BotQuests.Release(_quest, _failed ?? "the taker let it go", body.Alive && _quest.Done == _doneAtTake);
     }
 

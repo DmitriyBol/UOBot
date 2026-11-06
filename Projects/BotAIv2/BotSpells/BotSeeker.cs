@@ -65,6 +65,9 @@ public sealed class BotSeeker : IBotProposer
             return null;
         }
 
+        // <b>Not the resurrection scroll a caster carries to read (02.10.2026).</b> Its book would not cast the spell below the book's
+        // floor of Magery while the scroll would (BotRaise.KeepsScroll), so the scroll is not written in nor another asked for until it
+        // would; the rest of the book waits on it, as it waits on any spell in its order.
         if (spell == BotRaise.Spell && BotRaise.KeepsScroll(body))
         {
             return null;
@@ -73,17 +76,29 @@ public sealed class BotSeeker : IBotProposer
         var kind = BotGrimoire.ScrollFor(spell);
         var want = BotMarket.Wanted(bot, kind);
 
+        // Already in the pack — a scribe brought it against the want, or the bot came by one. There is nothing to buy: it only has
+        // to go into the book, and that comes before every route that costs money.
         if (BotQuill.Held(body, kind) > 0)
         {
             return BotAcquire.Delivery(kind, spell, map, body.Location);
         }
 
+        // <b>One gap at a time, and asking the world about it exactly once.</b> The first draft of this walked
+        // all sixty-four spells and asked, for each one, which shopkeeper sells it — and asking that means
+        // walking every remembered shop and reading its whole stock list. Sixty-four times a beat, per bot.
+        // That is the first version's cost model wearing a new hat, and the interface this implements says so
+        // in as many words: it may be a real question of the world, it must not be an expensive one.
         BotShops.Survey(map, body.Location);
 
         var shop = BotShops.Nearest(bot, kind);
         var counter = shop == null ? 0 : BotShops.Price(shop, kind);
         var front = BotShopkeep.Best(bot, kind, 1, out var ask, out _, out var landed);
 
+        // Whichever is cheaper, and a shopkeeper is the ceiling: no bot can charge more than the shelf for something the shelf has.
+        // A scribe's shop by the bank is weighed with its walk counted (01.10.2026: the stall it replaces needed no walk).
+        //
+        // <b>A tie goes to one of ours.</b> Coin paid to a bot stays in the population and comes round again, while coin paid across
+        // a counter leaves the world, and the only place new coin enters is a monster's purse.
         if (front != null && (counter <= 0 || landed <= counter))
         {
             return BotAcquire.AtShop(kind, spell, front, ask);
@@ -96,9 +111,14 @@ public sealed class BotSeeker : IBotProposer
 
         if (want != null)
         {
+            // Already asked and still unfilled. The want raises its own offer on the market's beat and gives
+            // up at the ceiling; there is nothing for the bot to do about this spell in the meantime, and
+            // asking again would only top the want up into an order for nine copies of one scroll.
             return null;
         }
 
+        // <b>Not asked of the island by a scribe that writes it for less itself (03.10.2026).</b> Its pen is offered the gap as
+        // its own order instead (BotQuill.Plan), and the money a want would hold stays free for the paper. See BotQuill.OwnPen.
         if (BotQuill.OwnPen(bot, kind))
         {
             BotScribes.LeftToPen(body, kind);
@@ -111,5 +131,6 @@ public sealed class BotSeeker : IBotProposer
         return BotAcquire.Board(kind, spell, map, body.Location, offer);
     }
 
+    /// <summary>Lets the complaint be made again after a world reload.</summary>
     public static void Forget() => _saidNoMap = false;
 }

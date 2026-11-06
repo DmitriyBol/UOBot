@@ -37,25 +37,36 @@ public static class BotTowns
     {
         public string Name;
 
+        /// <summary>The square: the middle of the region, settled on the ground.</summary>
         public Point3D Square;
 
         public Rectangle2D Bounds;
 
+        /// <summary>Whether a walker at home can get here at all. Asked of the gates once they are ready.</summary>
         public bool FromHome;
 
+        /// <summary>
+        /// Whether home cannot walk here but can sail: the town's dock has a lane to a dock home walks to. Set by
+        /// <see cref="BotSeaLanes"/> once the lanes are drawn (point 7 of 29.09.2026).
+        /// </summary>
         public bool BySea;
 
+        /// <summary>Whether the population's home lies in this town's box.</summary>
         public bool Home;
 
+        /// <summary>Guilds seated near it. See <see cref="BotSeat.Choose"/>.</summary>
         public int Seated;
 
+        /// <summary>Travellers that arrived here.</summary>
         public long Arrivals;
 
         public override string ToString() => $"{Name} ({Square.X}, {Square.Y})";
     }
 
+    /// <summary>A town region narrower than this across is a field or a farm and is passed over.</summary>
     public static int LeastSide { get; set; } = 60;
 
+    /// <summary>How far round a reachable town's square the population may work, as the roam round home. See <see cref="Within"/>.</summary>
     public static int Roam { get; set; } = 600;
 
     private static readonly List<Town> _towns = [];
@@ -64,14 +75,17 @@ public static class BotTowns
 
     public static bool Surveyed { get; private set; }
 
+    /// <summary>Whether the towns' reach from home has been asked of the gates.</summary>
     public static bool Reckoned { get; private set; }
 
     public static bool Ready => Surveyed && Reckoned;
 
     public static IReadOnlyList<Town> All => _towns;
 
+    /// <summary>Towns joined to home.</summary>
     public static int Reachable { get; private set; }
 
+    /// <summary>Reads the map's town regions once, and asks the gates which are reachable once they can answer. Cheap after the first call.</summary>
     public static bool Ensure(Map map)
     {
         if (map == null || map == Map.Internal)
@@ -169,6 +183,7 @@ public static class BotTowns
         logger.Information("Towns: {Reachable} of {Towns} can be walked to from home: {Names}", Reachable, _towns.Count, names.ToString());
     }
 
+    /// <summary>Somewhere to stand within <paramref name="sweep"/> tiles of a point, ring by ring.</summary>
     public static bool Place(Map map, int x, int y, int sweep, out Point3D spot)
     {
         for (var r = 0; r <= sweep; r += r < 4 ? 1 : 4)
@@ -197,6 +212,7 @@ public static class BotTowns
         return false;
     }
 
+    /// <summary>The town whose box holds this place, or null.</summary>
     public static Town Of(Point3D where)
     {
         for (var i = 0; i < _towns.Count; i++)
@@ -210,6 +226,7 @@ public static class BotTowns
         return null;
     }
 
+    /// <summary>The nearest reachable town to a place, by straight distance; the one holding it first.</summary>
     public static Town Nearest(Point3D where)
     {
         var holding = Of(where);
@@ -250,6 +267,7 @@ public static class BotTowns
         return null;
     }
 
+    /// <summary>Whether this place lies within <see cref="Roam"/> of a reachable town's square. See <c>BotPopulation.Within</c>.</summary>
     public static bool Within(Point3D where)
     {
         if (!Ready)
@@ -261,6 +279,8 @@ public static class BotTowns
         {
             var town = _towns[i];
 
+            // A town reached by sea is ground to work like one reached by road: a bot that sailed to Moonglow is a bot in
+            // Moonglow. Work across the water from a bot is still refused by the appraisal (BotGates.Joined). See BotSea.
             if ((town.FromHome || town.BySea) && Utility.InRange(town.Square, where, Roam))
             {
                 return true;

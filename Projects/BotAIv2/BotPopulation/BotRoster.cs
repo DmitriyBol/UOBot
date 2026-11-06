@@ -43,22 +43,49 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotRoster
 {
+    /// <summary>Whether leaders may change their rosters at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// How long a leader waits between changes to its roster.
+    ///
+    /// Half an hour, by order. It is deliberately the same figure as <see cref="BotGuilds.Patience"/> —
+    /// the time a member gives a new guild before it starts asking what it is getting — so that a guild
+    /// filling itself and a guild bleeding members run on the same clock and the numbers can be read
+    /// against each other.
+    /// </summary>
     public static int EveryMs { get; set; } = 1800000;
 
+    /// <summary>
+    /// How many candidates a leader is shown.
+    ///
+    /// Five. A model handed seventy names picks one out of the first few whatever the rest say, so the list
+    /// is cut here, by rank, rather than at the far end by the model's attention.
+    /// </summary>
     public static int Shortlist { get; set; } = 5;
 
+    /// <summary>
+    /// How full a guild has to be before a leader stops being shown anybody at all.
+    ///
+    /// Nought, meaning never: a guild at <see cref="BotGuilds.Most"/> is refused by
+    /// <see cref="BotGuilds.Recruit"/> anyway, and a leader that can see a better bot than one of its own
+    /// should be able to expel and take in on the same turn.
+    /// </summary>
     public static int StopAt { get; set; }
 
+    /// <summary>When each guild last changed its roster.</summary>
     private static readonly Dictionary<string, long> _changed = [];
 
+    /// <summary>Turns of the clock a leader has used.</summary>
     public static long Changes { get; private set; }
 
+    /// <summary>Times a leader was asked for a change and the clock said no.</summary>
     public static long TooSoon { get; private set; }
 
+    /// <summary>Times a leader named somebody who was not a candidate by the time it was asked for.</summary>
     public static long Gone { get; private set; }
 
+    /// <summary>Whether this guild's leader may change the roster now.</summary>
     public static bool Free(Guild guild)
     {
         if (!Running || guild == null)
@@ -69,6 +96,7 @@ public static class BotRoster
         return !_changed.TryGetValue(guild.Name, out var when) || Core.TickCount - (when + EveryMs) >= 0;
     }
 
+    /// <summary>How long until it may, in minutes, for the line a leader is shown.</summary>
     public static int Waits(Guild guild)
     {
         if (guild == null || !_changed.TryGetValue(guild.Name, out var when))
@@ -81,6 +109,15 @@ public static class BotRoster
         return left <= 0 ? 0 : left / 60000;
     }
 
+    /// <summary>
+    /// Everybody this guild could take, best first.
+    ///
+    /// <para>
+    /// Walks the population rather than the world, which is the only list of bots this assembly keeps and
+    /// is a few dozen entries long. Called when a leader is being written a state block — every couple of
+    /// minutes, for five bots — and not on anybody's beat.
+    /// </para>
+    /// </summary>
     public static List<BotMobile> Candidates(Guild guild, int most)
     {
         List<BotMobile> found = [];
@@ -117,6 +154,10 @@ public static class BotRoster
         return found;
     }
 
+    /// <summary>
+    /// This guild's own members, worst first — which is the order a leader deciding who to put out wants
+    /// them in, and the reverse of the one above on purpose so that both lists are read by the same number.
+    /// </summary>
     public static List<BotMobile> Weakest(Guild guild, int most)
     {
         List<BotMobile> found = [];
@@ -128,6 +169,9 @@ public static class BotRoster
 
         for (var i = 0; i < guild.Members.Count; i++)
         {
+            // The head is left off rather than listed and refused: a leader shown a name it cannot act on
+            // will eventually name it, and every such answer is a turn of the clock spent on nothing. It was
+            // the maker until 21.09.2026 — see BotGuilds.Head.
             if (guild.Members[i] is BotMobile { Deleted: false } member && !BotGuilds.IsHead(member))
             {
                 found.Add(member);
@@ -144,6 +188,10 @@ public static class BotRoster
         return found;
     }
 
+    /// <summary>
+    /// What one bot promises a guild, as one number. See the note at the top for what it is made of and
+    /// what it deliberately is not.
+    /// </summary>
     public static double Promise(BotMobile bot)
     {
         if (bot is not { Deleted: false })
@@ -151,9 +199,16 @@ public static class BotRoster
             return 0.0;
         }
 
+        // Trade first and money second, at a hundredth of the weight: a full purse should separate two bots
+        // of equal skill and should never outrank one that has learned its trade.
         return bot.Progress + Math.Min(1.0, (bot.Backpack?.GetAmount(typeof(Gold)) ?? 0) / 5000.0) * 0.01;
     }
 
+    /// <summary>
+    /// Puts the leader's judgement into effect: at most one out and at most one in, on one turn of the
+    /// clock, and only if at least one of them actually happened.
+    /// </summary>
+    /// <returns>What was done, in words, or null if nothing was.</returns>
     public static string Change(Guild guild, BotMobile putOut, BotMobile takeIn, string why)
     {
         if (!Running || guild == null || (putOut == null && takeIn == null))
@@ -168,6 +223,9 @@ public static class BotRoster
             return null;
         }
 
+        // Asked again at the moment of acting, because the list the leader answered from was written when
+        // it was asked and a model's answer arrives seconds later — by which time a candidate can have been
+        // taken by another guild, or died.
         var put = putOut != null && ReferenceEquals(putOut.Guild, guild) && BotGuilds.Expel(guild, putOut, why);
         var took = takeIn is { Deleted: false, Alive: true, Guild: null } && BotGuilds.Recruit(guild, takeIn, why);
 

@@ -26,8 +26,16 @@ public sealed class BotLesson : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLesson));
 
+    /// <summary>The ledger's key.</summary>
     public const string Trade = "drill";
 
+    /// <summary>
+    /// What holding a class is reckoned at per minute before experience corrects it.
+    ///
+    /// A fee or two an hour, which is modest, and it is meant to be: teaching is not how a captain gets rich
+    /// and the ledger will find that out inside a session. It exists so that the offer is not free —
+    /// a captain that could hold classes at no cost would hold them instead of patrolling.
+    /// </summary>
     public static double Prior { get; set; } = 35.0;
 
     private readonly Map _map;
@@ -44,10 +52,16 @@ public sealed class BotLesson : BotDeed
 
     private int _lessons;
 
+    /// <summary>Posts of the ring walked past this lesson because no road reached them. See <see cref="Bend"/>.</summary>
     private int _bends;
 
+    /// <summary>
+    /// How many posts of the ring one lesson may walk past before a refused walk ends it. Eight is a whole ring: a
+    /// captain who cannot reach any place round the block is not standing at a class.
+    /// </summary>
     public static int MostBends { get; set; } = 8;
 
+    /// <summary>Posts walked past during a lesson because the road to them was refused. See <see cref="Bend"/>.</summary>
     public static long Skipped { get; private set; }
 
     public BotLesson(Map map)
@@ -67,6 +81,11 @@ public sealed class BotLesson : BotDeed
 
     public override double Minutes => (BotSchool.GatherMs + BotSchool.LessonMs) / 60000.0;
 
+    /// <summary>
+    /// Nothing, and it is worth saying why: the captain is already at its own ceiling in everything it
+    /// teaches, so an hour of drill improves it by definition nought. Claiming a skill here would be the
+    /// ledger being told a lie it would take a session to unlearn.
+    /// </summary>
     public override SkillName? Trains => null;
 
     public override int Outlay => 0;
@@ -75,12 +94,38 @@ public sealed class BotLesson : BotDeed
 
     public override bool Alongside => true;
 
+    /// <summary>
+    /// Standing in one place is what this work is — <b>once the field is open</b>. See <see cref="BotDeed.Still"/>.
+    ///
+    /// <para>
+    /// A captain on its way to the ground it means to teach on is walking like anybody else, and a walk that
+    /// stops is the thing the stall watch exists to catch. Only from the moment the field is open does
+    /// standing still become the work rather than a symptom, and from that moment the roll's own clock —
+    /// <c>BotSchool.GatherMs</c>, then <c>LessonMs</c> — is what ends it.
+    /// </para>
+    /// </summary>
     public override bool Still => _opened;
 
+    /// <summary>
+    /// Kept, once the field is open, against the next thing on the board. See <see cref="BotDeed.Steadfast"/>.
+    ///
+    /// <para>
+    /// <b>The school had been dead since 20.09.2026, and this is why.</b> Faron closed the roll with Alden Ashdown on the
+    /// field at 08:40:32, having taken his 60gp, and at 08:40:41 "dropped drill … outbid by prowl at 31/min after 2.0 of
+    /// 11.9 minutes reckoned, taken at 18/min"; Ilsa took Piers's 90gp at 08:43:48 and dropped her class for a peddle at
+    /// 96/min four seconds later. Both students ended "the class ended — 0.0 points", the ledger filed drill-in at
+    /// −65/min and −209/min, and from then on every offer of a place read "drill-in is expected to pay −4.7/min here,
+    /// against a claim of 72" — 1,784 places offered in the session of 21:58 on 21.09, none taken, 72 classes called
+    /// and ended "nobody came to be taught", 446gp of wages paid out for nothing. A class is a fee taken on a promise;
+    /// a captain who leaves it for a better price has stolen the fee, and the student's ledger says so for a week.
+    /// </para>
+    /// </summary>
     public override bool Steadfast => _opened;
 
+    /// <summary>A post of the ring walked past is not the class being blocked. See <see cref="BotDeed.BendIsTrouble"/>.</summary>
     public override bool BendIsTrouble => !_teaching;
 
+    /// <summary>The whole of the roll and the lesson, with a minute over. See <see cref="BotDeed.HoldsFor"/>.</summary>
     public override double HoldsFor => _opened ? Minutes + 1.0 : 0.0;
 
     public override string Stage =>
@@ -95,13 +140,23 @@ public sealed class BotLesson : BotDeed
             return BotDoing.Failed("no body");
         }
 
+        // Somebody else has the field. Only one class runs at a time, and losing the race is not a failure
+        // worth marking the ground with.
         if (_opened && !ReferenceEquals(BotSchool.Master, body))
         {
             return BotDoing.Done("somebody else has the field");
         }
 
+        // Still walking to the ground. The field is not opened until the captain is standing on it, or bots
+        // would set off for a class whose master is four hundred tiles away.
         if (!body.InRange(BotSchool.Ground, BotSchool.Voice))
         {
+            // <b>Asked for the same distance that counts as having arrived, and the two were different.</b>
+            // The field is opened by standing within Voice of the middle; the walk asked to be put within
+            // two tiles of the exact tile — which on ground at z=20 is a tile a path may simply not exist to.
+            // Aldric failed to call a class seven times in eleven minutes with "no way through to
+            // (1479, 1629, 20)" while standing perfectly able to teach from four tiles off. One number, not
+            // two: a walk should ask for what the work actually needs.
             return BotDoing.Walk(_map, BotSchool.Ground, BotArrival.Within(BotSchool.Voice), "going to the training field");
         }
 
@@ -166,6 +221,8 @@ public sealed class BotLesson : BotDeed
             return BotDoing.Done($"the class is over — {_lessons} lessons given");
         }
 
+        // Everybody has learned everything this captain has to give. An honest ending, and a better one than
+        // standing on an empty field until the clock runs out.
         if (BotSchool.Students.Count == 0)
         {
             BotSchool.Close();
@@ -175,6 +232,8 @@ public sealed class BotLesson : BotDeed
 
         if (Core.TickCount - _beatTick < BotSchool.BeatMs)
         {
+            // Standing where the circuit last put him. Walking is how the captain gets there; the walk
+            // itself is the journey's business and it is finished before the next beat is due.
             return BotDoing.Work($"drilling {BotSchool.Students.Count}");
         }
 
@@ -196,6 +255,9 @@ public sealed class BotLesson : BotDeed
                 continue;
             }
 
+            // Only bots actually standing in the block are taught. A student that took the fee and wandered
+            // off is not being taught, and paying it points anyway would make the field a place bots visit
+            // once and then ignore.
             if (!student.InRange(BotSchool.Ground, BotSchool.Pace * BotSchool.Rank + BotSchool.Pace))
             {
                 continue;
@@ -214,11 +276,16 @@ public sealed class BotLesson : BotDeed
 
         _lessons++;
 
+        // The captain is the better for it too: a class that is actually teaching somebody is work that is
+        // paying, and this shard's contentment is exactly "work that pays".
         if (reached > 0)
         {
             body.Resolve.Urges.Paid(given * BotYield.GoldPerSkillPoint);
         }
 
+        // Round the ring, one place a beat, and something said on arrival. The saying is not decoration:
+        // which of the ranks he is standing over decides who learns most this beat, so a watcher can see the
+        // arithmetic happening.
         _turn++;
 
         var post = BotSchool.Post(_map, _turn, students.Count);
@@ -231,6 +298,7 @@ public sealed class BotLesson : BotDeed
         return BotDoing.Walk(_map, post, BotArrival.Within(1), $"drilling {students.Count}");
     }
 
+    /// <summary>Something to say. Rotated rather than random so a watcher can tell one circuit from the next.</summary>
     private static string Line(int turn, int reached) =>
         (turn / 2 % 5) switch
         {
@@ -241,6 +309,19 @@ public sealed class BotLesson : BotDeed
             _ => "Breathe out when you strike. You will live longer for it."
         };
 
+    /// <summary>
+    /// A post on the ring could not be walked to. During a lesson that is one place to stand, not the class.
+    ///
+    /// <para>
+    /// <b>A class of six ended every time the captain's circuit came round to one corner.</b> The ring's posts are
+    /// arithmetic round the block, and at (1460, 1500) the ones at (1462–1464, 1497–1498) have no road: on every build of
+    /// the night Faron's lesson failed there three or four times, "no way through to (1464, 1497, 0)", <see cref="Drop"/>
+    /// closed the field, and the students who had paid 60gp ended their lessons under a point in — 8, 8, 14 and 6 of
+    /// them a build. The circuit simply goes on to the next post, and the class goes on being taught from where the
+    /// captain stands. Before the field is open this is the old answer: a captain who cannot reach the ground has no
+    /// class.
+    /// </para>
+    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
         if (!_teaching || _bends >= MostBends)
@@ -257,6 +338,9 @@ public sealed class BotLesson : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
+        // Whichever way this ended — finished, failed, or outbid by something the captain would rather do —
+        // the field must not be left marked as held. A session nobody is running is a session no other
+        // captain can open and every student can still see.
         if (bot?.Self is BotMobile body && ReferenceEquals(BotSchool.Master, body))
         {
             BotSchool.Close();

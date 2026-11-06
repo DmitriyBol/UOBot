@@ -34,24 +34,36 @@ public sealed class BotShopkeeper : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
+    // ---- Every gate, counted apart. --------------------------------------------------------------------------
+
+    /// <summary>Bots looked at.</summary>
     public static long Looks { get; private set; }
 
+    /// <summary>Shifts offered.</summary>
     public static long Offered { get; private set; }
 
+    /// <summary>Shut a shop less than <see cref="BotShopkeep.RestMs"/> ago.</summary>
     public static long Rested { get; private set; }
 
+    /// <summary>The island already had <see cref="BotShopkeep.MostOpen"/> shops open.</summary>
     public static long Full { get; private set; }
 
+    /// <summary>Held less than <see cref="BotShopkeep.OpenWorth"/> of anything at all. Most answers, and not a refusal.</summary>
     public static long Thin { get; private set; }
 
+    /// <summary>Held enough goods, but not enough of what anybody is short of or has money down for.</summary>
     public static long Unwanted { get; private set; }
 
+    /// <summary>A red bot, a criminal or one of The Shadow: a town's guards are no customers.</summary>
     public static long Outlawed { get; private set; }
 
+    /// <summary>No banker within <see cref="BotShopkeep.BankTiles"/> of home.</summary>
     public static long NoBank { get; private set; }
 
+    /// <summary>The bank already had <see cref="BotShopkeep.PerBank"/> shops beside it.</summary>
     public static long Crowded { get; private set; }
 
+    /// <summary>Every pitch at the bank taken, lately unreachable for this bot, or proved to have no way to it.</summary>
     public static long NoPitch { get; private set; }
 
     public BotDeed Propose(IBotWilful bot)
@@ -70,6 +82,11 @@ public sealed class BotShopkeeper : IBotProposer
 
         Looks++;
 
+        // <b>A shop is kept by those who make or gather goods, not by fighters (01.10.2026).</b> Measured over 1,076 online bot-hours
+        // on 30.09.2026 (`night-r29-stalling.md`): 103 bot-hours a day went to shifts, 88 of them by Warriors, Archers, the two kinds
+        // of mage, WarriorArchers and Tamers standing at a bank with what came off corpses, and 53 % of all shifts ended "nobody
+        // came to buy". A fighter's surplus goes to the bank box, to a carrier's walk when somebody wants it, and to a shopkeeper
+        // when nobody does; the shop by the bank is the makers' and gatherers' (and the coming traders').
         if (!FightersKeepShop && !Merchant(body))
         {
             Fighters++;
@@ -107,6 +124,7 @@ public sealed class BotShopkeeper : IBotProposer
             return null;
         }
 
+        // A red name at a bank is a fight with the guards, not a shop. The fence keeps the band's goods at the hideout.
         if (body.Kills >= 5 || body.Criminal || BotUnderworld.Member(body))
         {
             Outlawed++;
@@ -114,6 +132,13 @@ public sealed class BotShopkeeper : IBotProposer
             return null;
         }
 
+        // <b>A guild's trader at home, everybody else in Britain (01.10.2026; Patrick, 30.09: "all trade and all the workshops
+        // live in Britain, and a guild's traders prefer to trade in their home town").</b> Britain first was already the rule
+        // (build 355: on 338–350 the shops by other banks were "too far off" for 98–99 % of the buyers' looks); what changes is the
+        // fallback. The bank by the bot's own home is gone — a shop at Skara Brae's bank is not the market — and in its place a
+        // guild member keeps shop at its guild's own town (its house, else its seat), where the guild lives and trades, when it is
+        // standing near that bank; failing that, Britain's. A bot with neither near is not offered a shift: its goods go by
+        // carrier to a want, to a shopkeeper, or to Britain with a traveller's journey (BotCapital.Trader).
         var bank = Home(map, body);
 
         if (bank != Point3D.Zero)
@@ -137,6 +162,10 @@ public sealed class BotShopkeeper : IBotProposer
             return null;
         }
 
+        // <b>A shift is for a bot already near its bank (30.09.2026, build 358).</b> Offered wherever the keeper happened to be,
+        // a shift began with a walk the auction did not wait out: of the shifts taken on 353–356, 134 were dropped "going to
+        // the bank … outbid by restock at 178/min after 8.2 of 10.0 minutes reckoned" against 38 finished — the keeper never
+        // stood at its pitch, and buyers who had set out found no shop. Only within ShiftReach of the bank it would keep shop at.
         if (!Utility.InRange(body.Location, bank, ShiftReach))
         {
             Afar++;
@@ -165,26 +194,43 @@ public sealed class BotShopkeeper : IBotProposer
         return new BotKeepShop(map, stand, bank, BotShopkeep.Claim(stock.Demanded), stock.Demanded);
     }
 
+    /// <summary>Whether fighters are offered shifts too. Off since 01.10.2026: see <see cref="Merchant"/>.</summary>
     public static bool FightersKeepShop { get; set; } = false;
 
+    /// <summary>Looks at a fighter, which keeps no shop. See <see cref="Merchant"/>.</summary>
     public static long Fighters { get; private set; }
 
+    /// <summary>
+    /// Whether this bot keeps shop: a maker or a gatherer (<see cref="BotRole.Producer"/> — the crafter, the gatherer, the
+    /// architect). The seam the traders' faction joins at when it comes.
+    /// </summary>
     public static bool Merchant(Mobile body) => body is BotMobile { Class: { } klass } && klass.Role == BotRole.Producer;
 
+    /// <summary>How far from Britain's bank a keeper is still sent there rather than to the bank by its home.</summary>
     public static int BritainReach { get; set; } = 200;
 
+    /// <summary>How near its bank a bot must stand to be offered a shift there. See <see cref="Propose"/>.</summary>
     public static int ShiftReach { get; set; } = 200;
 
+    /// <summary>Looks at which the bot stood further than ShiftReach from the bank it would keep shop at.</summary>
     public static long Afar { get; private set; }
 
+    /// <summary>Shifts offered at Britain's bank. See <see cref="Britain"/>.</summary>
     public static long ToBritain { get; private set; }
 
+    /// <summary>Shifts offered at a guild's own town's bank to one of its members. See <see cref="Home"/>.</summary>
     public static long ToHome { get; private set; }
 
+    /// <summary>How long a guild's town is remembered by its name. A minute: guilds move house rarely, and this is asked every review.</summary>
     public static int HomeMs { get; set; } = 60000;
 
     private static readonly Dictionary<string, (Point3D Bank, long Tick)> _homes = [];
 
+    /// <summary>
+    /// The bank of this bot's guild's own town, when the bot is a guild member standing within <see cref="ShiftReach"/> of it and
+    /// the town is not Britain itself (Britain's own members trade at the market as everybody does); zero otherwise. The town is
+    /// the guild's house's (<c>BotGuildHouses.TownOf</c>), else its seat's (<c>BotParley.Seat</c>). The Shadow keeps no shop.
+    /// </summary>
     private static Point3D Home(Map map, Mobile body)
     {
         if (body?.Guild is not Guilds.Guild guild || BotUnderworld.Member(body))
@@ -232,6 +278,10 @@ public sealed class BotShopkeeper : IBotProposer
         return home;
     }
 
+    /// <summary>
+    /// Britain's bank for this keeper, or zero when it is out of reach, not joined, or full. The town is the one the trade's centre
+    /// is named for (<see cref="BotCapital.Name"/>, 30.09.2026), so a dial that moves the capital moves its shops with it.
+    /// </summary>
     private static Point3D Britain(Map map, Mobile body)
     {
         var town = BotTowns.Find(BotCapital.Name);

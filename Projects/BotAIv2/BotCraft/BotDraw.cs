@@ -21,8 +21,10 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotDraw : BotDeed
 {
+    /// <summary>The ledger's word, and the word a bank nobody could reach is cautioned under.</summary>
     public const string Trade = "draw";
 
+    /// <summary>How near the banker the walk ends: well inside <see cref="BotMarket.BankReach"/>.</summary>
     public static int Near { get; set; } = 4;
 
     private readonly Map _map;
@@ -57,15 +59,19 @@ public sealed class BotDraw : BotDeed
 
     public override int Made => 0;
 
+    /// <summary>Its own goods moved from the box to the pack: nothing made, nothing paid. See <see cref="BotDeed.Unpaid"/>.</summary>
     public override bool Unpaid => true;
 
+    /// <summary>Put down for a flight and taken up again: the order still waits on the material.</summary>
     public override bool Steadfast => true;
 
     public override string Stage =>
         _taken > 0 ? $"took {_taken} {_kind?.Name} out of its bank box" : $"to the bank for its own {_units} {_kind?.Name}";
 
+    /// <summary>Counted once, when the walk wins the bot.</summary>
     public override void Taken(IBotWilful bot) => BotCraftFirst.Walked();
 
+    /// <summary>The bank could not be reached: written under this errand's word at the bank, which is what the offer asks.</summary>
     public override bool Bend(IBotWilful bot)
     {
         bot?.Resolve?.Ledger?.Beware(Trade, _map, _bank);
@@ -89,6 +95,8 @@ public sealed class BotDraw : BotDeed
 
         _taken = BotMarket.FromBank(bot, _kind, _units);
 
+        // The memory is served either way (the review of this build): a box the pack could not take from (a full pack, a stack
+        // the weight refuses) is not walked to again until the craft passes an order over again. See BotCraftFirst.Served.
         BotCraftFirst.Served(body, _taken);
 
         if (_taken <= 0)

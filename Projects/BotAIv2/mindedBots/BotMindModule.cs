@@ -35,6 +35,7 @@ public sealed class BotMindModule : BotModule
 
         BotMinds.Start();
 
+        // What the page says about the thinking layer, read from here because the page's assembly may not read this one.
         BotWebHooks.Minds = () => new BotMindsReport(
             BotOllama.Model,
             BotOllama.Endpoint,
@@ -46,6 +47,14 @@ public sealed class BotMindModule : BotModule
             BotOllama.LastMs
         );
 
+        // The model as the island's chronicler: the stories' one seam to it, filled whether or not any mind is running, since the
+        // stories are the population's and the model is the machine's (PLAN-life A3, 13.10.2026). See BotStoryVoice.
+        BotStoryVoice.Open();
+
+        // Both of these are for minds that exist. With none running, the proposer would be asked for an
+        // offer for every bot on every beat only to answer nothing, and the boot line below would announce
+        // three thinkers that are not there — which is the same fault as the log file: a subsystem that is
+        // switched on with nothing to do reads exactly like one that is working.
         if (BotMinds.All.Count == 0)
         {
             return;
@@ -53,6 +62,15 @@ public sealed class BotMindModule : BotModule
 
         BotWill.Offer(new BotMindProposer());
 
+        // The numbers this is actually running with, said once at startup, because the file may have moved
+        // any of them and a belief about behaviour built on the defaults in the source can be wrong by a
+        // factor of two without anything looking odd.
+        //
+        // <b>Who is thinking is counted, not written down.</b> This line said "Three minds are awake:
+        // Aldric the captain, Godric the architect and Cedric the sage" while four crafters were running and
+        // those three were stood down — and it went on saying "4 of 3 have bodies" without anybody's build
+        // breaking. The same fault as a hard-written population size, in the one line most likely to be read
+        // as authoritative.
         logger.Information(
             "{Count} minds are awake on {Model} at {Endpoint}: {Who}; asked to choose every {Think}ms while free, reckoning up at most every {Review}ms, holding {Lessons} rules each ({PerTrade} of them about any one trade) and asking with a weight of {Insistence:F2}; {Embodied} of them have bodies. Their thinking is written to {Log}",
             BotMinds.All.Count,
@@ -69,6 +87,7 @@ public sealed class BotMindModule : BotModule
         );
     }
 
+    /// <summary>The minds by name and office, for the boot line, read off the list rather than a constant.</summary>
     private static string Who()
     {
         var minds = BotMinds.All;
@@ -82,10 +101,12 @@ public sealed class BotMindModule : BotModule
         return string.Join(", ", names);
     }
 
+    /// <summary>What the two of them have done, for whoever is reading the log.</summary>
     public static string Summarise() => $"{BotMinds.Describe()}; {BotOllama.Describe()}";
 
     public override void Reset()
     {
+        BotStoryVoice.Close();
         BotMinds.Stop();
         BotOllama.Forget();
     }

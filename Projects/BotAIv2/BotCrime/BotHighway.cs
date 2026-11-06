@@ -32,60 +32,123 @@ public static class BotHighway
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHighway));
 
+    /// <summary>Whether The Shadow lies in wait on the roads at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How long after one ambush before another may be laid. Twenty minutes.</summary>
     public static int EveryMs { get; set; } = 1200000;
 
+    /// <summary>How often the roads are looked over for a carrier.</summary>
     public static int SweepMs { get; set; } = 30000;
 
+    /// <summary>
+    /// The least a carrier's goods must be worth, by the market, to be worth an ambush — until the roads have been measured
+    /// (<see cref="CargoSeen"/> carriers out of town), after which the bar is the worth that <see cref="CargoShare"/> of them carry
+    /// or more, never under <see cref="CargoFloor"/>. life18a, 07.10.2026: the bar of 300gp let 73 of 1859 carriers on the roads
+    /// through in nine hours (4 %); a haul's purchase is 87gp at the median and 149gp at the 80th percentile on this economy.
+    /// </summary>
     public static int LeastCargo { get; set; } = 100;
 
+    /// <summary>The share of the carriers on the roads whose cargo is worth an ambush: the bar is set at that quantile of what they carry.</summary>
     public static double CargoShare { get; set; } = 0.25;
 
+    /// <summary>The bar never falls under this, however poor the roads.</summary>
     public static int CargoFloor { get; set; } = 40;
 
+    /// <summary>Carriers out of town measured before the bar follows them; the last <see cref="CargoWindow"/> are kept.</summary>
     public static int CargoSeen { get; set; } = 40;
 
     public const int CargoWindow = 256;
 
+    /// <summary>
+    /// life18a: the spot is a point of the carrier's own route (the planner's, <c>BotErrand.Route</c>) where the carrier arrives
+    /// after the band: its road there at least <see cref="Lead"/> times the nearest bandit's straight walk, plus
+    /// <see cref="LeadSlack"/> tiles. Until now the spot lay <see cref="AheadTiles"/> ahead on the straight line to its goal, and
+    /// the carrier was past it before the band had taken the call: three waits in three ambushes, the carrier never came by.
+    /// </summary>
     public static double Lead { get; set; } = 1.3;
 
     public static int LeadSlack { get; set; } = 20;
 
+    /// <summary>How near the carrier's road still ahead the spot must lie for the ambush to stand; farther, the carrier turned.</summary>
     public static int OnRoad { get; set; } = 12;
 
+    /// <summary>How often an ambush is moved after its carrier before the band gives the carrier up.</summary>
     public static int MostRelays { get; set; } = 3;
 
+    /// <summary>The fewest bandits an ambush is laid with.</summary>
     public static int LeastParty { get; set; } = 2;
 
+    /// <summary>The most bandits in one ambush.</summary>
     public static int MostParty { get; set; } = 3;
 
+    /// <summary>How far from the carrier a bandit may be to be called to the ambush.</summary>
     public static int PartyReach { get; set; } = 250;
 
+    /// <summary>How far ahead of the carrier, along its road, the party lies in wait.</summary>
     public static int AheadTiles { get; set; } = 24;
 
+    /// <summary>How long the party has to take the call before the ambush is called off.</summary>
     public static int MusterMs { get; set; } = 180000;
 
+    /// <summary>How long the party lies in wait for the carrier to come past.</summary>
     public static int WaitMs { get; set; } = 240000;
 
+    /// <summary>The longest an ambush stands, wait and fight together.</summary>
     public static int CapMs { get; set; } = 900000;
 
+    /// <summary>How near the carrier must come to a hidden bandit for the party to strike (a route's points are walked to within 3).</summary>
     public static int StrikeWithin { get; set; } = 12;
 
+    /// <summary>A fighter of ours this near the carrier makes it escorted, and no target.</summary>
     public static int EscortWithin { get; set; } = 12;
 
+    /// <summary>How strong the party must be against the carrier to lay the ambush: the companies' choosing odds.</summary>
     public static double ChooseOdds { get; set; } = 1.0;
 
+    /// <summary>
+    /// The floor under what lying in wait is reckoned at a minute. life19: the price is the expected cargo now (the carrier's goods at
+    /// the fence's share, split among the party, over <see cref="BotLieInWait.Minutes"/>); a floor of 120 claimed a take no ambush ever
+    /// paid, and the review still sold it at 30–37/min to a delivery or a restock. The band is called by <see cref="Press"/> now, not
+    /// by the auction, so the price is what the ledger reads, not what decides.
+    /// </summary>
     public static double Prior { get; set; } = 1.0;
 
+    /// <summary>
+    /// <b>The band is mustered, as a company is (07.10.2026, life19).</b> On build 419 (2.3 h) three ambushes were laid and no bandit took
+    /// the call: the deed was an offer in each bandit's auction and lost it ("over ambush: lying in wait for Norna at 37/min" to a delivery
+    /// at 66/min; Joran's restock at 159/min over 30/min). With this on, the bandits within reach are pressed into the ambush the way a
+    /// company's call presses the enlistment (<c>BotWill.Press</c>): work that resumes is put down to take up again, never dropped; a
+    /// bandit at a fight, on a company's or a class's work, or carrying another bot's goods is passed over and counted by cause. The
+    /// ambush is laid only when <see cref="LeastParty"/> are free to be pressed. Off: the old offer at auction.
+    /// </summary>
     public static bool Press { get; set; } = true;
 
+    /// <summary>
+    /// The farthest along the carrier's road the spot may lie (life19): on 419 the spot was 561 and 703 tiles ahead, minutes of the
+    /// carrier's walk, and both carriers were lost before they came near it.
+    /// </summary>
     public static int MostAhead { get; set; } = 300;
 
+    /// <summary>
+    /// Whether a bandit strikes only when a second of the party is at hand (life19): the leader waits at the spot until two are
+    /// committed, and does not fall on the carrier alone.
+    /// </summary>
     public static bool StrikeTogether { get; set; } = true;
 
+    /// <summary>
+    /// <b>Cheap work is thrown away for the band's call (07.10.2026, life19b).</b> On build 420 (70 min) no ambush was laid: 16 calls had
+    /// fewer than two free, and the commonest bar was "on work that would be thrown away" (14 of 31 passings over): an inscription, a
+    /// restock, a hunt, a prowl — work that does not resume. Work reckoned under this many gp a minute is dropped for the ambush; dearer
+    /// work still keeps its bandit. Zero: nothing is thrown away.
+    /// </summary>
     public static double ThrowBelow { get; set; } = 40.0;
 
+    /// <summary>
+    /// <b>Hired hands (life19b).</b> Beside The Shadow's members and the thieves on the roll, a poor fighter (under <c>BotCrime.PoorBelow</c>)
+    /// with the greedy or the reckless trait, of a class a thief may be, may be called to an ambush on a carrier not of its own guild or an
+    /// ally's. Off: The Shadow and its thieves only.
+    /// </summary>
     public static bool HireHands { get; set; } = true;
 
     public static long Sweeps { get; private set; }
@@ -130,38 +193,48 @@ public static class BotHighway
 
     public static long TakenWorth { get; private set; }
 
+    /// <summary>life18a: carriers the band could not get ahead of on their road; ambushes moved after a carrier that turned; carriers lost.</summary>
     public static long NoCatch { get; private set; }
 
     public static long Relaid { get; private set; }
 
     public static long LostTrail { get; private set; }
 
+    /// <summary>life18a: carriers that set their load down (delivered, dropped) while the band lay in wait.</summary>
     public static long Unloaded { get; private set; }
 
+    /// <summary>life18a: bandits out of the recruits on the roll (not The Shadow's own) called to an ambush.</summary>
     public static long Recruits { get; private set; }
 
+    /// <summary>life19: bandits pressed into an ambush; of them, thieves taken off a turn in a crowd; and the work put down for it.</summary>
     public static long Pressed { get; private set; }
 
     public static long FromTurn { get; private set; }
 
     public static long PutDown { get; private set; }
 
+    /// <summary>life19b: work thrown away for the ambush (cheaper than <see cref="ThrowBelow"/>), by kind; and hired hands pressed in.</summary>
     public static long Thrown { get; private set; }
 
     public static long Hired { get; private set; }
 
     private static readonly Dictionary<string, long> _thrownKinds = [];
 
+    /// <summary>life19: calls with a carrier worth it in reach and fewer than <see cref="LeastParty"/> bandits free to be pressed.</summary>
     public static long TooFew { get; private set; }
 
+    /// <summary>life19: ambushes closed because fewer than two stayed committed before the carrier came; strikes held for a second bandit.</summary>
     public static long FellApart { get; private set; }
 
     public static long HeldStrike { get; private set; }
 
+    /// <summary>life19: sweeps that kept an ambush whose carrier was off its drawn road but still bound for the same goal and short of the spot.</summary>
     public static long KeptOnGoal { get; private set; }
 
+    /// <summary>life19: spots refused for lying more than <see cref="MostAhead"/> tiles along the carrier's road.</summary>
     public static long TooFarAhead { get; private set; }
 
+    /// <summary>life19: bandits within reach of a call not pressed into it, by why (one count a bandit a call).</summary>
     private static readonly Dictionary<string, long> _refused = [];
 
     private static readonly int[] _cargo = new int[CargoWindow];
@@ -183,6 +256,7 @@ public static class BotHighway
 
         public Point3D Spot;
 
+        /// <summary>Bumped every time the spot moves after the carrier, so a bandit lying in wait starts its clock again.</summary>
         public int SpotStamp;
 
         public int Relays;
@@ -199,10 +273,12 @@ public static class BotHighway
 
         public bool Chosen;
 
+        /// <summary>A strike was held for a second bandit at least once (life19).</summary>
         public bool HeldOnce;
 
         public bool Withdraw;
 
+        /// <summary>Laid on a quay for a colony's ship by <see cref="BotPiracy"/>, not on a road: the zones paint it while it waits (08.10.2026).</summary>
         public bool Quay;
 
         public bool CarrierDown;
@@ -223,12 +299,15 @@ public static class BotHighway
 
         public readonly HashSet<Serial> Took = [];
 
+        /// <summary>What each bandit took in goods, at what the fence pays: its work's takings beside the coin.</summary>
         public readonly Dictionary<Serial, int> Made = [];
 
         public readonly HashSet<Serial> Ended = [];
 
+        /// <summary>Where the carrier was bound when the ambush was laid (life19): a carrier off its drawn road but bound there still is followed.</summary>
         public Point3D Goal;
 
+        /// <summary>Bandits that took the call and are still on it, alive.</summary>
         public int Committed()
         {
             var count = 0;
@@ -244,6 +323,7 @@ public static class BotHighway
             return count;
         }
 
+        /// <summary>Committed bandits within <paramref name="range"/> of a point: who is at hand for the strike.</summary>
         public int AtHand(Point3D at, int range)
         {
             var count = 0;
@@ -282,8 +362,10 @@ public static class BotHighway
 
     private static bool _clock;
 
+    /// <summary>The ambush standing now, or null.</summary>
     public static Party Now => _party is { Closed: false } ? _party : null;
 
+    /// <summary>One look at the roads, from <see cref="BotCrime.Beat"/>: the standing ambush watched, or a new one laid.</summary>
     public static void Sweep(long now)
     {
         if (now - _sweptTick < SweepMs)
@@ -314,6 +396,7 @@ public static class BotHighway
             }
             else if (Press && !party.Hit && party.Took.Count > 0 && party.Committed() < Math.Max(1, LeastParty))
             {
+                // life19: the leader waits at the spot only while two are committed; one left alone does not take the carrier on.
                 FellApart++;
                 Close(party, $"fewer than {Math.Max(1, LeastParty)} of the band were left on it before the carrier came");
             }
@@ -330,6 +413,7 @@ public static class BotHighway
             return;
         }
 
+        // The first look after a boot starts the clock, so a restart is not a free ambush.
         if (!_clock)
         {
             _clock = true;
@@ -349,6 +433,7 @@ public static class BotHighway
 
     private static readonly List<BotMobile> _band = [];
 
+    /// <summary>Looks for a lone carrier worth the trouble and a party near enough to take it, and lays the ambush.</summary>
     private static void Lay(long now)
     {
         var map = BotPopulation.Home;
@@ -363,6 +448,8 @@ public static class BotHighway
 
         var bots = BotPopulation.Bots;
 
+        // life19: with the press on, every bandit on the map is looked at, so the call can count who could not come and why; the carrier
+        // is chosen by the nearest of them, and the party out of those free to be pressed (Callable).
         for (var i = 0; i < bots.Count; i++)
         {
             if (bots[i] is { Deleted: false, Alive: true } bot && bot.Map == map && (Bandit(bot) || Press && HireHands && Hireling(bot)) && !BotFence.Is(bot)
@@ -389,6 +476,8 @@ public static class BotHighway
         var nearest = int.MaxValue;
         var bar = Bar();
 
+        // life19: the carrier a free bandit is nearest; failing one, the carrier any bandit is nearest, so the call is made and
+        // who could not come is counted by why.
         BotMobile busyCarrier = null;
         var busyCargo = 0;
         var busyNearest = int.MaxValue;
@@ -428,6 +517,7 @@ public static class BotHighway
                 continue;
             }
 
+            // The carrier nearest any bandit: the one the band can reach first.
             var any = Nearest(bot, false);
 
             if (any <= PartyReach && any < busyNearest)
@@ -474,6 +564,7 @@ public static class BotHighway
                 break;
             }
 
+            // life19b: a hired hand is not set on a carrier of its own guild or an ally's.
             if (!Bandit(_band[i]) && _band[i].Guild is Server.Guilds.Guild own && carrier.Guild is Server.Guilds.Guild theirs
                 && (ReferenceEquals(own, theirs) || own.IsAlly(theirs)))
             {
@@ -483,6 +574,7 @@ public static class BotHighway
                 continue;
             }
 
+            // life19: only a bandit the call can press without throwing its work away; the rest are counted by why.
             if (Press && Callable(_band[i]) is { } why)
             {
                 _passed.Add(why);
@@ -591,6 +683,7 @@ public static class BotHighway
             return;
         }
 
+        // life19: the call presses the ambush on each of them, as a company's call presses the enlistment. Taken() counts the taker.
         for (var i = 0; i < party.Members.Count; i++)
         {
             if (party.Members[i] is not IBotWilful wilful)
@@ -641,6 +734,12 @@ public static class BotHighway
         }
     }
 
+    /// <summary>
+    /// A band laid by another's choosing (07.10.2026, sea20): The Shadow on a quay for a colony's loaded ship (<see cref="BotPiracy"/>).
+    /// The party is made the standing ambush and pressed as <see cref="Lay(long)"/> presses its own, and everything after it — the wait,
+    /// the strike, the robbery, the quarter, the loot, the report, the withdrawal — is this file's. False when an ambush stands already,
+    /// the ambushes are off, or the band could not be called together.
+    /// </summary>
     public static bool Lay(Party party, string why)
     {
         if (!Running || party == null || party.Members.Count == 0 || party.Carrier == null || _party is { Closed: false })
@@ -676,6 +775,10 @@ public static class BotHighway
         return true;
     }
 
+    /// <summary>
+    /// A hired hand (life19b): not of the band, a poor fighter of a class a thief may be (crime17's rule), greedy or reckless, no guild's
+    /// head, not wanted, not carrying goods of its own errand.
+    /// </summary>
     private static bool Hireling(BotMobile bot) =>
         !Bandit(bot) && !BotOutlaw.Outlaw(bot) && Goods(bot) == null && bot.Class is { } klass
         && klass.Role is not (BotRole.Producer or BotRole.Medic) && !klass.Unpaid && !klass.Leads && !klass.Neutral && klass is not (BotSage or BotArchitect)
@@ -686,6 +789,11 @@ public static class BotHighway
 
     private static readonly List<string> _passedWho = [];
 
+    /// <summary>
+    /// Why a bandit cannot be pressed into the ambush now, or null when it can (life19). The rule a company's call reads
+    /// (<c>BotSquads.Pressable</c>) — work that resumes is put down, never thrown away; a fight, a company's or a class's work and another
+    /// bot's goods are left alone — except that a thief's turn in a crowd is put down for it: the band's own call outranks its own errand.
+    /// </summary>
     private static string Callable(BotMobile bot)
     {
         if (bot.Squad != null)
@@ -748,18 +856,22 @@ public static class BotHighway
         return null;
     }
 
+    /// <summary>A bandit: one of The Shadow, or a thief on the roll the band recruited (life18a: The Shadow alone was two bodies).</summary>
     public static bool Bandit(Mobile m) => BotUnderworld.Member(m) || BotCrime.IsThief(m);
 
+    /// <summary>The kind a bot is carrying on the road for somebody: a delivery's, a haul's, or a caravan's (life18a); else null.</summary>
     private static Type Goods(BotMobile bot) =>
         bot.Resolve?.Deed switch
         {
             IBotWantCarrier carrying => carrying.Goods,
             BotCaravan caravan => caravan.Goods,
 
+            // A colony's ship's captain carrying the store home (07.10.2026, sea20): what a band laid on its quay waits for. See BotPiracy.
             BotColonyRun run => run.Goods,
             _ => null
         };
 
+    /// <summary>One carrier's cargo out of town, into the window the bar is read off. A carrier with nothing in its pack yet (on its way to buy) is not measured.</summary>
     private static void Measure(int worth)
     {
         if (worth <= 0)
@@ -772,6 +884,7 @@ public static class BotHighway
         _cargoCount = Math.Min(CargoWindow, _cargoCount + 1);
     }
 
+    /// <summary>What a carrier's cargo must come to: <see cref="LeastCargo"/> until measured, then the top <see cref="CargoShare"/>'s floor.</summary>
     public static int Bar()
     {
         if (_cargoCount < Math.Max(1, CargoSeen))
@@ -782,6 +895,7 @@ public static class BotHighway
         return Math.Max(CargoFloor, Quantile(1.0 - Math.Clamp(CargoShare, 0.01, 1.0)));
     }
 
+    /// <summary>The cargo at this quantile of the window. A copy of 256 numbers sorted: every 30 seconds at most.</summary>
     private static int Quantile(double q)
     {
         if (_cargoCount == 0)
@@ -795,6 +909,7 @@ public static class BotHighway
         return _cargoSort[Math.Clamp((int)(q * _cargoCount), 0, _cargoCount - 1)];
     }
 
+    /// <summary>What the carrier's goods come to at the market's worth: the kind it carries, in its pack.</summary>
     private static int Cargo(BotMobile carrier, Type goods)
     {
         if (goods == null || carrier.Backpack is not { } pack)
@@ -805,6 +920,7 @@ public static class BotHighway
         return pack.GetAmount(goods) * BotCrime.Worth(goods);
     }
 
+    /// <summary>Whether a fighter of ours is near enough to the carrier to stand with it.</summary>
     private static bool Escort(BotMobile carrier, Map map)
     {
         foreach (var other in map.GetMobilesInRange<BotMobile>(carrier.Location, Math.Max(1, EscortWithin)))
@@ -823,6 +939,7 @@ public static class BotHighway
 
     private static readonly HashSet<Serial> _free = [];
 
+    /// <summary>The nearest bandit to the carrier, in tiles; of those free to be pressed only, when <paramref name="free"/>.</summary>
     private static int Nearest(BotMobile carrier, bool free)
     {
         var nearest = int.MaxValue;
@@ -847,6 +964,11 @@ public static class BotHighway
 
     private static readonly List<Point3D> _road = [];
 
+    /// <summary>
+    /// The carrier's road still ahead: the points of the route the planner drew for the errand it walks (from the leg in hand),
+    /// then its goal — or, with no route held (a near goal walked straight, a fight on top), the straight line to its work's place,
+    /// a point every 16 tiles. A route that ends on a gate stops there: what lies beyond it is another place.
+    /// </summary>
     private static List<Point3D> Road(BotMobile carrier)
     {
         _road.Clear();
@@ -893,6 +1015,11 @@ public static class BotHighway
 
     private static double Away(Point3D a, Point3D b) => Math.Sqrt((a.X - b.X) * (double)(a.X - b.X) + (a.Y - b.Y) * (double)(a.Y - b.Y));
 
+    /// <summary>
+    /// The first point of the carrier's road, out of the guards and at least <see cref="AheadTiles"/> along it, that the carrier
+    /// reaches after the band does: its road there at least <see cref="Lead"/> times the nearest bandit's straight walk, plus
+    /// <see cref="LeadSlack"/>. Nowhere when the band cannot get ahead of it before its road ends (in a town, at a gate).
+    /// </summary>
     private static Point3D Ahead(Map map, BotMobile carrier, List<BotMobile> band)
     {
         var road = Road(carrier);
@@ -906,6 +1033,7 @@ public static class BotHighway
             along += Away(at, point);
             at = point;
 
+            // life19: not minutes of the carrier's walk off; it turns or sets its load down long before it gets there.
             if (MostAhead > 0 && along > MostAhead)
             {
                 TooFarAhead++;
@@ -937,6 +1065,7 @@ public static class BotHighway
         return Point3D.Zero;
     }
 
+    /// <summary>The distance from a point to the stretch a–b.</summary>
     private static double Off(Point3D p, Point3D a, Point3D b)
     {
         double dx = b.X - a.X;
@@ -949,6 +1078,7 @@ public static class BotHighway
         return Math.Sqrt(x * x + y * y);
     }
 
+    /// <summary>How far along its road ahead the carrier comes nearest the spot, in tiles; -1 when its road does not pass within <see cref="OnRoad"/>.</summary>
     private static int Along(BotMobile carrier, Point3D spot)
     {
         var road = Road(carrier);
@@ -969,6 +1099,10 @@ public static class BotHighway
         return -1;
     }
 
+    /// <summary>
+    /// The standing ambush, every sweep until it is sprung (life18a): the carrier still carrying, and the spot still on its road
+    /// ahead; a carrier that turned has the ambush moved after it, at most <see cref="MostRelays"/> times.
+    /// </summary>
     private static void Follow(Party party)
     {
         var carrier = party.Carrier;
@@ -993,6 +1127,9 @@ public static class BotHighway
             return;
         }
 
+        // life19: off the road the planner drew (a fresh plan, a step round a creature, the straight line while no route is held) but
+        // still bound where it was and not yet past the spot: the band keeps its place. On 419 three carriers were "lost" 30-90 seconds
+        // after the ambush was laid.
         if (party.Goal != Point3D.Zero && carrier.Resolve?.Deed?.Where is { } goal && goal == party.Goal
             && Away(carrier.Location, goal) > Away(party.Spot, goal) + StrikeWithin)
         {
@@ -1029,6 +1166,7 @@ public static class BotHighway
         );
     }
 
+    /// <summary>The ambush is over: what came of it said, and the carrier, if it lives, reports every bandit.</summary>
     private static void Close(Party party, string why)
     {
         if (party.Closed)
@@ -1064,6 +1202,7 @@ public static class BotHighway
         );
     }
 
+    /// <summary>A bot died: counted if it was the carrier or a bandit of the standing ambush. From <see cref="BotCrime.Fell"/>.</summary>
     public static void Fell(BotMobile fallen, Mobile killer)
     {
         var party = _party;
@@ -1087,6 +1226,7 @@ public static class BotHighway
 
             party.Killer = by;
 
+            // A carrier killed on the road is murder, by the outlaws' own book: red, the Baron's patrol, the body to be found.
             if (by != null)
             {
                 BotOutlaw.Murdered(by, fallen);
@@ -1102,6 +1242,7 @@ public static class BotHighway
         }
     }
 
+    /// <summary>The rule every bandit's fight follows: over at a withdrawal, at the carrier's choice, or when the carrier is down.</summary>
     public static string Over(IBotWilful bot, BotBrawl brawl)
     {
         var party = _party;
@@ -1186,6 +1327,7 @@ public static class BotHighway
         return null;
     }
 
+    /// <summary>Whether what stands with the carrier outweighs the band on the field, by the companies' withdrawal odds.</summary>
     private static bool Overmatched(Party party, BotMobile carrier)
     {
         var map = carrier.Map;
@@ -1219,6 +1361,7 @@ public static class BotHighway
         return ours <= 0.0 || theirs > ours * Math.Max(1.0, BotSquad.WithdrawOdds);
     }
 
+    /// <summary>What came into a bandit's pack since the census: counted, and made stolen goods.</summary>
     public static void Took(Party party, BotMobile bandit, Dictionary<Type, int> before)
     {
         List<(Type Kind, int Amount)> goods = [];
@@ -1269,6 +1412,7 @@ public static class BotHighway
         party.StruckTick = Core.TickCount;
         Struck++;
 
+        // A band on a quay for a colony's ship: the crew forms a company round its captain (07.10.2026, sea20). See BotPiracy.
         BotPiracy.Boarded(party);
 
         BotVoice.Say(by, "local", $"Stand and deliver, {party.Carrier?.Name}! The road is ours tonight.", true);
@@ -1286,6 +1430,10 @@ public static class BotHighway
 
     public static void Miss() => Missed++;
 
+    /// <summary>
+    /// Whether enough of the band is at hand to fall on the carrier (life19): <see cref="LeastParty"/> of the committed within twice
+    /// <see cref="StrikeWithin"/> of it, or all that are committed when fewer took the call. A strike held is counted once an ambush.
+    /// </summary>
     public static bool Together(Party party, BotMobile carrier)
     {
         if (!Press || !StrikeTogether || party == null || carrier == null)
@@ -1314,6 +1462,7 @@ public static class BotHighway
             ? "the roads: off"
             : $"the roads: {Sweeps} looks for a carrier ({Carriers} carriers seen, {InTown} in a guarded town, {Light} carrying under the bar, {Escorted} escorted, {Short} looks with the band too few, {Outmatched} let pass as too strong, {NoCatch} the band could not get ahead of on their road; the bar {Bar()}gp, {CargoBook()}), {Laid} ambushes laid ({Recruits} recruits called beside The Shadow), {Joined} bandits took the call and {Unmustered} ambushes nobody came to; {Mustered()}; {Relaid} moved after a carrier that turned, {LostTrail} carriers lost, {Unloaded} set their load down first; {Struck} sprung and {Missed} waits the carrier never came by; the carrier threw its goods down {Paid} times, ran {Fled}, fought on {FoughtOn} and died {Killed}; {Withdrawn} withdrawals at the odds; {BanditDeaths} bandits died at it; {TakenGold}gp and {TakenThings} things worth {TakenWorth}gp taken";
 
+    /// <summary>"the muster: 6 pressed (2 off a turn in a crowd, 4 putting work down), 3 calls with too few free; passed over: in a company 4, …".</summary>
     private static string Mustered()
     {
         if (!Press)
@@ -1401,6 +1550,7 @@ public static class BotHighway
         _cargoNext = 0;
     }
 
+    /// <summary>"cargo on the roads over the last 256: 12gp at the median, 60 at the 75th, 140 at the 90th".</summary>
     private static string CargoBook() =>
         _cargoCount == 0
             ? "no cargo measured on the roads yet"
@@ -1458,6 +1608,10 @@ public sealed class BotLieInWait : BotDeed
 
     public override Point3D Where => _party.Spot;
 
+    /// <summary>
+    /// The expected cargo (life19): the carrier's goods at the fence's share, split among the party, over the deed's minutes. A 250gp
+    /// cargo for two is some 10gp a minute — honest, and it no longer decides: the band is pressed (<see cref="BotHighway.Press"/>).
+    /// </summary>
     public override double Expects =>
         Math.Max(BotHighway.Prior, _party.Cargo * BotFencer.FenceShare / Math.Max(1, _party.Members.Count) / Math.Max(1.0, Minutes));
 
@@ -1520,6 +1674,7 @@ public sealed class BotLieInWait : BotDeed
 
             if (!_party.Hit && body.InRange(carrier.Location, BotHighway.StrikeWithin) && body.InLOS(carrier) && !BotHighway.Together(_party, carrier))
             {
+                // life19: not alone. The second is still on its way: hidden at the spot, the carrier let by rather than fought one to one.
                 return BotDoing.Work($"lying in wait for {carrier.Name}, waiting for the rest of the band");
             }
 
@@ -1535,6 +1690,7 @@ public sealed class BotLieInWait : BotDeed
             {
                 if (_stamp != _party.SpotStamp)
                 {
+                    // The carrier turned and the ambush moved after it: a new spot, a new wait.
                     _stamp = _party.SpotStamp;
                     _waitFrom = 0;
                 }
@@ -1589,6 +1745,7 @@ public sealed class BotLieInWait : BotDeed
             }
         }
 
+        // The carrier is dead and this one goes through what it left: the leader, or whoever is left standing.
         return Loot(bot, body);
     }
 

@@ -36,6 +36,7 @@ public class BotStandIn : PlayerMobile
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStandIn));
 
+    /// <summary>Doubles that came back from a world save and were deleted. See <see cref="Deserialize"/>.</summary>
     public static long Returned { get; private set; }
 
     public BotStandIn(Serial serial) : base(serial)
@@ -46,18 +47,23 @@ public class BotStandIn : PlayerMobile
     {
     }
 
+    /// <summary>Whose double this is, by name.</summary>
     public string Of { get; private set; }
 
+    /// <summary>Damage the engine applied to it in the fight, never more than it had standing.</summary>
     public int Taken { get; private set; }
 
+    /// <summary>Health given back in the fight — bandage, bottle or spell — as far as there was room for it.</summary>
     public int Healed { get; private set; }
 
+    /// <summary>Things copied onto it: worn, and carried into the fight.</summary>
     public int Copied { get; private set; }
 
     public override void OnDamage(int amount, Mobile from, bool willKill)
     {
         base.OnDamage(amount, from, willKill);
 
+        // Called before the hit points are lowered (Mobile.OnDamage), so what it had standing is still there to cap it.
         Taken += Math.Max(0, Math.Min(amount, Hits));
     }
 
@@ -65,9 +71,15 @@ public class BotStandIn : PlayerMobile
     {
         base.OnHeal(ref amount, from);
 
+        // The engine clamps the heal to the room left after this call (Mobile.Heal); count the same thing it will apply.
         Healed += Math.Max(0, Math.Min(amount, HitsMax - Hits));
     }
 
+    /// <summary>
+    /// Makes the double: the original's body and face, its raw stats and skills, a copy of everything it wears and of what it
+    /// fights with out of its pack, put down at <paramref name="at"/> with full health, stamina and mana. Null if the
+    /// original is not a body that can be copied.
+    /// </summary>
     public static BotStandIn Copy(BotMobile bot, Map map, Point3D at)
     {
         if (bot is not { Deleted: false } || map == null || map == Map.Internal)
@@ -77,6 +89,9 @@ public class BotStandIn : PlayerMobile
 
         var double_ = new BotStandIn
         {
+            // The flag the engine reads a player's death by. Without it a body that dies is deleted rather than left a
+            // ghost, which would do no harm here — but the engine also reads "alive" off it, and a double that reads as
+            // alive after it has died is a fight the referee never calls. See BotMobile.Become.
             Player = true,
             Of = bot.Name,
             Name = $"{bot.Name}'s double",
@@ -108,6 +123,7 @@ public class BotStandIn : PlayerMobile
             to.Base = from.Base;
         }
 
+        // Worn first, then carried: a bow wants its arrows in the pack, a book its reagents.
         var worn = bot.Items;
 
         for (var i = 0; i < worn.Count; i++)
@@ -141,6 +157,7 @@ public class BotStandIn : PlayerMobile
 
         if (pack != null)
         {
+            // Every level of the pack: a quiver or a pouch inside it holds arrows and bottles as surely as the pack does.
             _carried.Clear();
             Gather(pack, _carried);
 
@@ -167,6 +184,9 @@ public class BotStandIn : PlayerMobile
         double_.Stam = double_.StamMax;
         double_.Mana = double_.ManaMax;
 
+        // Its weapon was put in its hand before its stamina was filled, and equipping sets the next swing a whole swing away
+        // at the stamina of the moment (BaseWeapon.OnEquip, GetDelay): Cassia's first arrow waited 7.3 s against the 4.7 s
+        // of every one after it (the trace, 04:33 on 26.09.2026). A bot comes to a fight with its weapon long in its hand.
         double_.NextCombatTime = Core.TickCount;
 
         double_.MoveToWorld(at, map);
@@ -174,6 +194,7 @@ public class BotStandIn : PlayerMobile
         return double_;
     }
 
+    /// <summary>Whether a bot reaches for this out of its pack in a fight: what it heals and casts with, what it shoots, and a spare weapon.</summary>
     private static bool Fights(Item item) =>
         item is { Deleted: false } and (Bandage or BasePotion or BaseReagent or SpellScroll or Spellbook or Arrow or Bolt or BaseWeapon);
 
@@ -201,12 +222,20 @@ public class BotStandIn : PlayerMobile
         }
     }
 
+    /// <summary>Whether the bot this doubles is of a class that draws a blade when something closes (BotClass.Closes).</summary>
     public bool Closes { get; private set; }
 
+    /// <summary>Whether the bot this doubles is a shooter by class: it brings a bow up whenever it has something to put in it.</summary>
     public bool Shoots { get; private set; }
 
+    /// <summary>Weapon changes the double made in its fight.</summary>
     public int Draws { get; private set; }
 
+    /// <summary>
+    /// The bot's own swap between the weapon it shoots with and the one it swings (BotMobile.Draw), for a body that is not
+    /// a BotMobile: the held weapon into the pack, the best of the other kind out of it — a bow only if there is something to
+    /// fire. True when the double is holding the kind asked for.
+    /// </summary>
     public bool Draw(bool melee)
     {
         var pack = Backpack;
@@ -281,6 +310,7 @@ public class BotStandIn : PlayerMobile
         return false;
     }
 
+    /// <summary>What the double holds, and what it has to fire, for the fight's line: the proof that it is armed as the bot is.</summary>
     public string Holding()
     {
         var weapon = Weapon as BaseWeapon;
@@ -290,6 +320,7 @@ public class BotStandIn : PlayerMobile
         return ammo < 0 ? name : $"{name} with {ammo} to fire";
     }
 
+    /// <summary>The engine's own dupe of one thing, contents and all, or null if the engine cannot build it.</summary>
     private static Item Clone(Item source)
     {
         try
@@ -316,6 +347,7 @@ public class BotStandIn : PlayerMobile
                 return null;
             }
 
+            // A bound thing is blessed for its owner; the double is somebody else, and what it carries goes with it.
             copy.BlessedFor = null;
 
             return copy;
@@ -341,6 +373,7 @@ public class BotStandIn : PlayerMobile
 
         reader.ReadInt();
 
+        // Saved in the middle of a fight. The fight did not survive the stop; neither does the double.
         Returned++;
         Timer.DelayCall(Delete);
     }

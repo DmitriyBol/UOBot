@@ -119,6 +119,7 @@ internal sealed class GridNavTerrain : INavTerrain
         return new StepMask(mask, 0, land[0], land[1], land[2], land[3], land[4], land[5], land[6], land[7], 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
+    /// <summary>The neighbour's surface a mover at <paramref name="z"/> steps onto, if any.</summary>
     public bool Land(int x, int y, int z, out sbyte landed)
     {
         landed = 0;
@@ -143,6 +144,10 @@ internal sealed class GridNavTerrain : INavTerrain
         return found;
     }
 
+    /// <summary>
+    /// The exact least cost from one surface to another over the whole grid, by Dijkstra over (x, y, surface) with the
+    /// strict corner rule and <see cref="NavCost"/>'s prices: the oracle the planners are measured against. -1 when none.
+    /// </summary>
     public int Oracle(int sx, int sy, int sz, int gx, int gy, int gz)
     {
         var start = (sx, sy, Index(sx, sy, sz));

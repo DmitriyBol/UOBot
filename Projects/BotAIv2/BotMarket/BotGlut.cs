@@ -64,17 +64,28 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotGlut
 {
+    /// <summary>Whether the reading bites at all. Off, every factor is one and every yield is the island's price, as before 01.10.2026.</summary>
     public static bool Enabled { get; set; } = true;
 
+    /// <summary>
+    /// How long made, sold and peddled are remembered: two half-windows, so a reading covers between half of this and all of it.
+    /// Thirty minutes — about the life of a shop shift and a maker's two or three stints.
+    /// </summary>
     public static int WindowMs { get; set; } = 1800000;
 
+    /// <summary>The least a glut may discount a kind to. A tenth: the same floor as crowding and an empty purse, for the same reason.</summary>
     public static double Floor { get; set; } = 0.1;
 
+    /// <summary>A shelf's worth of a kind. A pile this small is stock, not a glut, and nothing is discounted for it.</summary>
     public static int Tolerance { get; set; } = 6;
 
+    /// <summary>The factor at or under which a maker choosing on spec passes the kind over for one that is not glutted.</summary>
     public static double Shunned { get; set; } = 0.34;
 
+    /// <summary>How long one reading of a kind stands before it is taken again. It is asked on every review of every maker's offer.</summary>
     public static int ReadMs { get; set; } = 5000;
+
+    // ---- What was made, sold and peddled lately, by kind ---------------------------------------------------------------------
 
     private sealed class Tally
     {
@@ -93,22 +104,28 @@ public static class BotGlut
 
     private static bool _turned;
 
+    /// <summary>Things made, sold between bots and peddled to shopkeepers since the world loaded, for the line.</summary>
     public static long MadeAll { get; private set; }
 
     public static long SoldAll { get; private set; }
 
     public static long PeddledAll { get; private set; }
 
+    /// <summary>Things made while their kind was already glutted: counted at the surplus price by <see cref="Yield"/>.</summary>
     public static long MadeIntoGlut { get; private set; }
 
+    /// <summary>Stints offered on spec by the makers that say so, and of those the ones for a kind already glutted. See <see cref="Spec"/>.</summary>
     public static long OnSpec { get; private set; }
 
     public static long OnSpecGlutted { get; private set; }
 
+    /// <summary>Choices on spec that passed a harder, glutted kind over for one the island is not full of. See <see cref="Steered"/>.</summary>
     public static long Turned { get; private set; }
 
+    /// <summary>Units a neutral class (a trader's gathering) asked for and the readings left out of the demand, summed over readings.</summary>
     public static long TraderUnitsLeftOut { get; private set; }
 
+    /// <summary>The two half-windows turned over, and both cleared after a gap longer than the window.</summary>
     private static void Turn()
     {
         var now = Core.TickCount;
@@ -180,6 +197,7 @@ public static class BotGlut
         return (made, sold, peddled);
     }
 
+    /// <summary>Something came out of a craft or a fire: booked where the trade counts its own output, so this never disagrees with it.</summary>
     public static void Made(Type kind, int units)
     {
         if (kind == null || units <= 0)
@@ -196,6 +214,7 @@ public static class BotGlut
         }
     }
 
+    /// <summary>Goods changed hands between two bots: a shop's till, a delivery. Booked by <see cref="BotMarket.Traded"/>.</summary>
     public static void Sold(Type kind, int units)
     {
         if (kind == null || units <= 0)
@@ -210,6 +229,10 @@ public static class BotGlut
 
     private static readonly Dictionary<Type, (long Units, long Gold)> _scrap = [];
 
+    /// <summary>
+    /// Goods sold to a shopkeeper, with what it paid: the one price a kind nobody asks for really has, learned from the counter
+    /// rather than typed. Halved past a thousand units, as the island's traded price is, so the first hour does not outweigh the fifth.
+    /// </summary>
     public static void Peddled(Type kind, int units, int gold)
     {
         if (kind == null || units <= 0)
@@ -237,10 +260,14 @@ public static class BotGlut
         _scrap[kind] = (u + units, g + gold);
     }
 
+    /// <summary>What a shopkeeper pays for one of this kind, as far as any peddle has shown; nought when none has.</summary>
     public static int Scrap(Type kind) =>
         kind != null && _scrap.TryGetValue(kind, out var sold) && sold.Units > 0 ? (int)Math.Max(1, sold.Gold / sold.Units) : 0;
 
+    /// <summary>Kinds a shopkeeper's price has been learned for.</summary>
     public static int ScrapKinds => _scrap.Count;
+
+    // ---- The reading -----------------------------------------------------------------------------------------------------
 
     private sealed class Reading
     {
@@ -257,10 +284,26 @@ public static class BotGlut
 
     private static readonly Dictionary<Type, Reading> _readings = [];
 
+    /// <summary>
+    /// How much of the island's price one more of this kind is worth to whoever makes it: one when the island asks for as many as
+    /// there are, down to <see cref="Floor"/> when a pile stands against nothing. Kept for <see cref="ReadMs"/> per kind.
+    /// </summary>
     public static double Factor(Type kind) => kind == null ? 1.0 : Read(kind).Factor;
 
+    /// <summary>Whether a maker choosing on spec should pass this kind over for one the island is not full of.</summary>
     public static bool Glutted(Type kind) => Enabled && kind != null && Read(kind).Factor <= Shunned;
 
+    /// <summary>
+    /// Units of a kind that passed through bots' hands this half hour — made, sold between bots — or stand on a bot's shop now.
+    /// Nought means no bot on the island is known to hold one.
+    ///
+    /// <para>
+    /// <b>A gathering for a thing nobody holds (01.10.2026, build 386).</b> A trader stood at Britain's bank twelve times saying
+    /// "buying 1 LightningScroll" for a mage past the carriers' reach, five minutes each, and nobody brought one: no scribe on
+    /// the island writes that scroll. The trader's proposer asks this before it offers a gathering (<c>BotHauler.Gathering</c>);
+    /// a kind the island has not made, sold or shown this half hour is not gathered for. Read off the balance's own buckets.
+    /// </para>
+    /// </summary>
     public static int Seen(Type kind)
     {
         if (kind == null)
@@ -285,11 +328,16 @@ public static class BotGlut
         var (made, sold, peddled) = Window(kind);
         var shown = BotShopkeep.Showing(kind);
 
+        // The pile: what the shops show now, or what was made this half hour and neither sold to a bot nor peddled to a
+        // shopkeeper — whichever is larger, since the second lies in packs and bank boxes nothing but its owner reads.
         var pile = Math.Max(shown, made - sold - peddled);
         var asked = Asked(kind);
         var demand = asked + sold;
         var factor = 1.0;
 
+        // A shelf's worth is always allowed, and the discount eases in from there: (demand + shelf) / pile, so seven of a kind
+        // nobody asks for read 0.86, twenty read 0.30, sixty read the floor. A cliff at the shelf's edge would have made the
+        // seventh piece the one that turned a trade off.
         if (Enabled && pile > Tolerance && demand < pile)
         {
             factor = Math.Clamp((demand + Tolerance) / (double)pile, Math.Clamp(Floor, 0.01, 1.0), 1.0);
@@ -315,6 +363,11 @@ public static class BotGlut
         return known;
     }
 
+    /// <summary>
+    /// The units open wants ask for and still open to a carrier, as <see cref="BotMarket.Asked"/> counts them, less what a neutral
+    /// class asks for: a trader's gathering is a far want carried, not demand of its own (see the remarks). One walk of the board,
+    /// once per <see cref="ReadMs"/> per kind.
+    /// </summary>
     private static int Asked(Type kind)
     {
         var units = 0;
@@ -342,6 +395,12 @@ public static class BotGlut
         return units;
     }
 
+    /// <summary>
+    /// What <paramref name="units"/> of a kind a bot has just made or smelted are worth to it, in gold-equivalent: the units open
+    /// wants ask for at the island's price (<see cref="BotMarket.Worth"/>), the rest at the surplus price — what a shopkeeper pays
+    /// for one when a peddle has shown it, else the island's price times the <see cref="Factor"/>. The number every maker's
+    /// <c>Made</c> reports since 01.10.2026, where it reported <c>units × Worth</c>.
+    /// </summary>
     public static int Yield(Type kind, int units, int guess)
     {
         if (kind == null || units <= 0)
@@ -365,6 +424,9 @@ public static class BotGlut
             return units * worth;
         }
 
+        // Never nought: a thing made is worth a gold-equivalent at the least, so a stint that made only surplus still reads as
+        // having produced (BotWill's "goods or skill" test on a failed trip, and the earnings page) — a glut is a low price,
+        // not a trade that made nothing.
         var surplus = Math.Max(1, Math.Max(Scrap(kind), (int)Math.Round(worth * reading.Factor)));
 
         if (surplus >= worth)
@@ -375,8 +437,13 @@ public static class BotGlut
         return wanted * worth + rest * surplus;
     }
 
+    /// <summary>
+    /// A maker's claim for work on spec, marked down by the glut of the kind it means to make. One for an unknown kind. The order's
+    /// claim is never passed through here: somebody has said it will pay.
+    /// </summary>
     public static double Claim(Type kind, double prior) => kind == null || !Enabled ? prior : prior * Read(kind).Factor;
 
+    /// <summary>A maker has offered a stint on spec for this kind. Counted here and nowhere else, so the share into a glut has a denominator.</summary>
     public static void Spec(Type kind)
     {
         OnSpec++;
@@ -387,8 +454,12 @@ public static class BotGlut
         }
     }
 
+    /// <summary>A chooser passed a harder, glutted kind over for one the island is not full of.</summary>
     public static void Steered() => Turned++;
 
+    // ---- What it says ----------------------------------------------------------------------------------------------------
+
+    /// <summary>The balance line: the glutted kinds, the half hour's flow, and what the makers did about it. Printed as <c>Balance:</c> every five minutes.</summary>
     public static string Describe()
     {
         List<(Type Kind, Reading Reading)> glutted = [];
@@ -450,6 +521,7 @@ public static class BotGlut
                + $"shopkeepers' prices learned from peddles for {_scrap.Count} kinds; {TraderUnitsLeftOut} units of traders' gathering wants left out of the demand over the readings; a shelf of {Tolerance} is never a glut and the floor is ×{Floor:F2}";
     }
 
+    /// <summary>A new world: nothing made, sold or peddled in the old one counts.</summary>
     public static void Reset()
     {
         _now.Clear();

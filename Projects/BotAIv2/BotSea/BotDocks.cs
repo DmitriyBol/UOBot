@@ -10,18 +10,30 @@ namespace Server.BotAI.V2;
 /// </summary>
 public sealed class BotBerth
 {
+    /// <summary>Ground a bot stands on beside the water, joined to the town's square: it boards from here.</summary>
     public Point3D Shore;
 
+    /// <summary>
+    /// Where the ship's middle is put down, at sea level, with a plank within <see cref="BotDocks.Gangway"/> of the shore. The
+    /// north-facing hull a deed puts down fits here; so does the hull lying as <see cref="East"/> says.
+    /// </summary>
     public Point3D Berth;
 
+    /// <summary>Whether the ship lies east–west at the berth and through the harbour; north–south otherwise.</summary>
     public bool East;
 
+    /// <summary>The harbour: the berth first, every turn, and last a tile in an open cell of the open sea.</summary>
     public List<Point3D> Harbour;
 
+    /// <summary>The open cell the harbour leads to.</summary>
     public int Entry;
 
     public int HarbourTiles;
 
+    /// <summary>
+    /// For a berth other than the dock's first: the open cells from its <see cref="Entry"/> to the first berth's, where the
+    /// dock's lanes begin. Empty for the first; null until drawn.
+    /// </summary>
     public List<int> Link;
 
     public BotSeaCourse.Ask Linking;
@@ -41,18 +53,24 @@ public sealed class BotDock
 
     public string Name;
 
+    /// <summary>Ground a bot stands on beside the water, joined to the town's square: it boards from here and lands here.</summary>
     public Point3D Shore;
 
+    /// <summary>Where the ship's middle is put down, at sea level, with a plank within <see cref="BotDocks.Gangway"/> of the shore.</summary>
     public Point3D Berth;
 
+    /// <summary>Whether the ship lies east–west at the berth and through the harbour; north–south otherwise.</summary>
     public bool East;
 
+    /// <summary>The harbour: the berth first, every turn, and last a tile in an open cell of the open sea.</summary>
     public List<Point3D> Harbour;
 
+    /// <summary>The open cell the harbour leads to, where the sea's course begins.</summary>
     public int Entry;
 
     public int HarbourTiles;
 
+    /// <summary>Every berth, the first — the one the fields above describe — first. See <see cref="BotDocks.MostBerths"/>.</summary>
     public readonly List<BotBerth> Berths = [];
 
     public BotBerth First => Berths.Count > 0 ? Berths[0] : null;
@@ -89,20 +107,31 @@ public static class BotDocks
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDocks));
 
+    /// <summary>How far from a town's square its shore is looked for. Britain's lies 78 tiles out, Trinsic's 76.</summary>
     public static int Reach { get; set; } = 200;
 
+    /// <summary>How far a plank may be from the shore. Six: the engine's plank puts a walker down no further from itself.</summary>
     public static int Gangway { get; set; } = 6;
 
+    /// <summary>How far from the berth the harbour is searched for the open sea, each way. Vesper's is 39 tiles, Britain's 38.</summary>
     public static int HarbourReach { get; set; } = 128;
 
+    /// <summary>How many shores one town may try before it is said to have no dock.</summary>
     public static int Tries { get; set; } = 24;
 
+    /// <summary>A shore within this many tiles of one already tried is not tried again: it is the same pond.</summary>
     public static int Spread { get; set; } = 16;
 
+    /// <summary>Where to look for a town's shore from, by town, instead of its square. From the configuration.</summary>
     public static Dictionary<string, Point2D> Pins { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Berths one dock keeps: the first, and others along the shore for when a ship is lying in it. Three. A ship lying at
+    /// anchor in a berth — its captain dead aboard, or its dry-docking refused — stays for the engine's nine days of decay.
+    /// </summary>
     public static int MostBerths { get; set; } = 3;
 
+    /// <summary>How far along the shore from the first berth's another may be. Forty-eight tiles: a walk of ten seconds.</summary>
     public static int BerthReach { get; set; } = 48;
 
     private static readonly List<BotDock> _docks = [];
@@ -123,20 +152,27 @@ public static class BotDocks
 
     public static bool Ready { get; private set; }
 
+    /// <summary>Berths passed over because the live world had something on them the map files do not: an item, a building.</summary>
     public static int Occupied { get; private set; }
 
+    /// <summary>Berths besides the docks' first, and those dropped for want of a way from them to their dock's first.</summary>
     public static int Spare { get; private set; }
 
     public static int Unlinked { get; private set; }
 
     public static IReadOnlyList<BotDock> All => _docks;
 
+    /// <summary>Towns beyond the charted sea, towns with no shore, and towns whose every shore was a pond.</summary>
     public static int Beyond { get; private set; }
 
     public static int Shoreless { get; private set; }
 
     public static int Landlocked { get; private set; }
 
+    /// <summary>
+    /// One piece of the survey: a town's shores scanned, or one of its shores tried. True once every town has been
+    /// asked. Needs the chart, the towns and the gates.
+    /// </summary>
     public static bool Step(Map map)
     {
         if (Ready)
@@ -184,6 +220,7 @@ public static class BotDocks
         {
             var shore = _shores[_try++];
 
+            // The other berths are along the shore from the first, not across the town.
             if (_dock != null && Away(shore.X, shore.Y, _dock.Shore) > BerthReach)
             {
                 return false;
@@ -230,6 +267,8 @@ public static class BotDocks
                 return false;
             }
 
+            // Its harbour may reach the open sea in another cell than the first berth's: the way between is drawn with the
+            // lanes, and a berth with none is dropped (Link).
             if (berth.Entry == _dock.Entry)
             {
                 berth.Link = [];
@@ -280,6 +319,10 @@ public static class BotDocks
         _failed.Clear();
     }
 
+    /// <summary>
+    /// Waits for the ways from every other berth to its dock's first, drops a berth that has none, and says what each dock's
+    /// berths hold right now. True once done; asked by the lanes before they are drawn.
+    /// </summary>
     public static bool Link(Map map)
     {
         if (_linked)
@@ -337,6 +380,7 @@ public static class BotDocks
                 logger.Information("Sea: {Town}'s berth {Berth} is dropped: no way by sea from its harbour to the first berth's", dock.Name, j + 1);
             }
 
+            // What the live world has on each berth now; a ship lying there goes away, anything else is a berth drawn wrong.
             for (var j = 0; j < berths.Count; j++)
             {
                 var berth = berths[j];
@@ -375,6 +419,7 @@ public static class BotDocks
         return names.ToString();
     }
 
+    /// <summary>Ground beside the water that the town's square can be walked to from, nearest the square first.</summary>
     private static void Scan(Map map, BotTowns.Town town)
     {
         _shores.Clear();
@@ -432,6 +477,7 @@ public static class BotDocks
         }
     }
 
+    /// <summary>Dry, with water a ship floats on beside it.</summary>
     private static bool Coastal(int x, int y) =>
         !BotSeaChart.Wet(x, y) && (BotSeaChart.Wet(x + 1, y) || BotSeaChart.Wet(x - 1, y) || BotSeaChart.Wet(x, y + 1) || BotSeaChart.Wet(x, y - 1));
 
@@ -448,10 +494,29 @@ public static class BotDocks
         return false;
     }
 
+    /// <summary>How many of a shore's candidate berths, best first, are asked of the live world before the shore is given up.</summary>
     public static int Candidates { get; set; } = 8;
 
     private static readonly List<(int Score, int X, int Y, bool East)> _candidates = [];
 
+    /// <summary>
+    /// A berth beside this shore and a harbour from it to the open sea, or null.
+    ///
+    /// <para>
+    /// <b>The berth takes the hull a deed puts down, whatever way the ship is to lie after.</b> A deed and a dry-docked ship
+    /// both put down a new ship, and a new ship faces north (<c>BaseBoatDeed.OnPlacement</c> asks <c>CanFit</c> of the new
+    /// ship's own item id); an east–west berth is turned to after. Build 321 chose Vesper's berth, (3010, 748), for the
+    /// east–west hull alone, and the north-facing one there covers (3010, 752) and (3010, 753) — the shore. Every voyage from
+    /// Vesper and from Buccaneer's Den (2743, 2160) was refused at the water; measured over map0 with the multi's own 36
+    /// tiles, the other three east–west berths (Trinsic, Nujel'm, Magincia) took the north hull by chance.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>And what the map files cannot show is asked of the world.</b> Decoration is items, not statics, and a ship's hull
+    /// is a multi: the best few candidates are asked of <see cref="BotSeaChart.Occupant"/> in order, and one with something
+    /// on it that is not a ship — ships move — is passed over (<see cref="Occupied"/>).
+    /// </para>
+    /// </summary>
     private static BotBerth Try(Map map, Point3D shore)
     {
         if (Near(_failed, shore.X, shore.Y))
@@ -461,6 +526,8 @@ public static class BotDocks
 
         var half = BotSeaChart.Half;
 
+        // A small window for the berth first, so that a shore with no water deep enough beside it costs a few hundred
+        // blocks' reading and not the harbour's thousand.
         var near = new BotSeaWindow(map, shore.X, shore.Y, Gangway + half * 2 + 2);
         var reach = Gangway + half;
 
@@ -487,6 +554,7 @@ public static class BotDocks
                         continue;
                     }
 
+                    // SmallBoat's planks sit two tiles either side of the middle, across the hull.
                     var plank = Math.Min(
                         Away(isEast ? px : px - 2, isEast ? py - 2 : py, shore),
                         Away(isEast ? px : px + 2, isEast ? py + 2 : py, shore)
@@ -551,6 +619,7 @@ public static class BotDocks
 
     private static int Away(int x, int y, Point3D p) => Math.Max(Math.Abs(x - p.X), Math.Abs(y - p.Y));
 
+    /// <summary>The town's dock, or null.</summary>
     public static BotDock Of(BotTowns.Town town)
     {
         for (var i = 0; i < _docks.Count; i++)
@@ -577,6 +646,7 @@ public static class BotDocks
         return null;
     }
 
+    /// <summary>The dock nearest a place as the crow flies, of any land.</summary>
     public static BotDock Nearest(Point3D where)
     {
         BotDock best = null;
@@ -650,6 +720,7 @@ internal sealed class BotSeaWindow
 
     private readonly int _size;
 
+    /// <summary>Dry tiles counted over every rectangle from the corner, so a hull is asked in four reads.</summary>
     private readonly int[] _dry;
 
     public BotSeaWindow(Map map, int x, int y, int radius)
@@ -714,6 +785,7 @@ internal sealed class BotSeaWindow
         return _dry[(j2 + 1) * stride + i2 + 1] - _dry[j1 * stride + i2 + 1] - _dry[(j2 + 1) * stride + i1] + _dry[j1 * stride + i1];
     }
 
+    /// <summary>Whether the small ship's hull, its whole rectangle, floats with its middle here.</summary>
     public bool Fits(int x, int y, bool east)
     {
         var hull = east ? BotSeaChart.HullEast : BotSeaChart.HullNorth;
@@ -721,6 +793,10 @@ internal sealed class BotSeaWindow
         return Dry(x + hull.X, y + hull.Y, x + hull.X + hull.Width - 1, y + hull.Y + hull.Height - 1) == 0;
     }
 
+    /// <summary>
+    /// Whether a deed could put the ship down with its middle here: the north-facing hull's own tiles float (the rectangle
+    /// when the multi could not be read). See <see cref="BotSeaChart.TilesNorth"/>.
+    /// </summary>
     public bool Places(int x, int y)
     {
         var tiles = BotSeaChart.TilesNorth;
@@ -744,6 +820,10 @@ internal sealed class BotSeaWindow
         return true;
     }
 
+    /// <summary>
+    /// The way from a berth to the open sea, breadth first over the tiles the hull fits on, lying as it lies: the berth, every
+    /// turn, and the first tile in an open cell of the open sea. Null when there is none inside the window.
+    /// </summary>
     public List<Point3D> Harbour(int x, int y, bool east, out int tiles, out int entry)
     {
         tiles = 0;
@@ -823,6 +903,7 @@ internal sealed class BotSeaWindow
         tiles = path.Count - 1;
         entry = BotSeaChart.CellOf(path[^1].X, path[^1].Y);
 
+        // Only the turns: a straight run of tiles is one leg, sailed straight.
         List<Point3D> turns = [path[0]];
 
         for (var i = 1; i < path.Count - 1; i++)

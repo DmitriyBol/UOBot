@@ -26,19 +26,26 @@ public sealed class BotMarketModule : BotModule
 
         BotMarket.Start();
 
+        // The city's treasury: the mint, the bounties, and its standing orders — served now at the bots' shops by Britain's
+        // bank, where the keepers stand, instead of off stalls. See BotCity.
         BotCity.Start();
 
         BotWill.Offer(new BotCourier());
 
+        // The buyer's half of hand to hand: it comes to meet the carrier (02.10.2026, Patrick's order). See BotRendezvous.
         BotWill.Offer(new BotMeeter());
 
         logger.Information(
-            "Meetings {State}: a carrier within {Call} tiles of its buyer calls the meeting; the buyer walks to meet it, or both to the nearest guarded ground within {Safe} tiles when either stands in a hostile or deadly patrol or on a square asking more than it brings; the buyer gives the meeting {Meet} minutes and stands {Wait}s beside the carrier for the hand-over",
+            "Meetings {State}: a carrier within {Call} tiles of its buyer calls the meeting; the buyer walks to meet it, or both to the nearest guarded ground within {Safe} tiles when either stands in a hostile or deadly patrol or on a square asking more than it brings; the buyer gives the meeting {Meet} minutes and stands {Wait}s beside the carrier for the hand-over; a buyer that walks on about its work stands where it is for a carrier within {Stand} tiles of it, {StandMs}ms a beat and at most {StandMost}s a walk, and a carrier that comes no nearer to its buyer in {Losing}s of walking after it lets it go",
             BotRendezvous.Running ? "on" : "off",
             BotRendezvous.CallTiles,
             BotRendezvous.SafeReach,
             BotRendezvous.MeetMs / 60000,
-            BotRendezvous.WaitMs / 1000
+            BotRendezvous.WaitMs / 1000,
+            BotRendezvous.StandTiles,
+            BotRendezvous.StandMs,
+            BotRendezvous.StandMostMs / 1000,
+            BotDeliver.LosingMs / 1000
         );
 
         logger.Information(
@@ -52,6 +59,7 @@ public sealed class BotMarketModule : BotModule
             BotHandover.MeetTiles
         );
 
+        // The reservation, the dead buyer's want, and the lines' clocks (02.10.2026, build 391). See BotMarket.Reserved and BotLines.
         logger.Information(
             "Wants reserve their buyer's money: a want is said only if what the buyer's other wants hold leaves enough for it, and everything else a bot spends is read off what is left; a dead buyer keeps its wants, asked again {Grace} minutes after it rises; a raise the buyer cannot reserve leaves the want at its price for up to {Age} minutes; a line is met if every unit arrives within {Window} minutes, and taken back or unpaid inside its first {Kept} minutes it is kept out; the board is {Restored}",
             BotMarket.RisenGraceMs / 60000,
@@ -62,6 +70,7 @@ public sealed class BotMarketModule : BotModule
         );
     }
 
+    /// <summary>A world reload is a different world: every want goes with the buyers that said it.</summary>
     public override void Reset()
     {
         logger.Information("The market, before the reload: {State}", BotMarket.Describe());

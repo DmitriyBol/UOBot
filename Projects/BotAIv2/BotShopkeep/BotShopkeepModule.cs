@@ -18,6 +18,7 @@ public sealed class BotShopkeepModule : BotModule
 
     public override string[] Requires => ["Will", "Shops", "Market", "Population"];
 
+    /// <summary>How often the shops are summed up in the log. Five minutes, with every other summary.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _timer;
@@ -64,6 +65,7 @@ public sealed class BotShopkeepModule : BotModule
         {
         }
 
+        // The establishments' clause after the shops' own (07.10.2026, trades17). See BotTrades.Clause.
         protected override void OnTick() => logger.Information("Bot shops: {What}", BotShopkeep.Describe() + BotTrades.Clause());
     }
 }

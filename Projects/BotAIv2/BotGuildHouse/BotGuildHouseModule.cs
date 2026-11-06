@@ -8,42 +8,61 @@ namespace Server.BotAI.V2;
 /// <summary>The numbers of <c>Configuration/bot-guildhouse.json</c>. A missing key keeps the code's value.</summary>
 public sealed class BotGuildHouseSettings
 {
+    /// <summary>Whether guilds settle in town buildings at all. See BotGuildHouses.Running.</summary>
     public bool? Running { get; set; }
 
+    /// <summary>The most guild houses in a town other than Britain. See BotGuildHouses.MostPerTown.</summary>
     public int? MostPerTown { get; set; }
 
+    /// <summary>The most guild houses in Britain. See BotGuildHouses.MostInBritain.</summary>
     public int? MostInBritain { get; set; }
 
+    /// <summary>What a house in another town costs. See BotGuildHouses.TownPrice.</summary>
     public int? TownPrice { get; set; }
 
+    /// <summary>What a house in Britain costs. See BotGuildHouses.BritainPrice.</summary>
     public int? BritainPrice { get; set; }
 
+    /// <summary>Whether Britain waits for the hall. See BotGuildHouses.BritainAfterHall.</summary>
     public bool? BritainAfterHall { get; set; }
 
+    /// <summary>Whether only towns fit to live in are settled in. See BotGuildHouses.FitTownsOnly.</summary>
     public bool? FitTownsOnly { get; set; }
 
+    /// <summary>Whether a bare seat moves into a building. See BotGuildHouses.Rehouse.</summary>
     public bool? Rehouse { get; set; }
 
+    /// <summary>How often the guilds are looked over, in milliseconds. See BotGuildHouses.LookMs.</summary>
     public int? LookMs { get; set; }
 
+    /// <summary>Looks a guild must be gone before its house is emptied. See BotGuildHouses.GoneLooks.</summary>
     public int? GoneLooks { get; set; }
 
+    /// <summary>How far round a house's heart a member is born or rises. See BotGuildHouses.Spread.</summary>
     public int? Spread { get; set; }
 
+    /// <summary>How often the free buildings are counted again, in milliseconds. See BotGuildHouses.RecountMs.</summary>
     public int? RecountMs { get; set; }
 
+    /// <summary>How often the module's clock turns, in milliseconds. See BotGuildHouseModule.TickMs.</summary>
     public int? TickMs { get; set; }
 
+    /// <summary>The least floor of a guild house, in tiles. See BotHouseSurvey.MinArea.</summary>
     public int? MinArea { get; set; }
 
+    /// <summary>The most floor of a guild house, in tiles. See BotHouseSurvey.MaxArea.</summary>
     public int? MaxArea { get; set; }
 
+    /// <summary>The least share of the floor under a roof. See BotHouseSurvey.RoofShare.</summary>
     public double? RoofShare { get; set; }
 
+    /// <summary>The most ways into a guild house. See BotHouseSurvey.MostEntrances.</summary>
     public int? MostEntrances { get; set; }
 
+    /// <summary>Loop milliseconds one slice of the survey may take. See BotHouseSurvey.SliceMs.</summary>
     public double? SliceMs { get; set; }
 
+    /// <summary>Whether the survey is kept in Data/bot-guild-houses.bin. See BotHouseSurvey.Cache.</summary>
     public bool? Cache { get; set; }
 }
 
@@ -65,6 +84,7 @@ public sealed class BotGuildHouseModule : BotModule
 
     private const string ConfigPath = "Configuration/bot-guildhouse.json";
 
+    /// <summary>How often the module's clock turns: a slice of the survey while it runs, then the look's own clock.</summary>
     public static int TickMs { get; set; } = 100;
 
     private static Timer _timer;
@@ -105,6 +125,7 @@ public sealed class BotGuildHouseModule : BotModule
 
         BotGuildHouses.Started = true;
 
+        // The towns' boxes are what the survey walks; read now if the travel and residence modules have not already.
         BotTowns.Ensure(BotPopulation.Home);
 
         _timer = new GuildHouseTimer(TimeSpan.FromMilliseconds(Math.Max(20, TickMs)));

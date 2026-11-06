@@ -44,6 +44,7 @@ public sealed class BotRoomTrial
 
     public BotDungeon.Deep Deep { get; }
 
+    /// <summary>What the room holds, by the names its spawner gives them.</summary>
     public List<string> Room { get; }
 
     public int Ring { get; }
@@ -56,12 +57,16 @@ public sealed class BotRoomTrial
 
     public string Verdict { get; private set; }
 
+    /// <summary>Doubles that fell.</summary>
     public int Deaths { get; private set; }
 
+    /// <summary>Of the room's creatures, how many are down.</summary>
     public int Downed { get; private set; }
 
+    /// <summary>The share of the room's whole health taken off it: one for a room cleared.</summary>
     public double Killed { get; private set; }
 
+    /// <summary>The share of the company's whole health spent, net of healing, floored at nought.</summary>
     public double Spent { get; private set; }
 
     public double Seconds { get; private set; }
@@ -78,6 +83,7 @@ public sealed class BotRoomTrial
 
     private int _companyHits;
 
+    /// <summary>Puts the company down on the west of the ring and the room on the east, and sets them on each other.</summary>
     public bool Begin()
     {
         if (Map == null || Map == Map.Internal || Party.Count == 0 || Room.Count == 0)
@@ -208,6 +214,7 @@ public sealed class BotRoomTrial
         return best;
     }
 
+    /// <summary>One beat: every double answers the creature nearest it. True when it is over.</summary>
     public bool Drive()
     {
         if (Verdict != null)
@@ -250,6 +257,13 @@ public sealed class BotRoomTrial
             return Decide("called at the cap");
         }
 
+        // <b>The company fights together: the leader's target first, the enemy nearest the leader where that cannot be struck
+        // (30.09.2026, build 355; Patrick: "fight all together; their main target is the leader's target, and if it cannot be reached,
+        // attack the one nearest the leader").</b> Each double took the creature nearest itself and kept it, so a company of five
+        // spread its blows over the room: all six companies of the night against Wrong's four golem controllers were "wiped
+        // out … 0 of 4 down", 13 to 49 % of the room's health taken. The leader is the first double standing; it keeps what it
+        // fights, else takes what is nearest it; every other double strikes that when it can see it, else the creature nearest
+        // the leader that it can see, else the nearest to itself.
         Mobile lead = null;
 
         for (var i = 0; i < _drivers.Count; i++)
@@ -305,12 +319,15 @@ public sealed class BotRoomTrial
         return false;
     }
 
+    /// <summary>Whether the company strikes the leader's target (the default) or each double its own nearest. See the trial's beat.</summary>
     public static bool Doctrine { get; set; } = true;
 
+    /// <summary>Beats a double struck the leader's target; beats it struck the enemy nearest the leader instead.</summary>
     public long OnLeaders { get; private set; }
 
     public long ByLeader { get; private set; }
 
+    /// <summary>The creature nearest the leader that this double can see; null when it sees none.</summary>
     private BaseCreature NearestSeen(Mobile lead, Mobile me)
     {
         BaseCreature best = null;
@@ -384,6 +401,7 @@ public sealed class BotRoomTrial
         return true;
     }
 
+    /// <summary>Everything off the ring: doubles, creatures, corpses.</summary>
     public void End()
     {
         for (var i = 0; i < _drivers.Count; i++)
@@ -439,6 +457,10 @@ public sealed class BotRoomTrial
             + (Doctrine ? $"on the leader's target {OnLeaders} beats, on the one nearest the leader {ByLeader}" : "each on its own nearest");
     }
 
+    /// <summary>
+    /// The room the dungeon makes worst: the spawner inside its box whose creatures add up to the most on the old scale, as
+    /// many of each as it keeps, strongest first, up to <paramref name="most"/>. Empty when there is none.
+    /// </summary>
     public static List<string> Worst(Map map, BotDungeon.Deep deep, int most)
     {
         List<string> best = [];

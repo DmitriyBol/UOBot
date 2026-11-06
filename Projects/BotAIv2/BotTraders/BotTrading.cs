@@ -36,80 +36,148 @@ public static class BotTrading
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTrading));
 
+    // ---- Dials -------------------------------------------------------------------------------------------------------------
+
+    /// <summary>Whether traders haul at all. Off, they are bots with a blade and a book, and hunt like anybody.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>Whether a neutral class stands outside the companies and the tolls. The guild muster reads the class itself.</summary>
     public static bool NeutralInWars { get; set; } = true;
 
+    /// <summary>Gold a trader keeps back from any purchase: below it, it buys nothing and earns its capital some other way.</summary>
     public static int LeastCapital { get; set; } = 60;
 
+    /// <summary>The least a haul must clear, in gold, to be worth the road.</summary>
     public static int LeastProfit { get; set; } = 12;
 
+    /// <summary>The share over cost a buyer's own offer must reach to be taken as said; under it the trader offers carriage.</summary>
     public static double LeastMarkup { get; set; } = 0.15;
 
+    /// <summary>The most over cost a trader ever asks: at most double.</summary>
     public static double MostMarkup { get; set; } = 1.0;
 
+    /// <summary>
+    /// The trader's share of what carrying saves the buyer, between its least price and the buyer's own alternative: half. The
+    /// buyers are poor (median 70gp on 384), and every gold over the least price is a unit fewer they can pay for.
+    /// </summary>
     public static double CarriageShare { get; set; } = 0.5;
 
+    /// <summary>The claim a haul is offered at, in gold a minute, is its own profit a minute held to this band.</summary>
     public static double LeastClaim { get; set; } = 4.0;
 
     public static double MostClaim { get; set; } = 200.0;
 
+    /// <summary>How long a want is left to the carriers within reach of it before a trader looks at it. A minute.</summary>
     public static int FreshMs { get; set; } = 60000;
 
+    /// <summary>How long a trader that found nothing worth hauling waits before it reads the wants again.</summary>
     public static int LookMs { get; set; } = 20000;
 
+    /// <summary>The most wants one look weighs, dearest first as the board holds them; the board's cap is 512.</summary>
     public static int MostLooked { get; set; } = 64;
 
+    /// <summary>How many buyers one haul may serve from one purchase: wants for the same kind near the first buyer.</summary>
     public static int MostOrders { get; set; } = 3;
 
+    /// <summary>How far from the first buyer another buyer of the same kind may be to ride on the same haul.</summary>
     public static int BatchTiles { get; set; } = 200;
 
+    /// <summary>The most things one haul carries.</summary>
     public static int MostUnits { get; set; } = 80;
 
+    /// <summary>Within this of a buyer the trader follows it; further off it walks to where the buyer was.</summary>
     public static int NearTiles { get; set; } = 40;
 
+    /// <summary>How long a trader follows a buyer that keeps walking away before it strikes the order. Eight minutes.</summary>
     public static int ChaseMs { get; set; } = 480000;
 
+    /// <summary>How long a haul waits for a buyer lying dead to rise before it strikes the line. Three minutes.</summary>
     public static int DeadWaitMs { get; set; } = 180000;
 
+    /// <summary>The longest a haul may take, pauses not counted, before it is given up. Forty-five minutes.</summary>
     public static int MostHaulMs { get; set; } = 2700000;
 
+    /// <summary>Minutes reckoned for a purchase at the counter and for a handing over, on top of the road.</summary>
     public static double BuyMinutes { get; set; } = 0.5;
 
     public static double HandMinutes { get; set; } = 0.5;
 
+    /// <summary>
+    /// How long a trader stands at its town's bank buying from whoever brings what a far buyer wants (the gathering, see
+    /// <see cref="BotHaulFrom.Gather"/>); longer while a carrier is on its way, up to twice this. Five minutes; nought never.
+    /// </summary>
     public static int GatherMs { get; set; } = 300000;
 
+    /// <summary>The share of a gathering's asking a trader reckons on being brought, when it weighs one against a counter.</summary>
     public static double GatherYield { get; set; } = 0.5;
 
+    /// <summary>How near the banker a gathering trader stands.</summary>
     public static int BankStand { get; set; } = 4;
 
+    /// <summary>Whether a well-off trader sails to a town no road or gate reaches. See <see cref="SailWealth"/>.</summary>
     public static bool Sails { get; set; } = true;
 
+    /// <summary>
+    /// What "well off" is: a trader worth this much (pack and bank) may buy a ship and sail; below it, land and gates. A ship is
+    /// <c>BotSea.ListPrice</c> (10,177) and a haul wants capital after it. A trader that already owns a ship sails regardless.
+    /// <b>Not read since 06.10.2026 (money15):</b> a haul no longer buys a ship at all (<see cref="CanSail"/>).
+    /// </summary>
     public static int SailWealth { get; set; } = 12000;
 
+    /// <summary>How often the <c>Traders:</c> line is written.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
+    /// <summary>How many closed orders a book keeps, newest first.</summary>
     public static int BookHistory { get; set; } = 40;
 
+    /// <summary>How long the list of shopkeepers that sell a kind is kept before it is read again.</summary>
     public static int SellersMs { get; set; } = 60000;
 
+    /// <summary>
+    /// How long a trader leaves a want alone after striking an order on it for the buyer's own doing — walked away from the
+    /// meeting, unreachable, refused — before it may take it again. Ten minutes (01.10.2026, build 385 review): nothing in the
+    /// haul's own strikes marked the want, so the next look re-took the same want and chased the same buyer for another
+    /// <see cref="ChaseMs"/>, as long as the want stood.
+    /// </summary>
     public static int ShunMs { get; set; } = 600000;
 
+    /// <summary>How long no trader gathers for a kind after a gathering for it brought nothing. See <c>BotHauler.ShunGathering</c> (build 386).</summary>
     public static int GatherShunMs { get; set; } = 1800000;
 
+    /// <summary>Tiles between samples of a haul's road against the quadrant record. See <c>BotHauler.Deadly</c> (build 386).</summary>
     public static int RoadStep { get; set; } = 32;
 
+    /// <summary>What a sampled square may ask, as a multiple of the trader's own strength, before the road is passed over; nought reads no road. See <c>BotHauler.Deadly</c>.</summary>
     public static double RoadDare { get; set; } = 1.5;
 
+    /// <summary>
+    /// <b>The largest share of the traders that may be resting at once (01.10.2026, build 388).</b> Patrick's word of 01.10: at
+    /// least half of the traders must be in the world. On 386 three of seven rested together from 13:40 to 18:30 — Kargan 6.3 h,
+    /// Vaeril and Norbert 5.3–5.9 h — and the island's own floor (<c>BotRest.FloorShare</c>, a half of everybody) said nothing
+    /// about it: the traders are the market's infrastructure, and four of them were the whole of it for five hours. A half:
+    /// with seven traders three may rest; the fourth past its hours plays on until one comes back, as the island's floor keeps
+    /// bots on. Read by <c>BotRest</c>; one reads no floor.
+    /// </summary>
     public static double RestShare { get; set; } = 0.5;
 
+    /// <summary>How near the end of its rest a trader may be brought back early when more than <see cref="RestShare"/> are resting (after a restart, say). Three hours.</summary>
     public static int RestEarlyMinutes { get; set; } = 180;
 
+    /// <summary>
+    /// <b>What a trader keeps in its pocket; everything above it goes into its account the moment it is paid (01.10.2026, build
+    /// 388).</b> Patrick's word of 01.10: keep the capital in the bank. A trader's capital rode in its pack between banks and a
+    /// death took it: on 386 Oriel stood at 0gp three times in twenty minutes, Mardred at 17–21gp for four hours after two
+    /// deaths, Vaeril and Norbert came back from their rest with nothing, and 28 % of the traders' looks were "too poor to buy".
+    /// The counters and the meetings already draw on the account (<c>BotShops.Buy</c>, <c>BotMarket.Charge</c>), so the capital
+    /// buys as well from the bank as from the pocket; what the pocket holds is only what a death can take. A hundred, the
+    /// population's own float (<c>BotPurse.KeepBack</c>). Nought keeps everything in the pocket, as before.
+    /// </summary>
     public static int PocketFloat { get; set; } = 100;
 
+    /// <summary>The least above the float worth putting away in one go. Twenty.</summary>
     public static int PutAwayLeast { get; set; } = 20;
 
+    /// <summary>Times a trader put its takings above the float away, and the gold; traders past their hours kept in the world by <see cref="RestShare"/>; traders brought back early for it.</summary>
     public static long PutAways { get; internal set; }
 
     public static long PutAwayGold { get; internal set; }
@@ -118,8 +186,14 @@ public static class BotTrading
 
     public static long RestEarly { get; internal set; }
 
+    /// <summary>A bot of the neutral class, whatever the war switch says: a trader. See <see cref="Neutral"/>.</summary>
     public static bool Trader(Mobile m) => m is BotMobile { Class.Neutral: true };
 
+    /// <summary>
+    /// Puts a trader's pocket above <see cref="PocketFloat"/> into its account, from wherever it stands (the engine's
+    /// <c>Banker.Deposit</c> reaches the box from anywhere, as <c>BotUnload</c> notes). Returns what went in. Asked at every
+    /// look of the hauler's and after every order handed over.
+    /// </summary>
     public static int PutAway(Mobile body)
     {
         if (PocketFloat <= 0 || !Trader(body) || body is not { Deleted: false, Alive: true } || body.Backpack is not { } pack)
@@ -134,6 +208,7 @@ public static class BotTrading
             return 0;
         }
 
+        // A box it has never opened is no box to the engine's deposit; opened here, once.
         if (body.FindBankNoCreate() == null)
         {
             _ = body.BankBox;
@@ -156,6 +231,8 @@ public static class BotTrading
 
         return excess;
     }
+
+    // ---- Counters: what the proposer saw -----------------------------------------------------------------------------------
 
     public static long Looks { get; internal set; }
 
@@ -185,19 +262,37 @@ public static class BotTrading
 
     public static long Heavy { get; internal set; }
 
+    /// <summary>
+    /// Shopkeepers' counters passed over because the island already holds a pile of the kind (<see cref="BotGlut.Glutted"/>):
+    /// a trader carrying a shopkeeper's goods into a glut would be the flood Patrick's point 8 forbids with the trader's own
+    /// margin on it (01.10.2026, build 385 review). The bots' shops, the trader's stock and a gathering — all of which drain the
+    /// pile — are still weighed.
+    /// </summary>
     public static long Glutted { get; internal set; }
 
+    /// <summary>Wants passed over because this trader struck an order on them lately for the buyer's own doing. See <see cref="ShunMs"/>.</summary>
     public static long Shunned { get; internal set; }
 
+    /// <summary>Wants passed over because the road to the source or the buyer crosses ground past the trader's strength. See <c>BotHauler.Deadly</c>.</summary>
     public static long DeadlyRoad { get; internal set; }
 
+    /// <summary>
+    /// <b>The dungeon block (03.10.2026, build next).</b> Wants passed over for a buyer down there that a walk or a haul from
+    /// outside lately found no way to (<see cref="BotUnreached.Refuses"/>), and wants or sources passed over because the trader,
+    /// or the counter, stands in the block and the next leg leaves its own land (<see cref="BotUnreached.Shut"/>). On live 396, 33
+    /// of the 35 orders struck "no way through to the buyer" touched the block, and 18 of the 21 failed hauls were these.
+    /// </summary>
     public static long Unreached { get; internal set; }
 
     public static long Stranded { get; internal set; }
 
+    /// <summary>Gatherings not offered because no bot on the island was seen holding the kind this half hour. See <c>BotGlut.Seen</c>.</summary>
     public static long GatherBarren { get; internal set; }
 
+    /// <summary>Gatherings not offered because one for the kind lately brought nothing. See <see cref="GatherShunMs"/>.</summary>
     public static long GatherShunned { get; internal set; }
+
+    // ---- Counters: what the hauls did --------------------------------------------------------------------------------------
 
     public static long Taken { get; internal set; }
 
@@ -223,14 +318,17 @@ public static class BotTrading
 
     public static long Gathers { get; internal set; }
 
+    /// <summary>Gatherings said over the trader's own standing want for the kind, topped up rather than refused. See BotHaul.Gather.</summary>
     public static long GatherOverOwn { get; internal set; }
 
     public static long GatheredUnits { get; internal set; }
 
     public static long GatheredGold { get; internal set; }
 
+    /// <summary>Gatherings nobody brought anything to.</summary>
     public static long GatherEmpty { get; internal set; }
 
+    /// <summary>Gatherings that came up short and bought the rest at a counter.</summary>
     public static long GatherTopped { get; internal set; }
 
     public static long Handovers { get; internal set; }
@@ -239,8 +337,10 @@ public static class BotTrading
 
     public static long HandedGold { get; internal set; }
 
+    /// <summary>What the goods handed over cost the trader: takings less this is the margin.</summary>
     public static long HandedCost { get; internal set; }
 
+    /// <summary>Gold paid above the buyers' own offers, as carriage they agreed to.</summary>
     public static long Carriage { get; internal set; }
 
     public static long Agreed { get; internal set; }
@@ -255,14 +355,34 @@ public static class BotTrading
 
     public static long SeaLost { get; internal set; }
 
+    // ---- Counters: neutrality ----------------------------------------------------------------------------------------------
+
+    /// <summary>Times a company's door — enlistment, levy, press, delve, war company, or raising one — was shut to a trader.</summary>
     public static long CompanyRefused { get; private set; }
 
+    /// <summary>A company's call — the hunt's enlistment, a band against a strong foe — never offered to a trader, by review.</summary>
     public static long CallsPassed { get; private set; }
 
+    /// <summary>Coin a trader took on a patrolling guild's land that owed no toll because the trader is neutral.</summary>
     public static long TollWaived { get; private set; }
 
+    /// <summary>
+    /// Whether this mobile stands outside every war: a bot of a <see cref="BotClass.Neutral"/> class, while
+    /// <see cref="NeutralInWars"/> holds.
+    ///
+    /// <para>
+    /// <b>What neutrality closes, in one place.</b> No guild (<c>BotGuilds.Outside</c> reads the class), so nothing that picks
+    /// an enemy or an ally by guild — <c>BotRegard.Hostile</c> and <c>AtWar</c>, the feud and its rallies and quarrels
+    /// (<c>BotFeuder</c>), a war company's attackers (<c>BotSquad.Consider</c>), war kills and plunder (<c>BotWar</c>), the
+    /// envoys and the duke's meetings — can ever name a trader. No company (<c>BotSquads.Form</c> and <c>Join</c> ask
+    /// <see cref="Refuses"/>), so no levy, harrow, delve, press or war company carries one. No toll (<c>BotToll.Rate</c>,
+    /// <c>Exempted</c>, the wardens' list). And the producer role keeps it out of the robber's, the skulker's and the
+    /// tourney's lists. Self-defence is a reflex and stays one: a trader set upon hits back.
+    /// </para>
+    /// </summary>
     public static bool Neutral(Mobile m) => NeutralInWars && m is BotMobile { Class: { Neutral: true } };
 
+    /// <summary>A company's door asked about a neutral bot: shut, and counted.</summary>
     public static bool Refuses(Mobile m)
     {
         if (!Neutral(m))
@@ -275,6 +395,7 @@ public static class BotTrading
         return true;
     }
 
+    /// <summary>A proposer of companies asked about a neutral bot: it offers nothing, counted apart from the doors.</summary>
     public static bool Passes(Mobile m)
     {
         if (!Neutral(m))
@@ -287,8 +408,13 @@ public static class BotTrading
         return true;
     }
 
+    /// <summary>A neutral bot's coin on a patrolling guild's land, let through toll-free. From <c>BotToll.Exempted</c>.</summary>
     public static void Waive() => TollWaived++;
 
+    /// <summary>
+    /// The porter's keep list, for a trader in the middle of a haul: the goods bought for the orders still open in its book are
+    /// promised, not surplus, and must ride in the pack to their buyers. From <c>BotUnload.Needed</c>.
+    /// </summary>
     public static void Keep(IBotWilful bot, Dictionary<Type, int> keep)
     {
         if (keep == null || bot?.Resolve is not { } resolve)
@@ -318,10 +444,16 @@ public static class BotTrading
         }
     }
 
+    // ---- The counters that sell a kind --------------------------------------------------------------------------------------
+
     private static readonly Dictionary<Type, (List<BaseVendor> Vendors, long Tick)> _sellers = [];
 
     private static bool _surveyed;
 
+    /// <summary>
+    /// Every town's shopkeepers written into <see cref="BotShops"/>' list, once: a trader buys in other towns, and the list
+    /// otherwise holds only the counters somebody has already walked near. One spatial query a town.
+    /// </summary>
     public static void Survey(Map map)
     {
         if (_surveyed || map == null || map == Map.Internal || !BotTowns.Ready)
@@ -345,6 +477,7 @@ public static class BotTrading
         logger.Information("Traders read the counters of every town they can reach: {Found} shopkeepers added to the list", found);
     }
 
+    /// <summary>The shopkeepers on the island that sell this kind now, kept <see cref="SellersMs"/>. Callers test the map.</summary>
     public static List<BaseVendor> Sellers(Type kind)
     {
         var now = Core.TickCount;
@@ -371,6 +504,11 @@ public static class BotTrading
         return known.Vendors;
     }
 
+    /// <summary>
+    /// What one of these costs this buyer at its own nearest counter, the walk there and back included at the shard's price of a
+    /// shopping minute, spread over the units: the most a buyer would rationally pay a trader to bring them. When no counter
+    /// sells the kind, the most the buyer's want could ever rise to.
+    /// </summary>
     public static double Alternative(Mobile buyer, Type kind, int units, BotWant want)
     {
         var best = double.MaxValue;
@@ -407,11 +545,24 @@ public static class BotTrading
             best = Math.Max(1, want?.Anchor ?? 1) * BotMarket.MostMultiple;
         }
 
+        // <b>Never past what the material is worth to anybody (02.10.2026, build next; Patrick: "a raw material is never worth
+        // more than twice what it becomes").</b> The buyer's own walk to the butcher priced a cook's rib at 16gp and more, so the
+        // carriage the trader asked for came to 17–20gp a rib, for a meal worth 6. See BotWant.Ceiling.
         return want is { Ceiling: > 0 } ? Math.Min(best, want.Ceiling) : best;
     }
 
+    /// <summary>
+    /// Whether a source costs the trader as much as the want's ceiling or more, so no price the buyer may pay leaves a margin:
+    /// counted (<see cref="OverCeiling"/>) and passed over rather than weighed and found thin.
+    /// </summary>
     internal static bool OverItsCeiling(BotWant want, int cost)
     {
+        // <b>A want read back from the save is not bought for until its ceiling is read (03.10.2026, build next).</b> The board is
+        // made before anything is priced, and traders wrote orders for read-back rib wants three seconds after the start, at 20gp
+        // a rib against an offer of 6. Raw meat, whose ceiling is the meal and is known the moment the cooking system is built, is
+        // read here when the market's beat has not yet, and passed over until it is. Any other kind is left to the beat, whose
+        // first look comes after the counters are surveyed (a ceiling read from half the prices would bring an offer down for
+        // good), and is weighed meanwhile as a want said now would be (review of build next, F5). See BotMarket.Recap.
         if (want is { CeilingPending: true } && Meat(want.Kind))
         {
             BotMarket.Recap(want);
@@ -434,10 +585,13 @@ public static class BotTrading
         return true;
     }
 
+    /// <summary>Sources a trader passed over for costing as much as the want's material ceiling or more. See <see cref="OverItsCeiling"/>.</summary>
     public static long OverCeiling { get; internal set; }
 
+    /// <summary>Wants read back from the save passed over before their material's ceiling could be read. See <see cref="OverItsCeiling"/>.</summary>
     public static long CeilingUnread { get; internal set; }
 
+    /// <summary>Whether a kind is raw meat a cook makes a meal of. See <see cref="BotOven.Raw"/>.</summary>
     private static bool Meat(Type kind)
     {
         var raw = BotOven.Raw;
@@ -453,6 +607,13 @@ public static class BotTrading
         return false;
     }
 
+    /// <summary>
+    /// What a trader asks for one, given what it cost: the buyer's own offer when that pays <see cref="LeastMarkup"/> over cost;
+    /// else the least price plus <see cref="CarriageShare"/> of the way up to the buyer's own alternative
+    /// (<see cref="Alternative"/>), capped at <see cref="MostMarkup"/> over cost; and when the buyer's own walk is cheaper than
+    /// the trader's least price, what that walk costs (the margin then usually fails the haul's least profit). Never under the
+    /// buyer's offer.
+    /// </summary>
     public static int Quote(int cost, int offer, double alternative)
     {
         var least = (int)Math.Ceiling(Math.Max(1, cost) * (1.0 + LeastMarkup));
@@ -471,11 +632,13 @@ public static class BotTrading
 
         var price = least + (int)((ceiling - least) * Math.Clamp(CarriageShare, 0.0, 1.0));
 
+        // Night carriage pays a quarter more (07.10.2026, events17), never past the buyer's ceiling. See BotNight.Carriage.
         price = BotNight.Carriage(least, price, ceiling);
 
         return Math.Max(offer, price);
     }
 
+    /// <summary>What a trader's own stock of a kind is reckoned at: the island's cheapest counter, or the market's own price.</summary>
     public static int BookValue(Type kind, int fallback)
     {
         var lowest = BotShops.Lowest(kind);
@@ -485,6 +648,7 @@ public static class BotTrading
 
     private static readonly Dictionary<Type, int> _weights = [];
 
+    /// <summary>The weight of one of a kind, read once off a sample. Whole stones; at least one tenth of nothing.</summary>
     public static double Weight(Type kind)
     {
         if (kind == null)
@@ -511,13 +675,21 @@ public static class BotTrading
         return tenths / 10.0;
     }
 
+    /// <summary>Whether a kind is goods a trader may carry: not a container, a deed, a key or a book of anybody's.</summary>
     public static bool Goods(Type kind) =>
         kind != null && !typeof(Container).IsAssignableFrom(kind) && !typeof(BaseBoatDeed).IsAssignableFrom(kind)
         && !typeof(HouseDeed).IsAssignableFrom(kind) && !typeof(Key).IsAssignableFrom(kind) && !typeof(Spellbook).IsAssignableFrom(kind)
         && !typeof(Runebook).IsAssignableFrom(kind) && kind.Namespace?.StartsWith("Server.BotAI", StringComparison.Ordinal) != true;
 
+    /// <summary>
+    /// Whether this trader can sail: it holds a ship of its own, whatever its wealth, as before.
+    /// A haul never buys the ship (06.10.2026, money15): no haul on this island has paid one back — on 04.10 one haul went by sea,
+    /// in a ship a journey had bought — so the sea is for the trader that already has one. See <see cref="BotSea.Owns"/>.
+    /// </summary>
     public static bool CanSail(BotMobile body) =>
         Sails && body != null && BotSea.Running && BotSea.Ready && BotSea.Owns(body);
+
+    // ---- The line ----------------------------------------------------------------------------------------------------------
 
     public static string Describe()
     {

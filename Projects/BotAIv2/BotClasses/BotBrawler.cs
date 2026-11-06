@@ -34,10 +34,19 @@ public sealed class BotBrawler : BotClass
 
     protected override void Defaults()
     {
+        // <b>Strength carries a fist, and this class had the least of it.</b> Damage from wrestling in this
+        // era comes off Strength, Tactics and Anatomy and off nothing else — there is no item in the world
+        // that can add to it — so a brawler built at forty Strength was the weakest fighter on the shard by
+        // arithmetic rather than by bad luck. Sixty, which is between the archer and the captain: it is the
+        // one build whose whole case is standing in contact, and it has to be able to.
         Str = 60;
         Dex = 40;
         Int = 10;
 
+        // <b>Higher than any other class's opening, and that is the point of a class with one trade.</b>
+        // Everybody else spreads its start across a weapon skill it will grow into; a brawler's weapon is
+        // its hands and it has nothing else to grow. Tactics and Anatomy are raised with it because in this
+        // era they are not support skills for a puncher, they are half of the damage.
         Skills =
         [
             (SkillName.Wrestling, 100.0),
@@ -46,6 +55,7 @@ public sealed class BotBrawler : BotClass
             (SkillName.Healing, 100.0)
         ];
 
+        // Fists leaned into, paid for out of Tactics and Anatomy (01.10.2026, Patrick's point 7). See BotLeaning.
         Leanings =
         [
             new BotLeaning("brawler", SkillName.Wrestling, 4, 58.0, 72.0),
@@ -56,6 +66,8 @@ public sealed class BotBrawler : BotClass
 
         PotionLimits[BotPotionKind.Heal] = 2;
 
+        // No weapon and no tools — the only class the granting step hands nothing to hold. What it is given
+        // instead goes <em>on</em> the hands: see BotBrawlerGloves for why that is armour and not damage.
         Kit = new BotKit
         {
             Armour = [typeof(BotBrawlerGloves)]

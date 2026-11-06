@@ -31,8 +31,10 @@ public static class BotTinkering
 
     public static CraftSystem System => DefTinkering.CraftSystem;
 
+    /// <summary>The metal every tool is made of.</summary>
     public static readonly Type Metal = typeof(IronIngot);
 
+    /// <summary>The tools the population uses, most worn first. The order is the tinker's order of preference when nothing is asked for.</summary>
     public static readonly Type[] Tools =
     [
         typeof(Pickaxe),
@@ -55,12 +57,23 @@ public static class BotTinkering
 
     public static TinkerTools Kit(Mobile bot) => BotOutfit.Oldest<TinkerTools>(bot?.Backpack);
 
+    /// <summary>How many tinker's tools a tinker keeps: its own and a spare, because nothing else on this island makes them.</summary>
     public static int Spares { get; set; } = 2;
 
     public static long Seeded { get; private set; }
 
     private static readonly HashSet<Serial> _seeded = [];
 
+    /// <summary>
+    /// Gives a crafter born before the trade existed its tinker's tools, once.
+    ///
+    /// <para>
+    /// The kit is in the class now, so a newborn has one; the crafters already alive had none, and the restock
+    /// could not buy one — no shop within a crafter's reach sells them, the nearest tinker being in Minoc. A
+    /// trade that makes every tool but cannot be begun without one has to be seeded once, and the spare rule in
+    /// <see cref="Choose"/> keeps it going after that.
+    /// </para>
+    /// </summary>
     public static bool Seed(Mobile bot)
     {
         if (bot is not BotMobile { Deleted: false, Alive: true } body || body.Backpack == null || Kit(body) != null
@@ -88,6 +101,7 @@ public static class BotTinkering
 
     public static double Able(Mobile bot) => bot?.Skills[Skill].Base ?? 0.0;
 
+    /// <summary>The recipe for that tool, if the bot's skill allows an attempt with a fair chance; null otherwise.</summary>
     public static CraftItem Recipe(Mobile bot, Type wanted)
     {
         var system = System;
@@ -115,10 +129,16 @@ public static class BotTinkering
         return null;
     }
 
+    /// <summary>
+    /// The tool the market is shortest of that this bot can make, or null when every tool is stocked.
+    /// </summary>
+    /// <param name="floor">Fewest of a tool in the island's stock before it is worth making more.</param>
     public static Type Choose(Mobile bot, int floor, out int stocked)
     {
         stocked = 0;
 
+        // The island's stock of a tool since the stalls went (01.10.2026): what the shops by the bank show, and what this tinker
+        // already holds in its pack and bank box, where its own unsold tools wait for a shift or a carrier's walk.
         Dictionary<Type, int> stock = [];
         var box = (bot as BotMobile)?.FindBankNoCreate();
 
@@ -133,6 +153,8 @@ public static class BotTinkering
             }
         }
 
+        // A spare of its own tools before anything else: a tinker whose only kit wears out is a crafter with an
+        // opinion about iron, and no counter within reach sells another.
         if ((bot?.Backpack?.GetAmount(typeof(TinkerTools)) ?? 0) < Spares && Recipe(bot, typeof(TinkerTools)) != null)
         {
             stocked = 0;

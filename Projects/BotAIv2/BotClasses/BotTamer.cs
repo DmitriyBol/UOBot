@@ -41,6 +41,7 @@ public sealed class BotTamer : BotClass
             (SkillName.Healing, 60.0)
         ];
 
+        // The tamer's own craft leaned into, or the bow the roll handed it (01.10.2026, Patrick's point 7). See BotLeaning.
         Leanings =
         [
             new BotLeaning("beastmaster", SkillName.AnimalTaming, 3, 58.0, 70.0),

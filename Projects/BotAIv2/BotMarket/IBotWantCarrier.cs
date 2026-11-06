@@ -15,9 +15,16 @@ namespace Server.BotAI.V2;
 /// </summary>
 public interface IBotWantCarrier
 {
+    /// <summary>Whether this work is bringing goods against this want.</summary>
     bool Carries(BotWant want);
 
+    /// <summary>Put down for longer than its own give-up clock: not coming for now. See <see cref="BotDeliver.Stale"/>.</summary>
     bool Stale { get; }
 
+    /// <summary>
+    /// The kind this work is carrying for a buyer. Read by <see cref="BotHandover.Promised"/> so the carrier's own body does not
+    /// put the goods on (01.10.2026, build 386): a trader wore the leather skirt it had bought for an order and struck the order
+    /// "nothing left to hand over" — 22 of 41 failed hauls and 5 of 17 failed deliveries on build 386 ended that way.
+    /// </summary>
     Type Goods { get; }
 }

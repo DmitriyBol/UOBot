@@ -41,32 +41,45 @@ public static class BotPrime
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPrime));
 
+    /// <summary>Whether the schedule runs at all. Off, the island's floor is <see cref="BotRest.FloorShare"/> at every hour.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// How long the target takes to move from one band's share to the next, from the band's start. Half an hour: a hundred
+    /// bots' difference at about three a minute. Nought jumps at the hour, and leaves the per-look caps to pace it.
+    /// </summary>
     public static int RampMinutes { get; set; } = 30;
 
+    /// <summary>The most bots one look of the rest clock may tire for being over the target. A cap behind the ramp, not the pace.</summary>
     public static int TirePerLook { get; set; } = 5;
 
+    /// <summary>The most bots one look may bring back from rest for being under it.</summary>
     public static int ReturnPerLook { get; set; } = 5;
 
     /// <summary>One band of the day: from an hour, to an hour, and the share of the island to be in the world between them.</summary>
     public readonly record struct Band(int From, int To, double Share)
     {
+        /// <summary>Whether this hour of the day, as a fraction, falls inside the band.</summary>
         public bool Holds(double hour) => hour >= From && hour < To;
 
         public override string ToString() => $"{From:00}–{To:00} at {Share:P0}";
     }
 
+    /// <summary>Patrick's three: the night at the whole island, the day at three quarters, the evening at a half.</summary>
     private static readonly List<Band> _bands = [new(0, 8, 1.0), new(8, 16, 0.75), new(16, 24, 0.5)];
 
     public static IReadOnlyList<Band> Bands => _bands;
 
+    /// <summary>Bots brought back from rest by the schedule this session, whatever rest they still owed.</summary>
     public static long Returned { get; internal set; }
 
+    /// <summary>Tires put off to a later look by <see cref="TirePerLook"/>, this session.</summary>
     public static long TiresPaced { get; internal set; }
 
+    /// <summary>Looks on which more were due back than <see cref="ReturnPerLook"/> let through.</summary>
     public static long ReturnsPaced { get; internal set; }
 
+    // The last look's reading, for the line.
     private static Band? _band;
     private static double _share;
     private static bool _ramping;
@@ -76,6 +89,11 @@ public static class BotPrime
     private static int _present;
     private static int _island;
 
+    /// <summary>
+    /// Replaces the bands with the ones configured. A band must run from an hour at or after nought to a later hour at or
+    /// before twenty-four, and the bands may not overlap; one that does is dropped and named. Returns how many were kept.
+    /// Given none, the three defaults stand.
+    /// </summary>
     public static int Set(IReadOnlyList<Band> bands)
     {
         if (bands == null || bands.Count == 0)
@@ -129,6 +147,7 @@ public static class BotPrime
         return _bands.Count;
     }
 
+    /// <summary>The band that holds this hour of the day, or null when none does.</summary>
     private static Band? At(double hour)
     {
         for (var i = 0; i < _bands.Count; i++)
@@ -142,6 +161,10 @@ public static class BotPrime
         return null;
     }
 
+    /// <summary>
+    /// The share of the island meant to be in the world now: the band's own, or on its way there from the band before
+    /// (<see cref="RampMinutes"/>). <see cref="BotRest.FloorShare"/> when the schedule is off or no band holds the hour.
+    /// </summary>
     public static double Share(DateTime utcNow, out Band? band, out bool ramping)
     {
         band = null;
@@ -171,6 +194,7 @@ public static class BotPrime
 
             if (minutesIn < RampMinutes)
             {
+                // The band before: the one holding the moment just before this one began, round the clock at midnight.
                 var before = At((now.Value.From == 0 ? 24.0 : now.Value.From) - 1.0 / 3600.0);
 
                 if (before != null && before.Value.Share != share)
@@ -186,6 +210,7 @@ public static class BotPrime
         return Math.Clamp(share, 0.0, 1.0);
     }
 
+    /// <summary>What the look found, kept for the line: the target in bots, who was in the world against it, and the band.</summary>
     internal static void Read(Band? band, double share, bool ramping, int island, int target, int present)
     {
         _band = band;
@@ -196,6 +221,7 @@ public static class BotPrime
         _present = present;
     }
 
+    /// <summary>The schedule for the boot line: every band.</summary>
     public static string Schedule()
     {
         using var line = ValueStringBuilder.Create(96);
@@ -213,6 +239,7 @@ public static class BotPrime
         return line.ToString();
     }
 
+    /// <summary>For the <c>Rest:</c> line: the band and target now, the island against it, and the session's counts.</summary>
     public static string Describe()
     {
         if (!Running)

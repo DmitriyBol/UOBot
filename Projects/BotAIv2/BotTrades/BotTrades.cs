@@ -16,14 +16,22 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotTrades
 {
+    /// <summary>Every establishment at once. Off, no tavern opens, no guest is sent to one and no loan is made; loans standing are still collected.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>Cooks keep taverns at the inns, and guests and tired lodgers eat there.</summary>
     public static bool Taverns { get; set; } = true;
 
+    /// <summary>Rich keepers of shops by the bank lend to poor bots with a trade.</summary>
     public static bool Lenders { get; set; } = true;
 
+    /// <summary>Scribes keep libraries by their guilds' seats, and casters short of a scroll buy there (07.10.2026, life18b).</summary>
     public static bool Libraries { get; set; } = true;
 
+    /// <summary>
+    /// Traders keep buying posts by the dungeon mouths, and hunters sell their loot there (07.10.2026, life18b). Patrick: if the ragmen die
+    /// often to the creatures, the role is taken out: this switch, live; their deaths are in the clause as "ragmen killed at the post".
+    /// </summary>
     public static bool Ragmen { get; set; } = true;
 
     public static bool TavernsOn => Running && Taverns;
@@ -34,6 +42,7 @@ public static class BotTrades
 
     public static bool RagmenOn => Running && Ragmen;
 
+    /// <summary>The establishments' clause of the five-minute <c>Bot shops:</c> line.</summary>
     public static string Clause() =>
         $"; establishments: {(TavernsOn ? "" : "taverns OFF, ")}{BotTaverns.Describe()}; {(LendersOn ? "" : "lending OFF, ")}{BotLoans.Describe()}; {(BotInfirmaries.On ? "" : "infirmaries OFF, ")}{BotInfirmaries.Describe()}"
         + $"; {(LibrariesOn ? "" : "libraries OFF, ")}{BotLibraries.Describe()}; {(RagmenOn ? "" : "ragmen OFF, ")}{BotRagmen.Describe()}";

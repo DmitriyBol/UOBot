@@ -31,6 +31,7 @@ public static class BotGuildBout
 
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often one guild's herald may challenge. Four hours.</summary>
     public static int EveryMs { get; set; } = 14400000;
 
     public static double PurseShare { get; set; } = 0.05;
@@ -39,15 +40,22 @@ public static class BotGuildBout
 
     public static int PurseMost { get; set; } = 800;
 
+    /// <summary>The share of the challenger's might the rival must have to accept.</summary>
     public static double AcceptOdds { get; set; } = 0.6;
 
+    /// <summary>How far from the stand a champion may be called from.</summary>
     public static int Reach { get; set; } = 150;
 
+    /// <summary>How long the champions are waited for.</summary>
     public static int WaitMs { get; set; } = 300000;
 
+    /// <summary>How near the stand both must stand for the bout to begin.</summary>
     public static int RingTiles { get; set; } = 5;
 
+    /// <summary>Argus's herald: the line called at the place. Filled by the debugger; null without one.</summary>
     public static Action<Map, Point3D, string> Witness { get; set; }
+
+    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long Challenges { get; private set; }
 
@@ -113,6 +121,7 @@ public static class BotGuildBout
         return false;
     }
 
+    /// <summary>A herald at its stand challenges a rival, if its guild is due one. From <see cref="BotHeraldStand.Stand"/>.</summary>
     public static void Challenge(BotMobile herald, Guild ours, Point3D at, long now)
     {
         if (!Running || herald?.Map == null || ours?.Name == null || Fighting(ours.Name))
@@ -271,6 +280,7 @@ public static class BotGuildBout
         return best;
     }
 
+    /// <summary>The clock: champions arriving, the duel begun, the duel read, the purse paid. From the module's timer.</summary>
     internal static void Beat(long now)
     {
         for (var i = _bouts.Count - 1; i >= 0; i--)
@@ -300,6 +310,7 @@ public static class BotGuildBout
                     continue;
                 }
 
+                // Both arrived and their walk ended on its own beat; then the duel.
                 if (bout.ChampA.Resolve?.Deed is Answer || bout.ChampB.Resolve?.Deed is Answer)
                 {
                     continue;

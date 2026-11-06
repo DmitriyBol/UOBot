@@ -20,10 +20,13 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotZoneRaster
 {
+    /// <summary>Minutes for a sighting to weigh half. Six hours: a patrol learned in the evening is still known in the morning.</summary>
     public static int HalfLifeMinutes { get; set; } = 360;
 
+    /// <summary>The most a cell can weigh, so a creature standing on one cell for an hour does not outweigh its whole patrol.</summary>
     public static float MostWeight { get; set; } = 64f;
 
+    /// <summary>A cell faded below this is forgotten at the next collection.</summary>
     public static float Forgotten { get; set; } = 0.05f;
 
     public static Map Map { get; private set; }
@@ -32,12 +35,15 @@ public static class BotZoneRaster
 
     public static int Height { get; private set; }
 
+    /// <summary>Awake sightings recorded since the start.</summary>
     public static long Recorded { get; private set; }
 
+    /// <summary>Cells holding any weight now, as of the last collection.</summary>
     public static int Touched => _touched.Count;
 
     private static float[] _weight;
 
+    /// <summary>The minute a cell was last brought up to date, plus one; nought for a cell never touched.</summary>
     private static ushort[] _minute;
 
     private static readonly List<int> _touched = [];
@@ -56,6 +62,10 @@ public static class BotZoneRaster
         Recorded = 0;
     }
 
+    /// <summary>
+    /// The minute of the session, as a stamp that is never nought. Wraps after forty-five days, and the arithmetic on it is by
+    /// subtraction in sixteen bits, so the wrap is harmless for any cell touched within the last forty-five days.
+    /// </summary>
     private static ushort Stamp(long now) => (ushort)((now - _startTick) / 60000 % 65535 + 1);
 
     private static float Faded(float weight, ushort then, ushort now)
@@ -65,6 +75,7 @@ public static class BotZoneRaster
         return minutes == 0 ? weight : weight * MathF.Pow(0.5f, minutes / (float)Math.Max(1, HalfLifeMinutes));
     }
 
+    /// <summary>An attacking creature was seen awake on this tile.</summary>
     public static void Record(int x, int y, long now)
     {
         if (_weight == null)
@@ -97,6 +108,7 @@ public static class BotZoneRaster
         Recorded++;
     }
 
+    /// <summary>The weight of a cell now, for the door.</summary>
     public static float WeightAt(int x, int y, long now)
     {
         if (_weight == null)
@@ -117,6 +129,10 @@ public static class BotZoneRaster
         return _minute[i] == 0 ? 0f : Faded(_weight[i], _minute[i], Stamp(now));
     }
 
+    /// <summary>
+    /// Every cell weighing at least <paramref name="least"/>, with its weight, into the two lists; cells faded out of memory are
+    /// dropped from the touched list on the way. On the loop, for a build.
+    /// </summary>
     public static void Collect(long now, float least, List<int> cells, List<float> weights)
     {
         if (_weight == null)
@@ -152,6 +168,7 @@ public static class BotZoneRaster
         _touched.RemoveRange(kept, _touched.Count - kept);
     }
 
+    /// <summary>A cell remembered from before a restart, already faded by the time the shard was down. See <see cref="BotZoneMemory"/>.</summary>
     public static void Restore(int i, float weight, long now)
     {
         if (_weight == null || (uint)i >= (uint)_weight.Length || weight < Forgotten)

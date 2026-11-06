@@ -64,5 +64,6 @@ public static class BotWebHooks
 {
     public static Func<BotMindsReport> Minds { get; set; }
 
+    /// <summary>The debugger squad, one report a watcher, asked on the game loop once a second while the live window is open.</summary>
     public static Func<IReadOnlyList<BotDebuggerReport>> Debuggers { get; set; }
 }

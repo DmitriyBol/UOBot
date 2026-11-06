@@ -31,6 +31,7 @@ namespace Server.BotAI.V2;
 /// </summary>
 public static class BotCraftEar
 {
+    /// <summary>How long a sentence stays worth quoting. A failure reported a minute after the word was said is about something else.</summary>
     public static int FreshMs { get; set; } = 30000;
 
     public static bool Running { get; private set; }
@@ -70,6 +71,8 @@ public static class BotCraftEar
             _unnumbered++;
         }
 
+        // Success is said too, and it is not what anybody asks this for: keeping it would let "you create the
+        // item" from the last good swing stand as the reason for the next bad stint.
         if (number is 1044154 or 1044155)
         {
             _last.Remove(from.Serial);
@@ -80,6 +83,10 @@ public static class BotCraftEar
         _last[from.Serial] = (number, message.String, Core.TickCount);
     }
 
+    /// <summary>
+    /// The last thing the craft system said to this bot that was not "you made it", if it said it lately — as a
+    /// clause ready to go on the end of a failure. Empty when there is nothing fresh.
+    /// </summary>
     public static string Why(Mobile bot)
     {
         if (bot == null || !_last.TryGetValue(bot.Serial, out var said) || Core.TickCount - said.When > FreshMs)
@@ -111,6 +118,7 @@ public static class BotCraftEar
         _last.Clear();
     }
 
+    /// <summary>The five sentences heard most, for the summary.</summary>
     public static string Describe()
     {
         if (!Running)
@@ -142,6 +150,7 @@ public static class BotCraftEar
         return $"the craft system said to bots: {string.Join(", ", parts)}";
     }
 
+    /// <summary>Everything the craft system has said, most often first, for the page.</summary>
     public static IEnumerable<(int Number, string Text, long Count)> Tallies()
     {
         List<KeyValuePair<int, long>> heard = [.. _tally];

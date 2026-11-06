@@ -22,14 +22,19 @@ public sealed class BotRaid : BotDeed
 
     public const string Trade = "raid";
 
+    /// <summary>How long the raid searches the hideout once it is there. Two minutes: a dozen searches.</summary>
     public static int SearchMs { get; set; } = 120000;
 
+    /// <summary>How far round the hideout the raid looks for members of The Shadow.</summary>
     public static int Around { get; set; } = 14;
 
+    /// <summary>Raids raised by the Baron.</summary>
     public static long Raised { get; private set; }
 
+    /// <summary>Fighters pressed into raids.</summary>
     public static long Hands { get; private set; }
 
+    /// <summary>Members of The Shadow found at a hideout by a raid.</summary>
     public static long Found { get; private set; }
 
     private readonly Map _map;
@@ -48,6 +53,10 @@ public sealed class BotRaid : BotDeed
 
     private int _found;
 
+    /// <param name="map">Where.</param>
+    /// <param name="at">The hideout.</param>
+    /// <param name="trains">The skill the fighting trains.</param>
+    /// <param name="leads">Whether this is the Baron's own raid, which presses the posse and ends the raid for the hideout.</param>
     public BotRaid(Map map, Point3D at, SkillName trains, bool leads)
     {
         _map = map;
@@ -85,6 +94,7 @@ public sealed class BotRaid : BotDeed
     public override string Stage =>
         _fight != null ? $"raid: {_fight.Stage}" : _arrived ? "searching The Shadow's hideout" : "marching on The Shadow's hideout";
 
+    /// <summary>The Baron's raid presses the nearest fit fighters into it, as a patrol does.</summary>
     public override void Taken(IBotWilful bot)
     {
         var body = bot?.Self;

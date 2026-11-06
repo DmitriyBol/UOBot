@@ -11,18 +11,34 @@ public sealed class BotSeaLane
 
     public BotDock B;
 
+    /// <summary>The course's turns from A's open cell to B's, as cells.</summary>
     public List<int> Turns;
 
+    /// <summary>Harbour, sea and harbour, in tiles.</summary>
     public int Tiles;
 
     public long Sailed;
 
+    /// <summary>
+    /// Voyages on this lane that did not arrive: a captain dead aboard, a wreck, a ship put back. Counted once per voyage
+    /// (<c>BotHelm.Lose</c>) for the session, so a lane that kills its sailors is passed over by those who choose to sail
+    /// (<see cref="BotSea.Shut"/>, 06.10.2026).
+    /// </summary>
     public long Lost;
 
     public BotDock Other(BotDock one) => one == A ? B : A;
 
+    /// <summary>
+    /// The waypoints from one end to the other: the departure harbour (the ship lying as it lies at that berth), the sea
+    /// (turning as it likes, every cell of it open), and the arrival harbour reversed (lying as it must at the far berth).
+    /// <paramref name="sea"/> is the first waypoint of the open sea and <paramref name="harbour"/> the first of the arrival.
+    /// </summary>
     public List<Point3D> Course(BotDock from, out int sea, out int harbour) => Course(from, null, out sea, out harbour);
 
+    /// <summary>
+    /// The same, from one of the dock's berths: its own harbour, then the open cells from its harbour's end to the first
+    /// berth's (<see cref="BotBerth.Link"/>), then the lane as from the first.
+    /// </summary>
     public List<Point3D> Course(BotDock from, BotBerth berth, out int sea, out int harbour)
     {
         var to = Other(from);
@@ -31,6 +47,7 @@ public sealed class BotSeaLane
         course.AddRange(berth?.Harbour ?? from.Harbour);
         sea = course.Count;
 
+        // The link ends in the cell the lane begins with; that one is the lane's.
         if (berth?.Link != null)
         {
             for (var i = 0; i < berth.Link.Count - 1; i++)
@@ -99,12 +116,15 @@ public static class BotSeaLanes
 
     public static IReadOnlyList<BotSeaLane> All => _lanes;
 
+    /// <summary>Pairs of docks a road already joins, and pairs no course could join.</summary>
     public static int Walked { get; private set; }
 
     public static int NoWay { get; private set; }
 
+    /// <summary>Towns reachable by sea and by nothing else.</summary>
     public static int SeaTowns { get; private set; }
 
+    /// <summary>Asks for every course once, then waits for them. True once every course is drawn and the towns are marked.</summary>
     public static bool Step(Map map)
     {
         if (Ready)
@@ -197,6 +217,7 @@ public static class BotSeaLanes
         }
     }
 
+    /// <summary>The towns home cannot walk to and can sail to, marked and said.</summary>
     private static void Mark(Map map)
     {
         var home = BotPopulation.Where;
@@ -242,6 +263,7 @@ public static class BotSeaLanes
         logger.Information("Towns: {Sea} more can be sailed to from home: {Names}", SeaTowns, SeaTowns > 0 ? names.ToString() : "none");
     }
 
+    /// <summary>The lane between two docks, or null.</summary>
     public static BotSeaLane Between(BotDock a, BotDock b)
     {
         if (a == null || b == null || a == b)

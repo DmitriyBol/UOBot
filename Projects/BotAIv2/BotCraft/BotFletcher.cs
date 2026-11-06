@@ -42,6 +42,7 @@ public sealed class BotFletcher : IBotProposer
 
     private static bool _said;
 
+    /// <summary>Every gate apart, with the denominator. There is no bucket called "other".</summary>
     public static long Asked { get; private set; }
 
     public static long NoKit { get; private set; }
@@ -54,12 +55,31 @@ public sealed class BotFletcher : IBotProposer
 
     public static long OnSpec { get; private set; }
 
+    /// <summary>Arrows asked for on the board that nobody could fill for want of feathers. The trade's whole story.</summary>
+    /// <summary>
+    /// Times a fletcher short of feathers found an arrow order it could not fill.
+    ///
+    /// <para>
+    /// <b>A count of looks and not of orders, and it used to be printed as orders.</b> It is
+    /// incremented once per pass through the no-feathers gate, so a single standing order looked at
+    /// by twenty fletchers on every beat reads in the hundreds: "419 arrow orders stood on the board"
+    /// at 23:42 on 04.09.2026, against no arrow order raised at all in the preceding half hour. A
+    /// counter whose sentence promises a different denominator than it counts is worse than no
+    /// counter — it is the second lying instrument found in one night.
+    /// </para>
+    /// </summary>
     public static long Unfilled { get; private set; }
 
+    /// <summary>Fewer feathers than this in the pack, and a fletcher standing at a bank takes more out of its own box first.</summary>
     public static int LeastFeathers { get; set; } = 5;
 
+    /// <summary>Rounds whose fletcher could not pay for the wood.</summary>
     public static long Poor { get; private set; }
 
+    /// <summary>
+    /// How long a fletcher's going without wood or feathers stands as a call on the woodcutters and the hunters.
+    /// See <see cref="Starved"/> and <see cref="Woodless"/>.
+    /// </summary>
     public static int CallMs { get; set; } = 600000;
 
     private static long _starvedAt;
@@ -70,8 +90,20 @@ public sealed class BotFletcher : IBotProposer
 
     private static bool _woodless;
 
+    /// <summary>
+    /// Whether a fletcher lately found no feather in its pack and none on any stall.
+    ///
+    /// <para>
+    /// <b>The demand the hunters read, when the fletcher cannot pay to post it.</b> A bird is worth a bounty to a hunter only while
+    /// the board has money down for feathers or arrows (<c>BotQuarry.Sought</c>), and a fletcher's want needs a purse it rarely
+    /// has. This is the same fact without the money: somebody who makes arrows has nothing to make them from.
+    /// </para>
+    /// </summary>
     public static bool Starved => _starved && Core.TickCount - _starvedAt < CallMs;
 
+    /// <summary>
+    /// Whether a fletcher lately found no wood in its pack, on any stall or at any counter in reach. See <see cref="Starved"/>.
+    /// </summary>
     public static bool Woodless => _woodless && Core.TickCount - _woodlessAt < CallMs;
 
     public string Name => "Fletcher";
@@ -109,6 +141,8 @@ public sealed class BotFletcher : IBotProposer
             return null;
         }
 
+        // Its own feathers out of its own bank box first, standing at a bank (01.10.2026: the box is reached only there, where the
+        // stall this took its feathers back off was reached from anywhere).
         if (BotFletching.Feathers(body) < LeastFeathers)
         {
             BotMarket.FromBank(bot, typeof(Feather), BotFletching.LeastArrows);
@@ -116,6 +150,9 @@ public sealed class BotFletcher : IBotProposer
 
         var feathers = BotFletching.Feathers(body);
 
+        // <b>Another bot's feathers come by a carrier's walk now.</b> They were bought off the cheapest stall from wherever the
+        // fletcher stood; since the auction went (01.10.2026) the fletcher's trade says its want aloud (BotStores) and a hunter who
+        // went through a bird walks the feathers over (BotCourier). A fletcher with none waits for that.
         if (feathers <= 0)
         {
             NoFeathers++;
@@ -126,6 +163,7 @@ public sealed class BotFletcher : IBotProposer
             {
                 Unfilled++;
 
+                // Remembered for the walk to its own bank box before it digs (03.10.2026, econ13). See BotCraftFirst.
                 BotCraftFirst.Short(body, typeof(Feather), Math.Max(LeastFeathers, BotFletching.LeastArrows));
             }
 
@@ -134,6 +172,7 @@ public sealed class BotFletcher : IBotProposer
 
         var order = Order(bot);
 
+        // Enough in the pack already — feathers and shafts or logs to match them. No shopping leg at all.
         if (BotFletching.Possible(body) >= BotFletching.LeastArrows)
         {
             Once(body, feathers);
@@ -152,6 +191,7 @@ public sealed class BotFletcher : IBotProposer
             return new BotFletch(map, body.Location, null, 0, 0);
         }
 
+        // Short of wood, which is the half that can simply be bought.
         BotShops.Survey(map, body.Location);
 
         var held = feathers;
@@ -159,6 +199,8 @@ public sealed class BotFletcher : IBotProposer
         var shop = BotShops.Nearest(bot, typeof(Log));
         var price = shop == null ? 0 : BotShops.Price(shop, typeof(Log));
 
+        // (The population's own wood off a stall counted here until the auction went on 01.10.2026. A woodcutter's logs reach a
+        // fletcher now by a carrier's walk to the wood its trade has asked for — BotStores says the want.)
         if (price <= 0)
         {
             NoWood++;
@@ -178,6 +220,8 @@ public sealed class BotFletcher : IBotProposer
             return null;
         }
 
+        // Bought to match the feathers and never by the armful: the feather is the binding half, and wood
+        // beyond it is money spent on arrows that cannot be made.
         var take = Math.Max(BotFletching.LeastArrows, held) - BotFletching.Shafts(body) - BotFletching.Logs(body);
 
         if (take <= 0)
@@ -208,6 +252,7 @@ public sealed class BotFletcher : IBotProposer
         return new BotFletch(map, body.Location, shop, price, take, null);
     }
 
+    /// <summary>The most valuable standing order for arrows, or null. Worth rather than nearness, as the smith does.</summary>
     private static BotWant Order(IBotWilful bot)
     {
         var wants = BotMarket.Wants;
@@ -224,6 +269,8 @@ public sealed class BotFletcher : IBotProposer
                 continue;
             }
 
+            // Only an order a carrier from here could deliver, and not one already fletched and waiting in the pack for the walk
+            // (01.10.2026, build 384 review). See BotCourier.Answerable and BotCourier.Holding.
             if (!BotCourier.Answerable(bot, want) || BotCourier.Holding(bot, want))
             {
                 continue;
@@ -236,6 +283,7 @@ public sealed class BotFletcher : IBotProposer
         return best;
     }
 
+    /// <summary>Said once, because the first arrow this shard ever made is worth a line and the thousandth is not.</summary>
     private static void Once(Mobile body, int feathers)
     {
         if (_said)

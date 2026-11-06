@@ -32,10 +32,21 @@ public static class NavigationService
 
     public static bool Enabled { get; set; } = true;
 
+    /// <summary>
+    /// Extra cost, in <see cref="NavCost"/> units, for routing through the node at (x, y) — set by whoever knows where the
+    /// ground is dangerous (the bots' quadrant map and barred boxes), null for none. Both planners add it to every node
+    /// they relax, so a road through blood costs more than a longer road round it and the route goes round. Consulted
+    /// once per relaxation: keep it to a lookup.
+    /// </summary>
     public static Func<int, int, int> Danger { get; set; }
 
+    /// <summary>
+    /// Told whenever the ground under a rectangle changes (<see cref="GroundChanged"/>: a house raised, moved or taken down),
+    /// on the loop, before the graph redraws. For whoever keeps a map of the same ground — the bots' reach map (01.10.2026).
+    /// </summary>
     public static Action<Map, Rectangle2D> GroundChangedHook { get; set; }
 
+    /// <summary>The danger at a node, or nought without a hook. See <see cref="Danger"/>.</summary>
     internal static int DangerAt(NavGraph graph, int node)
     {
         var danger = Danger;
@@ -43,8 +54,10 @@ public static class NavigationService
         return danger == null ? 0 : danger(graph.X(node), graph.Y(node));
     }
 
+    /// <summary>The most one slice of drawing may spend on the game loop, in milliseconds.</summary>
     public static int SliceMs { get; set; } = 8;
 
+    /// <summary>How often a slice runs, in milliseconds.</summary>
     public static int EveryMs { get; set; } = 50;
 
     private static readonly Dictionary<int, NavGraph> _graphs = new();
@@ -65,12 +78,18 @@ public static class NavigationService
 
     private static readonly List<Point3D> _groundPoints = [];
 
+    /// <summary>The roads found, remembered and handed out again. See <see cref="NavRouteMemory"/>.</summary>
     public static NavRouteMemory Memory => _memory;
 
+    /// <summary>Routes served from memory, a way round the danger among them, and the loop's milliseconds they cost.</summary>
     public static long Remembered { get; private set; }
 
     public static double RememberedMs { get; private set; }
 
+    /// <summary>
+    /// Routes the planners were asked for, and their milliseconds; of them, those the memory could have served had it held
+    /// a road (both ends placed, three clusters or more apart, and a way found), whose mean is the price a served route saves.
+    /// </summary>
     public static long Plans { get; private set; }
 
     public static double PlansMs { get; private set; }
@@ -79,15 +98,25 @@ public static class NavigationService
 
     public static double EligiblePlansMs { get; private set; }
 
+    /// <summary>Roads planned with the danger hook off, to be remembered; and ways round the danger planned after them.</summary>
     public static long GroundPlans { get; private set; }
 
     public static long RoundPlans { get; private set; }
 
+    /// <summary>Ways round the danger the planner could not find within its budget, walked as the ground road instead.</summary>
     public static long RoundFallbacks { get; private set; }
 
+    /// <summary>
+    /// The loop's milliseconds the memory has saved: the routes served times what a route it could have served cost to plan,
+    /// less what serving them cost. An estimate, and a low one: the roads served are the ones asked most, and far ones.
+    /// </summary>
     public static double SavedMs =>
         EligiblePlans <= 0 ? 0.0 : Math.Max(0.0, Remembered * (EligiblePlansMs / EligiblePlans) - RememberedMs);
 
+    /// <summary>
+    /// How often the remembered roads are written to disk when they have changed, in milliseconds. Ten minutes: the shard is
+    /// stopped by a kill as often as by a shutdown, and ten minutes of roads is a few dozen plans to find again.
+    /// </summary>
     public static int RouteWriteEveryMs { get; set; } = 600000;
 
     public static long RoutesWritten { get; private set; }
@@ -98,15 +127,18 @@ public static class NavigationService
 
     private static readonly Dictionary<int, ulong> _fingerprints = new();
 
+    /// <summary>Routes the medium tier could not find within its budget, handed to the long tier.</summary>
     public static long LongRoutes { get; private set; }
 
     private static readonly long[] _statuses = new long[Enum.GetValues<NavStatus>().Length];
 
+    /// <summary>How many routes have ended with that status.</summary>
     public static long Status(NavStatus status) =>
         (int)status >= 0 && (int)status < _statuses.Length ? _statuses[(int)status] : 0;
 
     private static Timer _timer;
 
+    /// <summary>Whether graphs are kept on disk between boots. See <see cref="NavGraphFile"/>.</summary>
     public static bool Persist { get; set; } = true;
 
     /// <summary>A graph being read from disk on a worker thread, per map, and what it read.</summary>
@@ -122,6 +154,7 @@ public static class NavigationService
 
         public string Error;
 
+        /// <summary>The remembered roads of the map, read by the same worker after the graph. See <see cref="NavRouteFile"/>.</summary>
         public List<NavRouteRecord> Routes;
 
         public string RoutesError;
@@ -129,6 +162,7 @@ public static class NavigationService
 
     private static readonly Dictionary<int, Load> _loads = new();
 
+    /// <summary>Maps whose graph has been written to disk this boot, or is being.</summary>
     private static readonly HashSet<int> _saved = new();
 
     private static volatile bool _writing;
@@ -139,8 +173,14 @@ public static class NavigationService
 
     public static double WorstRouteMs { get; private set; }
 
+    /// <summary>
+    /// A route that holds the loop this long is written down with its ends and tiers (29.09.2026, build 322). The worst route
+    /// of 319 took 2164.8 ms and of 320 1164.4 ms — the whole world stood still that long — and the summary kept only the
+    /// number. An instrument before a fix.
+    /// </summary>
     public static double SlowRouteMs { get; set; } = 250.0;
 
+    /// <summary>Routes slower than <see cref="SlowRouteMs"/>.</summary>
     public static long SlowRoutes { get; private set; }
 
     private static int _routeMediumCalls;
@@ -166,12 +206,18 @@ public static class NavigationService
         _memory.DetourMs = ServerConfiguration.GetOrUpdateSetting("pathfinding.routes.detourMs", _memory.DetourMs);
         RouteWriteEveryMs = ServerConfiguration.GetOrUpdateSetting("pathfinding.routes.writeEveryMs", RouteWriteEveryMs);
 
+        // A shutdown writes what the ten-minute clock has not; a kill loses at most ten minutes of roads.
         EventSink.Shutdown += () => WriteRoutes(true);
     }
 
+    /// <summary>The graph of a map, or null when nobody has asked for one.</summary>
     public static NavGraph Graph(Map map) =>
         map != null && _graphs.TryGetValue(map.MapID, out var graph) ? graph : null;
 
+    /// <summary>
+    /// Makes sure <paramref name="map"/> has a graph and that it is drawn outward from <paramref name="center"/> first. The
+    /// first call for a map starts drawing it; a later one re-orders what is left.
+    /// </summary>
     public static void Prepare(Map map, Point3D center)
     {
         if (!Enabled || map == null || map == Map.Internal)
@@ -197,6 +243,7 @@ public static class NavigationService
 
         graph.Prioritize(center.X, center.Y);
 
+        // A graph kept from the last boot, read on a worker thread while the loop goes on; the bake waits for it.
         if (Persist && !_loads.ContainsKey(map.MapID) && graph.Built == 0)
         {
             var load = new Load { Fingerprint = StepCacheFile.ComputeFingerprint(map.MapID), Center = center };
@@ -224,6 +271,7 @@ public static class NavigationService
             });
         }
 
+        // The remembered roads are written on their own clock, when they have changed. See WriteRoutes.
         if (Persist && _routeTimer == null && RouteWriteEveryMs > 0)
         {
             var every = TimeSpan.FromMilliseconds(RouteWriteEveryMs);
@@ -239,8 +287,16 @@ public static class NavigationService
         }
     }
 
+    /// <summary>
+    /// A route over the map's graph from <paramref name="from"/> to <paramref name="to"/>: the points to walk
+    /// (<see cref="NavStatus.Ok"/>), or why there are none.
+    /// </summary>
     public static NavStatus Route(Map map, Point3D from, Point3D to, List<Point3D> points) => Route(map, from, to, points, 0);
 
+    /// <summary>
+    /// The same, for a walker that arrives within <paramref name="reach"/> tiles of <paramref name="to"/>: when the goal's own
+    /// cell is shut off from the start, the nearest one within reach that is not. See <see cref="HierarchicalPlanner.Route(NavGraph, int, int, int, int, int, int, List{Point3D}, int)"/>.
+    /// </summary>
     public static NavStatus Route(Map map, Point3D from, Point3D to, List<Point3D> points, int reach)
     {
         points.Clear();
@@ -262,6 +318,9 @@ public static class NavigationService
         _routeLongCalls = 0;
         _routeLongExpanded = 0;
 
+        // <b>Remembered first (29.09.2026, "paths and graphs must be remembered; they can only be optimised").</b> A road the
+        // shard has found before is proved against the graph and the danger in microseconds and handed out; only what the
+        // memory cannot answer is planned. See NavRouteMemory.
         var recall = _memory.Recall(graph, _cache, _medium.Anchorage, from, to, points, Danger);
         NavStatus status;
 
@@ -319,6 +378,7 @@ public static class NavigationService
         return status;
     }
 
+    /// <summary>The medium tier, and the long tier when the medium runs out of budget: the planners as they always were.</summary>
     private static NavStatus Plan(NavGraph graph, Point3D from, Point3D to, List<Point3D> points, int reach)
     {
         var status = _medium.Route(graph, from.X, from.Y, from.Z, to.X, to.Y, to.Z, points, reach);
@@ -326,10 +386,13 @@ public static class NavigationService
         _routeMediumCalls++;
         _routeMediumExpanded += _medium.LastExpanded;
 
+        // Round a river the straight line lies and the medium tier's search runs out: the long tier finds the corridor and the
+        // medium tier searches it alone.
         if (status == NavStatus.BudgetExceeded)
         {
             LongRoutes++;
 
+            // To the goal the medium tier settled on within reach.
             var goal = _medium.LastGoal;
 
             status = _long.Route(graph, from.X, from.Y, from.Z, goal.X, goal.Y, goal.Z, points);
@@ -341,6 +404,20 @@ public static class NavigationService
         return status;
     }
 
+    /// <summary>
+    /// What the memory could not answer, planned, and offered to it.
+    ///
+    /// <para>
+    /// <b>The road is planned on the ground; the danger is read over it after (29.09.2026).</b> A road not remembered is
+    /// planned with the danger hook off and offered: the memory keeps ground roads, whose cost does not change by the minute,
+    /// so "only cheaper replaces" means something. If nothing along it is charged now, it is the road the danger-aware
+    /// planner would have found (every road costs at least its ground price, and none is cheaper on the ground) and it is
+    /// walked as it is — one plan, and the cheaper one: build 297 measured 940 nodes a route without the hook against
+    /// 2500–4400 with it. Only a road that crosses blood is planned again with the hook on, and that way round is kept a
+    /// while as a detour (<see cref="NavRouteMemory.OfferDetour"/>). A remembered road that crosses blood now
+    /// (<see cref="NavRecall.Bloodied"/>) goes straight to that second plan.
+    /// </para>
+    /// </summary>
     private static NavStatus Planned(NavGraph graph, Point3D from, Point3D to, List<Point3D> points, int reach, NavRecall recall)
     {
         var danger = Danger;
@@ -364,6 +441,7 @@ public static class NavigationService
                 return round;
             }
 
+            // No way round within the planners' budgets: the remembered ground road, blood and all, rather than the old chart.
             if (_memory.LastGround(points))
             {
                 RoundFallbacks++;
@@ -394,6 +472,7 @@ public static class NavigationService
             return ground;
         }
 
+        // A road planned while a gate is shunned may go round it; kept only until the shun runs out (NavRouteMemory.Expired).
         _memory.Offer(
             graph,
             _cache,
@@ -423,6 +502,7 @@ public static class NavigationService
             return status;
         }
 
+        // No way round within the planners' budgets: the ground road, blood and all, rather than the old chart.
         RoundFallbacks++;
         points.Clear();
         points.AddRange(_groundPoints);
@@ -430,22 +510,31 @@ public static class NavigationService
         return NavStatus.Ok;
     }
 
+    /// <summary>
+    /// The component of the map's graph that a body at <paramref name="at"/> stands in, or -1 while the graph is not whole or its
+    /// components are not counted. Two points in one component are joined by ground; two in different components are not, and
+    /// only a teleporter joins them. See <see cref="HierarchicalPlanner.ComponentAt"/>.
+    /// </summary>
     public static int ComponentOf(Map map, Point3D at) =>
         Enabled && map != null && map != Map.Internal && _graphs.TryGetValue(map.MapID, out var graph)
             ? _medium.ComponentAt(graph, at.X, at.Y, at.Z)
             : -1;
 
+    /// <summary>How many times the map's components were counted; a component kept across a change of this is stale.</summary>
     public static int ComponentEpoch(Map map) =>
         map != null && _graphs.TryGetValue(map.MapID, out var graph) ? graph.ComponentEpoch : 0;
 
+    /// <summary>Whether <see cref="ComponentOf"/> can answer for this map at all.</summary>
     public static bool ComponentsCounted(Map map) =>
         map != null && _graphs.TryGetValue(map.MapID, out var graph) && graph.ComponentsValid;
 
+    /// <summary>How the two ends join the map's graph. See <see cref="HierarchicalPlanner.Explain"/>.</summary>
     public static string Explain(Map map, Point3D from, Point3D to) =>
         map != null && _graphs.TryGetValue(map.MapID, out var graph)
             ? _medium.Explain(graph, from.X, from.Y, from.Z, to.X, to.Y, to.Z)
             : "no graph for that map";
 
+    /// <summary>A walker could not pass the gate at <paramref name="point"/>. See <see cref="HierarchicalPlanner.Shun"/>.</summary>
     public static void Shun(Map map, Point3D point)
     {
         if (map != null && _graphs.TryGetValue(map.MapID, out var graph))
@@ -455,8 +544,13 @@ public static class NavigationService
         }
     }
 
+    /// <summary>
+    /// The ground under a rectangle changed — a house raised, moved or taken down: its clusters are torn down and drawn
+    /// again ahead of anything else, and the planners forget their windows there.
+    /// </summary>
     public static void GroundChanged(Map map, Rectangle2D bounds)
     {
+        // Told first, whether or not this map has a graph: the bots' reach map (BotReachMap) draws the same ground again.
         GroundChangedHook?.Invoke(map, bounds);
 
         if (map == null || !_graphs.TryGetValue(map.MapID, out var graph))
@@ -482,6 +576,7 @@ public static class NavigationService
 
         foreach (var (mapId, graph) in _graphs)
         {
+            // Waiting for the graph from disk; the chart answers meanwhile.
             if (_loads.TryGetValue(mapId, out var load) && load != null)
             {
                 if (!load.Done)
@@ -547,11 +642,13 @@ public static class NavigationService
 
             if (graph.Complete && graph.ComponentsValid)
             {
+                // Kept on disk once whole, from a copy taken here, written by a worker; never while the world saves.
                 if (Persist && !_saved.Contains(mapId) && !_writing && !World.Saving)
                 {
                     Save(mapId, graph);
                 }
 
+                // The long tier's regions, ahead of time, once the first level is whole.
                 if (!_long.Prebuilt(graph))
                 {
                     idle = false;
@@ -597,6 +694,7 @@ public static class NavigationService
                 );
             }
 
+            // One map a slice.
             break;
         }
 
@@ -606,6 +704,7 @@ public static class NavigationService
         }
     }
 
+    /// <summary>The clusters in or beside a sector with a multi in it now: the ground a saved graph may have wrong.</summary>
     private static List<int> Housed(NavGraph graph)
     {
         var housed = new List<int>();
@@ -672,6 +771,11 @@ public static class NavigationService
         });
     }
 
+    /// <summary>
+    /// The remembered roads written to disk when they have changed: the records taken on the loop (arrays that never change
+    /// once a road is made), written by a worker, never while the world saves. <paramref name="now"/>, at shutdown, writes on
+    /// the calling thread.
+    /// </summary>
     private static void WriteRoutes(bool now)
     {
         if (!Persist || !_memory.Enabled || !_memory.Dirty || _routesWriting || !now && World.Saving)

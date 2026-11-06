@@ -11,14 +11,19 @@ public enum BotBerthBlock
 {
     None,
 
+    /// <summary>A hull tile that is not water at sea level: the berth was drawn wrong.</summary>
     Ground,
 
+    /// <summary>A static of the map at or above the water: a pier, a rock.</summary>
     Static,
 
+    /// <summary>Another ship's hull, tillerman, hold or plank.</summary>
     Ship,
 
+    /// <summary>Another multi's tile that is not a ship.</summary>
     Multi,
 
+    /// <summary>A visible item standing on the water inside the hull's rectangle: decoration, something dropped.</summary>
     Item
 }
 
@@ -57,25 +62,40 @@ public static class BotSeaChart
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeaChart));
 
+    /// <summary>
+    /// The height of the sea. Minus five: 14,512,366 of map0's water land tiles lie there and the next height has 1,118
+    /// (29.09.2026). <c>BaseBoat.CanFit</c> asks for water at exactly the ship's own Z, and a ship is placed at the height of
+    /// the water it is put on.
+    /// </summary>
     public static int SeaLevel { get; set; } = -5;
 
+    /// <summary>The small ship facing north (<c>SmallBoat.NorthID</c>). The one ship the population buys.</summary>
     public const int ShipNorth = 0x0;
 
+    /// <summary>The small ship facing east (<c>SmallBoat.EastID</c>).</summary>
     public const int ShipEast = 0x1;
 
+    /// <summary>Blocks across the charted sea: x below 5120, the engine's first wrap rectangle for Britannia.</summary>
     public const int Width = 640;
 
+    /// <summary>Blocks down the charted sea.</summary>
     public const int Height = 512;
 
+    /// <summary>
+    /// Cells shut along the edge. The engine wraps a ship that sails past the edge of its rectangle (16 to 5103 by 16 to
+    /// 4079) round to the other side, which no course means; three cells keep every hull inside it.
+    /// </summary>
     private const int Rim = 3;
 
+    /// <summary>How much of the loop one slice of charting may take, in milliseconds.</summary>
     public static double SliceMs { get; set; } = 6.0;
 
+    /// <summary>Whether the chart is kept on disk between boots.</summary>
     public static bool Cache { get; set; } = true;
 
     public const string CachePath = "Data/bot-sea-chart.bin";
 
-    private const uint Magic = 0x31414553;
+    private const uint Magic = 0x31414553; // "SEA1"
 
     private const int Version = 1;
 
@@ -97,12 +117,19 @@ public static class BotSeaChart
 
     private static long _began;
 
+    /// <summary>How far the ship reaches from its middle, read from its multi. Five for the small ship.</summary>
     public static int Half { get; private set; } = 5;
 
+    /// <summary>The small ship's hull, facing north and facing east, as offsets from its middle.</summary>
     public static Rectangle2D HullNorth { get; private set; } = new(-2, -5, 5, 11);
 
     public static Rectangle2D HullEast { get; private set; } = new(-5, -2, 11, 5);
 
+    /// <summary>
+    /// The tiles the ship stands on facing north, as offsets from its middle: 36 of the rectangle's 55 (multi 0x0). The
+    /// hull a deed puts down, whatever way the dock means the ship to lie — <c>BaseBoatDeed.OnPlacement</c> asks
+    /// <c>CanFit</c> of the new ship's own item id, and a new ship faces north.
+    /// </summary>
     public static Point2D[] TilesNorth { get; private set; } = [];
 
     private static Point2D[] Offsets(MultiComponentList hull)
@@ -139,18 +166,21 @@ public static class BotSeaChart
 
     public static bool Ready { get; private set; }
 
+    /// <summary>Whether the masks came from the file rather than from the map.</summary>
     public static bool FromFile { get; private set; }
 
     public static int OpenCells { get; private set; }
 
     public static int Bodies { get; private set; }
 
+    /// <summary>The open sea: the largest body of open cells, and how many cells it has.</summary>
     public static int Sea { get; private set; } = -1;
 
     public static int SeaCells { get; private set; }
 
     public static long WetTiles { get; private set; }
 
+    /// <summary>Loop time spent charting, and the worst slice.</summary>
     public static double SpentMs { get; private set; }
 
     public static double WorstMs { get; private set; }
@@ -159,10 +189,16 @@ public static class BotSeaChart
 
     public static Map Map => _map;
 
+    /// <summary>Whether a water land tile, by the engine's own numbers in <c>BaseBoat.CanFit</c>.</summary>
     public static bool WaterLand(int id) => id is >= 168 and <= 171 or >= 310 and <= 311;
 
+    /// <summary>Whether a water static, by the same.</summary>
     public static bool WaterStatic(int id) => id is >= 0x1796 and <= 0x17B2;
 
+    /// <summary>
+    /// One slice of charting. True once the chart is ready. Everything that needs the map is asked on the loop, a block at
+    /// a time, and the slice stops at the deadline.
+    /// </summary>
     public static bool Step(Map map)
     {
         if (Ready)
@@ -246,6 +282,7 @@ public static class BotSeaChart
         _stage = 1;
     }
 
+    /// <summary>The ship's reach, from the engine's own multi data, so a different client's ship is charted as it is.</summary>
     private static void Hull()
     {
         var north = MultiData.GetComponents(ShipNorth);
@@ -265,6 +302,7 @@ public static class BotSeaChart
         var half = Math.Max(Math.Max(-north.Min.X, north.Max.X), Math.Max(-north.Min.Y, north.Max.Y));
         half = Math.Max(half, Math.Max(Math.Max(-east.Min.X, east.Max.X), Math.Max(-east.Min.Y, east.Max.Y)));
 
+        // A reach past a block's width would need the cells two away; the small ship is five, and a bigger one is not bought.
         Half = Math.Clamp(half, 0, 8);
     }
 
@@ -295,6 +333,11 @@ public static class BotSeaChart
         _stage = 2;
     }
 
+    /// <summary>
+    /// The water tiles of one block, by the engine's rule: water land at sea level, or a water static at sea level, and no
+    /// other static at or above it. Statics are read only where there is water land, unless <paramref name="allStatics"/>
+    /// asks for them everywhere (a harbour, where moats and canals are water laid over ground).
+    /// </summary>
     public static ulong Mask(Map map, int bx, int by, bool allStatics)
     {
         var land = map.Tiles.GetLandBlock(bx, by);
@@ -402,6 +445,10 @@ public static class BotSeaChart
         _stage = 3;
     }
 
+    /// <summary>
+    /// Whether a ship fits anywhere in this cell, either way round: the cell and <see cref="Half"/> tiles round it are
+    /// water. Read from the nine blocks' masks — the columns and rows of each neighbour the reach falls in.
+    /// </summary>
     private static bool Opens(int cx, int cy)
     {
         if (cx < Rim || cy < Rim || cx >= Width - Rim || cy >= Height - Rim)
@@ -443,6 +490,7 @@ public static class BotSeaChart
             _   => Half >= 8 ? ~0UL : (1UL << (Half * 8)) - 1
         };
 
+    /// <summary>Numbers the bodies of open water, a flood at a time, and names the largest the open sea.</summary>
     private static void Label(long deadline)
     {
         var total = Width * Height;
@@ -523,6 +571,7 @@ public static class BotSeaChart
 
     private static readonly int[] _dy = [-1, -1, 0, 1, 1, 1, 0, -1];
 
+    /// <summary>The cell a step in direction <paramref name="d"/> (0 north, clockwise) leads to, when a ship can make it.</summary>
     public static bool Passable(int cx, int cy, int d, out int next)
     {
         next = -1;
@@ -542,6 +591,7 @@ public static class BotSeaChart
             return false;
         }
 
+        // Diagonally only past two open corners: a hull turning a corner sweeps both.
         if ((d & 1) == 1 && (!_open[nx * Height + cy] || !_open[cx * Height + ny]))
         {
             return false;
@@ -556,15 +606,19 @@ public static class BotSeaChart
 
     public static int DY(int d) => _dy[d];
 
+    /// <summary>The cell holding a tile, or -1 off the chart.</summary>
     public static int CellOf(int x, int y) =>
         x < 0 || y < 0 || x >= Width * 8 || y >= Height * 8 ? -1 : (x >> 3) * Height + (y >> 3);
 
+    /// <summary>The tile a ship aims for in a cell: its middle.</summary>
     public static Point3D Middle(int cell) => new(cell / Height * 8 + 4, cell % Height * 8 + 4, SeaLevel);
 
     public static bool IsOpen(int cell) => Ready && cell >= 0 && cell < _open.Length && _open[cell];
 
+    /// <summary>Whether this cell is open and part of the open sea.</summary>
     public static bool AtSea(int cell) => IsOpen(cell) && _body[cell] == Sea;
 
+    /// <summary>Whether a ship floats on this tile, as the chart read it (statics only where there is water land).</summary>
     public static bool Wet(int x, int y)
     {
         var cell = CellOf(x, y);
@@ -572,8 +626,25 @@ public static class BotSeaChart
         return cell >= 0 && _wet != null && (_wet[cell] >> (((y & 7) << 3) | (x & 7)) & 1) != 0;
     }
 
+    /// <summary>
+    /// Whether the small ship could be put down here now, facing north or east: <c>BaseBoat.CanFit</c> without a ship to ask
+    /// it of. See <see cref="Occupant"/>.
+    /// </summary>
     public static bool FitsNow(Map map, Point3D p, bool east) => Occupant(map, p, east, out _, out _) == null;
 
+    /// <summary>
+    /// What stops the small ship being put down here now, facing north or east, in words — null when nothing does. The two
+    /// loops of <c>BaseBoat.CanFit</c> in their order: every hull tile must be water at sea level with no static or ship's
+    /// tile at or above it, and no visible item may stand at or above the water inside the hull's rectangle.
+    ///
+    /// <para>
+    /// <b>Written because "the berth at Vesper is taken" was all the log could say, and it was not taken.</b> Build 322's
+    /// first ordered voyage (Rhiannel, Vesper for Nujel'm, 29.09.2026 20:12) waited two minutes at the dock and failed so;
+    /// nothing was in the water. The dock lay east–west and the check asked the north-facing hull a deed puts down, which
+    /// covers (3010, 752) and (3010, 753) — the shore. Every kind of obstruction now has its name and its own count, and
+    /// only a ship is worth waiting for (<see cref="BotBerthBlock"/>).
+    /// </para>
+    /// </summary>
     public static string Occupant(Map map, Point3D p, bool east, out BotBerthBlock block, out BaseBoat ship)
     {
         block = BotBerthBlock.None;
@@ -656,6 +727,7 @@ public static class BotSeaChart
                 continue;
             }
 
+            // A tillerman, a hold or a plank is another ship's, and says so.
             ship = BaseBoat.FindBoatAt(item.Location, map);
 
             if (ship != null)

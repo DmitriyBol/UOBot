@@ -15,6 +15,7 @@ public sealed class BotTownGroundSettings
 
     public int? SweepEveryMs { get; set; }
 
+    /// <summary>What a guild really paid for a square, read off the claim lines of the logs: refunded instead of the standing price.</summary>
     public List<BotTownGroundPaid> Paid { get; set; }
 }
 
@@ -69,40 +70,58 @@ public static class BotTownGround
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTownGround));
 
+    /// <summary>Whether town ground is refused and swept. Off: claims are opened and held anywhere, as before 07.10.2026.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often every held square is looked at again. An hour.</summary>
     public static int SweepEveryMs { get; set; } = 3600000;
 
+    /// <summary>Staker looks at an open square passed over because it lies on town ground. Counts squares looked at.</summary>
     public static long OpenPassed { get; private set; }
 
+    /// <summary>Staker looks at another guild's square passed over (never weighed for a seizure) because it lies on town ground.</summary>
     public static long HeldPassed { get; private set; }
 
+    /// <summary>Claims refused at <c>BotClaim.Open</c> itself for town ground: the last wall.</summary>
     public static long Refused { get; private set; }
 
+    /// <summary>Sweeps run, and held squares dropped by them; of those, how many had been paid for.</summary>
     public static long Sweeps { get; private set; }
 
     public static long Dropped { get; private set; }
 
     public static long DroppedBought { get; private set; }
 
+    /// <summary>What the dropped squares' guilds got back, and how much of it the city's purse could not cover.</summary>
     public static long Refunded { get; private set; }
 
     public static long Short { get; private set; }
 
+    /// <summary>Of the dropped squares, those whose guild was gone, so nothing was refunded.</summary>
     public static long Orphans { get; private set; }
 
+    /// <summary>Claims still mustering on town ground called off by a sweep, and the held price handed back to their chests.</summary>
     public static long BidsCalled { get; private set; }
 
     public static long BidsReturned { get; private set; }
 
+    /// <summary>Halls' yards on town ground, kept, at the last sweep. A gauge, not a count.</summary>
     public static int YardsKept { get; private set; }
 
     private static readonly Dictionary<(int Map, int X, int Y), (string Town, int Tiles)> _known = [];
 
     private const string ConfigPath = "Configuration/bot-townground.json";
 
+    /// <summary>
+    /// <b>The real prices, by the record</b> (Patrick, 07.10.2026: "give the guilds their money back if they paid for the
+    /// claim"). The claim store keeps whether a square was bought, not for how much, and the ladder of prices
+    /// (<c>BotClaim.Price</c> up to <c>Cheap</c>, then <c>Step</c> more each) made The Anchor's later squares cost 7000 to
+    /// 16000. The prices the logs show are read from <see cref="ConfigPath"/> by guild and square; each is used once, and a
+    /// square not in it is refunded at the standing price.
+    /// </summary>
     private static readonly Dictionary<(string Guild, int X, int Y), int> _record = [];
 
+    /// <summary>Squares refunded at the price the record shows, and at the standing price, with the gold of each.</summary>
     public static long ByRecord { get; private set; }
 
     public static long ByRecordGold { get; private set; }
@@ -113,6 +132,7 @@ public static class BotTownGround
 
     private static long _sweepShort;
 
+    /// <summary>Reads the dials and the record of real prices. Called at the estate's start; no file is written if there is none.</summary>
     public static void Load()
     {
         var settings = JsonConfig.Deserialize<BotTownGroundSettings>(Path.Combine(Core.BaseDirectory, ConfigPath));
@@ -152,6 +172,7 @@ public static class BotTownGround
 
     private static bool _sweptOnce;
 
+    /// <summary>Whether a square lies on town ground, and the town and how many of its tiles. Asked once a square, then remembered.</summary>
     public static bool Guarded(Map map, (int Map, int X, int Y) key, out string town, out int tiles)
     {
         town = null;
@@ -174,9 +195,11 @@ public static class BotTownGround
         return tiles > 0;
     }
 
+    /// <summary>Whether the square this point falls in lies on town ground.</summary>
     public static bool Guarded(Map map, Point3D where) =>
         map != null && Guarded(map, BotQuad.Key(map, where), out _, out _);
 
+    /// <summary>The staker passed over an open square (or, <paramref name="held"/>, another guild's) for town ground.</summary>
     public static void Passed(bool held)
     {
         if (held)
@@ -189,6 +212,7 @@ public static class BotTownGround
         }
     }
 
+    /// <summary>The last wall, asked by <c>BotClaim.Open</c>: true, counted and logged, when the square is town ground.</summary>
     public static bool Refuses(string guild, Map map, (int Map, int X, int Y) key)
     {
         if (!Guarded(map, key, out var town, out var tiles))
@@ -210,6 +234,7 @@ public static class BotTownGround
         return true;
     }
 
+    /// <summary>Whether a sweep is due now: the first once the halls are adopted, then one every <see cref="SweepEveryMs"/>.</summary>
     public static bool Due()
     {
         if (!Running || !BotEstate.HallsAdopted)
@@ -220,6 +245,7 @@ public static class BotTownGround
         return !_sweptOnce || Core.TickCount - (_swept + SweepEveryMs) >= 0;
     }
 
+    /// <summary>A sweep begins: the remembered answers are forgotten, so the towns are read again.</summary>
     public static void Begin()
     {
         _known.Clear();
@@ -230,6 +256,10 @@ public static class BotTownGround
         _sweepShort = 0;
     }
 
+    /// <summary>
+    /// A sweep done. <b>Patrick ordered the refund</b>, so a chest is made whole even when the city's purse is not deep enough;
+    /// what the purse could not cover is the city's debt, said once here (and counted in <c>BotCity.UnclaimedShort</c>).
+    /// </summary>
     public static void End()
     {
         if (_sweepShort <= 0)
@@ -247,6 +277,7 @@ public static class BotTownGround
         _sweepShort = 0;
     }
 
+    /// <summary>A hall's yard on town ground, kept. Said once a sweep.</summary>
     public static void Yard(string guild, (int Map, int X, int Y) key, string town, int tiles)
     {
         YardsKept++;
@@ -261,10 +292,15 @@ public static class BotTownGround
         );
     }
 
+    /// <summary>
+    /// A held square on town ground has been dropped: the guild gets back <paramref name="price"/> out of the city's purse into
+    /// its chest; what the purse could not cover is counted, and the chest is made whole all the same, by Patrick's order.
+    /// </summary>
     public static void Drop(string guild, (int Map, int X, int Y) key, bool bought, int standing, string town, int tiles)
     {
         Dropped++;
 
+        // The price the record shows, once; else the standing price for a bought square, nothing for a free one.
         var recorded = 0;
         var byRecord = guild != null && _record.Remove((guild, key.X, key.Y), out recorded);
         var price = byRecord ? recorded : bought ? standing : 0;
@@ -340,6 +376,11 @@ public static class BotTownGround
         );
     }
 
+    /// <summary>
+    /// A claim still mustering on town ground, called off by the sweep. Its held price (<paramref name="held"/>, never in the
+    /// city's purse) goes back to the chest; a price paid to the city at the declaration (<paramref name="atOnce"/>, a claim on
+    /// a held square) comes back out of the purse like a dropped square's.
+    /// </summary>
     public static void CallOff(string guild, (int Map, int X, int Y) key, int held, int atOnce, string town)
     {
         BidsCalled++;
@@ -356,6 +397,7 @@ public static class BotTownGround
             }
             else
             {
+                // A guild gone has no chest; the city takes the held price, as a claim on open ground would have paid it.
                 BotCity.Tax(held);
             }
         }
@@ -384,6 +426,7 @@ public static class BotTownGround
         );
     }
 
+    /// <summary>For the claims clause of the "Treasuries:" line.</summary>
     public static string Describe() =>
         !Running
             ? "town ground: not refused (off)"
@@ -415,6 +458,11 @@ public static class BotTownGround
         _sweepShort = 0;
     }
 
+    /// <summary>
+    /// Every tile of the square asked, once — but only when a sector under it carries a region that is guarded or inside one;
+    /// the wild island is answered by a look at a dozen sectors' region lists. The town named is the one holding most of the
+    /// square's guarded tiles.
+    /// </summary>
     private static (string Town, int Tiles) Probe(Map map, (int Map, int X, int Y) key)
     {
         var x0 = key.X * BotQuad.Side;

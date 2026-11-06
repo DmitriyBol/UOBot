@@ -34,14 +34,19 @@ public static class BotPets
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPets));
 
+    /// <summary>Whether beasts are driven at all. Off, a tamed beast follows and does nothing else.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>The most beasts one bot keeps.</summary>
     public static int Most { get; set; } = 2;
 
+    /// <summary>How far round itself a bot looks for its beasts after a boot.</summary>
     public static int AdoptReach { get; set; } = 24;
 
+    /// <summary>How often a bot's beasts are fed.</summary>
     public static int FeedMs { get; set; } = 600000;
 
+    /// <summary>How far a beast may be from its master before it is called back rather than set on a foe.</summary>
     public static int Leash { get; set; } = 18;
 
     public static long Tamed { get; private set; }
@@ -54,6 +59,7 @@ public static class BotPets
 
     public static long Fed { get; private set; }
 
+    /// <summary>The beasts of every bot, by its serial; a list is made when the first beast is tamed or adopted.</summary>
     private static readonly Dictionary<Serial, List<BaseCreature>> _beasts = [];
 
     private static readonly Dictionary<Serial, long> _adoptedTick = [];
@@ -65,6 +71,7 @@ public static class BotPets
 
     public static int Count(Mobile bot) => Of(bot).Count;
 
+    /// <summary>Whether this creature is the sort a bot tames as a beast: not a mount, not summoned, tamable.</summary>
     public static bool Beastly(BaseCreature creature) =>
         creature is { Deleted: false, Tamable: true, Summoned: false } && creature is not BaseMount;
 
@@ -87,6 +94,7 @@ public static class BotPets
         }
     }
 
+    /// <summary>The bot's beat: its beasts found after a boot, set on what it fights, called back, fed. A dictionary lookup for a bot with none.</summary>
     public static void Keep(BotMobile bot)
     {
         if (!Running || bot is not { Deleted: false, Alive: true } || bot.Map == null || bot.Map == Map.Internal)
@@ -153,6 +161,7 @@ public static class BotPets
         }
     }
 
+    /// <summary>The creatures round a bot that already answer to it, after a boot.</summary>
     private static void Adopt(BotMobile bot)
     {
         foreach (var creature in bot.Map.GetMobilesInRange<BaseCreature>(bot.Location, AdoptReach))
@@ -165,6 +174,7 @@ public static class BotPets
         }
     }
 
+    /// <summary>A beast tamed just now. See <see cref="BotTame"/>.</summary>
     public static void Took(BotMobile bot, BaseCreature beast)
     {
         Add(bot, beast);
@@ -202,8 +212,10 @@ public sealed class BotTame : BotDeed
 
     public const string Trade = "tame";
 
+    /// <summary>What taming is worth a minute. Sixty: a lesson's worth, since the beast pays in every fight after.</summary>
     public static double Prior { get; set; } = 60.0;
 
+    /// <summary>Seconds between tries, as the engine paces a player.</summary>
     public static int TryMs { get; set; } = 4000;
 
     public static int MostTries { get; set; } = 6;
@@ -252,6 +264,17 @@ public sealed class BotTame : BotDeed
 
     public override void Taken(IBotWilful bot) => Tried++;
 
+    /// <summary>
+    /// The walk to the beast found no way: the beast is left alone by every tamer for a while, and this tamer rests its taming
+    /// as after a failed one.
+    ///
+    /// <para>
+    /// <b>The same alligator, twelve times (01.10.2026, build 386).</b> "No way through to an alligator at (6041, 1491) in Misc
+    /// Dungeons" ended twelve of the twenty tamings of build 386 — Katra, six within two seconds at 13:56:46 and six more at
+    /// 14:01:48 — because the ending marked nothing and the next look found the same beast within reach again. The nearest
+    /// beast through a wall is the nearest beast on the next beat too. See <see cref="BotTamerProposer.Unreachable"/>.
+    /// </para>
+    /// </summary>
     public override bool Bend(IBotWilful bot)
     {
         BotTamerProposer.Unreachable(_beast);
@@ -261,6 +284,7 @@ public sealed class BotTame : BotDeed
         return false;
     }
 
+    /// <summary>Beasts the walk found no way to, shunned for <see cref="BotTamerProposer.UnreachableMs"/>. See <see cref="Bend"/>.</summary>
     public static long Unreached { get; private set; }
 
     public override BotDoing Advance(IBotWilful bot)
@@ -292,6 +316,7 @@ public sealed class BotTame : BotDeed
         _triedTick = now;
         _tries++;
 
+        // The engine's own window: MinTameSkill, six more for every owner before, 50 % at the middle of it.
         var minSkill = _beast.MinTameSkill + _beast.Owners.Count * 6.0 + 24.9;
 
         if (AnimalTaming.CheckMastery(body, _beast) || body.CheckTargetSkill(SkillName.AnimalTaming, _beast, minSkill - 25.0, minSkill + 25.0))
@@ -356,18 +381,24 @@ public sealed class BotTame : BotDeed
 /// <summary>Offers a bot whose class knows taming the nearest beast its skill allows, while it keeps fewer than <see cref="BotPets.Most"/>.</summary>
 public sealed class BotTamerProposer : IBotProposer
 {
+    /// <summary>How far round itself a bot looks for a beast to tame.</summary>
     public static int Reach { get; set; } = 14;
 
+    /// <summary>The least Animal Taming a bot needs before a beast is offered at all.</summary>
     public static double LeastSkill { get; set; } = 20.0;
 
+    /// <summary>The least a beast must be worth in a fight to be tamed: a hundred keeps the rats, the dogs and the hawks of the town out of it (Imogen's first two were a dog and a rat, 02:38 on 29.09.2026).</summary>
     public static double LeastPower { get; set; } = 100.0;
 
+    /// <summary>How long one bot waits after a taming that failed before another beast is offered.</summary>
     public static int RetryMs { get; set; } = 300000;
 
+    /// <summary>How long a beast the walk found no way to is offered to nobody. See <see cref="Unreachable"/> (build 386).</summary>
     public static int UnreachableMs { get; set; } = 1800000;
 
     private static readonly Dictionary<Serial, long> _unreachable = [];
 
+    /// <summary>A beast no tamer could walk up to: left alone by every tamer for <see cref="UnreachableMs"/>. See <see cref="BotTame.Bend"/>.</summary>
     public static void Unreachable(Mobile beast)
     {
         if (beast == null || UnreachableMs <= 0)
@@ -442,6 +473,7 @@ public sealed class BotTamerProposer : IBotProposer
                 continue;
             }
 
+            // A beast behind a wall, lately found so. See Unreachable.
             if (Shunned(creature))
             {
                 continue;
@@ -457,6 +489,7 @@ public sealed class BotTamerProposer : IBotProposer
                 continue;
             }
 
+            // The strongest it can hope to tame: a wolf before a rabbit.
             var worth = BotThreat.Power(creature) / (1.0 + Math.Max(0.0, creature.MinTameSkill - skill));
 
             if (worth > bestWorth)
@@ -492,6 +525,7 @@ public sealed class BotTamerProposer : IBotProposer
         return new BotTame(map, best);
     }
 
+    /// <summary>A taming failed: this bot is left alone a while. Called by the will's ending of the deed through BotTame? No: by the deed's own failure path via the retry map here.</summary>
     public static void Failed(Mobile bot)
     {
         if (bot != null)

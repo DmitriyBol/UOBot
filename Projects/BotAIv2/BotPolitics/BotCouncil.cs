@@ -41,28 +41,40 @@ public static class BotCouncil
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCouncil));
 
+    /// <summary>Whether the towns give posts at all. Off: no posts, no commission, no wage, no outcasts.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>A council's term: two hours of running time.</summary>
     public static int TermMs { get; set; } = 7200000;
 
+    /// <summary>The first posts are given this long after the module starts: a quarter of an hour.</summary>
     public static int FirstMs { get; set; } = 900000;
 
+    /// <summary>The collector's share of its town's tax income.</summary>
     public static double TaxShare { get; set; } = 0.10;
 
+    /// <summary>Tasks a guild must have done for a town to hold a post in it.</summary>
     public static int LeastDone { get; set; } = 1;
 
+    /// <summary>A post-holder's regard of a guild at or under which the guild is the town's outcast.</summary>
     public static double OutcastRegard { get; set; } = -60.0;
 
+    /// <summary>What an outcast pays at the town's counters, as a multiple.</summary>
     public static double OutcastFactor { get; set; } = 1.05;
 
+    /// <summary>Whether the captain's members are offered the town's guard for a wage.</summary>
     public static bool Captaincy { get; set; } = true;
 
+    /// <summary>The town's wage for one watch.</summary>
     public static int Wage { get; set; } = 20;
 
+    /// <summary>The most a town pays in wages in one term.</summary>
     public static int WageBudget { get; set; } = 400;
 
+    /// <summary>Members of the captain's guild on the town's guard at once.</summary>
     public static int MostOnDuty { get; set; } = 2;
 
+    /// <summary>How far from a town its captain's members are offered the guard.</summary>
     public static int Reach { get; set; } = 250;
 
     /// <summary>One town's council for this term.</summary>
@@ -74,12 +86,15 @@ public static class BotCouncil
 
         public string Captain;
 
+        /// <summary>Wages held or paid this term.</summary>
         public int Wages;
 
         public int OnDuty;
 
+        /// <summary>The wage budget a steward added this term, for its captain or its guard line (07.10.2026, steward20).</summary>
         public int Extra;
 
+        /// <summary>The captain a steward hired, kept through the council's terms until <see cref="HiredUntil"/>.</summary>
         public string Hired;
 
         public long HiredUntil;
@@ -101,18 +116,21 @@ public static class BotCouncil
 
     private static (Serial Buyer, double Factor, long Tick) _quote;
 
+    /// <summary>Terms given, posts given and posts that changed hands.</summary>
     public static long Terms { get; private set; }
 
     public static long Posts { get; private set; }
 
     public static long Changed { get; private set; }
 
+    /// <summary>Commissions paid to collectors' chests, their gold, and commissions the purse could not pay.</summary>
     public static long Commissions { get; private set; }
 
     public static long CommissionGold { get; private set; }
 
     public static long CommissionsUnpaid { get; private set; }
 
+    /// <summary>Watches of the town's guard paid, their wages, watches the purse could not hold a wage for, and town-terms whose wage budget was spent.</summary>
     public static long Watches { get; private set; }
 
     public static long WageGold { get; private set; }
@@ -121,12 +139,15 @@ public static class BotCouncil
 
     public static long BudgetSpent { get; private set; }
 
+    /// <summary>Purchases at an outcast's surcharge, and the gold of the surcharge that went to the treasury as tax.</summary>
     public static long OutcastBuys { get; private set; }
 
     public static long OutcastGold { get; private set; }
 
+    /// <summary>Whether any guild is an outcast anywhere now: the counter skips the lookup when none is.</summary>
     public static bool AnyOutcast => Running && _outcast.Count > 0;
 
+    /// <summary>The module started: the first term begins <see cref="FirstMs"/> from now and the tax is counted from here.</summary>
     public static void Open(long now)
     {
         _termAt = now - Math.Max(0, TermMs) + Math.Max(0, FirstMs);
@@ -134,6 +155,12 @@ public static class BotCouncil
         _opened = true;
     }
 
+    // ---- the counter -------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// What this guild pays at this town's counters on top of its standing: <see cref="OutcastFactor"/> for an outcast, else one.
+    /// Asked by <c>BotBurgh.Factor</c>; remembers the quote so the bill's settling can tax the outcast's share.
+    /// </summary>
     public static double Surcharge(Mobile buyer, string guild, string town)
     {
         if (!Running || _outcast.Count == 0 || buyer == null || !_outcast.Contains((guild, town)) || OutcastFactor <= 1.0)
@@ -146,6 +173,10 @@ public static class BotCouncil
         return OutcastFactor;
     }
 
+    /// <summary>
+    /// A surcharge of <paramref name="more"/> on a bill of <paramref name="bill"/> at <paramref name="factor"/> was taken from the
+    /// buyer: the outcast's share of it goes into the treasury. From <c>BotBurgh.Settle</c>.
+    /// </summary>
     public static void Taxed(Mobile buyer, int bill, double factor, int more)
     {
         if (buyer == null || more <= 0 || _quote.Buyer != buyer.Serial || _quote.Tick != Core.TickCount || _quote.Factor <= 1.0)
@@ -167,8 +198,12 @@ public static class BotCouncil
         OutcastGold += share;
     }
 
+    // ---- the posts ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>Whether any town has a captain of its guard now: the proposer's first, cheapest question.</summary>
     public static bool AnyCaptain { get; private set; }
 
+    /// <summary>The nearest town within <paramref name="reach"/> of <paramref name="at"/> whose guard this guild captains, or null.</summary>
     public static BotTowns.Town CaptainOf(string guild, Point3D at, int reach)
     {
         if (!AnyCaptain || guild == null)
@@ -198,9 +233,11 @@ public static class BotCouncil
         return best;
     }
 
+    /// <summary>Whether this guild captains this town's guard. Asked by <see cref="BotGuardDuty"/>.</summary>
     public static bool Captains(string guild, BotTowns.Town town) =>
         Running && Captaincy && guild != null && town != null && _seats.TryGetValue(town.Name, out var seat) && seat.Captain == guild;
 
+    /// <summary>Whether this town can hold one more watch of its captain's members, wage and budget allowing.</summary>
     public static bool Room(BotTowns.Town town)
     {
         if (town == null || !_seats.TryGetValue(town.Name, out var seat))
@@ -208,9 +245,11 @@ public static class BotCouncil
             return false;
         }
 
+        // Asked by the proposer on the beat, so nothing is counted here; refusals are counted where a watch is held.
         return seat.OnDuty < MostOnDuty && seat.Wages + Wage <= WageBudget + seat.Extra && BotCity.Purse >= Wage;
     }
 
+    /// <summary>A watch was taken: its wage is held out of the purse and against the town's budget. False if the purse cannot.</summary>
     public static bool Hold(BotTowns.Town town)
     {
         if (town == null || !_seats.TryGetValue(town.Name, out var seat) || !BotCity.Escrow(Wage))
@@ -223,6 +262,7 @@ public static class BotCouncil
         seat.Wages += Wage;
         seat.OnDuty++;
 
+        // The town's budget for the term is spent with this watch: counted once a town a term.
         if (seat.Wages + Wage > WageBudget + seat.Extra)
         {
             BudgetSpent++;
@@ -231,6 +271,7 @@ public static class BotCouncil
         return true;
     }
 
+    /// <summary>A watch ended. Paid: the held wage was handed to the watchman. Not paid: it goes back into the purse.</summary>
     public static void Release(BotTowns.Town town, bool paid)
     {
         _seats.TryGetValue(town?.Name ?? "", out var seat);
@@ -257,6 +298,7 @@ public static class BotCouncil
         }
     }
 
+    /// <summary>Once a minute: the term's end and the new posts when due, and the outcasts read again.</summary>
     public static void Look(long now)
     {
         if (!Running)
@@ -281,6 +323,7 @@ public static class BotCouncil
         Outcasts();
     }
 
+    /// <summary>The term's commission: a tenth of each collector's town's share of the tax taken over the term.</summary>
     private static void EndTerm(long now)
     {
         var taxed = BotCity.Taxed - _taxMark;
@@ -385,6 +428,7 @@ public static class BotCouncil
             var collector = _ranked.Count > 0 ? _ranked[0].Guild : null;
             var captain = _ranked.Count > 1 ? _ranked[1].Guild : null;
 
+            // A captain the town's steward hired keeps the post, and its wages, until the hire is out (07.10.2026, steward20).
             if (seat?.Hired != null && seat.HiredUntil - now > 0 && seat.Hired != collector && BotGuilds.Named(seat.Hired) is { Disbanded: false })
             {
                 captain = seat.Hired;
@@ -448,6 +492,7 @@ public static class BotCouncil
         }
     }
 
+    /// <summary>Whether any seat has a captain: read after the posts change.</summary>
     private static void Recount()
     {
         AnyCaptain = false;
@@ -463,15 +508,22 @@ public static class BotCouncil
         }
     }
 
+    // ---- the steward's word (07.10.2026, steward20) -------------------------------------------------------------------------
+
+    /// <summary>The guild that captains this town's guard now, or null.</summary>
     public static string CaptainIn(string town) => Running && town != null && _seats.TryGetValue(town, out var seat) ? seat.Captain : null;
 
+    /// <summary>The guild that collects this town's taxes now, or null.</summary>
     public static string CollectorIn(string town) => Running && town != null && _seats.TryGetValue(town, out var seat) ? seat.Collector : null;
 
+    /// <summary>Whether this guild is this town's outcast now.</summary>
     public static bool IsOutcast(string guild, string town) => Running && guild != null && town != null && _outcast.Contains((guild, town));
 
+    /// <summary>What is left of this town's wage budget this term, a steward's money included.</summary>
     public static int BudgetLeft(string town) =>
         town != null && _seats.TryGetValue(town, out var seat) ? Math.Max(0, WageBudget + seat.Extra - seat.Wages) : 0;
 
+    /// <summary>Whether this guild may hold a post in this town: the council's own test (tasks done, not put out, not the band).</summary>
     public static bool Eligible(Guild guild, BotTowns.Town town)
     {
         if (guild is not { Disbanded: false } || town == null || BotUnderworld.Band(guild))
@@ -490,6 +542,11 @@ public static class BotCouncil
         return false;
     }
 
+    /// <summary>
+    /// The town's steward hires this guild as captain of the guard until <paramref name="until"/>, and raises the town's wage
+    /// budget by <paramref name="budget"/> — coin the steward has handed back to the purse, paid out per watch stood like any
+    /// wage. Kept through the council's next term while the hire stands. False when the captaincy is off.
+    /// </summary>
     public static bool Appoint(BotTowns.Town town, string guild, int budget, long until)
     {
         if (!Running || !Captaincy || town == null || guild == null)
@@ -521,6 +578,7 @@ public static class BotCouncil
         return true;
     }
 
+    /// <summary>A steward's money for the guard's watches this term, for its guard line. Nothing when the town has no council seat.</summary>
     public static void Fund(string town, int budget)
     {
         if (town != null && budget > 0 && _seats.TryGetValue(town, out var seat))
@@ -529,9 +587,11 @@ public static class BotCouncil
         }
     }
 
+    /// <summary>The better standing: the cheaper, then the more tasks done, then the fewer failed.</summary>
     private static bool Better(BotBurgh.Standing a, BotBurgh.Standing b) =>
         a.Factor < b.Factor - 0.0001 || Math.Abs(a.Factor - b.Factor) <= 0.0001 && (a.Done > b.Done || a.Done == b.Done && a.Failed < b.Failed);
 
+    /// <summary>Who each town's post-holders will not abide, read afresh once a minute. See the class note.</summary>
     private static void Outcasts()
     {
         _outcast.Clear();
@@ -583,8 +643,11 @@ public static class BotCouncil
             }
         }
 
+        // A guild no longer an outcast may be told again if it becomes one.
         _saidOutcast.IntersectWith(_outcast);
     }
+
+    // ---- telling -----------------------------------------------------------------------------------------------------------
 
     public static void Write(Utf8JsonWriter w, string guild)
     {
@@ -628,6 +691,7 @@ public static class BotCouncil
         w.WriteEndArray();
     }
 
+    /// <summary>The <c>Diplomacy:</c> line's clause, after the towns'.</summary>
     public static string Describe()
     {
         if (!Running)
@@ -664,8 +728,12 @@ public static class BotCouncil
         return say.ToString();
     }
 
+    // ---- the store ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>The watches' wages read back as held at the last save, handed back to the purse at the module's start. See <see cref="Settle"/>.</summary>
     private static int _wagesAtLoad;
 
+    /// <summary>What the watches on duty hold of the purse now: <see cref="Wage"/> a watch, as <see cref="Release"/> hands it back.</summary>
     private static int HeldWages()
     {
         long held = 0;
@@ -678,6 +746,12 @@ public static class BotCouncil
         return (int)Math.Min(int.MaxValue, held);
     }
 
+    /// <summary>
+    /// The watches' wages held at the save (07.10.2026, reset26 review; <c>BotPoliticsStore</c> shape 2). Written after the
+    /// tributes, so that a shape-1 save still reads as it did.
+    /// </summary>
+    // The wages read back and not yet settled ride along too (review B of reset26b, 07.10.2026): with the politics module
+    // off at boot nobody settles them, and a save writing only the live watches' wages would drop them.
     internal static void SaveHeld(IGenericWriter writer) => writer.WriteEncodedInt((int)Math.Min(int.MaxValue, (long)HeldWages() + _wagesAtLoad));
 
     internal static int LoadHeld(IGenericReader reader)
@@ -687,6 +761,15 @@ public static class BotCouncil
         return _wagesAtLoad;
     }
 
+    /// <summary>
+    /// <b>The wages a restart caught on duty, back into the purse (07.10.2026, reset26 review).</b> A watch holds its wage out of
+    /// the purse (<see cref="Hold"/>); the purse was saved without it and nothing wrote it down, so at every ordinary restart that
+    /// coin was destroyed. It is written now (<see cref="SaveHeld"/>), and handed back here rather than held again: the watch
+    /// itself does not survive a restart — a bot comes back knowing only the kind of work it was doing, not the deed — so a wage
+    /// held again would have nobody to pay it or give it back, and would stand counted as held for ever. Counted as held and
+    /// refunded in one step, so the purse's held count is left as it was and the purse rises by the coin. From the module's start,
+    /// once the treasury is read. Returns the gold.
+    /// </summary>
     public static int Settle()
     {
         var gold = _wagesAtLoad;
@@ -744,6 +827,7 @@ public static class BotCouncil
             };
         }
 
+        // The term goes on where it was; the tax is counted afresh from this boot (BotCity.Taxed starts again at nought).
         _termAt = now - Math.Clamp(ago, 0L, (long)int.MaxValue);
         _taxMark = BotCity.Taxed;
         _opened = true;
@@ -770,6 +854,19 @@ public static class BotCouncil
         _saidOutcast.Clear();
     }
 
+    /// <summary>
+    /// Every town's council forgotten, for Patrick's reset (07.10.2026, reset26): the collectors and the captains, exactly what
+    /// <see cref="Save"/> writes, and the term's clock, opened again at once as at a first start.
+    ///
+    /// <para>
+    /// <b>The watches' wages held go back first.</b> A watch taken holds its <see cref="Wage"/> out of the city's purse
+    /// (<see cref="Hold"/>) until it ends; the reset deletes the watchmen, and a deleted bot's deed is forgotten, never dropped, so
+    /// nothing would ever hand that coin back — the purse short by a wage a watch and its held count up by as much, for nothing.
+    /// Each seat's watches on duty are handed back here (<c>BotCity.Refund</c>) before the seat is forgotten. A commission is
+    /// held and paid in one step, and a steward's hire went back into the purse when it was decreed, so nothing else is held.
+    /// See <see cref="BotPolitics.Wipe"/>. Returns the gold handed back.
+    /// </para>
+    /// </summary>
     public static int Wipe()
     {
         var back = 0;
@@ -782,6 +879,7 @@ public static class BotCouncil
             back += held;
         }
 
+        // A save read back but not yet settled (a reset inside the module's first minute) is handed back too.
         back += Settle();
 
         _seats.Clear();
@@ -790,6 +888,8 @@ public static class BotCouncil
         _ranked.Clear();
         _quote = default;
 
+        // Opened now rather than left for the next look (reset26 review): the save is taken before the politics clock looks again,
+        // and it writes the term's age from _termAt, so a closed clock would have carried the old world's term into the new one.
         Open(Core.TickCount);
         Recount();
         Forget();

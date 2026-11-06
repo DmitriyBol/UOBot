@@ -47,18 +47,28 @@ public sealed class BotTownTask
         Supply
     }
 
+    /// <summary>How long a task stands before it has failed, in hours. Two.</summary>
     public static double Hours { get; set; } = 2.0;
 
+    /// <summary>How much better a square must read to count as cleared, capped at neutral. A tenth.</summary>
     public static double ClearGain { get; set; } = 0.10;
 
+    /// <summary>Minutes the guild's members must have stood in the square between them. Ten.</summary>
     public static double ClearPresence { get; set; } = 10.0;
 
+    /// <summary>
+    /// How much of the square's asking strength the guild's might must be for it to be set the square. Two: a company sent to
+    /// ground that asks what the whole guild brings is a company sent to die, which is the one task a town must not set.
+    /// </summary>
     public static double ClearOdds { get; set; } = 2.0;
 
+    /// <summary>Member-minutes inside the town's walls for a guard. Ninety: three members for half an hour.</summary>
     public static double GuardMinutes { get; set; } = 90.0;
 
+    /// <summary>Units of the material to go out onto the market. Twenty.</summary>
     public static int SupplyUnits { get; set; } = 20;
 
+    /// <summary>The materials a town may ask for: the guild board's own words (<c>BotCharter.Materials</c>) that a kind of goods maps to.</summary>
     public static readonly string[] Materials = ["ore", "logs", "hides", "feathers", "meat", "herbs", "wool"];
 
     public string Id { get; init; }
@@ -71,14 +81,17 @@ public sealed class BotTownTask
 
     public Map Map { get; init; }
 
+    /// <summary>For a clearing, the square's middle; for a guard, the town's hall.</summary>
     public Point3D Target { get; init; }
 
+    /// <summary>For a supply, the material.</summary>
     public string Material { get; init; }
 
     public double Need { get; init; }
 
     public double Done { get; set; }
 
+    /// <summary>For a clearing: member-minutes stood in the square, and what the square read when the task was set.</summary>
     public double Presence { get; set; }
 
     public double StartReading { get; init; }
@@ -87,8 +100,10 @@ public sealed class BotTownTask
 
     public long Deadline { get; set; }
 
+    /// <summary>The words it was set in, the town's (the model's or the rule's).</summary>
     public string Charge { get; set; }
 
+    /// <summary>What it is, in one line, for the model's list and the rule's words.</summary>
     public string Offer =>
         Kind switch
         {
@@ -97,8 +112,10 @@ public sealed class BotTownTask
             _ => $"{Id} — put {Need:0} {Material} on the bots' market, on stalls or into standing orders"
         };
 
+    /// <summary>What a clearing must read.</summary>
     public double Goal => Math.Min(BotQuad.Neutral, StartReading + ClearGain);
 
+    /// <summary>How far along it is, in words.</summary>
     public string Progress =>
         Kind switch
         {
@@ -107,6 +124,12 @@ public sealed class BotTownTask
             _ => $"{Done:0} of {Need:0} {Material}"
         };
 
+    // ---- the catalogue ------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// What this town may set this guild now: a clearing if there is ground fit for it, a guard always, and a supply for each
+    /// material the market is shortest of — none of them a target another guild is working for this town.
+    /// </summary>
     public static List<BotTownTask> Options(Guild guild, BotTowns.Town town, Point3D hall, BotTownReport report)
     {
         List<BotTownTask> found = [];
@@ -143,6 +166,7 @@ public sealed class BotTownTask
             Began = now
         });
 
+        // The materials the market is shortest of: a buyer with money down first, then nothing standing on a stall.
         List<(string Material, int Score)> scarce = [];
 
         for (var i = 0; i < Materials.Length; i++)
@@ -188,6 +212,7 @@ public sealed class BotTownTask
         return found;
     }
 
+    /// <summary>A few representative kinds of each material, for reading the market by.</summary>
     private static Type[] Samples(string material) =>
         material switch
         {
@@ -200,6 +225,7 @@ public sealed class BotTownTask
             _ => [typeof(Wool), typeof(Cloth), typeof(BoltOfCloth)]
         };
 
+    /// <summary>Which of the town's materials a kind of goods is, or null. Asked where goods go onto the market.</summary>
     public static string MaterialOf(Type kind) =>
         kind == null ? null
         : typeof(BaseOre).IsAssignableFrom(kind) || typeof(BaseIngot).IsAssignableFrom(kind) ? "ore"
@@ -211,6 +237,9 @@ public sealed class BotTownTask
         : kind == typeof(Wool) || kind == typeof(Cotton) || kind == typeof(Flax) || kind == typeof(Cloth) || kind == typeof(BoltOfCloth) || kind == typeof(UncutCloth) ? "wool"
         : null;
 
+    // ---- the audience ---------------------------------------------------------------------------------------------------------
+
+    /// <summary>The town's hearing: the voice opens, the envoy asks, the voice looks at the town; the tasks and the facts are made ready.</summary>
     public static void Hearing(BotHearing m)
     {
         var guild = BotGuilds.Named(m.Guest);
@@ -249,6 +278,10 @@ public sealed class BotTownTask
         m.Brief = b.ToString();
     }
 
+    /// <summary>
+    /// The town's word by rule: ground to clear first, when there is ground the guild can face — a town that is killing its own
+    /// people needs that before anything; else the scarcest material; else a guard.
+    /// </summary>
     public static BotVerdict Rule(BotHearing m, string because)
     {
         BotTownTask pick = null;
@@ -280,6 +313,7 @@ public sealed class BotTownTask
         };
     }
 
+    /// <summary>The rule's words for setting a task.</summary>
     public static string Words(BotTownTask task, string guild) =>
         task.Kind switch
         {
@@ -288,6 +322,12 @@ public sealed class BotTownTask
             _ => $"{guild}: bring {task.Need:0} {task.Material} to the market within {Hours:0.#} hours."
         };
 
+    // ---- the check --------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Brings the task up to date over the last <paramref name="sinceMs"/>: members in the square or the walls counted. Returns
+    /// whether it is done. Supplies are counted where the goods go out, not here.
+    /// </summary>
     public bool Check(long sinceMs)
     {
         var guild = BotGuilds.Named(Guild);

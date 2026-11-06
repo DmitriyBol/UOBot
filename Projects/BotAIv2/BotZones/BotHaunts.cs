@@ -32,30 +32,48 @@ public sealed class BotZoneKind
 
     public string Name { get; }
 
+    /// <summary>A name the spawners use for it, for building a specimen when none is alive.</summary>
     public string Spawned { get; set; }
 
+    /// <summary>Whether its traits have been read, from the living or from a specimen.</summary>
     public bool Known { get; set; }
 
     public bool FromLife { get; set; }
 
+    /// <summary>The engine would not build it: a constructor wanting arguments, or not a creature after all.</summary>
     public bool Unbuildable { get; set; }
 
+    /// <summary>Attacks on sight: <c>Closest</c>, <c>Strongest</c> or <c>Weakest</c>. <c>None</c>, <c>Aggressor</c> and <c>Evil</c> do not come for a bot first.</summary>
     public bool Aggressive { get; set; }
 
     public bool Caster { get; set; }
 
     public int Perception { get; set; } = 16;
 
+    /// <summary>
+    /// How far its blow lands from, in tiles: a caster's spell, an archer's bow; nought for a creature that has to close
+    /// (08.10.2026). Its aggro reach is the larger of this and its sight: it picks a target only within its sight, so a spell
+    /// that lands farther than it sees (a short-sighted caster) is what widens it. See <see cref="BotHaunts.StrikeOf"/>.
+    /// </summary>
     public int Strike { get; set; }
 
+    /// <summary>Cannot walk and can swim: a sea creature, which never sets foot on the land a bot walks.</summary>
     public bool Water { get; set; }
 
+    /// <summary>
+    /// Can swim, walking or not. A swimmer that can also walk — a water elemental — is the sea's when its spawner stands in the
+    /// water and the land's when it stands ashore (07.10.2026): the same test the sweep makes of a living one by where it stands.
+    /// Until then a sea camp of krakens and water elementals was painted as a deadly land zone whose patrol never held anybody.
+    /// </summary>
     public bool Swims { get; set; }
 
+    /// <summary>Cannot walk and cannot swim: it stays where it grew, and reaches only as far as it strikes.</summary>
     public bool Rooted { get; set; }
 
+    /// <summary>A shopkeeper, an escort, a healer or anything the engine makes invulnerable: not a creature of any zone.</summary>
     public bool Townsfolk { get; set; }
 
+    /// <summary>The mean strength of the ones measured (<see cref="BotThreat.Power"/>), at most <see cref="MostPowerSamples"/> of them.</summary>
     public double Power => _powerCount == 0 ? 0.0 : _powerSum / _powerCount;
 
     public const int MostPowerSamples = 32;
@@ -75,6 +93,7 @@ public sealed class BotZoneKind
         _powerCount++;
     }
 
+    /// <summary>Takes the traits off a creature of the kind.</summary>
     public void ReadFrom(BaseCreature c)
     {
         Aggressive = BotHaunts.AttacksFirst(c.FightMode);
@@ -116,38 +135,58 @@ public sealed class BotHaunt
 
     public Point3D At { get; set; }
 
+    /// <summary>The declared walking range, in tiles: the larger of the spawner's home and walking ranges.</summary>
     public int Radius { get; set; }
 
+    /// <summary>How many creatures the spawner keeps when full.</summary>
     public int Count { get; set; }
 
     public bool Running { get; set; }
 
+    /// <summary>Inside a town's region: passive creatures here are the town's cats and dogs, not a hunting ground.</summary>
     public bool InTown { get; set; }
 
     public BotHauntEntry[] Entries { get; set; } = [];
 
+    /// <summary>Marked by the survey pass that last found the spawner; a haunt no pass found is dropped at the end of it.</summary>
     public bool Found { get; set; }
 
+    /// <summary>Its index in the list handed to the last build, for the creatures that belong to it.</summary>
     public int Index { get; set; } = -1;
 
+    /// <summary>Whether the spawner's own tile is water, and the tile that was read for it (read once; a spawner seldom moves).</summary>
     public bool Wet { get; set; }
 
     public Point3D WetAt { get; set; } = new(-1, -1, 0);
 
+    /// <summary>Seconds its ground was seen awake, continuously sampled (see <see cref="Sample"/>).</summary>
     public double AwakeSeconds { get; set; }
 
+    /// <summary>Awake sightings of its creatures.</summary>
     public long Samples { get; set; }
 
+    /// <summary>The farthest from home one of its creatures has been seen awake, in tiles, never past the declaration.</summary>
     public int ObservedRange { get; set; }
 
+    /// <summary>
+    /// <b>How far its creatures really go (08.10.2026).</b> Every calm awake sighting — no combatant, out of war mode — counted
+    /// by its distance from home in tiles up to <see cref="Radius"/> + <see cref="CountedBeyond"/> (a sighting farther off
+    /// counts at the cap), each weighing one and halved every <see cref="BotZones.ReachHalfLifeMinutes"/>. The analysis of 08.10
+    /// (deaths30) found 258 of 420 observed land zones at their declared radius: <see cref="ObservedRange"/> is clipped there.
+    /// <see cref="ReachAt"/> reads a high percentile of it, and the build lets a camp claim the cells it was seen patrolling out
+    /// to there. Calm only (both reviews of 08.10): a chase is where the bot led it, and counting chases made the map a slow
+    /// pursuit overlay that painted the road a bot fled down and then agreed with the next death on it.
+    /// </summary>
     private float[] _reach;
 
     private long _reachTick;
 
+    /// <summary>The faded weight of the sightings counted for <see cref="ReachAt"/>, as of the last sighting or reading.</summary>
     public double ReachWeight { get; private set; }
 
     public DateTime LastAwake { get; set; } = DateTime.MinValue;
 
+    /// <summary>How many times the tour has stood here, and when it last did.</summary>
     public int Toured { get; set; }
 
     public DateTime TouredAt { get; set; } = DateTime.MinValue;
@@ -156,14 +195,26 @@ public sealed class BotHaunt
 
     private bool _wasAwake;
 
+    /// <summary>
+    /// How far the shape is learned: half from the seconds its ground has been seen awake against
+    /// <see cref="BotZones.ConfidentSeconds"/>, half from the sightings against <see cref="BotZones.ConfidentSamples"/>. Both
+    /// halves, because either alone lies: a thousand sightings of one creature that never moved in a minute of waking say
+    /// little of a patrol, and ten minutes awake with a single sighting say little of a pack.
+    /// </summary>
     public double Confidence =>
         0.5 * Math.Min(1.0, AwakeSeconds / Math.Max(1, BotZones.ConfidentSeconds))
         + 0.5 * Math.Min(1.0, Samples / (double)Math.Max(1, BotZones.ConfidentSamples));
 
+    /// <summary>
+    /// What a creature of it was doing when the scan passed it: awake or asleep, how far from home, and whether calm (no
+    /// combatant, out of war mode), which alone counts for the reach.
+    /// </summary>
     public void Sample(long now, bool awake, int away, bool calm)
     {
         if (awake)
         {
+            // Awake time is the gap since the last sample only when that sample was awake too, and only while the gap is short
+            // enough to be one stretch of waking: two awake sightings an hour apart are not an hour of patrol.
             var gap = now - _sampledTick;
 
             if (_wasAwake && gap > 0 && gap <= BotZones.AwakeGapMs)
@@ -174,11 +225,14 @@ public sealed class BotHaunt
             Samples++;
             LastAwake = DateTime.UtcNow;
 
+            // Never past the declaration: the observed range can only shrink the disc, and a creature seen 748 tiles from home
+            // (the memory file of 02.10.2026, a chase across the island) says nothing of its spawner's patrol. See BotZoneBuild.
             if (away > ObservedRange)
             {
                 ObservedRange = Math.Min(away, Radius);
             }
 
+            // How far past it they go on their own is counted apart, capped and fading; a chase is not counted at all.
             if (calm)
             {
                 AddReach(now, away, 1f);
@@ -191,6 +245,11 @@ public sealed class BotHaunt
 
     public string Key => $"{At.X},{At.Y},{At.Z}";
 
+    /// <summary>
+    /// The distance from home within which <see cref="BotZones.ReachPercentile"/> of the faded sightings fall, in tiles, at most
+    /// <see cref="Radius"/> + <see cref="CountedBeyond"/> (the build caps it at <see cref="BotZones.ReachBeyond"/>); -1 while they
+    /// weigh less than <see cref="BotZones.ReachLeast"/>, and for a spawner too wide to paint.
+    /// </summary>
     public int ReachAt(long now)
     {
         Fade(now);
@@ -218,6 +277,11 @@ public sealed class BotHaunt
         return bins.Length - 1;
     }
 
+    /// <summary>
+    /// What a restart brought back, as the counted sightings themselves, each bin faded by the time the shard was down. Only the
+    /// bins: a percentile point put back as all of its weight would hold the reach out where it was for the many half-lives it
+    /// takes new sightings to outweigh it (the reviews of 08.10), and each restart would ratchet it outward.
+    /// </summary>
     public void Restore(float[] bins, double fade, long now)
     {
         if (bins == null || fade <= 0.0)
@@ -234,6 +298,7 @@ public sealed class BotHaunt
         }
     }
 
+    /// <summary>A file holding only a reach point and its weight: put back as at most <see cref="BotZones.ReachLeast"/>, a hint and no more.</summary>
     public void Seed(int reach, double weight, long now)
     {
         if (reach >= 0 && weight > 0.0)
@@ -242,6 +307,7 @@ public sealed class BotHaunt
         }
     }
 
+    /// <summary>A copy of the counted sightings faded to now, for the memory file; null when nothing is counted.</summary>
     public float[] ReachBins(long now)
     {
         Fade(now);
@@ -249,6 +315,7 @@ public sealed class BotHaunt
         return _reach == null || ReachWeight <= 0.0 ? null : (float[])_reach.Clone();
     }
 
+    /// <summary>Tiles past the declared range the sightings are counted out to, whatever <see cref="BotZones.ReachBeyond"/> paints.</summary>
     public const int CountedBeyond = 32;
 
     private void AddReach(long now, int away, float weight)
@@ -262,6 +329,7 @@ public sealed class BotHaunt
 
         if (_reach == null || _reach.Length != length)
         {
+            // New, or the spawner's range changed under it: what was counted against the old range is dropped.
             _reach = new float[length];
             _reachTick = now;
             ReachWeight = 0.0;
@@ -273,6 +341,7 @@ public sealed class BotHaunt
         ReachWeight += weight;
     }
 
+    /// <summary>Halves the sightings every <see cref="BotZones.ReachHalfLifeMinutes"/>, brought up to date at most once a minute.</summary>
     private void Fade(long now)
     {
         var bins = _reach;
@@ -309,20 +378,30 @@ public sealed class BotZoneSeen
 
     public long Tick;
 
+    /// <summary>Its own strength, read when first seen and again every <see cref="BotHaunts.RepowerEvery"/> sightings.</summary>
     public float Power;
 
     public int Sightings;
 
+    /// <summary>
+    /// <b>Where a wanderer has been (08.10.2026).</b> For an attacker with no spawner or out past its spawner's range: its last
+    /// places, a ring of <see cref="BotHaunts.TrailMost"/>, a new point only once it has moved a cell, each with the tick it was
+    /// last seen there. The build paints a wanderer over where it walked in the last <see cref="BotZones.WanderMinutes"/>, not
+    /// on the one tile it stood on at the last build: the analysis of 08.10 found a wandering spider's victim four tiles off its
+    /// paint. Null for a creature that never wandered.
+    /// </summary>
     public short[] TrailX;
 
     public short[] TrailY;
 
     public long[] TrailTick;
 
+    /// <summary>Points in the ring, and the slot of the newest.</summary>
     public int TrailCount;
 
     public int TrailHead;
 
+    /// <summary>Its place now: a new point, unless it is within a cell of the newest one, which is only freshened.</summary>
     public void Walked(int x, int y, long now)
     {
         if (TrailX == null)
@@ -365,44 +444,57 @@ public static class BotHaunts
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHaunts));
 
+    /// <summary>Tiles in one strip of the survey.</summary>
     public static int StripTiles { get; set; } = 256;
 
+    /// <summary>How often the spawners are read again, for any added or removed.</summary>
     public static int ResurveyMs { get; set; } = 1800000;
 
+    /// <summary>Unknown kinds built and measured at most in one beat. Each is one construction and one delete.</summary>
     public static int MeasurePerBeat { get; set; } = 2;
 
+    /// <summary>A creature's own strength is read again after this many sightings, for a creature whose health has grown.</summary>
     public static int RepowerEvery { get; set; } = 16;
 
+    /// <summary>Places at most in a wanderer's trail (<see cref="BotZoneSeen.Walked"/>).</summary>
     public static int TrailMost { get; set; } = 32;
 
+    /// <summary>A creature the scan has not passed for this long is dropped from the register: dead, gone or moved away.</summary>
     public static int StaleMs { get; set; } = 180000;
 
     public static Map Map { get; private set; }
 
+    /// <summary>Whether a whole pass over the map has finished since the start.</summary>
     public static bool Surveyed { get; private set; }
 
     public static int Surveys { get; private set; }
 
+    /// <summary>Loop milliseconds the last whole pass cost, strips summed.</summary>
     public static double SurveyMs { get; private set; }
 
+    /// <summary>Spawners read in the last pass that keep a creature, that keep none (reagents, scenery), and that are stopped.</summary>
     public static int Spawners => _all.Count;
 
     public static int NoCreature { get; private set; }
 
     public static int Stopped { get; private set; }
 
+    /// <summary>Names on spawners the engine could not resolve to a creature.</summary>
     public static int UnknownNames { get; private set; }
 
+    /// <summary>Kinds measured by building a specimen, and kinds that would not build.</summary>
     public static long Measured { get; private set; }
 
     public static long Unbuildable { get; private set; }
 
+    /// <summary>Kinds a spawner names that are neither seen alive nor measured yet, as of the last beat.</summary>
     public static int Pending { get; private set; }
 
     public static IReadOnlyList<BotHaunt> All => _all;
 
     public static IReadOnlyCollection<BotZoneKind> Kinds => _kinds.Values;
 
+    /// <summary>Living creatures in the register.</summary>
     public static int Registered => _seen.Count;
 
     private static readonly List<BotHaunt> _all = [];
@@ -436,11 +528,19 @@ public static class BotHaunts
         Forget();
         Map = map;
 
+        // Due at once: the first beat starts the first pass, by the same path every later pass takes.
         _passedTick = now - ResurveyMs;
     }
 
+    /// <summary>Whether a mode attacks a bot on sight.</summary>
     public static bool AttacksFirst(FightMode mode) => mode is FightMode.Closest or FightMode.Strongest or FightMode.Weakest;
 
+    /// <summary>
+    /// How far a creature's blow lands from (08.10.2026): a caster's spell at the range the engine targets spells at
+    /// (<c>IRangedSpell.TargetRange</c>, <see cref="BotZones.SpellReach"/>), a bow or crossbow in its hands at the weapon's own
+    /// range; nought otherwise, and nought for all with <see cref="BotZones.SpellReach"/> at nought. A breath reaches as far as
+    /// the creature sees, which its sight already counts.
+    /// </summary>
     public static int StrikeOf(BaseCreature c)
     {
         if (BotZones.SpellReach <= 0)
@@ -456,8 +556,10 @@ public static class BotHaunts
         return c.Weapon is BaseRanged ranged ? Math.Max(0, ranged.MaxRange) : 0;
     }
 
+    /// <summary>Whether a creature belongs to the towns' life rather than to any zone.</summary>
     public static bool IsTownsfolk(BaseCreature c) => c is BaseVendor or BaseEscortable || c.IsInvulnerable;
 
+    /// <summary>One strip of the survey, when a pass is under way or due. True when it did any work.</summary>
     public static bool Step(long now)
     {
         var map = Map;
@@ -503,6 +605,7 @@ public static class BotHaunts
             return true;
         }
 
+        // The pass is done: what it did not find is gone.
         for (var i = _all.Count - 1; i >= 0; i--)
         {
             var haunt = _all[i];
@@ -602,6 +705,7 @@ public static class BotHaunts
         }
     }
 
+    /// <summary>The kind a spawner's name stands for, or null when it names no creature.</summary>
     public static BotZoneKind KindNamed(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -650,6 +754,9 @@ public static class BotHaunts
         return kind;
     }
 
+    /// <summary>
+    /// Builds and measures kinds nobody has seen alive, at most <see cref="MeasurePerBeat"/> a beat. True when it did any work.
+    /// </summary>
     public static bool Measure()
     {
         var done = 0;
@@ -686,6 +793,7 @@ public static class BotHaunts
             kind.Caster = traits.AI == AIType.AI_Mage;
             kind.Perception = traits.Perception;
 
+            // A specimen's weapon is not read here, a caster's spell is: an archer learns its bow when first seen alive.
             kind.Strike = traits.AI == AIType.AI_Mage ? Math.Max(0, BotZones.SpellReach) : 0;
             kind.Water = traits.CantWalk && traits.CanSwim;
             kind.Swims = traits.CanSwim;
@@ -703,6 +811,10 @@ public static class BotHaunts
     public static BotHaunt Of(BaseSpawner spawner) =>
         spawner != null && _bySpawner.TryGetValue(spawner, out var haunt) ? haunt : null;
 
+    /// <summary>
+    /// The scan passed a creature: its kind learned from it, its entry in the register brought up to date, and its haunt told
+    /// whether it was awake and how far from home. Returns its kind, or null for a creature no zone counts.
+    /// </summary>
     public static BotZoneKind Note(BaseCreature c, bool awake, long now)
     {
         var kind = KindOf(c.GetType());
@@ -747,6 +859,8 @@ public static class BotHaunts
             haunt.Sample(now, awake, away, c.Combatant == null && !c.Warmode);
         }
 
+        // A wanderer's trail (08.10.2026): an attacker of the land with no spawner, or out past its spawner's declared range. The
+        // build decides which are wanderers by its own ranges; this keeps the places of every one that might be.
         if ((haunt == null || away > haunt.Radius) && AttacksFirst(c.FightMode) && !(c.CantWalk && c.CanSwim))
         {
             seen.Walked(c.X, c.Y, now);
@@ -755,6 +869,10 @@ public static class BotHaunts
         return kind;
     }
 
+    /// <summary>
+    /// The register, pruned of the dead, the deleted, the tamed and the long unseen, handed to <paramref name="each"/> one living
+    /// creature at a time.
+    /// </summary>
     public static void Living(Map map, long now, Action<BaseCreature, BotZoneSeen> each)
     {
         _gone.Clear();

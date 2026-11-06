@@ -17,10 +17,13 @@ namespace Server.BotAI.Mind;
 /// </summary>
 public static class BotStewardArgus
 {
+    /// <summary>Whether the model is asked at all. Off: the rules decide every round.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>The model asked; empty means the duke's (<c>BotParley.JudgeModel</c>), else the minds' own.</summary>
     public static string Model { get; set; }
 
+    /// <summary>The longest speech kept, in characters.</summary>
     public static int MostSpeech { get; set; } = 200;
 
     public static long Asked { get; private set; }
@@ -129,6 +132,7 @@ public static class BotStewardArgus
         writer.WriteEndObject();
     }
 
+    /// <summary>The decree, its speech and reason; a null decree when it cannot be read or is not one offered.</summary>
     private static (string Id, string Speech, string Reason) Answer(BotStewardAsk q, string json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -158,6 +162,7 @@ public static class BotStewardArgus
 
             return (id, speech, Field(root, "reason"));
         }
+        // Any failure to read an answer is not an answer: the rule decides.
         catch (Exception)
         {
             return (null, null, null);

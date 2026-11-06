@@ -45,36 +45,49 @@ public sealed class BotBurgle : BotDeed
 
     public const string Trade = "burgle";
 
+    /// <summary>Whether bandits break into halls and houses at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>The share of a bandit's thoughts of robbery that are of a hall or a house, when there is one worth it.</summary>
     public static double Share { get; set; } = 0.3;
 
+    /// <summary>The least a guild must have put by for its hall to be worth breaking into.</summary>
     public static int Least { get; set; } = 200;
 
+    /// <summary>The fewest things a house's chest must hold to be worth it.</summary>
     public static int LeastThings { get; set; } = 3;
 
+    /// <summary>What a pick that opens a hall's chest takes of the treasury, and the most it takes.</summary>
     public static double TakeShare { get; set; } = 0.25;
 
     public static int MostTake { get; set; } = 2000;
 
+    /// <summary>The most things a pick that opens a house's chest carries off.</summary>
     public static int MostThings { get; set; } = 3;
 
+    /// <summary>How long the same hall or house is left alone after a break-in, or a try at one. An hour.</summary>
     public static int AgainMs { get; set; } = 3600000;
 
+    /// <summary>How far a bandit goes for a hall or a house.</summary>
     public static int Reach { get; set; } = 800;
 
     public static int PickMs { get; set; } = 3000;
 
     public static int MostPicks { get; set; } = 6;
 
+    /// <summary>The chance a failed try is heard.</summary>
     public static double NoiseChance { get; set; } = 0.25;
 
+    /// <summary>The chance a failed try snaps the pick.</summary>
     public static double BreakChance { get; set; } = 0.35;
 
+    /// <summary>How near the hall a burglar hides.</summary>
     public static int HideAt { get; set; } = 14;
 
+    /// <summary>How far a witness may be to see a burglar at the chest.</summary>
     public static int Sight { get; set; } = 12;
 
+    /// <summary>Lockpicks a bot is given when it joins the band. See <c>BotUnderworld</c>.</summary>
     public static int PicksIssued { get; set; } = 5;
 
     public static int CapMs { get; set; } = 600000;
@@ -91,6 +104,7 @@ public sealed class BotBurgle : BotDeed
 
     public static long Gold { get; private set; }
 
+    /// <summary>Things carried out of houses, picks snapped, burglars posted wanted, and thoughts of a break-in with no pick in the pack.</summary>
     public static long Things { get; private set; }
 
     public static long Snapped { get; private set; }
@@ -103,8 +117,10 @@ public sealed class BotBurgle : BotDeed
 
     private readonly BaseHouse _house;
 
+    /// <summary>The guild whose hall this is, or null for a bot's own house.</summary>
     private readonly string _guild;
 
+    /// <summary>Whose house, when it is a house.</summary>
     private readonly string _owner;
 
     private readonly long _began;
@@ -130,8 +146,14 @@ public sealed class BotBurgle : BotDeed
         _pickTick = _began - PickMs;
     }
 
+    /// <summary>Whether this bot has a pick to work with.</summary>
     public static bool HasPick(Mobile body) => (body?.Backpack?.GetAmount(typeof(Lockpick)) ?? 0) > 0;
 
+    /// <summary>
+    /// The hall with the most put by, or the house whose chest holds the most, within reach and not tried lately; the
+    /// hall's guild or the house's owner in <paramref name="whose"/>. Null with no pick in the pack: a burglar without one
+    /// has nothing to try the lock with.
+    /// </summary>
     public static BaseHouse Target(Mobile body, Map map, out string whose)
     {
         whose = null;
@@ -174,6 +196,8 @@ public sealed class BotBurgle : BotDeed
             }
         }
 
+        // A house's chest is reckoned by the things in it, a thing worth a hundred against the hall's gold, so a full
+        // chest beats a thin treasury and a thin chest never beats a fat one.
         foreach (var house in BotAbode.Houses)
         {
             if (house is not { Deleted: false } || house.Map != map || !body.InRange(house.BanLocation, Reach))
@@ -213,6 +237,7 @@ public sealed class BotBurgle : BotDeed
         return best;
     }
 
+    /// <summary>Whose house this is, from the sign; null for a hall or an unsigned house.</summary>
     public static string OwnerOf(BaseHouse house)
     {
         var sign = house?.Sign?.Name;
@@ -222,6 +247,7 @@ public sealed class BotBurgle : BotDeed
             : null;
     }
 
+    /// <summary>Whether this house is one of the population's own rather than a guild's hall.</summary>
     public static bool IsAbode(BaseHouse house) => OwnerOf(house) != null;
 
     private static (double Low, double High) Lock(BaseHouse hall) =>
@@ -325,6 +351,7 @@ public sealed class BotBurgle : BotDeed
         _pickTick = now;
         _picks++;
 
+        // In plain sight at the chest: whoever sees it posts it wanted. See Seen.
         if (!body.Hidden)
         {
             Seen(body);
@@ -361,6 +388,7 @@ public sealed class BotBurgle : BotDeed
         return BotDoing.Work($"picking the lock of the chest in {Place}");
     }
 
+    /// <summary>A hall's chest opened: a share of the guild's treasury.</summary>
     private BotDoing Plunder(Mobile body)
     {
         var take = (int)Math.Min(MostTake, BotChest.Holds(_guild) * TakeShare);
@@ -388,6 +416,7 @@ public sealed class BotBurgle : BotDeed
         return BotDoing.Done($"carried {got}gp out of the hall of {_guild}");
     }
 
+    /// <summary>A house's chest opened: up to <see cref="MostThings"/> things out of it, the dearest first.</summary>
     private BotDoing Rob(Mobile body, Container chest)
     {
         var pack = body.Backpack;
@@ -449,6 +478,7 @@ public sealed class BotBurgle : BotDeed
 
     private static int Worth(Item item) => item is Gold g ? g.Amount : item is BaseWeapon or BaseArmor ? 150 : 40;
 
+    /// <summary>A burglar in plain sight at the chest, with a bot outside the band within <see cref="Sight"/> that can see it, is posted wanted on that bot's word. Once a break-in.</summary>
     private void Seen(Mobile body)
     {
         if (_posted || body is not BotMobile burglar || body.Map == null)

@@ -34,12 +34,16 @@ public static class BotPurpose
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPurpose));
 
+    /// <summary>Whether members vote on what the chest saves for. Off, and the goal is the old rule.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>How often a guild votes again: two hours.</summary>
     public static int EveryMs { get; set; } = 7200000;
 
+    /// <summary>A guild's first vote within this of the module starting, spread. Half an hour.</summary>
     public static int FirstMs { get; set; } = 1800000;
 
+    /// <summary>What a war chest keeps back.</summary>
     public static int WarChest { get; set; } = 3000;
 
     public enum Aim
@@ -70,6 +74,7 @@ public static class BotPurpose
 
         public int Of;
 
+        /// <summary>Whether the chest has held the price since this vote: a goal is reached once, not every minute after.</summary>
         public bool Met;
     }
 
@@ -79,6 +84,7 @@ public static class BotPurpose
 
     private static readonly List<Guild> _guilds = [];
 
+    /// <summary>Votes held, and of them won against the head's proposal; goals reached; votes called because a goal stopped making sense.</summary>
     public static long Held { get; private set; }
 
     public static long Overruled { get; private set; }
@@ -89,6 +95,10 @@ public static class BotPurpose
 
     public static string Word(Aim aim) => _words[(int)aim];
 
+    /// <summary>
+    /// What the members voted to save for and its price, once they have voted and while it still applies; false, and the old
+    /// rule stands, otherwise. Asked by <c>BotDues.Goal</c>. "Nothing" is true with no price: the chest keeps nothing back.
+    /// </summary>
     public static bool Goal(Guild guild, out string what, out int price)
     {
         what = null;
@@ -128,6 +138,7 @@ public static class BotPurpose
             _            => 0
         };
 
+    /// <summary>The head's proposal: the first that applies, in the order of the class note.</summary>
     private static Aim Propose(Guild guild)
     {
         if (Applies(guild, Aim.Hall))
@@ -153,6 +164,7 @@ public static class BotPurpose
         return Applies(guild, Aim.Widening) ? Aim.Widening : Aim.Nothing;
     }
 
+    /// <summary>One member's vote, by its own need. See the class note.</summary>
     private static Aim Wish(BotMobile member, Guild guild, Aim proposed, bool hall, bool war, bool ransom)
     {
         if (hall)
@@ -173,6 +185,7 @@ public static class BotPurpose
         return BotYield.Spendable(member) < BotEstate.Keep ? Aim.Nothing : proposed;
     }
 
+    /// <summary>Once a minute: every guild whose vote is due votes.</summary>
     public static void Look(long now)
     {
         if (!Running)
@@ -304,6 +317,8 @@ public static class BotPurpose
         }
     }
 
+    // ---- telling -----------------------------------------------------------------------------------------------------------
+
     public static void Write(Utf8JsonWriter w, string guild)
     {
         if (guild == null || !_ballots.TryGetValue(guild, out var b) || !b.Voted)
@@ -320,6 +335,7 @@ public static class BotPurpose
         w.WriteString("purposeProposed", Word(b.Proposed));
     }
 
+    /// <summary>The <c>Treasuries:</c> line's clause.</summary>
     public static string Describe()
     {
         if (!Running)
@@ -354,6 +370,8 @@ public static class BotPurpose
 
         return say.ToString();
     }
+
+    // ---- the store ---------------------------------------------------------------------------------------------------------
 
     internal static void Save(IGenericWriter writer)
     {
@@ -432,6 +450,11 @@ public static class BotPurpose
         Array.Clear(_won);
     }
 
+    /// <summary>
+    /// Every chest's purpose forgotten, for Patrick's reset (07.10.2026, reset26): exactly what <see cref="Save"/> writes. A purpose
+    /// is what a chest saves for, not coin set aside — the coin stays in the chest — so forgetting it moves no gold. See
+    /// <see cref="BotPolitics.Wipe"/>. Returns the ballots forgotten.
+    /// </summary>
     public static int Wipe()
     {
         var ballots = _ballots.Count;

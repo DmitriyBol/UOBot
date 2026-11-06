@@ -31,6 +31,10 @@ namespace Server.BotAI.Mind;
 /// </summary>
 public sealed class BotWatcher
 {
+    /// <summary>
+    /// The three charges, in the order the watchers are raised. The first is the lead's; the lead also
+    /// takes whatever nobody's stems match.
+    /// </summary>
     public static readonly (string Charge, string[] Stems)[] Charges =
     [
         (
@@ -47,8 +51,10 @@ public sealed class BotWatcher
         )
     ];
 
+    /// <summary>Which charge a subsystem falls under, by its class name; the lead's when nobody's stems match.</summary>
     public static int Owner(string typeName) => Owner(typeName, out _);
 
+    /// <summary>The same, with the index of the stem that matched in that charge (-1 when none did).</summary>
     public static int Owner(string typeName, out int stem)
     {
         stem = -1;
@@ -90,10 +96,16 @@ public sealed class BotWatcher
 
     public int Hue { get; }
 
+    /// <summary>Nought for the lead. Decides the charge, which suspects it goes to, and who answers the door.</summary>
     public int Rank { get; }
 
+    /// <summary>What its rank gives it to watch, in words: the charge it has when nobody's is lent to it.</summary>
     public string OwnCharge { get; }
 
+    /// <summary>
+    /// What it watches now, in words, for its own prompt and the dashboard: its own charge, with the zone keeper's beside it
+    /// while the keeper is on the zones; the keeper's own reads the zones alone (07.10.2026).
+    /// </summary>
     public string Charge
     {
         get
@@ -116,12 +128,23 @@ public sealed class BotWatcher
         }
     }
 
+    /// <summary>Whether this watcher organises events rather than diagnosing. See <see cref="BotMarshal"/>.</summary>
     public bool Organiser { get; init; }
 
+    /// <summary>
+    /// Whether a subsystem's line is this watcher's to read: under its own charge, or, while the zone keeper is away, under the
+    /// keeper's and dealt to it — the keeper's stems taken in turn by the heirs, so the two do not quote the same lines (07.10.2026).
+    /// The keeper reads none while it is away.
+    /// </summary>
     public bool Watches(string typeName) => Owns(typeName) || Borrows(typeName);
 
+    /// <summary>Whether a subsystem's line is under this watcher's own charge; nothing is, for the keeper while it is away.</summary>
     public bool Owns(string typeName) => !BotVigil.IsKeeper(this) && Owner(typeName) == Rank % Charges.Length;
 
+    /// <summary>
+    /// Whether a subsystem's line is the zone keeper's, lent to this watcher while the keeper is away (07.10.2026): the keeper's
+    /// stems dealt in turn among the heirs. Read after the watcher's own lines, on a budget grown by the keeper's share.
+    /// </summary>
     public bool Borrows(string typeName)
     {
         var keeper = BotVigil.Keeper;
@@ -153,28 +176,38 @@ public sealed class BotWatcher
 
     public long Findings { get; set; }
 
+    /// <summary>Answers turned away because they were a label run together into one word rather than a sentence.</summary>
     public long Labels { get; set; }
 
+    /// <summary>Answers turned away because they repeated a claim already standing, word for word.</summary>
     public long Echoes { get; set; }
 
     public long Quiet { get; set; }
 
     public long Reflections { get; set; }
 
+    /// <summary>The bot the model asked to stand beside next, and why it is where it is.</summary>
     public string Wanted { get; set; }
 
     public string Because { get; set; } = "it was the first bot I saw";
 
+    /// <summary>The last few things it said, recited back at its next look.</summary>
     public List<string> Found { get; } = [];
 
     public long ReportedTick { get; set; }
 
+    // ---- What the dashboard's live window shows of it (Patrick, 02.10.2026: "windows that show the debuggers and what they
+    // are thinking right now"). Every string is one the debugger's own log prints; see BotDebugWeb.
+
+    /// <summary>The bot it last went to stand beside, by name. See <see cref="BotVigil"/>'s Follow.</summary>
     public string Beside { get; set; }
 
+    /// <summary>What it has asked the model and is waiting on, or null.</summary>
     public string Asking { get; private set; }
 
     public DateTime AskingSince { get; private set; }
 
+    /// <summary>When it last heard back from the model, and what: the kind, the question, the claim, the rest of the answer, whom about.</summary>
     public DateTime? ThoughtAt { get; private set; }
 
     public string ThoughtKind { get; private set; }
@@ -187,18 +220,23 @@ public sealed class BotWatcher
 
     public string About { get; private set; }
 
+    /// <summary>How sure the model said it was, 0 to 1, or -1 when the answer carries no such figure.</summary>
     public double Sure { get; private set; } = -1;
 
+    /// <summary>The last lines it wrote into its own log, newest last.</summary>
     public List<BotDebuggerLine> Feed { get; } = [];
 
+    /// <summary>How many of its own log lines the live window keeps.</summary>
     public static int FeedKeep { get; set; } = 12;
 
+    /// <summary>It has put a question to the model.</summary>
     public void Ask(string what)
     {
         Asking = what;
         AskingSince = DateTime.Now;
     }
 
+    /// <summary>The model answered, or failed to: what it said, as the log has it.</summary>
     public void Think(string kind, string question, string thought, string answer, string about, double sure = -1)
     {
         Asking = null;
@@ -211,6 +249,7 @@ public sealed class BotWatcher
         Sure = sure;
     }
 
+    /// <summary>One line of its own log, for the window's feed.</summary>
     public void Heard(string line)
     {
         Feed.Add(new BotDebuggerLine(DateTime.Now, line));
@@ -221,6 +260,7 @@ public sealed class BotWatcher
         }
     }
 
+    /// <summary>One clause about it, for the summary.</summary>
     public string Describe() =>
         Body is not { Deleted: false }
             ? $"{Name} has no body"

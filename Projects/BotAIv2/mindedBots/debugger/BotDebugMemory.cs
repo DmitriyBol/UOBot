@@ -22,12 +22,23 @@ public sealed class BotDebugBelief
 
     public double Confidence { get; set; }
 
+    /// <summary>
+    /// How many times this has been found, counting across sessions.
+    ///
+    /// <para>
+    /// <b>The most valuable number in this file.</b> A defect named once by a language model is a guess; the
+    /// same defect named nine times over four evenings, from measurements taken on different populations, is
+    /// something a person should go and look at. Nothing else here distinguishes the two, and without it a
+    /// memory of findings is just a longer list of guesses.
+    /// </para>
+    /// </summary>
     public int Seen { get; set; }
 
     public string First { get; set; }
 
     public string Last { get; set; }
 
+    /// <summary>Whether the debugger has since looked and found the numbers no longer support it.</summary>
     public bool Gone { get; set; }
 }
 
@@ -50,6 +61,7 @@ public sealed class BotDebugRecall
 
     public List<BotDebugBelief> Beliefs { get; set; } = [];
 
+    /// <summary>Standing conclusions from the slow question. Fewer, broader, and about the shard.</summary>
     public List<string> Lessons { get; set; } = [];
 
     public List<BotDebugAsk> Notes { get; set; } = [];
@@ -86,12 +98,16 @@ public static class BotDebugMemory
 
     private const string MemoryPath = "Configuration/bot-debugger-memory.json";
 
+    /// <summary>How alike two findings must be before the second is the first again, as a share of words.</summary>
     public static double Same { get; set; } = 0.67;
 
+    /// <summary>Most beliefs kept. Beyond this the least-seen goes, not the oldest.</summary>
     public static int MostBeliefs { get; set; } = 40;
 
+    /// <summary>Most standing conclusions kept.</summary>
     public static int MostLessons { get; set; } = 12;
 
+    /// <summary>Most beliefs recited into a prompt, strongest first.</summary>
     public static int Recall { get; set; } = 8;
 
     private static BotDebugRecall _recall = new();
@@ -112,6 +128,9 @@ public static class BotDebugMemory
         }
         catch (Exception e)
         {
+            // A memory that will not parse is not a reason to refuse to run. It is a reason to say so once
+            // and carry on with nothing, because the alternative is a debugger that will not start on the
+            // morning after the one evening its own file was written badly.
             _recall = new BotDebugRecall();
 
             logger.Warning("The debugger's memory could not be read and it starts this session with none: {Message}", e.Message);
@@ -121,6 +140,8 @@ public static class BotDebugMemory
         _recall.Lessons ??= [];
         _recall.Notes ??= [];
 
+        // Labels held from before they were turned away at the door go now, each named in the log with its count, so
+        // that what was dropped can still be read.
         for (var i = _recall.Beliefs.Count - 1; i >= 0; i--)
         {
             var belief = _recall.Beliefs[i];
@@ -167,6 +188,9 @@ public static class BotDebugMemory
         }
     }
 
+    /// <summary>
+    /// Files a finding, merging it into one already held if it is saying the same thing again.
+    /// </summary>
     public static void Believe(BotDebugNote note)
     {
         if (note == null || string.IsNullOrWhiteSpace(note.Finding) || note.Kind == "nothing" || Label(note.Finding))
@@ -183,6 +207,9 @@ public static class BotDebugMemory
             held.Last = now;
             held.Gone = false;
 
+            // The stronger statement of the two is kept. A finding restated with more confidence and a
+            // better-named cause is the same finding better understood, and keeping the first draft for ever
+            // because it came first would make the memory worse the longer it ran.
             if (note.Confidence >= held.Confidence)
             {
                 held.Confidence = note.Confidence;
@@ -214,6 +241,7 @@ public static class BotDebugMemory
         Save();
     }
 
+    /// <summary>The debugger looked again and the numbers no longer support what it said. Kept, and marked.</summary>
     public static void Doubt(string finding)
     {
         var held = Alike(finding);
@@ -229,6 +257,7 @@ public static class BotDebugMemory
         Save();
     }
 
+    /// <summary>A conclusion from the slow question. Broader than a finding and about the shard, not a bot.</summary>
     public static void Learn(string lesson)
     {
         if (string.IsNullOrWhiteSpace(lesson))
@@ -254,6 +283,7 @@ public static class BotDebugMemory
         Save();
     }
 
+    /// <summary>Somebody asked the debugger something. Kept across restarts: a question outlives a process.</summary>
     public static void Ask(string who, string what)
     {
         if (string.IsNullOrWhiteSpace(what))
@@ -273,6 +303,7 @@ public static class BotDebugMemory
         Save();
     }
 
+    /// <summary>Marks every standing question as having been put in front of the model.</summary>
     public static void Answered()
     {
         var moved = false;
@@ -307,6 +338,10 @@ public static class BotDebugMemory
         return waiting;
     }
 
+    /// <summary>
+    /// What it has believed across every session, strongest first — strongest meaning most often found, not
+    /// most recently found.
+    /// </summary>
     public static string Recite()
     {
         if (_recall.Beliefs.Count == 0 && _recall.Lessons.Count == 0)
@@ -383,8 +418,22 @@ public static class BotDebugMemory
         }
     }
 
+    /// <summary>The longest run of characters without a space that a finding may hold before it is a label.</summary>
     public static int LongestWord { get; set; } = 32;
 
+    /// <summary>
+    /// Whether a finding is a label rather than a sentence: no space in it at all, or a run of characters without one
+    /// longer than any word has business being.
+    ///
+    /// <para>
+    /// <b>The strongest belief this memory held on 14.09.2026 was the word "SameTwoTiles", found 102 times in 387
+    /// sessions.</b> The prompt quoted that word as the example of what a finding is not, beside a model sentence with a
+    /// bot's name and coordinates in it; the schema's floor on length made the model pad the word into a hundred
+    /// joined-up characters with coordinates spliced in; and every repetition was merged here as another independent
+    /// sighting, so it was recited at the top of every prompt. Twenty-six findings in ninety minutes that evening were
+    /// that label about five different bots, while twenty-eight bots died in one field and no watcher said so.
+    /// </para>
+    /// </summary>
     public static bool Label(string finding)
     {
         if (string.IsNullOrWhiteSpace(finding) || finding.IndexOf(' ') < 0)
@@ -412,6 +461,7 @@ public static class BotDebugMemory
         return false;
     }
 
+    /// <summary>The belief already held that says the same thing, or null.</summary>
     private static BotDebugBelief Alike(string finding)
     {
         if (string.IsNullOrWhiteSpace(finding))
@@ -430,6 +480,12 @@ public static class BotDebugMemory
         return null;
     }
 
+    /// <summary>
+    /// How much two sentences have in common, as a share of the shorter one's words.
+    ///
+    /// By overlap, never by prefix: the same defect written twice differs at the first word as often as at
+    /// the last, and a check on the opening characters lets every restatement through.
+    /// </summary>
     private static double Overlap(string a, string b)
     {
         if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
@@ -459,6 +515,12 @@ public static class BotDebugMemory
         return shared / (double)Math.Min(one.Length, two.Length);
     }
 
+    /// <summary>
+    /// Keeps the file bounded by dropping the least-often-found, never the oldest.
+    ///
+    /// The oldest belief is frequently the truest one — it has had the most evenings to be re-found — and a
+    /// memory that forgets by age throws away exactly the findings that earned their place.
+    /// </summary>
     private static void Trim()
     {
         while (_recall.Beliefs.Count > MostBeliefs)
@@ -477,6 +539,7 @@ public static class BotDebugMemory
         }
     }
 
+    /// <summary>One line for the shard's own log.</summary>
     public static string Describe() =>
         $"{_recall.Beliefs.Count} findings remembered over {_recall.Sessions} sessions, "
         + $"{_recall.Lessons.Count} standing conclusions, {Unanswered()} questions from people still unanswered";

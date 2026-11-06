@@ -36,16 +36,33 @@ public static class BotGrowth
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGrowth));
 
+    /// <summary>Whether newcomers arrive at all.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>Minutes between arrivals. Patrick's two hours.</summary>
     public static int EveryMinutes { get; set; } = 120;
 
+    /// <summary>Newcomers per arrival. Patrick's couple.</summary>
     public static int By { get; set; } = 2;
 
+    /// <summary>
+    /// The population past which nobody new arrives, resting bots counted. A ceiling, not a target. 210 since 30.09.2026
+    /// (build 370, Patrick: «let us raise the overall limit to 210», the growth itself unchanged at two every two hours): 120 bots
+    /// with 62 in the world held the whole shard at 4.4 % of one core, the population's tick at 3.75ms a 100ms look.
+    /// </summary>
     public static int Most { get; set; } = 210;
 
+    /// <summary>
+    /// The population the island is filled to at once, resting counted. 200 since 02.10.2026 (Patrick: "let us populate the
+    /// world up to 200 bots right away"). Under it, <see cref="BurstBy"/> newcomers a look of the rest clock — every twenty
+    /// seconds, so a hundred and ten in about seven minutes — each raised as any newcomer is (the mix's draw, <c>BotBirth</c>'s
+    /// leanings, a fresh name, its first turn spread over the idle look as at a boot) and put somewhere into its first session
+    /// (<c>BotRest.Spread</c>) so the burst does not tire as one wave. The two-hourly growth carries on above it, up to
+    /// <see cref="Most"/>, which stays the ceiling. Nought turns the burst off. A new world fills to it too, after the mix.
+    /// </summary>
     public static int FillTo { get; set; } = 200;
 
+    /// <summary>Newcomers a look while under <see cref="FillTo"/>.</summary>
     public static int BurstBy { get; set; } = 5;
 
     private static readonly Dictionary<string, int> _added = new(StringComparer.OrdinalIgnoreCase);
@@ -56,16 +73,30 @@ public static class BotGrowth
 
     private static bool _saidFilled;
 
+    /// <summary>Newcomers raised this session.</summary>
     public static long Raised { get; private set; }
 
+    /// <summary>Of those, the ones raised by the burst towards <see cref="FillTo"/>.</summary>
     public static long Burst { get; private set; }
 
+    /// <summary>
+    /// <b>Born into the gap (29.09.2026).</b> A guild of this many bots with nobody of a role gets its next newcomer in
+    /// that role — a producer first, a medic second — instead of a roll of the mix; the newcomer's own joining
+    /// (<c>BotGuilds.Roomiest</c>) then seats it where its role is thinnest. Nought turns it off.
+    /// </summary>
     public static int LeastToWant { get; set; } = 3;
 
+    /// <summary>Newcomers born into a role a guild lacked, instead of a roll of the mix.</summary>
     public static long ByNeed { get; private set; }
 
     private static readonly BotRole[] _wanted = [BotRole.Producer, BotRole.Medic];
 
+    /// <summary>
+    /// The configured mix with every newcomer so far laid over it — except over an office, which stays at what the configuration
+    /// says and never above one (07.10.2026). A newcomer Captain raised for an empty floor was counted here, so the next boot
+    /// asked for two and raised the second; a save from before the wipe would have brought back four. See
+    /// <see cref="BotClass.Office"/>.
+    /// </summary>
     public static IReadOnlyDictionary<string, int> Mix(IReadOnlyDictionary<string, int> configured)
     {
         if (configured == null)
@@ -114,6 +145,7 @@ public static class BotGrowth
             return;
         }
 
+        // The two-hour clock starts at the first look, as before; the burst does not wait for it.
         if (_last == default)
         {
             _last = now;
@@ -178,6 +210,10 @@ public static class BotGrowth
         }
     }
 
+    /// <summary>
+    /// One look's worth of the burst towards <see cref="FillTo"/>: up to <see cref="BurstBy"/> newcomers, drawn from the mix
+    /// as any newcomer is, and one line for the lot rather than one each.
+    /// </summary>
     private static void Fill(int have)
     {
         var goal = Math.Min(FillTo, Most);
@@ -207,6 +243,7 @@ public static class BotGrowth
             have++;
             raised++;
 
+            // Somewhere into its first session, as the ones met at a boot are, and among the posts it fills.
             BotRest.Spread(bot);
             BotCritical.Born(bot);
 
@@ -239,6 +276,10 @@ public static class BotGrowth
         }
     }
 
+    /// <summary>
+    /// A newcomer counted by class, to be laid over the mix at the next boot; never an office, which the mix holds at one
+    /// whoever was raised into it (07.10.2026). See <see cref="Mix"/>.
+    /// </summary>
     private static void Added(BotClass klass)
     {
         if (!klass.Office)
@@ -249,6 +290,13 @@ public static class BotGrowth
 
     private static readonly HashSet<string> _saidHeld = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Whether this class is an office (<see cref="BotClass.Office"/>) that somebody holds — in the world, dead ones counted,
+    /// or resting — so no branch may raise it (07.10.2026, Patrick: one Captain, one Baron, one Architect, one Sage at any
+    /// population). Counted by class over the whole population (<see cref="BotPopulation.Holder"/>), not through
+    /// <c>BotCritical</c>'s posts, which never counted the Sage or the Architect. Said once a session for each office, not at
+    /// every pick: a floor written above one would ask at every look.
+    /// </summary>
     private static bool Held(BotClass klass)
     {
         if (klass is not { Office: true } || BotPopulation.Holder(klass) is not { } holder)
@@ -266,12 +314,20 @@ public static class BotGrowth
         return true;
     }
 
+    /// <summary>Times a branch asked for an office while its holder stood, and was passed on to something else.</summary>
     public static long OfficesPassedOver { get; private set; }
 
+    /// <summary>
+    /// A class in proportion to the configured mix, offices left out (<see cref="BotClass.Office"/>). A critical post the whole
+    /// island has too few of comes first (<see cref="BotCritical.Wanting"/>), a held office passed over for the next short post;
+    /// then, outside the burst, a guild's gap, unless what it lacks is a held office.
+    /// </summary>
     private static BotClass Pick(bool burst)
     {
         var mix = BotPopulationConfig.Mix;
 
+        // <b>A post the island is short of, resting counted, before anything else (02.10.2026).</b> The class, not the trade:
+        // which trade a crafter is born to is drawn by its name. See BotCritical.
         if (BotCritical.Running && BotCritical.Wanting(out var post, Held) is { } asked)
         {
             BotCritical.ByPost++;
@@ -280,6 +336,8 @@ public static class BotGrowth
             return asked;
         }
 
+        // The guild's gap is left to the slow growth: a burst of a hundred would answer one guild's want many times over
+        // before the first of them had joined anybody.
         if (LeastToWant > 0 && !burst)
         {
             for (var r = 0; r < _wanted.Length; r++)
@@ -305,6 +363,8 @@ public static class BotGrowth
             }
         }
 
+        // The draw: every class the mix asks for, by its count, and never an office (07.10.2026). Until then the test was "a
+        // count above 1", which made the rule a number in the file — and the file in the staged tree still said 2.
         var total = 0;
 
         foreach (var (name, many) in mix)
@@ -340,10 +400,14 @@ public static class BotGrowth
         return null;
     }
 
+    /// <summary>A new world starts from the configured mix again. See BotHand's reset.</summary>
+    /// <summary>A class of this role, by the mix's weights among those it lists; the first the classes know otherwise.</summary>
     private static BotClass OfRole(BotRole role, IReadOnlyDictionary<string, int> mix)
     {
         var total = 0;
 
+        // A class no guild may take in is never sent to fill a guild's gap (01.10.2026, build 385): the trader and the
+        // architect are producers by role and barred from the bands, so the guild that lacked one would have lacked it still.
         foreach (var (name, many) in mix)
         {
             if (many > 0 && BotClasses.Find(name) is { } k && k.Role == role && !BotGuilds.Bars(k.Name) && !k.Neutral)

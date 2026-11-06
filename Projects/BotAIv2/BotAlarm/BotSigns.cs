@@ -41,24 +41,52 @@ public static class BotSigns
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSigns));
 
+    /// <summary>How often the rules are read.</summary>
     public static int TickMs { get; set; } = 60000;
 
+    /// <summary>Errors in one look before the channel is told. The shard's own rate was 0.3 a minute.</summary>
     public static int ErrorsAt { get; set; } = 5;
 
+    /// <summary>The window the work rules are judged over.</summary>
     public static int WorkMs { get; set; } = 300000;
 
+    /// <summary>Fewest pieces of work taken on in that window before finishing them is judged at all.</summary>
     public static int WorkLeast { get; set; } = 20;
 
+    /// <summary>The share of work taken that must finish. Four in five were finishing when this was written.</summary>
+    /// <summary>
+    /// Below this share of work finishing, over the work window, the shard says so.
+    ///
+    /// <para>
+    /// <b>Raised from 0.25 to 0.55 on 08.09.2026, and the old figure was a measurement of a sick shard.</b>
+    /// A quarter was chosen when the population was finishing between 9% and 49% of what it took on — which
+    /// turned out to be the engine refusing every step of an exhausted mount, not the work being wrong. With
+    /// that fixed the same population finishes 72% to 91% window after window, nine windows running, and a
+    /// floor at a quarter could not fire again short of the shard stopping outright.
+    /// </para>
+    ///
+    /// <para>
+    /// Seventeen points below the worst window actually observed. Close enough that a real collapse trips it
+    /// within one window; far enough that the ordinary swing between 72 and 91 does not. It is a threshold on
+    /// a noisy ratio, so it wants revisiting whenever the population's shape changes — and the way to set it
+    /// is the way this one was set: read nine consecutive windows off a healthy shard first.
+    /// </para>
+    /// </summary>
     public static double WorkFloor { get; set; } = 0.55;
 
+    /// <summary>The share of the population standing still that is worth waking somebody for.</summary>
     public static double StandShare { get; set; } = 0.3;
 
+    /// <summary>Fewest bots alive before the standing share means anything.</summary>
     public static int StandLeast { get; set; } = 10;
 
+    /// <summary>How long a market with stalls and wants on it may move nothing at all.</summary>
     public static int MarketMs { get; set; } = 600000;
 
+    /// <summary>Deaths in one work window that count as a plague rather than a bad afternoon.</summary>
     public static int DeathsAt { get; set; } = 10;
 
+    /// <summary>How often the channel says that nothing is wrong.</summary>
     public static int AliveMs { get; set; } = 3600000;
 
     private static long _errorsAt;
@@ -89,8 +117,10 @@ public static class BotSigns
 
     private static long _aliveErrors;
 
+    /// <summary>Times the rules have been read this session.</summary>
     public static long Looks { get; private set; }
 
+    /// <summary>Sets every anchor to now, so the first window measures this session and not the last one.</summary>
     public static void Start()
     {
         var now = Core.TickCount;
@@ -116,8 +146,21 @@ public static class BotSigns
         Looks = 0;
     }
 
+    /// <summary>
+    /// Whether a window is up, with half a tick of slack.
+    ///
+    /// <b>Without the slack a window equal to the tick fires every other tick.</b> Found the hour this was
+    /// written: the heartbeat was dialled to a minute against a one-minute tick and came out two minutes
+    /// apart, while the event it wrote still called its window "1m". A period and a sampling rate that are
+    /// the same number do not divide cleanly, and the number that lies about it is the one in the report.
+    /// </summary>
     private static bool Due(long now, long anchor, int every) => now - anchor >= every - TickMs / 2;
 
+    /// <summary>
+    /// The window as it actually was, not as it was meant to be. Every event says how long it looked over,
+    /// and a rule that reports its intention instead of its measurement is a rule whose numbers cannot be
+    /// compared with each other.
+    /// </summary>
     private static string Window(long now, long anchor)
     {
         var seconds = (now - anchor) / 1000;
@@ -125,8 +168,14 @@ public static class BotSigns
         return seconds < 90 ? $"{seconds}s" : $"{(seconds + 30) / 60}m";
     }
 
+    /// <summary>
+    /// Percentages, said the same way whatever the host's locale is. <c>P0</c> here renders with a
+    /// non-breaking space on a Russian machine, and this shard has already lost time to locale-shaped
+    /// differences between what a number looks like on the developer's box and everywhere else.
+    /// </summary>
     private static int Percent(double share) => (int)Math.Round(share * 100);
 
+    /// <summary>One look at everything. Called from the module's own clock.</summary>
     public static void Look()
     {
         Looks++;
@@ -154,14 +203,59 @@ public static class BotSigns
         }
     }
 
+    /// <summary>How far above its payment a trade's claim must stand before it is an alarm: half again.</summary>
     public static double OverstatedBy { get; set; } = 1.5;
 
+    /// <summary>
+    /// And by how much, at least, in gold a minute. A ratio alone called a claim of three against a payment of nought an
+    /// overstatement ("acquire is read by the auction at 3/min and pays 0/min", build 97, 22:40): true, and a number too
+    /// small to steer anything.
+    /// </summary>
     public static double OverstatedGap { get; set; } = 5.0;
 
+    /// <summary>The trade the alarm is standing on, or null. Cleared in its own event when the gap closes.</summary>
     private static string _overstated;
 
+    /// <summary>
+    /// Claims that are ranks by design, named so the alarm passes them over: flight is reckoned at two thousand a minute
+    /// so that it wins every auction, and unloading at a hundred and twenty so that a full pack is carried to the
+    /// counter; neither is a promise about coin. A lesson ("drill-in") claims the worth of the skill it teaches and pays
+    /// its fee in coin — the board measures coin and goods and prices skill at nothing, so every lesson reads as a loss
+    /// (-37/min over 28 at 13:02 on 16.09.2026) and the claim is right. A claim that is a wager on purpose, or that is
+    /// paid in a currency the board does not price, goes here with its reason and nowhere else — the alarm's whole value
+    /// is that everything not on this list is meant to pay what it says.
+    /// </summary>
+    // "rescue" since 16.09.2026, evening: its number is a friend's need against a hunt, and the alarm read it at 103
+    // claimed against 12 paid an hour after the claim was halved — the promise-and-wager class, not a stale number.
+    // "harrow" since 17.09.2026: BotHarrow.Prior is written as a rank ("nothing else the Baron may take comes near it, which
+    // is what makes him walk the town only when there is nowhere to go") and is paid in ground made safe, which the board
+    // does not price. It was the only alarm standing all day on 17.09 — raised at every boot, 38 read against 25, 21, 17 and
+    // 10 paid.
+    // "band" since 25.09.2026: its takings are divided at the corpse and land in the members' packs through the squad's
+    // share-out, so the band's own line reads empty by construction — 0/min over 2230 outcomes, read at 7 by the floor
+    // under Patrick's claim of 30 (16.09.2026); raised at the boot of 25.09. The alarm names one trade at a time, so a claim
+    // that can never pass hides every other behind it.
     public static readonly HashSet<string> Ranked = new(StringComparer.OrdinalIgnoreCase) { "flee", "unload", "drill-in", "rescue", "harrow", "band" };
 
+    /// <summary>
+    /// A trade whose claim, as the auction reads it, stands more than <see cref="OverstatedBy"/> times what it turned out
+    /// to pay, on enough outcomes to be believed.
+    ///
+    /// <para>
+    /// <b>As the auction reads it, from build 95.</b> The alarm compared the number typed in the source, and on enough
+    /// outcomes to be believed the island's correction has already all but replaced that number: past
+    /// <c>TradeConfidence</c> outcomes the claim keeps two parts in twenty-seven. So the alarm named one trade after
+    /// another whose choices it no longer steered — mend at 74 against 20 was read by every auction as 24, sewing by a
+    /// mind at 110 against 60 as 64 — and four claims were lowered on 16.09.2026 on its word. What it now names is a claim
+    /// the correction cannot bring down, which is the floor (<c>BotCommons.LeastShare</c>) holding a quarter of a number
+    /// that pays less than that: the claim still steering the population, which is the defect.
+    /// </para>
+    /// This is the class of defect the shard has paid for most often — a number in the source that stopped
+    /// being true, with the whole population chasing it (opening numbers that seal themselves, two thresholds on one
+    /// shelf) — and until 16.09.2026 it could be seen only on the Known tab, which nobody has open at four in the morning.
+    /// Read off the same board the auction reads; the worst overstatement is named, and nothing is said until it
+    /// changes.
+    /// </summary>
     private static void Overstated()
     {
         var gaps = BotCommons.Gaps(0);
@@ -175,6 +269,11 @@ public static class BotSigns
             var (kind, claimed, measured, settled, _) = gaps[i];
             var reads = BotAppraisal.Reads(kind, claimed);
 
+            // Unpaid work's claim is a rank, not a promise: flight is reckoned at two thousand a minute so that it wins
+            // every auction, and it pays nothing on purpose. Only work that is meant to pay is measured against its claim.
+            // <b>And only a claim an auction has read.</b> The first word of the alarm on build 95, 21:28, was "duel is read by
+            // the auction at 50/min and pays -4/min": true, and about a number no auction ever reads, because a duel is
+            // pressed on a bot by the tournament. So are the patrol's chase, a temptation and a sentence.
             if (settled < BotCommons.TradeConfidence || measured * OverstatedBy >= reads || reads - measured < OverstatedGap || BotAppraisal.IsUnpaid(kind) || Ranked.Contains(kind)
                 || !BotWill.Auctioned(kind))
             {
@@ -211,6 +310,11 @@ public static class BotSigns
         }
     }
 
+    /// <summary>
+    /// Errors printed since the last look. Cleared as soon as a quiet minute passes, because a burst that
+    /// has stopped is a different thing from one that is still going and the difference is what a person
+    /// woken at midnight most wants to know.
+    /// </summary>
     private static void Errors()
     {
         var now = Core.TickCount;
@@ -239,6 +343,10 @@ public static class BotSigns
         }
     }
 
+    /// <summary>
+    /// How much of the population is standing still, as a share of it. The number is the shard's own count
+    /// of stalled bots, not a second opinion derived from positions.
+    /// </summary>
     private static void Standing()
     {
         var alive = BotPopulation.Count;
@@ -277,6 +385,11 @@ public static class BotSigns
         }
     }
 
+    /// <summary>
+    /// Work taken on against work finished, over the work window, plus deaths in the same window. Judged
+    /// only when enough work was taken on to divide by — otherwise a quiet five minutes reads as a broken
+    /// shard, which is the shape of false alarm this project has produced most often.
+    /// </summary>
     private static void Work(long now)
     {
         var finished = BotWill.Finished - _workFinished;
@@ -293,8 +406,14 @@ public static class BotSigns
         _workFailed = BotWill.Failed;
         _workDropped = BotWill.Dropped;
 
+        // <b>Judged on the work that ended, which is what every build is measured on.</b> This read finished over taken, so
+        // the alarm and the census were two numbers for one fact, and work taken in a window's last minute and still in hand
+        // counted against it as though it had failed.
         var ended = finished + failed + dropped;
 
+        // <b>And the loudest loop of the window, named.</b> On 14.09.2026 this alarm could not tell the shard from one bot in
+        // a loop — Quill, Kelda and Hale each in turn — and every time the first hour went on finding out which (§3 C5, §5 S5).
+        // Asked and emptied every window, so a loop from a quarter of an hour ago does not name this one.
         var loudest = BotBreaker.Loudest(out var who, out var kind, out var why, out var times, out var failures);
 
         if (ended >= WorkLeast)
@@ -343,6 +462,12 @@ public static class BotSigns
         }
     }
 
+    /// <summary>
+    /// A market with shops open, wants said, and nothing moving either way. Both halves are required: an empty market is not a stuck
+    /// one, and the difference is the whole of the alarm. Since 01.10.2026 "sold" is goods over a shop's till by the bank or handed
+    /// over at a carrier's meeting, and "filled" is goods handed over against a spoken want by either road.
+    /// </summary>
+    /// <summary>Things sold hand to hand, both roads: over a shop's till by the bank, and at a carrier's meeting.</summary>
     private static long Sold() => BotShopkeep.Units + BotHandover.Units;
 
     private static void Market(long now)
@@ -385,6 +510,11 @@ public static class BotSigns
         );
     }
 
+    /// <summary>
+    /// The hourly "nothing is wrong", with the numbers it is asserting that about. Without it, a channel
+    /// that has quietly stopped writing looks exactly like a shard with nothing to report — and this project
+    /// has already lost an evening to a monitor whose filter matched nothing at all.
+    /// </summary>
     private static void Heartbeat(long now)
     {
         var taken = BotWill.Taken - _aliveTaken;
@@ -407,6 +537,7 @@ public static class BotSigns
         );
     }
 
+    /// <summary>One line for the boot log and the summaries.</summary>
     public static string Describe() =>
         $"{Looks} looks taken, thresholds: {ErrorsAt} errors a minute, work finishing below {Percent(WorkFloor)}% of"
         + $" {WorkLeast}+ taken in {WorkMs / 60000}m, {Percent(StandShare)}% of the population standing still,"

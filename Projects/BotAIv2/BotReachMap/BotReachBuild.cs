@@ -42,6 +42,7 @@ public sealed class BotReachTerrain : INavTerrain
 
     private bool _housed;
 
+    /// <summary>The impassable immovable items over each cell of the window: heights and tops, packed two a short.</summary>
     private readonly List<int>[] _items = new List<int>[Side * Side];
 
     private readonly List<int> _touched = [];
@@ -54,10 +55,16 @@ public sealed class BotReachTerrain : INavTerrain
 
     public int Height => _map.Height;
 
+    /// <summary>Whether the window was read with the houses in it.</summary>
     public bool Housed => _housed;
 
+    /// <summary>Items read into windows so far, for the cost of the survey.</summary>
     public long ItemsRead { get; private set; }
 
+    /// <summary>
+    /// Reads what the window round the cluster at (<paramref name="x0"/>, <paramref name="y0"/>) holds that the tiles do not: the
+    /// houses near it and the items standing in it. Returns the signature of both.
+    /// </summary>
     public long Prepare(int x0, int y0)
     {
         for (var i = 0; i < _touched.Count; i++)
@@ -124,12 +131,14 @@ public sealed class BotReachTerrain : INavTerrain
             list.Add((item.Z & 0xFFFF) | (top << 16));
             ItemsRead++;
 
+            // Order-free: a sector hands its items back in no promised order.
             signature += Mix(item.X, item.Y, item.Z, item.ItemID);
         }
 
         return signature;
     }
 
+    /// <summary>Whether an item fills the ground it stands on for a walker: the walker's own test (<see cref="BotStep.BlockedByItems"/>), immovable things only.</summary>
     public static bool Blocks(Item item)
     {
         if (item == null || item.Deleted || item.Movable || item.Parent != null || item is BaseMulti or Teleporter or PublicMoongate or Moongate)
@@ -207,6 +216,10 @@ public sealed class BotReachTerrain : INavTerrain
     public StepMask Step(int x, int y, sbyte z) =>
         _housed ? StepProbe.ComputeMultiMaskAt(_map, x, y, z) : StepProbe.ComputeMaskAt(_map, x, y, z);
 
+    /// <summary>
+    /// Whether a tile's own land is water: the sea, a lake, a river — water a ship could be on. A moat or a fountain is a wet
+    /// static over dry land, and a yard beside one is not a shore (01.10.2026: Britain's gardens read as isles by their pools).
+    /// </summary>
     public bool WetLand(int x, int y)
     {
         if (x < 0 || y < 0 || x >= _map.Width || y >= _map.Height)
@@ -219,6 +232,7 @@ public sealed class BotReachTerrain : INavTerrain
         return !land.Ignored && (TileData.LandTable[land.ID & TileData.MaxLandValue].Flags & TileFlag.Wet) != 0;
     }
 
+    /// <summary>Whether a tile with nowhere to stand is water: land that is wet, or a wet static (a moat, a fountain, the sea under a pier).</summary>
     public bool Wet(int x, int y)
     {
         if (x < 0 || y < 0 || x >= _map.Width || y >= _map.Height)
@@ -260,14 +274,19 @@ public sealed class BotReachTerrain : INavTerrain
 /// </summary>
 public sealed class BotReachCluster
 {
+    /// <summary>A tile nothing can stand on and no ship floats on: rock, wall, tree trunk, the void.</summary>
     public const byte Blocked = 0xFF;
 
+    /// <summary>A tile nothing can stand on that is water.</summary>
     public const byte Water = 0xFE;
 
+    /// <summary>Standing ground in a region past the most one cluster may number: kept as a sealed pocket.</summary>
     public const byte Crowded = 0xFD;
 
+    /// <summary>Regions one cluster may number; past it the ground is <see cref="Crowded"/>.</summary>
     public const int MostRegions = 0xFD;
 
+    /// <summary>Neighbours a link may point into.</summary>
     public const int Self = 0;
 
     public const int East = 1;
@@ -278,24 +297,40 @@ public sealed class BotReachCluster
 
     public const int SouthWest = 4;
 
+    /// <summary>A link one way: from this cluster's region into the other's.</summary>
     public const int Forward = 1;
 
+    /// <summary>A link the other way: from the other's region into this cluster's.</summary>
     public const int Backward = 2;
 
+    /// <summary>For each tile: the region of its lowest standing place, or <see cref="Blocked"/>, <see cref="Water"/>, <see cref="Crowded"/>.</summary>
     public byte[] Cells;
 
+    /// <summary>
+    /// Every standing place of every tile that has more than one, in tile order and lowest first: tile (8 bits), stratum (2),
+    /// region (8) and height plus 128 (8), packed. Null when no tile has two.
+    /// </summary>
     public int[] Layers;
 
+    /// <summary>Regions numbered.</summary>
     public int Regions;
 
+    /// <summary>Regions with water beside them, a bit each; null for none.</summary>
     public ulong[] Coast;
 
+    /// <summary>
+    /// Links out of this cluster's regions: region (8 bits), neighbour (3), the neighbour's region (8), and the directions (2)
+    /// packed. See <see cref="Forward"/>, <see cref="Backward"/>.
+    /// </summary>
     public int[] Links;
 
+    /// <summary>What the houses and items round it read when it was drawn. See <see cref="BotReachTerrain.Prepare"/>.</summary>
     public long Signature;
 
+    /// <summary>Whether it was drawn with a house in or beside it.</summary>
     public bool Housed;
 
+    /// <summary>Tiles with somewhere to stand.</summary>
     public int Standing;
 
     public static int LinkFrom(int link) => link & 0xFF;
@@ -314,6 +349,7 @@ public sealed class BotReachCluster
 
     public static int LayerZ(int layer) => ((layer >> 18) & 0xFF) - 128;
 
+    /// <summary>The region of stratum <paramref name="stratum"/> of tile <paramref name="cell"/>, or -1.</summary>
     public int RegionOf(int cell, int stratum)
     {
         if (stratum == 0 || Layers == null)
@@ -338,6 +374,7 @@ public sealed class BotReachCluster
         return -1;
     }
 
+    /// <summary>The region of the standing place of tile <paramref name="cell"/> nearest height <paramref name="z"/>, or -1.</summary>
     public int RegionNear(int cell, int z)
     {
         if (Layers != null)
@@ -369,6 +406,7 @@ public sealed class BotReachCluster
         return code < Crowded ? code : -1;
     }
 
+    /// <summary>The index of the first layer of a tile, or -1 when it has none.</summary>
     public int FirstLayer(int cell)
     {
         if (Layers == null)
@@ -397,6 +435,7 @@ public sealed class BotReachCluster
 
     public bool Coastal(int region) => Coast != null && (Coast[region >> 6] & (1UL << (region & 63))) != 0;
 
+    /// <summary>The cluster a neighbour index points to, or -1 off the map.</summary>
     public static int Neighbour(int c, int rel, int clustersX, int clustersY)
     {
         var cx = c % clustersX;
@@ -429,6 +468,7 @@ public sealed class BotReachCluster
         return cells;
     }
 
+    /// <summary>One array for every cluster whose 256 tiles are all the same, so the open sea costs nothing.</summary>
     public static byte[] Shared(byte[] cells)
     {
         var first = cells[0];
@@ -485,6 +525,7 @@ public sealed class BotReachBuilder
 
     private readonly List<int> _layers = [];
 
+
     public BotReachBuilder(Map map)
     {
         _terrain = new BotReachTerrain(map);
@@ -498,10 +539,13 @@ public sealed class BotReachBuilder
 
     public BotReachTerrain Terrain => _terrain;
 
+    /// <summary>Cells probed through the window, for the cost of the survey.</summary>
     public long Probes => _w.Probes;
 
+    /// <summary>The houses and items round a cluster now, without drawing it: what a boot compares a kept cluster with.</summary>
     public long Signature(int c) => _terrain.Prepare(c % _clustersX * NavWindow.ClusterSide, c / _clustersX * NavWindow.ClusterSide);
 
+    /// <summary>Draws cluster <paramref name="c"/>. The clusters east, south, south-east and south-west of it must be drawn already.</summary>
     public BotReachCluster Build(int c, BotReachCluster[] drawn)
     {
         var x0 = c % _clustersX * NavWindow.ClusterSide;
@@ -534,6 +578,7 @@ public sealed class BotReachBuilder
             return cluster;
         }
 
+        // Regions: steps that go both ways join two standing places into one.
         for (var s = 0; s < _parent.Length; s++)
         {
             _parent[s] = s;
@@ -571,6 +616,7 @@ public sealed class BotReachBuilder
             }
         }
 
+        // Numbered in tile order, so a cluster drawn twice from the same ground numbers its regions the same way.
         var regions = 0;
 
         Array.Fill(_region, -1);
@@ -626,8 +672,14 @@ public sealed class BotReachBuilder
         cluster.Regions = regions;
         cluster.Standing = standing;
 
+        // <b>A shore: the land's own water within <see cref="ShoreReach"/> tiles (01.10.2026).</b> The land's water — the sea, a
+        // lake, a river — and not a fountain's or a moat's, which are statics: Britain's walled gardens read as isles by their
+        // pools. Within three and not beside: Nujel'm's beaches meet the sea through a band of surf no body stands on, and read
+        // as a sealed pocket when only the tile beside was asked. The water is read from the land tiles alone, the window
+        // widened by the reach and swept both ways, so it costs a few hundred lookups a cluster.
         cluster.Coast = Shore(x0, y0);
 
+        // Links: one-way steps inside, and every step across the east, south, south-east and south-west edges, both ways.
         _links.Clear();
 
         for (var k = 0; k < _oneWay.Count; k++)
@@ -646,6 +698,7 @@ public sealed class BotReachBuilder
             var ix = i & 15;
             var iy = i >> 4;
 
+            // Only the tiles on the east or south edge, or the west edge's south corner, touch the four neighbours joined here.
             if (ix != 15 && iy != 15 && !(ix == 0 && iy == 15))
             {
                 continue;
@@ -728,6 +781,11 @@ public sealed class BotReachBuilder
         return cluster;
     }
 
+    /// <summary>
+    /// A step as the walker takes it: the graph's own (<see cref="NavWindow.Step"/>), and on a diagonal both flanking steps must
+    /// land somewhere too — the engine's rule, which reads items on the flanks as the window's mask cannot (a railing's gap
+    /// one tile wide cut on the slant is no gap to a walker).
+    /// </summary>
     private bool StepOk(int x, int y, int s, int d, out int nx, out int ny, out int ns)
     {
         if (!_w.Step(x, y, s, d, out nx, out ny, out ns))
@@ -743,6 +801,7 @@ public sealed class BotReachBuilder
         return _w.Step(x, y, s, (d + 7) & 7, out _, out _, out _) && _w.Step(x, y, s, (d + 1) & 7, out _, out _, out _);
     }
 
+    /// <summary>How far from the land's water standing ground still counts as a shore a ship could put a walker down on.</summary>
     public const int ShoreReach = 3;
 
     private const int ShoreSide = NavWindow.ClusterSide + 2 * ShoreReach;
@@ -751,6 +810,7 @@ public sealed class BotReachBuilder
 
     private readonly bool[] _shoreRow = new bool[ShoreSide * ShoreSide];
 
+    /// <summary>The regions within <see cref="ShoreReach"/> of the land's own water, a bit each; null for none.</summary>
     private ulong[] Shore(int x0, int y0)
     {
         var any = false;
@@ -771,6 +831,7 @@ public sealed class BotReachBuilder
             return null;
         }
 
+        // Across, then down: a tile is near water when any tile within the reach both ways is water.
         for (var yy = 0; yy < ShoreSide; yy++)
         {
             for (var xx = ShoreReach; xx < ShoreSide - ShoreReach; xx++)
@@ -824,6 +885,7 @@ public sealed class BotReachBuilder
         return coast;
     }
 
+    /// <summary>Which neighbour a tile at this offset from the cluster's corner lies in: <see cref="BotReachCluster.Self"/> when not one of the four.</summary>
     private static int Rel(int dx, int dy)
     {
         var ex = dx >= NavWindow.ClusterSide;

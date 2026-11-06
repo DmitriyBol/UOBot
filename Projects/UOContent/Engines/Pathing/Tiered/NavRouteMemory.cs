@@ -6,36 +6,48 @@ namespace Server.Engines.Pathing.Tiered;
 /// <summary>What the route memory made of a request. See <see cref="NavRouteMemory.Recall"/>.</summary>
 public enum NavRecall
 {
+    /// <summary>Not the memory's to answer: off, an end the graph cannot place, or the two ends too near to be worth it.</summary>
     Skipped,
 
+    /// <summary>No remembered road from any node the start reaches to the goal's cluster that the goal joins.</summary>
     Missed,
 
+    /// <summary>A remembered road, quiet all along: the points are in the list.</summary>
     Served,
 
+    /// <summary>A remembered way round the danger, whose reason still stands: the points are in the list.</summary>
     Detoured,
 
+    /// <summary>The remembered road stands and crosses ground the danger hook charges now: plan round it.</summary>
     Bloodied
 }
 
 /// <summary>What a remembered road's clusters said when it was proved against the graph. See NavRouteMemory.Prove.</summary>
 internal enum NavProof
 {
+    /// <summary>Every cluster as it was, by version or by signature.</summary>
     Valid,
 
+    /// <summary>A cluster it crosses is being drawn again: not now, and not forgotten.</summary>
     Waiting,
 
+    /// <summary>A cluster it crosses came out different: the road is forgotten.</summary>
     Changed
 }
 
 /// <summary>What became of a route offered to the memory. See <see cref="NavRouteMemory.Offer"/>.</summary>
 public enum NavOffer
 {
+    /// <summary>Not taken: the memory is off, the ends are too near, or the route could not be priced from the graph.</summary>
     Declined,
 
+    /// <summary>Kept for places nothing was remembered from before.</summary>
     Stored,
 
+    /// <summary>Cheaper, from at least one place, than what was remembered there: it replaced it there.</summary>
     Improved,
 
+    /// <summary>No cheaper from anywhere than what was remembered: the memory is as it was.</summary>
     Kept
 }
 
@@ -89,20 +101,40 @@ public enum NavOffer
 /// </summary>
 public sealed class NavRouteMemory
 {
+    /// <summary>
+    /// Roads kept, at most. Two thousand and forty-eight: the shard asked 2244 routes in fifteen minutes of 29.09.2026
+    /// (18:38–18:53), most from a few dozen places — the halls, the banks, the mouths — to a few dozen more.
+    /// </summary>
     public int Capacity { get; set; } = 2048;
 
+    /// <summary>
+    /// Nodes kept over all roads, at most: a quarter of a million, some twelve megabytes with the places to join them. A road
+    /// from Britain to Yew is some two hundred nodes; most are under a hundred.
+    /// </summary>
     public int NodeCapacity { get; set; } = 262144;
 
+    /// <summary>
+    /// Ends fewer clusters apart than this (in the larger of the two axes) are left to the planner: a route of two clusters is
+    /// a few dozen expansions, well under the price of proving a remembered one, and a road joined from the wrong side of its
+    /// start cluster would be dear in proportion. Three.
+    /// </summary>
     public int NearClusters { get; set; } = 3;
 
+    /// <summary>
+    /// How long a way round the danger is trusted, in milliseconds. Five minutes: the time a sighting of creatures stands on
+    /// the quadrant map (BotQuad.SightMs), the quickest part of the danger to change.
+    /// </summary>
     public int DetourMs { get; set; } = 300000;
 
+    /// <summary>Ways round the danger kept, one a pair of clusters. Five hundred and twelve.</summary>
     public int DetourCapacity { get; set; } = 512;
 
+    /// <summary>Cluster signatures kept between proofs, before the lot is dropped and signed again.</summary>
     public int SignatureCapacity { get; set; } = 65536;
 
     public bool Enabled { get; set; } = true;
 
+    /// <summary>The clock the detours are timed by. <c>Core.TickCount</c>; replaced by the tests.</summary>
     public Func<long> Clock { get; set; } = static () => Core.TickCount;
 
     private readonly Dictionary<long, Place> _index = new();
@@ -129,6 +161,8 @@ public sealed class NavRouteMemory
 
     private int _gc;
 
+    // The ends flooded last, so the offer that follows a missed recall — the same start, and the goal the planner settled on,
+    // which is the same cell as a rule — does not flood them again. A cluster's flood is fixed by its version.
     private int _startGraph;
 
     private long _startEnd;
@@ -158,10 +192,16 @@ public sealed class NavRouteMemory
 
     public int Detours => _detours.Count;
 
+    /// <summary>Whether anything was kept or forgotten since the file was last written.</summary>
     public bool Dirty { get; set; }
 
+    /// <summary>The ground road's danger at the last recall that answered <see cref="NavRecall.Bloodied"/>.</summary>
     public long LastGroundDanger { get; private set; }
 
+    /// <summary>
+    /// The ground road itself at the last recall that answered <see cref="NavRecall.Bloodied"/>, into <paramref name="points"/>: for the
+    /// walker whose way round the planners cannot find within their budgets, which walks the ground road rather than the old chart.
+    /// </summary>
     public bool LastGround(List<Point3D> points)
     {
         points.Clear();
@@ -174,14 +214,17 @@ public sealed class NavRouteMemory
 
     public long Served { get; private set; }
 
+    /// <summary>Of those served, joined somewhere after the road's first node: the walker was already on it.</summary>
     public long Middles { get; private set; }
 
     public long Detoured { get; private set; }
 
     public long Missed { get; private set; }
 
+    /// <summary>A place matched but the goal could not be joined to the road's end from where it was asked.</summary>
     public long Unjoined { get; private set; }
 
+    /// <summary>A road crossed a cluster being drawn again: not served, not forgotten.</summary>
     public long Waiting { get; private set; }
 
     public long Bloodied { get; private set; }
@@ -196,24 +239,39 @@ public sealed class NavRouteMemory
 
     public long Declined { get; private set; }
 
+    /// <summary>Forgotten because a cluster they cross came out different.</summary>
     public long Invalidated { get; private set; }
 
+    /// <summary>Clusters drawn again the same, whose roads were kept and their node ids looked up afresh.</summary>
     public long Rejoined { get; private set; }
 
+    /// <summary>Roads planned round a shunned gate, forgotten when the shun ran out. See <see cref="Offer"/>.</summary>
     public long Expired { get; private set; }
 
+    /// <summary>Roads every place of which was taken by a cheaper one.</summary>
     public long Superseded { get; private set; }
 
     public long Evicted { get; private set; }
 
+    /// <summary>Forgotten by hand: a walker could not pass a gate on them, or a house went up or down beside them.</summary>
     public long Forgotten { get; private set; }
 
     public long DetoursStored { get; private set; }
 
+    /// <summary>Ways round dropped: past their time, the ground road quieter, or the way round bloodier than when drawn.</summary>
     public long DetoursDropped { get; private set; }
 
+    /// <summary>Roads read from the file at boot.</summary>
     public long Read { get; private set; }
 
+    // ------------------------------------------------------------------------------------------------ recall
+
+    /// <summary>
+    /// A remembered road from <paramref name="from"/> to <paramref name="to"/>, into <paramref name="points"/> (cleared
+    /// first) when the answer is <see cref="NavRecall.Served"/> or <see cref="NavRecall.Detoured"/>. <paramref name="danger"/>
+    /// is the hook the road is read against, null for none. <paramref name="anchorage"/> is the planner's own, so an end
+    /// stands where the planner would stand it.
+    /// </summary>
     public NavRecall Recall(
         NavGraph graph, NavWindowCache cache, int anchorage, Point3D from, Point3D to, List<Point3D> points, Func<int, int, int> danger
     )
@@ -267,6 +325,7 @@ public sealed class NavRouteMemory
         return NavRecall.Bloodied;
     }
 
+    /// <summary>The cheapest valid remembered ground road the two ends of the request in hand join.</summary>
     private bool Ground(NavGraph graph, out Candidate best)
     {
         best = default;
@@ -294,15 +353,19 @@ public sealed class NavRouteMemory
             Insert(new Candidate(place.Route, place.At, to, start + rest));
         }
 
+        // Cheapest first; the first that proves valid is the answer.
         for (var i = 0; i < _candidates.Count; i++)
         {
             var c = _candidates[i];
 
             if (c.Route.Slot < 0)
             {
+                // Forgotten by an earlier candidate's proof in this same call.
                 continue;
             }
 
+            // Planned round a gate a walker could not pass, and the gate is no longer shunned: planned again, and the new road
+            // offered in its place. A way round a shunned gate kept for good would be a detour served for ever.
             if (c.Route.Expires && Clock() - c.Route.Until >= 0)
             {
                 Expired++;
@@ -338,6 +401,7 @@ public sealed class NavRouteMemory
         return false;
     }
 
+    /// <summary>The way round the danger kept for this pair of clusters, when its reason still stands.</summary>
     private bool Round(NavGraph graph, long groundDanger, Func<int, int, int> danger, List<Point3D> points)
     {
         var key = DetourKey(graph.Id, _sc, _gc);
@@ -358,6 +422,10 @@ public sealed class NavRouteMemory
                 return false;
             }
 
+            // No bloodier than when it was drawn, and still quieter than the ground road for whoever is asking now: the reason to
+            // go round still stands. (Until 01.10.2026 this asked that the ground road be no quieter than when the detour was
+            // drawn; with the hook priced for the walker that asks — a company reads a road quieter than a bot alone — that
+            // dropped and redrew the same detour at every change of walker.)
             var detourDanger = Danger(detour, 0, detour.Count - 1, danger);
 
             if (proof == NavProof.Valid && detourDanger <= detour.DangerThen && detourDanger < groundDanger)
@@ -381,6 +449,10 @@ public sealed class NavRouteMemory
         return false;
     }
 
+    /// <summary>
+    /// Whether a planned route's nodes are all quiet under <paramref name="danger"/> (the start node excepted, as the
+    /// planners charge it), and the danger along it when not.
+    /// </summary>
     public static bool Quiet(NavGraph graph, IReadOnlyList<int> path, Func<int, int, int> danger, out long along)
     {
         along = 0;
@@ -398,6 +470,13 @@ public sealed class NavRouteMemory
         return along == 0;
     }
 
+    // ------------------------------------------------------------------------------------------------ offer
+
+    /// <summary>
+    /// A ground route just planned from <paramref name="from"/> to <paramref name="goal"/> (the cell the planner settled on),
+    /// as <paramref name="path"/> (<see cref="HierarchicalPlanner.LastPath"/>). Kept wherever it is cheaper than what is
+    /// remembered, or nothing is; never where it is dearer.
+    /// </summary>
     public NavOffer Offer(
         NavGraph graph, NavWindowCache cache, int anchorage, Point3D from, Point3D goal, IReadOnlyList<int> path, int expiresMs = 0
     )
@@ -454,6 +533,7 @@ public sealed class NavRouteMemory
 
             var held = place.Route;
 
+            // What is left of the remembered road from this node to the same goal, over the graph as it stands.
             if (held.Offer != _offer)
             {
                 held.Offer = _offer;
@@ -518,6 +598,10 @@ public sealed class NavRouteMemory
         return improved ? NavOffer.Improved : NavOffer.Stored;
     }
 
+    /// <summary>
+    /// A way round the danger just planned from <paramref name="from"/> to <paramref name="goal"/>, kept for this pair of
+    /// clusters for <see cref="DetourMs"/> beside the ground road, whose danger was <paramref name="groundDanger"/>.
+    /// </summary>
     public bool OfferDetour(
         NavGraph graph, NavWindowCache cache, int anchorage, Point3D from, Point3D goal, IReadOnlyList<int> path, long groundDanger,
         Func<int, int, int> danger
@@ -566,6 +650,13 @@ public sealed class NavRouteMemory
         return true;
     }
 
+    // ------------------------------------------------------------------------------------------------ forgetting
+
+    /// <summary>
+    /// The ground under a rectangle changed — a house raised or taken down. Every road and detour within a cluster of it is
+    /// forgotten: those that cross it would be found out by their signatures, but a house taken down may open a shortcut
+    /// beside a road that crosses nothing that changed, and a road that is no longer the cheapest is not worth keeping.
+    /// </summary>
     public void GroundChanged(NavGraph graph, int x1, int y1, int x2, int y2)
     {
         var minX = Math.Min(x1, x2) - NavGraph.Side;
@@ -587,6 +678,7 @@ public sealed class NavRouteMemory
         DropDetours(graph, r => r.MinX <= maxX && r.MaxX >= minX && r.MinY <= maxY && r.MaxY >= minY);
     }
 
+    /// <summary>A walker could not pass the gate at (x, y): every road and detour through it is forgotten.</summary>
     public void Shun(NavGraph graph, int x, int y)
     {
         for (var i = _routes.Count - 1; i >= 0; i--)
@@ -632,6 +724,9 @@ public sealed class NavRouteMemory
         Dirty = true;
     }
 
+    // ------------------------------------------------------------------------------------------------ the file
+
+    /// <summary>The roads of one graph as the file keeps them: arrays that never change once a road is made, shared, not copied.</summary>
     public List<NavRouteRecord> Records(NavGraph graph)
     {
         var records = new List<NavRouteRecord>();
@@ -640,17 +735,24 @@ public sealed class NavRouteMemory
         {
             var r = _routes[i];
 
+            // A road round a shunned gate is not kept past the boot: the shuns are not.
             if (r.GraphId == graph.Id && !r.Expires)
             {
                 records.Add(r.Record());
             }
         }
 
+        // Most lately used first, so a file read back orders the memory's clock the same way.
         records.Sort(static (a, b) => b.Used.CompareTo(a.Used));
 
         return records;
     }
 
+    /// <summary>
+    /// Roads read from a file, laid into the memory for <paramref name="graph"/>. Nothing is proved here: each road is proved
+    /// by its clusters' signatures the first time it is used, whenever the graph is ready for it. A place already held is
+    /// kept; the file is ordered most lately used first.
+    /// </summary>
     public int Adopt(NavGraph graph, IReadOnlyList<NavRouteRecord> records)
     {
         if (!Enabled || graph == null || records == null || !Fits(graph))
@@ -697,6 +799,12 @@ public sealed class NavRouteMemory
         return adopted;
     }
 
+    // ------------------------------------------------------------------------------------------------ the pieces
+
+    /// <summary>
+    /// Whether the clusters a road crosses between two of its nodes are as they were: by version, or failing that by
+    /// signature, when the node ids are looked up again from where the nodes stand.
+    /// </summary>
     private NavProof Prove(NavGraph graph, NavRememberedRoute route, int from, int to)
     {
         for (var k = route.RunOf[from]; k <= route.RunOf[to]; k++)
@@ -744,6 +852,10 @@ public sealed class NavRouteMemory
         return NavProof.Valid;
     }
 
+    /// <summary>
+    /// The cheapest node of the road's last run that the goal is reached from, at or after <paramref name="from"/>, and what
+    /// the road costs from <paramref name="from"/> to the goal by it.
+    /// </summary>
     private bool JoinGoal(NavGraph graph, NavRememberedRoute route, int from, out int to, out long rest)
     {
         to = -1;
@@ -770,6 +882,7 @@ public sealed class NavRouteMemory
         return to >= 0;
     }
 
+    /// <summary>The cheapest node of the road's first run that the start reaches, for a detour, and what it costs from there.</summary>
     private bool JoinStart(NavGraph graph, NavRememberedRoute route, out int from, out long cost)
     {
         from = -1;
@@ -796,6 +909,7 @@ public sealed class NavRouteMemory
         return from >= 0;
     }
 
+    /// <summary>What the danger hook charges along a road between two of its nodes, the first excepted as the planners except it.</summary>
     private static long Danger(NavRememberedRoute route, int from, int to, Func<int, int, int> danger)
     {
         if (danger == null)
@@ -813,10 +927,12 @@ public sealed class NavRouteMemory
         return along;
     }
 
+    /// <summary>The points of a road between two of its nodes, as <c>HierarchicalPlanner.Unwind</c> gives them.</summary>
     private static void Points(NavRememberedRoute route, int from, int to, List<Point3D> points)
     {
         for (var t = from; t <= to; t++)
         {
+            // The near side of a gate is a step before its far side, and the far side is the one worth walking to.
             if (t < to && route.RunOf[t + 1] != route.RunOf[t])
             {
                 continue;
@@ -826,6 +942,10 @@ public sealed class NavRouteMemory
         }
     }
 
+    /// <summary>
+    /// Joins the two ends of a request to their clusters as the planner joins them: each anchored within
+    /// <paramref name="anchorage"/>, the start's costs to every state of its cluster and the goal's from every state of its.
+    /// </summary>
     private bool Ends(NavGraph graph, NavWindowCache cache, int anchorage, Point3D from, Point3D to)
     {
         if (!graph.Contains(from.X, from.Y) || !graph.Contains(to.X, to.Y))
@@ -905,6 +1025,7 @@ public sealed class NavRouteMemory
         return own;
     }
 
+    /// <summary>A road from a planned path: its nodes where they stand, the ground cost along it, and its runs of clusters.</summary>
     private NavRememberedRoute Make(NavGraph graph, IReadOnlyList<int> path, int goal)
     {
         var n = path.Count;
@@ -970,6 +1091,7 @@ public sealed class NavRouteMemory
         return route;
     }
 
+    /// <summary>The cheapest edge from one node to another, or -1 when the graph has none.</summary>
     private static int Edge(NavGraph graph, int a, int b)
     {
         if (!graph.EdgesOf(a, out var to, out var cost, out var from, out var until))
@@ -1012,6 +1134,10 @@ public sealed class NavRouteMemory
         return sig;
     }
 
+    /// <summary>
+    /// A cluster's nodes and edges as one number, independent of node ids and of the order they were made in: two clusters
+    /// drawn from the same ground sign the same. Each node by where it stands; each edge by where it leads and its cost.
+    /// </summary>
     public static ulong Sign(NavGraph graph, int c)
     {
         var nodes = graph.NodesOf(c);
@@ -1115,6 +1241,7 @@ public sealed class NavRouteMemory
         Dirty = true;
     }
 
+    /// <summary>The least lately used roads go until the memory is inside both its bounds.</summary>
     private void Trim()
     {
         while (_routes.Count > 0 && (_routes.Count > Capacity || Nodes > NodeCapacity))
@@ -1134,6 +1261,7 @@ public sealed class NavRouteMemory
         }
     }
 
+    /// <summary>Whether the map is small enough for the places' keys: 8192 tiles a side and 131072 clusters.</summary>
     private static bool Fits(NavGraph graph) =>
         graph.Terrain.Width <= 8192 && graph.Terrain.Height <= 8192 && graph.ClustersX * graph.ClustersY <= 131072;
 
@@ -1148,6 +1276,10 @@ public sealed class NavRouteMemory
 
     private static long DetourKey(int graph, int start, int goal) => ((long)graph << 40) | ((long)start << 20) | (uint)goal;
 
+    /// <summary>
+    /// One line: what is kept, what was served, what was offered and what was forgotten. The price of a plan is the caller's to
+    /// say; see <c>NavigationService.Describe</c>.
+    /// </summary>
     public string Describe() =>
         !Enabled
             ? "routes are not remembered"
@@ -1169,6 +1301,7 @@ internal sealed class NavRememberedRoute
 {
     public readonly int GraphId;
 
+    /// <summary>The cluster the road ends in.</summary>
     public readonly int Goal;
 
     public readonly int Count;
@@ -1181,18 +1314,23 @@ internal sealed class NavRememberedRoute
 
     public readonly byte[] S;
 
+    /// <summary>The ground cost from the first node to each, in <see cref="NavCost"/> units.</summary>
     public readonly int[] Cum;
 
+    /// <summary>The run each node belongs to: a run is the nodes the road has in one cluster, one after another.</summary>
     public readonly int[] RunOf;
 
     public int[] RunCluster = [];
 
+    /// <summary>The first node of each run, and one more entry: the node count.</summary>
     public int[] RunStart = [];
 
     public ulong[] RunSig = [];
 
+    /// <summary>The loop's: the version each run's cluster had when last proved; -1 for never.</summary>
     public int[] RunStamp = [];
 
+    /// <summary>The loop's: node ids, looked up again from X, Y and S whenever a cluster is proved by signature.</summary>
     public readonly int[] Ids;
 
     public int MinX;
@@ -1207,10 +1345,13 @@ internal sealed class NavRememberedRoute
 
     public int Uses;
 
+    /// <summary>Places the index holds for this road; nought and it is dropped.</summary>
     public int Keys;
 
+    /// <summary>Where it stands in the memory's list; -1 once forgotten.</summary>
     public int Slot = -1;
 
+    /// <summary>The offer this road was last proved for, and what the proof said. See NavRouteMemory.Offer.</summary>
     internal int Offer;
 
     internal NavProof Standing;
@@ -1219,6 +1360,7 @@ internal sealed class NavRememberedRoute
 
     public long GroundDangerThen;
 
+    /// <summary>A detour always, a ground road only when planned while a gate was shunned: when it is to be forgotten.</summary>
     public bool Expires;
 
     public long Until;
@@ -1295,6 +1437,10 @@ internal sealed class NavRememberedRoute
             Used = Used
         };
 
+    /// <summary>
+    /// A road read from the file: nothing proved yet, every stamp -1 and every id unknown. Null when the record does not hold
+    /// together — a node outside the cluster its run names, a stratum the windows do not have — since the file is not trusted.
+    /// </summary>
     public static NavRememberedRoute From(NavGraph graph, NavRouteRecord record)
     {
         var n = record.X?.Length ?? 0;
@@ -1370,5 +1516,6 @@ public sealed class NavRouteRecord
 
     public int Uses;
 
+    /// <summary>The memory's clock when last used; not written, only for ordering what is.</summary>
     public long Used;
 }

@@ -39,12 +39,20 @@ public static class BotProvision
 {
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// Of the kit's bandages, the share a bot must carry. A quarter since 02.10.2026 (build 389): with the stand capped and the
+    /// dues taken only above the keep (Patrick's option 1), the guild pays for less of a poor member's supplies, and a bar at
+    /// half the kit would shut the companies — the island's whole income in gold — to the bots that most need them.
+    /// </summary>
     public static double BandageShare { get; set; } = 0.25;
 
+    /// <summary>Of each bottle its class carries, how many (at most the class's own count).</summary>
     public static int Bottles { get; set; } = 1;
 
+    /// <summary>Of the quiver it was born with, the share an archer must carry.</summary>
     public static double AmmoShare { get; set; } = 0.5;
 
+    /// <summary>How many casts of its key spell a caster must carry the reagents for.</summary>
     public static int Casts { get; set; } = 5;
 
     public static long Asked { get; private set; }
@@ -59,22 +67,28 @@ public static class BotProvision
 
     public static long NoHerbs { get; private set; }
 
+    /// <summary>Restocks the guild paid for, and what it paid.</summary>
     public static long Funded { get; private set; }
 
     public static long FundedGold { get; private set; }
 
+    /// <summary>Restocks the guild could not pay for either.</summary>
     public static long Unfunded { get; private set; }
 
     private static readonly Dictionary<int, Type[]> _herbs = [];
 
     private static readonly List<int> _spells = [];
 
+    /// <summary>Whether this bot carries what the threshold asks; <paramref name="why"/> says what it lacks when it does not.</summary>
+    /// <summary>Bandages cut out of cloth in the pack instead of bought. See BotWeave.Bandages.</summary>
     public static long Cut { get; private set; }
 
     public static bool Fit(Mobile body, out string why) => Check(body, true, out why);
 
+    /// <summary>The same question, not counted: for the shopper, which asks it far more often than any door.</summary>
     public static bool Short(Mobile body) => !Check(body, false, out _);
 
+    /// <summary>What a bandage, a bottle, a herb and a scroll are guessed to cost when the market has priced none.</summary>
     public static int BandageGuess { get; set; } = 5;
 
     public static int BottleGuess { get; set; } = 15;
@@ -83,6 +97,12 @@ public static class BotProvision
 
     public static int ScrollGuess { get; set; } = 10;
 
+    /// <summary>
+    /// What it would cost this bot, now, to carry what the threshold asks: the bandages, bottles and reagents it lacks at the
+    /// market's price for each. Asked of a bot that has just died, with its pack on the corpse, it is the bill the next door
+    /// will present — see <c>BotYield.Settle</c> (02.10.2026, build 389; Patrick's option 4). Ammunition is left out: it is
+    /// bound by count and comes back with the bot.
+    /// </summary>
     public static int Bill(Mobile body)
     {
         if (!Running || body is not BotMobile bot || bot.Class is not { } klass || bot.Backpack is not { } pack)
@@ -139,6 +159,11 @@ public static class BotProvision
         return bill;
     }
 
+    /// <summary>
+    /// What one cast of <paramref name="spell"/> costs this bot in goods: the scroll it would spend, or the herbs its book
+    /// would burn, at the market's price. One at the least, so a cap reckoned from it never divides by nothing. See
+    /// <c>BotSlay.Thrifty</c> (02.10.2026, build 389; Patrick's option 4).
+    /// </summary>
     public static int CastCost(Mobile bot, int spell)
     {
         if (bot == null || spell < 0)
@@ -194,6 +219,7 @@ public static class BotProvision
             var need = (int)Math.Ceiling(kit.Bandages * BandageShare);
             var have = pack.GetAmount(typeof(Bandage));
 
+            // Cloth and scissors in the pack are bandages a bot can cut itself (BotWeave.Bandages, 29.09.2026).
             if (have < need && pack.GetAmount(typeof(Cloth)) > 0)
             {
                 Cut += BotWeave.Bandages(body, need - have);
@@ -285,6 +311,10 @@ public static class BotProvision
         return false;
     }
 
+    /// <summary>
+    /// The spells whose reagents a bot must carry: a caster's strongest attack in its book; a healer's greater heal (or its
+    /// heal) and its cure; anybody else whose kit carries reagents, its heal. A book that holds none of them asks for none.
+    /// </summary>
     private static void Key(Mobile bot, BotClass klass, List<int> spells)
     {
         spells.Clear();
@@ -332,6 +362,7 @@ public static class BotProvision
         }
     }
 
+    /// <summary>The reagents one cast of a spell takes, read off the engine's own spell once and kept.</summary>
     private static Type[] Herbs(Mobile bot, int spell)
     {
         if (_herbs.TryGetValue(spell, out var herbs))
@@ -345,6 +376,32 @@ public static class BotProvision
         return herbs;
     }
 
+    /// <summary>
+    /// The key spells (<see cref="Key"/>) and, for a class that is not a caster but carries reagents, the attack it should be
+    /// stocking too: the highest attack its book holds at or below <see cref="BotStrike.Stock"/>'s circle, so its Magery and its
+    /// pool decide, and nothing when Stock has nothing. The spells whose herbs <see cref="Floor"/> asks for.
+    ///
+    /// <para>
+    /// <b>A healer's one attack was nobody's errand (08.10.2026, cast30).</b> The Healer's kit is heal, cure and magic arrow, the
+    /// Warrior-Mage's heal and magic arrow, and magic arrow burns sulphurous ash — which neither class's key spells name. So the
+    /// floor asked a healer for garlic, ginseng and silk and a warrior-mage for its heal's herbs, and the ash came only out of a
+    /// purse above its keep, which a poor bot has not got. In the save of 01:35 on 08.10.2026, 2 of 21 Healers carried any ash and
+    /// 15 of 26 Warrior-Mages had herbs for none of their attacks; in the arena that night 17 of 19 Healer bouts threw nothing.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Who reads it, and who does not (cast30 reviews A2/B F3).</b> <see cref="Floor"/> carries it, and so do its readers:
+    /// <c>BotShopper.ByPurse</c> (the attack's herbs are bought out of the bot's own purse whatever its keep — never out of the
+    /// guild's: <c>Fund</c> is sized by <see cref="DoorFloor"/>), <c>BotShopper.Wanting</c> (floor reagents first),
+    /// <c>BotAskFirst.Sized</c> (the same purse sum without the guild) and <c>BotAskFirst.Urgent</c> (a bot with none of its attack's
+    /// herbs walks to a counter rather than waiting on a carrier — kept: a caster with nothing to throw is as urgent as one with no
+    /// heal), and <c>BotQuartermaster</c>'s surplus allowance (no change: the kit's keep of 30 is above it). <b>Not</b> the guild
+    /// store: <c>BotGuildStore.Lacks</c> and <c>Issue</c> read <see cref="DoorFloor"/>, so the store never issues the attack's herbs
+    /// as a debt that would stand in front of the next heal-kit draw. Nor the doors: <see cref="Check"/> and <see cref="Bill"/>
+    /// read <see cref="Key"/> alone, so no healer is turned away from a delve for want of ash. No reagent is handed out by any of
+    /// this.
+    /// </para>
+    /// </summary>
     private static void Armed(Mobile bot, BotClass klass, List<int> spells)
     {
         Key(bot, klass, spells);
@@ -362,8 +419,20 @@ public static class BotProvision
         }
     }
 
+    /// <summary>
+    /// <see cref="Floor"/> without the attack <see cref="Armed"/> adds for a class that is not a caster: the doors' own threshold, the
+    /// part the guild pays for (<c>BotShopper.ByPurse</c>) and the guild store issues (<c>BotGuildStore</c>). Cast30 reviews A1/B F2:
+    /// the guild was paying for a poor healer's ash while the garlic that made it needy stayed unbought.
+    /// </summary>
     public static int DoorFloor(Mobile body, Type kind) => Floor(body, kind, false);
 
+    /// <summary>
+    /// How many of this kind the threshold asks this bot to carry: a quarter of the kit's bandages, a bottle of each kind its class
+    /// carries, half the quiver it was born with, <see cref="Casts"/> of each reagent its key spells burn — and, for a class that
+    /// is not a caster, its strongest attack's (<see cref="Armed"/>, 08.10.2026, cast30); nought for anything else. Read by the
+    /// shopper, which buys up to this whatever the purse and the rest of the kit only above the keep (<c>BotShopper.ByPurse</c>,
+    /// 02.10.2026, build next).
+    /// </summary>
     public static int Floor(Mobile body, Type kind) => Floor(body, kind, true);
 
     private static int Floor(Mobile body, Type kind, bool armed)
@@ -423,10 +492,16 @@ public static class BotProvision
         return 0;
     }
 
+    /// <summary>Whether this is one of the things the threshold asks for: bandages, bottles, reagents, ammunition.</summary>
     public static bool Consumable(Type kind) =>
         kind != null && (kind == typeof(Bandage) || typeof(BasePotion).IsAssignableFrom(kind)
             || typeof(BaseReagent).IsAssignableFrom(kind) || kind == typeof(Arrow) || kind == typeof(Bolt));
 
+    /// <summary>
+    /// Makes sure this bot can pay <paramref name="cost"/>: what it lacks comes out of its guild's chest (tolls and tithes),
+    /// then from its guildmates (<c>BotGuilds.Stand</c>), into its bank, where every purchase on this shard is paid from.
+    /// False when neither could cover it, or the bot has no guild.
+    /// </summary>
     public static bool Fund(Mobile body, int cost)
     {
         var short0 = cost - BotYield.Spendable(body);
@@ -445,6 +520,8 @@ public static class BotProvision
 
         var paid = 0;
 
+        // Only what the chest can spare above what its guild is saving for: supplies come out of the members' spare as they
+        // always did, and the dues saved for a hall stay saved. See BotDues.Goal (29.09.2026).
         var spare = BotDues.Spare(guild);
 
         if (spare < short0)
@@ -485,6 +562,7 @@ public static class BotProvision
             paid += rest;
         }
 
+        // Handed over by the guild, and not the takings of whatever the bot is in the middle of. See BotYield.Aside.
         BotYield.Aside(bot, -paid);
         Funded++;
         FundedGold += paid;

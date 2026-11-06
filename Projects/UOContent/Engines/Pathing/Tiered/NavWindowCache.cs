@@ -10,6 +10,7 @@ namespace Server.Engines.Pathing.Tiered;
 /// </summary>
 public sealed class NavWindowCache
 {
+    /// <summary>Windows kept.</summary>
     public int Capacity { get; set; } = 64;
 
     private readonly Dictionary<long, NavWindow> _windows = new();
@@ -22,6 +23,7 @@ public sealed class NavWindowCache
 
     private static long Key(NavGraph graph, int cluster) => ((long)graph.Id << 32) | (uint)cluster;
 
+    /// <summary>A window over <paramref name="cluster"/> of <paramref name="graph"/>, probed as far as it has been before.</summary>
     public NavWindow Get(NavGraph graph, int cluster)
     {
         var key = Key(graph, cluster);
@@ -62,6 +64,7 @@ public sealed class NavWindowCache
         return window;
     }
 
+    /// <summary>Drops the windows over the clusters a rectangle of <paramref name="graph"/> touches, and the ring round them.</summary>
     public void Invalidate(NavGraph graph, int x1, int y1, int x2, int y2)
     {
         var cx1 = x1 / NavGraph.Side - 1;

@@ -29,10 +29,13 @@ public sealed class BotTravel : BotDeed
 
     public const string Trade = "travel";
 
+    /// <summary>What a journey is worth a minute. Eight: above the walk home's five, below any trade.</summary>
     public static double Prior { get; set; } = 8.0;
 
+    /// <summary>How long a traveller walks before it gives up. Twenty-five minutes: Yew is some fifteen hundred steps from Britain.</summary>
     public static int MarchMs { get; set; } = 1500000;
 
+    /// <summary>How near the square counts as arriving.</summary>
     public static int Arrival { get; set; } = 10;
 
     public static long Journeys { get; private set; }
@@ -51,10 +54,13 @@ public sealed class BotTravel : BotDeed
 
     private long _began;
 
+    /// <summary>The traveller's footprints every <c>BotRoadbook.TrackStep</c> tiles, offered to the roadbook on arriving.</summary>
     private readonly List<Point3D> _track = [];
 
+    /// <summary>Whether the walk jumped — a gate, a death — and is not a road.</summary>
     private bool _broken;
 
+    /// <summary>The recall that may carry a mage there instead of the road. See <see cref="BotRecall"/>.</summary>
     private BotRecall _recall;
 
     public BotTravel(Map map, BotTowns.Town town, string from)
@@ -78,6 +84,7 @@ public sealed class BotTravel : BotDeed
 
     public override int Outlay => 0;
 
+    /// <summary>Counted as coin, and it produces none — flight's lie, for flight's reason: a bot born poor must still be able to go.</summary>
     public override double Coin => 1.0;
 
     public override int Made => 0;
@@ -118,6 +125,7 @@ public sealed class BotTravel : BotDeed
             return BotDoing.Failed($"could not reach {_town.Name} from {_from} in {MarchMs / 60000} minutes");
         }
 
+        // Runes (29.09.2026): a mage holding a rune for the town recalls instead of walking; the road is then not walked. See BotRecall.
         if (BotRecall.Instead(bot, _map, _town.Square, Arrival, _town.Name, ref _recall) is { } cast)
         {
             return cast;
@@ -126,12 +134,14 @@ public sealed class BotTravel : BotDeed
         return BotDoing.Walk(_map, _town.Square, BotArrival.Within(Arrival), $"to {_town.Name} by the road");
     }
 
+    /// <summary>In the square: the road is walked, and the guild is told what it was like.</summary>
     private BotDoing Arrive(Mobile body)
     {
         Arrived++;
         _town.Arrivals++;
 
         var minutes = (Core.TickCount - _began) / 60000.0;
+        // A recall is not a road walked: the book counts only feet (BotRecall.Moved). Runes (29.09.2026).
         var road = _recall is { Moved: true } ? BotRoadbook.Between(_from, _town.Name) : BotRoadbook.Walked(_from, _town.Name, _broken ? null : _track);
         var safety = road != null ? BotRoadbook.Safety(road) : BotQuad.Fresh;
         var band = BotQuad.Band(safety);
@@ -171,6 +181,7 @@ public sealed class BotTravel : BotDeed
         return BotDoing.Done($"in {_town.Name} after {minutes:F0} minutes on the road from {_from}, which reads {band}");
     }
 
+    /// <summary>A footprint, every <c>BotRoadbook.TrackStep</c> tiles; a jump further than a walk breaks the track.</summary>
     private void Track(Point3D at)
     {
         if (_track.Count == 0)
@@ -213,14 +224,27 @@ public sealed class BotTraveller : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTraveller));
 
+    /// <summary>How long one bot waits between journeys. Two hours.</summary>
     public static int EveryMs { get; set; } = 7200000;
 
+    /// <summary>The furthest town offered, as the crow flies.</summary>
     public static int Furthest { get; set; } = 1800;
 
+    /// <summary>How much likelier a road nobody has walked is than one walked once. The weight is 1 / (1 + walked / this).</summary>
     public static double Curiosity { get; set; } = 2.0;
 
+    /// <summary>
+    /// The least of its class's targets a bot must have reached before it is offered a journey. Fifteen hundredths: in the
+    /// first ten minutes of the wiped world (29.09.2026, 01:35) twelve newcomers died on the road — Elenwe on the way to
+    /// Trinsic among them — of the 58 deaths in all. A novice sees the next town when it can walk the road.
+    /// </summary>
     public static double LeastProgress { get; set; } = 0.15;
 
+    /// <summary>
+    /// How much stronger than the worst the road asks (<see cref="BotRoadbook.Asks"/>) a traveller must be. Half again, the
+    /// tolerance the shard uses for every fight it chooses. Five travellers died on the roads in the first twenty minutes of
+    /// build 279 with the progress gate alone: the roads round Britain run past trolls, reapers and gazers.
+    /// </summary>
     public static double Odds { get; set; } = 1.5;
 
     public static long Green { get; private set; }
@@ -239,6 +263,7 @@ public sealed class BotTraveller : IBotProposer
 
     public static long Offered { get; private set; }
 
+    /// <summary>Traders standing in the capital not offered a journey away from it. See <see cref="BotCapital.Trader"/>.</summary>
     public static long KeptAtCapital { get; private set; }
 
     private static readonly Dictionary<Serial, long> _last = [];
@@ -310,6 +335,10 @@ public sealed class BotTraveller : IBotProposer
         var here = BotTowns.Nearest(body.Location);
         var from = here?.Name ?? "the wild";
 
+        // <b>A trader is at the centre of trade already, and stays (30.09.2026, Patrick's evening order: «the traders must
+        // put Britain first as the centre of trade»).</b> A bot holding a shop's worth of what the island asks for, standing
+        // in the capital, is where its customers and the capital's counters are; a journey for its own sake would carry the
+        // shop away from them. See BotCapital.Trader.
         var capital = BotCapital.Town;
         var trader = capital != null && BotCapital.Trader(who);
 
@@ -320,6 +349,8 @@ public sealed class BotTraveller : IBotProposer
             return null;
         }
 
+        // The sea (BotSea, Patrick's point 7 of 29.09.2026): a town no road reaches is sailed to, by chance against the
+        // road's towns, and a bot on a land no road joins to home travels by sea or not at all. Not decided: the roads, as before.
         if (BotSea.Travel(bot, here, from, out var voyage))
         {
             Offered += voyage != null ? 1 : 0;
@@ -352,6 +383,7 @@ public sealed class BotTraveller : IBotProposer
                 continue;
             }
 
+            // The road is measured against the walker: what the worst of its ground asks, against the bot's own strength.
             if (road != null && BotRoadbook.Asks(road) * Odds > power)
             {
                 outmatched++;
@@ -379,6 +411,11 @@ public sealed class BotTraveller : IBotProposer
 
         BotTowns.Town picked = null;
 
+        // <b>And a trader elsewhere takes its goods to the capital (30.09.2026).</b> The journey is offered at the same moments and
+        // behind the same gates as any other — a trade far enough along, fit, supplied, two hours since the last, a road not past
+        // its strength (Odds) and within Furthest — so no bot takes a road it would not have taken; only where it leads changes.
+        // On arriving it is within BotShopkeeper.ShiftReach of the capital's bank, so its shift is offered there, and its loads go
+        // to the capital's counters as the nearest. A trader whose road to the capital is not on offer travels as before.
         if (trader)
         {
             for (var i = 0; i < towns.Count; i++)

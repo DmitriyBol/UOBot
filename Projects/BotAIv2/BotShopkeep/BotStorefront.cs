@@ -35,50 +35,67 @@ public sealed class BotStorefront
         OpenedTick = Core.TickCount;
     }
 
+    /// <summary>The bot behind the counter.</summary>
     public BotMobile Keeper { get; }
 
+    /// <summary>The shift this shop belongs to. A shop whose keeper is holding anything else is shut. See <see cref="BotShopkeep.Live"/>.</summary>
     public BotDeed Deed { get; }
 
     public Map Map { get; }
 
+    /// <summary>Where the keeper stands: a tile a few steps from the banker. Fixed for the shift, so a customer's walk is stable.</summary>
     public Point3D Location { get; }
 
+    /// <summary>The banker the pitch was chosen beside. Two shops beside one banker keep <see cref="BotShopkeep.Apart"/> tiles between them.</summary>
     public Point3D Bank { get; }
 
+    /// <summary>The town the bank stands in, by the region's name; "the country" outside every town.</summary>
     public string Town { get; }
 
     public long OpenedTick { get; }
 
+    /// <summary>Set when the shift ends or is put down. A shut shop is taken off the list on the same beat.</summary>
     public bool Shut { get; internal set; }
 
+    /// <summary>When the stock was last counted.</summary>
     public long StockedTick { get; internal set; }
 
+    /// <summary>Things on show at the last count, and what they come to at the keeper's asks.</summary>
     public int Units { get; private set; }
 
     public int Worth { get; private set; }
 
+    /// <summary>Of <see cref="Worth"/>, what the population is short of or has money down for (<see cref="BotShopkeep.Demanded"/>).</summary>
     public int Demanded { get; private set; }
 
+    /// <summary>What was demanded when the shop opened: the denominator of the measured sell-through. See <see cref="BotShopkeep.Share"/>.</summary>
     public int Shown { get; internal set; }
 
     public int Kinds => _units.Count;
 
+    /// <summary>Things sold this shift, sales made, and the coin taken for them.</summary>
     public int Sold { get; private set; }
 
     public int Sales { get; private set; }
 
     public int Takings { get; private set; }
 
+    /// <summary>Different bots served this shift.</summary>
     public int Customers => _customers.Count;
 
+    /// <summary>How many of this kind were on show at the last count, less what has sold since.</summary>
     public int Held(Type kind) => kind != null && _units.TryGetValue(kind, out var units) ? units : 0;
 
+    /// <summary>What the keeper asks for one of this kind, or nought when it is not on show.</summary>
     public int Ask(Type kind) => kind != null && _asks.TryGetValue(kind, out var price) ? price : 0;
 
+    /// <summary>Whether any of this kind sold this shift. Read at the close, where a kind nobody bought is marked down.</summary>
     public bool SoldAny(Type kind) => kind != null && _sold.ContainsKey(kind);
 
+    /// <summary>The kinds on show, for the close and for the page.</summary>
     public IEnumerable<Type> Goods => _units.Keys;
 
+    /// <summary>A fresh count. The dictionaries are copied, never kept, so the caller may reuse its own.</summary>
     internal void Restock(Dictionary<Type, int> units, Dictionary<Type, int> asks, int demanded)
     {
         _units.Clear();
@@ -106,6 +123,7 @@ public sealed class BotStorefront
         StockedTick = Core.TickCount;
     }
 
+    /// <summary>A sale, written into the snapshot at once, so the next customer's arithmetic does not count goods already gone.</summary>
     internal void Took(Mobile buyer, Type kind, int units, int gold)
     {
         if (units <= 0 || kind == null)
@@ -144,6 +162,7 @@ public sealed class BotStorefront
         }
     }
 
+    /// <summary>A price moved during the shift. The snapshot follows at once rather than at the next count.</summary>
     internal void Priced(Type kind, int price)
     {
         if (kind != null && price > 0 && _asks.ContainsKey(kind))
@@ -152,6 +171,7 @@ public sealed class BotStorefront
         }
     }
 
+    /// <summary>The kinds on show, dearest stock first, with their counts and asks: for the page and the cry.</summary>
     public List<(Type Kind, int Units, int Ask)> Ranked()
     {
         List<(Type Kind, int Units, int Ask)> ranked = [];

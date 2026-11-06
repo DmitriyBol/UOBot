@@ -34,6 +34,7 @@ public static class BotSocialTalk
             ["answer:thanks"] = ["Thank you, {other}.", "Kind of you, {other}.", "Aye. Thanks, {other}.", "I'll remember that, {other}."]
         };
 
+    /// <summary>Puts the defaults into the voice's bank, each only where the bank has nothing for that occasion. Returns how many were added.</summary>
     public static int Phrases()
     {
         var added = 0;

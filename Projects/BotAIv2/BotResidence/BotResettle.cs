@@ -33,8 +33,10 @@ public sealed class BotResettle : BotDeed
 
     public const string Trade = "resettle";
 
+    /// <summary>What moving house is worth a minute. Ten: above a journey for its own sake (eight) and the walk home (five), below any trade.</summary>
     public static double Prior { get; set; } = 10.0;
 
+    /// <summary>Moves set out on, and how they ended.</summary>
     public static long Began { get; private set; }
 
     public static long Arrived { get; private set; }
@@ -83,6 +85,7 @@ public sealed class BotResettle : BotDeed
 
     public override SkillName? Trains => null;
 
+    /// <summary>The walk, honestly, as the walk home declares it. See the class.</summary>
     public override double Minutes =>
         Math.Max(0.2, Math.Sqrt(Math.Pow(Where.X - _at.X, 2) + Math.Pow(Where.Y - _at.Y, 2)) * BotWalk.StepDelayMs(BotMobile.Runs) / 60000.0);
 
@@ -106,6 +109,7 @@ public sealed class BotResettle : BotDeed
         rec.Moves++;
         rec.Deaths.Clear();
 
+        // Its living is judged afresh in the new town, from the next look.
         rec.Watched = false;
 
         Began++;

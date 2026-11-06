@@ -31,16 +31,29 @@ public static class BotSea
 
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// The chance that a traveller on home's land who could sail is offered a town across the sea rather than one by road. A
+    /// quarter: six sea towns against ten road towns, and a voyage is a quarter of an hour at the least.
+    /// </summary>
     public static double Share { get; set; } = 0.25;
 
+    /// <summary>The longest voyage offered, in tiles of walk and sea together. Britain to Skara Brae round the south is 5,568.</summary>
     public static int Furthest { get; set; } = 8000;
 
+    /// <summary>Whether a bot's guild stands what it lacks for a ship, from its chest and its members, as for supplies.</summary>
     public static bool GuildPays { get; set; } = true;
 
+    /// <summary>Whether a bot that cannot afford a ship is handed one for nothing. For trials on a young world; off.</summary>
     public static bool Grant { get; set; }
 
+    /// <summary>What a small ship costs where no shopkeeper selling one is known yet: <c>SBShipwright</c>'s and <c>SBProvisioner</c>'s price.</summary>
     public static int ListPrice { get; set; } = 10177;
 
+    /// <summary>
+    /// An order by hand, through the debugger's door: <c>dial BotSea.Order Adela to Moonglow</c> presses that bot to sail
+    /// there now (<see cref="BotWill.Press"/>), whatever it was doing, and the answer is in the log. Read and cleared by the
+    /// survey's clock.
+    /// </summary>
     public static string Order { get; set; } = "";
 
     public static bool Ready => BotSeaLanes.Ready;
@@ -57,16 +70,48 @@ public static class BotSea
 
     public static long Ordered { get; private set; }
 
+    /// <summary>
+    /// Travellers not offered a voyage because they hold no ship and the journey would have had to buy one. See
+    /// <see cref="Owns"/>: a journey pays nothing, so no voyage on this island pays a ship back.
+    /// </summary>
     public static long Shipless { get; private set; }
 
+    /// <summary>Colonists on their colony's island not offered a journey by sea: the ship they may hold is the colony's (07.10.2026).</summary>
     public static long ColonyKept { get; private set; }
 
+    /// <summary>Lanes passed over by a traveller or a trader because they have lost more voyages than they delivered. See <see cref="Shut"/>.</summary>
     public static long LanesShut { get; private set; }
 
+    /// <summary>
+    /// Whether this bot holds a ship of its own (or one is handed over, <see cref="Grant"/>): the only way a journey or a trader's
+    /// haul sails.
+    ///
+    /// <para>
+    /// <b>No voyage on this island pays a ship back (06.10.2026, money15).</b> On 04.10 (build 400, 04:20–15:37) nine small ships
+    /// were bought at 10,177gp each and three more in the evening, 122,124gp in all; every one was bought by "took on voyage:
+    /// looking for a ship", the traveller's journey (<see cref="Travel"/>), which is worth eight a minute of curiosity and pays no
+    /// coin (the six arrivals: "0 coin" each). Not one was bought for a trader's haul. The ships did not last: thirteen lie at
+    /// anchor, twelve of them on the way to Nujel'm ((3514–3546, 1066–1087), (3346, 1246)) and one at (3012, 748), left there when the captain died
+    /// aboard or was wrecked and the engine refused the dry-dock for want of the key ("NoKey"), so the next journey bought
+    /// another (Norna twice in seven hours). A ship is no longer bought for a voyage that pays nothing: a journey sails only
+    /// in a ship the bot holds. The one buyer left is the way home from an island (<see cref="BotSeafarer"/>), where the sea is
+    /// the only way off and nothing else will take the bot home, and an order by hand.
+    /// </para>
+    /// </summary>
     public static bool Owns(Mobile body) => body != null && (Grant || BotHelm.ShipOf(body) != null);
 
+    /// <summary>
+    /// Whether a lane has lost more voyages than it has delivered — a death aboard, a wreck, a ship put back — and is passed over
+    /// by those who choose to sail. The memory is the session's (<see cref="BotSeaLane.Lost"/>): the island's measure of a way
+    /// that kills its sailors, as the failure of a road is remembered against the road.
+    /// </summary>
     public static bool Shut(BotSeaLane lane) => lane != null && lane.Lost > lane.Sailed;
 
+    /// <summary>
+    /// The traveller's hook. True when the sea has decided — <paramref name="voyage"/> is the voyage, or null for "nothing" —
+    /// and false to leave the choice to the roads as before. A bot at sea is decided (nothing); a bot on home's land is
+    /// asked by <see cref="Share"/>; a bot on an island always.
+    /// </summary>
     public static bool Travel(IBotWilful bot, BotTowns.Town here, string from, out BotDeed voyage)
     {
         voyage = null;
@@ -84,6 +129,7 @@ public static class BotSea
             return true;
         }
 
+        // A colonist on its colony's island holding the colony's ship sails it home with the goods, not on a journey (sea20).
         if (BotColonies.OnShift(body))
         {
             ColonyKept++;
@@ -105,6 +151,8 @@ public static class BotSea
             Islanders++;
         }
 
+        // A journey pays no coin, so it never buys a ship: only a bot that holds one is offered the sea. See Owns. Asked
+        // before the lanes are weighed, which also spares the planning for the many who hold none.
         if (!Owns(body))
         {
             Shipless++;
@@ -178,6 +226,13 @@ public static class BotSea
         return true;
     }
 
+    /// <summary>
+    /// The dock to set out from for <paramref name="to"/>: of the docks a walker at <paramref name="at"/> can reach, the one
+    /// that makes walk and voyage together shortest — a bot at Britain bound for Skara Brae walks to Yew's dock rather than
+    /// sail round the continent. <paramref name="tiles"/> is the walk plus the lane. <paramref name="wary"/>: a lane that has
+    /// lost more voyages than it delivered is passed over (<see cref="Shut"/>) — by those who choose to sail, not by a bot whose
+    /// only way home is the sea.
+    /// </summary>
     public static bool Plan(Map map, Point3D at, BotDock to, out BotDock from, out BotSeaLane lane, out int tiles, bool wary = false)
     {
         from = null;
@@ -209,6 +264,8 @@ public static class BotSea
                 continue;
             }
 
+            // A walker makes about as many tiles a second as a ship: running bots step every 200ms, the ship three tiles
+            // every 750ms. Counted alike.
             var cost = BotHelm.Away(at, dock.Shore) + way.Tiles;
 
             if (cost < tiles)
@@ -222,6 +279,11 @@ public static class BotSea
         return from != null;
     }
 
+    /// <summary>
+    /// Whether this bot has a ship or could have one: in its pack, within its purse, within what its guild could stand, or
+    /// handed over (<see cref="Grant"/>). Asked before a voyage is offered, so a bot is not sent to a shipwright to be
+    /// turned away.
+    /// </summary>
     public static bool CanSail(BotMobile body)
     {
         if (body == null)
@@ -254,6 +316,8 @@ public static class BotSea
             return false;
         }
 
+        // What the guild could stand, as BotProvision.Fund would draw it: the chest above what it saves for (BotDues.Spare),
+        // then each member's purse above what it keeps back.
         var could = have + BotDues.Spare(guild);
 
         for (var i = 0; i < guild.Members.Count && could < price; i++)
@@ -267,6 +331,7 @@ public static class BotSea
         return could >= price;
     }
 
+    /// <summary>The order by hand, if one was written. See <see cref="Order"/>.</summary>
     public static void Obey()
     {
         var order = Order;
@@ -311,6 +376,7 @@ public static class BotSea
         }
 
         var here = BotTowns.Nearest(bot.Location);
+        // An order by hand may buy the ship it needs: somebody asked for this voyage by name.
         var voyage = new BotVoyage(bot.Map, from, dock, lane, town, town.Square, here?.Name ?? "the wild", false, null, true);
 
         if (BotWill.Press(bot, voyage, "ordered to sea by hand (BotSea.Order)"))
@@ -321,6 +387,7 @@ public static class BotSea
         }
     }
 
+    /// <summary>The summary line: the three numbers that matter first, then every part's own account.</summary>
     public static string Describe() =>
         !Running
             ? "the sea is off"
@@ -328,6 +395,7 @@ public static class BotSea
               + $"{BotSeaChart.Describe()}; {BotDocks.Describe()}; {BotSeaLanes.Describe()}; asked {Asked} travellers ({Islanders} on an island): {Shipless} holding no ship, which a journey does not buy (it pays 0gp: no voyage here pays a ship back), {Offered} offered a voyage, {Nowhere} with nowhere to sail, {ColonyKept} colonists kept to their colony; {LanesShut} lanes passed over for losing more voyages than they delivered ({ShutLanes()}); "
               + $"{BotSeafarer.Describe()}; {Ordered} ordered by hand; {BotVoyage.Describe()}; {BotHelm.Describe()}; {BotSeaCourse.Describe()}; {BotColonies.Describe()}";
 
+    /// <summary>The lanes shut now, by their docks and their record, for the line.</summary>
     private static string ShutLanes()
     {
         var lanes = BotSeaLanes.All;
@@ -395,6 +463,7 @@ public sealed class BotSeafarer : IBotProposer
 
     public static long Sent { get; private set; }
 
+    /// <summary>Colonists on their colony's island, not offered the way home: the colony's ship takes them at their shift's end.</summary>
     public static long Colonists { get; private set; }
 
     public string Name => "Seafarer";
@@ -416,6 +485,7 @@ public sealed class BotSeafarer : IBotProposer
             return null;
         }
 
+        // A colonist on its colony's island is at work there, not stranded: it goes home on the colony's own ship (BotColonyRun).
         if (BotColonies.OnShift(body))
         {
             Colonists++;
@@ -483,6 +553,7 @@ public sealed class BotSeafarer : IBotProposer
 
         Sent++;
 
+        // The way home from an island may still buy its ship: the sea is the only way off, and a bot left there has nothing.
         return new BotVoyage(map, start, end, lane, null, hearth, BotTowns.Nearest(body.Location)?.Name ?? "the wild", true, null, true);
     }
 

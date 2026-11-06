@@ -33,18 +33,26 @@ public sealed class BotClaimStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotClaimStore));
 
+    /// <summary>
+    /// The shape of what is written below. 2 (06.10.2026, build 408): each claim being made carries the price held for it
+    /// (<c>BotClaim.Bid.Escrow</c>), and the failed musters still resting follow the claims, so neither a held price nor a
+    /// square's rest is lost to a restart. A shape-1 save reads as claims that hold nothing — they paid when declared.
+    /// </summary>
     private const int Shape = 2;
 
     private const int Oldest = 1;
 
     private static BotClaimStore _store;
 
+    /// <summary>Registered from <c>BotCore.Configure</c>: a persistence must exist before the world loads.</summary>
     public static void Configure() => _store ??= new BotClaimStore();
 
+    /// <summary>The priority is only an ordering among save files; nothing else depends on it.</summary>
     public BotClaimStore() : base("BotClaims", 14)
     {
     }
 
+    /// <summary>Squares read back from the last save, for the start-up line to report.</summary>
     public static int Restored { get; private set; }
 
     public override void Serialize(IGenericWriter writer)
@@ -91,6 +99,7 @@ public sealed class BotClaimStore : GenericPersistence
             writer.WriteEncodedInt(bid.Escrow);
         }
 
+        // A held price still owed to a chest from the last boot is written as a claim, and is owed again on the next.
         for (var i = 0; i < owed.Count; i++)
         {
             writer.WriteEncodedInt(owed[i].Key.Map);
