@@ -6,32 +6,14 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A picture of the map for the page to draw the bots on, made from the client's own radar colours.
-///
-/// <para>
-/// <b>Drawn in slices on the game loop, encoded off it.</b> The tile matrix is not safe to read from
-/// another thread, so the sampling runs here a few rows at a time; the PNG encoding is pure arithmetic over
-/// a byte array and goes to the thread pool. Once the file is on disk it is not drawn again until the map
-/// files change, because a shard restarts often and the picture does not.
-/// </para>
-///
-/// <para>
-/// <b>Statics over land, top one wins.</b> That is what the client's radar does: a road, a house or a tree
-/// shows in its own colour, and bare ground in the land tile's. The colours come from <c>radarcol.mul</c>,
-/// sixteen bits each, in the client folder the server already knows.
-/// </para>
-/// </summary>
 public static class BotWebMap
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWebMap));
 
     public static bool Enabled { get; set; } = true;
 
-    /// <summary>Tiles per pixel.</summary>
     public static int Scale { get; set; } = 4;
 
-    /// <summary>Rows of pixels sampled per slice of the loop.</summary>
     public static int RowsPerSlice { get; set; } = 12;
 
     public static bool Ready { get; private set; }
@@ -62,12 +44,6 @@ public static class BotWebMap
 
     private static readonly object _radarLock = new();
 
-    /// <summary>
-    /// The client's radar colours, read once and kept, for the live window's terrain (02.10.2026). The picture above lets go
-    /// of its copy once it is written; this one is small (two bytes a tile kind) and stays. Null without the client files.
-    /// A file read, never the world, so any thread may ask; the live window asks from the listener the first time a bot is
-    /// watched, so the loop never waits on the disk.
-    /// </summary>
     public static ushort[] Radar()
     {
         if (_radarTried)
@@ -110,10 +86,6 @@ public static class BotWebMap
         }
     }
 
-    /// <summary>
-    /// The radar colour of one tile: the topmost static's, else the land tile's, as <see cref="Slice"/> draws the picture.
-    /// Game loop only — the tile matrix is not safe to read from another thread.
-    /// </summary>
     public static ushort Colour(TileMatrix tiles, ushort[] colours, int x, int y)
     {
         var index = tiles.GetLandTile(x, y).ID & 0x3FFF;
@@ -133,7 +105,6 @@ public static class BotWebMap
         return index >= 0 && index < colours.Length ? colours[index] : (ushort)0;
     }
 
-    /// <summary>Points the drawing at a map and a file. Nothing is read until <see cref="Slice"/> is called.</summary>
     public static void Prepare(Map map, string folder)
     {
         if (!Enabled || map == null || map == Map.Internal)
@@ -200,7 +171,6 @@ public static class BotWebMap
         }
     }
 
-    /// <summary>One slice of sampling on the game loop. Returns true while there is more to do.</summary>
     public static bool Slice()
     {
         if (Ready || Failed || _map == null || _rgb == null || _encoding)
@@ -355,7 +325,6 @@ public static class BotWebMap
 
     private static byte[] Big(uint value) => [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
 
-    /// <summary>An 8-bit RGB PNG with no filtering, which is all a map needs.</summary>
     public static byte[] Png(int width, int height, byte[] rgb)
     {
         using var png = new MemoryStream();

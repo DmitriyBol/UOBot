@@ -3,17 +3,10 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The voices as a module: reads the file, opens the speech log, and hooks the occasions.
-///
-/// After the population and the will, because every occasion here is one of theirs. The mood clock runs on
-/// its own timer, once every few seconds over the roster, and each bot decides for itself whether it is due.
-/// </summary>
 public sealed class BotVoiceModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotVoiceModule));
 
-    /// <summary>How often the roster is walked for moods that are due.</summary>
     public static int TickMs { get; set; } = 5000;
 
     private static MoodTimer _timer;
@@ -43,8 +36,6 @@ public sealed class BotVoiceModule : BotModule
         _timer ??= new MoodTimer();
         _timer.Start();
 
-        // The trade room is made once the engine has made its own conferences (see BotVoice.OpenTradeRoom); on a world reload the
-        // server is already up and it is made, or put back in its place, at once.
         if (_serverUp)
         {
             OpenTradeRoom();

@@ -7,31 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The herald's work: a recruiting stand by the bank of the guild's town, the guild's news read aloud there, and a challenge to
-/// a rival guild's bout.
-///
-/// <para>
-/// <b>A shift like a shop's.</b> The herald walks to the banker nearest its guild's seat (<see cref="BotShopkeep.BankNear"/>)
-/// and stands <see cref="ShiftMinutes"/> there, then rests <see cref="RestMs"/>. Every <see cref="LookMs"/> it looks round
-/// <see cref="Reach"/> tiles: a bot in no guild that may join one, or a member of another guild that is discontented in it — it
-/// thinks <see cref="SourRegard"/> or worse of its head, or its guild has nothing to show (<see cref="BotGuilds.Worth(Guild)"/>
-/// nought) while the herald's has a hall or ground — is invited once in <see cref="InviteRestMs"/>, and joins at
-/// <see cref="JoinChance"/> (the unguilded) or <see cref="CrossChance"/> (the discontented), by the guild's own doors
-/// (<see cref="BotGuilds.Recruit"/>, <see cref="BotGuilds.Poach"/>) with every one of their rules. Never across a war, never an
-/// outlaw, never a head or an officer, never out of a guild at its fewest.
-/// </para>
-///
-/// <para>
-/// <b>News.</b> Every <see cref="NewsEveryMs"/> the herald reads one piece aloud: what the officers and the folders have posted
-/// (<see cref="BotOfficers.News"/>), else a standing fact — a war and its score, the chest and what it saves for, the store.
-/// </para>
-///
-/// <para>
-/// <b>A bout.</b> Once in <see cref="BotGuildBout.EveryMs"/> a herald at its stand challenges the guild nearest its own in might
-/// that is at war with nobody's side of it (<see cref="BotGuildBout"/>).
-/// </para>
-/// </summary>
 public sealed class BotHeraldStand : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHeraldStand));
@@ -46,7 +21,6 @@ public sealed class BotHeraldStand : IBotProposer
 
     public static int RestMs { get; set; } = 2700000;
 
-    /// <summary>How far from the stand a herald is offered its shift.</summary>
     public static int Far { get; set; } = 200;
 
     public static int StandTiles { get; set; } = 5;
@@ -61,15 +35,11 @@ public sealed class BotHeraldStand : IBotProposer
 
     public static double CrossChance { get; set; } = 0.35;
 
-    /// <summary>What a member must think of its head, or worse, to be counted discontented. Politics' own bar.</summary>
     public static int SourRegard { get; set; } = -30;
 
-    /// <summary>Whether discontented members of other guilds are invited at all.</summary>
     public static bool Poaching { get; set; } = true;
 
     public static int NewsEveryMs { get; set; } = 75000;
-
-    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long Stands { get; private set; }
 
@@ -313,7 +283,6 @@ public sealed class BotHeraldStand : IBotProposer
         }
     }
 
-    /// <summary>One look round the stand. Returns the invited and the joined.</summary>
     private static (int Invited, int Joined) Recruit(BotMobile herald, Guild guild, long now)
     {
         var invited = 0;
@@ -406,10 +375,6 @@ public sealed class BotHeraldStand : IBotProposer
         return (invited, joined);
     }
 
-    /// <summary>
-    /// Null when this bot may be invited (and <paramref name="from"/> is the guild it would leave, or null); otherwise why not,
-    /// empty for a reason not worth counting.
-    /// </summary>
     private static string Invitable(BotMobile m, Guild ours, out Guild from)
     {
         from = null;
@@ -468,7 +433,6 @@ public sealed class BotHeraldStand : IBotProposer
         return null;
     }
 
-    /// <summary>One piece of news aloud, posted or standing. Returns whether anything was said.</summary>
     private static bool Read(BotMobile herald, Guild guild)
     {
         var text = BotOfficers.NextNews(guild.Name);
@@ -494,7 +458,6 @@ public sealed class BotHeraldStand : IBotProposer
         return BotVoice.Say(herald, "local", $"Hear ye! {text}", force: true);
     }
 
-    /// <summary>A standing fact about the guild, in turn: its wars, its chest, its store, its members.</summary>
     private static string Fact(Guild guild)
     {
         var turn = _facts.GetValueOrDefault(guild.Name);

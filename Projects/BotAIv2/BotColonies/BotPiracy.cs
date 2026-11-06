@@ -4,51 +4,24 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Pirates: The Shadow waits on the quay for a colony's loaded ship and boards it as it comes in.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "it can be lost in war or to pirates: The Shadow at sea intercepts loaded ships (sea ambushes are honest:
-/// a loaded ship does not turn)."</b> And the order's own simplification: the ambush at the quay on arrival, outside the guards.
-/// A run home with goods aboard (<see cref="BotColonyRun"/>) is watched while it sails; when it is within
-/// <see cref="LayAheadMs"/> of the quay it makes for, that quay lies where no town's guards act, and two or three of The Shadow
-/// stand on that land within <see cref="PartyReach"/> and are a match for the captain and the hands aboard, the band is laid on
-/// the quay. The ship holds its course — it does not turn — and lands into them.
-/// </para>
-///
-/// <para>
-/// <b>The ambush is the highway's own</b> (<see cref="BotHighway.Lay"/>): the band pressed with <see cref="BotLieInWait"/>, the
-/// strike, the robbery fought by <see cref="BotBrawl"/>, the captain's choice at a quarter (<see cref="BotQuarter"/>), the goods
-/// taken marked hot for the fence, the withdrawal when the field turns, the report. What this adds is the sea: the choice of the
-/// ship and the moment, and the crew. As the captain steps ashore with a band lying in wait, its hands form a company round it
-/// (<see cref="BotSquads.Form"/>), and the company fights by the companies' rules (company16): a blow on a member turns the
-/// company on whoever struck it, and it pulls back on results.
-/// </para>
-/// </summary>
 public static class BotPiracy
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPiracy));
 
-    /// <summary>Whether The Shadow waits for colony ships at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>How long after one boarding before another is laid. Half an hour.</summary>
     public static int EveryMs { get; set; } = 1800000;
 
-    /// <summary>How near its quay, in sailing time, a ship must be for the band to be laid: long enough to walk there, short enough to wait.</summary>
     public static int LayAheadMs { get; set; } = 150000;
 
-    /// <summary>How far from the quay a member of The Shadow may be and still be called to it.</summary>
     public static int PartyReach { get; set; } = 400;
 
     public static int LeastParty { get; set; } = 2;
 
     public static int MostParty { get; set; } = 3;
 
-    /// <summary>The band's strength against the captain's and the hands' aboard, at least: the companies' choosing rule.</summary>
     public static double ChooseOdds { get; set; } = 1.0;
 
-    /// <summary>The least a ship's goods must be worth, by the market, to be worth boarding.</summary>
     public static int LeastWorth { get; set; } = 150;
 
     public static long Heard { get; private set; }
@@ -83,7 +56,6 @@ public static class BotPiracy
 
     private static long _laid;
 
-    /// <summary>A loaded run put to sea: watched until it is near its quay. From <see cref="BotColonyRun"/>.</summary>
     public static void Sailing(BotSailing passage, int units, int worth)
     {
         if (!Running || passage == null || units <= 0)
@@ -103,7 +75,6 @@ public static class BotPiracy
         _watched[passage] = worth;
     }
 
-    /// <summary>From the colonies' clock: a watched ship near its quay gets its band; a band that is over is counted.</summary>
     public static void Look()
     {
         if (_party != null && _party.Closed)
@@ -273,11 +244,6 @@ public static class BotPiracy
         );
     }
 
-    /// <summary>
-    /// The captain is ashore at a quay where the band lies in wait: how many of its hands stepped ashore with it, counted. From
-    /// <see cref="BotColonyRun"/>. The company is formed when the band strikes (<see cref="Boarded"/>), not before: a company with
-    /// no enemy goes looking for one, and the crew would be off hunting the dunes.
-    /// </summary>
     public static void Landing(BotSailing passage)
     {
         if (passage == null || _for != passage || _party is not { Closed: false } || passage.Captain is not { Deleted: false, Alive: true } captain)
@@ -305,7 +271,6 @@ public static class BotPiracy
 
     public static long HandsAshore { get; private set; }
 
-    /// <summary>The band struck: from <c>BotHighway.Strike</c>. Two seconds on, when the first blow has made the band the aggressor, the crew forms up.</summary>
     public static void Boarded(BotHighway.Party party)
     {
         if (party == null || !ReferenceEquals(party, _party) || _for == null)
@@ -318,11 +283,6 @@ public static class BotPiracy
         Timer.DelayCall(TimeSpan.FromSeconds(2), () => FormUp(party, passage));
     }
 
-    /// <summary>
-    /// The crew forms a company round its captain and turns on the band (<see cref="BotSquad.Engage"/>): from here it fights by the
-    /// companies' rules (company16) - a blow on a member turns it, whoever can reach what is killing a member fights it, and it pulls
-    /// back on results.
-    /// </summary>
     private static void FormUp(BotHighway.Party party, BotSailing passage)
     {
         if (party.Closed || passage.Captain is not { Deleted: false, Alive: true } captain || captain.Map != party.Map)
@@ -375,7 +335,6 @@ public static class BotPiracy
         );
     }
 
-    /// <summary>A band that is over: what it came to, against the colony.</summary>
     private static void Settle()
     {
         var party = _party;

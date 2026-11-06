@@ -4,7 +4,6 @@ using System.Text.Json;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One minute of the shard, for the page's charts.</summary>
 public readonly record struct BotWebSample(
     DateTime At,
     int Alive,
@@ -21,11 +20,6 @@ public readonly record struct BotWebSample(
     int Reached
 );
 
-/// <summary>
-/// The shard a minute at a time since it started, so that a number on the page can be read as a trend
-/// rather than a value. Every counter it reads is cumulative; the loop cost is the one figure taken as a
-/// difference, because a total of milliseconds since boot says nothing about now.
-/// </summary>
 public static class BotWebHistory
 {
     public static int EveryMs { get; set; } = 60000;
@@ -57,7 +51,6 @@ public static class BotWebHistory
         }
     }
 
-    /// <summary>Takes a sample when one is due. Game loop only.</summary>
     public static void Sample(long now, int alive, int stuck)
     {
         if (!_first)
@@ -79,7 +72,7 @@ public static class BotWebHistory
         var seconds = Math.Max(1.0, (now - _lastTick) / 1000.0);
         var spent = BotWill.SpentMs + BotWalk.SpentMs;
         var loopMs = (spent - _lastSpent) / seconds;
-        // The walkers' own count, beside counting as arriving (build 386, see BotWalk.WalkerSearches).
+
         var searches = BotWalk.WalkerSearches - _lastSearches;
         var reached = BotWalk.WalkerReached - _lastReached;
 
@@ -116,7 +109,6 @@ public static class BotWebHistory
         }
     }
 
-    /// <summary>The whole series as JSON. Any thread.</summary>
     public static string Json()
     {
         BotWebSample[] samples;

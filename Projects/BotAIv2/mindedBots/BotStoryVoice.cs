@@ -4,26 +4,6 @@ using Server.BotAI.V2;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The model as the island's chronicler: one chapter or one closed day retold from its dated facts, when the model's slot is free.
-/// PLAN-life A3, 13.10.2026: asked to retell one chapter of a bot's life or one closed day of the Chronicle from the dated facts
-/// the template was written from, and to say nothing else.
-/// Filled into <see cref="BotStory.Ask"/> from <c>BotMindModule.Start</c> and emptied on a reload, as the steward's
-/// (<c>BotStewardArgus</c>) is from the debugger's; the bots' assembly never references this one.
-///
-/// <para>
-/// <b>Strings in, a string out.</b> The question is made on the loop from strings the story built (<see cref="BotStoryAsk"/>), the
-/// call runs off the loop inside <see cref="BotOllama"/>, and the answer is read here on the loop, where <c>BotOllama</c> posts it;
-/// <see cref="BotStory"/> then checks it against the facts (<c>BotStoryWriter.Check</c>) and keeps it or throws it away. Nothing
-/// here touches a mobile, an item or a map.
-/// </para>
-///
-/// <para>
-/// <b>The duke's model and the duke's manners with the card.</b> Unless <c>bot-story.json</c> names one, the chronicler asks the
-/// duke's model (<c>BotParley.JudgeModel</c>, else the population's own) with the duke's keep-alive and timeout, without
-/// thinking: a paragraph from a list wants no reckoning, and a thinking model would hold the one slot for a minute.
-/// </para>
-/// </summary>
 public static class BotStoryVoice
 {
     public static long Asked { get; private set; }
@@ -96,7 +76,6 @@ public static class BotStoryVoice
 
     private const string Schema = "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\",\"minLength\":40}},\"required\":[\"text\"]}";
 
-    /// <summary>The paragraph out of the model's JSON, or null when there is none to read.</summary>
     private static string Answer(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -114,7 +93,7 @@ public static class BotStoryVoice
                 ? text.GetString()?.Trim()
                 : null;
         }
-        // Any failure to read an answer is not an answer: the template stands. See BotOllama.Content for why the catch is wide.
+
         catch (Exception)
         {
             return null;

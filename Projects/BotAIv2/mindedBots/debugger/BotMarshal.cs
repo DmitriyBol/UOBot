@@ -9,78 +9,34 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The marshal of events: the fourth of Argus's watchers, who organises rather than diagnoses.
-///
-/// <para>
-/// <b>Patrick's order of 16.09.2026, evening:</b> the guilds' masters are ordinary bots; the events — camps,
-/// tournaments, errands, orders — are the business of one thinking bot in Argus's squad. Every
-/// <see cref="EveryMs"/> it is shown the population's numbers, the board of errands, the treasury, the tournament
-/// and the revels' ledger, and asked for one event or none: a revel (one trade worth ×3 for twelve minutes with a
-/// prize), a camp (a revel with an orc camp raised where it says), a tournament, an errand on the board (kill,
-/// gather or scout, paid from the treasury), a standing order, a bounty on a square, a price on a head, or a fair.
-/// </para>
-///
-/// <para>
-/// <b>It invents no mechanism.</b> Every one of these is a verb the door already had, so what the marshal does is
-/// what a hand at the keyboard could do, on a clock, with a reason written to the watchers' log. While it stands the
-/// revels are its business too, and Argus goes back to watching.
-/// </para>
-/// </summary>
 public static class BotMarshal
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMarshal));
 
-    /// <summary>The marshal's name. Hermes, the herald: the watchers are named for the far-sighted, and this one for the messenger.</summary>
     public static string Name { get; set; } = "Hermes";
 
-    /// <summary>Whether a marshal stands at all. Without one, Argus declares the revels as before.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>How often the marshal is asked for an event. Ten minutes.</summary>
     public static int EveryMs { get; set; } = 600000;
 
-    /// <summary>The marshal's robe.</summary>
     public static int Hue { get; set; } = 53;
 
-    /// <summary>The watcher that is the marshal, while one stands.</summary>
     public static BotWatcher Standing { get; internal set; }
 
     private static long _thoughtTick;
 
     public static long Asked { get; private set; }
 
-    /// <summary>Events set going.</summary>
     public static long Events { get; private set; }
 
-    /// <summary>Times the marshal chose nothing.</summary>
     public static long Nothings { get; private set; }
 
-    /// <summary>Answers that could not be read.</summary>
     public static long Unread { get; private set; }
 
-    /// <summary>Events refused: an unknown event, or one its own rules turned away.</summary>
     public static long Refused { get; private set; }
 
-    /// <summary>What came of the marshal's last answer, shown to it the next time it is asked. See <see cref="Sight"/>.</summary>
     private static string _last;
 
-    /// <summary>
-    /// How long an event the city refused is refused again without being tried, and said to be.
-    ///
-    /// <para>
-    /// <b>Being shown the refusal was not enough.</b> On build 97 Hermes asked for a fair at 22:50, was told "the treasury
-    /// holds 500gp of the 5000gp a fair wants", was shown exactly that at 23:00, and asked for a fair again. Twenty-five
-    /// minutes: two more asks, and time for the mint to put a thousand gold back.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>Only a refusal about the city's state rests an event; a refusal about the answer's own fields does not.</b> Build
-    /// 98 rested whatever was refused, and at 23:55 Hermes asked for a revel of the kind "nothing": resting revels for that
-    /// would have turned away the same revel with its kind put right. A treasury short of a fair's floor stays short for
-    /// a while; a wrong word is put right on the next ask, and the answer shown to the marshal already names the words.
-    /// </para>
-    /// </summary>
     public static int RefusedRestMs { get; set; } = 1500000;
 
     private static string _refusedEvent;
@@ -89,75 +45,34 @@ public static class BotMarshal
 
     private static string _refusedWhy;
 
-    /// <summary>Answers turned away because the same event had been refused within <see cref="RefusedRestMs"/>.</summary>
     public static long Repeated { get; private set; }
 
     public static bool Due(long now) => Running && Standing != null && now - _thoughtTick >= EveryMs;
 
-    /// <summary>The clock restarted: at waking, and each time the marshal is asked.</summary>
     public static void Woke(long now) => _thoughtTick = now;
 
-    /// <summary>Minutes until the marshal is next asked for an event. For the live window (02.10.2026).</summary>
     public static long NextInMinutes(long now) => Math.Max(0, EveryMs - (now - _thoughtTick)) / 60000;
 
-    /// <summary>
-    /// What the model may answer. The event's words are enforced in <see cref="Act"/>, as the revel's are.
-    ///
-    /// <para>
-    /// <b>Every field required, from build 95.</b> With only the event and the reason required, the model left out what the
-    /// event needed and the verb refused it: on build 94 Hermes's first two events were a revel with no kind (20:51) and a
-    /// standing order with no amount and no price (21:11). A field that must be written is a field the model has to think
-    /// about; one it may leave out is one it forgets.
-    /// </para>
-    ///
-    /// <para>
-    /// <b>The event and the kind chosen from lists, from build 101e.</b> A field that must be written can still be written
-    /// wrong, and a wrong word is refused as surely as a missing one. On the night of 16–17.09.2026 Hermes asked for revels of
-    /// the kinds "nothing" (23:55), "" (01:51, 02:53, 07:34) and orders for things called "herbs", "wood", "hunt" and "" — each
-    /// refused, each shown to it, and the next ask as likely to repeat it. The event names and the kinds, which are closed
-    /// lists, are enumerated (N2: narrow the enumeration instead of persuading); the thing an order or an errand names is not a
-    /// closed list, and the sight names what the city knows instead (see <see cref="Sight"/>).
-    /// </para>
-    ///
-    /// <para>
-    /// <b>One shape for each event open this time, with only the fields it takes, from build 102.</b> Two lists in one flat form
-    /// still let a right word land in the wrong event, and every number was a "number": from 03:13 to 10:22 on 17.09.2026
-    /// Hermes was asked 42 times and 22 answers were refused — an errand of the kind "hunt" (09:39, a revel's word, which the
-    /// shared list allowed), orders for things called "wood", "ore", "hunt" and "" twice, standing orders and errands with an
-    /// amount or a reward of nought (six; and a "10.0" was read as nought too), fairs on a treasury short of its floor and the
-    /// same fair again (seven). So the form is an <c>anyOf</c> of events: the kinds, the things, the creatures and the murderers
-    /// each named from a list of their own, whole numbers between the bounds the verbs refuse outside, and an event the city
-    /// would refuse on its state left out altogether — a fair while the treasury is under its floor, a price on a head while
-    /// nobody is red. Measured against Ollama 0.34 before it was built: a demanded amount of 0 came back 1, "3.5 gold" came
-    /// back 3, a fair of 2 minutes against a least of 5 came back 20, and "Bananas" came back as a thing on the list.
-    /// </para>
-    /// </summary>
     public static string Schema => Build();
 
-    /// <summary>The events open when the sight was last written, so the form offers what the sight named. See <see cref="Open"/>.</summary>
     private static List<string> _open;
 
     private static long _openTick;
 
-    /// <summary>The events <see cref="Act"/> carries out.</summary>
     private static readonly string[] EventWords = ["nothing", "revel", "camp", "tourney", "errand", "order", "bounty", "head", "fair"];
 
-    /// <summary>The kinds any event reads: a revel's or a camp's trade, or an errand's kill, gather or scout.</summary>
     private static readonly string[] ErrandKinds = ["kill", "gather", "scout"];
 
-    /// <summary>The raw goods a gathering errand may name besides what is on show at the shops, where the engine knows the type.</summary>
     private static readonly string[] Gathered =
     [
         "IronOre", "Log", "Hides", "Leather", "RawRibs", "Feather", "Wool", "Garlic", "Ginseng", "MandrakeRoot", "Nightshade",
         "Bloodmoss", "SpidersSilk", "BlackPearl", "SulfurousAsh"
     ];
 
-    /// <summary>Largest place either way a shape offers, a little past the edge of Felucca.</summary>
     private const int MostX = 7167;
 
     private const int MostY = 4095;
 
-    /// <summary>The form of this ask: one shape per open event. See <see cref="Schema"/>.</summary>
     private static string Build()
     {
         var open = _open != null && Core.TickCount - _openTick < 5000 ? _open : Open();
@@ -200,9 +115,7 @@ public static class BotMarshal
 
                             if (creatures.Count > 0)
                             {
-                                // No place: a kill goes to the nearest lair that keeps the creature. The only coordinates
-                                // the marshal is given are the population's home, and at 12:46 on 17.09.2026 it put five
-                                // ogres there — refused, the nearest ogre spawner being 200 tiles off.
+
                                 new Shape(w, "errand").Words("kind", ["kill"]).Words("name", creatures)
                                     .Number("number", 1, BotQuests.MostAmount).Number("pay", 1, pays).Close();
                             }
@@ -264,20 +177,6 @@ public static class BotMarshal
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    /// <summary>
-    /// One event's shape in the form, its fields written and required in alphabetical order.
-    ///
-    /// <para>
-    /// <b>Alphabetical because that is the order the model is held to.</b> Asked with thinking on, Ollama 0.34 sorts a
-    /// schema's properties by name before the answer is constrained (a Go map is written out sorted): deepseek-r1:14b,
-    /// asked on 17.09.2026 for "a standing order for 10 Leather", answered <c>{"event": "errand", "gold": …, "kind":
-    /// "scout", …}</c> and then a bounty — every shape whose first field sorted before "event" ("amount", in the kill, the
-    /// gather and the order) was closed to an answer that began with "event", so build 102's form left Hermes the scout, the
-    /// bounty and the events with no amount. Its answers at 11:25, 11:49 and 12:00 were scouts whose reasons were
-    /// standing orders. The names are chosen so the sorted order is the answer's order — event, kind, name, number, pay,
-    /// say, why, x, y — and a qwen3 asked without thinking, which keeps the written order, is given the same.
-    /// </para>
-    /// </summary>
     private sealed class Shape
     {
         private readonly Utf8JsonWriter _w;
@@ -288,7 +187,6 @@ public static class BotMarshal
         {
             _w = w;
 
-            // A list of one rather than a constant: both are read the same way, and a list is the older of the two.
             _fields.Add(("event", x => Enumerated(x, [what])));
         }
 
@@ -328,7 +226,6 @@ public static class BotMarshal
 
         private static void Text(Utf8JsonWriter x) => x.WriteString("type", "string");
 
-        /// <summary>The herald's line and the reasoning added, every field written in order, then what must be written.</summary>
         public void Close(bool says = true)
         {
             if (says)
@@ -363,12 +260,6 @@ public static class BotMarshal
         }
     }
 
-    /// <summary>
-    /// The events that can be carried out now, in <see cref="EventWords"/>' order: nothing always; not an event refused on
-    /// the city's state within <see cref="RefusedRestMs"/>; a revel or a camp only while no revel runs; a tournament only while none runs; an errand, a bounty or a head
-    /// only on a treasury with gold in it; an order only while something is on show at the shops by the bank; a head only while somebody is red;
-    /// a fair only on a treasury at its floor and while no fair runs. See <see cref="Schema"/>.
-    /// </summary>
     private static List<string> Open()
     {
         List<string> open = [];
@@ -407,7 +298,6 @@ public static class BotMarshal
         return open;
     }
 
-    /// <summary>The names of the murderers at large now.</summary>
     private static List<string> Reds()
     {
         List<string> reds = [];
@@ -424,7 +314,6 @@ public static class BotMarshal
         return reds;
     }
 
-    /// <summary>What a gathering errand may name: the shops' things and the raw goods the engine knows, each once.</summary>
     private static List<string> Goods(List<string> stalls)
     {
         List<string> goods = [..stalls];
@@ -442,7 +331,6 @@ public static class BotMarshal
         return goods;
     }
 
-    /// <summary>The names of the things most on show at the bots' shops by the bank, most first, as a sentence.</summary>
     private static string Offered(int most)
     {
         var names = Stalls(most);
@@ -450,10 +338,6 @@ public static class BotMarshal
         return names.Count == 0 ? "nothing at the shops by the bank" : string.Join(", ", names);
     }
 
-    /// <summary>
-    /// The names of the things most on show at the bots' shops by the bank, most first: names the city's order knows. The stalls,
-    /// until the auction went on 01.10.2026; the city's standing orders are served at the shops now (<c>BotShopkeep.CityBuy</c>).
-    /// </summary>
     private static List<string> Stalls(int most)
     {
         var lots = BotShopkeep.Lots();
@@ -486,7 +370,6 @@ public static class BotMarshal
         return names;
     }
 
-    /// <summary>What the marshal is told before it is asked.</summary>
     public static string System(string name)
     {
         var home = BotPopulation.Where;
@@ -533,7 +416,6 @@ public static class BotMarshal
                + "and the same answer will be refused again.";
     }
 
-    /// <summary>The board, the treasury, the tournament, the revels and the murderers, appended to the watcher's report.</summary>
     public static string Sight()
     {
         using var say = ValueStringBuilder.Create(2048);
@@ -563,7 +445,6 @@ public static class BotMarshal
         return say.ToString();
     }
 
-    /// <summary>The plan carried out; the answer for the log, or null when nothing could be read.</summary>
     public static string Act(BotMarshalPlan plan, Map map)
     {
         Asked++;
@@ -671,8 +552,7 @@ public static class BotMarshal
                 }
 
             case "fair":
-                // The city's own rule for when a fair is worth holding, which its clock has always asked and the marshal did
-                // not: the first fair Hermes called, at 21:22 on 16.09.2026, was on a purse of 3850gp.
+
                 if (BotCity.Purse < BotCity.FairFloor)
                 {
                     Refused++;
@@ -693,10 +573,6 @@ public static class BotMarshal
                 return $"\"{plan.Event}\" is no event the marshal knows ({plan.Why})";
         }
 
-        // <b>An event is something that changed, not a sentence that came back.</b> Every verb answers in words whether it
-        // did anything or not, and on build 94 a standing order with no amount was logged "set an event going: order — a
-        // standing order needs an amount and a price" and counted among the events. The mechanisms' own counters say
-        // whether anything was set going.
         if (Signature() == before)
         {
             Refused++;
@@ -715,7 +591,6 @@ public static class BotMarshal
         return $"{what}: {answer} ({plan.Why})";
     }
 
-    /// <summary>Remembers a refused event, so the same answer is not tried again straight away. See <see cref="RefusedRestMs"/>.</summary>
     private static void Refuse(string what, string why)
     {
         _refusedEvent = what;
@@ -723,7 +598,6 @@ public static class BotMarshal
         _refusedWhy = why;
     }
 
-    /// <summary>What the event verbs have set going, all told: a revel, a championship, an errand, anything of the city's.</summary>
     private static (long Revels, long Tourneys, long Errands, long City) Signature() =>
         (BotRevel.Declared, BotTourney.Called, BotQuests.Posted, BotCity.Changes);
 
@@ -764,7 +638,6 @@ public static class BotMarshal
     }
 }
 
-/// <summary>What the marshal answered. A record of its own, for the same reason <see cref="BotRevelPlan"/> is one.</summary>
 public sealed class BotMarshalPlan
 {
     public string Event { get; init; }
@@ -823,12 +696,6 @@ public sealed class BotMarshalPlan
     private static string Word(JsonElement root, string name) =>
         root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
-    /// <summary>A number of the answer as a whole number, "10.0" included: read as nought before build 102.</summary>
-    /// <summary>
-    /// A coordinate, whole or written with a point: a model writes "1442.0" as readily as "1442", and <c>TryGetInt32</c>
-    /// refuses the first. False when it is absent or not a number. See <see cref="BotRevel.Ring"/> for what a camp without
-    /// one used to do.
-    /// </summary>
     private static bool Tile(JsonElement root, string name, out int value)
     {
         value = 0;

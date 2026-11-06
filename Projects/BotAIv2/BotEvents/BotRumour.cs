@@ -5,56 +5,33 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Rumours (07.10.2026, Patrick's fifth idea: "once an hour Argus spreads a rumour of a treasure or a lair, the first to reach it
-/// takes it"). Every <see cref="EveryMs"/> a chest is put on open ground <see cref="Near"/>–<see cref="Far"/> tiles out of a town
-/// and filled with <see cref="ChestGold"/> taken from the crown's purse — the revels' own, filled by the guilds' tax, so the coin is
-/// moved and not made (<see cref="BotSeasons.CrownTake"/>). Argus's herald spreads the word with the bearing from the town.
-///
-/// <para>
-/// <b>A treasure or a lair.</b> A chest on ground the zones read hostile is a lair: only a bot that brings <see cref="LoneOdds"/>
-/// times the fight standing there — the lone bot's rule — is offered the walk. A chest on quiet ground is a treasure, and any bot
-/// with a safe road may go. At most <see cref="MostSeekers"/> go at once (<see cref="BotRumourSeek"/>): the first to stand at the
-/// chest takes the coin into its account and the chest is gone; whoever comes after finds nothing, and says so as a failure —
-/// which is why the seekers are few. Unfound after <see cref="LapseMs"/>, the chest goes and its coin returns to the crown.
-/// </para>
-/// </summary>
 public static class BotRumour
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRumour));
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>How often a rumour is spread, and how long after a boot the first may be.</summary>
     public static int EveryMs { get; set; } = 3600000;
 
     public static int FirstMs { get; set; } = 1200000;
 
-    /// <summary>What a chest holds, and the least the crown must give for one to be put out.</summary>
     public static int ChestGold { get; set; } = 300;
 
     public static int LeastGold { get; set; } = 50;
 
-    /// <summary>How far out of a town the chest lies.</summary>
     public static int Near { get; set; } = 60;
 
     public static int Far { get; set; } = 200;
 
-    /// <summary>How far from the chest a bot is offered the walk; how many may seek it at once.</summary>
     public static int Reach { get; set; } = 300;
 
     public static int MostSeekers { get; set; } = 2;
 
-    /// <summary>How long a chest waits to be found.</summary>
     public static int LapseMs { get; set; } = 2400000;
 
-    /// <summary>What a lone bot must bring against the fight at a lair, as a multiple.</summary>
     public static double LoneOdds { get; set; } = 3.0;
 
-    /// <summary>What seeking a rumour is reckoned at per minute before the ledger has seen one.</summary>
     public static double Prior { get; set; } = 30.0;
-
-    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long Spread { get; private set; }
 
@@ -78,7 +55,6 @@ public static class BotRumour
 
     public static long GoldBack { get; private set; }
 
-    /// <summary>One rumour: the chest, where, what it holds, whether it is a lair, who seeks it.</summary>
     public sealed class Tale
     {
         public Container Chest;
@@ -112,7 +88,6 @@ public static class BotRumour
 
     private static bool _seeded;
 
-    /// <summary>The rumour standing now, if its chest is still to be found.</summary>
     public static Tale Now => _tale is { Open: true } t ? t : null;
 
     public static void Beat(long now)
@@ -146,7 +121,6 @@ public static class BotRumour
         Begin(now);
     }
 
-    /// <summary>Set by hand to spread a rumour at the next beat.</summary>
     public static bool CallNow
     {
         get => false;
@@ -224,7 +198,6 @@ public static class BotRumour
         );
     }
 
-    /// <summary>Open ground out of a reached town; a lair when the zones read it hostile, a treasure when the ground is quiet.</summary>
     private static bool Place(Map map, out BotTowns.Town town, out Point3D at, out bool lair, out double asks)
     {
         town = null;
@@ -287,7 +260,7 @@ public static class BotRumour
         }
         else
         {
-            // The crown has gone (the debugger switched off): the coin goes to the city's purse rather than nowhere.
+
             BotCity.Held(gold);
             BotCity.Refund(gold);
         }
@@ -307,8 +280,6 @@ public static class BotRumour
         _tale = null;
     }
 
-    // ---- the seekers ------------------------------------------------------------------------------------------------------------
-
     internal static void Offer() => Offered++;
 
     internal static void Seek(Tale tale, Mobile bot)
@@ -325,7 +296,6 @@ public static class BotRumour
 
     internal static void Gave(Tale tale, Mobile bot) => tale.Seeking.Remove(bot?.Serial ?? Serial.MinusOne);
 
-    /// <summary>The bot stands at the chest: the coin into its account and the chest gone, if it is still there. The coin taken.</summary>
     internal static int Take(Tale tale, Mobile bot)
     {
         if (!tale.Open)
@@ -337,7 +307,6 @@ public static class BotRumour
 
         var gold = tale.Chest.GetAmount(typeof(Gold));
 
-        // The coin in the chest is destroyed with it and the same sum put into the finder's account: moved, not made.
         tale.Chest.Delete();
 
         if (!BotSeasons.Pay(bot, gold))
@@ -363,9 +332,6 @@ public static class BotRumour
 
     internal static void Late() => TooLate++;
 
-    // ---- the store ----------------------------------------------------------------------------------------------------------------
-
-    /// <summary>A rumour read back after a restart: the chest the world kept, open again for its time left.</summary>
     internal static void Restore(Container chest, int townIndex, bool lair, double asks, long msLeft)
     {
         if (chest is not { Deleted: false } || chest.Map == null || chest.Map == Map.Internal)
@@ -403,7 +369,6 @@ public static class BotRumour
         return -1;
     }
 
-    /// <summary>The rumour standing, for the store: its chest is kept by the world save itself.</summary>
     internal static Tale Kept => Now;
 
     public static string Describe() =>
@@ -412,12 +377,6 @@ public static class BotRumour
             : $"{Spread} spread ({Lairs} lairs; {NoCrown} hours the crown could not fill a chest, {NoPlace} no place found); {Offered} walks offered, {Seekers} bots went seeking, {Found} chests found for {GoldFound}gp, {TooLate} came too late, {Lapsed} lapsed with {GoldBack}gp back to the crown"
               + (Now is { } t ? $"; now: {t.Gold}gp {t.Bearing}{(t.Lair ? " in a lair" : "")}, {t.Seeking.Count} seeking, {Math.Max(0, t.LapseTick - Core.TickCount) / 60000} minutes left" : "");
 
-    /// <summary>
-    /// The rumour standing called off, for Patrick's reset (07.10.2026, reset26): its chest taken out of the world and the coin in it
-    /// back to the crown that filled it, as a lapse does. A reload keeps the rumour (the store reads it back); a new world does not,
-    /// and <see cref="Forget"/> alone would leave the chest standing in the world with the crown's coin in it and nothing to say so.
-    /// Returns the gold handed back.
-    /// </summary>
     public static int Stand()
     {
         if (_tale == null)
@@ -440,11 +399,6 @@ public static class BotRumour
     }
 }
 
-/// <summary>
-/// Offers a bot the walk to a rumoured chest (07.10.2026): any bot for a treasure, a bot bringing <see cref="BotRumour.LoneOdds"/>
-/// times the fight for a lair; within <see cref="BotRumour.Reach"/>, while fewer than <see cref="BotRumour.MostSeekers"/> are on
-/// their way, by a road the walk's own question does not refuse.
-/// </summary>
 public sealed class BotRumourCall : IBotProposer
 {
     public string Name => "Rumour";
@@ -487,7 +441,6 @@ public sealed class BotRumourCall : IBotProposer
     }
 }
 
-/// <summary>Seeking a rumoured chest: the walk to it, and the coin if it is still there.</summary>
 public sealed class BotRumourSeek : BotDeed
 {
     public const string Trade = "rumour";

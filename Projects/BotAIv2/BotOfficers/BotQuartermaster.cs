@@ -7,30 +7,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The quartermaster's work: a shift at the guild's store, the kits it issues, the surplus it takes in, the wants it posts for
-/// the guild and the surplus it sells.
-///
-/// <para>
-/// <b>A shift like a shop's.</b> The quartermaster walks to the store (<see cref="BotGuildStore.At"/>) and keeps it open for
-/// <see cref="ShiftMinutes"/>, then rests <see cref="RestMs"/>; it is offered a shift sooner when members are waiting for a kit.
-/// While it is open: a member standing within <see cref="Counter"/> tiles with capped surplus over its allowance hands it in
-/// (<see cref="BotGuildStore.Hand"/>); a member short of its kit and poor or new walks in and draws what it lacks
-/// (<see cref="BotKitDraw"/>, <see cref="BotGuildStore.Issue"/>) — a debt; the goods the guild bought are put away and the
-/// quartermaster is paid back by the chest at the want's price; once a shift it posts a want for the kind the store is shortest
-/// of, puts one lot of surplus on the hall's merchant and carries the merchant's takings into the chest.
-/// </para>
-///
-/// <para>
-/// <b>The guild's wants are the chest's purchases, said by the quartermaster.</b> The market takes a want only from a bot that can
-/// pay it (<see cref="BotMarket.Ask"/>), so the quartermaster asks in its own name, pays the carrier from its own purse like any
-/// buyer, and the chest pays it back unit for unit at the want's price when the goods go into the store — never before, never for
-/// goods it did not get. A want is posted only when the chest holds the whole bill. What the store aims to hold of a kind is half
-/// what the members' kits ask (<see cref="TargetShare"/>), twice that while the guild is at war or its chest saves for a war
-/// (<see cref="WarFactor"/>, "what to buy for a war by the chest's purpose"). Its lines are the guild's procurement, counted apart
-/// from the members' own Needs lines (<c>BotLines.IsProcurement</c>).
-/// </para>
-/// </summary>
 public sealed class BotQuartermaster : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotQuartermaster));
@@ -39,48 +15,35 @@ public sealed class BotQuartermaster : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
-    /// <summary>What a shift is reckoned at a minute: the guild's duty, unpaid.</summary>
     public static double Prior { get; set; } = 30.0;
 
-    /// <summary>And per member waiting for a kit.</summary>
     public static double WaitingWorth { get; set; } = 8.0;
 
     public static int ShiftMinutes { get; set; } = 6;
 
-    /// <summary>The rest between shifts; a shift with members waiting is offered after <see cref="WaitedRestMs"/>.</summary>
     public static int RestMs { get; set; } = 2400000;
 
     public static int WaitedRestMs { get; set; } = 300000;
 
-    /// <summary>How far from the store a quartermaster is offered a shift.</summary>
     public static int Reach { get; set; } = 200;
 
-    /// <summary>How near the store the quartermaster stands, and how near it a member must be to hand in or draw.</summary>
     public static int StoreTiles { get; set; } = 4;
 
     public static int Counter { get; set; } = 6;
 
-    /// <summary>How often an open store looks round it.</summary>
     public static int ActMs { get; set; } = 5000;
 
-    /// <summary>Whether the quartermaster posts the guild's wants at all.</summary>
     public static bool Wants { get; set; } = true;
 
-    /// <summary>The most units one guild want asks for.</summary>
     public static int WantMost { get; set; } = 30;
 
-    /// <summary>The least shortfall worth a want.</summary>
     public static int WantLeast { get; set; } = 10;
 
-    /// <summary>What the store aims to hold of a kind, as a share of what the members' kits ask of it.</summary>
     public static double TargetShare { get; set; } = 0.5;
 
     public static double WarFactor { get; set; } = 2.0;
 
-    /// <summary>How long a guild want is followed before what is left of it is let go.</summary>
     public static int WantHoldMs { get; set; } = 5400000;
-
-    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long Shifts { get; private set; }
 
@@ -112,14 +75,10 @@ public sealed class BotQuartermaster : IBotProposer
 
     private static void Gate(string why) => _gates[why] = _gates.GetValueOrDefault(why) + 1;
 
-    // ---- open stores and guild wants ---------------------------------------------------------------------------------------
-
-    /// <summary>Each guild's open store: the quartermaster keeping it and where.</summary>
     private static readonly Dictionary<string, (BotMobile Qm, Map Map, Point3D At, long Until)> _open = new(StringComparer.Ordinal);
 
     private static readonly Dictionary<Serial, long> _rested = [];
 
-    /// <summary>Members of each guild that have taken a draw and are walking in. Counted, not trusted: a draw ends by itself.</summary>
     private static readonly Dictionary<string, int> _waiting = new(StringComparer.Ordinal);
 
     private sealed class Order
@@ -143,10 +102,8 @@ public sealed class BotQuartermaster : IBotProposer
 
     private static readonly Dictionary<string, Order> _orders = new(StringComparer.Ordinal);
 
-    /// <summary>Whether this guild's store is open now, and who keeps it where.</summary>
     public static bool Open(Guild guild, out BotMobile qm, out Map map, out Point3D at) => Open(guild, out qm, out map, out at, out _);
 
-    /// <summary>The same, and how long it stays open, in milliseconds.</summary>
     public static bool Open(Guild guild, out BotMobile qm, out Map map, out Point3D at, out long left)
     {
         qm = null;
@@ -180,7 +137,6 @@ public sealed class BotQuartermaster : IBotProposer
         }
     }
 
-    /// <summary>Whether a want on the board is one of the guilds' (procurement for the store, not a member's own need).</summary>
     public static bool Procures(BotWant want)
     {
         if (want == null)
@@ -198,8 +154,6 @@ public sealed class BotQuartermaster : IBotProposer
 
         return false;
     }
-
-    // ---- the proposer ------------------------------------------------------------------------------------------------------
 
     public BotDeed Propose(IBotWilful bot)
     {
@@ -247,7 +201,6 @@ public sealed class BotQuartermaster : IBotProposer
             return null;
         }
 
-        // Inside the long rest only members waiting for a kit bring the quartermaster back early; asked only then.
         var waiting = Needy(guild);
 
         if (rested < RestMs && waiting == 0)
@@ -267,7 +220,6 @@ public sealed class BotQuartermaster : IBotProposer
         return new Shift(guild, map, at, waiting);
     }
 
-    /// <summary>Members of this guild a kit could be issued to now: poor or new, short of their kit, owing nothing.</summary>
     private static int Needy(Guild guild)
     {
         var needy = 0;
@@ -283,8 +235,6 @@ public sealed class BotQuartermaster : IBotProposer
 
         return needy;
     }
-
-    // ---- the shift ---------------------------------------------------------------------------------------------------------
 
     public sealed class Shift : BotDeed
     {
@@ -368,7 +318,7 @@ public sealed class BotQuartermaster : IBotProposer
             {
                 if (_in)
                 {
-                    // Pushed off its post: walk back, the shift's clock goes on.
+
                     _in = false;
                 }
 
@@ -399,7 +349,6 @@ public sealed class BotQuartermaster : IBotProposer
             {
                 _acted = now;
 
-                // Open again after anything that set the shift aside for a moment (a blow, a heal): the store is open while it stands.
                 _open[_guild.Name] = (qm, _map, _at, _since + ShiftMinutes * 60000L);
                 Act(qm, now);
             }
@@ -447,7 +396,6 @@ public sealed class BotQuartermaster : IBotProposer
             _bought += Settle(qm, _guild);
             _handed += TakeIn(qm, _guild, _at);
 
-
             if (!_wanted)
             {
                 _wanted = true;
@@ -460,7 +408,6 @@ public sealed class BotQuartermaster : IBotProposer
 
                 var shelved = BotGuildStore.Shelve(qm, _guild);
 
-                // The hall merchant's takings beyond its float into the chest, by the quartermaster's hand.
                 if (BotShelf.Of(_guild) is { Deleted: false } merchant)
                 {
                     var given = BotShelf.Collect(qm, merchant);
@@ -487,7 +434,6 @@ public sealed class BotQuartermaster : IBotProposer
         }
     }
 
-    /// <summary>The kits of members standing at the store with a draw in hand. Returns how many were issued.</summary>
     private static int Kits(BotMobile qm, Guild guild, Point3D at)
     {
         var issued = 0;
@@ -510,7 +456,6 @@ public sealed class BotQuartermaster : IBotProposer
         return issued;
     }
 
-    /// <summary>Members standing at the store with capped surplus over their allowance hand it in, a whole lot at a time.</summary>
     private static int TakeIn(BotMobile qm, Guild guild, Point3D at)
     {
         var lots = 0;
@@ -550,7 +495,7 @@ public sealed class BotQuartermaster : IBotProposer
 
                 if (spare < Math.Max(1, lot.Amount))
                 {
-                    // The engine's own split: the original keeps the amount asked for, so this lot is the surplus.
+
                     if (Mobile.LiftItemDupe(lot, spare) == null)
                     {
                         continue;
@@ -571,19 +516,12 @@ public sealed class BotQuartermaster : IBotProposer
         return lots;
     }
 
-    // ---- the guild's wants -------------------------------------------------------------------------------------------------
-
-    /// <summary>How often the guilds' bought goods are put away and paid back, wherever the quartermaster stands.</summary>
     public static int SettleMs { get; set; } = 30000;
 
     private static long _settled;
 
     private static readonly List<string> _settling = [];
 
-    /// <summary>
-    /// The guilds' wants settled on the clock: the goods a carrier handed the quartermaster go into the store and the chest pays it
-    /// back at once, before its porter can carry them to its own bank box. From the module's timer.
-    /// </summary>
     internal static void SettleAll(long now)
     {
         if (_orders.Count == 0 || now - _settled < SettleMs)
@@ -625,10 +563,6 @@ public sealed class BotQuartermaster : IBotProposer
         }
     }
 
-    /// <summary>
-    /// Once a shift: the kind the store is shortest of against what the members' kits ask, asked for on the board in the
-    /// quartermaster's name, when the chest holds the bill.
-    /// </summary>
     private static void Want(BotMobile qm, Guild guild)
     {
         if (!Wants || _orders.TryGetValue(guild.Name, out var standing) && BotMarket.Stands(standing.Want))
@@ -740,10 +674,6 @@ public sealed class BotQuartermaster : IBotProposer
         }
     }
 
-    /// <summary>
-    /// The goods the guild's want brought, out of the quartermaster's pack into the store, and the chest's payment back to it at
-    /// the want's price for exactly what went in. Returns the units put away.
-    /// </summary>
     private static int Settle(BotMobile qm, Guild guild)
     {
         if (!_orders.TryGetValue(guild.Name, out var order) || order.Qm != qm.Name)
@@ -756,8 +686,7 @@ public sealed class BotQuartermaster : IBotProposer
 
         if (units > 0)
         {
-            // What the quartermaster really paid the carriers for what arrived and is not paid back yet, for the share of it that
-            // went into the store: a carriage agreed over the offer is the guild's cost too, and goods it did not get are not.
+
             var spent = Math.Max(0, (order.Want?.Paid ?? units * order.Price) - order.PaidBack);
             var owed = (int)Math.Min(spent, (long)spent * units / Math.Max(1, arrived));
 
@@ -810,8 +739,6 @@ public sealed class BotQuartermaster : IBotProposer
 
         return units;
     }
-
-    // ---- telling -----------------------------------------------------------------------------------------------------------
 
     public static string Gates()
     {
@@ -867,28 +794,20 @@ public sealed class BotQuartermaster : IBotProposer
     }
 }
 
-/// <summary>
-/// A member short of its kit, poor or new, walks to its guild's open store and draws what it lacks: a debt to the chest
-/// (<see cref="BotGuildStore.Issue"/>). Offered only while the store is open and within <see cref="Reach"/>.
-/// </summary>
 public sealed class BotKitDraw : IBotProposer
 {
     public string Name => "KitDraw";
 
     public BotStanding Rung => BotStanding.Free;
 
-    /// <summary>What drawing a kit is reckoned at a minute: what going out short of it costs, unpaid.</summary>
     public static double Prior { get; set; } = 40.0;
 
     public static int Reach { get; set; } = 100;
 
-    /// <summary>How often one member may be offered a draw.</summary>
     public static int EveryMs { get; set; } = 1800000;
 
-    /// <summary>How long the store must stay open yet for a draw to be offered.</summary>
     public static int LeastLeftMs { get; set; } = 150000;
 
-    /// <summary>How long a member walks for a draw before the store is given up on.</summary>
     public static int WalkMs { get; set; } = 240000;
 
     public static long Offered { get; private set; }
@@ -921,7 +840,6 @@ public sealed class BotKitDraw : IBotProposer
             return null;
         }
 
-        // Not with the store about to shut: a walk that finds it shut is a failure for nothing.
         if (left < LeastLeftMs)
         {
             return null;
@@ -999,7 +917,6 @@ public sealed class BotKitDraw : IBotProposer
             _at = at;
         }
 
-        /// <summary>Whether the quartermaster has handed this draw its kit (or found nothing for it).</summary>
         public bool Served { get; private set; }
 
         public override string Kind => Trade;
@@ -1041,7 +958,6 @@ public sealed class BotKitDraw : IBotProposer
             }
         }
 
-        /// <summary>From the quartermaster's look at the store: the kit handed over.</summary>
         internal void Serve(BotMobile qm)
         {
             if (Served)
@@ -1118,7 +1034,6 @@ public sealed class BotKitDraw : IBotProposer
                 return BotDoing.Walk(_map, _at, BotArrival.Within(BotQuartermaster.Counter - 2), $"to {_guild.Name}'s store for a kit");
             }
 
-            // At the counter: the quartermaster's look hands it over within a few seconds.
             if (qm.InRange(body, BotQuartermaster.Counter + 2))
             {
                 Serve(qm);

@@ -97,7 +97,6 @@ there is.
 | `The ground:` | `BotSquad/BotSquads.cs` | `BotGround`, `BotWoodsman`, `BotStable` |
 | `Getting about:` | `BotPopulation/BotBeat.cs` | `BotPath`, `BotStep`, `BotJourney`, `BotDanger`, `BotSight` (the `sight:` clause: creatures a walker saw and could not beat, the walks changed for them by kind, and deaths by what the bot had made of its killer — 03.10.2026) |
 | `The market:` | `BotPopulation/BotBeat.cs` | `BotAuction`, `BotHaggle`, `BotListing` |
-| `Reflexes:` | `BotPopulation/BotBeat.cs` | `BotReflex` (the stopwatch: struck, seen coming, the failing line, first cries, patients, fights ended — each with its spread, its "never" and who died undecided); then `the answers:` from `BotMobile.DescribeAlarms` — `BotWill.Alerts`, `BotSurgeon` (the healer's call and the press to a failing patient), `BotCry` (dire cries summoned for, steady cries' near call, `BotSquadSpare`'s spares), `BotDefender` (blows answered, the stand), `BotSquads.DescribeAnswers` (12.10.2026, w5: the near call, the stand taken, the spare and the press are each their own bucket here) |
 | `Lines:` | `BotPopulation/BotBeat.cs` | `BotLines` — Patrick's Needs measure: each line a bot asks for, met in its first hour or not, by whom, and the cause of each failure; the `needs` block of `/api/state` holds the same counters (02.10.2026, build 391) |
 | `Bot shops:` | `BotShopkeep/BotShopkeepModule.cs` | `BotShopkeep`, `BotShopkeeper`, `BotPatron`, `BotShopBook`, `BotAuction.Capped` — shops by the banks: shifts, sales to bots short of their kit or with a want on the board, the customer's weighing against counter and stall, the till, and the auction's lot cap (29.09.2026) |
 | `What we know:` | `BotPopulation/BotBeat.cs` | `BotLedger` |
@@ -122,7 +121,6 @@ there is.
 | `Relics:` | `BotRelics/BotRelicsModule.cs` | `BotRelics` (the registry: town relics hidden and held, banners and trophies, hangings, handovers, war's spoils, grudges, revenge let past a truce, banner ransoms and returns, the fence's ransoms and sales, rebates at the relic's town and Great Fairs), `BotRelicLair` (lairs laid, captains, companies, wardens, cleared, lapsed, deaths), `BotRelicHomeward`, `BotRelicSnatch` — 07.10.2026 |
 | `Stewards:` | `BotPolitics/BotStewardship.cs` | each town's steward (`BotStewardship`): tax, coffer, regard; chosen and deposed; decrees by kind and by rule, model or Argus (`BotStewardshipDecrees`); the coffers' coin drawn, taxed, paid and held; bars, refused work and walks turned back — 07.10.2026 |
 | `Events:` | `BotEvents/BotSeasons.cs` | `BotInvasion` (raids called, answered, waves, heads, kills, deaths on the field, head money), `BotMilitia`, `BotFair` (counter prices, fairgoers, lottery), `BotCaravans` (posted, led, arrived, lost, wages, premiums), `BotNight`, `BotRumour`, and the city's coin held, paid and handed back — 07.10.2026 |
-| `Stories:` | `BotStory/BotStoryModule.cs` | `BotStory` (books opened, born or found, chapters by stage, stories with three chapters or more and with three of things seen to happen, notes from births, events and the walk, build time per story, the model's asks, answers, kept and thrown away by reason, slot busy, chapters retold and waiting, reads in the model's words and the template's), `BotChronicle` (days, entries today, recorded by kind, repeats, past a full page, days retold) — PLAN-life A3, 13.10.2026 |
 
 `Spells ready:` is written once at boot by `BotSpells/BotSpellsModule.cs`, not every five minutes.
 
@@ -137,7 +135,6 @@ Per-bot lines, which are the other half of the log:
 | `; put down <trade> to take up again (<cause> by …)` on a take line | `BotWill/BotWill.cs` | steadfast work paused rather than dropped, because what took the bot off it would not wait |
 | `X took up <trade> again after <other>, Ns after putting it down` | `BotWill/BotWill.cs` | the paused work resumed when the interruption ended |
 | `X dropped <trade>: … — outbid by <other> at N/min after A of B minutes reckoned, taken at T/min and worth W/min by then` | `BotWill/BotWill.cs` | a real change of mind, with the numbers that decided it |
-| `A cry nobody answered: X cried about <foe> and <died / is at N %>; the nearest of ours able at the cry was Y the <class> N tiles off, holding <work>, now holding <work>` | `BotCombat/BotReflex.cs` | one unanswered first cry in `BotReflex.SampleEvery` that had somebody in earshot: who stood nearest and what it held, for the next analysis (12.10.2026, w5) |
 | `X opened a shop by the bank at (x, y) in <town>: …` / `X shut its shop in <town> after N minutes: …` | `BotShopkeep/BotShopkeep.cs` | a shift of a bot's shop begun and ended, with its stock and its takings |
 | `X bought N <kind> at Y's shop in <town> for Ngp, P each — short of it for its kit` / `— against its own want on the board` | `BotShopkeep/BotShopkeep.cs` | one sale at a bot's shop, and which need brought the buyer |
 
@@ -176,7 +173,7 @@ Holds the subsystems, works out what order to start them in, starts them, and sa
 
 `BotMobile : PlayerMobile` is the bot. One timer serves the whole population and gives each bot a turn on its own schedule — `BotBeat`, which is also where four of the summary lines are written. This folder also owns what survives a restart (`BotProgress`: skills, fame, karma, savings) and the three pieces of work that belong to no trade: walking home, going back for what death took, and taking a full pack to a counter.
 
-**Module** `BotPopulationModule` · **Config** `bot-population.json` · **Writes** `Getting about:` · **Writes** `The market:` · **Writes** `What we know:` · **Writes** `Money:`
+**Module** `BotPopulationModule` · **Config** `bot-names.json` · **Writes** `Getting about:` · **Writes** `The market:` · **Writes** `What we know:` · **Writes** `Money:`
 
 - **Trap.** A bot must be Player-flagged or death deletes it outright, and a dead bot counts as alive and silently drops out of the beat.
 - **Trap.** `BotProgress` is the only place skills persist. Zeroing it is not the same as touching the world save, and the world save holds Patrick's own character — never delete it.
@@ -589,7 +586,7 @@ Scrolls, reagents and spellbooks: the first work in the project whose output no 
 
 The fight itself belongs to the engine — `Warmode` and `Combatant` are enough, and its own skill checks train skills exactly as they do for a player. What is here is the judgement around it: is this thing worth fighting, is this fight being lost, is somebody calling for help, and how a shooter keeps its distance.
 
-**Config** `bot-combat.json` · **Writes** `Arms:` · **Writes** `Bows:`
+**Writes** `Arms:` · **Writes** `Bows:`
 
 | offers work | as | on the rung | handing out |
 |---|---|---|---|
@@ -603,7 +600,6 @@ The fight itself belongs to the engine — `Warmode` and `Combatant` are enough,
 | `BotArms.cs` | Whether a bot has anything in its hands, asked at the moment it matters. |
 | `BotBolt.cs` | Getting away from whatever is killing it. |
 | `BotBrawl.cs` | A fight with one of our own — a duel, a robbery, a manhunt — as a piece of work: close, hit, and stop when told. |
-| `BotCombatConfig.cs` | What Configuration/bot-combat.json is allowed to say about the cry, the stand and the stopwatch. |
 | `BotCry.cs` | Somebody of ours is being killed and has said so out loud. |
 | `BotDuel.cs` | Two of ours set against each other on purpose, and the rule that says when it is over. |
 | `BotFugitive.cs` | Offers a bot whose health is going the one thing that was missing from that rung: leaving. |
@@ -876,7 +872,7 @@ A bot's double against a creature in Green Acres, and a guild's company of doubl
 
 The one thing this population builds that outlives it. A guild saves in its chest — the members' dues, a fifth of what their work brings in (`BotDues`), and the tithes of its ground — levies the rest off its members, finds ground the engine will take a house on, raises a hall, and fits it out with the tools of its own trade. Next start the halls are read back out of the world by the name on their signs and handed to whoever leads that guild now.
 
-**Module** `BotEstateModule` · **Config** `bot-estate.json` · **Writes** `Estate:` · **Writes** `Treasuries:`
+**Module** `BotEstateModule` · **Config** `bot-townground.json` · **Writes** `Estate:` · **Writes** `Treasuries:`
 
 | offers work | as | on the rung | handing out |
 |---|---|---|---|
@@ -1174,7 +1170,6 @@ The four crafters — and from 07.09.2026 nobody else — choose what to do next
 | `BotMindTalk.cs` | The one place the thinking bots can hear each other. |
 | `BotMinds.cs` | What is kept between sessions: one bot's name and the rules it has written for itself. |
 | `BotOllama.cs` | The only thing in this assembly that talks to the model, and the only thing that leaves the game thread. |
-| `BotStoryVoice.cs` | The model as the island's chronicler: one chapter or one closed day retold from its dated facts, when the model's slot is free. |
 
 ### `mindedBots/debugger/` — Argus, the observer
 
@@ -1206,7 +1201,7 @@ A thinking thing that is not one of the population: an invisible figure that nob
 | `BotRevel.cs` | Something for the population to do that nobody planned: a bounty, a hunt, a contest. |
 | `BotStewardArgus.cs` | The model as a town's steward (07.10.2026, steward20): asked, when the slot is free, to choose one of the decrees the rule set found lawful in the town this rou |
 | `BotTourney.cs` | The championship: every hour Argus's herald calls the strongest of the ranks to a ring, sets them against each other one pair at a time for the right to challen |
-| `BotTourneyArena.cs` | The day's championship at the round arenas east of Papua: the other half of . |
+| `BotTourneyArena.cs` | The day's championship at the round arenas east of Papua (07.10.2026, arena27): twelve rings found in the map's statics round (6563, 3168) at boot, at least 50 free bots once a real day from 20:00, ported in batches with a moongate flash, one pair to a ring, the referee shown at the main ring, losers sent home; `do arena [force|state|stop]`. |
 | `BotVenues.cs` | Where the watchers hold what they hold: a revel's feast in a town, a hunt's waves and an orc camp in the countryside, the championship's ring — each chosen from |
 | `BotVigil.cs` | The debugger itself: the body, the watch it keeps, and the two questions it asks. |
 | `BotWatch.cs` | One bot as the debugger has actually seen it: everything here was measured by this file, on this file's own clock, since the moment the debugger first laid eyes on the bot. |
@@ -1269,24 +1264,6 @@ A thinking thing that is not one of the population: an invisible figure that nob
 | `BotFencer.cs` | Offers whoever holds stolen goods the way to turn them into coin: the walk to the band's fence, who buys at half their worth, or — for the fence itself, or a th |
 | `BotHighway.cs` | The ambush on the road: two or three of The Shadow lie in wait ahead of a lone carrier with goods worth taking, out of any guarded town, and fall on it as it passes. |
 
-### `BotDay/` — the daily cycle
-
-A clock of six named parts of the day on local time (`BotDay`: dawn from 05, morning 07, noon 12, afternoon 14, evening 18, night 22, each a dial in `bot-day.json`), a timetable per bot drawn once from its name, class and nature and kept in its own store (`BotTimetable`: wake and bed hours, meal hours, an evening habit — tavern, fireside, home, prowl — night owls who live the day ten hours later, and where it sleeps without a house), and the hour as one more multiplier outside the auction's root beside the calling, the toll and the nature (`BotDay.Factor`: the evening's tavern and fireside, the night's fire and the night's trades, the dawn's market, ×0.67–×1.5 held in ×0.5–×2). The rest clock's queue to tire is put bedtime-first and its queue back wake-hour-first. PLAN-life A1, the week of 12.10.2026; measured on the `Day:` line and under `day` in `/api/state`.
-
-**Module** `BotDayModule` · **Config** `bot-day.json`
-
-- **Trap.** A factor without a floor is a veto: a markdown is never applied to a broke bot's paid work (`Floored` counts them), and the whole factor is held in `Least`–`Most`, never nought.
-- **Trap.** The prime time's bands and shares are Patrick's and untouched: the cycle chooses *who* rests, never how many. `BotRest.Look` asks `AtBed` for the order and the early candidates; the allowance arithmetic is the same.
-- **Trap.** The part of the day is read into a static on the module's two-second clock; the auction never reads the wall clock.
-
-| file | decides |
-|---|---|
-| `BotDay.cs` | The daily cycle: a shard clock of named parts of the day, and what each part is worth to each bot's timetable in the auction. |
-| `BotDayConfig.cs` | What Configuration/bot-day.json may say. |
-| `BotDayModule.cs` | The daily cycle as a module: reads bot-day.json, reads the clock every two seconds, writes the Day: line every five minutes and says at boot what the hours are and how the timetables fall. |
-| `BotDayStore.cs` | Keeps every bot's timetable across restarts. |
-| `BotTimetable.cs` | One bot's timetable: when it wakes and goes to bed, when it eats, what it does with its evening, whether it is a night owl and where it would rather sleep. |
-
 ### `BotEvents/`
 
 **Module** `BotEventsModule` · **Config** `bot-events.json`
@@ -1312,7 +1289,7 @@ A clock of six named parts of the day on local time (`BotDay`: dawn from 05, mor
 | offers work | as | on the rung | handing out |
 |---|---|---|---|
 | `BotGuildScout` | Scout | Free | — |
-| `BotHeraldStand` | Herald stand | Free | — |
+| `BotHeraldStand` | Herald | Free | — |
 | `BotQuartermaster` | Quartermaster | Free | — |
 
 | file | decides |
@@ -1366,24 +1343,6 @@ Politics inside the guilds and the towns, Patrick's order of 07.10.2026: a guild
 | `BotReachSolve.cs` | What one tile of the map is to a walker. |
 | `BotReachWeb.cs` | The reach map on the dashboard: a summary the loop writes, and the tiles themselves, cut out of the immutable snapshot on the listener's own threads. |
 
-### `BotStory/` — each bot's story and the island's Chronicle
-
-PLAN-life A3, 13.10.2026. Every bot has a book of notes (`BotStoryBook`), written from two places: the event stream as each event is posted (`BotEvents.Heard` → `BotStory.Heard`: offices, elections, relics, crime's turning points, residences, halls and the guild services opened) and a slow walk over the population that notices what no event says (a guild joined or left, a rank risen, a house bought, the champion's yellow, the veteran's title). `BotStoryWriter` turns a book, the biography's three tales and the strongest ties into chapters by stage — youth, apprenticeship, the guild, deeds, friends and foes, home, family, old age — one dated sentence a fact; that template is always the story. When the minds assembly is loaded, `BotStoryVoice` asks the model to retell one chapter or one closed day, at most `VoicePerHour` an hour, once for each set of facts (kept against their hash in the save), and the answer is thrown away if it names anybody or any number the facts do not. `BotChronicle` keeps a page a day of the wars, guilds, champions, relics, elections, the duke's words and the towns' news. The page reads both through volatile snapshots (`/api/story?bot=`, `/api/chronicle`, the Story tab).
-
-**Module** `BotStoryModule` · **Config** `bot-story.json` · **Writes** `Stories:`
-
-- **Trap.** The model's HTTP call is the only thing off the loop, inside `BotOllama`; the answer comes back through `Core.LoopContext.Post` and is checked and stored on the loop. Nothing on a listener thread touches a book: it reads the shelf and posts the name it was asked for.
-- **Trap.** A book is keyed by name, like a life. The first two minutes after a start (`SettleMs`) are taken as where a bot stands, not as news — ranks are worked out and houses adopted a few seconds after the reclaim, and without the settle every restart wrote "became an Expert Tailor" for the whole population.
-- **Trap.** `do reset` empties the store through `BotStory.Wipe` and seals the stories until the restart.
-
-| file | decides |
-|---|---|
-| `BotChronicle.cs` | Which events are the island's history, and the Chronicle's page a day of them. |
-| `BotStory.cs` | What goes into a bot's book, when its story is rebuilt and handed to the page, and which chapter the model retells next. |
-| `BotStoryBook.cs` | One bot's book: when the chronicle first saw it, what it was then, its notes, and the chapters the model retold. |
-| `BotStoryModule.cs` | The stories as a module: reads bot-story.json, listens to the event stream, starts the story's clock and the Stories: line. |
-| `BotStoryWriter.cs` | The chapters by template, and the check that throws away a retelling which names anything the facts do not. |
-
 ### `BotTraders/`
 
 **Module** `BotTradersModule` · **Config** `bot-traders.json`
@@ -1431,7 +1390,7 @@ PLAN-life A3, 13.10.2026. Every bot has a book of notes (`BotStoryBook`), writte
 | `BotZone.cs` | How dangerous a piece of ground is to a bot walking across it, in the four words the planners, the hunt and the dashboard share. |
 | `BotZoneBuild.cs` | Turns what is known about the haunts, the living creatures, the observed patrols and the deaths into zones: which cells are patrol, which are aggro fringe, what |
 | `BotZoneInput.cs` | The numbers a build works by, copied off the dials when its input is gathered, so a build running off the loop never reads a property the door may be changing under it. |
-| `BotZoneMemory.cs` | What the zones learned, kept across a restart: each haunt's awake seconds, sightings, observed range, tour stops and the calm sightings its reach is read from ( |
+| `BotZoneMemory.cs` | What the zones learned, kept across a restart: each haunt's awake seconds, sightings, observed range and tour stops, and the cells patrols were seen in. |
 | `BotZoneRaster.cs` | Where attacking creatures have actually been seen awake: one number per cell of four tiles, fading with time. |
 | `BotZoneScan.cs` | The sweep: every living creature of the home map passed once every few seconds, a window of sectors at a time, within a budget of loop time per beat. |
 | `BotZoneShapes.cs` | The outline of a patch of cells as a few smooth rings: marching squares round the cells, Douglas–Peucker to drop the staircase, Chaikin to round the corners. |

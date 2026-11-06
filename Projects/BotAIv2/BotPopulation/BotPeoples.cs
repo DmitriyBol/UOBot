@@ -6,26 +6,21 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One people of the population, as <c>Configuration/bot-names.json</c> describes it.</summary>
 public sealed class BotPeopleSettings
 {
-    /// <summary>The engine's race the people is born as: Human or Elf. A people with no race of its own (dwarves) is Human.</summary>
+
     public string Race { get; set; }
 
-    /// <summary>How many of every hundred newborns are of this people, before the class's own leaning.</summary>
     public double? Share { get; set; }
 
-    /// <summary>Whether its men wear beards.</summary>
     public bool? Beards { get; set; }
 
     public string[] Male { get; set; }
 
     public string[] Female { get; set; }
 
-    /// <summary>Family names, for when the given names run out: "Aldric" and then "Aldric Ashdown".</summary>
     public string[] Houses { get; set; }
 
-    /// <summary>How much likelier a newborn of a class is to be of this people: class name to weight; a class not named weighs one.</summary>
     public Dictionary<string, double> Classes { get; set; }
 }
 
@@ -34,39 +29,6 @@ public sealed class BotNamesSettings
     public Dictionary<string, BotPeopleSettings> Peoples { get; set; }
 }
 
-/// <summary>
-/// Who the bots are born as: their people, their name, their race and their looks.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, points seven and eight: "add a settings document that says where the bots' names
-/// come from; invent two hundred names of the period, human, elvish and dwarvish, from the warlike to the magical; and
-/// teach the bots to be born of different classes and races."</b> Until now every bot was a human of one of sixty-four
-/// given names and twenty-two houses, dealt in order (<c>BotPopulation.Names</c>), and every class drew from the same
-/// pool.
-/// </para>
-///
-/// <para>
-/// <b>The file is the authority, and the code is what the file says when it says nothing.</b> The whole bank below is
-/// written to <c>Configuration/bot-names.json</c> the first time the shard runs, so the names can be changed, added to
-/// or replaced without touching the code; a people taken out of the file is a people nobody is born as. A name is
-/// never dealt twice while somebody wears it, and a newcomer is never given a name whose learning the shard still
-/// remembers (<c>BotProgress</c>), which is the old rule kept: the name is the key to everything a bot has learned.
-/// </para>
-///
-/// <para>
-/// <b>Race is the engine's, and a people is a name for it.</b> Humans and elves are bodies the client draws
-/// (<c>Race.Human</c>, <c>Race.Elf</c>); there are no dwarves in this era's client, so the dwarves are humans with
-/// beards, dwarvish names and a dwarf's leanings — smiths, warriors and architects more often than mages. Elves lean
-/// the other way. The class is dealt first, from the configured mix, as it always was; the people is drawn for the
-/// class, by share times the class's weight; the name follows the people and the sex.
-/// </para>
-///
-/// <para>
-/// <b>Which people a bot is, is read off its name.</b> Nothing new is saved: the race is the engine's and survives a
-/// restart with the body; the people is whichever list the given name is in, so the dashboard and the log can say it
-/// and the wipe has nothing to clear.
-/// </para>
-/// </summary>
 public static class BotPeoples
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPeoples));
@@ -91,7 +53,6 @@ public static class BotPeoples
 
         public Dictionary<string, double> Classes = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Where the dealing stands in each list, so names go out in the file's order.</summary>
         public int NextMale;
 
         public int NextFemale;
@@ -112,12 +73,10 @@ public static class BotPeoples
 
     public static IReadOnlyList<People> All => _peoples;
 
-    /// <summary>Whether the file gave any people at all; when not, the population's old pool is used as before.</summary>
     public static bool Any => _peoples.Count > 0;
 
     public static long Named { get; private set; }
 
-    /// <summary>Reads the file, or writes the bank below as the file and reads that.</summary>
     public static void Load()
     {
         if (Loaded)
@@ -225,7 +184,6 @@ public static class BotPeoples
         return n;
     }
 
-    /// <summary>The people a newborn of this class is drawn as: share times the class's weight, by lot.</summary>
     public static People Pick(BotClass klass)
     {
         Load();
@@ -262,7 +220,6 @@ public static class BotPeoples
         return _peoples[^1];
     }
 
-    /// <summary>The people this bot belongs to, by its given name; null for a name from the old pool.</summary>
     public static People Of(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -276,13 +233,8 @@ public static class BotPeoples
         return _byName.TryGetValue(given, out var people) && !string.Equals(people.Name, given, StringComparison.OrdinalIgnoreCase) ? people : null;
     }
 
-    /// <summary>Whether this name is one of the bank's, of any people.</summary>
     public static bool Knows(string name) => Of(name) != null;
 
-    /// <summary>
-    /// A name of the people for a newborn of that sex: the next unworn one in the file's order, and past the end of the
-    /// list a house name — "Aldric Ashdown" — and never a number. See <c>BotPopulation.Christen</c> for the rule.
-    /// </summary>
     public static string Christen(People people, bool female, Func<string, bool> taken)
     {
         if (people == null)
@@ -356,11 +308,6 @@ public static class BotPeoples
         Named = 0;
     }
 
-    /// <summary>
-    /// The bank: two hundred names of the period, three peoples. Humans of the towns; elves of the greenwood, who lean to the
-    /// bow and the book; dwarves of the hills, who lean to the hammer and the shield. Written to the file once and read from
-    /// it after.
-    /// </summary>
     public static BotNamesSettings Defaults() =>
         new()
         {

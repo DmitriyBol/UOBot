@@ -9,31 +9,13 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Politics inside guilds and towns, as one clock: the page's politics object, the phrases, and the seams other folders wire.
-///
-/// <para>
-/// The four parts are <see cref="BotElection"/> (the head by vote, and the plot that deposes it), <see cref="BotPurpose"/>
-/// (what the chest saves for, by vote), <see cref="BotCouncil"/> (the towns' posts, their income and the outcasts' surcharge)
-/// and <see cref="BotTribute"/> (ultimatums, and tribute instead of war). Patrick's order of 07.10.2026, night.
-/// </para>
-///
-/// <para>
-/// <b>Three seams are left for other folders, wired at merge.</b> <see cref="TiesRegard"/> (what one bot thinks of another —
-/// <c>BotTies.Regard</c>) and <see cref="Veteran"/> (<c>BotTraits.Veteran</c>) come from the character folder, and
-/// <see cref="Ransom"/> (what a guild's jailed members' ransom needs) from the crime folder. Until wired they are null and
-/// read as nought: voters weigh records alone, nobody is discontented by dislike, and no chest saves for a ransom.
-/// </para>
-/// </summary>
 public static class BotPolitics
 {
-    /// <summary>What <c>a</c> thinks of <c>b</c>, roughly −100 to 100. Wire to <c>BotTies.Regard</c> at merge.</summary>
+
     public static Func<BotMobile, BotMobile, double> TiesRegard { get; set; }
 
-    /// <summary>Whether this bot is a veteran. Wire to <c>BotTraits.Veteran</c> at merge.</summary>
     public static Func<BotMobile, bool> Veteran { get; set; }
 
-    /// <summary>What freeing this guild's jailed members would cost, or nought. Wire to the crime folder's ransom at merge.</summary>
     public static Func<Guild, int> Ransom { get; set; }
 
     public static double RegardOf(BotMobile a, BotMobile b) => a == null || b == null || TiesRegard == null ? 0.0 : TiesRegard(a, b);
@@ -42,7 +24,6 @@ public static class BotPolitics
 
     public static int RansomOf(Guild guild) => guild == null || Ransom == null ? 0 : Math.Max(0, Ransom(guild));
 
-    /// <summary>One look of all four parts. From the module's clock, once a minute.</summary>
     public static void Look(long now)
     {
         BotElection.Look(now);
@@ -54,20 +35,9 @@ public static class BotPolitics
             BotTribute.Look(now);
         }
 
-        // Each town's steward and its decrees (07.10.2026, steward20). See BotStewardship.
         BotStewardship.Look(now);
     }
 
-    /// <summary>
-    /// <b>Patrick's reset (07.10.2026, reset26): the politics of a world that no longer exists, forgotten.</b> The module's own reload
-    /// (<see cref="BotPoliticsModule.Reset"/>) forgets counters only and keeps what its two stores write; the reset of 20:56 that night
-    /// left <c>Saves/BotPolitics</c> and <c>Saves/BotStewardship</c> whole, every office kept by a guild's or a member's name, so a
-    /// guild founded again under an old name would have come back with its old head, its old purpose, the town posts it held and
-    /// the tributes it paid. Each part empties exactly what its store writes. The stewards and the council go first because they
-    /// alone hold the city's coin — the coffers, and the wages of watches on duty — and hand it back to the purse; the rest hold
-    /// none. The clock keeps running, so a new world's first term and first steward come as at a first start. Returns the gold
-    /// handed back to the purse.
-    /// </summary>
     public static int Wipe()
     {
         var back = BotStewardship.Wipe() + BotCouncil.Wipe();
@@ -79,7 +49,6 @@ public static class BotPolitics
         return back;
     }
 
-    /// <summary>The guild's politics on the page, inside its object in <c>/api/state</c>'s <c>guilds</c>. From <c>BotWebSnapshot</c>.</summary>
     public static void Write(Utf8JsonWriter w, Guild guild)
     {
         if (guild?.Name == null)
@@ -96,7 +65,6 @@ public static class BotPolitics
         w.WriteEndObject();
     }
 
-    /// <summary>What the bots say about it, put into the voice's bank wherever the bank has nothing for the occasion.</summary>
     public static Dictionary<string, string[]> Phrases() =>
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -126,7 +94,6 @@ public static class BotPolitics
         };
 }
 
-/// <summary>The numbers of <c>Configuration/bot-politics.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotPoliticsSettings
 {
     public bool? Elections { get; set; }
@@ -170,20 +137,14 @@ public sealed class BotPoliticsSettings
     public double? TributeShare { get; set; }
 }
 
-/// <summary>
-/// Politics as a module: reads its file, fills the voice's bank, offers the captain's guard, and runs the clock. World phase,
-/// after the population, the will, the travel, the estate and the diplomacy, whose guilds, towns, chests and wars it reads.
-/// </summary>
 public sealed class BotPoliticsModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPoliticsModule));
 
     private const string ConfigPath = "Configuration/bot-politics.json";
 
-    /// <summary>How often the four parts look: a minute.</summary>
     public static int LookMs { get; set; } = 60000;
 
-    /// <summary>How long after the module starts before the first look: five minutes, while the population is raised.</summary>
     public static int SettleMs { get; set; } = 300000;
 
     private static Timer _timer;
@@ -223,7 +184,6 @@ public sealed class BotPoliticsModule : BotModule
         BotCouncil.Open(_started);
         BotStewardship.Start();
 
-        // The watches' wages a restart caught on duty, back into the treasury (reset26 review). See BotCouncil.Settle.
         BotCouncil.Settle();
 
         logger.Information(

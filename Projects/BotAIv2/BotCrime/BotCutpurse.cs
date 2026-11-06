@@ -6,74 +6,30 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a thief a turn in the crowd by a bank: the engine's own Stealing on a bot's pack.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "thieves stealing from packs in the crowd by the bank (Stealing is in the engine)".</b> Nothing about
-/// the theft is the bots': the thief joins the engine's thieves' guild, puts its weapon away (both hands must be free), uses the
-/// skill and targets the mark, and the engine picks a random thing off the top of the mark's pack, weighs it against the skill,
-/// takes as much of a stack as the skill allows, and decides whether anybody noticed — a thief at nought is noticed almost
-/// always, at a hundred one time in three. Noticed is a criminal act: grey, and in a guarded town with a shopkeeper or a banker
-/// within eight tiles the engine sends its guards at once. That is the risk Patrick named, and it is the engine's.
-/// </para>
-///
-/// <para>
-/// <b>Bounded twice.</b> One thief per <see cref="BotCrime.ThiefPerBots"/> bots in the world, and <see cref="PerHour"/> tries
-/// across the whole island: a thief caught by a bank usually dies to a guard, and deaths per bot-hour are one of the night's
-/// key numbers. Each thief waits <see cref="EveryMs"/> between tries of its own.
-/// </para>
-/// </summary>
 public sealed class BotCutpurse : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCutpurse));
 
-    /// <summary>Whether thieves work the crowds at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>Tries at a pack across the island in an hour of uptime.</summary>
     public static int PerHour { get; set; } = 6;
 
-    /// <summary>How long one thief waits between its turns in a crowd.</summary>
     public static int EveryMs { get; set; } = 900000;
 
-    /// <summary>How far round the bank a thief looks for a mark.</summary>
     public static int CrowdTiles { get; set; } = 8;
 
-    /// <summary>
-    /// How long a thief waits by the bank for somebody worth robbing before it gives up. A minute (three until 07.10.2026, loops18):
-    /// the turn is offered only at a bank where a crowd stood when it was offered (<see cref="LeastCrowd"/>), so a long wait is a
-    /// crowd that has gone, not one still coming.
-    /// </summary>
     public static int CrowdWaitMs { get; set; } = 60000;
 
-    /// <summary>
-    /// <b>The marks standing by a bank for a turn there to be offered (07.10.2026, loops18).</b> On build 418's first 35 minutes 681
-    /// turns were offered and one was tried: every thief went to the nearest town's bank, which for Kirsten and Orlando was Skara
-    /// Brae's, where nobody came ("nobody worth robbing came by the bank in Skara Brae"), and the other turns dropped at the end of
-    /// their dwell, outbid by a peddle, while they waited. The banks are counted once every <see cref="CrowdLookMs"/> for the whole
-    /// island, and a thief is sent to the nearest within <see cref="CrowdReach"/> that has this many in its crowd. Nought: any bank.
-    /// </summary>
     public static int LeastCrowd { get; set; } = 2;
 
-    /// <summary>How often the crowds by the banks are counted, for the whole island. Thirty seconds, the market's own cadence.</summary>
     public static int CrowdLookMs { get; set; } = 30000;
 
-    /// <summary>How far a thief goes for a crowd, in tiles from where it stands. Its own leash still holds (<c>BotPopulation.Within</c>).</summary>
     public static int CrowdReach { get; set; } = 400;
 
-    /// <summary>
-    /// Whether a turn in a crowd is held against ordinary offers once taken (<see cref="BotDeed.Steadfast"/>, 07.10.2026, loops18): the
-    /// turn is a few minutes, and on build 418 eleven of twelve drops were "outbid by peddle/unload/deliver" or "jumped" at the end
-    /// of the dwell, with the thief still waiting for its mark. What will not wait still gets through, and a company's call is not
-    /// made to a thief at its turn (<c>BotSquads.Thieving</c>). Off: as before.
-    /// </summary>
     public static bool Holds { get; set; } = true;
 
-    /// <summary>Turns not offered because no bank within reach had a crowd (<see cref="LeastCrowd"/>). Looks, not thieves.</summary>
     public static long Crowdless { get; private set; }
 
-    /// <summary>Times the crowds by the banks were counted.</summary>
     public static long Counted { get; private set; }
 
     private static readonly List<(Point3D Bank, string Town, int Marks)> _crowds = [];
@@ -82,12 +38,10 @@ public sealed class BotCutpurse : IBotProposer
 
     private static long _crowdTick;
 
-    /// <summary>Whether a bot by a bank is somebody a thief could take from: in the world, seen, something in its pack, not one of the band.</summary>
     internal static bool Mark(BotMobile other) =>
         other is { Deleted: false, Alive: true, Hidden: false } && other.Backpack is { } pack && pack.Items.Count > 0
         && !BotUnderworld.Member(other) && !BotCrime.IsThief(other) && !BotOutlaw.Jailed(other);
 
-    /// <summary>Counts the marks by every town's bank, at most once every <see cref="CrowdLookMs"/>: one query a town, island-wide.</summary>
     private static void CountCrowds(Map map)
     {
         var now = Core.TickCount;
@@ -127,7 +81,6 @@ public sealed class BotCutpurse : IBotProposer
         }
     }
 
-    /// <summary>The bank nearest the thief, within reach and its leash, with a crowd of at least <see cref="LeastCrowd"/>; Zero if none.</summary>
     private static Point3D Crowd(BotMobile thief, Map map, out string town)
     {
         town = null;
@@ -161,22 +114,16 @@ public sealed class BotCutpurse : IBotProposer
         return best;
     }
 
-    /// <summary>How long a thief may close on one mark before it picks another.</summary>
     public static int CloseMs { get; set; } = 45000;
 
-    /// <summary>Tries at the engine in one turn: a stack too heavy or a bag is refused before any roll, and the thief tries again.</summary>
     public static int Tries { get; set; } = 3;
 
-    /// <summary>The chance a mark notices a theft nobody saw, after the thief has gone: it knows it was robbed, not by whom.</summary>
     public static double NoticeChance { get; set; } = 0.5;
 
-    /// <summary>How near a bystander must stand to the mark to see a thief caught and add its word to the mark's.</summary>
     public static int WitnessTiles { get; set; } = 8;
 
-    /// <summary>What a turn in the crowd is reckoned at before the ledger has measured one.</summary>
     public static double Prior { get; set; } = 40.0;
 
-    /// <summary>How far a thief walks away from the mark afterwards.</summary>
     public static int SlipTiles { get; set; } = 14;
 
     public static long Offered { get; private set; }
@@ -213,7 +160,6 @@ public sealed class BotCutpurse : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
-    /// <summary>Whether the island's hourly tries have room for one more.</summary>
     public static bool Room()
     {
         var now = Core.TickCount;
@@ -226,7 +172,6 @@ public sealed class BotCutpurse : IBotProposer
         return _tries.Count < Math.Max(0, PerHour);
     }
 
-    /// <summary>One try spent, of the island's and of the thief's.</summary>
     public static void Spent(Mobile thief)
     {
         var now = Core.TickCount;
@@ -270,7 +215,6 @@ public sealed class BotCutpurse : IBotProposer
             return null;
         }
 
-        // To a bank with a crowd, not the nearest town's (07.10.2026, loops18). See LeastCrowd.
         var bank = Crowd(body, map, out var town);
 
         if (bank == Point3D.Zero)
@@ -334,7 +278,6 @@ public sealed class BotCutpurse : IBotProposer
     }
 }
 
-/// <summary>A thief's turn in the crowd by a bank: find a mark, close on it, try its pack, and slip away. See <see cref="BotCutpurse"/>.</summary>
 public sealed class BotPickpocket : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPickpocket));
@@ -392,16 +335,12 @@ public sealed class BotPickpocket : BotDeed
 
     public override SkillName? Trains => SkillName.Stealing;
 
-    /// <summary>What the stolen goods will fetch at the fence: takings in their own right, as an ingot is to a smith.</summary>
     public override int Made => _made;
 
-    /// <summary>Once a mark is chosen the thief is about it: no ordinary offer takes it off the mark or the getaway.</summary>
     public override bool Committed => _mark != null || _done;
 
-    /// <summary>Held against ordinary offers for its own few minutes, the walk to the crowd and the wait included. See <see cref="BotCutpurse.Holds"/>.</summary>
     public override bool Steadfast => BotCutpurse.Holds;
 
-    /// <summary>Taken up again after something that would not wait: the wait for a mark starts again, and so do the clocks of a close or a getaway.</summary>
     public override void Resumed(IBotWilful bot)
     {
         var now = Core.TickCount;
@@ -436,7 +375,7 @@ public sealed class BotPickpocket : BotDeed
 
         if (_done)
         {
-            // The getaway: a few steps away from the mark, then over.
+
             if (body.InRange(_away, 2) || now - _leaving >= 20000)
             {
                 return _lifted ? BotDoing.Done(_outcome) : BotDoing.Failed(_outcome);
@@ -518,7 +457,6 @@ public sealed class BotPickpocket : BotDeed
         return Try(body, _mark, now);
     }
 
-    /// <summary>The mark: a bot of nobody's band near the bank with something in its pack, the fattest purse first.</summary>
     private BotMobile Choose(BotMobile thief)
     {
         BotMobile best = null;
@@ -543,14 +481,12 @@ public sealed class BotPickpocket : BotDeed
         return best;
     }
 
-    /// <summary>One try at the mark's pack through the engine's own skill, and what came of it.</summary>
     private BotDoing Try(BotMobile thief, BotMobile mark, long now)
     {
         var before = BotCrime.Census(thief);
         var grey = thief.Criminal;
         var pack = thief.Backpack;
 
-        // Both hands must be free: the engine's rule. What is put away is put back the moment the try is over.
         List<Item> stowed = [];
 
         if (pack != null)
@@ -599,7 +535,7 @@ public sealed class BotPickpocket : BotDeed
 
         if (gold <= 0 && things <= 0 && !caught)
         {
-            // Refused before any roll (a bag, a stack too heavy, something bound) or fumbled unseen: try again while there are tries.
+
             BotCutpurse.Refuse();
 
             if (_tries < Math.Max(1, BotCutpurse.Tries))
@@ -648,7 +584,6 @@ public sealed class BotPickpocket : BotDeed
             BotVoice.Say(mark, "cry", $"Thief! {thief.Name} has a hand in my pack!", true);
             BotCrime.Report(thief, mark, _town, "picking pockets by the bank", worth);
 
-            // A bystander who saw it adds its word: two reports and the town posts the thief.
             foreach (var other in _map.GetMobilesInRange<BotMobile>(mark.Location, BotCutpurse.WitnessTiles))
             {
                 if (other == thief || other == mark || other is not { Deleted: false, Alive: true } || BotUnderworld.Member(other)

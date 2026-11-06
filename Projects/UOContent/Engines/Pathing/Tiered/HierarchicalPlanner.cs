@@ -3,52 +3,31 @@ using System.Collections.Generic;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>How a route came out.</summary>
 public enum NavStatus
 {
-    /// <summary>A route: waypoints to walk, a short leg at a time.</summary>
+
     Ok,
 
-    /// <summary>The two places are joined inside one cluster: walk straight there with the precise search.</summary>
     Direct,
 
-    /// <summary>No way on the ground, as the graph was built: provably, from the components, or after searching all of it.</summary>
     Unreachable,
 
-    /// <summary>The clusters at one end are not built yet.</summary>
     Pending,
 
-    /// <summary>The search spent its budget before it found the goal.</summary>
     BudgetExceeded,
 
-    /// <summary>One end is off the map, or stands nowhere a body can stand.</summary>
     Unplaced
 }
 
-/// <summary>
-/// The medium tier: hierarchical A* over the first level of the navigation graph.
-///
-/// <para>
-/// The start and the goal are joined to their clusters' nodes by a flood inside each cluster (<see cref="NavWindow"/>),
-/// forward from the start and backward to the goal; when the start's flood reaches the goal the answer is
-/// <see cref="NavStatus.Direct"/>. Otherwise an A* over the nodes, estimated by <see cref="NavCost.Estimate"/> (never more
-/// than the truth, every step costing at least a step), and ties broken towards the larger cost so far, which is the
-/// node nearer the goal. What comes back is one point a cluster: of each gate's two nodes the far one, since the near
-/// one is a single step before it.
-/// </para>
-/// </summary>
 public sealed class HierarchicalPlanner
 {
-    /// <summary>Most nodes one route may expand before it answers <see cref="NavStatus.BudgetExceeded"/>.</summary>
+
     public int MaxExpansions { get; set; } = 20000;
 
-    /// <summary>The estimate is raised by one part in this many (0 for none). See Relax.</summary>
     public int TieBreak { get; set; } = 1000;
 
-    /// <summary>How far round an end the planner looks for a tile a body can stand on, when the end itself has none.</summary>
     public int Anchorage { get; set; } = 2;
 
-    /// <summary>How long a gate a walker could not pass is shunned, in milliseconds, and what shunning it adds to a route.</summary>
     public int ShunMs { get; set; } = 600000;
 
     public int ShunCost { get; set; } = 40 * NavCost.Step;
@@ -57,14 +36,8 @@ public sealed class HierarchicalPlanner
 
     public long Shunned { get; private set; }
 
-    /// <summary>Whether any gate is shunned now (or was, and has not been asked about since): a route planned now may go round one.</summary>
     public bool Shunning => _shunned.Count > 0;
 
-    /// <summary>
-    /// A walker could not pass the gate at (x, y): every node there is shunned for <see cref="ShunMs"/>, so the next
-    /// routes go round it where there is a way round. Something the graph cannot see stands in it — an item, a crowd, a
-    /// house raised since its cluster was drawn and not yet redrawn.
-    /// </summary>
     public void Shun(NavGraph graph, int x, int y)
     {
         for (var s = 0; s < NavWindow.MaxStrata; s++)
@@ -98,13 +71,8 @@ public sealed class HierarchicalPlanner
         return ShunCost + danger;
     }
 
-    /// <summary>
-    /// When set, the search keeps to the clusters whose region (<see cref="StrategicPlanner.RegionOf"/>) is marked in it: the
-    /// corridor the long tier found. Null for the whole map.
-    /// </summary>
     public HashSet<int> Corridor { get; set; }
 
-    /// <summary>Where the ends' windows come from: a shared cache of probed clusters, or, when null, windows of its own.</summary>
     public NavWindowCache Cache { get; set; }
 
     private readonly NavWindow _ownStart = new();
@@ -137,35 +105,19 @@ public sealed class HierarchicalPlanner
 
     public long Expanded { get; private set; }
 
-    /// <summary>Parent chains found looping in <c>Unwind</c> and cut. See StrategicPlanner.Corridor.</summary>
     public long Cycles { get; private set; }
 
     public int LastExpanded { get; private set; }
 
     public int LastCost { get; private set; }
 
-    /// <summary>
-    /// The nodes of the last <see cref="NavStatus.Ok"/> route, start end first, the gates' near sides included; empty after
-    /// any other answer. What the route memory keeps (<see cref="NavRouteMemory"/>): the points handed to the walker are
-    /// these less every gate's near side.
-    /// </summary>
     public IReadOnlyList<int> LastPath => _path;
 
-    /// <summary>
-    /// The route from (sx, sy, sz) to (gx, gy, gz) over <paramref name="graph"/>, into <paramref name="points"/> (cleared
-    /// first), when the answer is <see cref="NavStatus.Ok"/>.
-    /// </summary>
     public NavStatus Route(NavGraph graph, int sx, int sy, int sz, int gx, int gy, int gz, List<Point3D> points) =>
         Route(graph, sx, sy, sz, gx, gy, gz, points, 0);
 
-    /// <summary>The goal the last route was planned to: the cell asked for, or the one within reach it settled on.</summary>
     public Point3D LastGoal { get; private set; }
 
-    /// <summary>
-    /// The same, for a walker that arrives within <paramref name="reach"/> tiles of the goal: when the goal's own cell is
-    /// not joined to the start — a herb on a table, a fire in a walled corner, the tile under a stall — the nearest cell
-    /// within reach that is, as the precise search itself settles for one.
-    /// </summary>
     public NavStatus Route(NavGraph graph, int sx, int sy, int sz, int gx, int gy, int gz, List<Point3D> points, int reach)
     {
         points.Clear();
@@ -204,8 +156,6 @@ public sealed class HierarchicalPlanner
         var placed = false;
         Span<int> order = stackalloc int[NavWindow.MaxStrata];
 
-        // The goal's own cell first, then ring by ring out to the reach; on each cell, its surfaces nearest the height asked.
-        // Past the reach only the anchor counts: the first cell with anywhere to stand, for a goal on a tree or a wall.
         for (var r = 0; r <= radius; r++)
         {
             if (placed && r > reach)
@@ -272,7 +222,6 @@ public sealed class HierarchicalPlanner
         return placed ? NavStatus.Unreachable : NavStatus.Unplaced;
     }
 
-    /// <summary>A cell's strata, nearest the height <paramref name="z"/> first.</summary>
     private static void Nearest(NavWindow w, int x, int y, int z, int n, Span<int> order)
     {
         for (var i = 0; i < n; i++)
@@ -301,16 +250,6 @@ public sealed class HierarchicalPlanner
         return own;
     }
 
-    /// <summary>
-    /// The component of the graph a body standing at (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>) belongs
-    /// to: the component of any node of its cluster that its own window's flood reaches. Minus one when the components are
-    /// not counted yet, the cluster is not built, the point cannot be anchored, or the cell is a pocket no gate leaves.
-    ///
-    /// <para>
-    /// One flood of a sixteen-tile window and a walk over the cluster's nodes — microseconds. It is what a teleporter's two
-    /// ends are asked, so that a route can be drawn to the gate whose far side is joined to the goal (BotGates, 29.09.2026).
-    /// </para>
-    /// </summary>
     public int ComponentAt(NavGraph graph, int x, int y, int z)
     {
         if (graph == null || !graph.ComponentsValid || !graph.Contains(x, y))
@@ -353,11 +292,6 @@ public sealed class HierarchicalPlanner
         return -1;
     }
 
-    /// <summary>
-    /// How the two ends of a route join the graph: the stratum each was anchored to, and every node of its cluster with the
-    /// cost from the start (or to the goal) and its component. For the door, when the graph says there is no way and a
-    /// walker finds one.
-    /// </summary>
     public string Explain(NavGraph graph, int sx, int sy, int sz, int gx, int gy, int gz)
     {
         if (!graph.Contains(sx, sy) || !graph.Contains(gx, gy))
@@ -410,7 +344,6 @@ public sealed class HierarchicalPlanner
         return string.Join(" | ", parts);
     }
 
-    /// <summary>The stratum of the end's cell nearest its height, or of the nearest cell within <see cref="Anchorage"/> with any.</summary>
     internal static bool Anchor(NavWindow w, ref int x, ref int y, int z, int anchorage, out int stratum)
     {
         for (var r = 0; r <= anchorage; r++)
@@ -442,7 +375,6 @@ public sealed class HierarchicalPlanner
         return false;
     }
 
-    /// <summary>Whether a node the start reaches in its cluster and a node that reaches the goal in its share a component.</summary>
     private bool Share(NavGraph graph, IReadOnlyList<int> startNodes, IReadOnlyList<int> goalNodes)
     {
         for (var i = 0; i < startNodes.Count; i++)
@@ -597,10 +529,6 @@ public sealed class HierarchicalPlanner
         _g[node] = cost;
         _parent[node] = parent;
 
-        // f first; at equal f, the larger g, which is the node nearer the goal. The estimate is raised by one part in
-        // TieBreak: a step costs the same straight or diagonal, so the straight-line metric leaves wide plateaus of routes of
-        // exactly equal cost, and A* explores all of every plateau unless the estimate leans, however slightly, towards
-        // the goal. A route at most one part in TieBreak dearer than the best.
         var lean = TieBreak > 0 ? estimate / TieBreak : 0;
 
         _open.Enqueue(node, ((long)(cost + estimate + lean) << 32) | (uint)(int.MaxValue - cost));
@@ -613,7 +541,7 @@ public sealed class HierarchicalPlanner
 
         for (var node = _parent[g]; node >= 0 && node != s; node = _parent[node])
         {
-            // Bounded as StrategicPlanner.Corridor is: a chain longer than the graph is a loop.
+
             if (++steps > graph.Capacity + 2)
             {
                 Cycles++;
@@ -631,7 +559,6 @@ public sealed class HierarchicalPlanner
         {
             var node = _path[i];
 
-            // The near side of a gate is a step before its far side, and the far side is the one worth walking to.
             if (i + 1 < _path.Count && graph.ClusterOfNode(_path[i + 1]) != graph.ClusterOfNode(node))
             {
                 continue;

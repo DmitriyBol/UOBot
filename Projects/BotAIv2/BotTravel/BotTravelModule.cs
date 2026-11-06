@@ -5,32 +5,22 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-travel.json</c>. A missing key keeps the code's value.</summary>
 public sealed class BotTravelSettings
 {
-    /// <summary>Whether bots travel to other towns at all.</summary>
+
     public bool? Running { get; set; }
 
-    /// <summary>Hours one bot waits between journeys.</summary>
     public double? EveryHours { get; set; }
 
-    /// <summary>The furthest town offered, as the crow flies.</summary>
     public int? Furthest { get; set; }
 
-    /// <summary>What a journey is worth a minute.</summary>
     public double? Prior { get; set; }
 
-    /// <summary>How far round a reachable town the population may work. See BotTowns.Roam.</summary>
     public int? TownRoam { get; set; }
 
-    /// <summary>How much likelier an unwalked road is. See BotTraveller.Curiosity.</summary>
     public double? Curiosity { get; set; }
 }
 
-/// <summary>
-/// The towns, the roads between them and the journeys. See <see cref="BotTowns"/>, <see cref="BotRoadbook"/> and
-/// <see cref="BotTravel"/> — Patrick's order of 29.09.2026.
-/// </summary>
 public sealed class BotTravelModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTravelModule));
@@ -39,7 +29,6 @@ public sealed class BotTravelModule : BotModule
 
     public static bool Enabled { get; set; } = true;
 
-    /// <summary>How often the roads are drawn, a pair a slice, and the towns asked of the gates.</summary>
     public static int SliceMs { get; set; } = 250;
 
     private static Timer _timer;
@@ -108,7 +97,6 @@ public sealed class BotTravelModule : BotModule
         BotTowns.Forget();
     }
 
-    /// <summary>One slice of drawing while there is drawing to do; then a look at the roads' JSON once a minute for the danger readings.</summary>
     private sealed class TravelTimer : Timer
     {
         private long _wroteTick;

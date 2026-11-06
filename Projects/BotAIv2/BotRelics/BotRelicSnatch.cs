@@ -3,22 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a thief a relic in a carrier's pack (07.10.2026, relics20; Patrick: "a relic can be stolen — thieves get a target"). The
-/// thieves are <c>BotCrime</c>'s: a member of The Shadow or a recruit on its roll (<see cref="BotCrime.IsThief"/>), and every try
-/// is one of the island's hourly tries at a pack (<see cref="BotCutpurse.Room"/>, <see cref="BotCutpurse.Spent"/>), so relic
-/// thefts are bounded by the same number the crowds by the banks are.
-///
-/// <para>
-/// <b>The relic bar.</b> The engine's Stealing will not lift an item that cannot be moved, and a relic cannot, so the try is the
-/// shard's own, on the engine's skill: only a thief at <see cref="Bar"/> Stealing or better is offered a relic at all, and it takes
-/// it with a chance of its skill over a hundred times <see cref="Odds"/> (at most <see cref="Most"/>). A miss is always seen: the
-/// carrier cries thief and reports it to the town. A lift is seen <see cref="SeenChance"/> of the time, and then reported with the
-/// weight of two (a relic's theft posts the thief at once). Only a relic on the road is a target — one in a hall is taken by a war
-/// alone — and never one carried by the thief's own guild. At most one relic theft is tried on the island every
-/// <see cref="EveryMs"/>.
-/// </para>
-/// </summary>
 public sealed class BotRelicSnatch : IBotProposer
 {
     public string Name => "RelicThief";
@@ -27,30 +11,22 @@ public sealed class BotRelicSnatch : IBotProposer
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>The least Stealing a thief brings to be offered a relic.</summary>
     public static double Bar { get; set; } = 30.0;
 
-    /// <summary>The chance of a lift is Stealing / 100 × this, at most <see cref="Most"/>.</summary>
     public static double Odds { get; set; } = 0.6;
 
     public static double Most { get; set; } = 0.6;
 
-    /// <summary>The chance a lift is seen anyway.</summary>
     public static double SeenChance { get; set; } = 0.5;
 
-    /// <summary>How far a thief goes after a carrier.</summary>
     public static int Reach { get; set; } = 150;
 
-    /// <summary>The least time between two relic thefts tried on the island.</summary>
     public static int EveryMs { get; set; } = 1800000;
 
-    /// <summary>How long a thief closes on a carrier before it gives up.</summary>
     public static int CloseMs { get; set; } = 120000;
 
-    /// <summary>What a relic's theft is reported as having taken: it raises the bounty on the thief's head.</summary>
     public static int Worth { get; set; } = 300;
 
-    /// <summary>What the try is reckoned at per minute before the ledger has measured one.</summary>
     public static double Prior { get; set; } = 60.0;
 
     public static long Offered { get; private set; }
@@ -147,7 +123,6 @@ public sealed class BotRelicSnatch : IBotProposer
     }
 }
 
-/// <summary>A thief after a relic in a carrier's pack: close on it, reach for it, and slip away.</summary>
 public sealed class BotRelicTheft : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRelicTheft));
@@ -188,10 +163,6 @@ public sealed class BotRelicTheft : BotDeed
 
     public override SkillName? Trains => SkillName.Stealing;
 
-    /// <summary>
-    /// Half what the fence asks for it: takings in their own right, as a lifted purse's goods are at the fence's share — and half,
-    /// because a relic is sold only if some guild's chest can pay before the thief is caught.
-    /// </summary>
     public override int Made => _lifted ? BotRelics.RelicRansom / 2 : 0;
 
     public override bool Committed => _done;

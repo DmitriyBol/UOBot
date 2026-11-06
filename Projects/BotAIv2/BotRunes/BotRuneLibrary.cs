@@ -6,39 +6,16 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guild's rune library: a runebook in the hall's chest, or in the pack of the guild's keeper where there is no hall,
-/// written from what the guild knows (<see cref="BotRuneShelf"/>), and the copies it lends to the guild's rune-mages.
-///
-/// <para>
-/// <b>The library is the guild's record; the runes that travel are the mages' own.</b> A rune in a chest two hundred tiles
-/// away takes nobody anywhere, so the pathfinder that marks a place keeps the rune in its own book
-/// (<see cref="BotRunes.Satchel"/>) and the knowledge goes to the library at once, where Patrick can open the chest and
-/// read every place the guild has stood. A rune-mage standing at the library — within <see cref="Reach"/> of the chest,
-/// or of the keeper — is lent a copy of every rune its own book lacks, and <b>each copy costs it a blank rune</b>. Copying
-/// a rune is not an engine operation; the blank is the engine's price of a rune, so what a library holds spreads through
-/// the guild at the price of the blanks, and a guild with no blanks spreads nothing (<see cref="BotRuneBuyer"/>).
-/// </para>
-///
-/// <para>
-/// <b>The book outlives the body that carried it.</b> A hall's chest is saved with the world and its book with it; a
-/// keeper's pack is not, since the population is raised afresh at every boot. A library missing from where it belongs is
-/// written again from the shelf, as the keeper's knowledge was never in the book in the first place.
-/// </para>
-/// </summary>
 public static class BotRuneLibrary
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRuneLibrary));
 
     public const string Prefix = "the library of ";
 
-    /// <summary>How near the hall's chest a rune-mage stands to be lent copies. Sixteen: anywhere in the hall or at its door.</summary>
     public static int Reach { get; set; } = 16;
 
-    /// <summary>How near the keeper a rune-mage stands to be lent copies, where the guild has no hall. Eight.</summary>
     public static int KeeperReach { get; set; } = 8;
 
-    /// <summary>How often each guild's library is looked at: the module's clock. Five seconds.</summary>
     public static int EveryMs { get; set; } = 5000;
 
     public static long Books { get; private set; }
@@ -47,7 +24,6 @@ public static class BotRuneLibrary
 
     public static long Lent { get; private set; }
 
-    /// <summary>Copies a mage at the library went without for want of a blank.</summary>
     public static long Unlent { get; private set; }
 
     public static long Moved { get; private set; }
@@ -56,11 +32,9 @@ public static class BotRuneLibrary
 
     private static readonly Dictionary<string, int> _written = new(StringComparer.Ordinal);
 
-    /// <summary>The hall's chest, or null when the guild has no hall.</summary>
     public static Container Chest(Guild guild) =>
         BotEstate.Hall(guild) is { Deleted: false } hall ? BotAbode.Chest(hall) : null;
 
-    /// <summary>The rune-mage of the guild with the most Magery, or its head when it has none.</summary>
     public static BotMobile Keeper(Guild guild)
     {
         BotMobile best = null;
@@ -85,11 +59,6 @@ public static class BotRuneLibrary
     private static bool IsLibrary(Runebook book, Guild guild) =>
         book is { Deleted: false } && string.Equals(book.Description, Title(guild), StringComparison.Ordinal);
 
-    /// <summary>
-    /// The guild's library where it belongs — in the hall's chest when there is a hall, else in the pack of a member — found
-    /// or made when <paramref name="make"/>, and moved when it is not where it belongs: into the chest once a hall has gone
-    /// up, and to the keeper when whoever carried it has left the guild.
-    /// </summary>
     public static Runebook Book(Guild guild, bool make)
     {
         if (guild == null)
@@ -147,7 +116,6 @@ public static class BotRuneLibrary
         return book;
     }
 
-    /// <summary>The library in the hall's chest, or in a member's pack — the keeper's, or one carried before the hall went up.</summary>
     private static Runebook Search(Guild guild, Container chest)
     {
         if (chest != null)
@@ -182,13 +150,11 @@ public static class BotRuneLibrary
         return null;
     }
 
-    /// <summary>Whether the library stands where it belongs: in the chest when there is one, else with a member of the guild.</summary>
     private static bool Placed(Runebook book, Guild guild, Container chest) =>
         chest != null
             ? ReferenceEquals(book.Parent, chest)
             : book.RootParent is BotMobile { Deleted: false } holder && holder.Guild == guild;
 
-    /// <summary>Puts the library where it belongs. False when there is nowhere: no hall and nobody to carry it.</summary>
     private static bool Place(Runebook book, Guild guild, Container chest)
     {
         if (chest != null)
@@ -209,7 +175,6 @@ public static class BotRuneLibrary
         return true;
     }
 
-    /// <summary>Writes the guild's knowledge into its library: an entry for every place on the shelf, none for a place off it.</summary>
     public static void Write(Guild guild)
     {
         var places = BotRuneShelf.Of(guild?.Name);
@@ -229,7 +194,6 @@ public static class BotRuneLibrary
 
         var entries = book.Entries;
 
-        // What the shelf no longer holds leaves the book: a seat that moved, a place dropped off a full shelf.
         for (var i = entries.Count - 1; i >= 0; i--)
         {
             var entry = entries[i];
@@ -271,10 +235,6 @@ public static class BotRuneLibrary
         return false;
     }
 
-    /// <summary>
-    /// Lends a rune-mage standing at the library a copy of every rune its own book lacks, a blank rune each. Returns the
-    /// copies made.
-    /// </summary>
     public static int Lend(BotMobile mage, Guild guild, Runebook library)
     {
         if (library == null || !BotRunes.Mage(mage) || mage.Guild != guild || BotDungeon.Under(mage.Location))
@@ -351,10 +311,6 @@ public static class BotRuneLibrary
         return copies;
     }
 
-    /// <summary>
-    /// One look at every guild's library, on the module's clock (<see cref="EveryMs"/>): written when the guild's knowledge
-    /// has changed, and lending to whoever stands at it.
-    /// </summary>
     public static void Tick()
     {
         if (!BotRunes.Running)

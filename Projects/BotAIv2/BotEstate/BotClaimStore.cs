@@ -2,57 +2,22 @@
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps who owns which square of the island across restarts.
-///
-/// <para>
-/// <b>Patrick's order of 10.09.2026: "claims must be written down, because the bots pay for them".</b> Every other
-/// board on this shard is cleared on a world reload and that is right — a market stall, a want, an errand
-/// and a squad are all about a moment. Ground is not. A guild spends four free claims and then five thousand
-/// gold a square, stands three of its members in a field for five minutes to earn each one, and until this
-/// existed the whole register was thrown away by the next rebuild. That is not a board going stale, it is
-/// the shard taking something a guild bought.
-/// </para>
-///
-/// <para>
-/// <b>Names and numbers only, exactly as <see cref="BotQuadStore"/> is.</b> A holding is a facet id, two
-/// square coordinates, a guild's name and whether it was paid for. Nothing here points at a mobile, an item
-/// or a serial, so it outlives a world the rest of the shard cannot.
-/// </para>
-///
-/// <para>
-/// <b>A claim still running is written too, and it comes back with its clock reset.</b> The money went when
-/// the claim was declared, so a restart in the middle of a muster would otherwise charge a guild five
-/// thousand gold for nothing. Restoring the remaining seconds would be worse than useless — the population
-/// is rebuilt scattered and thirty seconds is not enough for anybody to walk anywhere — so what is returned
-/// is the attempt, whole. The tick it began at is deliberately not written: a tick count means nothing in
-/// the next process, and on some hosts it is the machine's uptime.
-/// </para>
-/// </summary>
 public sealed class BotClaimStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotClaimStore));
 
-    /// <summary>
-    /// The shape of what is written below. 2 (06.10.2026, build 408): each claim being made carries the price held for it
-    /// (<c>BotClaim.Bid.Escrow</c>), and the failed musters still resting follow the claims, so neither a held price nor a
-    /// square's rest is lost to a restart. A shape-1 save reads as claims that hold nothing — they paid when declared.
-    /// </summary>
     private const int Shape = 2;
 
     private const int Oldest = 1;
 
     private static BotClaimStore _store;
 
-    /// <summary>Registered from <c>BotCore.Configure</c>: a persistence must exist before the world loads.</summary>
     public static void Configure() => _store ??= new BotClaimStore();
 
-    /// <summary>The priority is only an ordering among save files; nothing else depends on it.</summary>
     public BotClaimStore() : base("BotClaims", 14)
     {
     }
 
-    /// <summary>Squares read back from the last save, for the start-up line to report.</summary>
     public static int Restored { get; private set; }
 
     public override void Serialize(IGenericWriter writer)
@@ -99,7 +64,6 @@ public sealed class BotClaimStore : GenericPersistence
             writer.WriteEncodedInt(bid.Escrow);
         }
 
-        // A held price still owed to a chest from the last boot is written as a claim, and is owed again on the next.
         for (var i = 0; i < owed.Count; i++)
         {
             writer.WriteEncodedInt(owed[i].Key.Map);

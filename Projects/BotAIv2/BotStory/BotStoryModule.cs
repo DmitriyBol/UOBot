@@ -6,15 +6,10 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The stories as a module: reads bot-story.json, listens to the event stream, starts the story's clock and the Stories: line.
-/// It hangs <see cref="BotStory.Heard"/> on <see cref="BotEvents"/>; it offers no work and asks nothing of any bot.
-/// </summary>
 public sealed class BotStoryModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStoryModule));
 
-    /// <summary>How often the <c>Stories:</c> line is written. The population's own five minutes.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _clock;
@@ -87,17 +82,13 @@ public sealed class BotStoryModule : BotModule
 
 /// <summary>
 /// Keeps the stories across restarts (PLAN-life A3, 13.10.2026): every bot's book — when it was first seen or born, what it was
-/// then, its notes, what the walk last saw of it — the chapters the model retold with the facts' hash each was told from, and
-/// the Chronicle's days. In the world save, never a loose file under <c>Saves/</c> (that folder is moved to a backup at every
-/// save); emptied by <c>do reset</c> through <see cref="BotStory.Wipe"/>.
-/// </summary>
+
 public sealed class BotStoryStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStoryStore));
 
     private static BotStoryStore _store;
 
-    /// <summary>Called from <see cref="BotStoryCore.Configure"/>: a persistence must exist before the world is read.</summary>
     public static void Open() => _store ??= new BotStoryStore();
 
     public BotStoryStore() : base("BotStory", 25)
@@ -106,13 +97,6 @@ public sealed class BotStoryStore : GenericPersistence
 
     public override void Serialize(IGenericWriter writer) => BotStory.Save(writer);
 
-    /// <summary>
-    /// A file of another shape is never handed to the engine. The engine reads a store through a memory-mapped view and stops the
-    /// boot on a console prompt ("Skip this file and continue?") unless the reader ends exactly at the file's length; a store left
-    /// half read, or seeked to the view's end (page-rounded on Windows: a 100-byte file reads 4096), both stop it, and a shard
-    /// started from a script never answers. So the shape, the file's first number, is read here first, and on a mismatch the
-    /// stories are dropped with a warning and the next save writes the new shape. The stories are worth less than a boot.
-    /// </summary>
     public override void Deserialize(string savePath, Dictionary<ulong, string> typesDb)
     {
         var path = Path.GetFullPath(SaveFilePath, savePath);
@@ -132,7 +116,6 @@ public sealed class BotStoryStore : GenericPersistence
         base.Deserialize(savePath, typesDb);
     }
 
-    /// <summary>The first encoded integer of the file, or null when there is no file or it cannot be read (the engine then decides).</summary>
     private static int? Peek(string path)
     {
         try
@@ -175,10 +158,9 @@ public sealed class BotStoryStore : GenericPersistence
     public override void Deserialize(IGenericReader reader) => BotStory.Load(reader);
 }
 
-/// <summary>The stories' way in: the store and the module registered from outside <c>BotCore</c>, after it has read its own switch.</summary>
 public static class BotStoryCore
 {
-    /// <summary>After <c>BotCore.Configure</c> (40) and the character's (41); before the world is read, which the store needs.</summary>
+
     [CallPriority(47)]
     public static void Configure()
     {
@@ -187,8 +169,6 @@ public static class BotStoryCore
             return;
         }
 
-        // Read here as well as at the module's start: the population raises its bots (and BotStory.Born writes their births) in its
-        // own start, before this module's, and a Running of false must already hold for them.
         BotStoryConfig.Load();
 
         BotStoryStore.Open();
@@ -196,7 +176,6 @@ public static class BotStoryCore
     }
 }
 
-/// <summary><c>Configuration/bot-story.json</c>: every key optional, PascalCase, nothing written means the code's own number.</summary>
 public sealed class BotStorySettings
 {
     public bool? Running { get; set; }

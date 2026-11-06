@@ -7,55 +7,22 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The city's treasury: the one purse on the shard that mints coin, and everything the city does is paid from it.
-///
-/// <para>
-/// <b>A lever with a budget is a lever a model may hold.</b> Until 16.09.2026 the city was one button on the
-/// administrator's dashboard — buy ten lots from afar, paid for out of nothing, without limit — and for that reason it
-/// could be given to nobody else. Patrick's order: whatever the city can do must be in Argus's and the debuggers'
-/// hands. So the city has a purse. It fills at <see cref="MintPerHour"/> up to <see cref="Cap"/> and never faster,
-/// every purchase comes out of it, and a purchase it cannot pay for is refused and counted. A watcher that buys
-/// everything on the market at three in the morning has spent the treasury, not printed one.
-/// </para>
-///
-/// <para>
-/// <b>Two ways the city spends.</b> A buy takes whole lots from the bots' shops standing open by the bank, and pays what was
-/// asked. A standing order names a thing, an amount and a price, and the clock takes that thing from any open shop whenever it
-/// is on show at or under the price — the outside demand a producer sees as goods that sell as fast as they are made. Both are
-/// booked as sales, so the shops learn from them like from any other.
-/// </para>
-///
-/// <para>
-/// <b>At the shops, never off stalls (01.10.2026, the auction removed on Patrick's order of 30.09).</b> The city used to buy off
-/// the placeless stalls from wherever it was; now it buys only where a keeper is standing at its pitch with the goods
-/// (<see cref="BotShopkeep.CityBuy"/>): the town's own buyer at the market, as a shopkeeper buys over its counter. The goods
-/// leave the world as they always did — bought by somewhere that is not here — and the keeper is paid in coin into its pack.
-/// </para>
-/// </summary>
 public static class BotCity
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCity));
 
-    /// <summary>Whether the treasury mints, serves and sells at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>What the treasury opens with at a boot.</summary>
     public static int Opening { get; set; } = 1000;
 
-    /// <summary>What the mint adds in an hour, spread over the clock's ticks.</summary>
     public static int MintPerHour { get; set; } = 3000;
 
-    /// <summary>The most the treasury may hold. The mint stops here; spending starts it again.</summary>
     public static int Cap { get; set; } = 20000;
 
-    /// <summary>How often the clock turns: the mint, and the standing orders served at the bots' shops.</summary>
     public static int EveryMs { get; set; } = 60000;
 
-    /// <summary>Most standing orders at once.</summary>
     public static int MostWants { get; set; } = 8;
 
-    /// <summary>What is in the treasury now.</summary>
     public static int Purse { get; private set; }
 
     public static long Minted { get; private set; }
@@ -66,34 +33,16 @@ public static class BotCity
 
     public static long Units { get; private set; }
 
-    /// <summary>Things bought against a standing order.</summary>
     public static long Served { get; private set; }
 
-    /// <summary>Standing orders filled to the last unit.</summary>
     public static long Filled { get; private set; }
 
-    /// <summary>Buys refused because the treasury was empty.</summary>
     public static long Refused { get; private set; }
 
-    /// <summary>What the guilds have paid the city for ground (and for houses, and what outlaws were fined), all told, every coin into the purse.</summary>
     public static long Taxed { get; private set; }
 
-    /// <summary>Of <see cref="Taxed"/>, what came in while the purse stood at or above <see cref="Cap"/>: until build 408, destroyed.</summary>
     public static long AboveCap { get; private set; }
 
-    /// <summary>
-    /// Coin the guilds paid for ground, into the treasury. Patrick's fifth City idea of 16.09.2026.
-    ///
-    /// <para>
-    /// <b>The cap is the mint's ceiling, not the purse's (06.10.2026, build 408).</b> This took only what fitted under
-    /// <see cref="Cap"/> and the rest of the payment was simply gone: on build 405 26 claims paid 104,000gp and about 64,000 of
-    /// it was destroyed against a full purse — 05:05 to 05:10 the city was taxed 23,000 more, spent 3,409 and held 933 more,
-    /// so 18,658gp vanished in five minutes. A payment is coin that already exists, and Patrick's rule is that no money is
-    /// made or destroyed quietly: the whole of it goes into the purse, and the mint (<see cref="Mint"/>), which makes coin,
-    /// still stops at the cap. What came in above the cap is counted (<see cref="AboveCap"/>), and the fairs, errands and
-    /// bounties spend it like any other coin in the purse.
-    /// </para>
-    /// </summary>
     public static void Tax(int coin)
     {
         if (coin <= 0)
@@ -106,17 +55,10 @@ public static class BotCity
         Purse = (int)Math.Min(int.MaxValue, (long)Purse + coin);
     }
 
-    /// <summary>Claim money paid back to the guilds for squares on town ground (07.10.2026, <c>BotTownGround</c>), and of it how much the purse could not cover.</summary>
     public static long Unclaimed { get; private set; }
 
     public static long UnclaimedShort { get; private set; }
 
-    /// <summary>
-    /// <b>Claim money going back where it came from</b> (Patrick, 07.10.2026: "remove such claims right now and give the guilds
-    /// their money back"). As much of <paramref name="coin"/> as the purse holds leaves it; the caller puts the whole of
-    /// <paramref name="coin"/> in the guild's chest, so what the purse could not cover is counted here, never hidden. Not
-    /// booked as spent: the ground was never sold, the payment is undone.
-    /// </summary>
     public static int Unclaim(int coin)
     {
         if (coin <= 0)
@@ -133,21 +75,12 @@ public static class BotCity
         return paid;
     }
 
-    /// <summary>What the city has paid on top of the capital's counters, and over how many sales. See <see cref="BotCapital"/>.</summary>
     public static long CapitalPaid { get; private set; }
 
     public static long CapitalSales { get; private set; }
 
-    /// <summary>Whether the purse holds anything above <paramref name="reserve"/>: what the capital's chooser asks before it counts the premium.</summary>
     public static bool Holds(int reserve) => Running && Purse > Math.Max(0, reserve);
 
-    /// <summary>
-    /// <b>The capital's price, out of the purse (30.09.2026, Patrick's evening order: Britain the centre of trade).</b> As much of
-    /// <paramref name="gold"/> as the purse holds above <paramref name="reserve"/>, taken out and booked as spent; the caller
-    /// hands it to the seller (<see cref="BotCapital.Sold"/>). Nothing when the city is not running. Out of the treasury rather
-    /// than made on the spot, so the premium is a lever with a budget: never more than the mint, and stopped by an empty purse
-    /// the way a buy or a fair is.
-    /// </summary>
     public static int Draw(int gold, int reserve)
     {
         if (!Running || gold <= 0)
@@ -170,10 +103,8 @@ public static class BotCity
         return paid;
     }
 
-    /// <summary>Coin taken out of the purse and held for a promise on the board of errands. See <see cref="BotQuests"/>.</summary>
     public static long Escrowed { get; private set; }
 
-    /// <summary>The purse asked to hold this much for an errand; false, and nothing moves, if it cannot.</summary>
     public static bool Escrow(int gold)
     {
         if (gold <= 0 || Purse < gold)
@@ -187,11 +118,6 @@ public static class BotCity
         return true;
     }
 
-    /// <summary>
-    /// Coin an errand read back from the save already holds: taken from the purse before the restart, and still owed. The
-    /// purse itself is read back without it, so only the count of what is held is put right — after build 95's boot the
-    /// city's line said "0gp held for the board's errands" with a 150gp errand standing on the board.
-    /// </summary>
     public static void Held(int gold)
     {
         if (gold > 0)
@@ -200,7 +126,6 @@ public static class BotCity
         }
     }
 
-    /// <summary>Held coin back in the purse: the errand lapsed or was withdrawn.</summary>
     public static void Refund(int gold)
     {
         if (gold <= 0)
@@ -212,7 +137,6 @@ public static class BotCity
         Escrowed = Math.Max(0, Escrowed - gold);
     }
 
-    /// <summary>Held coin paid out to whoever did the errand.</summary>
     public static void Disbursed(int gold)
     {
         if (gold <= 0)
@@ -224,15 +148,6 @@ public static class BotCity
         Spent += gold;
     }
 
-    /// <summary>
-    /// <b>For Patrick's reset (07.10.2026, reset26): whatever is still counted as held, once every holder has handed its coin back,
-    /// goes back into the purse.</b> Every holder of the purse's coin — the board's errands, the events, the watches' wages, the
-    /// stewards' coffers — is wiped by the reset and hands back what it holds through <see cref="Refund"/> first. What is left of
-    /// <see cref="Escrowed"/> after that was taken out of the purse for a promise nobody can keep any more: a holder whose own
-    /// account of it was lost (a deleted bot's deed is forgotten, never dropped). It is the purse's coin, so it goes back into the
-    /// purse rather than staying counted as held by nobody — and the next boot, which counts as held only what a store reads back,
-    /// would otherwise lose it without a word. Said in the log when it is not nought. Returns the gold.
-    /// </summary>
     public static int Unhold()
     {
         var rest = (int)Math.Min(int.MaxValue, Math.Max(0L, Escrowed));
@@ -263,7 +178,6 @@ public static class BotCity
 
     private static readonly List<Order> _wants = [];
 
-    /// <summary>A bounty on ground: paid, split evenly, to the company that clears the square it is in.</summary>
     private sealed class Prize
     {
         public Map Map;
@@ -277,7 +191,6 @@ public static class BotCity
         public long SetTick;
     }
 
-    /// <summary>A bounty on a red's head: paid to whoever catches it.</summary>
     private sealed class Price
     {
         public Serial Who;
@@ -293,16 +206,7 @@ public static class BotCity
 
     private static readonly List<Price> _heads = [];
 
-    /// <summary>How long a bounty on ground stands before it lapses. Two hours.</summary>
     public static int BountyMs { get; set; } = 7200000;
-
-    // ---- Prices on kinds (02.10.2026, build 389; Patrick's option 3: half the mint from the fairs to bounties on the kinds that
-    // kill bots, split like spoils, the mint itself unchanged) ------------------------------------------------------------
-    //
-    // <b>The mint reached the rich.</b> On build 386 the treasury minted 22,000gp in 7.5 hours and spent 13,700 of it at four
-    // fairs, buying from the ten bots who keep shops: 44 shifts earned 14,920gp, 339gp a shift, the best-paid work on the shard,
-    // while quests and bounties paid nothing. A price on the head of what has lately killed bots is pay per kill, like the
-    // corpse's own gold, and it goes to whoever opens the corpse — the hunters, most of them poor.
 
     private sealed class KindPrice
     {
@@ -310,10 +214,8 @@ public static class BotCity
 
         public string Name;
 
-        /// <summary>A head's price.</summary>
         public int Gold;
 
-        /// <summary>Of ours that fell to the kind inside the window, when the price was last set.</summary>
         public int Kills;
 
         public long SetTick;
@@ -336,37 +238,28 @@ public static class BotCity
 
     private static readonly Dictionary<Type, Killer> _killers = [];
 
-    /// <summary>What each hand has collected in heads inside its hour. See <see cref="HeadHourCap"/>.</summary>
     private static readonly Dictionary<Serial, (long Since, int Gold)> _collected = [];
 
     private static readonly List<Mobile> _hands = [];
 
-    /// <summary>The share of each mint that goes to the heads' purse. Half.</summary>
     public static double HeadShare { get; set; } = 0.5;
 
-    /// <summary>The most the heads' purse holds; what it cannot take goes to the treasury as before.</summary>
     public static int HeadCap { get; set; } = 10000;
 
-    /// <summary>What is in the heads' purse now.</summary>
     public static int HeadPurse { get; private set; }
 
-    /// <summary>A head's price lies between these, reckoned at the kind's strength over <see cref="HeadPerPower"/>.</summary>
     public static int HeadLeast { get; set; } = 20;
 
     public static int HeadMost { get; set; } = 60;
 
     public static double HeadPerPower { get; set; } = 25.0;
 
-    /// <summary>How often the killers are read and the prices set.</summary>
     public static int HeadEveryMs { get; set; } = 600000;
 
-    /// <summary>How many of ours a kind must have killed inside <see cref="BountyMs"/> to carry a price.</summary>
     public static int HeadKills { get; set; } = 2;
 
-    /// <summary>How many kinds carry a price at once.</summary>
     public static int MostKinds { get; set; } = 6;
 
-    /// <summary>The most one bot collects in heads in an hour: the farming guard.</summary>
     public static int HeadHourCap { get; set; } = 300;
 
     public static long KindsPosted { get; private set; }
@@ -381,77 +274,40 @@ public static class BotCity
 
     public static long KindsUnpaid { get; private set; }
 
-    /// <summary>Kinds carrying a price now. For the store's line.</summary>
     public static int KindPrices => _kinds.Count;
 
     private static long _huntedTick;
 
-    /// <summary>Most bounties on ground at once.</summary>
     public static int MostBounties { get; set; } = 6;
 
-    /// <summary>Bounties on ground paid out, and what they came to.</summary>
     public static long BountiesPaid { get; private set; }
 
     public static long BountyGold { get; private set; }
 
-    /// <summary>Bounties on heads paid out.</summary>
     public static long HeadsPaid { get; private set; }
 
-    /// <summary>Murderers laid low that the city paid for, and what it came to.</summary>
     public static long BloodPaid { get; private set; }
 
     public static long BloodGold { get; private set; }
 
-    /// <summary>Times the treasury could not cover the price of blood in full.</summary>
     public static long BloodShort { get; private set; }
 
-    /// <summary>Bounties that lapsed unclaimed.</summary>
     public static long Lapsed { get; private set; }
 
-    /// <summary>
-    /// Prices on heads moved onto a red's new body after a boot.
-    ///
-    /// <para>
-    /// <b>The same loss as the outlaws' cells, one store over (C6).</b> A price is written with the red's body and read back
-    /// onto it; then <c>BotPopulation.PurgeSaved</c> deletes every bot the save brought back and raises the population
-    /// again by name, and the first tick found the body gone and took the price down without a line — so every restart
-    /// cleared every price on a head, as it had let every prisoner out until build 101d. Found on 17.09.2026 by reading the
-    /// stores for anything kept by body after 101d's rebinding was seen to work ("1 records moved onto a bot's new body
-    /// after a boot", 10:35). Moved by name once the population stands, and judged red on the next tick, after the
-    /// outlaws have moved their own record.
-    /// </para>
-    /// </summary>
     public static long HeadsRebound { get; private set; }
 
     private static Clock _timer;
 
-    /// <summary>How long a fair runs. An hour: Patrick's proposal of 16.09.2026, "an hour, the city takes everything on the stalls at 80%" — the shops by the bank since 01.10.2026.</summary>
     public static int FairMs { get; set; } = 3600000;
 
-    /// <summary>The share of the asking price the city pays at a fair.</summary>
     public static double FairShare { get; set; } = 0.8;
 
-    /// <summary>How many lots the fair takes from the open shops at each turn of the clock.</summary>
     public static int FairLots { get; set; } = 20;
 
-    /// <summary>How often the city declares a fair on its own, or nought for only by hand. Six hours.</summary>
     public static int FairEveryMs { get; set; } = 21600000;
 
-    /// <summary>The least in the treasury for a fair to be declared on its own.</summary>
     public static int FairFloor { get; set; } = 5000;
 
-    /// <summary>
-    /// What a fair leaves in the treasury, however long it runs: the board's errands, the bounties and the standing orders
-    /// are paid from the same purse.
-    ///
-    /// <para>
-    /// <b>A fair of an hour spent in a minute, and spent to nothing.</b> The first fair Hermes called, at 21:22 on
-    /// 16.09.2026, took 932 things for 3899gp in its first minute and left a gold piece in the treasury; when a 5000gp claim
-    /// tax came in four minutes later it took 942 things for 3812gp in the next one. Every stall that filled after the
-    /// first minute met a fair with nothing to pay, and nothing could be posted on the board for the hour it took the mint
-    /// to refill the purse. Spent evenly over the minutes left, above this reserve.
-    /// </para>
-    /// </summary>
     public static int FairReserve { get; set; } = 2000;
 
     private static long _fairUntil;
@@ -468,32 +324,18 @@ public static class BotCity
 
     private static int _fairGold;
 
-    /// <summary>Whether a fair is on now.</summary>
     public static bool Fairing => _fairUntil != 0 && _fairUntil - Core.TickCount > 0;
 
-    /// <summary>Fairs declared, by hand or by the clock.</summary>
     public static long Fairs { get; private set; }
 
-    /// <summary>
-    /// Standing orders, bounties, prices on heads and fairs the city's verbs actually set or changed. A verb answers in a
-    /// sentence whether it did anything or not; this is how a caller tells an accepted order from a refusal without
-    /// reading the sentence. See <c>BotMarshal.Act</c>.
-    /// </summary>
     public static long Changes { get; private set; }
 
-    /// <summary>Lots (a kind at one shop), things and gold taken at fairs, all told.</summary>
     public static long FairStalls { get; private set; }
 
     public static long FairUnits { get; private set; }
 
     public static long FairGold { get; private set; }
 
-    /// <summary>
-    /// A fair: for so many minutes the city takes what the bots' shops by the bank hold at a share of the asking price, so many lots
-    /// a minute, out of the treasury. The surplus's exit and the market's day out, in one event; the tournament and
-    /// the revel are the other two under that roof (BotTourney, the debuggers' revel). Patrick's fifth City idea of
-    /// 16.09.2026, taken that evening.
-    /// </summary>
     public static string Fair(int minutes, double share, string who)
     {
         if (!Running)
@@ -563,7 +405,6 @@ public static class BotCity
             return;
         }
 
-        // Spent evenly over what is left of the fair, above the reserve. See FairReserve.
         var left = Math.Max(1L, (_fairUntil - now + 59999) / 60000);
         var budget = (int)Math.Min(int.MaxValue, Math.Max(0L, Purse - FairReserve) / left);
 
@@ -606,14 +447,12 @@ public static class BotCity
             ? $"a fair is on for another {(_fairUntil - Core.TickCount) / 60000.0:F0} minutes at {_fairShare:P0}"
             : "no fair on";
 
-    /// <summary>Whether a save was read back at this boot, so <see cref="Start"/> does not put the opening sum over it.</summary>
     private static bool _restored;
 
     public static void Start()
     {
         Stop();
 
-        // The opening sum only when nothing was read back: every restart used to empty a full treasury. See BotCityStore.
         if (!_restored)
         {
             Purse = Opening;
@@ -644,11 +483,6 @@ public static class BotCity
         Lapse();
     }
 
-    /// <summary>
-    /// A bounty on ground: the city pays the company that clears the square, split evenly among whoever is in it when
-    /// the ground is done. The Baron goes to bountied ground before the map's own choice — see BotHarrower — which is
-    /// the whole point: a watcher that sees trouble at a place can send him there.
-    /// </summary>
     public static string Bounty(Map map, int x, int y, int gold, string who)
     {
         if (!Running)
@@ -700,7 +534,6 @@ public static class BotCity
         return $"the city puts {gold}gp on the square at ({x}, {y}); the Baron goes there before anywhere else, and the company that clears it is paid. {Purse}gp in the treasury.";
     }
 
-    /// <summary>The nearest square the city has put a bounty on, settled on the tile named, or nothing.</summary>
     public static Point3D Bountied(Map map, Point3D from, int within)
     {
         Prize best = null;
@@ -729,7 +562,6 @@ public static class BotCity
         return best?.Where ?? Point3D.Zero;
     }
 
-    /// <summary>The ground was cleared: the bounty on its square, if any, paid out evenly to the company. Returns what was paid.</summary>
     public static int Claim(Map map, Point3D where, IReadOnlyList<IBotSquadMember> company)
     {
         if (map == null || company == null)
@@ -803,7 +635,6 @@ public static class BotCity
         return 0;
     }
 
-    /// <summary>One of ours fell to <paramref name="killer"/>. Read from <c>BotKept.Fell</c>; a bot, a pet or a summons is not a kind.</summary>
     public static void Fell(Mobile killer)
     {
         if (!Running || killer is not BaseCreature { Deleted: false, Controlled: false, Summoned: false } creature || killer is BotMobile)
@@ -837,11 +668,6 @@ public static class BotCity
         return null;
     }
 
-    /// <summary>
-    /// Every <see cref="HeadEveryMs"/>: the kinds that killed most of ours inside the window, <see cref="HeadKills"/> at the least,
-    /// carry a price between <see cref="HeadLeast"/> and <see cref="HeadMost"/> by their strength; a standing price is refreshed, a
-    /// new one takes the place of the least-killing kind when all <see cref="MostKinds"/> are taken.
-    /// </summary>
     private static void Hunted()
     {
         var now = Core.TickCount;
@@ -946,7 +772,6 @@ public static class BotCity
         }
     }
 
-    /// <summary>A lone hunter went through the corpse of one of <paramref name="kind"/>: the price on its head, if any, to the hunter.</summary>
     public static int Collect(Type kind, Mobile hand)
     {
         _hands.Clear();
@@ -959,7 +784,6 @@ public static class BotCity
         return PayHeads(kind);
     }
 
-    /// <summary>A company's corpse: the price split between the claimants like the corpse's own gold. See <c>BotSpoils.Share</c>.</summary>
     public static int Collect(Type kind, IReadOnlyList<IBotSquadMember> hands)
     {
         _hands.Clear();
@@ -1003,7 +827,6 @@ public static class BotCity
                 continue;
             }
 
-            // The farming guard: a hand at its hour's cap takes no share, and the share goes to the others.
             if (_collected.TryGetValue(hand.Serial, out var took) && now - took.Since < 3600000L && took.Gold >= HeadHourCap)
             {
                 KindsCapped++;
@@ -1061,7 +884,6 @@ public static class BotCity
         head.Paid += paid;
         head.Heads++;
 
-        // The price counts towards what the kind pays, so the hunters that rank quarry by its gold see it. See BotQuarry.Rewarded.
         BotQuarry.Rewarded(kind, paid);
 
         logger.Information(
@@ -1076,7 +898,6 @@ public static class BotCity
         return paid;
     }
 
-    /// <summary>A bounty on a red's head, paid to whoever catches it. See BotOutlaw.Jail.</summary>
     public static string Head(BotMobile red, int gold, string who)
     {
         if (!Running)
@@ -1089,10 +910,6 @@ public static class BotCity
             return "no such bot.";
         }
 
-        // <b>Wanted is enough, and it has to be.</b> This asked for red until the night of 18.09.2026, when the price
-        // Patrick set on an exposed fence — 5000gp the moment a witness tells — was refused here every time, because a
-        // fence that has killed nobody is grey and not red. The caller's own line said the city had put the price on,
-        // and the city had not; a log that says a thing happened when it did not is worse than no log.
         if (!BotOutlaw.Outlaw(red))
         {
             return $"{red.Name} is neither red nor wanted; the city puts a price only on an outlaw's head.";
@@ -1123,7 +940,6 @@ public static class BotCity
         return $"the city puts {gold}gp on {red.Name}'s head, paid to whoever catches it. {Purse}gp in the treasury.";
     }
 
-    /// <summary>A red was caught: the price on its head, if any, paid to the catcher.</summary>
     public static void Collect(BotMobile red, Mobile by)
     {
         if (red == null)
@@ -1163,16 +979,6 @@ public static class BotCity
         }
     }
 
-    /// <summary>
-    /// The price of blood: what the city pays for a murderer laid low, split evenly between the hands that did it.
-    ///
-    /// <para>
-    /// <b>Patrick's order of 17.09.2026, night.</b> The price rises with the murders proved against the dead bot
-    /// (<c>BotUnderworld.Price</c>); the Baron's own kill pays nobody, an ordinary bot's kill pays it the whole, and a
-    /// band's kill is split between them. Paid at the moment of the kill out of the purse, like a bounty on ground and
-    /// unlike an errand, which is held out of it at the posting; a treasury too thin pays what it has and says so.
-    /// </para>
-    /// </summary>
     public static int Blood(Mobile red, IReadOnlyList<Mobile> hands, int gold)
     {
         if (!Running || red == null || gold <= 0 || hands == null || hands.Count == 0)
@@ -1240,15 +1046,10 @@ public static class BotCity
         return paid;
     }
 
-    /// <summary>Bounties off the towns' wanted lists paid out of the purse, and what they came to. See <see cref="Reward"/>.</summary>
     public static long Rewards { get; private set; }
 
     public static long RewardGold { get; private set; }
 
-    /// <summary>
-    /// A bounty off a town's wanted list, paid out of the purse into its captor's pack (07.10.2026, crime17): as much of
-    /// <paramref name="gold"/> as the purse holds, booked as spent. Returns what was paid. See <c>BotCrime.Caught</c>.
-    /// </summary>
     public static int Reward(Mobile to, int gold)
     {
         if (!Running || gold <= 0 || to is not { Deleted: false })
@@ -1283,7 +1084,6 @@ public static class BotCity
         return true;
     }
 
-    /// <summary>The purse, the standing orders and the bounties, for <see cref="BotCityStore"/>.</summary>
     internal static void Save(IGenericWriter writer)
     {
         var now = Core.TickCount;
@@ -1323,7 +1123,6 @@ public static class BotCity
             writer.Write(_heads[i].By ?? "");
         }
 
-        // Shape 2 (02.10.2026, build 389): the heads' purse and the prices on kinds. See BotCityStore.
         writer.WriteEncodedInt(HeadPurse);
         writer.WriteEncodedInt(_kinds.Count);
 
@@ -1340,11 +1139,6 @@ public static class BotCity
         }
     }
 
-    /// <summary>
-    /// The treasury read back. A standing order for a thing this build does not know is dropped; a bounty is set back by
-    /// its age, so one older than <see cref="BountyMs"/> lapses at the first tick, with its own line; a price on a head
-    /// whose red is gone is dropped.
-    /// </summary>
     internal static (int Purse, int Orders, int Bounties, int Heads) Load(IGenericReader reader, int shape)
     {
         var now = Core.TickCount;
@@ -1414,7 +1208,6 @@ public static class BotCity
         _kinds.Clear();
         HeadPurse = 0;
 
-        // A shape-1 save ends here; the heads' purse starts empty and fills from the next mint.
         if (shape >= 2)
         {
             HeadPurse = Math.Max(0, reader.ReadEncodedInt());
@@ -1467,7 +1260,7 @@ public static class BotCity
 
             if (red is not { Deleted: false })
             {
-                // The body went with the boot's purge: the same bot stands again under its name. See HeadsRebound.
+
                 var again = Named(_heads[i].Name);
 
                 if (again != null)
@@ -1478,7 +1271,6 @@ public static class BotCity
                     continue;
                 }
 
-                // Not raised yet, so not gone yet.
                 if (BotPopulation.Count == 0)
                 {
                     continue;
@@ -1489,13 +1281,11 @@ public static class BotCity
                 continue;
             }
 
-            // No longer red — the hour ran out, or it is gone — and nobody caught it. The price comes down.
             _heads.RemoveAt(i);
             Lapsed++;
         }
     }
 
-    /// <summary>The living bot of the population with this name, or null.</summary>
     private static BotMobile Named(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -1516,7 +1306,6 @@ public static class BotCity
         return null;
     }
 
-    /// <summary>The bounties standing, for the door and the dashboard.</summary>
     public static string Bounties()
     {
         if (_bounties.Count == 0 && _heads.Count == 0 && _kinds.Count == 0)
@@ -1592,9 +1381,6 @@ public static class BotCity
             return;
         }
 
-        // <b>Half of each mint to the heads' purse (02.10.2026, build 389; Patrick's option 3).</b> The same coin, minted at the
-        // same rate; only where it goes changes: the fairs and the lots draw on the treasury, which now gets the other half. What
-        // the heads' purse cannot take at its cap goes to the treasury as before.
         var heads = Math.Min((int)(coin * Math.Clamp(HeadShare, 0.0, 1.0)), Math.Max(0, HeadCap - HeadPurse));
 
         HeadPurse += heads;
@@ -1613,7 +1399,6 @@ public static class BotCity
         Minted += added;
     }
 
-    /// <summary>The city buys whole lots at the bots' shops open by the bank, for what is in the treasury.</summary>
     public static (int Lots, int Units, int Paid) Buy(int lots, string who)
     {
         if (!Running || lots <= 0)
@@ -1650,7 +1435,6 @@ public static class BotCity
         return (taken, units, paid);
     }
 
-    /// <summary>A standing order: the city takes this thing at the bots' shops whenever it is on show at or under the price.</summary>
     public static string Want(string name, int amount, int price, string who)
     {
         if (!Running)
@@ -1702,7 +1486,6 @@ public static class BotCity
         return $"the city now wants {amount} {kind.Name} at up to {price}gp each, at the bots' shops by the bank as they show it; {Purse}gp in the treasury.";
     }
 
-    /// <summary>A standing order withdrawn.</summary>
     public static string Forget(string name)
     {
         for (var i = 0; i < _wants.Count; i++)
@@ -1758,7 +1541,6 @@ public static class BotCity
         }
     }
 
-    /// <summary>The standing orders, for the door and the dashboard.</summary>
     public static string Wants()
     {
         if (_wants.Count == 0)
@@ -1822,10 +1604,6 @@ public static class BotCity
         _collected.Clear();
         _huntedTick = 0;
 
-        // <b>The heads' purse goes into the treasury, not nowhere (07.10.2026, reset26 review).</b> It is minted coin (Mint sends
-        // its share there) kept by the store, and this zeroed it at every reset and every reload of the market: up to HeadCap of the
-        // city's money destroyed without a word, against Patrick's rule that no coin is made or lost quietly. The prices on kinds
-        // it paid for are forgotten above; the coin itself stays the city's. Added with a ceiling, so it cannot overflow the purse.
         Purse = (int)Math.Min(int.MaxValue, (long)Purse + Math.Max(0, HeadPurse));
         HeadPurse = 0;
         KindsPosted = 0;

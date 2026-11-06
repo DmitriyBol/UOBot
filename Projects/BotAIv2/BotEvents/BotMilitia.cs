@@ -2,20 +2,12 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a fighter of an invaded town the town's call: to raise the militia and march on the place (07.10.2026). One captain at
-/// a time; another is offered when the call came to nothing (<see cref="BotInvasion.CallRetryMs"/>). Only to a fighter in no
-/// company, within <see cref="BotInvasion.TownReach"/> of the town's square, whose way to the place is not sealed, and only while
-/// at least <see cref="BotInvasion.LeastMilitia"/> free fighters stand near the town — counted once every half minute, not per
-/// bot — so a captain is not handed a call it cannot raise a company for.
-/// </summary>
 public sealed class BotMilitiaCall : IBotProposer
 {
     public string Name => "Militia";
 
     public BotStanding Rung => BotStanding.Free;
 
-    /// <summary>How often the free fighters round the invaded town are counted for the offer.</summary>
     public static int CountEveryMs { get; set; } = 30000;
 
     private static long _countedTick;
@@ -88,13 +80,6 @@ public sealed class BotMilitiaCall : IBotProposer
     }
 }
 
-/// <summary>
-/// The militia: a town's call answered by a captain who raises a company and marches on the invaded road (07.10.2026). The work
-/// itself is the shard's patrol (<see cref="BotSweep"/>) — the call to the free fighters round the captain, the gathering, the
-/// march, holding the ground and fighting there as a company — so every rule a company keeps holds here too. This adds the town:
-/// its name on the work (<c>militia</c> in the ledger, so what a militia pays is learned apart from a sweep), the company handed to
-/// the invasion to be watched for arrival, and an end when the raid is over and nothing is in front of the company.
-/// </summary>
 public sealed class BotMilitia : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMilitia));
@@ -135,7 +120,6 @@ public sealed class BotMilitia : BotDeed
     {
         var member = bot as IBotSquadMember;
 
-        // The raid is over and nothing stands in front of the company: the town's call is answered.
         if (_raid.Over && member?.Squad is not { Stance: BotSquadStance.Fighting })
         {
             _sweep.Drop(bot);

@@ -3,22 +3,10 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps every bot's character across restarts: its traits, its kills and veteran's title, the counts and the three tales of
-/// its biography, and its ties. See <see cref="BotLife"/>.
-///
-/// <para>
-/// <b>By name, never by serial.</b> A bot is raised afresh at every boot with a new serial; the name is what
-/// <c>BotProgress</c> carries over, and it is what a tie names the other bot by. A record for a name nobody bears any more is
-/// kept (a bot resting through the boot is still somebody's friend) and costs a few dozen bytes. A shape this build cannot read
-/// is dropped whole rather than guessed at, and then every nature is drawn again from the names, which gives the same natures.
-/// </para>
-/// </summary>
 public sealed class BotCharacterStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCharacterStore));
 
-    /// <summary>Shape 2 adds the heard stories (<see cref="BotLife.HeardTales"/>, A6) and each tale's last telling; shape 1 is still read, without them.</summary>
     private const int Shape = 2;
 
     private static BotCharacterStore _store;

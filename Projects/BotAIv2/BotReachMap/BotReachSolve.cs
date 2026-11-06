@@ -4,40 +4,30 @@ using System.Diagnostics;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What one tile of the map is to a walker. See <see cref="BotReachMap"/>.</summary>
 public enum BotReachClass : byte
 {
-    /// <summary>Not drawn yet.</summary>
+
     Unknown = 0,
 
-    /// <summary>Somewhere to stand that a walk from home reaches, over the ground and through the gates.</summary>
     Open = 1,
 
-    /// <summary>Somewhere to stand no walk from home reaches, on land that touches water: a ship could put a walker down there.</summary>
     Isle = 2,
 
-    /// <summary>Somewhere to stand no walk from home reaches and no shore leads to: a walled yard, a roof, a sealed room.</summary>
     Pocket = 3,
 
-    /// <summary>Nowhere to stand, and water: a ship sails it, a walker never.</summary>
     Water = 4,
 
-    /// <summary>Nowhere to stand, and dry: rock, wall, a tree's trunk, the void between the dungeons.</summary>
     Blocked = 5
 }
 
-/// <summary>One land no walk from home reaches, for the page and the door.</summary>
 public readonly record struct BotReachLand(int Root, int Tiles, int X, int Y, bool Coastal);
 
-/// <summary>A way the solve is told of that the ground does not show: a teleporter or a moongate, from the tile stepped on to where the body is put down.</summary>
 public readonly record struct BotReachGate(Point3D From, Point3D To);
 
-/// <summary>What a solve is handed on the loop: the clusters as drawn, the gates and home. Nothing in it is game state.</summary>
 public sealed class BotReachSolveInput
 {
     public Map Map;
 
-    /// <summary>The map's name, taken on the loop, so the dashboard's threads never touch the map itself.</summary>
     public string MapName;
 
     public int Width;
@@ -57,23 +47,9 @@ public sealed class BotReachSolveInput
     public int Version;
 }
 
-/// <summary>
-/// The second half of the reach map: the clusters' regions joined into the whole map, and each tile named by what a walker
-/// from home can do with it. Pure arithmetic over the clusters (<see cref="BotReachCluster"/>), which are never changed once
-/// made — so it runs on a worker thread when the machine has the cores, and hands back an immutable
-/// <see cref="BotReachSnapshot"/> through one volatile reference (CLAUDE.md rules 3 and 10).
-///
-/// <para>
-/// <b>Reachable means reachable from home, in the direction of travel (01.10.2026).</b> Home is where the population lives
-/// (<see cref="BotPopulation.Where"/>); the search runs along every step the way it can be taken — a ledge dropped off is ground
-/// the walk reaches, the ledge above it is not — and through every gate from the tile stepped on to where the body is put down.
-/// A tile a walk from home reaches is <see cref="BotReachClass.Open"/>; everything reachable from an open tile is open too, so a
-/// walker standing on open ground can be refused anything that is not, without a search.
-/// </para>
-/// </summary>
 public static class BotReachSolve
 {
-    /// <summary>How many of the largest lands no walk reaches are kept for the page.</summary>
+
     public static int LargestKept { get; set; } = 32;
 
     public static BotReachSnapshot Run(BotReachSolveInput input)
@@ -96,7 +72,6 @@ public static class BotReachSolve
             parent[i] = i;
         }
 
-        // Directed edges, counted then filled: a row of targets per region.
         var degree = new int[n + 1];
 
         void Each(Action<int, int> edge)
@@ -175,7 +150,6 @@ public static class BotReachSolve
             }
         );
 
-        // Reached from home, in the direction of travel.
         var open = new bool[n];
         var queue = new int[Math.Max(1, n)];
         int head = 0, tail = 0;
@@ -203,7 +177,6 @@ public static class BotReachSolve
             }
         }
 
-        // The lands no walk reaches: one per undirected piece, a shore if any of its regions touches water.
         var roots = new int[n];
         var coastal = new bool[n];
 
@@ -232,7 +205,6 @@ public static class BotReachSolve
             regionClass[g] = (byte)(open[g] ? BotReachClass.Open : coastal[roots[g]] ? BotReachClass.Isle : BotReachClass.Pocket);
         }
 
-        // The tiles.
         var classes = new byte[count][];
         var layerClasses = new int[count][];
         var tiles = new long[6];
@@ -300,7 +272,6 @@ public static class BotReachSolve
                     }
                 }
 
-                // A tile with more than one standing place is as good as its best; where its places differ, each is kept with its height.
                 var first = cluster.FirstLayer(i);
 
                 if (first >= 0)
@@ -360,7 +331,6 @@ public static class BotReachSolve
             mixed.Add(c);
         }
 
-        // The largest lands no walk reaches.
         var lands = 0;
         var largest = new List<BotReachLand>();
 
@@ -436,7 +406,6 @@ public static class BotReachSolve
         return first < _uniform.Length ? _uniform[first] : cells;
     }
 
-    /// <summary>Whether open ground in a mixed cluster touches ground of another class: where the border tiles to check are.</summary>
     private static bool HasOpenBorder(byte[] cells)
     {
         for (var i = 0; i < 256; i++)
@@ -459,7 +428,6 @@ public static class BotReachSolve
         return false;
     }
 
-    /// <summary>The global region standing at a point: the tile's own place nearest its height, or the nearest tile within <paramref name="within"/> with one.</summary>
     private static int RegionAt(BotReachSolveInput input, int[] bases, Point3D at, int within)
     {
         for (var r = 0; r <= within; r++)

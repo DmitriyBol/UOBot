@@ -7,67 +7,46 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-sea.json</c>. A missing key keeps the code's value.</summary>
 public sealed class BotSeaSettings
 {
-    /// <summary>Whether bots go to sea at all.</summary>
+
     public bool? Running { get; set; }
 
-    /// <summary>The chance a traveller on home's land is offered a town across the sea. See BotSea.Share.</summary>
     public double? Share { get; set; }
 
-    /// <summary>The longest voyage offered, walk and sea together, in tiles.</summary>
     public int? Furthest { get; set; }
 
-    /// <summary>What a voyage to another town is worth a minute.</summary>
     public double? Prior { get; set; }
 
-    /// <summary>What the voyage home from an island is worth a minute.</summary>
     public double? HomeWorth { get; set; }
 
-    /// <summary>Whether a bot's guild stands what it lacks for a ship.</summary>
     public bool? GuildPays { get; set; }
 
-    /// <summary>Whether a bot that cannot afford a ship is handed one for nothing (trials only).</summary>
     public bool? Grant { get; set; }
 
-    /// <summary>Whether the chart is kept on disk between boots.</summary>
     public bool? Cache { get; set; }
 
-    /// <summary>How far from a town's square its shore is looked for.</summary>
     public int? DockReach { get; set; }
 
-    /// <summary>Where to look for a town's shore from instead of its square: town name to [x, y].</summary>
     public Dictionary<string, int[]> Docks { get; set; }
 
-    /// <summary>Whether guilds send expeditions and keep colonies on the islands. See BotColonies.Running.</summary>
     public bool? Colonies { get; set; }
 
-    /// <summary>The most a party is, the captain counted. See BotColonies.PartySize.</summary>
     public int? PartySize { get; set; }
 
-    /// <summary>What an expedition's stores cost the guild's chest. See BotColonies.Cost.</summary>
     public int? ColonyCost { get; set; }
 
-    /// <summary>The islands a colony may be founded on, by their docks' names, comma-separated. See BotColonies.Islands.</summary>
     public string Islands { get; set; }
 
-    /// <summary>Whether The Shadow waits on the quays for the colonies' loaded ships. See BotPiracy.Running.</summary>
     public bool? Piracy { get; set; }
 }
 
-/// <summary>
-/// The sea as a module: charts the water, finds the docks, draws the lanes, offers the way home from an island, and keeps
-/// the helm's clock. Patrick's point 7 of 29.09.2026. See <see cref="BotSeaChart"/>, <see cref="BotDocks"/>,
-/// <see cref="BotSeaLanes"/>, <see cref="BotHelm"/>, <see cref="BotVoyage"/> and <see cref="BotSea"/>.
-/// </summary>
 public sealed class BotSeaModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSeaModule));
 
     private const string ConfigPath = "Configuration/bot-sea.json";
 
-    /// <summary>How often the survey is given a slice: the chart, a town's dock, the courses.</summary>
     public static int SliceMs { get; set; } = 100;
 
     private static Timer _survey;
@@ -90,7 +69,6 @@ public sealed class BotSeaModule : BotModule
         {
             BotWill.Offer(new BotSeafarer());
 
-            // The guilds' expeditions, colonies and runs home, and The Shadow on the quays (07.10.2026, sea20). See BotColonies.
             BotColonies.Start();
         }
 
@@ -176,7 +154,6 @@ public sealed class BotSeaModule : BotModule
         BotSea.Forget();
     }
 
-    /// <summary>The chart, then a town's dock a tick, then the courses; once they are drawn, the ships found at boot and the order by hand.</summary>
     private sealed class SurveyTimer : Timer
     {
         private int _faults;
@@ -219,7 +196,7 @@ public sealed class BotSeaModule : BotModule
             }
             catch (Exception e)
             {
-                // Loud and bounded: a survey that throws every tenth of a second would bury the log, so the tenth fault stops it.
+
                 logger.Error(e, "Sea: the survey threw ({Faults} so far); it is tried again next tick", ++_faults);
 
                 if (_faults >= 10)

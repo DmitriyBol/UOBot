@@ -4,26 +4,13 @@ using Server.BotAI.V2;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The model as a town's steward (07.10.2026, steward20): asked, when the slot is free, to choose one of the decrees the rule set
-/// found lawful in the town this round — or none — and to say it in a sentence. Filled into <see cref="BotStewardship.Ask"/> from
-/// <c>BotDebugModule.Start</c> and emptied on a reload, as the duke's witness is; the bots' assembly never references this one.
-///
-/// <para>
-/// <b>Narrow the enumeration instead of persuading</b> (DECISIONS N2, the duke's rule): the schema's enumeration is exactly the
-/// ids the rule set offered, so a model cannot decree what is unlawful; what it chooses is checked again before it is given, and
-/// an answer that cannot be read, or none at all, leaves the round to the rule.
-/// </para>
-/// </summary>
 public static class BotStewardArgus
 {
-    /// <summary>Whether the model is asked at all. Off: the rules decide every round.</summary>
+
     public static bool Running { get; set; } = true;
 
-    /// <summary>The model asked; empty means the duke's (<c>BotParley.JudgeModel</c>), else the minds' own.</summary>
     public static string Model { get; set; }
 
-    /// <summary>The longest speech kept, in characters.</summary>
     public static int MostSpeech { get; set; } = 200;
 
     public static long Asked { get; private set; }
@@ -132,7 +119,6 @@ public static class BotStewardArgus
         writer.WriteEndObject();
     }
 
-    /// <summary>The decree, its speech and reason; a null decree when it cannot be read or is not one offered.</summary>
     private static (string Id, string Speech, string Reason) Answer(BotStewardAsk q, string json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -162,7 +148,7 @@ public static class BotStewardArgus
 
             return (id, speech, Field(root, "reason"));
         }
-        // Any failure to read an answer is not an answer: the rule decides.
+
         catch (Exception)
         {
             return (null, null, null);

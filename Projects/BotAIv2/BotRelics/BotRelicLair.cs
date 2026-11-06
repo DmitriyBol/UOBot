@@ -7,76 +7,41 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A town relic in a lair behind its warden (07.10.2026, relics20; Patrick: "the Crown of Britannia — a chest behind a lair boss").
-/// A rare rumour: every <see cref="EveryMs"/> (±<see cref="Jitter"/>), the first <see cref="FirstMs"/> after a boot, one hidden town
-/// relic is laid in a chest on open ground <see cref="Near"/>–<see cref="Far"/> tiles out of its own town (hostile ground first),
-/// and the town crier — Argus's herald when the debugger is on — spreads the word.
-///
-/// <para>
-/// <b>The first company that clears it takes it.</b> A free fighter within <see cref="Reach"/> is offered the call to raise a
-/// company and march (<see cref="BotRelicCall"/>, the shard's patrol <see cref="BotSweep"/> under the relic's name, every company
-/// rule holding). No warden stands until a company's captain is within <see cref="ArriveReach"/> of the chest: then one creature
-/// comes out, the dearest kind the company record prices at no more than <see cref="Odds"/> of what the company brings — no caster,
-/// nothing that waits to be struck — on a <see cref="Leash"/>-tile leash, named the warden of the relic. A company too weak for the
-/// least of them is sent away and the lair waits for a stronger one. When the warden falls, the relic goes into the pack of the
-/// captain of the company that felled it (or the killer, or any captain at the chest) and the lair is over; its carrier walks it
-/// home (<see cref="BotRelicHomeward"/>). A warden left alone for <see cref="GoneMs"/> goes back into the dark until the next
-/// company; a lair nobody clears in <see cref="LapseMs"/> is gone and the relic hidden again.
-/// </para>
-///
-/// <para>
-/// <b>Honest.</b> The chest holds the relic and nothing else; the warden's gold is the engine's own loot, a kill. A restart takes
-/// the warden off the island and hides the relic again (<see cref="BotRelicStore"/>).
-/// </para>
-/// </summary>
 public static class BotRelicLair
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRelicLair));
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>How often a relic is laid in a lair, with its jitter; how long after a boot the first may be.</summary>
     public static int EveryMs { get; set; } = 14400000;
 
     public static double Jitter { get; set; } = 0.25;
 
     public static int FirstMs { get; set; } = 2400000;
 
-    /// <summary>How long a lair waits to be cleared.</summary>
     public static int LapseMs { get; set; } = 7200000;
 
-    /// <summary>How far out of the relic's town the lair lies.</summary>
     public static int Near { get; set; } = 60;
 
     public static int Far { get; set; } = 200;
 
-    /// <summary>How far from the lair a fighter is offered the call.</summary>
     public static int Reach { get; set; } = 300;
 
-    /// <summary>How near the chest a captain must stand for the warden to come out, and for the company to count as there.</summary>
     public static int ArriveReach { get; set; } = 20;
 
-    /// <summary>The warden's price at most, as a share of what the company brings (never above one).</summary>
     public static double Odds { get; set; } = 0.7;
 
-    /// <summary>The warden's leash round the chest.</summary>
     public static int Leash { get; set; } = 6;
 
-    /// <summary>Captains asked per lair at most, companies at the lair at once at most, and the wait between two calls.</summary>
     public static int MostCalls { get; set; } = 6;
 
     public static int MostCompanies { get; set; } = 2;
 
     public static int CallRetryMs { get; set; } = 120000;
 
-    /// <summary>How long the warden stands with no company near before it goes back into the dark.</summary>
     public static int GoneMs { get; set; } = 180000;
 
-    /// <summary>What the call is reckoned at per minute before the ledger has seen one pay.</summary>
     public static double Prior { get; set; } = 60.0;
-
-    // ---- counters ----------------------------------------------------------------------------------------------------------------
 
     public static long Laid { get; private set; }
 
@@ -108,7 +73,6 @@ public static class BotRelicLair
 
     public static long Deaths { get; private set; }
 
-    /// <summary>One lair: the relic, the chest, the warden, the companies come for it.</summary>
     public sealed class Lair
     {
         public BotRelic Relic;
@@ -137,7 +101,6 @@ public static class BotRelicLair
 
         public bool Hostile;
 
-        /// <summary>The warden fell with no captain of ours at the chest: the next captain to stand there takes the relic.</summary>
         public bool Felled;
 
         public readonly List<BotSquad> Squads = [];
@@ -155,13 +118,10 @@ public static class BotRelicLair
 
     private static bool _seeded;
 
-    /// <summary>The lair standing, or null.</summary>
     public static Lair Now => _lair is { Over: false } l ? l : null;
 
-    /// <summary>The warden standing, for the store: a restart takes it off the island.</summary>
     public static BaseCreature Warden => _lair?.Warden;
 
-    /// <summary>Set by hand to lay a relic in a lair at the next beat.</summary>
     public static bool CallNow
     {
         get => false;
@@ -262,7 +222,6 @@ public static class BotRelicLair
         );
     }
 
-    /// <summary>Open ground out of the town, hostile first: twenty tries for hostile ground, then any open ground.</summary>
     private static bool Place(Map map, BotTowns.Town town, out Point3D at, out bool hostile)
     {
         at = Point3D.Zero;
@@ -297,8 +256,6 @@ public static class BotRelicLair
         return false;
     }
 
-    // ---- the field ---------------------------------------------------------------------------------------------------------------
-
     private static void Run(Lair lair, long now)
     {
         if (lair.Over)
@@ -310,7 +267,7 @@ public static class BotRelicLair
 
         if (lair.Chest is not { Deleted: false } || lair.Relic.Place != BotRelicPlace.Lair)
         {
-            // Handed over by hand, or the chest went: nothing left to clear.
+
             End(lair, "the relic is no longer in the chest");
 
             return;
@@ -416,7 +373,6 @@ public static class BotRelicLair
         typeof(Lizardman), typeof(Ratman), typeof(Orc), typeof(Zombie), typeof(Gnaw)
     ];
 
-    /// <summary>The warden comes out for the company at the chest: the dearest kind within its means. False, and refused, when none is.</summary>
     private static void Raise(Lair lair, BotSquad company)
     {
         var able = company.Able();
@@ -523,7 +479,7 @@ public static class BotRelicLair
         }
         catch
         {
-            // No plain constructor: not a warden.
+
         }
 
         if (probe == null)
@@ -542,7 +498,6 @@ public static class BotRelicLair
         }
     }
 
-    /// <summary>The warden fell: the relic into the pack of the captain whose company felled it, and the lair is over.</summary>
     private static void Fell(Lair lair, long now)
     {
         var warden = lair.Warden;
@@ -608,7 +563,6 @@ public static class BotRelicLair
         Take(lair, taker, by, killer);
     }
 
-    /// <summary>The relic out of the chest into the taker's pack; the chest goes.</summary>
     private static void Take(Lair lair, Mobile taker, BotSquad by, Mobile killer)
     {
         var relic = lair.Relic;
@@ -657,7 +611,6 @@ public static class BotRelicLair
         }
     }
 
-    /// <summary>The lair over: the warden away, the relic hidden again unless taken, the chest gone.</summary>
     private static void End(Lair lair, string why)
     {
         lair.Over = true;
@@ -684,7 +637,6 @@ public static class BotRelicLair
         _lair = null;
     }
 
-    /// <summary>The standing lair given up: by hand, or before a reload.</summary>
     internal static void Abandon(string why)
     {
         if (_lair != null)
@@ -692,8 +644,6 @@ public static class BotRelicLair
             End(_lair, why);
         }
     }
-
-    // ---- the captains ------------------------------------------------------------------------------------------------------------
 
     internal static bool Offers(Lair lair, long now)
     {
@@ -747,10 +697,7 @@ public static class BotRelicLair
         logger.Information("{Name}'s company for {Relic} ended: {How} — {Note}", captain?.Name, lair.Relic.Name, how.Kind, how.Note);
     }
 
-    /// <summary>Whether this company was sent away as too weak for the warden.</summary>
     internal static bool Refused(Lair lair, BotSquad squad) => squad != null && lair.Refused.Contains(squad.Id);
-
-    // ---- telling it --------------------------------------------------------------------------------------------------------------
 
     private static string Cap(string s) => string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
@@ -795,11 +742,6 @@ public static class BotRelicLair
     }
 }
 
-/// <summary>
-/// Offers a free fighter near a relic's lair the call to raise a company and clear it (07.10.2026, relics20): one captain at a
-/// time, another after <see cref="BotRelicLair.CallRetryMs"/>, at most <see cref="BotRelicLair.MostCalls"/> a lair, by a road the
-/// walk's own question does not seal.
-/// </summary>
 public sealed class BotRelicCall : IBotProposer
 {
     public string Name => "Relic";
@@ -838,10 +780,6 @@ public sealed class BotRelicCall : IBotProposer
     }
 }
 
-/// <summary>
-/// A company raised for a relic: the shard's patrol (<see cref="BotSweep"/>) marched on the lair, so every company rule holds; ends
-/// when the lair is over, or when the company is sent away as too weak for its warden.
-/// </summary>
 public sealed class BotRelicQuest : BotDeed
 {
     public const string Trade = "relic";

@@ -8,49 +8,18 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The live window's picture (Patrick, 02.10.2026: "can the picture be shown straight from the game?"): what stands where
-/// round a watched bot, in the client's own terms, for the page to draw with the client's own pictures.
-///
-/// <para>
-/// <b>Two parts, sent at two speeds.</b> The ground and what is built on it — the land tile and its height, every static and
-/// every piece of a house or a boat — changes only when the bot walks off the square it was cut for or a multi comes, goes
-/// or moves; it is cut on the loop then, kept as one string, and the page fetches it from <c>/api/live/scene</c> when the
-/// frame's <c>pic.scene</c> number moves on. What moves — the mobiles with their bodies, hues, facing, war mode, mount and
-/// worn items, and the items on the ground — rides in every frame, once a second.
-/// </para>
-///
-/// <para>
-/// <b>Compact.</b> The land is three bytes a tile (the id and the height) and a static is seven (where in the square, the
-/// id, the height, the hue), both base64: about 12 kB for open country and 40 kB for a town, a few times a minute for a
-/// walking bot. A mobile is a few numbers, its worn items one flat array.
-/// </para>
-///
-/// <para>
-/// <b>Cheap on the loop, and bounded.</b> The map blocks are the tile matrix's own, read once and kept by the matrix; at
-/// most <see cref="SceneBlockBudget"/> blocks are read for the first time in one beat across all watched bots, and a square
-/// that could not be finished is finished in the next beats. The pictures themselves are never decoded here: see
-/// <see cref="BotWebArt"/>.
-/// </para>
-/// </summary>
 public static partial class BotWebLive
 {
-    /// <summary>The square the picture covers round the bot, in tiles each way.</summary>
+
     public static int PictureRadius { get; set; } = 18;
 
-    /// <summary>How far the bot may walk before the ground is cut again round where it stands.</summary>
     public static int PictureSlack { get; set; } = 6;
 
-    /// <summary>Most map blocks read for the first time in one beat, across every watched bot.</summary>
     public static int SceneBlockBudget { get; set; } = 32;
 
-    /// <summary>Most items on the ground in one frame.</summary>
     public static int MostGround { get; set; } = 300;
 
-    /// <summary>Most map blocks remembered as read; past it the memory is emptied, which costs only a re-count.</summary>
     public static int MostSceneBlocks { get; set; } = 16384;
-
-    // ---- the counts /api/health prints ----------------------------------------------------------------------
 
     public static long Scenes { get; private set; }
 
@@ -72,7 +41,6 @@ public static partial class BotWebLive
 
     private static readonly List<Item> _groundScratch = new(64);
 
-    /// <summary>The newest scene of a watched bot, as the loop cut it; null until the first. Any thread; does not mark it watched.</summary>
     public static string SceneOf(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -86,12 +54,6 @@ public static partial class BotWebLive
         }
     }
 
-    // ---- the frame's part: what moves, and which scene goes with it ---------------------------------------------
-
-    /// <summary>
-    /// Writes <c>look</c> (the bot itself as the client would draw it), <c>ground</c> (the items lying about) and <c>pic</c>
-    /// (which scene goes with this frame), cutting a new scene first when the bot has walked off the last one.
-    /// </summary>
     private static void WritePicture(Utf8JsonWriter w, Watch watch, BotMobile bot, Map map, ref int blocks)
     {
         var started = Stopwatch.GetTimestamp();
@@ -116,13 +78,8 @@ public static partial class BotWebLive
         PictureMs += Elapsed(started);
     }
 
-    /// <summary>The layers the client draws on a body; the backpack, the bank, the mount and the vendor boxes are not among them.</summary>
     private static bool Drawn(Layer layer) => layer is >= Layer.OneHanded and <= Layer.InnerLegs and not Layer.Backpack;
 
-    /// <summary>
-    /// A mobile as the client is told about it: serial, height, body, hue, facing, war mode (2 holding a two-handed weapon),
-    /// the mount's body and hue, and the worn items as layer, item id and hue in one flat array, hair and beard among them.
-    /// </summary>
     private static void Look(Utf8JsonWriter w, Mobile m)
     {
         var solid = m.SolidHueOverride;
@@ -180,11 +137,6 @@ public static partial class BotWebLive
         w.WriteEndArray();
     }
 
-    /// <summary>
-    /// The body a mount is drawn with. The client looks the mount item up in its own table; the server knows the creature
-    /// under it, which is the same body. A mount with no creature (an ethereal, a guard's virtual horse) is drawn as the horse
-    /// whose item it uses, as the server's own horses pair them, else as a brown horse: tiledata names no body for these items.
-    /// </summary>
     private static int MountBody(Item mount)
     {
         if (mount is IMountItem { Mount: Mobile creature })
@@ -201,7 +153,6 @@ public static partial class BotWebLive
         };
     }
 
-    /// <summary>Called by <see cref="Items"/> for every item in the square, so the map's item query is walked once a frame.</summary>
     private static void NoteGround(BotMobile bot, Item item)
     {
         if (_groundScratch.Count >= MostGround || item.Deleted || !item.Visible || item is BaseMulti)
@@ -217,10 +168,6 @@ public static partial class BotWebLive
         _groundScratch.Add(item);
     }
 
-    /// <summary>
-    /// The items lying about: id as drawn, place, height, hue, a number that is the body for a corpse and 1 for a stack the
-    /// client draws twice, and the facing; a corpse adds what it wears.
-    /// </summary>
     private static void Ground(Utf8JsonWriter w)
     {
         w.WritePropertyName("ground");
@@ -238,7 +185,7 @@ public static partial class BotWebLive
             }
             else if (item.Amount > 1)
             {
-                // Coins change their picture with the pile; other stacks are drawn twice, a little apart.
+
                 if (id is 0x0EEA or 0x0EED or 0x0EF0)
                 {
                     id += item.Amount > 5 ? 2 : 1;
@@ -298,12 +245,6 @@ public static partial class BotWebLive
         _groundScratch.Clear();
     }
 
-    // ---- the scene: the ground and what is built on it ------------------------------------------------------------
-
-    /// <summary>
-    /// Cuts the scene again when the bot has walked further than the slack, the last one was not finished, or the multis in
-    /// the square have changed; otherwise leaves it as it is.
-    /// </summary>
     private static void CutScene(Watch watch, Map map, int x, int y, ref int blocks)
     {
         var half = PictureRadius + PictureSlack;
@@ -312,7 +253,6 @@ public static partial class BotWebLive
         var cx = moved ? x : watch.SceneX;
         var cy = moved ? y : watch.SceneY;
 
-        // One more row and column than the square: the slopes of its last row and column are shaped by the tiles past them.
         var x0 = cx - half;
         var y0 = cy - half;
         var side = half * 2 + 2;
@@ -327,14 +267,11 @@ public static partial class BotWebLive
         var tiles = map.Tiles;
         var complete = true;
 
-        // Emptied before the square is counted, never halfway through it: a block forgotten in the middle would be left out of
-        // a scene that still calls itself complete.
         if (_sceneSeen.Count >= MostSceneBlocks)
         {
             _sceneSeen.Clear();
         }
 
-        // The blocks never read before, within the budget; the matrix keeps them once read.
         for (var by = y0 >> 3; by <= (y0 + side - 1) >> 3; by++)
         {
             for (var bx = x0 >> 3; bx <= (x0 + side - 1) >> 3; bx++)
@@ -367,12 +304,10 @@ public static partial class BotWebLive
             }
         }
 
-        // Off the map, or in a block not read yet: 0xFFFF, which the page leaves undrawn.
         var land = new byte[side * side * 3];
         Array.Fill(land, (byte)0xFF);
         _statics.Clear();
 
-        // Block by block, each block's land and statics looked up once.
         for (var by = y0 >> 3; by <= (y0 + side - 1) >> 3; by++)
         {
             for (var bx = x0 >> 3; bx <= (x0 + side - 1) >> 3; bx++)
@@ -416,7 +351,6 @@ public static partial class BotWebLive
             }
         }
 
-        // The pieces of houses and boats, as the client is sent them: every piece the multi lists as shown.
         var pieces = 0;
 
         if (multis != 0)
@@ -495,7 +429,6 @@ public static partial class BotWebLive
         }
     }
 
-    /// <summary>A static as seven bytes: where in the square, the id, the height, the hue.</summary>
     private static void Record(int tx, int ty, int id, int z, int hue)
     {
         var span = _statics.GetSpan(7);
@@ -510,7 +443,6 @@ public static partial class BotWebLive
         _statics.Advance(7);
     }
 
-    /// <summary>A number that changes when a multi in or near the square comes, goes, moves or is rebuilt; 0 when there are none.</summary>
     private static long Multis(Map map, int x0, int y0, int side)
     {
         long sum = 0;
@@ -529,8 +461,6 @@ public static partial class BotWebLive
 
         return sum;
     }
-
-    // ---- what it costs ----------------------------------------------------------------------------------------
 
     private static void PictureHealth(Utf8JsonWriter w)
     {

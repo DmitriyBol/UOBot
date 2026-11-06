@@ -3,22 +3,10 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The daily cycle as a module: reads <c>bot-day.json</c>, reads the clock every two seconds, writes the <c>Day:</c> line every
-/// five minutes and says at boot what the hours are and how the timetables fall. See <see cref="BotDay"/> and
-/// <see cref="BotTimetable"/>.
-///
-/// <para>
-/// <b>Registers itself</b> from its own <c>Configure</c>, after <c>BotCore.Configure</c> (priority 42 against 40), as the
-/// character module does: several agents build modules in the same week and one line each in the list in <c>BotCore</c> would be
-/// as many patches colliding in one hunk. A World-phase module needs nothing from the Settings phase, so the order is harmless.
-/// </para>
-/// </summary>
 public sealed class BotDayModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDayModule));
 
-    /// <summary>The clock: the part of the day is read on it. Two seconds.</summary>
     public static int TickMs { get; set; } = 2000;
 
     private static DayTimer _timer;
@@ -47,7 +35,6 @@ public sealed class BotDayModule : BotModule
         BotDayConfig.Load();
         BotDay.Refresh(Core.Now);
 
-        // Every living bot's timetable drawn now rather than at its first offer, so the boot line can say how they fall.
         var bots = BotPopulation.Bots;
         var drawn = 0;
 
@@ -97,7 +84,6 @@ public sealed class BotDayModule : BotModule
         );
     }
 
-    /// <summary>The clock's work, every <see cref="TickMs"/>.</summary>
     public static void Tick(long now)
     {
         BotDay.Refresh(Core.Now);
@@ -123,7 +109,6 @@ public sealed class BotDayModule : BotModule
         _timer?.Stop();
         _timer = null;
 
-        // The timetables themselves are kept: they are what the save holds, and a reload reads the world, not the timetables.
         BotDay.Forget();
     }
 

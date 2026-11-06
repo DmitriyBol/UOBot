@@ -3,22 +3,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a member of a guild that captains a town's guard a paid watch in that town: the captain's post as work.
-///
-/// <para>
-/// <b>The town's guard for the town's wage (07.10.2026, Patrick's town council).</b> The watch the towns already set as a task
-/// (<see cref="BotStandGuard"/>) is reckoned at <see cref="BotStandGuard.Prior"/> a minute and pays nothing; the captain's
-/// members are offered the same five minutes inside the walls for <see cref="BotCouncil.Wage"/>gp, held out of the treasury
-/// when the watch is taken and paid into the watchman's account when it is stood (<see cref="BotCouncil.Hold"/>,
-/// <see cref="BotCouncil.Release"/>): a wage, not a handout, and never more than <see cref="BotCouncil.WageBudget"/> a town a
-/// term. The claim is the watch's own worth plus the wage a minute, and it is a posted claim — the wage is held — so the
-/// commons corrects it by how often it is earned, not towards an average.
-/// </para>
-/// </summary>
 public sealed class BotGuardDuty : IBotProposer
 {
-    /// <summary>Watches taken, stood and paid, and ended without the wage (the purse could not hold it, or the watch was dropped).</summary>
+
     public static long Taken { get; private set; }
 
     public static long Stood { get; private set; }
@@ -55,7 +42,6 @@ public sealed class BotGuardDuty : IBotProposer
         return new Watch(map, town, guild.Name);
     }
 
-    /// <summary>One paid watch inside a town's walls.</summary>
     public sealed class Watch : BotDeed
     {
         public const string Trade = "guard-duty";

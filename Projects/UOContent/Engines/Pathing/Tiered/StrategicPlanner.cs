@@ -3,34 +3,12 @@ using System.Collections.Generic;
 
 namespace Server.Engines.Pathing.Tiered;
 
-/// <summary>
-/// The long tier: regions of <see cref="RegionClusters"/>×<see cref="RegionClusters"/> clusters (128 tiles) over the first
-/// level of the graph, and a corridor through them for the medium tier to search in.
-///
-/// <para>
-/// <b>Why a second level.</b> The medium tier's estimate is the straight line, and round a river the straight line lies:
-/// from the east bank to The Lantern's hall is 84 tiles straight and 1,381 steps by road, and an A* over the first level
-/// expanded 29,819 nodes to find it. Over regions the same detour is a few dozen nodes. The region's border nodes are the
-/// first-level nodes on its outer edge (a gate across a region's edge is always a gate across a cluster's); inside a
-/// region, a Dijkstra from each border node over the region's first-level edges gives its edges to the others.
-/// Regions are built when first needed, or ahead of time a slice at a time (<see cref="Prebuild"/>), and rebuilt when any
-/// of their clusters has changed since (<see cref="NavGraph.ClusterVersion"/>).
-/// </para>
-///
-/// <para>
-/// <b>What it answers.</b> An A* over the border nodes from the start's region to the goal's, estimated by the straight
-/// line (admissible: every step costs at least <see cref="NavCost.Step"/>). The regions it passes through, and the ring
-/// round them, are the corridor; the medium tier then finds the route in the corridor alone
-/// (<see cref="HierarchicalPlanner.Corridor"/>), which is where the thousands of nodes it expanded round the river were not.
-/// </para>
-/// </summary>
 public sealed class StrategicPlanner
 {
     public const int RegionClusters = 8;
 
     public const int RegionTiles = RegionClusters * NavGraph.Side;
 
-    /// <summary>Most border nodes one route may expand.</summary>
     public int MaxExpansions { get; set; } = 20000;
 
     private readonly HierarchicalPlanner _medium;
@@ -79,12 +57,10 @@ public sealed class StrategicPlanner
 
     public int Regions => _regions.Count;
 
-    /// <summary>Parent chains found looping in <c>Corridor</c> and cut, and the node the cut was made at. See the note there.</summary>
     public long Cycles { get; private set; }
 
     public int LastCycleNode { get; private set; } = -1;
 
-    /// <summary>Whether every region of the graph has been built ahead of time.</summary>
     public bool Prebuilt(NavGraph graph) => _prebuilt >= RegionsX(graph) * RegionsY(graph);
 
     public static int RegionsX(NavGraph graph) => (graph.ClustersX + RegionClusters - 1) / RegionClusters;
@@ -96,7 +72,6 @@ public sealed class StrategicPlanner
 
     private static long Key(NavGraph graph, int region) => ((long)graph.Id << 32) | (uint)region;
 
-    /// <summary>Builds regions ahead of time until the stopwatch passes <paramref name="deadline"/>. True when all are built.</summary>
     public bool Prebuild(NavGraph graph, long deadline)
     {
         var total = RegionsX(graph) * RegionsY(graph);
@@ -114,10 +89,6 @@ public sealed class StrategicPlanner
         return _prebuilt >= total;
     }
 
-    /// <summary>
-    /// The route from (sx, sy, sz) to (gx, gy, gz): a corridor of regions by the long tier, then the medium tier's route
-    /// inside it, into <paramref name="points"/>.
-    /// </summary>
     public NavStatus Route(NavGraph graph, int sx, int sy, int sz, int gx, int gy, int gz, List<Point3D> points)
     {
         points.Clear();
@@ -154,7 +125,6 @@ public sealed class StrategicPlanner
         var rs = RegionOf(graph, sc);
         var rg = RegionOf(graph, gc);
 
-        // The start's costs to its cluster's nodes, then over its region to the region's border.
         _startCost.Clear();
 
         var flood = ws.Flood(sx, sy, ss, false);
@@ -173,7 +143,6 @@ public sealed class StrategicPlanner
 
         Spread(graph, rs, _startCost, false);
 
-        // The goal's costs from its cluster's nodes, then backward over its region from the region's border.
         _goalCost.Clear();
 
         flood = wg.Flood(gx, gy, gs, true);
@@ -205,7 +174,6 @@ public sealed class StrategicPlanner
             return status;
         }
 
-        // The medium tier's route, inside the corridor.
         _medium.Corridor = _corridor;
 
         try
@@ -218,10 +186,6 @@ public sealed class StrategicPlanner
         }
     }
 
-    /// <summary>
-    /// Dijkstra over one region's first-level edges from the costs already in <paramref name="cost"/> (forward), or towards
-    /// them over the reversed edges (<paramref name="backward"/>), adding every node of the region it reaches.
-    /// </summary>
     private void Spread(NavGraph graph, int region, Dictionary<int, int> cost, bool backward)
     {
         _local.Clear();
@@ -285,7 +249,6 @@ public sealed class StrategicPlanner
         }
     }
 
-    /// <summary>Every edge of a region, reversed, for the backward spread from the goal.</summary>
     private void Reverse(NavGraph graph, int region)
     {
         foreach (var list in _reverse.Values)
@@ -375,18 +338,13 @@ public sealed class StrategicPlanner
             }
         }
 
-        // Start and goal in one region: the goal's own nodes are reached from the start's spread.
         if (rs == rg)
         {
             foreach (var (n, c) in _goalCost)
             {
                 if (_startCost.TryGetValue(n, out var toHere))
                 {
-                    // <b>The goal's parent must itself have a parent in this search (29.09.2026).</b> This handed the goal a
-                    // border node as its parent without ever relaxing that node, so the node's own parent was whatever
-                    // the last search had left in the array, or nought; Corridor then walked the goal's chain into node 0,
-                    // whose parent is 0, and the loop hung the shard twice. Relaxed from the start first, the chain is
-                    // goal, node, start.
+
                     Relax(graph, n, toHere, s, gx, gy);
                     RelaxGoal(g, toHere + c, n);
                 }
@@ -500,7 +458,6 @@ public sealed class StrategicPlanner
         _open.Enqueue(g, ((long)cost << 32) | (uint)(int.MaxValue - cost));
     }
 
-    /// <summary>The regions the route passes through, with the ring round each.</summary>
     private void Corridor(NavGraph graph, int s, int g, int rs, int rg)
     {
         var rx = RegionsX(graph);
@@ -526,9 +483,6 @@ public sealed class StrategicPlanner
         Add(rs);
         Add(rg);
 
-        // <b>A parent chain with a loop in it never reaches the start (29.09.2026).</b> The shard's loop hung twice inside
-        // this walk with the danger hook on, the stack taken the second time; the loop is not reproduced on a grid, so
-        // the walk is bounded: more steps than the graph has nodes is a loop, and the corridor is what was gathered.
         var steps = 0;
 
         for (var node = _parent[g]; node >= 0 && node != s; node = _parent[node])
@@ -545,7 +499,6 @@ public sealed class StrategicPlanner
         }
     }
 
-    /// <summary>A region's border nodes and their edges to each other inside it, built or rebuilt as needed.</summary>
     private NavRegion Ensure(NavGraph graph, int region)
     {
         var version = Version(graph, region);
@@ -632,7 +585,6 @@ public sealed class StrategicPlanner
     }
 }
 
-/// <summary>One region's border nodes and the edges between them inside it.</summary>
 internal sealed class NavRegion
 {
     public int Version;

@@ -8,46 +8,16 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The inns and taverns of the map, and what a bot gets for sleeping in one.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point two: "bots cannot simply go offline; they should leave from a tavern or an
-/// inn. Whoever goes to rest from an inn and pays for it gets a bonus to positive thought and an extra regeneration buff
-/// for a third of the time spent resting — rest sixty minutes, the buff lasts twenty."</b> Until now a tired bot logged
-/// out where it stood (<see cref="BotRest.Leave"/>), which is what a player does when the connection drops and not what
-/// a player does at the end of an evening.
-/// </para>
-///
-/// <para>
-/// <b>The inns are read from the world, two ways.</b> The engine's own word for an inn is a region with
-/// <c>NoLogoutDelay</c> — the room a player logs out of at once — and every town has one; and every tavern has a
-/// <c>TavernKeeper</c> or an <c>Innkeeper</c> standing in it, put there by a spawner whose own tile is the floor. Both
-/// are read once, the way the dungeons' rooms are read from their spawners: a table of inns would be a promise about a
-/// map. Britain has four taverns and one inn by this count; Trinsic, Minoc and Vesper one or two each.
-/// </para>
-///
-/// <para>
-/// <b>Paying is what earns the bonus, and the price is a night's, not a fortune.</b> <see cref="PricePerHour"/> gold for
-/// each hour of the rest, taken from the purse and then the bank; a bot that cannot pay still sleeps in the inn and gets
-/// nothing for it but the roof. The bonus is two things: the day's boredom falls by <see cref="Cheer"/> (the same relief
-/// a hundred gold of takings gives, times two — see <c>BotUrges.Paid</c>), so the mood the dashboard shows rises; and
-/// for <see cref="BuffShare"/> of the rest, hits, stamina and mana come back <see cref="RegenPoints"/> every
-/// <see cref="RegenEveryMs"/> on top of the engine's own rate (<see cref="Regen"/>, from the bot's beat).
-/// </para>
-/// </summary>
 public static class BotInns
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotInns));
 
-    /// <summary>One inn or tavern: a floor tile inside it, and what it is called for the log.</summary>
     public sealed class Inn
     {
         public Point3D Spot;
 
         public string Name;
 
-        /// <summary>The engine's inn region round it, when the spot lies in one.</summary>
         public bool NoLogoutDelay;
 
         public long Lodged;
@@ -55,37 +25,28 @@ public static class BotInns
         public override string ToString() => $"{Name} at ({Spot.X}, {Spot.Y})";
     }
 
-    /// <summary>Whether tired bots are sent to an inn at all. Off, they leave where they stand as before.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>How far a tired bot may be from the nearest inn and still be sent to it. Four hundred, as the walk home is.</summary>
     public static int Reach { get; set; } = 400;
 
-    /// <summary>Gold an hour of rest costs at an inn.</summary>
     public static int PricePerHour { get; set; } = 5;
 
-    /// <summary>What share of the rest the regeneration lasts for afterwards. A third, by order.</summary>
     public static double BuffShare { get; set; } = 1.0 / 3.0;
 
-    /// <summary>Boredom relief a paid night brings, in the takings' own units. See <c>BotUrges.Paid</c>.</summary>
     public static double Cheer { get; set; } = 200.0;
 
-    /// <summary>Points of hits, stamina and mana a rested bot regains every <see cref="RegenEveryMs"/>.</summary>
     public static int RegenPoints { get; set; } = 2;
 
     public static int RegenEveryMs { get; set; } = 4000;
 
-    /// <summary>How near the inn's spot a bot has to be to be lodging there.</summary>
     public static int Near { get; set; } = 8;
 
-    /// <summary>How long after being sent to an inn a tired bot may be sent again, when the walk came to nothing.</summary>
     public static int RetryMs { get; set; } = 600000;
 
     private static readonly List<Inn> _inns = [];
 
     private static Map _map;
 
-    /// <summary>Who paid for a bed, and at which inn, until the rest takes them out of the world.</summary>
     private static readonly Dictionary<Serial, (Inn Inn, int Paid, double Hours)> _paid = [];
 
     private static readonly Dictionary<Serial, long> _sent = [];
@@ -104,7 +65,6 @@ public static class BotInns
 
     public static long LeftOutside { get; private set; }
 
-    /// <summary>Bots that left the world from under their own roof, which counts as a paid night. See BotRest.Leave.</summary>
     public static long AtHome { get; private set; }
 
     public static void NotedAtHome() => AtHome++;
@@ -119,7 +79,6 @@ public static class BotInns
 
     public static IReadOnlyList<Inn> All => _inns;
 
-    /// <summary>Reads the map's inn regions and its tavern keepers' spawners, once.</summary>
     public static void Survey(Map map)
     {
         if (Surveyed || map == null || map == Map.Internal)
@@ -148,7 +107,7 @@ public static class BotInns
 
                 if (Place(map, x, y, out var spot))
                 {
-                    // The engine's inn regions carry no name of their own; the town is their parent.
+
                     var town = !string.IsNullOrWhiteSpace(inn.Name) ? inn.Name : inn.Parent?.Name ?? Region.Find(spot, map)?.Name ?? "the town";
 
                     _inns.Add(new Inn { Spot = spot, Name = $"the inn of {town}", NoLogoutDelay = true });
@@ -157,7 +116,6 @@ public static class BotInns
             }
         }
 
-        // The whole map as one spatial query, by the repository's rule (no walk over World.Items).
         foreach (var spawner in map.GetItemsInBounds<BaseSpawner>(new Rectangle2D(0, 0, map.Width, map.Height)))
         {
             if (spawner is not { Deleted: false } || spawner.Map != map || spawner.Entries == null)
@@ -228,7 +186,6 @@ public static class BotInns
         return false;
     }
 
-    /// <summary>The nearest inn within <paramref name="reach"/> of a place, or null.</summary>
     public static Inn Nearest(Point3D at, int reach)
     {
         Inn best = null;
@@ -249,13 +206,8 @@ public static class BotInns
         return best;
     }
 
-    /// <summary>The inn this bot is standing in, or null.</summary>
     public static Inn At(Mobile bot) => bot?.Map == null || bot.Map == Map.Internal ? null : Nearest(bot.Location, Near);
 
-    /// <summary>
-    /// A tired bot with no inn round it is sent to the nearest one within <see cref="Reach"/>; returns whether it was. Asked by
-    /// the rest's clock before it lets a bot leave, after the walk home to its own house (BotRepose.HomeToRest).
-    /// </summary>
     public static bool ToInn(BotMobile bot, double hours)
     {
         if (!Running || bot?.Map == null || bot.Map == Map.Internal)
@@ -265,8 +217,6 @@ public static class BotInns
 
         Survey(bot.Map);
 
-        // Already under a roof: the bed is paid for where it stands, and the rest takes it out from here. Bryn the Crafter
-        // left "the bed unpaid" at 01:15 on 29.09.2026 standing in a Britain tavern, because only the walk paid.
         if (At(bot) is { } here)
         {
             if (!_paid.ContainsKey(bot.Serial))
@@ -291,7 +241,6 @@ public static class BotInns
 
         var inn = Nearest(bot.Location, Reach);
 
-        // An inn with a cook's tavern open, when it is not much further (07.10.2026, trades17): the tired eat before they sleep.
         inn = BotTaverns.InnFor(bot, inn, Reach) ?? inn;
 
         if (inn == null)
@@ -319,7 +268,6 @@ public static class BotInns
         return true;
     }
 
-    /// <summary>The bed is paid for, or not; said by the lodging errand when it arrives.</summary>
     public static void Paid(Mobile bot, Inn inn, int paid, double hours)
     {
         if (bot == null || inn == null)
@@ -330,10 +278,6 @@ public static class BotInns
         _paid[bot.Serial] = (inn, paid, hours);
     }
 
-    /// <summary>
-    /// The bot is leaving the world: where from, and whether the bed was paid for. Asked once by <see cref="BotRest.Leave"/>;
-    /// the answer is written into the rest's own record, so it survives a restart.
-    /// </summary>
     public static Inn Settle(BotMobile bot, out int paid)
     {
         paid = 0;
@@ -373,13 +317,11 @@ public static class BotInns
         return at;
     }
 
-    /// <summary>Takes the price out of the purse and then the bank. Returns what was paid, nought when the bot could not.</summary>
     public static int Pay(Mobile bot, double hours)
     {
         var price = Math.Max(1, (int)Math.Ceiling(hours * PricePerHour));
         var pack = bot?.Backpack;
 
-        // Not out of money its wants on the board hold (02.10.2026, build 391): it sleeps there unpaid, as a bot with no money does.
         if (pack == null || BotYield.Spendable(bot) < price)
         {
             return 0;
@@ -395,7 +337,6 @@ public static class BotInns
         return 0;
     }
 
-    /// <summary>A paid night's rest is over: the buff and the cheer. See <see cref="BotRest.Return"/>.</summary>
     public static void Rested(BotMobile bot, double restedHours, out DateTime until)
     {
         until = default;
@@ -411,7 +352,6 @@ public static class BotInns
         Buffed++;
     }
 
-    /// <summary>Extra regeneration for a bot inside its buff. From the bot's beat; a dictionary lookup for everybody else.</summary>
     public static void Regen(BotMobile bot)
     {
         if (bot is not { Deleted: false, Alive: true } || bot.WellRestedUntil == default)
@@ -486,10 +426,6 @@ public static class BotInns
     }
 }
 
-/// <summary>
-/// The walk to an inn to sleep there: in at the door, the bed paid for, and the rest itself is <see cref="BotRest"/>'s,
-/// which takes the bot out of the world from where it stands. Pressed, like the walk home to rest (BotRepose).
-/// </summary>
 public sealed class BotLodge : BotDeed
 {
     public const string Trade = "lodge";
@@ -500,14 +436,12 @@ public sealed class BotLodge : BotDeed
 
     public static long CouldNotPay { get; private set; }
 
-    /// <summary>A bot already under a roof that could not pay for its bed. See <see cref="BotInns.ToInn"/>.</summary>
     public static void NotedUnpaid() => CouldNotPay++;
 
     private readonly BotInns.Inn _inn;
 
     private readonly double _hours;
 
-    /// <summary>Supper looked for at a cook's tavern in this inn, once, before the bed (07.10.2026, trades17). See BotTaverns.Supper.</summary>
     private bool _supper;
 
     private bool _supperWalk;
@@ -551,8 +485,6 @@ public sealed class BotLodge : BotDeed
             return BotDoing.Failed("no inn to go to");
         }
 
-        // <b>Supper first, at the cook's table, when a tavern is open here (07.10.2026, trades17).</b> A minute's walk to the cook at
-        // most, then to bed with or without it.
         if (!_supper && BotTaverns.KeeperAt(_inn) is { } cook && body is BotMobile lodger && body.InRange(_inn.Spot, 12))
         {
             if (!_supperWalk)

@@ -6,21 +6,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The steward's decrees: what is lawful in a town now and what each costs (<see cref="Options"/>), the rule that picks one, the
-/// model's question, what each does (<see cref="Apply"/>), and Argus's two commands (<c>do steward</c>, <c>do decree</c>).
-///
-/// <para>
-/// <b>The rule, in its order:</b> the militia when an invasion of the town has stood five minutes with no company come; a tax
-/// cut when the regard has sunk three rounds running, by a point and a half, under a tax; a bounty raised on a head wanted in the town and at large for a
-/// quarter of an hour; a captain hired when the town has none, or one at war with or loathed by the steward's guild, or its
-/// wage budget is spent while heads are at large or an invasion stands; an outcast guild barred for a day (the council's outcast
-/// of the town, with none of its members living in it, not seated by it, and a captain to keep the line); a tax raised when the coffer is under twice the floor, the allowance has stopped or a decree was wanted and could not
-/// be paid; a caravan when the town's counters are short of a kind the bots found missing; a holiday when the regard is under
-/// 45 or the coffer rich; a tax cut when the coffer is rich. The model is shown every lawful decree, including tax steps the rule
-/// would not take, and may answer "none".
-/// </para>
-/// </summary>
 public static partial class BotStewardship
 {
     private sealed class Option
@@ -35,7 +20,6 @@ public static partial class BotStewardship
 
         public int Cost;
 
-        /// <summary>Whether the rule takes it; the model is shown it either way.</summary>
         public bool Rule;
 
         public string Why;
@@ -43,7 +27,6 @@ public static partial class BotStewardship
         public string Means;
     }
 
-    /// <summary>Set when a lawful decree was wanted and only the coffer stood in its way: a reason to raise the tax.</summary>
     private static bool _wantedPoor;
 
     private static string Poor(Office o, int cost)
@@ -52,8 +35,6 @@ public static partial class BotStewardship
 
         return $"the coffer holds {o.Coffer}gp and keeps {Floor}gp: {cost}gp is more than it can spend";
     }
-
-    // ---- what is lawful -----------------------------------------------------------------------------------------------------
 
     private static string CanTax(Office o, int percent, long now)
     {
@@ -347,7 +328,6 @@ public static partial class BotStewardship
         return count;
     }
 
-    /// <summary>A kind the bots found a shelf empty of that this town's shopkeepers hold under the caravans' low share, or null.</summary>
     private static string Short(BotTowns.Town town)
     {
         var dry = BotShops.Dry();
@@ -384,9 +364,6 @@ public static partial class BotStewardship
         return null;
     }
 
-    // ---- the rule's choice --------------------------------------------------------------------------------------------------
-
-    /// <summary>Whether this guild should captain this town's guard now, and who the steward would hire.</summary>
     private static string Captain(Office o, BotTowns.Town town, out string why)
     {
         why = null;
@@ -452,7 +429,6 @@ public static partial class BotStewardship
         return best;
     }
 
-    /// <summary>Every decree lawful in the town now, in the rule's order. See the class note.</summary>
     private static void Options(Office o, BotTowns.Town town, long now, List<Option> into)
     {
         _wantedPoor = false;
@@ -471,7 +447,6 @@ public static partial class BotStewardship
             );
         }
 
-        // Sunk three rounds running, and by a point and a half: a tax the town will not bear much longer.
         var sinking = o.Samples.Count >= 4 && o.Samples[^1] < o.Samples[^2] - 0.0001 && o.Samples[^2] < o.Samples[^3] - 0.0001
                       && o.Samples[^3] < o.Samples[^4] - 0.0001 && o.Samples[^4] - o.Samples[^1] >= 1.5;
 
@@ -601,7 +576,6 @@ public static partial class BotStewardship
                     cut.Rule = true;
                     cut.Why = $"the coffer is rich, {o.Coffer}gp";
 
-                    // A rich coffer's cut comes last in the rule's order, after everything the town needs.
                     into.RemoveAt(i);
                     into.Add(cut);
 
@@ -610,7 +584,6 @@ public static partial class BotStewardship
             }
         }
 
-        // The rule takes the first it would; the model sees them all. Those the rule would take go first.
         var ruled = 0;
 
         for (var i = 0; i < into.Count; i++)
@@ -702,8 +675,6 @@ public static partial class BotStewardship
         return new BotStewardAsk { Town = town.Name, Guild = o.Guild, Head = o.Head, Brief = brief.ToString(), Ids = ids, Means = means };
     }
 
-    // ---- what a decree does -------------------------------------------------------------------------------------------------
-
     private static void Record(Office o, string kind, string text, int cost, string by)
     {
         o.Decrees.Add(new Decree { Utc = DateTime.UtcNow, Kind = kind, Text = text, Cost = cost, By = by });
@@ -729,7 +700,6 @@ public static partial class BotStewardship
         }
     }
 
-    /// <summary>Gives the decree, checked again first: the town may have changed since it was offered. Says what came of it.</summary>
     private static string Apply(Office o, BotTowns.Town town, Option opt, string by, string speech, string why)
     {
         var now = Core.TickCount;
@@ -843,7 +813,6 @@ public static partial class BotStewardship
                         break;
                     }
 
-                    // Through the events' own hold, so their line balances: out of the coffer into the purse, held again for the raid.
                     o.Coffer -= MilitiaGold;
                     BotCity.Refund(MilitiaGold);
 
@@ -926,7 +895,6 @@ public static partial class BotStewardship
                         break;
                     }
 
-                    // Held until the fair is announced in the town; spent then, given back if it is not.
                     o.Coffer -= HolidayCost;
                     o.Pending = HolidayCost;
                     o.PendingAt = now;
@@ -1009,7 +977,6 @@ public static partial class BotStewardship
         return $"{town.Name}: {text}; the coffer holds {o.Coffer}gp";
     }
 
-    /// <summary>A holiday's fair and a caravan's posting, settled the minute after the decree.</summary>
     private static void Resolve(long now)
     {
         foreach (var o in _offices.Values)
@@ -1067,9 +1034,6 @@ public static partial class BotStewardship
         }
     }
 
-    // ---- Argus --------------------------------------------------------------------------------------------------------------
-
-    /// <summary>The town named at the head of <paramref name="tail"/>, the longest name first, and the rest.</summary>
     private static BotTowns.Town TownIn(string tail, out string rest)
     {
         rest = "";
@@ -1098,7 +1062,6 @@ public static partial class BotStewardship
         return best;
     }
 
-    /// <summary><c>do steward [&lt;town&gt;]</c>: who governs, the coffer, the tax, the regard, the bars, the last decrees and what is lawful now.</summary>
     public static string Tell(string tail)
     {
         if (string.IsNullOrWhiteSpace(tail))
@@ -1183,10 +1146,6 @@ public static partial class BotStewardship
         return say.Length == 0 ? "none yet" : say.ToString();
     }
 
-    /// <summary>
-    /// <c>do decree &lt;town&gt; &lt;tax +2 | captain [guild] | bounty &lt;bot&gt; | militia | bar &lt;guild&gt; | holiday | caravan [&lt;town&gt;]&gt;</c>:
-    /// the steward gives it by Argus's word, if it is lawful and the coffer can pay. Logged and spoken like any decree.
-    /// </summary>
     public static string ByHand(string tail)
     {
         if (!Running)

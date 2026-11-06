@@ -8,101 +8,40 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Each town's steward: the head of the guild with the best standing in it, holding the town's coffer and its levers, and
-/// answering for both.
-///
-/// <para>
-/// <b>Patrick, approved 07.10.2026 (wave 17, "a livelier world"):</b> "A town elects a steward (the head of the guild with the
-/// best standing in the town, or a thinking role like the duke). Real levers, each a decree announced in town and logged:
-/// raise/lower the shops' tax (±1–3 %), hire the captain of the guard (a guild gets the post and pay), set a bounty on a head,
-/// call the militia, bar an outcast guild from the town for a day, declare a holiday (an extra fair), order a caravan. Guilds
-/// react (a higher tax sends traders to another town; a bounty draws hunters). The steward answers: an empty purse or a falling
-/// town regard deposes it."
-/// </para>
-///
-/// <para>
-/// <b>Who.</b> In each town reached from home, the guild with the best standing there (<c>BotBurgh</c>: the cheapest prices,
-/// then the most tasks done, then the fewest failed — the council's own order, <c>BotCouncil</c>), with <see cref="LeastDone"/>
-/// tasks done, not put out of the town, not The Shadow and with a head. The steward is that guild's head, whoever it is now.
-/// Chosen again every <see cref="ChooseMs"/>, and at once when the guild is gone, headless, put out or barred, when its head
-/// falls, or when the steward is deposed. A deposed guild may not be chosen in that town for <see cref="DeposedMs"/>.
-/// </para>
-///
-/// <para>
-/// <b>The coffer is the treasury's coin, held for the town.</b> Every coin in a coffer is held out of the city's purse
-/// (<see cref="BotCity.Escrow"/>), so the <c>City:</c> line counts it as held and a restart keeps it (<see cref="BotStewardStore"/>).
-/// It fills two ways: an allowance of <see cref="Allowance"/>gp an hour while the treasury holds more than <see cref="CityKeep"/>,
-/// and the town's tax — the part of every bill at the town's counters that the steward's tax added, paid into the treasury as
-/// tax (<see cref="BotCity.Tax"/>) and held for the coffer. A tax cut is a rebate the coffer pays (<see cref="BotCity.Disbursed"/>),
-/// suspended while the coffer holds under <see cref="CutCover"/>. Every decree that costs anything moves the coin to where it
-/// works: the captain's and the guard line's watches are paid out of the purse per watch stood (the coin is handed back to the
-/// purse and the town's wage budget raised by it, <c>BotCouncil.Appoint/Fund</c>); a bounty is paid out of the purse when the
-/// head is taken (<c>BotCrime.Raise</c>); the militia's head money goes into the invasion's own hold (<c>BotSeasons.Hold</c>);
-/// a caravan's hold out of the purse; a holiday's feast is bought from the town's shopkeepers (spent, like any NPC purchase).
-/// Nothing is made and nothing vanishes unseen: the <c>Stewards:</c> line prints every flow and what the coffers hold now.
-/// </para>
-///
-/// <para>
-/// <b>The town's regard</b> of its steward is 50 with the steward's guild's prices there taken off (×1.05 is −10) plus the
-/// town's mood: each decree moves it once (a tax raised −2 a point, cut +2 a point, the militia +5, a holiday +6, a caravan +3,
-/// a bounty, a captain or a bar +2), and every round presses on it (a tax over nought −0.15 a point, each head at large posted
-/// in the town −0.5, an invasion with no company come −2, a coffer under the floor −1), between −40 and +40. Deposed: the
-/// coffer under <see cref="Floor"/> for <see cref="PoorMs"/>, or the regard not risen once in <see cref="FallMs"/> and lower by
-/// <see cref="FallLeast"/> or more over it.
-/// </para>
-/// </summary>
 public static partial class BotStewardship
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotStewardship));
 
-    // ---- dials -------------------------------------------------------------------------------------------------------------
-
-    /// <summary>Whether towns have stewards at all. Off: no decrees, no tax, no bars; the coffers stay held.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>How often a steward decides: a quarter of an hour.</summary>
     public static int EveryMs { get; set; } = 900000;
 
-    /// <summary>The first round this long after the first look, the towns a minute apart.</summary>
     public static int FirstMs { get; set; } = 600000;
 
-    /// <summary>How often the steward is chosen again: two hours.</summary>
     public static int ChooseMs { get; set; } = 7200000;
 
-    /// <summary>A town with no steward looks again this often.</summary>
     public static int RetryMs { get; set; } = 600000;
 
-    /// <summary>Tasks done for the town before a guild may hold its stewardship.</summary>
     public static int LeastDone { get; set; } = 1;
 
-    /// <summary>The lowest and highest shops' tax a steward may decree: −3 % and +5 %.</summary>
     public static double TaxFloor { get; set; } = -0.03;
 
     public static double TaxCeiling { get; set; } = 0.05;
 
-    /// <summary>The most one decree moves the tax, in points.</summary>
     public static int TaxMostStep { get; set; } = 3;
 
-    /// <summary>One tax decree a town in this long.</summary>
     public static int TaxEveryMs { get; set; } = 3600000;
 
-    /// <summary>The coffer's allowance from the treasury, gold an hour a town.</summary>
     public static int Allowance { get; set; } = 100;
 
-    /// <summary>The treasury keeps this much: no allowance under it.</summary>
     public static int CityKeep { get; set; } = 5000;
 
-    /// <summary>The most a coffer is filled to by the allowance.</summary>
     public static int CofferMost { get; set; } = 5000;
 
-    /// <summary>The coffer's floor: no decree spends under it, and a coffer under it for <see cref="PoorMs"/> deposes.</summary>
     public static int Floor { get; set; } = 50;
 
-    /// <summary>A coffer this full cuts the tax and may keep a holiday.</summary>
     public static int Rich { get; set; } = 1200;
 
-    /// <summary>A tax cut is suspended at the counters while the coffer holds under this.</summary>
     public static int CutCover { get; set; } = 20;
 
     public static int PoorMs { get; set; } = 3600000;
@@ -111,15 +50,12 @@ public static partial class BotStewardship
 
     public static double FallLeast { get; set; } = 4.0;
 
-    /// <summary>How long a deposed guild may not hold the same town's stewardship: six hours.</summary>
     public static int DeposedMs { get; set; } = 21600000;
 
-    /// <summary>The captain's hire: watches funded and how long the post is kept through the council's own terms.</summary>
     public static int HireGold { get; set; } = 200;
 
     public static int HireMs { get; set; } = 7200000;
 
-    /// <summary>What one decree adds to a head's bounty, how far over the crime folder's own cap, and how often per head.</summary>
     public static int BountyRaise { get; set; } = 150;
 
     public static int BountyAbove { get; set; } = 1000;
@@ -128,12 +64,10 @@ public static partial class BotStewardship
 
     public static int BountyAgainMs { get; set; } = 3600000;
 
-    /// <summary>The militia's head money added to an invasion of the town, and how long a raid stands unanswered first.</summary>
     public static int MilitiaGold { get; set; } = 300;
 
     public static int MilitiaWaitMs { get; set; } = 300000;
 
-    /// <summary>The guard line's wages for a bar, how long a bar stands, how many at once, and the regard that calls for one.</summary>
     public static int BarCost { get; set; } = 100;
 
     public static double BarHours { get; set; } = 24.0;
@@ -142,7 +76,6 @@ public static partial class BotStewardship
 
     public static double BarRegard { get; set; } = -60.0;
 
-    /// <summary>A holiday's feast, the hours since any fair before one, a town's hours between two, and the regard that wants one.</summary>
     public static int HolidayCost { get; set; } = 250;
 
     public static double HolidayGapHours { get; set; } = 8.0;
@@ -151,44 +84,26 @@ public static partial class BotStewardship
 
     public static double HolidayRegard { get; set; } = 45.0;
 
-    /// <summary>A caravan's share paid from the coffer, and a town's time between two.</summary>
     public static int CaravanGold { get; set; } = 300;
 
     public static int CaravanEveryMs { get; set; } = 7200000;
 
-    /// <summary>Whether the model chooses among the lawful decrees when the thinking assembly is in and free.</summary>
     public static bool ModelChooses { get; set; } = true;
 
-    /// <summary>Whether a barred guild's walk into the town is turned back at the line (besides its work there being refused).</summary>
     public static bool WalkerBars { get; set; } = true;
 
-    /// <summary>How often the <c>Stewards:</c> line is written.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
-    /// <summary>Decrees each town remembers for the page and Argus.</summary>
     public static int Remembered { get; set; } = 8;
 
-    /// <summary>The bounds of the town's mood.</summary>
     public static double MoodMost { get; set; } = 40.0;
 
-    /// <summary>What each point of tax over nought takes off the town's regard every round: a point bears it, two do not for long.</summary>
     public static double TaxPress { get; set; } = 0.15;
 
-    /// <summary>With nothing the rule would decree, the model is still asked every this many rounds of a town (an hour).</summary>
     public static int AskEvery { get; set; } = 4;
 
-    // ---- the seam to the thinking assembly ---------------------------------------------------------------------------------
-
-    /// <summary>
-    /// The model as the steward: given a question, it answers through the callback with the decree's id (one of the options, or
-    /// "none"), a line of speech and a reason, or nulls. Returns whether it will be asked. Filled by
-    /// <c>mindedBots/debugger/BotStewardArgus</c>; null when the thinking assembly is off, and then the rules decide.
-    /// </summary>
     public static Func<BotStewardAsk, Action<string, string, string>, bool> Ask { get; set; }
 
-    // ---- the offices -------------------------------------------------------------------------------------------------------
-
-    /// <summary>One decree as remembered.</summary>
     public sealed class Decree
     {
         public DateTime Utc;
@@ -202,15 +117,12 @@ public static partial class BotStewardship
         public string By;
     }
 
-    /// <summary>One town's stewardship.</summary>
     public sealed class Office
     {
         public string Town;
 
-        /// <summary>The steward's guild, or null while the town has none.</summary>
         public string Guild;
 
-        /// <summary>The head's name when last seen.</summary>
         public string Head;
 
         public bool HeadDown;
@@ -221,10 +133,8 @@ public static partial class BotStewardship
 
         public long NextRound;
 
-        /// <summary>Coin held for the town out of the treasury.</summary>
         public int Coffer;
 
-        /// <summary>Coin still held for a holiday whose fair has not been announced yet.</summary>
         public int Pending;
 
         public long PendingAt;
@@ -263,22 +173,18 @@ public static partial class BotStewardship
 
         public long AskedAt;
 
-        /// <summary>Rounds this town has had, for the model's hourly question.</summary>
         public long Held;
 
-        /// <summary>The invasion the steward last called the militia against, by its start.</summary>
         public bool MilitiaCalled;
 
         public long MilitiaRaid;
 
-        /// <summary>Bills taken at the town's counters under the tax this round, and the last round's.</summary>
         public long Takings;
 
         public long LastTakings;
 
         public readonly Dictionary<string, DateTime> Bars = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>Heads whose bounty this steward raised, and when.</summary>
         public readonly Dictionary<string, long> Raised = new(StringComparer.Ordinal);
 
         public readonly List<Decree> Decrees = [];
@@ -299,8 +205,6 @@ public static partial class BotStewardship
     private static long _saidAt;
 
     private static long _heldAtLoad;
-
-    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long Chosen { get; private set; }
 
@@ -382,14 +286,10 @@ public static partial class BotStewardship
 
     public static long TurnedBack { get; private set; }
 
-    /// <summary>Every office, for the page and Argus.</summary>
     public static IEnumerable<Office> Offices => _offices.Values;
 
     public static Office Of(string town) => town != null && _offices.TryGetValue(town, out var o) ? o : null;
 
-    // ---- the clock ---------------------------------------------------------------------------------------------------------
-
-    /// <summary>The politics module started: the coffers read back are counted as held by the treasury again.</summary>
     public static void Start()
     {
         BotStewardConfig.Load();
@@ -424,7 +324,6 @@ public static partial class BotStewardship
         );
     }
 
-    /// <summary>The politics module reloaded: counters forgotten, the offices and their coffers kept.</summary>
     public static void Stop()
     {
         logger.Information("Stewards, before the reload: {Line}", Describe());
@@ -437,24 +336,6 @@ public static partial class BotStewardship
         ForgetCounters();
     }
 
-    /// <summary>
-    /// <b>Patrick's reset (07.10.2026, reset26): every town's stewardship ended and its coffer handed back to the treasury, so the
-    /// save writes the stewardships empty.</b> <see cref="Stop"/> keeps the offices and their coffers for a reload, and the reset of
-    /// 20:56 that night left <c>Saves/BotStewardship</c> whole: every town's old steward guild, its tax, its bars against guilds
-    /// founded again under old names, its decrees and the guilds deposed.
-    ///
-    /// <para>
-    /// <b>The books.</b> A coffer is coin held out of the city's purse for its town: drawn by <c>BotCity.Escrow</c>, counted in
-    /// <c>BotCity.Escrowed</c> and not in <c>BotCity.Purse</c>, written by this store and counted as held again at the boot
-    /// (<see cref="Start"/>). Forgotten without a word, the coin would be gone from the purse and still counted as held; written
-    /// empty, the next boot would count nothing held and the coin would simply be gone. So each office's <see cref="Office.Coffer"/>
-    /// and <see cref="Office.Pending"/> (a holiday's coin not yet spent on its fair) go back into the purse with
-    /// <c>BotCity.Refund</c>, which raises the purse and lowers the held count by the same coin. A caravan's contribution went back
-    /// into the purse when it was decreed (a caravan posted for it holds its own coin, which the events' wipe hands back), as did a
-    /// captain's hire and a bounty's raise; a militia's head money is the invasion's pool. Nothing else is held by a steward.
-    /// Returns the gold handed back.
-    /// </para>
-    /// </summary>
     public static int Wipe()
     {
         long back = 0;
@@ -504,7 +385,6 @@ public static partial class BotStewardship
 
     private static long _faults;
 
-    /// <summary>Once a minute, from <c>BotPolitics.Look</c>. A fault here is logged and kept from the rest of politics.</summary>
     public static void Look(long now)
     {
         try
@@ -572,7 +452,6 @@ public static partial class BotStewardship
                 Round(o, town, now);
             }
 
-            // A model's word that never came back is let go after five minutes; the rules decide the next round.
             if (o.Asking && now - o.AskedAt >= 300000)
             {
                 o.Asking = false;
@@ -581,9 +460,6 @@ public static partial class BotStewardship
         }
     }
 
-    // ---- who --------------------------------------------------------------------------------------------------------------
-
-    /// <summary>The steward kept, or chosen again: on the clock, when none, and at once when its guild can no longer hold it.</summary>
     private static void Keep(Office o, BotTowns.Town town, long now)
     {
         if (o.Guild == null)
@@ -639,7 +515,6 @@ public static partial class BotStewardship
         }
     }
 
-    /// <summary>The guild with the best standing in the town that may hold it; the same order the council gives its posts by.</summary>
     private static void Choose(Office o, BotTowns.Town town, long now, string why)
     {
         o.ChosenAt = now;
@@ -719,8 +594,6 @@ public static partial class BotStewardship
     private static bool Deposed(string guild, string town, long now) =>
         _deposed.TryGetValue((guild, town), out var at) && now - at < Math.Max(0, DeposedMs);
 
-    // ---- the round ---------------------------------------------------------------------------------------------------------
-
     private static void Round(Office o, BotTowns.Town town, long now)
     {
         o.NextRound = now + Math.Max(60000, EveryMs);
@@ -772,7 +645,7 @@ public static partial class BotStewardship
 
         if (ModelChooses && Ask is { } ask && !AnyAsking() && (options[0].Rule || o.Held % Math.Max(1, AskEvery) == 0))
         {
-            // The model is shown every lawful decree, the rule's and the rest; it may also answer "none".
+
             var q = Question(o, town, options, regard);
 
             if (ask(q, (id, speech, reason) => Answered(o.Town, options, id, speech, reason)))
@@ -808,7 +681,6 @@ public static partial class BotStewardship
         return false;
     }
 
-    /// <summary>The model's word, on the game thread: one of the options, "none", or nothing readable (then the rule).</summary>
     private static void Answered(string townName, List<Option> options, string id, string speech, string reason)
     {
         if (!_offices.TryGetValue(townName, out var o) || !o.Asking)
@@ -857,7 +729,6 @@ public static partial class BotStewardship
         Ruled(o, town, options);
     }
 
-    /// <summary>The rule's decree when the model gave none that could be read: the first the rule would take, if any.</summary>
     private static void Ruled(Office o, BotTowns.Town town, List<Option> options)
     {
         if (options.Count > 0 && options[0].Rule)
@@ -866,7 +737,6 @@ public static partial class BotStewardship
         }
     }
 
-    /// <summary>The allowance for one round, while the treasury holds more than it keeps.</summary>
     private static void Draw(Office o)
     {
         var gold = (int)Math.Max(0L, (long)Allowance * Math.Max(60000, EveryMs) / 3600000);
@@ -891,7 +761,6 @@ public static partial class BotStewardship
         Drawn += gold;
     }
 
-    /// <summary>What presses on the town's regard every round. See the class note.</summary>
     private static void Press(Office o, BotTowns.Town town, long now)
     {
         var press = 0.0;
@@ -928,7 +797,6 @@ public static partial class BotStewardship
 
     private static void Mood(Office o, double by) => o.Mood = Math.Clamp(o.Mood + by, -MoodMost, MoodMost);
 
-    /// <summary>The town's regard of its steward now, 0 to 100.</summary>
     public static double Regard(Office o, BotTowns.Town town)
     {
         var factor = 1.0;
@@ -949,10 +817,8 @@ public static partial class BotStewardship
         return Math.Clamp(50.0 + o.Mood - (factor - 1.0) * 200.0, 0.0, 100.0);
     }
 
-    /// <summary>The regard's trend over the samples kept: the last minus the first.</summary>
     private static double Trend(Office o) => o.Samples.Count < 2 ? 0.0 : o.Samples[^1] - o.Samples[0];
 
-    /// <summary>Whether the regard has not risen once over the window and is lower by <see cref="FallLeast"/>.</summary>
     private static bool Falling(Office o)
     {
         var need = Math.Max(2, FallMs / Math.Max(60000, EveryMs)) + 1;
@@ -973,7 +839,6 @@ public static partial class BotStewardship
         return o.Samples[o.Samples.Count - need] - o.Samples[^1] >= FallLeast;
     }
 
-    /// <summary>The steward answers for an empty purse and a falling regard. True when it was deposed.</summary>
     private static bool Answer(Office o, BotTowns.Town town, long now, double regard)
     {
         if (o.Coffer < Floor)
@@ -1051,15 +916,8 @@ public static partial class BotStewardship
         return true;
     }
 
-    // ---- the counter: the tax ----------------------------------------------------------------------------------------------
-
     private static (Serial Buyer, double Levy, long Tick, Office Office) _quote;
 
-    /// <summary>
-    /// What a bot pays at this vendor's counter on top of everything else, as a multiple: one plus the town's tax. Asked by
-    /// <c>BotBurgh.Factor</c> for every bot, guild or none; remembers the quote so the bill's settling can move the tax's share.
-    /// A cut is quoted only while the coffer can pay for it.
-    /// </summary>
     public static double Levy(Mobile buyer, BaseVendor vendor)
     {
         if (_taxed == 0)
@@ -1082,10 +940,6 @@ public static partial class BotStewardship
         return levy;
     }
 
-    /// <summary>
-    /// A bill of <paramref name="bill"/> at <paramref name="factor"/> was settled with this buyer: the tax's share of it goes into
-    /// the treasury and is held for the town's coffer; a cut's share is paid out of the coffer. From <c>BotBurgh.Settle</c>.
-    /// </summary>
     public static void Settled(Mobile buyer, int bill, double factor)
     {
         var q = _quote;
@@ -1151,9 +1005,6 @@ public static partial class BotStewardship
         }
     }
 
-    // ---- the guard line ------------------------------------------------------------------------------------------------------
-
-    /// <summary>Whether this bot's guild is barred from the town that holds this place, by its steward's decree.</summary>
     public static bool Bars(Mobile bot, Map map, Point3D where, out string town)
     {
         town = null;
@@ -1170,7 +1021,6 @@ public static partial class BotStewardship
         return true;
     }
 
-    /// <summary>The same for the auction: work in a town the bot's guild is barred from is refused, and counted.</summary>
     public static bool Refuses(Mobile bot, Map map, Point3D where, out string why)
     {
         why = null;
@@ -1188,10 +1038,6 @@ public static partial class BotStewardship
 
     private static readonly Dictionary<Serial, long> _turnedSaid = [];
 
-    /// <summary>
-    /// The walker's check, once a step and cheap: a bot of a barred guild walking into the town from outside is turned back at
-    /// the line. Not one in a fight: running is never kept out.
-    /// </summary>
     public static bool TurnsBack(Mobile bot, Point3D target)
     {
         if (_barredGuilds.Count == 0 || !WalkerBars || bot == null || bot.Combatant != null || !Bars(bot, bot.Map, target, out var townName)
@@ -1241,7 +1087,6 @@ public static partial class BotStewardship
 
     private static readonly List<string> _lapsed = [];
 
-    /// <summary>Bars whose day is over are lifted.</summary>
     private static void Expire()
     {
         if (_barredGuilds.Count == 0)
@@ -1278,9 +1123,6 @@ public static partial class BotStewardship
         }
     }
 
-    // ---- speaking ------------------------------------------------------------------------------------------------------------
-
-    /// <summary>One of the steward's guild standing in the town, its head first, or null.</summary>
     private static Mobile Speaker(Office o, BotTowns.Town town)
     {
         var guild = BotGuilds.Named(o.Guild);
@@ -1306,10 +1148,6 @@ public static partial class BotStewardship
         return null;
     }
 
-    /// <summary>
-    /// A decree said in the town: by the steward or one of its guild standing there; else, for a loud one, by the town's crier
-    /// (Argus's herald when the debugger is on, <c>BotSeasons.Announce</c>); always on the dashboard's stream.
-    /// </summary>
     private static void Speak(Office o, BotTowns.Town town, string text, bool loud, string kind)
     {
         var line = kind == "chosen" ? text : $"By the steward's decree: {text}";
@@ -1332,8 +1170,6 @@ public static partial class BotStewardship
         BotEvents.Post("politics", o.Head ?? $"the steward of {town.Name}", null, o.Guild, town.Square.X, town.Square.Y, line, "steward", BotJson.Object(w => w.WriteString("outcome", kind)));
     }
 
-    // ---- telling ------------------------------------------------------------------------------------------------------------
-
     public static string Pct(double tax) => tax > 0.00001 ? $"+{tax * 100:0.#}%" : tax < -0.00001 ? $"{tax * 100:0.#}%" : "0%";
 
     private static int Held()
@@ -1348,7 +1184,6 @@ public static partial class BotStewardship
         return (int)Math.Min(int.MaxValue, held);
     }
 
-    /// <summary>The <c>Stewards:</c> line.</summary>
     public static string Describe()
     {
         using var say = ValueStringBuilder.Create(1024);
@@ -1401,7 +1236,6 @@ public static partial class BotStewardship
         return say.ToString();
     }
 
-    /// <summary>The town's steward and decrees inside its object in <c>/api/state</c>'s <c>towns</c>. From <c>BotWebSnapshot</c>.</summary>
     public static void Write(Utf8JsonWriter w, BotTowns.Town town)
     {
         if (town == null || !_offices.TryGetValue(town.Name, out var o))
@@ -1464,8 +1298,6 @@ public static partial class BotStewardship
         w.WriteEndArray();
     }
 
-    // ---- the store ---------------------------------------------------------------------------------------------------------
-
     internal static void Save(IGenericWriter writer)
     {
         var now = Core.TickCount;
@@ -1478,8 +1310,7 @@ public static partial class BotStewardship
             writer.Write(o.Guild ?? "");
             writer.Write(o.Head ?? "");
             writer.Write(Math.Max(0L, now - o.Since));
-            // A holiday's coin not yet spent is written as coffer: read back, it is held again with the coffer (Start), which is
-            // where Resolve would have put it had the fair not come. So no held coin is lost at a restart (reset26 review, B3).
+
             writer.WriteEncodedInt(o.Coffer + o.Pending);
             writer.Write(o.Tax);
             writer.Write(o.Mood);
@@ -1579,7 +1410,6 @@ public static partial class BotStewardship
                 o.Head = null;
             }
 
-            // The term goes on where it was; the first round comes a few minutes after the boot, the towns spread.
             o.Since = now - Math.Clamp(ago, 0L, (long)int.MaxValue);
             o.ChosenAt = now;
             o.NextRound = now + Math.Max(0, FirstMs) + i * 60000L;
@@ -1610,7 +1440,6 @@ public static partial class BotStewardship
     }
 }
 
-/// <summary>A question to the model as the steward: who, the facts, and the decrees it may give, each with what it does.</summary>
 public sealed class BotStewardAsk
 {
     public string Town;
@@ -1619,12 +1448,9 @@ public sealed class BotStewardAsk
 
     public string Head;
 
-    /// <summary>The facts, plain lines.</summary>
     public string Brief;
 
-    /// <summary>The ids it may answer, "none" first.</summary>
     public string[] Ids;
 
-    /// <summary>What each id does, in the same order.</summary>
     public string[] Means;
 }

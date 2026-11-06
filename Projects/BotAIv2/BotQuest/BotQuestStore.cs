@@ -2,10 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps the board of errands across restarts, each errand with its count and its held reward; a taker is not
-/// kept, so every errand is open again after a boot. See <see cref="BotQuests"/>.
-/// </summary>
 public sealed class BotQuestStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotQuestStore));
@@ -20,7 +16,6 @@ public sealed class BotQuestStore : GenericPersistence
     {
     }
 
-    /// <summary>Errands read back at the last load. For the summary.</summary>
     public static int Restored { get; private set; }
 
     public override void Serialize(IGenericWriter writer)

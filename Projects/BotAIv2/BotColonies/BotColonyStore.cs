@@ -3,17 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps the guilds' colonies across restarts: whose, on which island, where the store stands and what the colony has brought in.
-///
-/// <para>
-/// <b>A file of its own</b>, as <see cref="BotSeizureStore"/> is beside the war ledger, so a build without colonies ignores it. The
-/// store is a chest in the world and is saved by the engine; this keeps its serial and finds it again after the load
-/// (<see cref="BotColonies"/>' first look). Who is on the land is not kept: it is looked at again, and a shift's clock starts again
-/// at the boot. Registered by the engine's own call of every <c>Configure</c>, after <see cref="BotCore.Configure"/>, so that
-/// <c>BotCore</c> is not touched.
-/// </para>
-/// </summary>
 public sealed class BotColonyStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotColonyStore));
@@ -24,7 +13,6 @@ public sealed class BotColonyStore : GenericPersistence
 
     private static BotColonyStore _store;
 
-    /// <summary>After <c>BotCore.Configure</c> (priority 40), which reads whether the bots are on at all.</summary>
     [CallPriority(41)]
     public static void Configure()
     {

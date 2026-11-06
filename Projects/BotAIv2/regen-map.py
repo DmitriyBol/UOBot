@@ -35,8 +35,6 @@ END = "<!--SECTION2:END-->"
 
 ROOT = "(root)"
 
-# Reading order: the way in, the clock, the decision, then everything a decision reaches for, then the
-# subsystems that watch rather than act.
 ORDER = [
     ROOT, "BotModules", "BotPopulation", "BotWill", "BotMovement", "BotClasses", "BotOutfit",
     "BotHarvest", "BotCraft", "BotHunt", "BotShops", "BotMarket", "BotShopkeep", "BotSpells",
@@ -44,7 +42,6 @@ ORDER = [
     "BotDashboard", "BotAlarm", "BotVoice", "BotSocial", "BotWeb", "mindedBots", "mindedBots/debugger",
 ]
 
-# folder -> (title, what it is, [traps])
 BLOCKS = {
     ROOT: (
         "the way in",
@@ -549,8 +546,6 @@ BLOCKS = {
     ),
 }
 
-# folder -> the summary lines it writes into. Verified against a live log rather than derived, because a
-# clause can reach a line through two levels of Describe().
 LINES = {
     "BotPopulation": ["Getting about:", "The market:", "What we know:", "Money:"],
     "BotWill": ["What we know:"],
@@ -588,11 +583,9 @@ TYPE_SUMMARY = re.compile(
     re.S,
 )
 
-
 def read(path):
     with open(path, "rb") as handle:
         return handle.read().decode("utf-8-sig", errors="replace")
-
 
 def purpose(text):
     found = TYPE_SUMMARY.search(text)
@@ -607,13 +600,9 @@ def purpose(text):
 
     return (sentence.group(1) if sentence else body[:160]).strip()
 
-
 DIAL = re.compile(r"public static ([\w<>?\[\]]+) (\w+) \{ get; set; \} = ([^;]{1,60});")
 
-# A configuration file can only reach a dial through a line like `BotMarket.StaleMs = settings.StaleMs ??`
-# in that subsystem's *Config.cs. Anything not on the left of one of those needs a rebuild to change.
 SETTABLE = re.compile(r"(\w+)\.(\w+)\s*=\s*(?:settings|cfg|c)\.(\w+)\s*\?\?")
-
 
 def collect():
     """Everything the blocks are built out of, read once per file."""
@@ -641,8 +630,6 @@ def collect():
 
             found = re.search(r"Configuration/(bot-[a-z-]+\.json)", text)
 
-            # Each key is credited to the file its setter reads, not to the folder: BotPopulation/ reads bot-population.json,
-            # bot-rest.json and bot-names.json, and the folder heading alone named bot-names.json for all of them (12.10.2026).
             for reach in SETTABLE.finditer(text):
                 here["settable"][(reach.group(1), reach.group(2))] = (reach.group(3), found.group(1) if found else None)
 
@@ -652,7 +639,6 @@ def collect():
             if re.search(r"class\s+%s\s*:\s*[^{\n]*BotDeed" % re.escape(stem), text):
                 here["deeds"].add(stem)
 
-            # The heading names the file the folder's first *Config.cs reads, and only failing one the first file named anywhere.
             if found and (not here["config"] or stem.endswith("Config") and not here.get("owned")):
                 here["config"] = found.group(1)
                 here["owned"] = here.get("owned") or stem.endswith("Config")
@@ -664,7 +650,6 @@ def collect():
                     (stem, offers.group(1) if offers else stem, rung.group(1) if rung else "?", text)
                 )
 
-    # A proposer's deeds are whatever it constructs that is a deed anywhere in the assembly.
     every = set().union(*(f["deeds"] for f in folders.values())) if folders else set()
 
     for here in folders.values():
@@ -674,7 +659,6 @@ def collect():
         ]
 
     return folders
-
 
 def block(folder, data):
     title, says, traps = BLOCKS.get(folder, ("", "", []))
@@ -728,7 +712,6 @@ def block(folder, data):
 
     return out
 
-
 def dials(folders, order):
     """DIALS.md: every tunable in the assembly, its default, and whether a config file can reach it."""
     out = [
@@ -743,7 +726,6 @@ def dials(folders, order):
         "changed without a rebuild.",
     ]
 
-    # A dial may be set from another folder's config reader (BotHaven's steps from BotMendConfig): looked up everywhere.
     everywhere = {}
 
     for data in folders.values():
@@ -771,9 +753,7 @@ def dials(folders, order):
 
     return sum(len(f["dials"]) for f in folders.values()), sum(len(f["settable"]) for f in folders.values())
 
-
 ROW = re.compile(r"^\| `([A-Za-z0-9_]+\.cs)` \|")
-
 
 def drift():
     """Subsystem READMEs whose file table no longer matches the folder. Reported, never rewritten."""
@@ -788,7 +768,6 @@ def drift():
         with open(path, encoding="utf-8") as handle:
             lines = handle.read().split("\n")
 
-        # The first contiguous run of file rows is the "What is in it" table; later tables are other things.
         first = last = None
 
         for i, line in enumerate(lines):
@@ -812,7 +791,6 @@ def drift():
             out.append((folder, sorted(actual - listed), sorted(listed - actual)))
 
     return out
-
 
 def main():
     folders = collect()
@@ -862,7 +840,6 @@ def main():
             parts.append("lists absent " + ", ".join(ghosts))
 
         print("%s/README.md has drifted: %s" % (folder, "; ".join(parts)))
-
 
 if __name__ == "__main__":
     main()

@@ -5,35 +5,25 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-reach.json</c> may say. Everything optional; an empty file keeps the code's numbers. PascalCase:
-/// a key in lower case is silently a default, and the boot line is the proof of what took.
-/// </summary>
 public sealed class BotReachSettings
 {
-    /// <summary>Whether the reach map is drawn and asked at all.</summary>
+
     public bool? Enabled { get; set; }
 
-    /// <summary>The loop's milliseconds a tick of drawing may take, and how often a tick runs.</summary>
     public double? SliceMs { get; set; }
 
     public int? EveryMs { get; set; }
 
-    /// <summary>Whether the clusters are kept on disk between boots.</summary>
     public bool? Persist { get; set; }
 
-    /// <summary>Cores the machine needs for the solve to run off the loop.</summary>
     public int? OffLoopCores { get; set; }
 
-    /// <summary>How near a sampled place open ground must be.</summary>
     public int? SampleReach { get; set; }
 
-    /// <summary>Steps onto ground the map calls unreachable, in one cluster, before it is drawn again; and how many are said.</summary>
     public int? RedrawAfter { get; set; }
 
     public int? SayContradictions { get; set; }
 
-    /// <summary>The check: whether it runs at the first solve, how many tiles, its budget, clock, flood and whether a debugger stands on each.</summary>
     public bool? CheckOnBoot { get; set; }
 
     public int? CheckSamples { get; set; }
@@ -47,10 +37,6 @@ public sealed class BotReachSettings
     public bool? CheckCarry { get; set; }
 }
 
-/// <summary>
-/// The reach map as a module: the numbers read, the map started on the population's home map, and one <c>Reach:</c> line every
-/// five minutes with every counter it keeps.
-/// </summary>
 public sealed class BotReachModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotReachModule));
@@ -63,7 +49,6 @@ public sealed class BotReachModule : BotModule
 
     public override string[] Requires => ["Population", "Movement"];
 
-    /// <summary>How often the map is summed up in the log.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _say;

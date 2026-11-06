@@ -9,53 +9,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The zone watch: how often the danger map is right, counted both ways and in two parts over a rolling window, and the end of
-/// the watching once both parts are right often enough.
-///
-/// <para>
-/// <b>Patrick's order of 07.10.2026, evening: "if the debuggers are useful, we don't remove them; one debugger goes wholly onto
-/// the zones, its other duties are shared out, we keep a counter of the zones' accuracy. As soon as zone accuracy is 99 percent
-/// — we stop watching the zones and give the passed duties back."</b> The keeper is <see cref="BotZoneTour.Keeper"/>; this
-/// class is the counter and the clock that ends its posting.
-/// </para>
-///
-/// <para>
-/// <b>Deaths</b> (<see cref="Died"/>), one check a death. Only a bot killed by a creature that attacks on sight counts — the
-/// killer the engine credits is a <see cref="BaseCreature"/> nobody controls or summoned, not townsfolk, whose fight mode attacks
-/// first; a bot's, a guard's, a pet's kill, a passive animal the bot set upon, or nothing named is no evidence and is counted
-/// apart. Where it fell is read off the map published at that moment: clear ground (no patrol, no fringe; a hunting ground's
-/// own level is clear too) counts against; hostile or deadly patrol counts for; a fringe counts for only while the zone it
-/// borders has living attackers in that build, and apart otherwise — a fringe round an empty camp warned of nothing, and
-/// painting more fringe must not buy agreement (reviews of 07.10.2026).
-/// </para>
-///
-/// <para>
-/// <b>Visits</b> (<see cref="Visited"/>), one vote a zone. Every tour stop held its whole <see cref="BotZoneTour.HoldMs"/>, by
-/// the keeper or anyone, looks for a living attacker in the zone's own patrol cells. Hostile or deadly with one: agrees. Hostile
-/// or deadly with none: against if every spawner feeding it is full (the creatures exist and are not where the map says),
-/// apart as <em>respawning</em> if any is below its count (hunted out and refilling: painting it hostile is right, and the
-/// hold proves nothing). Clear (a hunting ground; only the keeper stands in those) with an attacker: against; with none:
-/// agrees. A zone's latest verdict replaces its earlier one, so the visit part is "zones whose latest verdict in the window
-/// agrees, over zones with a verdict in the window", and re-checking a zone never adds weight to it.
-/// </para>
-///
-/// <para>
-/// <b>The end, and no automatic return.</b> Each part is judged on its own sample (<see cref="AccuracyMinDeaths"/> deaths,
-/// <see cref="AccuracyMinZones"/> zones); the watch ends only when both are at <see cref="AccuracyTarget"/> or better for
-/// <see cref="AccuracyHoldMinutes"/>. Then the tour stops for every debugger, the keeper's duties go back to it, and deaths go
-/// on being counted. Afterwards the deaths alone, over <see cref="AlarmWindowHours"/> with <see cref="AlarmMinDeaths"/>, under
-/// <see cref="ResumeBelow"/> for <see cref="ResumeAfterMinutes"/> raise an alarm in <c>alerts.ndjson</c> and do nothing else:
-/// <c>do zonewatch on</c> restarts it, by hand. The deaths and the zones' verdicts are printed beside the painted patrol and
-/// fringe, so a map that grows its painted ground to agree is seen to.
-/// </para>
-///
-/// <para>
-/// <b>Kept in <c>Data/</c>, not in <c>Saves/</c></b> (which is moved to a backup at every save), as <see cref="BotZoneMemory"/>
-/// keeps the observations: the deaths, each zone's latest verdict and the watch's own state, read and written off the loop and
-/// written once more at shutdown or a crash. A file that cannot be read is moved aside to <c>.bad</c> and said at warning.
-/// </para>
-/// </summary>
 public static class BotZoneWatch
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotZoneWatch));
@@ -64,76 +17,54 @@ public static class BotZoneWatch
 
     private const string AlarmKind = "zones-accuracy";
 
-    /// <summary>The rolling window both parts are counted over.</summary>
     public static int AccuracyWindowHours { get; set; } = 6;
 
-    /// <summary>The fewest deaths in the window before the death part is judged.</summary>
     public static int AccuracyMinDeaths { get; set; } = 100;
 
-    /// <summary>The fewest zones with a verdict in the window before the visit part is judged: about half the land's zones.</summary>
     public static int AccuracyMinZones { get; set; } = 200;
 
-    /// <summary>The accuracy at which the zones need no more watching, each part.</summary>
     public static double AccuracyTarget { get; set; } = 0.99;
 
-    /// <summary>How long both parts must hold the target, with their samples, before the watch ends.</summary>
     public static int AccuracyHoldMinutes { get; set; } = 60;
 
-    /// <summary>After the end: the deaths' accuracy under this, held for <see cref="ResumeAfterMinutes"/>, raises an alarm.</summary>
     public static double ResumeBelow { get; set; } = 0.97;
 
     public static int ResumeAfterMinutes { get; set; } = 60;
 
-    /// <summary>The alarm's own window and sample: deaths alone, the tour having stopped, over a span a quiet night still fills.</summary>
     public static int AlarmWindowHours { get; set; } = 12;
 
     public static int AlarmMinDeaths { get; set; } = 100;
 
-    /// <summary>
-    /// How long an empty hostile zone with a spawner below its count is excused as refilling, at least: past the longer of this
-    /// and twice the slowest such spawner's longest delay since it was first held empty, an empty hold counts against (second
-    /// reviews of 07.10.2026: zone 4, skeletons SE of Yew, 0 of 10 alive after 83,598 awake seconds, was excused for ever).
-    /// </summary>
     public static int RespawnGraceMinutes { get; set; } = 30;
 
-    /// <summary>A zone whose last visit disagreed is not stood in again by the keeper sooner than this.</summary>
     public static int RecheckMinutes { get; set; } = 30;
 
-    /// <summary>The file, under the Distribution folder, and how often it is written.</summary>
     public static string File { get; set; } = "Data/bot-zones-accuracy.json";
 
     public static int SaveEveryMs { get; set; } = 300000;
 
-    /// <summary>The most deaths held; the oldest go first.</summary>
     public static int MostDeaths { get; set; } = 50000;
 
-    /// <summary>Whether the zones are being watched. Turned by the verdict, or by hand (<see cref="Turn"/>); never a dial.</summary>
     public static bool On { get; private set; } = true;
 
-    /// <summary>When the watch ended (unix seconds, nought while it runs), and by what.</summary>
     public static long EndedAt { get; private set; }
 
     public static string EndedBy { get; private set; } = "";
 
-    /// <summary>A line for Argus's feed. Filled by the debugger, which writes it into its own log under the lead's name.</summary>
     public static Action<string> Noted { get; set; }
 
-    /// <summary>Changes the dashboard has not been shown yet. See <see cref="BotZones"/>' JSON.</summary>
     public static long Version { get; private set; }
 
-    // ---- Since the start: what was heard and why some of it is no evidence.
     public static long DeathsHeard { get; private set; }
 
     public static long DeathsNotByCreature { get; private set; }
 
     public static long DeathsUnmapped { get; private set; }
 
-    /// <summary>Deaths in the fringe of a zone that had no living attacker in the build: counted apart.</summary>
     public static long DeathsFringeOfEmpty { get; private set; }
 
     public static long VisitsHeard { get; private set; }
 
-    /// <summary>Empty holds in a hostile zone with a spawner below its count: refilling, counted apart.</summary>
     public static long VisitsRespawning { get; private set; }
 
     public static long Alarms { get; private set; }
@@ -142,23 +73,18 @@ public static class BotZoneWatch
 
     private static readonly List<Death> _deaths = [];
 
-    /// <summary>Each zone's latest verdict, by its stand (a spawner's tile, steadier than a zone number across restarts).</summary>
     private static readonly Dictionary<long, (long At, bool Agree)> _zones = [];
 
-    /// <summary>Every full hold's time by zone, respawning ones included, so the keeper does not stand in a refilling camp again at once.</summary>
     private static readonly Dictionary<long, long> _visitedAt = [];
 
-    /// <summary>When each hostile zone was first held empty, cleared when an attacker is seen there; and when its last hold was excused.</summary>
     private static readonly Dictionary<long, long> _emptySince = [];
 
     private static readonly Dictionary<long, long> _excusedAt = [];
 
-    /// <summary>The stands of the zones in the build the verdicts were last counted against, and that build.</summary>
     private static readonly HashSet<long> _current = [];
 
     private static BotZoneState _currentOf;
 
-    // ---- The parts, recounted when stale: deaths and zones in the accuracy window, deaths in the alarm's.
     private static int _deathsAgree, _deathsAll, _zonesAgree, _zonesAll, _alarmAgree, _alarmAll;
 
     private static bool _stale = true;
@@ -178,10 +104,6 @@ public static class BotZoneWatch
     private static long Now() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
     private static long Key(Point3D stand) => ((long)stand.X << 20) | (uint)(stand.Y & 0xFFFFF);
-
-    // ---------------------------------------------------------------------------------------------------------------------
-    // The parts
-    // ---------------------------------------------------------------------------------------------------------------------
 
     private static void Recount()
     {
@@ -215,8 +137,6 @@ public static class BotZoneWatch
             }
         }
 
-        // Only zones of the build published now: a zone retired by a rebuild (the sea camps once painted as land) leaves the
-        // visit part at once rather than when its verdict ages out (second reviews of 07.10.2026).
         var state = BotZones.State;
 
         if (!ReferenceEquals(state, _currentOf))
@@ -240,7 +160,6 @@ public static class BotZoneWatch
         }
     }
 
-    /// <summary>Zones whose latest hold was excused as refilling, within the window: set apart from the visit part now.</summary>
     public static int ExcusedZones
     {
         get
@@ -262,7 +181,6 @@ public static class BotZoneWatch
 
     private static double Share(int agree, int all) => all == 0 ? 0.0 : (double)agree / all;
 
-    /// <summary>The death part: agreements over deaths in the window.</summary>
     public static double DeathAccuracy
     {
         get
@@ -273,7 +191,6 @@ public static class BotZoneWatch
         }
     }
 
-    /// <summary>The visit part: zones whose latest verdict in the window agrees, over zones with a verdict in the window.</summary>
     public static double VisitAccuracy
     {
         get
@@ -284,7 +201,6 @@ public static class BotZoneWatch
         }
     }
 
-    /// <summary>Both parts as one share, for the eye; the verdict reads the two apart.</summary>
     public static double Accuracy
     {
         get
@@ -295,10 +211,6 @@ public static class BotZoneWatch
         }
     }
 
-    /// <summary>
-    /// A bot died. From <c>BotMobile.OnDeath</c> beside <see cref="BotZones.Fell"/>, with the place taken before anything moved
-    /// the ghost and the killer the engine credits.
-    /// </summary>
     public static void Died(Map map, Point3D at, Mobile killer)
     {
         var state = BotZones.State;
@@ -324,7 +236,6 @@ public static class BotZoneWatch
             return;
         }
 
-        // The map as it stood when the bot fell: the build this death will promote a zone in comes after it.
         var level = BotZones.LevelAt(map, at.X, at.Y);
 
         if (level == BotZoneLevel.Edge && state.Owner(at.X, at.Y) is { Aggressive: <= 0 })
@@ -345,21 +256,10 @@ public static class BotZoneWatch
         Version++;
     }
 
-    /// <summary>
-    /// Whether a killer is the kind of thing the danger map is about: a creature nobody controls or summoned, not townsfolk,
-    /// that attacks on sight. A bear the bot set upon itself, a bot's pet or another bot says nothing about the map.
-    /// </summary>
     public static bool ByCreature(Mobile killer) =>
         killer is BaseCreature { Deleted: false } c && !c.Controlled && !c.Summoned && !BotHaunts.IsTownsfolk(c)
         && BotHaunts.AttacksFirst(c.FightMode);
 
-    /// <summary>
-    /// A tour stop held its whole time: <paramref name="seen"/> is whether a living attacker stood in the zone's own patrol at any
-    /// of its looks; <paramref name="refillMinutes"/> is nought when every spawner feeding it is full (or none runs), else twice
-    /// the longest delay of the slowest one below its count. Judged against the zone's level in the build published then; the
-    /// zone's latest verdict replaces its earlier one. An empty hostile zone that is refilling is excused only while its emptiness
-    /// is younger than the longer of <paramref name="refillMinutes"/> and <see cref="RespawnGraceMinutes"/>.
-    /// </summary>
     public static void Visited(BotZone zone, bool seen, double refillMinutes)
     {
         if (zone == null || zone.Stray)
@@ -392,7 +292,7 @@ public static class BotZoneWatch
 
                 if (refillMinutes > 0 && now - since < grace)
                 {
-                    // Hunted out and refilling, and not for long: no evidence either way, and the zone's last verdict stands.
+
                     VisitsRespawning++;
                     _excusedAt[key] = now;
 
@@ -413,10 +313,8 @@ public static class BotZoneWatch
         Version++;
     }
 
-    /// <summary>When the zone was last held to the end, verdict or none (unix seconds; nought for never this process). For the keeper's choice.</summary>
     public static long LastVisit(BotZone zone) => zone != null && _visitedAt.TryGetValue(Key(zone.Stand), out var at) ? at : 0;
 
-    /// <summary>The zone's latest visit verdict, if it has one: when (unix seconds) and whether it agreed.</summary>
     public static bool LastCheck(BotZone zone, out long at, out bool agree)
     {
         if (zone != null && _zones.TryGetValue(Key(zone.Stand), out var last))
@@ -433,7 +331,6 @@ public static class BotZoneWatch
         return false;
     }
 
-    /// <summary>Drops the deaths older than both windows.</summary>
     private static void Prune(long now)
     {
         var from = now - Math.Max(Math.Max(1, AccuracyWindowHours), Math.Max(1, AlarmWindowHours)) * 3600L;
@@ -449,15 +346,9 @@ public static class BotZoneWatch
             _deaths.RemoveRange(0, first);
         }
 
-        // Counted afresh every judgement: a check leaving the window changes the parts though nothing was added.
         _stale = true;
     }
 
-    // ---------------------------------------------------------------------------------------------------------------------
-    // The verdict
-    // ---------------------------------------------------------------------------------------------------------------------
-
-    /// <summary>One beat, from the zones' own: the windows judged every few seconds, the file written when due.</summary>
     public static void Beat(long now)
     {
         if (!_started)
@@ -478,7 +369,6 @@ public static class BotZoneWatch
         }
     }
 
-    /// <summary>Both parts have their samples and are at the target or better.</summary>
     private static bool BothAtTarget() =>
         _deathsAll >= Math.Max(1, AccuracyMinDeaths) && _zonesAll >= Math.Max(1, AccuracyMinZones)
         && Share(_deathsAgree, _deathsAll) >= AccuracyTarget && Share(_zonesAgree, _zonesAll) >= AccuracyTarget;
@@ -488,7 +378,6 @@ public static class BotZoneWatch
         Prune(now);
         Recount();
 
-        // The page is told only when a part moved: a death or a verdict leaving the window changes it with nothing added.
         var parts = (_deathsAgree, _deathsAll, _zonesAgree, _zonesAll, _alarmAgree, _alarmAll);
 
         if (parts != _parts)
@@ -523,7 +412,6 @@ public static class BotZoneWatch
             return;
         }
 
-        // After the end the tour is still and only the deaths speak: judged over their own window and sample.
         _aboveSince = 0;
 
         var alarm = Share(_alarmAgree, _alarmAll);
@@ -583,7 +471,6 @@ public static class BotZoneWatch
         Noted?.Invoke(line);
     }
 
-    /// <summary>The door's <c>zonewatch on|off|state</c>.</summary>
     public static string Turn(string word)
     {
         var now = Now();
@@ -639,7 +526,6 @@ public static class BotZoneWatch
 
     private static string Pct(int agree, int all) => all == 0 ? "–" : $"{agree * 100.0 / all:F1} %";
 
-    /// <summary>The two parts and the combined share, each with its counts and its sample.</summary>
     private static string Parts()
     {
         Recount();
@@ -649,7 +535,6 @@ public static class BotZoneWatch
                + $"combined {Pct(_deathsAgree + _zonesAgree, _deathsAll + _zonesAll)}, window {AccuracyWindowHours}h";
     }
 
-    /// <summary>The painted ground the shares were earned on: land patrol and fringe, in tiles.</summary>
     private static string Painted()
     {
         var state = BotZones.State;
@@ -666,15 +551,6 @@ public static class BotZoneWatch
         return $"painted {patrol / 1000}k patrol + {fringe / 1000}k fringe tiles";
     }
 
-    // ---------------------------------------------------------------------------------------------------------------------
-    // Words and the dashboard
-    // ---------------------------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// The clause the <c>Zones:</c> line carries: <c>accuracy: deaths 94.5 % (120/127), visits 93.0 % (186/200 zones), combined
-    /// 93.8 %, window 6h; 14 holds respawning, 3 fringe deaths of empty zones apart; painted …; keeper Heimdall on zones</c>, or
-    /// <c>watch ended at 23:40</c> in place of the keeper.
-    /// </summary>
     public static string Summary()
     {
         var who = On
@@ -689,7 +565,6 @@ public static class BotZoneWatch
     private static string KeeperWhy() =>
         !BotZoneTour.Running ? "the tour is off" : BotZoneTour.Walkers == null ? "no debugger" : $"{Keeper()} is not a helper of the squad with a body";
 
-    /// <summary>The five-minute sentence: the summary, what was heard and set apart, and the clock towards the end or the alarm.</summary>
     public static string Describe()
     {
         Recount();
@@ -702,7 +577,6 @@ public static class BotZoneWatch
         return $"Zone watch {Summary()}. Since the start: {DeathsHeard} deaths heard ({DeathsNotByCreature} not by an attacking creature, {DeathsUnmapped} before a map, {DeathsFringeOfEmpty} in the fringe of an empty zone), {VisitsHeard} full holds ({VisitsRespawning} respawning); {_zones.Count} zones with a verdict ever; the file {_loaded}.{after}";
     }
 
-    /// <summary>The same as an object: <c>watch</c> in <c>/api/zones</c>, <c>zoneWatch</c> in <c>/api/state</c>. Game loop only.</summary>
     public static void Write(Utf8JsonWriter w)
     {
         Recount();
@@ -760,22 +634,12 @@ public static class BotZoneWatch
         w.WriteEndObject();
     }
 
-    /// <summary>The <c>zoneWatch</c> block of <c>/api/state</c>.</summary>
     public static void Web(Utf8JsonWriter w)
     {
         w.WritePropertyName("zoneWatch");
         Write(w);
     }
 
-    // ---------------------------------------------------------------------------------------------------------------------
-    // The file
-    // ---------------------------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// Starts reading the file off the loop, once a process: a world reload keeps the window in memory (it is about the map,
-    /// not the population), and a second read would put the old file over what was counted since. Hooks the shutdown and the
-    /// crash, which write it once more.
-    /// </summary>
     public static void Load()
     {
         if (_started)
@@ -813,7 +677,7 @@ public static class BotZoneWatch
                 }
                 catch (Exception e)
                 {
-                    // Kept as evidence rather than written over at the next save: an ended watch read as nothing would start again.
+
                     var moved = false;
 
                     try
@@ -823,7 +687,7 @@ public static class BotZoneWatch
                     }
                     catch
                     {
-                        // Said below; the next save writes over it.
+
                     }
 
                     Core.LoopContext.Post(
@@ -905,7 +769,6 @@ public static class BotZoneWatch
         return read;
     }
 
-    /// <summary>What was read, merged under what this session has counted already; the watch's state taken unless a hand turned it first.</summary>
     private static void Apply(Read read, string why)
     {
         _read = true;
@@ -943,8 +806,7 @@ public static class BotZoneWatch
 
         if (!_byHand)
         {
-            // The clocks towards the end and towards the alarm count minutes the shard was up and measuring: moved on by the time
-            // since the file was written, so a restart neither breaks a hold nor counts the downtime as held.
+
             var down = Math.Max(0, Now() - read.SavedAt);
 
             On = read.On;
@@ -995,7 +857,6 @@ public static class BotZoneWatch
         return new Snapshot(On, EndedAt, EndedBy, _aboveSince, _belowSince, _deaths.ToArray(), zones, empty);
     }
 
-    /// <summary>Writes a snapshot beside the file and moves it over, so a stop mid-write leaves the last good one. Off the loop or at shutdown.</summary>
     private static void WriteFile(Snapshot s, string path, string temp)
     {
         var buffer = new ArrayBufferWriter<byte>(64 * 1024);
@@ -1057,7 +918,6 @@ public static class BotZoneWatch
         System.IO.File.Move(temp, path, true);
     }
 
-    /// <summary>Copies the window on the loop; writes the JSON and the file off it. Never before the read.</summary>
     public static void Save()
     {
         if (!_started || !_read || _writing)
@@ -1085,7 +945,7 @@ public static class BotZoneWatch
                     Core.LoopContext.Post(
                         () =>
                         {
-                            // Not marked dirty: the next write is the clock's, not the next beat's, so a full disk is said every few minutes.
+
                             _writing = false;
                             logger.Warning("Zones: {File} could not be written: {Message}", File, e.Message);
                         }
@@ -1095,10 +955,6 @@ public static class BotZoneWatch
         );
     }
 
-    /// <summary>
-    /// The shutdown's and the crash's write, on the calling thread: the loop has stopped and posts no more. Beside its own temporary
-    /// file, so a periodic write still in flight cannot share one; never before the read, which would put nothing over the window.
-    /// </summary>
     private static void SaveNow()
     {
         if (!_started || !_read)

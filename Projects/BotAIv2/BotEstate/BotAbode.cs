@@ -9,34 +9,12 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Houses of the population's own: a bot that has done well buys one, spends its leisure there, and keeps its belongings in a
-/// chest by the wall.
-///
-/// <para>
-/// <b>Patrick's order of 26.09.2026, the fourth of the night:</b> "well-to-do bots may buy houses of their own, of different
-/// kinds; they can pass the time in them, their mood rises there, they can have chests for their belongings. It is a status —
-/// a sign that the bot has achieved a great deal." So a house is bought, not issued: by a bot whose pack and account cover
-/// the price with <see cref="Keep"/> to spare, the largest of the four hall sizes it can afford (<see cref="BotHallKind"/>, at
-/// the prices below — a house of one's own is dearer than a guild's first hall because one bot pays for it); the time is
-/// <see cref="BotRepose"/>, the mood is boredom falling while it is there, and the chest is a wooden chest locked down inside.
-/// </para>
-///
-/// <para>
-/// <b>The world is the register, as it is for the halls.</b> A house is known by the name on its sign — "Nessa's house" — and
-/// found again at every boot (<see cref="Adopt"/>); nothing else is saved. The engine keeps the rest: a bot owns its house,
-/// and a bot deleted takes a house with no co-owners with it (<c>BaseHouse.HandleDeletion</c>), which is right — a wiped
-/// island keeps nobody's house, and <c>do reset</c> razes them as it razes the halls.
-/// </para>
-/// </summary>
 public static class BotAbode
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAbode));
 
-    /// <summary>Whether bots buy houses and go home to them at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>What each size costs one bot.</summary>
     public static int SmallPrice { get; set; } = 10000;
 
     public static int PatioPrice { get; set; } = 25000;
@@ -45,13 +23,10 @@ public static class BotAbode
 
     public static int MarblePrice { get; set; } = 80000;
 
-    /// <summary>What a buyer keeps after paying: a house is status, not ruin.</summary>
     public static int Keep { get; set; } = 2000;
 
-    /// <summary>The most houses of the population's own on the island. Ground near the towns is scarce, and halls need it too.</summary>
     public static int Most { get; set; } = 20;
 
-    /// <summary>How near another bot's house one may stand. The halls keep their own, wider distance (<c>BotPlot.Apart</c>).</summary>
     public static int Apart { get; set; } = 16;
 
     public const string Suffix = "'s house";
@@ -72,7 +47,6 @@ public static class BotAbode
 
     public static int Count => _houses.Count;
 
-    /// <summary>This bot's house, or null.</summary>
     public static BaseHouse Of(Mobile bot)
     {
         if (bot?.Name == null || !_houses.TryGetValue(bot.Name, out var house))
@@ -90,7 +64,6 @@ public static class BotAbode
         return null;
     }
 
-    /// <summary>What a house of this size costs one bot.</summary>
     public static int Price(BotHallKind kind) =>
         kind.Size switch
         {
@@ -100,7 +73,6 @@ public static class BotAbode
             _ => MarblePrice
         };
 
-    /// <summary>The largest size this much money buys with <see cref="Keep"/> to spare, or null.</summary>
     public static BotHallKind Affordable(int wealth)
     {
         BotHallKind best = null;
@@ -120,7 +92,6 @@ public static class BotAbode
 
     public static string SignFor(string name) => $"{name}{Suffix}";
 
-    /// <summary>A house just bought.</summary>
     public static void Register(Mobile owner, BaseHouse house)
     {
         if (owner?.Name == null || house == null)
@@ -136,10 +107,6 @@ public static class BotAbode
 
     public static void Stow(int many) => Stowed += Math.Max(0, many);
 
-    /// <summary>
-    /// Finds every house of the population's own by its sign and gives it back to its bot: owner, doors unlocked, decay
-    /// refreshed. At boot, after the population is raised; a house whose bot is gone is left to the engine's decay.
-    /// </summary>
     public static void Adopt()
     {
         if (!Running)
@@ -206,7 +173,6 @@ public static class BotAbode
         return null;
     }
 
-    /// <summary>The chest inside a house of one's own, or null.</summary>
     public static Container Chest(BaseHouse house)
     {
         var downs = house?.LockDowns;
@@ -227,7 +193,6 @@ public static class BotAbode
         return null;
     }
 
-    /// <summary>Takes every house of the population's own off the island. For a wipe (<c>do reset</c>).</summary>
     public static int Raze()
     {
         var gone = 0;
@@ -275,7 +240,6 @@ public static class BotAbode
         return sb.ToString();
     }
 
-    /// <summary>A world reload: the houses stand; the register is rebuilt from their signs at the next boot.</summary>
     public static void Forget()
     {
         _houses.Clear();
@@ -286,16 +250,11 @@ public static class BotAbode
     }
 }
 
-/// <summary>
-/// Offers a well-to-do bot the purchase of a house of its own: the largest size its pack and account cover with
-/// <see cref="BotAbode.Keep"/> to spare, on ground found from its guild's seat. See <see cref="BotAbode"/>.
-/// </summary>
 public sealed class BotAbodeBuyer : IBotProposer
 {
-    /// <summary>How often one bot is looked at for a house. Its wealth moves over hours.</summary>
+
     public static int LookMs { get; set; } = 600000;
 
-    /// <summary>How often the island's ground is searched for a house at all: the search is the estate's dearest question.</summary>
     public static int SearchMs { get; set; } = 20000;
 
     public static long Asked { get; private set; }
@@ -308,7 +267,6 @@ public sealed class BotAbodeBuyer : IBotProposer
 
     public static long Groundless { get; private set; }
 
-    /// <summary>Times no ground was found for the size first affordable, but a smaller house fit (H1: the fallback keeps the buy alive).</summary>
     public static long Downsized { get; private set; }
 
     private static readonly Dictionary<Serial, long> _looked = [];
@@ -329,7 +287,6 @@ public sealed class BotAbodeBuyer : IBotProposer
             return null;
         }
 
-        // A bandit has a hideout, and a house with its name on the sign is a house the Baron knows where to find.
         if (BotUnderworld.Outlawed(body) || BotUnderworld.Member(body) || BotAbode.Of(body) != null)
         {
             return null;
@@ -364,7 +321,7 @@ public sealed class BotAbodeBuyer : IBotProposer
 
         if (_searched && now - _searchedTick < SearchMs)
         {
-            // Asked again at its next look rather than now; the throttle is the island's, not this bot's.
+
             _looked.Remove(body.Serial);
 
             return null;
@@ -373,13 +330,11 @@ public sealed class BotAbodeBuyer : IBotProposer
         _searched = true;
         _searchedTick = now;
 
-        // Round where the bot lives (29.09.2026): its guild's hall or seat, or its town. See BotPopulation.HomeOf.
         var from = BotPopulation.HomeOf(body);
 
         if (!BotPlot.FindHome(body, from, kind.Multi, out var plot))
         {
-            // No ground for the largest it could afford: try each smaller kind before calling the island bare (H1,
-            // 06.11.2026) — a small house bought is better than a big one that was never offered.
+
             for (var size = kind.Size - 1; size >= 1; size--)
             {
                 var less = BotHallKind.Sized(size);
@@ -425,10 +380,6 @@ public sealed class BotAbodeBuyer : IBotProposer
     }
 }
 
-/// <summary>
-/// A bot buys its house: walks to the ground, proves it with the engine, pays out of its pack and then its account, and puts
-/// the house up with its name on the sign and a chest inside. See <see cref="BotAbode"/>.
-/// </summary>
 public sealed class BotAbodeBuy : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAbodeBuy));
@@ -501,7 +452,6 @@ public sealed class BotAbodeBuy : BotDeed
             return BotDoing.Walk(_map, _plot, BotArrival.Within(Reach), $"to the ground for a house at {_plot.X},{_plot.Y}");
         }
 
-        // Not on the ground of a guild neither the bot's own nor allied. See BotBounds.
         if (BotBounds.Refuse(BotBounds.Placing.Abode, (body.Guild as Server.Guilds.Guild)?.Name, _map, _plot, _kind.Multi, out var foreign))
         {
             BotPlot.Spend();
@@ -601,7 +551,6 @@ public sealed class BotAbodeBuy : BotDeed
         return BotDoing.Done($"bought {_kind} at {_plot.X},{_plot.Y} for {price}gp");
     }
 
-    /// <summary>The price out of the pack first and the account after, all of it or none.</summary>
     private static bool Pay(Mobile body, int price)
     {
         var pack = body.Backpack;

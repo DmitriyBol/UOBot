@@ -5,10 +5,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The traders as a module (01.10.2026, build 385): reads <c>Configuration/bot-traders.json</c>, offers the haul
-/// (<see cref="BotHauler"/>), and writes the <c>Traders:</c> line every <see cref="BotTrading.SayEveryMs"/>.
-/// </summary>
 public sealed class BotTradersModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTradersModule));
@@ -65,7 +61,6 @@ public sealed class BotTradersModule : BotModule
     }
 }
 
-/// <summary><c>Configuration/bot-traders.json</c>: every key optional, PascalCase, nothing written means the code's own number.</summary>
 public sealed class BotTradersSettings
 {
     public bool? Running { get; set; }
@@ -126,16 +121,12 @@ public sealed class BotTradersSettings
 
     public double? RoadDare { get; set; }
 
-    /// <summary>The largest share of the traders that may be resting at once (build 388, Patrick's word of 01.10: at least half in the world).</summary>
     public double? RestShare { get; set; }
 
-    /// <summary>How near the end of its rest a trader may be brought back early when more than that share is resting.</summary>
     public int? RestEarlyMinutes { get; set; }
 
-    /// <summary>What a trader keeps in its pocket; the rest is put in its account the moment it is paid (build 388).</summary>
     public int? PocketFloat { get; set; }
 
-    /// <summary>The least above the float worth putting away in one go.</summary>
     public int? PutAwayLeast { get; set; }
 }
 

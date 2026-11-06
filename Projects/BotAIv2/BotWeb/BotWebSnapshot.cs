@@ -13,23 +13,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The whole shard as one JSON document, rebuilt on the game loop every couple of seconds and handed to the
-/// web server as a string.
-///
-/// <para>
-/// <b>Built here, served there.</b> Everything the page shows is read from the world in one pass on the
-/// loop, written once, and then given away; the server never touches a bot. That is the same division as
-/// the summary lines in the log — the loop writes, everybody else reads — and it is why a browser left
-/// open all night costs the population nothing.
-/// </para>
-///
-/// <para>
-/// <b>Every number here is one the log already prints.</b> The page adds no counters of its own; it reads
-/// the same statics the five-minute summary reads, so a figure on the page and a figure in the log can never
-/// disagree about the shard.
-/// </para>
-/// </summary>
 public static class BotWebSnapshot
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWebSnapshot));
@@ -40,10 +23,8 @@ public static class BotWebSnapshot
 
     public static int CraftMs { get; set; } = 15000;
 
-    /// <summary>Plans without getting nearer before a walking bot is called stuck on the page.</summary>
     public static int StuckPlans { get; set; } = 3;
 
-    /// <summary>Most route points sent per bot; a long route is thinned to this many.</summary>
     public static int MostRoutePoints { get; set; } = 64;
 
     public static volatile string State = "{\"at\":null,\"bots\":[]}";
@@ -92,7 +73,6 @@ public static class BotWebSnapshot
         }
     }
 
-    /// <summary>Called a few times a second from the module's timer. Game loop only.</summary>
     public static void Tick(long now)
     {
         if (!BotWebMap.Ready && !BotWebMap.Failed)
@@ -100,8 +80,6 @@ public static class BotWebSnapshot
             BotWebMap.Slice();
         }
 
-        // The live window: a frame a second for each bot somebody is looking at, and the debuggers' page. A tick comparison
-        // and two reads when nobody is. See BotWebLive (02.10.2026).
         BotWebLive.Tick(now);
 
         if (now - _snapTick >= SnapshotMs)
@@ -180,7 +158,6 @@ public static class BotWebSnapshot
             var bots = BotPopulation.Bots;
             var away = BotPopulation.Away;
 
-            // The bots first, because the roll-up above them is made while they are written.
             var botsBuffer = new ArrayBufferWriter<byte>(32 * 1024);
 
             using (var bw = new Utf8JsonWriter(botsBuffer, Options))
@@ -247,7 +224,6 @@ public static class BotWebSnapshot
 
             WriteWork(w);
 
-            // What the bots earn, the special classes left out (Patrick, 29.09.2026). See BotEarnings.
             BotEarnings.Write(w);
             WritePaths(w, map);
 
@@ -287,39 +263,27 @@ public static class BotWebSnapshot
             WriteGuilds(w);
             WriteWars(w);
 
-            // Relations between guilds, each guild's standing in its towns, and the meetings standing (29.09.2026).
             BotDiplomacyWeb.Write(w);
             WriteSquads(w);
             WriteGates(w);
             WriteTowns(w);
 
-            // Bots' shops by the banks, written by their own module (29.09.2026). See BotShopkeep.Web.
             BotShopkeep.Web(w);
 
-            // The guilds' colonies on the islands, the parties at the docks and at sea, and The Shadow on the quays (07.10.2026, sea20).
             BotColonies.Web(w);
 
-            // The Needs board by Patrick's measure: lines opened, met in their first hour, the share, open now, failed by cause, and
-            // the money the wants hold (02.10.2026, build 391). See BotLines.Web.
             BotLines.Web(w);
 
-            // How long the bots take to answer a blow, a creature coming, a failing health, a cry, a wound and a fight's end
-            // (06.10.2026). See BotReflex.
             BotReflex.Web(w);
 
-            // The relics: each with its holder, place and pin, the lair standing, the counters and the news (07.10.2026, relics20).
             BotRelics.Web(w);
 
-            // The bots' own houses (BotAbode): owner, kind, place, and whether the owner is at home (07.10.2026).
             WriteAbodes(w);
 
-            // The daily cycle: the part of the day, offers taken by part, tavern guests by hour, who sleeps where (PLAN-life A1).
             BotDay.Write(w);
 
-            // The stories and the Chronicle: books, chapters, the model's retellings and the day's entries (PLAN-life A3, 13.10.2026).
             BotStory.Web(w);
 
-            // The zone watch: the danger map's accuracy both ways, the keeper, the end (07.10.2026). See BotZoneWatch.
             BotZoneWatch.Web(w);
 
             WriteBarred(w);
@@ -531,17 +495,16 @@ public static class BotWebSnapshot
             w.WriteNumber("mood", Math.Round(bot.Mood, 3));
             w.WriteNumber("purse", bot.Backpack?.GetAmount(typeof(Gold)) ?? 0);
             w.WriteNumber("bank", Banker.GetBalance(bot));
-            // Units over the allowance in capped kinds, and how many things the bank box holds of its 125 (06.10.2026, build next).
+
             w.WriteNumber("over", BotUnload.OverUnits(bot));
             w.WriteNumber("boxItems", bot.FindBankNoCreate()?.TotalItems ?? 0);
-            // Whether that box is at its count, so it takes only what joins a stack it holds (06.10.2026, box16). See BotSurplus.
+
             w.WriteBoolean("boxFull", BotSurplus.BoxFull(bot));
             w.WriteString("rank", bot.BotRank ?? "");
             w.WriteString("level", Level(bot.BotRank));
             w.WriteNumber("progress", Math.Round(bot.Progress, 3));
             w.WriteNumber("kills", bot.Kills);
 
-            // Its nature, its story and its friends and enemies (07.10.2026, traits17). See BotCharacterWeb.
             BotCharacterWeb.Write(w, bot);
             BotDay.WriteBot(w, bot);
 
@@ -638,7 +601,7 @@ public static class BotWebSnapshot
         }
         else
         {
-            // No graph route: the precise plan, which is at most a leg long.
+
             var plan = journey.Plan;
             var from = Math.Max(0, plan.Count - journey.Remaining);
 
@@ -723,8 +686,7 @@ public static class BotWebSnapshot
         w.WriteNumber("dropped", BotWill.Dropped);
         w.WriteNumber("died", BotWill.Deaths);
         w.WriteNumber("share", ended <= 0 ? 0.0 : Math.Round((double)BotWill.Finished / ended, 4));
-        // Both shares side by side (Patrick, 01.10.2026: "both on the dashboard"): the 95 % is read on the share without deaths;
-        // the share over every ending, deaths in the middle of the work included, stands beside it as the other measure.
+
         var endedAll = ended + BotWill.Deaths;
         w.WriteNumber("shareWithDeaths", endedAll <= 0 ? 0.0 : Math.Round((double)BotWill.Finished / endedAll, 4));
         w.WriteNumber("target", 0.95);
@@ -733,8 +695,7 @@ public static class BotWebSnapshot
 
         foreach (var (kind, taken, finished, failed, dropped, died) in BotWill.Tallies())
         {
-            // Deaths are endings, as the Resolve line counts them (build 334): without them the page read flee at 100 % while
-            // half of its endings were deaths.
+
             var ends = finished + failed + dropped + died;
 
             w.WriteStartObject();
@@ -760,7 +721,7 @@ public static class BotWebSnapshot
         w.WriteNumber("reached", BotPath.Reached);
         w.WriteNumber("partial", BotPath.PartialRuns);
         w.WriteNumber("refused", BotPath.SealedRuns);
-        // The walkers' arrivals, beside counting as arriving (build 386, see BotWalk.WalkerSearches); the raw search share beside it.
+
         w.WriteNumber("share", BotWalk.WalkerSearches <= 0 ? 0.0 : Math.Round((double)BotWalk.WalkerReached / BotWalk.WalkerSearches, 4));
         w.WriteNumber("walkerSearches", BotWalk.WalkerSearches);
         w.WriteNumber("walkerReached", BotWalk.WalkerReached);
@@ -807,7 +768,6 @@ public static class BotWebSnapshot
         w.WriteNumber("overChart", BotJourney.Charted);
         w.WriteNumber("noWay", BotJourney.NoWay);
 
-        // The route memory (29.09.2026): served against planned, what it saved, and what it keeps and forgets. See NavRouteMemory.
         var memory = NavigationService.Memory;
         var answerable = NavigationService.Remembered + NavigationService.EligiblePlans;
 
@@ -838,7 +798,7 @@ public static class BotWebSnapshot
         }
         catch
         {
-            // A map without a graph is a graph of nothing.
+
         }
 
         if (graph == null)
@@ -914,10 +874,6 @@ public static class BotWebSnapshot
             w.WriteNumber("alive", alive);
             BotJson.StringOrNull(w, "leader", guild.Leader?.Name);
 
-            // <b>"hall" is the hall, from 29.09.2026, evening, and "seat" is the seat.</b> Until then "hall" carried the seat,
-            // which was the hall's place for a guild with one and the bare point it was given for one without — and the page
-            // drew a house at it. With guild houses the seat is a building in a town and the hall stands in the fields, and
-            // the page draws both. See BotGuildHouses.
             var hall = BotEstate.Hall(guild);
 
             if (hall is { Deleted: false })
@@ -957,7 +913,6 @@ public static class BotWebSnapshot
                 w.WriteNull("house");
             }
 
-            // What the guild could pay with (chest and members' spare) and what it is saving for. See BotDues.
             var goal = BotDues.Goal(guild, out var saving);
 
             w.WriteNumber("fund", BotEstate.Fund(guild));
@@ -965,15 +920,11 @@ public static class BotWebSnapshot
             BotJson.StringOrNull(w, "saving", saving);
             w.WriteNumber("chest", BotChest.Holds(guild.Name));
 
-            // How much the guild is worth belonging to, and how long it has been unwanted (06.10.2026). See BotGuilds.Appeal
-            // and BotGuilds.Wane: at "unwantedMin" of BotGuilds.CloseAfterMs a guild of fewer than five closes.
             w.WriteNumber("appeal", Math.Round(BotGuilds.Appeal(guild), 1));
             w.WriteNumber("unwantedMin", BotGuilds.LowMinutes(guild));
 
-            // Its politics: the elected head, what the chest saves for by vote, its posts in the towns, tribute (07.10.2026).
             BotPolitics.Write(w, guild);
 
-            // Its officers, its store and their counts (07.10.2026, officers20). See BotOfficers.
             BotOfficers.Write(w, guild);
             w.WritePropertyName("wars");
             w.WriteStartArray();
@@ -990,8 +941,6 @@ public static class BotWebSnapshot
 
             w.WriteEndArray();
 
-            // The squares the guild holds, as the tile at each square's corner, whether it was paid for and whether it is town ground; the side is
-            // "quad" at the root. Patrick's order of 29.09.2026: the guilds' zones on the map in the browser.
             w.WritePropertyName("squares");
             w.WriteStartArray();
 
@@ -1007,7 +956,6 @@ public static class BotWebSnapshot
                 w.WriteNumberValue(qy * BotQuad.Side);
                 w.WriteNumberValue(bought ? 1 : 0);
 
-                // 1 when the square reaches ground where a town's guards act: after the sweep only a hall's yard (07.10.2026, BotTownGround).
                 w.WriteNumberValue(BotTownGround.Guarded(Map.Maps[mapId], (mapId, qx, qy), out _, out _) ? 1 : 0);
                 w.WriteEndArray();
             }
@@ -1044,7 +992,6 @@ public static class BotWebSnapshot
         w.WriteEndArray();
     }
 
-    /// <summary>The cave mouths and other teleporters read as gates: where to step, where it leads, what it is called. See BotGates (29.09.2026).</summary>
     private static void WriteGates(Utf8JsonWriter w)
     {
         w.WritePropertyName("gates");
@@ -1073,10 +1020,6 @@ public static class BotWebSnapshot
         w.WriteEndArray();
     }
 
-    /// <summary>
-    /// The houses of the population's own (<see cref="BotAbode"/>): the owner with its class and guild, the house's kind and
-    /// sign, where it stands, and whether the owner is inside it now. For the dashboard's "houses" layer.
-    /// </summary>
     private static void WriteAbodes(Utf8JsonWriter w)
     {
         w.WritePropertyName("abodes");
@@ -1116,10 +1059,6 @@ public static class BotWebSnapshot
         w.WriteEndArray();
     }
 
-    /// <summary>
-    /// Ground closed to the population: the standing bars and the quarantines in force, the killing fields among them,
-    /// each with why, the dead and the minutes left. See BotBarred (29.09.2026).
-    /// </summary>
     private static void WriteBarred(Utf8JsonWriter w)
     {
         w.WritePropertyName("barred");
@@ -1162,7 +1101,6 @@ public static class BotWebSnapshot
         w.WriteEndArray();
     }
 
-    /// <summary>The towns, their squares and whether they can be walked to from home. See BotTowns (29.09.2026).</summary>
     private static void WriteTowns(Utf8JsonWriter w)
     {
         w.WritePropertyName("towns");
@@ -1184,15 +1122,13 @@ public static class BotWebSnapshot
                 w.WriteBoolean("home", town.Home);
                 w.WriteNumber("guilds", town.Seated);
 
-                // Guild houses in the town and the empty buildings still free there. See BotGuildHouses (29.09.2026).
                 w.WriteNumber("houses", BotGuildHouses.Houses(town.Name));
                 w.WriteNumber("free", BotGuildHouses.Free(town.Name));
                 w.WriteNumber("arrivals", town.Arrivals);
                 w.WriteNumber("residents", BotResidence.Residents(town));
 
-                // The town's charters, one per craft held or sold this period (07.10.2026, charters20). See BotCharters.Write.
                 BotCharters.Write(w, town.Name);
-                // Its steward and the last decrees (07.10.2026, steward20). See BotStewardship.Write.
+
                 BotStewardship.Write(w, town);
                 w.WriteEndObject();
             }
@@ -1286,7 +1222,7 @@ public static class BotWebSnapshot
         }
         catch
         {
-            // The minds assembly answers for itself; a throw there is not the page's fault.
+
         }
 
         if (report == null)
@@ -1308,7 +1244,6 @@ public static class BotWebSnapshot
         w.WriteEndObject();
     }
 
-    /// <summary>One bot in full, with the events about it. Any thread.</summary>
     public static string Bot(string name)
     {
         string json;
@@ -1324,7 +1259,6 @@ public static class BotWebSnapshot
         var recent = BotEvents.Latest(40, e => string.Equals(e.Bot, name, StringComparison.OrdinalIgnoreCase));
         var text = new StringBuilder(json.Length + recent.Count * 200 + 64);
 
-        // The cached object without its closing brace, then the extra fields.
         text.Append(json, 0, json.Length - 1);
         text.Append(",\"recent\":[");
 
@@ -1460,10 +1394,6 @@ public static class BotWebSnapshot
         );
     }
 
-    /// <summary>
-    /// "away from a dire wolf" and "away from an ettin" are one family: the reason with its object replaced by
-    /// what kind of object it was — a place, somebody named, or a creature.
-    /// </summary>
     private static string Family(string reason)
     {
         if (string.IsNullOrEmpty(reason))

@@ -5,19 +5,12 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The relics as a module (07.10.2026, relics20): registers itself from its own <c>Configure</c> (no line in <c>BotCore</c>), reads
-/// <c>Configuration/bot-relics.json</c>, offers the three pieces of work relics make (the call to clear a lair, the carrier's walk
-/// home, the thief's try), settles what the store read back, and starts the relics' clock and the <c>Relics:</c> line.
-/// </summary>
 public sealed class BotRelicsModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRelicsModule));
 
-    /// <summary>How often the relics' clock turns: the lair's field and the registry's look ride on it. Five seconds.</summary>
     public static int EveryMs { get; set; } = 5000;
 
-    /// <summary>How often the <c>Relics:</c> line is written. The population's own five minutes.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _clock;
@@ -110,7 +103,6 @@ public sealed class BotRelicsModule : BotModule
 
         Stop();
 
-        // The lair's warden and chest go before the counters are forgotten; the relic in it goes back into hiding.
         BotRelicLair.Abandon("the world is being reloaded");
 
         BotRelicLair.Forget();
@@ -120,10 +112,9 @@ public sealed class BotRelicsModule : BotModule
     }
 }
 
-/// <summary>The relics' way in: the module and the store registered from outside <c>BotCore</c>, after it has read its own switch.</summary>
 public static class BotRelicsCore
 {
-    /// <summary>After <c>BotCore.Configure</c> (40) and the events (45); before the world is read, which the store needs.</summary>
+
     [CallPriority(46)]
     public static void Configure()
     {
@@ -137,7 +128,6 @@ public static class BotRelicsCore
     }
 }
 
-/// <summary><c>Configuration/bot-relics.json</c>: every key optional, PascalCase, nothing written means the code's own number.</summary>
 public sealed class BotRelicsSettings
 {
     public bool? Running { get; set; }

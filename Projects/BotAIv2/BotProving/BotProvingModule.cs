@@ -5,16 +5,11 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-proving.json</c> may say. Everything optional; empty keeps the code's numbers. PascalCase: a
-/// key in lower case is silently a default (see BotDelveSettings).
-/// </summary>
 public sealed class BotProvingSettings
 {
-    /// <summary>Whether fights are held.</summary>
+
     public bool? Enabled { get; set; }
 
-    /// <summary>Whether the delve reads proven strength.</summary>
     public bool? Judges { get; set; }
 
     public int? Rings { get; set; }
@@ -33,23 +28,11 @@ public sealed class BotProvingSettings
 
     public int? Keep { get; set; }
 
-    /// <summary>Whether bots wake the ground round them as a client would (<see cref="BotWake"/>). Off unless said.</summary>
     public bool? Wake { get; set; }
 
-    /// <summary>Only inside dungeons.</summary>
     public bool? WakeDeepsOnly { get; set; }
 }
 
-/// <summary>
-/// The proving ground as a module: the numbers read, the field swept of whatever a stop left on it, the referee's beat
-/// started, and one line every five minutes saying what the ground has measured.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, because the rings are places on the map and the ladder is read off the dungeons' spawners;
-/// it requires <c>Population</c>, whose bots are the ones copied, and <c>Delve</c>, whose dungeons are the ladder and whose
-/// choice is the thing the readings change.
-/// </para>
-/// </summary>
 public sealed class BotProvingModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotProvingModule));
@@ -62,7 +45,6 @@ public sealed class BotProvingModule : BotModule
 
     public override string[] Requires => ["Population", "Delve"];
 
-    /// <summary>How often the ground is summed up in the log.</summary>
     public static int SayEveryMs { get; set; } = 300000;
 
     private static Timer _beat;
@@ -94,7 +76,6 @@ public sealed class BotProvingModule : BotModule
         _say = new SayTimer(TimeSpan.FromMilliseconds(SayEveryMs));
         _say.Start();
 
-        // The rings are woken before every fight (BotProving.Wake); whether the bots' own ground is woken is the wake's.
         BotWake.Start();
 
         logger.Information("The wake {State}", BotWake.Describe());

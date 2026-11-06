@@ -5,19 +5,6 @@ using Server.Engines.Pathing.Tiered;
 
 namespace Server.Tests.Pathfinding.Tiered;
 
-/// <summary>
-/// A synthetic ground for the navigation tests, drawn from rows of characters. Each character names the standable
-/// surfaces of its cell:
-/// <c>.</c> ground at 0, <c>#</c> and <c>~</c> nothing (wall, deep water), <c>=</c> a bridge deck at 20 over water,
-/// <c>+</c> a bridge deck at 20 over ground at 0 (two strata), <c>h</c> high ground at 10, <c>/</c> and <c>r</c> ramps
-/// at 5 and 15.
-///
-/// <para>
-/// A step goes to the neighbour's surface nearest the mover's height, allowed when it climbs at most 5 or drops at most
-/// 10: so high ground drops to the ground beside it but cannot be climbed back, a ramp joins the two, and a deck is
-/// reached only from a deck or a ramp at its own height. The mask is raw, as the engine's is: no corner rule.
-/// </para>
-/// </summary>
 internal sealed class GridNavTerrain : INavTerrain
 {
     public const int Climb = 5;
@@ -119,7 +106,6 @@ internal sealed class GridNavTerrain : INavTerrain
         return new StepMask(mask, 0, land[0], land[1], land[2], land[3], land[4], land[5], land[6], land[7], 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
-    /// <summary>The neighbour's surface a mover at <paramref name="z"/> steps onto, if any.</summary>
     public bool Land(int x, int y, int z, out sbyte landed)
     {
         landed = 0;
@@ -144,10 +130,6 @@ internal sealed class GridNavTerrain : INavTerrain
         return found;
     }
 
-    /// <summary>
-    /// The exact least cost from one surface to another over the whole grid, by Dijkstra over (x, y, surface) with the
-    /// strict corner rule and <see cref="NavCost"/>'s prices: the oracle the planners are measured against. -1 when none.
-    /// </summary>
     public int Oracle(int sx, int sy, int sz, int gx, int gy, int gz)
     {
         var start = (sx, sy, Index(sx, sy, sz));

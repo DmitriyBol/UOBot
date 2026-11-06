@@ -3,59 +3,30 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A murdered bot's body found: the finder searches for the killer with Detect Hidden, calls out, and tells the Baron.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026: a bot that finds a body tries to find the killer with its detecting skill and tells
-/// the Baron.</b> Every murder leaves a scene here (<see cref="BotOutlaw.Murdered"/>). On every <see cref="SweepMs"/> the
-/// nearest law-abiding bot within <see cref="FindWithin"/> of an unreported body finds it: it searches around itself with
-/// Detect Hidden (<see cref="BotShadow.Search"/>) — with none of the skill that reaches no tile at all, and it is how the
-/// skill is learned — and names the killer if the search brought it out of hiding or the killer stands in plain sight within
-/// <see cref="BotLawful.Sight"/>. A named killer is made known to the Baron (<see cref="BotOutlaw.Tell"/>), who raises
-/// patrols only against murderers he knows of and can see (<see cref="BotOutlaw.AtLarge"/>); an unnamed one is a murder by an
-/// unknown hand, told and counted. A body nobody comes to in <see cref="SceneMs"/> is counted too.
-/// </para>
-///
-/// <para>
-/// It also presses a robber that has just gone through a body into lying low (<see cref="BotLieLow"/>), a sweep after the
-/// robbery ends, because a deed cannot press its own bot while it is finishing.
-/// </para>
-/// </summary>
 public static class BotInquest
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotInquest));
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>How often the bodies are looked at. Five seconds.</summary>
     public static int SweepMs { get; set; } = 5000;
 
-    /// <summary>How long a body waits to be found before the murder is counted as nobody's business. Fifteen minutes.</summary>
     public static int SceneMs { get; set; } = 900000;
 
-    /// <summary>How near a bot must come to a body to find it, in tiles.</summary>
     public static int FindWithin { get; set; } = 6;
 
-    /// <summary>Murders that left a body here.</summary>
     public static long Scenes { get; private set; }
 
-    /// <summary>Bodies found.</summary>
     public static long Found { get; private set; }
 
-    /// <summary>Of those, the killer brought out of hiding by the finder's search.</summary>
     public static long Revealed { get; private set; }
 
-    /// <summary>Of those, the killer seen in plain sight by the finder.</summary>
     public static long Seen { get; private set; }
 
-    /// <summary>Of those, told as a murder by an unknown hand.</summary>
     public static long Unsolved { get; private set; }
 
-    /// <summary>Bodies nobody came to in time.</summary>
     public static long Unfound { get; private set; }
 
-    /// <summary>Robbers pressed into lying low.</summary>
     public static long LyingLow { get; private set; }
 
     private sealed class Scene
@@ -77,7 +48,6 @@ public static class BotInquest
 
     private static long _sweptTick;
 
-    /// <summary>A murder: the body lies where the victim fell. From <see cref="BotOutlaw.Murdered"/>.</summary>
     public static void Murder(BotMobile killer, BotMobile victim)
     {
         if (!Running || killer == null || victim?.Map is not { } map || map == Map.Internal)
@@ -95,7 +65,6 @@ public static class BotInquest
         }
     }
 
-    /// <summary>A robber that has just gone through a body, to be pressed into lying low on the next sweep. From <see cref="BotRob"/>.</summary>
     public static void LieLow(BotMobile robber, Map map, Point3D body)
     {
         if (Running && robber != null && map != null)
@@ -104,7 +73,6 @@ public static class BotInquest
         }
     }
 
-    /// <summary>One look at the bodies and the robbers, from <c>BotOutlaw</c>'s clock.</summary>
     public static void Beat(long now)
     {
         if (!Running || now - _sweptTick < SweepMs)
@@ -163,7 +131,6 @@ public static class BotInquest
         }
     }
 
-    /// <summary>The nearest law-abiding bot within reach of the body, not the killer and not the dead one risen, or null.</summary>
     private static BotMobile Finder(Scene scene)
     {
         BotMobile best = null;

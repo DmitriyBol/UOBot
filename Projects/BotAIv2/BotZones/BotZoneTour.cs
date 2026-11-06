@@ -5,121 +5,55 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The debuggers' walk round the zones: each goes to the least-watched zone, wakes the ground round it the way a client would,
-/// holds it awake long enough for the patrol to move, and goes on.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026: "walk the world with Argus and the other debuggers, look at all the mob zones".</b> The
-/// world sleeps where no client is (<see cref="BotWake"/>): a creature nobody is near stands where it was spawned, so the only
-/// way to learn a patrol a bot has never been near is to wake the ground there and watch. That is what the stop does:
-/// <c>Sector.Activate</c> on the sectors round the zone — the five by five a client wakes, widened to the zone's own box up to
-/// <see cref="MostSectors"/> — and a pass of the zone's box every <see cref="FocusMs"/> while it holds
-/// (<see cref="BotZoneScan.Focus"/>), for <see cref="HoldMs"/>.
-/// </para>
-///
-/// <para>
-/// <b>Which zone next: the least watched, and the nearest among equals.</b> Zones are ranked by the seconds their ground has
-/// been seen awake, in buckets of <see cref="Bucket"/> seconds, and within a bucket by distance from the walker — so a walker
-/// sweeps a region of never-watched zones before crossing the map, and a zone the bots walk through every hour (already awake
-/// by <see cref="BotWake"/>) waits for last. A round ends when every zone has been stood in once; the next begins at once.
-/// Resumable: the awake seconds and the stops are kept across a restart (<see cref="BotZoneMemory"/>), so a new session picks
-/// up with the zones the last one had not reached.
-/// </para>
-///
-/// <para>
-/// <b>It never disturbs the bots' own waking.</b> A sector is put back to sleep only if the tour woke it, no bot needs it
-/// (<see cref="BotWake.Needed"/>) and no client is near; and <see cref="BotWake"/> in turn leaves alone a sector the tour holds
-/// (<see cref="Holds"/>).
-/// </para>
-///
-/// <para>
-/// <b>The walkers are the debugger's, reached through two hooks.</b> The debugger lives in the minds' assembly, which references
-/// this one and never the reverse; it fills <see cref="Walkers"/> (the watchers free to walk: a body, not witnessing a meeting,
-/// not charting the dungeons) and <see cref="Move"/> (its own teleport) when it starts. With no debugger the tour stands still
-/// and says so.
-/// </para>
-///
-/// <para>
-/// <b>One of them is the zone keeper while the zone watch runs (07.10.2026, Patrick: "one debugger goes wholly onto the
-/// zones").</b> <see cref="Keeper"/> names it and <see cref="KeeperHook"/> says whether the squad has given it up to the zones;
-/// it walks first, without a pause between stops, and chooses by what the accuracy counter most needs: a zone with no verdict in
-/// the window first, then one whose last visit disagreed, then the oldest verdict. Every full hold by anybody is a check for
-/// <see cref="BotZoneWatch"/>: a living attacker in the zone's own patrol, or none, against the level the zone is painted. The
-/// tour walks only while the watch is on; when the watch ends it stops for every debugger.
-/// </para>
-/// </summary>
 public static class BotZoneTour
 {
-    /// <summary>Whether the debuggers walk the zones. <c>do zones tour on|off</c> at the door.</summary>
+
     public static bool Running { get; set; } = true;
 
-    /// <summary>How often the tour's beat runs.</summary>
     public static int TickMs { get; set; } = 1000;
 
-    /// <summary>How long a walker holds a zone awake. Past a minute so a patrol has moved: creatures wander a step every second or two.</summary>
     public static int HoldMs { get; set; } = 75000;
 
-    /// <summary>How long a sector stays awake after the walker has gone, as the bots' wake keeps its own.</summary>
     public static int GraceMs { get; set; } = 30000;
 
-    /// <summary>Sectors round the stand woken each way: two is the client's five by five.</summary>
     public static int Reach { get; set; } = 2;
 
-    /// <summary>The most sectors one stop wakes, the zone's box and the stand's square together, nearest the stand kept.</summary>
     public static int MostSectors { get; set; } = 81;
 
-    /// <summary>The most debuggers walking at once.</summary>
     public static int MostWalkers { get; set; } = 4;
 
-    /// <summary>How often the held zone's box is passed by the scan while a walker holds it.</summary>
     public static int FocusMs { get; set; } = 2000;
 
-    /// <summary>Whether sea zones are toured. Off: the land's patrols are what the paths need.</summary>
     public static bool Water { get; set; }
 
-    /// <summary>Seconds of awake observation counted alike when choosing the next zone; nearest wins within a bucket.</summary>
     public static int Bucket { get; set; } = 60;
 
-    /// <summary>
-    /// The debugger that does nothing but the tour while the zone watch runs (07.10.2026). A name of the squad; a helper, never
-    /// the lead or the marshal, whose duties nobody could take over. <c>Configuration/bot-zones.json</c> key <c>TourKeeper</c>.
-    /// </summary>
     public static string Keeper { get; set; } = "Heimdall";
 
-    /// <summary>The keeper the squad has actually given up to the zones now, or null. Filled by the debugger (BotVigil.KeeperName).</summary>
     public static Func<string> KeeperHook { get; set; }
 
-    /// <summary>The name of the keeper on the zones now, or null.</summary>
     public static string KeeperNow() => Running && BotZoneWatch.On ? KeeperHook?.Invoke() : null;
 
-    /// <summary>A zone the keeper's move to was refused is not chosen by it again for this long.</summary>
     public static int RefusedRestMs { get; set; } = 600000;
 
-    /// <summary>The watchers free to walk now, with their bodies. Filled by the debugger (BotDebugModule); null without one.</summary>
     public static Func<IReadOnlyList<(string Name, Mobile Body)>> Walkers { get; set; }
 
-    /// <summary>Puts a watcher's body at a place. Filled by the debugger with its own teleport.</summary>
     public static Func<Mobile, Map, Point3D, bool> Move { get; set; }
 
-    /// <summary>Stops finished, stops cut short because the walker was called away, and moves the teleport refused.</summary>
     public static long Stops { get; private set; }
 
     public static long Abandoned { get; private set; }
 
     public static long Refused { get; private set; }
 
-    /// <summary>Rounds finished since the start, and the round under way (one-based).</summary>
     public static int Round { get; private set; } = 1;
 
-    /// <summary>Sectors the tour woke, put back to sleep, and left awake because a bot or a client needed them.</summary>
     public static long Woken { get; private set; }
 
     public static long PutBack { get; private set; }
 
     public static long LeftAwake { get; private set; }
 
-    /// <summary>Zones stood in this round, and zones to stand in, as of the last beat.</summary>
     public static int Visited { get; private set; }
 
     public static int Total { get; private set; }
@@ -142,7 +76,6 @@ public static class BotZoneTour
 
         public long Focused;
 
-        /// <summary>Whether the keeper holds it, how many looks found a living attacker in the zone's own patrol, and how many looks.</summary>
         public bool Keeper;
 
         public int Seen;
@@ -175,7 +108,6 @@ public static class BotZoneTour
 
     private static readonly Dictionary<int, long> _refused = [];
 
-    /// <summary>Full holds judged for the zone watch, and of the stops held to the end those the keeper held.</summary>
     public static long Judged { get; private set; }
 
     public static long KeeperStops { get; private set; }
@@ -192,13 +124,8 @@ public static class BotZoneTour
         _map = null;
     }
 
-    /// <summary>Whether the tour holds this sector awake now. Asked by <see cref="BotWake"/> before it puts one back to sleep.</summary>
     public static bool Holds(Map map, int x, int y) => map != null && map == _map && _held.ContainsKey((x, y));
 
-    /// <summary>
-    /// The bots' wake is letting go of a sector the tour still holds: the tour takes it over, and puts it back to sleep itself
-    /// when its own grace runs out. False when the tour does not hold it.
-    /// </summary>
     public static bool Adopt(Map map, int x, int y)
     {
         if (map == null || map != _map || !_held.TryGetValue((x, y), out var held))
@@ -211,22 +138,19 @@ public static class BotZoneTour
         return true;
     }
 
-    /// <summary>Whether this body is on a stop now, and so is not to be moved on by the debugger's own vigil.</summary>
     public static bool Holding(Mobile body) => body != null && _stops.ContainsKey(body);
 
-    /// <summary>The stop this body holds, in the words <see cref="Write"/> gives the zones page, or null. For the live window (02.10.2026).</summary>
     public static string StopOf(Mobile body) =>
         body != null && _stops.TryGetValue(body, out var stop)
             ? $"holding {Math.Min(HoldMs, Core.TickCount - stop.Began) / 1000}/{HoldMs / 1000} s at zone {stop.Zone} ({stop.Label})"
             : null;
 
-    /// <summary>One beat. True when anything the dashboard shows changed.</summary>
     public static bool Beat(Map map, long now)
     {
         _map = map;
 
         var state = BotZones.State;
-        // The tour is the zone watch's: when the watch has ended, nobody walks (07.10.2026). See BotZoneWatch.
+
         var walkers = Running && BotZoneWatch.On ? Walkers?.Invoke() : null;
 
         _walking.Clear();
@@ -249,7 +173,6 @@ public static class BotZoneTour
             }
         }
 
-        // A walker the debugger no longer offers — called to witness a meeting, or charting — is let go where it stands.
         _dropped.Clear();
 
         foreach (var (body, _) in _stops)
@@ -306,7 +229,6 @@ public static class BotZoneTour
         return false;
     }
 
-    /// <summary>A land patrol, or the sea's when toured; never a wanderers' zone, which has no spawner to learn and moves with them.</summary>
     private static bool Eligible(BotZone zone) => zone.Level >= BotZoneLevel.Hostile && !zone.Stray && (Water || !zone.Water);
 
     private static void Count(BotZoneState state)
@@ -342,7 +264,7 @@ public static class BotZoneTour
 
         if (zone == null && Total > 0 && Visited >= Total)
         {
-            // Every zone stood in once: the round is over, and the next starts with the least watched again.
+
             Round++;
             _visited.Clear();
             Visited = 0;
@@ -363,7 +285,7 @@ public static class BotZoneTour
 
         if (!Move(body, map, at) && (body.Map != map || body.Location != at))
         {
-            // Not worth a second try this round: the next beat picks another.
+
             Refused++;
             _visited.Add(zone.Id);
             _refused[zone.Id] = now;
@@ -385,7 +307,6 @@ public static class BotZoneTour
 
         Sectors(map, zone, at, stop.Sectors);
 
-        // The focus pass covers the woken ground and nothing else: a sleeping sector beyond it shows only creatures standing still.
         int x0 = int.MaxValue, y0 = int.MaxValue, x1 = -1, y1 = -1;
 
         for (var i = 0; i < stop.Sectors.Count; i++)
@@ -405,7 +326,6 @@ public static class BotZoneTour
         Keep(map, stop, now);
     }
 
-    /// <summary>The least-watched zone nobody else is standing in and nobody has stood in this round, nearest among equals.</summary>
     private static BotZone Pick(BotZoneState state, Mobile body)
     {
         BotZone best = null;
@@ -436,13 +356,6 @@ public static class BotZoneTour
         return best;
     }
 
-    /// <summary>
-    /// The keeper's choice (07.10.2026): what the accuracy counter most needs. Any land zone that is not wanderers', clear ones
-    /// (hunting grounds) included, because "clear" is a claim too; nobody else's stop, and no zone whose move was refused lately.
-    /// First a zone with no verdict inside the window, nearest first; then one whose last verdict disagreed, nearest first; then
-    /// the longest unvisited. A zone held to the end in the last <see cref="BotZoneWatch.RecheckMinutes"/> — a refilling camp that
-    /// gave no verdict among them — comes after all of those, so the keeper never stands in the same camp twice running.
-    /// </summary>
     private static BotZone PickForKeeper(BotZoneState state, Mobile body, long now)
     {
         BotZone best = null;
@@ -513,7 +426,6 @@ public static class BotZoneTour
         return false;
     }
 
-    /// <summary>The sectors of the stand's square and of the zone's box, nearest the stand first, at most <see cref="MostSectors"/>.</summary>
     private static void Sectors(Map map, BotZone zone, Point3D at, List<(int X, int Y)> into)
     {
         var width = map.Width >> Map.SectorShift;
@@ -542,7 +454,6 @@ public static class BotZoneTour
         }
     }
 
-    /// <summary>Holds the stop's sectors awake for another grace and, when due, passes its box.</summary>
     private static void Keep(Map map, Stop stop, long now)
     {
         var until = now + GraceMs;
@@ -573,12 +484,6 @@ public static class BotZoneTour
         }
     }
 
-    /// <summary>
-    /// One look for the zone watch (07.10.2026): whether a living attacker stands in the zone's own patrol cells (not its fringe)
-    /// on the map published now. Asleep or awake alike — a creature in a sleeping sector is there, only standing still. The
-    /// same creatures the sweep counts as attackers: nobody's pet or summons, not townsfolk, attacking on sight. Once one is found
-    /// the hold's answer is known and the looks stop.
-    /// </summary>
     private static void Look(Map map, Stop stop)
     {
         var state = BotZones.State;
@@ -624,7 +529,6 @@ public static class BotZoneTour
         }
     }
 
-    /// <summary>A stop held its time: the zone counts as stood in this round, and its spawners as toured.</summary>
     private static void Finish(Stop stop, long now)
     {
         Stops++;
@@ -642,8 +546,6 @@ public static class BotZoneTour
             return;
         }
 
-        // The whole hold is the zone watch's check: the painted level against what stood in the patrol (07.10.2026). A hold in
-        // which the map was never looked at (none published) is no check. See BotZoneWatch.Visited.
         if (stop.Looks > 0)
         {
             Judged++;
@@ -665,12 +567,6 @@ public static class BotZoneTour
         }
     }
 
-    /// <summary>
-    /// Whether a spawner feeding the zone — standing on its ground — is running and below its count now (reviews of 07.10.2026),
-    /// as twice the longest delay of the slowest such spawner in minutes, or nought: a camp hunted out and refilling, whose empty
-    /// hold is no evidence against its colour while that long has not passed (see <see cref="BotZoneWatch.Visited"/>). With
-    /// every spawner full, or none running, an empty hold is evidence: the creatures exist and are not where the map paints them.
-    /// </summary>
     private static double RefillMinutes(BotZone zone)
     {
         var minutes = 0.0;
@@ -696,10 +592,6 @@ public static class BotZoneTour
         return minutes;
     }
 
-    /// <summary>
-    /// Every held sector whose grace has run out is let go, and put back to sleep only if the tour woke it, no bot needs it and
-    /// no client is near: the bots' own waking is never undone from here.
-    /// </summary>
     private static void LetGo(Map map, long now)
     {
         if (_held.Count == 0)
@@ -754,14 +646,12 @@ public static class BotZoneTour
         _stops.Clear();
     }
 
-    /// <summary>The zones are switched off: the walkers go back to the vigil and the held ground sleeps after its grace.</summary>
     public static void Release(long now)
     {
         EndAll();
         LetGo(_map, now);
     }
 
-    /// <summary>For the dashboard: the round, the progress and every walker with where it stands and what it is doing.</summary>
     public static void Write(Utf8JsonWriter w)
     {
         var now = Core.TickCount;
@@ -829,7 +719,6 @@ public static class BotZoneTour
             + $"{_held.Count} sectors held now, {Woken} woken, {PutBack} put back to sleep, {LeftAwake} left awake for a bot or a client";
     }
 
-    /// <summary>After a reload: every sector the tour woke is put back at once, unless a bot or a client needs it.</summary>
     public static void Forget(long now)
     {
         EndAll();

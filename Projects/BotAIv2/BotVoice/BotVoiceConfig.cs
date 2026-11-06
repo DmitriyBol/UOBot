@@ -5,16 +5,11 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-voice.json</c> may say. Everything optional; the starter file the shard writes
-/// carries the whole phrase bank so that it can be edited rather than discovered.
-/// </summary>
 public sealed class BotVoiceSettings
 {
-    /// <summary>Whether the bots speak at all.</summary>
+
     public bool? Enabled { get; set; }
 
-    /// <summary>The channels, one switch each.</summary>
     public bool? World { get; set; }
 
     public bool? Guild { get; set; }
@@ -25,58 +20,38 @@ public sealed class BotVoiceSettings
 
     public bool? Cry { get; set; }
 
-    /// <summary>
-    /// The trade channel (02.10.2026): wants, raises, offers, orders, shop and haul calls, said overhead and posted to the chat
-    /// conference <see cref="TradeConference"/> instead of broadcast to every client.
-    /// </summary>
     public bool? Trade { get; set; }
 
-    /// <summary>The chat conference trade lines go to. Empty: overhead only.</summary>
     public string TradeConference { get; set; }
 
-    /// <summary>Whether a client lands in the trade conference at login instead of the engine's first one.</summary>
     public bool? TradeAtLogin { get; set; }
 
-    /// <summary>How long one line about an item keeps every other line about it out of the trade channel. Zero: no such limit.</summary>
     public int? TradeRepeatMs { get; set; }
 
-    /// <summary>Whether a trade line is also said over the speaker's head.</summary>
     public bool? TradeOverhead { get; set; }
 
-    /// <summary>Whether the hand-over lines ("here you are", "as agreed") go to the trade channel rather than staying local.</summary>
     public bool? TradeHandOvers { get; set; }
 
-    /// <summary>The least time between two lines from one bot, in milliseconds. Cries are exempt.</summary>
     public int? SayEveryMs { get; set; }
 
-    /// <summary>The least time between two cries from one bot.</summary>
     public int? CryEveryMs { get; set; }
 
-    /// <summary>How often a bot says how it feels.</summary>
     public int? MoodEveryMs { get; set; }
 
-    /// <summary>How far a line carries, in tiles: who is in earshot of a mood. See BotVoice.Earshot (01.10.2026).</summary>
     public int? Earshot { get; set; }
 
-    /// <summary>How long a mood line due with nobody in earshot waits for somebody. See BotVoice.MoodHoldMs.</summary>
     public int? MoodHoldMs { get; set; }
 
-    /// <summary>How often a waiting mood line looks again for an audience. See BotVoice.MoodRetryMs.</summary>
     public int? MoodRetryMs { get; set; }
 
-    /// <summary>The chance, nought to one, that taking or finishing a piece of work is said out loud.</summary>
     public double? WorkChance { get; set; }
 
-    /// <summary>The chance that a failure is said out loud.</summary>
     public double? FailChance { get; set; }
 
-    /// <summary>The chance that dropping work for something better is said out loud.</summary>
     public double? DropChance { get; set; }
 
-    /// <summary>Longest line a bot says.</summary>
     public int? MostLetters { get; set; }
 
-    /// <summary>Hues for the kinds of overhead text.</summary>
     public int? WorldHue { get; set; }
 
     public int? GuildHue { get; set; }
@@ -87,10 +62,8 @@ public sealed class BotVoiceSettings
 
     public int? TradeHue { get; set; }
 
-    /// <summary>Whether world lines are also broadcast to every connected client, as the town crier would.</summary>
     public bool? Broadcast { get; set; }
 
-    /// <summary>The phrase bank, by occasion. A key given here replaces the code's list for that occasion.</summary>
     public Dictionary<string, string[]> Phrases { get; set; }
 }
 

@@ -7,50 +7,16 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The Needs board counted by Patrick's measure: every line a bot asks for, whether it was met within its first hour, by whom,
-/// and, when it was not, why (02.10.2026, build 391; step 1 of the Needs plan, <c>needs-design.md</c> §5 and §8).
-///
-/// <para>
-/// <b>Nothing here decides anything.</b> The market calls in at the four places a line's life turns: a want said or topped up
-/// (<see cref="Open"/>, <see cref="Topped"/>), units handed over (<see cref="Filled"/>, the one choke point
-/// <see cref="BotMarket.Received(BotWant, int, int, Mobile, BotRoute)"/>), a want leaving the board (<see cref="Ended"/>) and the market's own beat
-/// (<see cref="Aged"/>). Until this, "met", "taken back" and "orphaned" were bare counters with no clock, and the baseline of
-/// 02.10 had to rebuild every line from the log by buyer and kind.
-/// </para>
-///
-/// <para>
-/// <b>How a line is settled, once.</b>
-/// <list type="bullet">
-/// <item><b>Met</b>: every unit handed to the buyer within <see cref="WindowMs"/> of the line opening, by one bot or jointly.</item>
-/// <item><b>Failed</b>: not met at its hour; or, after its first <see cref="GraceMs"/>, stood down because the buyer could not pay
-/// (Patrick, 02.10: "a buyer that can no longer pay after its 10th minute is a failure"), taken back by its buyer, or given up.
-/// The cause is named from what the want recorded: the buyer dead or out of the world, part handed, taken by a carrier and not
-/// brought, offered and nothing brought, passed over (the commonest reason), or nobody able looked.</item>
-/// <item><b>Kept out, and printed</b>: the buyer gone; taken back or unpaid inside its first ten minutes (the shopper's pile wait
-/// is three); the market switched off.</item>
-/// </list>
-/// A line met after its hour stays a failure and is counted again as met after the hour. A trader's want is procurement for
-/// another bot's line and is counted apart, outside the share, as <see cref="BotGlut"/> keeps it out of demand.
-/// </para>
-/// </summary>
 public static class BotLines
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotLines));
 
-    /// <summary>The first hour: a line met inside it is met. Patrick's number.</summary>
     public static int WindowMs { get; set; } = 3600000;
 
-    /// <summary>
-    /// A line's first ten minutes: taken back or unpaid inside them it is kept out; after them it is a failure. The same ten
-    /// minutes as <see cref="BotMarket.RaiseMs"/> by default, and a separate number on purpose.
-    /// </summary>
     public static int GraceMs { get; set; } = 600000;
 
-    /// <summary>A top-up later than this after the newest line opened is a new line; sooner, more units on the same one.</summary>
     public static int NewLineMs { get; set; } = 600000;
 
-    /// <summary>A buyer dead this long of a failed line's hour, or dead at its end, names the failure "buyer dead".</summary>
     public static int DeadCauseMs { get; set; } = 900000;
 
     internal const int PassKinds = 12;
@@ -64,8 +30,6 @@ public static class BotLines
     ];
 
     public static string PassName(int kind) => kind >= 0 && kind < _passNames.Length ? _passNames[kind] : "?";
-
-    // ---- Counted, since the shard started -----------------------------------------------------------------------------------
 
     public static long Opened { get; private set; }
 
@@ -81,17 +45,10 @@ public static class BotLines
 
     public static long MetJoint { get; private set; }
 
-    /// <summary>
-    /// Lines met by the buyer itself (06.10.2026, ribs17b): taken back as "had it another way" (<c>BotWithdraw.Have</c>) inside
-    /// their hour with the line's open units in the buyer's own pack at that moment. Patrick, 06.10.2026: "пополнил запас сам —
-    /// это успех" (it restocked itself: that is a success). Inside <see cref="Met"/>, apart from <see cref="MetOne"/> and
-    /// <see cref="MetJoint"/>. A take-back without the units in hand keeps the ten-minute rule (kept out inside, failed after).
-    /// </summary>
     public static long MetSelf { get; private set; }
 
     private const string SelfCause = "met by the buyer itself";
 
-    /// <summary>Whether the buyer's pack holds what is still open of this line (its units less those handed).</summary>
     private static bool HoldsOpen(BotWant want, BotLine line)
     {
         var pack = want?.Buyer?.Self?.Backpack;
@@ -111,16 +68,10 @@ public static class BotLines
 
     public static long ProcKeptOut { get; private set; }
 
-    /// <summary>
-    /// Of <see cref="Met"/> and <see cref="Failed"/>, the lines for raw meat (<see cref="BotOven.Raw"/>): a cook's supper stock, whose
-    /// wants the stores size to what the island brings (<c>BotStores.SupplyGated</c>, 03.10.2026). Printed beside the share for
-    /// everything else, so that fewer rib lines said is never read as better service (review of build next, F2).
-    /// </summary>
     public static long MetStock { get; private set; }
 
     public static long FailedStock { get; private set; }
 
-    /// <summary>Whether a line is for raw meat. See <see cref="MetStock"/>.</summary>
     private static bool Stock(BotLine line)
     {
         var kind = line?.Want?.Kind;
@@ -139,7 +90,6 @@ public static class BotLines
 
     private static string Percent(long met, long failed) => met + failed > 0 ? $"{met / (double)(met + failed):P1}" : "n/a";
 
-    /// <summary>Met lines by route: a carrier's walk, a trader's book, the buyer at a bot's shop. A line met two ways counts in both.</summary>
     public static long ByCarrier { get; private set; }
 
     public static long ByTrader { get; private set; }
@@ -150,7 +100,6 @@ public static class BotLines
 
     private static readonly Dictionary<string, long> _keptOutBy = new(StringComparer.Ordinal);
 
-    /// <summary>Minutes from opening to the last unit (met lines) and to the first unit (any line), the newest <see cref="Kept"/> of each.</summary>
     private const int Kept = 2048;
 
     private static readonly float[] _metMinutes = new float[Kept];
@@ -161,9 +110,6 @@ public static class BotLines
 
     private static long _firstCount;
 
-    // ---- Where a line's life turns ------------------------------------------------------------------------------------------
-
-    /// <summary>A want said for the first time: its first line.</summary>
     internal static BotLine Open(BotWant want, int units)
     {
         var line = want.OpenLine(units, Core.TickCount, IsProcurement(want));
@@ -173,7 +119,6 @@ public static class BotLines
         return line;
     }
 
-    /// <summary>A want asked for more: more units on its newest line, or a new line when the newest is older than <see cref="NewLineMs"/> or settled.</summary>
     internal static BotLine Topped(BotWant want, int units)
     {
         if (want == null || units <= 0)
@@ -193,7 +138,6 @@ public static class BotLines
 
         var line = want.OpenLine(units, now, IsProcurement(want));
 
-        // "Of them" in the summary: Opened leaves a trader's procurement out, so this does too.
         if (!line.Procurement)
         {
             Topups++;
@@ -224,14 +168,10 @@ public static class BotLines
         }
     }
 
-    /// <summary>Lines read back from the save. Their clocks go on; they are counted as carried over, not as opened.</summary>
     internal static void Carried(int lines) => Restored += Math.Max(0, lines);
 
-    /// <summary>A trader's want is procurement for another bot's line. See the class remarks.</summary>
-    // A quartermaster's want for its guild's store is procurement too, counted apart from the members' own lines (07.10.2026, officers20).
     private static bool IsProcurement(BotWant want) => BotTrading.Trader(want?.Buyer?.Self) || BotQuartermaster.Procures(want);
 
-    /// <summary>Units handed to the buyer against the want: they fill its lines oldest first.</summary>
     internal static void Filled(BotWant want, int units, Mobile seller, BotRoute route)
     {
         if (want == null || units <= 0)
@@ -289,7 +229,6 @@ public static class BotLines
                 return;
             }
 
-            // Crossed its hour between two beats of the market: a failure like any other line past its hour.
             Settle(line, BotLineState.Failed, ("met after its hour", $"met {age / 60000.0:F1} minutes after it opened"), now);
         }
 
@@ -309,7 +248,6 @@ public static class BotLines
         }
     }
 
-    /// <summary>The market's beat: a line still open at its hour has failed it.</summary>
     internal static void Aged(BotWant want, long now)
     {
         var lines = want.Lines;
@@ -325,11 +263,6 @@ public static class BotLines
         }
     }
 
-    /// <summary>
-    /// A line at its hour, unmet. Failed, with its cause — unless its buyer is out of the world, resting (<c>BotRest</c> parks a
-    /// bot on the internal map for hours): a line nobody could hand anything to is not the island's failure, and is kept out and
-    /// printed.
-    /// </summary>
     private static void AtHour(BotLine line, long now)
     {
         if (line.Want is { Away: true })
@@ -342,7 +275,6 @@ public static class BotLines
         Settle(line, BotLineState.Failed, CauseAtHour(line, now), now);
     }
 
-    /// <summary>The want has left the board: every line still open is settled by how it left.</summary>
     internal static void Ended(BotWant want, BotLineEnd end, string why)
     {
         if (want == null)
@@ -400,7 +332,7 @@ public static class BotLines
                     }
                 case BotLineEnd.Withdrawn:
                     {
-                        // Taken back for its own stock with the units in hand: met by the buyer itself (06.10.2026, ribs17b). See MetSelf.
+
                         if (!line.Procurement && why == "had it another way" && HoldsOpen(want, line))
                         {
                             Settle(line, BotLineState.Met, (SelfCause, "met by the buyer itself"), now);
@@ -408,7 +340,6 @@ public static class BotLines
                             break;
                         }
 
-                        // "Nobody brought it, walked to a counter" (BotWithdraw.Walked), kept out: followed. See Watched.
                         if (age < GraceMs && !line.Procurement && why != null && why.StartsWith("nobody brought it", StringComparison.Ordinal))
                         {
                             Watch(want);
@@ -436,7 +367,7 @@ public static class BotLines
                     }
                 default:
                     {
-                        // Given up: at its price ceiling, or unable to reserve a louder price for longer than a want stands.
+
                         Settle(line, BotLineState.Failed, (why, $"{why} after {age / 60000.0:F1} min"), now);
 
                         break;
@@ -445,16 +376,8 @@ public static class BotLines
         }
     }
 
-    // ---- The kept-out lines followed for twenty minutes (06.10.2026, needs15) ------------------------------------------------
-
-    /// <summary>
-    /// How long a line taken back inside its first ten minutes is followed: did its buyer get the kind after all? The analyst's
-    /// question of 06.10.2026 (an-needs14 §1.5): of 652 such lines on 04.10, 453 had a purchase within twenty minutes and 199 had
-    /// none to be found in the log. Nought switches the watch off. Nothing here moves a line into or out of the share.
-    /// </summary>
     public static int KeptWatchMs { get; set; } = 1200000;
 
-    /// <summary>Kept-out lines whose buyer's pack held more of the kind within the watch, held no more by its end, or lost sight of (gone, dead or out of the world).</summary>
     public static long KeptGot { get; private set; }
 
     public static long KeptNotGot { get; private set; }
@@ -470,7 +393,6 @@ public static class BotLines
             return;
         }
 
-        // At most one watch a buyer and kind, and a bounded list: the instrument must not become a load of its own.
         for (var i = 0; i < _watched.Count; i++)
         {
             if (ReferenceEquals(_watched[i].Buyer, buyer) && _watched[i].Kind == want.Kind)
@@ -487,11 +409,6 @@ public static class BotLines
         _watched.Add((buyer, want.Kind, buyer.Backpack.GetAmount(want.Kind), Core.TickCount));
     }
 
-    /// <summary>
-    /// The market's beat: each watched buyer's pack read for the kind. More than at the withdrawal is "got it" (a purchase, a make,
-    /// a loot); at the watch's end, "not got". Read every beat (thirty seconds), so a thing bought and used up inside one beat is
-    /// missed, which undercounts "got": a bound, as the analyst's was.
-    /// </summary>
     internal static void Watched(long now)
     {
         for (var i = _watched.Count - 1; i >= 0; i--)
@@ -522,12 +439,6 @@ public static class BotLines
         }
     }
 
-    /// <summary>
-    /// Why a line still standing at its hour failed it, from what its want recorded since it opened. First match wins, in the
-    /// order a reader would look: the buyer could not be handed anything (dead, or out of the world); part came; a carrier took
-    /// it and did not bring it; a walk, a haul or an order was offered and nothing came; able bots looked and passed it over;
-    /// nobody able looked.
-    /// </summary>
     private static (string Key, string Said) CauseAtHour(BotLine line, long now)
     {
         var want = line.Want;
@@ -587,7 +498,6 @@ public static class BotLines
             return ($"passed over: {PassName(top)}", $"passed over {total} times, {most} of them: {PassName(top)}");
         }
 
-        // What the want recorded before a restart is not kept, only its lines: say so rather than "nobody looked".
         if (line.Restored)
         {
             return ("unmet across a restart", "carried over a restart with nothing recorded since");
@@ -755,10 +665,8 @@ public static class BotLines
         return sorted[Math.Clamp((int)Math.Ceiling(share * n) - 1, 0, n - 1)];
     }
 
-    /// <summary>The share of lines met in their hour, of those settled met or failed; null before any.</summary>
     public static double? Share => Met + Failed > 0 ? Met / (double)(Met + Failed) : null;
 
-    /// <summary>The lines standing now: open inside their hour, the part of those past half of it, and failed lines whose want still stands.</summary>
     private static (int Open, int Past30, int StandingFailed) Standing(long now)
     {
         var open = 0;
@@ -838,10 +746,6 @@ public static class BotLines
         return say.ToString();
     }
 
-    /// <summary>
-    /// The <c>Lines:</c> summary line, cumulative since the shard started. The share is met over met plus failed, of lines that are
-    /// not a trader's procurement; kept-out lines are printed and stay out of it.
-    /// </summary>
     public static string Describe()
     {
         var now = Core.TickCount;
@@ -856,7 +760,6 @@ public static class BotLines
                + $"traders' procurement, outside the share: {ProcOpened} opened, {ProcMet} met, {ProcFailed} failed, {ProcKeptOut} kept out";
     }
 
-    /// <summary>The <c>needs</c> block of <c>/api/state</c>: the same counters as <see cref="Describe"/>, and the oldest lines standing.</summary>
     public static void Web(Utf8JsonWriter w)
     {
         var now = Core.TickCount;
@@ -920,7 +823,6 @@ public static class BotLines
 
         BotMarket.WebReserve(w);
 
-        // The oldest lines still standing, open or failed, at most forty: what the page shows as the board's worst.
         List<BotLine> standingLines = [];
         var wants = BotMarket.Wants;
 
@@ -995,7 +897,6 @@ public static class BotLines
         w.WriteEndObject();
     }
 
-    /// <summary>A new world: nothing counted in the old one is about this one.</summary>
     public static void Forget()
     {
         Opened = 0;
@@ -1028,7 +929,6 @@ public static class BotLines
     }
 }
 
-/// <summary>How a want left the board, for its lines. See <see cref="BotLines.Ended"/>.</summary>
 public enum BotLineEnd
 {
     Met,

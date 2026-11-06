@@ -4,48 +4,25 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The sweep: every living creature of the home map passed once every few seconds, a window of sectors at a time, within a
-/// budget of loop time per beat.
-///
-/// <para>
-/// <b>Spatial questions only, never the world's list.</b> One window is <see cref="WindowSectors"/> sectors to a side
-/// (128 tiles at eight), asked of the map with <c>GetMobilesInBounds</c>, which walks the sectors of the window and nothing
-/// else; an empty window — the sea, the black between the facets — costs the walk of its sector heads. The beat takes
-/// windows until <see cref="BudgetMs"/> is spent or <see cref="MostWindows"/> are done, and the time is measured and printed,
-/// because a budget nobody measures is a hope.
-/// </para>
-///
-/// <para>
-/// <b>And the tour's ground more often.</b> While a debugger holds a zone awake, its box is passed every
-/// <see cref="BotZoneTour.FocusMs"/> (<see cref="Focus"/>) rather than once a sweep: the whole point of standing there is to
-/// see the patrol move, and a sighting every fifteen seconds would see a minute of it four times.
-/// </para>
-/// </summary>
 public static class BotZoneScan
 {
-    /// <summary>Sectors to a side of one window. Eight: 128 tiles.</summary>
+
     public static int WindowSectors { get; set; } = 8;
 
-    /// <summary>Loop milliseconds the sweep may spend in one beat.</summary>
     public static double BudgetMs { get; set; } = 0.6;
 
-    /// <summary>Windows at most in one beat, whatever the clock says.</summary>
     public static int MostWindows { get; set; } = 48;
 
-    /// <summary>Whole sweeps finished, and windows passed, since the start.</summary>
     public static long Sweeps { get; private set; }
 
     public static long Windows { get; private set; }
 
-    /// <summary>Loop milliseconds the sweep has spent, all told, and on the tour's focus.</summary>
     public static double SpentMs { get; private set; }
 
     public static double FocusSpentMs { get; private set; }
 
     public static long Focused { get; private set; }
 
-    /// <summary>The last whole sweep: seconds it took, creatures passed, attackers among them, attackers awake, sea creatures, the towns' and the tame.</summary>
     public static double SweepSeconds { get; private set; }
 
     public static int Creatures { get; private set; }
@@ -98,7 +75,6 @@ public static class BotZoneScan
         _sweepBegan = now;
     }
 
-    /// <summary>Windows until the budget is spent. True when it passed any.</summary>
     public static bool Step(long now)
     {
         var map = _map;
@@ -149,7 +125,6 @@ public static class BotZoneScan
         return done > 0;
     }
 
-    /// <summary>One box passed now, for the tour's held ground. Counted apart from the sweep.</summary>
     public static void Focus(Map map, Rectangle2D box, long now)
     {
         if (map == null || map != _map)
@@ -194,9 +169,6 @@ public static class BotZoneScan
             var water = c.CantWalk && c.CanSwim;
             var attacks = BotHaunts.AttacksFirst(c.FightMode);
 
-            // A sea creature's patrol is not the land's: it is never written into the raster the land zones are drawn from. Nor is
-            // a creature in a fight (02.10.2026): one chasing a bot is where the bot led it, not where it patrols — the Sonnet
-            // analyst of 388 found 676 sighting cells inside Britain that matched no spawner, chasers recorded as patrols.
             if (attacks && awake && !water && c.Combatant == null)
             {
                 BotZoneRaster.Record(c.X, c.Y, now);

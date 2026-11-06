@@ -4,18 +4,9 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-botshops.json</c> is allowed to say. Everything optional; an empty file keeps the code's numbers.
-///
-/// <para>
-/// <b>PascalCase, and it is not a style question.</b> The deserialiser matches these names as written, so a key in lower case
-/// is not an error and not a warning — it is a value silently left at its default. The boot line the module writes is the only
-/// proof of what the shops are running with.
-/// </para>
-/// </summary>
 public sealed class BotShopkeepSettings
 {
-    /// <summary>Whether bots keep shops at all. Off, the market has no shops: goods go by carrier or to a shopkeeper.</summary>
+
     public bool? Running { get; set; }
 
     public double? ShiftMinutes { get; set; }
@@ -48,7 +39,6 @@ public sealed class BotShopkeepSettings
 
     public int? SeekTiles { get; set; }
 
-    /// <summary>What a minute's walk to a shop is worth in gold. Follows <c>BotRestock.Prior</c> unless given.</summary>
     public double? WalkGold { get; set; }
 
     public int? CryMs { get; set; }
@@ -56,7 +46,6 @@ public sealed class BotShopkeepSettings
     public int? SayEveryMs { get; set; }
 }
 
-/// <summary>Reads the shops' file and moves the numbers it names; writes an empty starter file when there is none.</summary>
 public static class BotShopkeepConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotShopkeepConfig));
@@ -96,7 +85,6 @@ public static class BotShopkeepConfig
         BotShopkeep.CryMs = settings.CryMs ?? BotShopkeep.CryMs;
         BotShopkeepModule.SayEveryMs = settings.SayEveryMs ?? BotShopkeepModule.SayEveryMs;
 
-        // Only when the file gives it: read back as "?? WalkGold" it would freeze today's BotRestock.Prior into it for good.
         if (settings.WalkGold is { } walk)
         {
             BotShopkeep.WalkGold = walk;

@@ -7,75 +7,30 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A newborn's temperament: the same birth points as its class deals, leaned towards one skill of the class's own.
-///
-/// <para>
-/// <b>Patrick's point 7 of 01.10.2026:</b> "all the bots start at the same level now — add some randomness". Swordsmen with
-/// more Swordsmanship and fewer points in the rest, gatherers
-/// who love digging with more Mining, crafters with the most in Blacksmithy, Fletching and the other producing trades. Until
-/// this, <c>BotMobile.Learn</c> gave every bot of a class the same fifty, thirty and twenty and <c>LearnWeapon</c> the weapon at
-/// fifty, so a class was one bot many times over — and its crafters were born at Blacksmithy 30, thirty-five points under the
-/// first coloured metal the engine lets a smith work (dull copper, 65 on the base: <c>CraftItem</c> line 647). On build 384 the
-/// island dug 622 coloured ingots that no crafter could touch, and the live crafters stood at Blacksmithy 36 to 49 after a day.
-/// </para>
-///
-/// <para>
-/// <b>Nothing is added; the birth's own points move.</b> A leaning (<see cref="BotLeaning"/>, declared by the class) raises one
-/// skill to a value drawn inside its band; the points come out of the other skills the bot was born with, in proportion to what
-/// each can spare. A skill spares down to <see cref="KeepShare"/> of its birth value, or to the floor the leaning names for it,
-/// and the skill the class is judged by (<see cref="BotClass.MainSkill"/>) spares nothing unless the leaning names a floor for it
-/// — a healer's Healing, an archer's Archery and a mage's Magery are never lowered. Within a hundred per skill and the class's own
-/// target; the total is the class's own, far under the era's 700.
-/// </para>
-///
-/// <para>
-/// <b>Seeded by the bot's name and class, so a birth is reproducible.</b> FNV-1a over the two names into a SplitMix64 stream: the
-/// same name raised into the same class leans the same way on every shard and every run (the engine's <c>Utility.Random</c>
-/// would not, and <c>string.GetHashCode</c> is randomised per process). The seasoned classes are left as they are: they are born
-/// at their share of their targets for their offices' sake (<see cref="BotClass.Seasoned"/>).
-/// </para>
-/// </summary>
 public static class BotBirth
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBirth));
 
-    /// <summary>Whether newborns lean at all. Off, every bot is born as its class deals it, exactly as before 01.10.2026.</summary>
     public static bool Leans { get; set; } = true;
 
-    /// <summary>
-    /// The share of its birth value a skill keeps when it pays for a leaning, unless the leaning names its own floor. A half: a
-    /// smith's blade goes from fifty to twenty-five at the most, which is what the crafter class says its blade is for ("it carries a
-    /// blade because everything on this island does"). Raised to 0.6 a smith still reaches 68; from 0.65 the smith's band can no
-    /// longer be paid for in full and births start counting as short of the first coloured metal (<see cref="Short"/>).
-    /// </summary>
     public static double KeepShare { get; set; } = 0.5;
 
-    /// <summary>Bots raised this session through a class's deal (the seasoned classes are not counted).</summary>
     public static long Born { get; private set; }
 
-    /// <summary>Of those, the ones that leaned.</summary>
     public static long Leaned { get; private set; }
 
-    /// <summary>Of those, the ones born even: the class's own deal.</summary>
     public static long Even { get; private set; }
 
-    /// <summary>Leanings whose other skills could not pay for the whole draw, which leaned less than they drew.</summary>
     public static long Trimmed { get; private set; }
 
-    /// <summary>Smiths born at or above the first coloured metal's floor: the first stint holding a coloured bar makes coloured armour.</summary>
     public static long Coloured { get; private set; }
 
-    /// <summary>Smiths born below it. Nought unless the class's skills or <see cref="KeepShare"/> were changed under the leaning.</summary>
     public static long Short { get; private set; }
 
-    /// <summary>Points moved by leanings this session, in tenths, for the census.</summary>
     private static long _moved;
 
-    /// <summary>Leanings born this session, by class and by the word for the leaning.</summary>
     private static readonly Dictionary<string, Dictionary<string, int>> _census = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The skills a birth dealt: the class's own and the weapon the roll handed over, once each. Reused; births are rare.</summary>
     private static readonly List<Dealt> _dealt = [];
 
     private sealed class Dealt
@@ -91,10 +46,6 @@ public static class BotBirth
         public int Gives;
     }
 
-    /// <summary>
-    /// Leans a bot that has just been dealt its class's skills and its weapon. Called by <c>BotMobile.Become</c> after
-    /// <c>LearnWeapon</c> and before <c>BotProgress.Restore</c>, which only ever raises what this leaves.
-    /// </summary>
     public static void Lean(BotMobile bot, BotClass klass)
     {
         if (bot == null || klass == null || klass.Seasoned)
@@ -135,7 +86,7 @@ public static class BotBirth
 
         if (sig == null)
         {
-            // A leaning towards a skill the class never dealt: born at nought in it, aiming at a hundred.
+
             sig = new Dealt { Skill = signature, Plain = bot.Skills[signature].BaseFixedPoint, Target = 1000 };
             _dealt.Add(sig);
         }
@@ -145,7 +96,6 @@ public static class BotBirth
         var lowT = Math.Min((int)Math.Round(low * 10.0), cap);
         var highT = Math.Max(lowT, Math.Min((int)Math.Round(high * 10.0), cap));
 
-        // Whole points: a tenth of a point is not a temperament.
         var drawn = Math.Min(cap, lowT + draw.Below((highT - lowT) / 10 + 1) * 10);
         var want = drawn - sig.Plain;
         var spare = 0;
@@ -179,7 +129,6 @@ public static class BotBirth
             Trimmed++;
         }
 
-        // In proportion to what each can spare, the remainder a tenth at a time to whoever still can.
         var left = take;
 
         for (var i = 0; i < _dealt.Count && spare > 0; i++)
@@ -243,7 +192,6 @@ public static class BotBirth
         Say(bot, klass, word, sig, take < want);
     }
 
-    /// <summary>The birth line: what moved, from what to what.</summary>
     private static void Say(BotMobile bot, BotClass klass, string word, Dealt sig, bool trimmed)
     {
         using var said = ValueStringBuilder.Create(192);
@@ -285,7 +233,6 @@ public static class BotBirth
         );
     }
 
-    /// <summary>The skills this birth dealt, read back off the bot: the class's list and the rolled weapon, once each.</summary>
     private static void Deal(BotMobile bot, BotClass klass, BotWeaponOption? weapon)
     {
         _dealt.Clear();
@@ -332,7 +279,6 @@ public static class BotBirth
         return null;
     }
 
-    /// <summary>One of the class's leanings, by weight.</summary>
     private static BotLeaning Pick(IReadOnlyList<BotLeaning> leanings, ref Draw draw)
     {
         var total = 0;
@@ -364,7 +310,6 @@ public static class BotBirth
         return leanings[^1];
     }
 
-    /// <summary>The band a leaning draws in: its own two numbers, or its ladder's first coloured rung with the same span.</summary>
     public static (double Low, double High) Band(BotLeaning leaning)
     {
         if (leaning.Tier == BotTier.None)
@@ -377,10 +322,6 @@ public static class BotBirth
         return (rung, rung + Math.Max(0.0, leaning.High - leaning.Low));
     }
 
-    /// <summary>
-    /// The skill the first material above the plain one asks for, on the engine's own ladder; the fallback when the engine has not
-    /// built the system yet. Dull copper, spined leather and the dull copper vein all stand at sixty-five in this era.
-    /// </summary>
     public static double FirstRung(BotTier tier, double fallback)
     {
         var least = double.MaxValue;
@@ -443,7 +384,6 @@ public static class BotBirth
         }
     }
 
-    /// <summary>The word for a leaning: the weapon's own for a blade ("swordsman", "maceman", "fencer"), else the leaning's name.</summary>
     private static string Word(BotLeaning leaning, SkillName signature) =>
         !leaning.Weapon
             ? leaning.Name
@@ -468,10 +408,6 @@ public static class BotBirth
         words[word] = words.GetValueOrDefault(word) + 1;
     }
 
-    /// <summary>
-    /// The seed of a birth: FNV-1a over the name and the class. Stable across processes and runs, which <c>string.GetHashCode</c>
-    /// is not.
-    /// </summary>
     public static ulong Seed(string name, string calling)
     {
         var hash = 14695981039346656037UL;
@@ -497,7 +433,6 @@ public static class BotBirth
         return hash;
     }
 
-    /// <summary>SplitMix64: a small, fixed generator, so the same seed draws the same numbers on every build of .NET.</summary>
     private struct Draw
     {
         private ulong _state;
@@ -516,14 +451,9 @@ public static class BotBirth
             return z ^ (z >> 31);
         }
 
-        /// <summary>A whole number from nought to one under <paramref name="n"/>.</summary>
         public int Below(int n) => n <= 1 ? 0 : (int)(Next() % (ulong)n);
     }
 
-    /// <summary>
-    /// The census for the <c>Rest:</c> line: births this session, how many leaned, how many smiths were born able to work a
-    /// coloured bar, and every class's leanings by count.
-    /// </summary>
     public static string Describe()
     {
         if (Born == 0)

@@ -6,34 +6,10 @@ using Server.Text;
 
 namespace Server.BotAI.Mind;
 
-/// <summary>
-/// The debugger's ear, and the one door in the world through which a person can reach it.
-///
-/// <para>
-/// Say <c>Hey Argus, the smith is making nothing</c> anywhere on the shard and the line is written into the
-/// debugger's own log, answered on the spot, and put in front of the model on its next report — where it is
-/// told that this came from the person who runs the shard and is the first thing to account for.
-/// </para>
-///
-/// <para>
-/// <b>The wake phrase is built from the debugger's name rather than written down here.</b> The name is a
-/// configuration value; a trigger hard-written as "hey argus" would go on working after somebody renamed the
-/// bot in <c>bot-debugger.json</c>, and then stop working the first time they typed the new name — with no
-/// error anywhere, because a sentence nobody is listening for looks exactly like a sentence nobody said.
-/// </para>
-///
-/// <para>
-/// <b>Staff only, and that is not about trust.</b> The debugger is invisible to players by design; a
-/// population that could talk to it would be a population that knows it exists, and every answer it gave
-/// would be a message from nowhere. It also means a note in the log is always from somebody whose word is
-/// worth acting on, which is what makes the notes usable as instructions rather than as data.
-/// </para>
-/// </summary>
 public static class BotHail
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHail));
 
-    /// <summary>What a person said to the debugger, and whether the model has been shown it yet.</summary>
     public sealed class Note
     {
         public string Who { get; init; }
@@ -42,24 +18,15 @@ public static class BotHail
 
         public DateTime When { get; init; }
 
-        /// <summary>Whether this has been put in front of the model at least once.</summary>
         public bool Read { get; set; }
     }
 
-    /// <summary>
-    /// How many notes are kept and recited.
-    ///
-    /// Every one of them stays in the log for ever; this is only how many are carried into the next prompt,
-    /// and it is bounded because a prompt that grows without limit eventually pushes out the measurements
-    /// the note is asking about.
-    /// </summary>
     public static int MostNotes { get; set; } = 10;
 
     private static readonly List<Note> _notes = [];
 
     private static bool _listening;
 
-    /// <summary>How many notes have been left, and how many are still waiting to be looked at.</summary>
     public static int Heard { get; private set; }
 
     public static int Waiting
@@ -90,8 +57,6 @@ public static class BotHail
         _listening = true;
         EventSink.Speech += Said;
 
-        // Registered under the debugger's own name, so it follows a rename, and under a stable word as well
-        // so that somebody who has forgotten what it is called can still find it.
         CommandSystem.Register(BotVigil.Name, AccessLevel.Administrator, Summon);
 
         if (!string.Equals(BotVigil.Name, "debugger", StringComparison.OrdinalIgnoreCase))
@@ -99,7 +64,6 @@ public static class BotHail
             CommandSystem.Register("debugger", AccessLevel.Administrator, Summon);
         }
 
-        // And one per helper, so [Lynceus and [Heimdall go to them the way [Argus goes to the lead.
         for (var i = 0; i < BotVigil.Helpers.Length; i++)
         {
             var helper = BotVigil.Helpers[i];
@@ -127,7 +91,6 @@ public static class BotHail
         EventSink.Speech -= Said;
     }
 
-    /// <summary>Somebody spoke. Almost always not to the debugger, so this must be cheap to refuse.</summary>
     private static void Said(SpeechEventArgs e)
     {
         var from = e?.Mobile;
@@ -151,8 +114,6 @@ public static class BotHail
 
         _notes.Add(note);
 
-        // And into the long memory, because a question outlives the process it was asked in. A note left at
-        // midnight and a shard restarted at one o'clock used to mean the question had never been asked.
         BotDebugMemory.Ask(from.Name, text);
 
         while (_notes.Count > MostNotes * 2)
@@ -168,18 +129,10 @@ public static class BotHail
 
         logger.Information("{Who} left the debugger a note: {What}", from.Name, text);
 
-        // Answered on the spot and privately. It has no voice in the world — nobody but staff can see it at
-        // all, and a shout from an invisible thing is a message from nowhere.
         from.SendMessage(0x35, $"{BotVigil.Name}: noted. {Answer()}");
         from.SendMessage(0x35, $"{BotVigil.Name}: it is in my log and goes in front of me at my next report.");
     }
 
-    /// <summary>
-    /// Whether this was addressed to the debugger, and what was left once the greeting is taken off.
-    ///
-    /// Two forms, both natural: <c>Hey Argus, ...</c> and <c>Argus, ...</c>. Anything else is somebody
-    /// talking to somebody else.
-    /// </summary>
     private static string Addressed(string said)
     {
         var name = BotVigil.Name;
@@ -202,7 +155,6 @@ public static class BotHail
             return false;
         }
 
-        // The next character has to end the word, or "Argusson" would be talking to it.
         if (said.Length > opening.Length && char.IsLetterOrDigit(said[opening.Length]))
         {
             return false;
@@ -213,16 +165,6 @@ public static class BotHail
         return rest.Length > 0;
     }
 
-    /// <summary>
-    /// What the debugger can say back without asking anything of a model: where it is, what the last
-    /// roll-call found, and when it will next think.
-    ///
-    /// <para>
-    /// It is deliberately not "noted, I will look into it". A person who has just told the watcher something
-    /// wants to know whether the watcher is awake and what it already believes, and both are known here
-    /// without a single token being spent.
-    /// </para>
-    /// </summary>
     private static string Answer()
     {
         var body = BotVigil.Body;
@@ -236,8 +178,6 @@ public static class BotHail
                     : "I have no body this moment"
             );
 
-            // BotVigil.Describe already ends with the roll-call's own line; saying it here as well printed
-            // the same sentence twice in the one answer a person actually reads.
             sb.Append(". ");
             sb.Append(BotVigil.Describe());
 
@@ -249,19 +189,9 @@ public static class BotHail
         }
     }
 
-    /// <summary>
-    /// The notes as the model is shown them, newest last, with the unread ones marked.
-    ///
-    /// <para>
-    /// Read notes are still recited. A person who asked yesterday whether the smith was making anything is
-    /// still owed an answer today, and a note that vanishes the moment it has been seen once turns a standing
-    /// question into a single missed opportunity.
-    /// </para>
-    /// </summary>
     public static string Recite()
     {
-        // Anything still unanswered from before this session comes first: it has been waiting longest and is
-        // the likeliest thing to be forgotten by a watcher whose memory used to end at the restart.
+
         var standing = Standing();
 
         if (_notes.Count == 0)
@@ -304,7 +234,6 @@ public static class BotHail
         }
     }
 
-    /// <summary>Questions left in earlier sessions that were never put in front of the model.</summary>
     private static string Standing()
     {
         var notes = BotDebugMemory.Notes;
@@ -339,7 +268,6 @@ public static class BotHail
         }
     }
 
-    /// <summary>Everything back to nothing, for a world reload.</summary>
     public static void Reset()
     {
         _notes.Clear();
@@ -368,8 +296,6 @@ public static class BotHail
             return;
         }
 
-        // "here" brings it to you; anything else takes you to it. Two directions, because half the time the
-        // thing worth looking at is where you are and half the time it is where the debugger went.
         if (e.Length > 0 && e.GetString(0).InsensitiveEquals("here"))
         {
             body.Hover(from.Map, from.Location);

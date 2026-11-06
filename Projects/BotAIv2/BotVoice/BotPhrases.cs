@@ -3,24 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot says, by occasion. The whole bank is written to <c>Configuration/bot-voice.json</c> the first
-/// time the shard runs, so the words can be changed without touching the code; what is here is the default
-/// when the file says nothing about an occasion.
-///
-/// <para>
-/// <b>Keys are occasions, and an occasion may be specific or general.</b> <c>took:mine</c> is said on taking
-/// up mining; if there is no such key, <c>took:*</c> is. The same for <c>finished</c>, <c>failed</c> and
-/// <c>dropped</c>. The rest are one occasion each: a cry for help, a death, a mood, a search for something to
-/// buy, a war, a hall.
-/// </para>
-///
-/// <para>
-/// <b>Placeholders</b>: <c>{name}</c>, <c>{class}</c>, <c>{work}</c>, <c>{stage}</c>, <c>{guild}</c>,
-/// <c>{foe}</c>, <c>{item}</c>, <c>{amount}</c>, <c>{place}</c>, <c>{reason}</c>, <c>{minutes}</c>,
-/// <c>{coin}</c>, <c>{enemy}</c>, <c>{killer}</c>, <c>{price}</c>.
-/// </para>
-/// </summary>
 public static class BotPhrases
 {
     public static Dictionary<string, string[]> Defaults() =>
@@ -149,8 +131,7 @@ public static class BotPhrases
                 "Who has {item}? Coin waiting.",
                 "I will buy {item}, {amount} of them."
             ],
-            // The market, hand to hand (BotMarket, 01.10.2026): a want said in the trade chat, {town} where the buyer stands; a
-            // raise; a carrier setting out ({buyer}); the handing over ({seller}, {buyer}, {amount}, {item}, {price} the total).
+
             ["market:want"] =
             [
                 "Buying {amount} {item} at {price} gold each. Bring them to me in {town}, coin on the spot.",
@@ -171,7 +152,7 @@ public static class BotPhrases
             ],
             ["market:hand"] = ["Here you are, {buyer}: {amount} {item}.", "{amount} {item}, as asked, {buyer}.", "Count them, {buyer}. {amount} {item}."],
             ["market:paid"] = ["{price} gold, as agreed. Thank you, {seller}.", "Good. Here is your {price}, {seller}.", "Just what I needed, {seller}. {price} gold."],
-            // A bot keeping shop by the bank (BotShopkeep, 29.09.2026): {goods} is its three dearest stocks, {item} and {price} the first.
+
             ["shop:open"] =
             [
                 "Open for trade by the bank in {town}: {goods}.",
@@ -228,8 +209,7 @@ public static class BotPhrases
                 "My purse is empty and so is my patience.",
                 "Something had better turn up."
             ],
-            // The seven moods that ask for something (BotMoods, 01.10.2026): each line must say which, because the bot in earshot
-            // answers the tag and the person at the log reads the words.
+
             ["mood:hurt"] = ["I am bleeding and I have nothing to bind it with.", "Every step hurts. I need a bandage.", "Hurt, and no healer in sight.", "Look at me. Half dead on my feet."],
             ["mood:tired"] = ["I am done in. My legs will not carry me much further.", "Tired to the bone. A fire and a sit would do it.", "I could sleep standing up.", "Worn out. Somebody tell me where a fire is."],
             ["mood:grieving"] = ["We lost one of ours. I keep seeing it.", "A friend is dead and I was not there.", "Grief is heavy and the road is long.", "Not today. We are burying somebody."],

@@ -4,27 +4,9 @@ using System.Diagnostics;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A course over the open cells of the chart: A* from one cell to another, sliced across ticks, one search at a time.
-///
-/// <para>
-/// <b>A search across the sea is too big for one tick and too cheap to thread.</b> The worst pair on map0 — Britain's dock
-/// to Skara Brae's, round the south of the continent — expands 113,061 cells, and a pair that cannot be joined expands the
-/// whole open sea, 214,506 (the Python pass of 29.09.2026). That is tens of milliseconds, so a search keeps its heap and its
-/// marks between slices and stops at the slice's deadline. The marks are stamped rather than cleared: the arrays are the
-/// size of the chart and allocated once, and a new search is a new stamp.
-/// </para>
-///
-/// <para>
-/// <b>What a course is.</b> Eight directions, ten a straight step and fourteen a diagonal one, a diagonal only past two open
-/// corners (<see cref="BotSeaChart.Passable"/>), and a cell shut for a while by a ship that found it blocked is not entered
-/// (<see cref="Shut"/>). The cells come back as the turns only: a straight run of cells is one leg, sailed straight from one
-/// cell's middle to another's, which is a line of cells the chart has already proved open.
-/// </para>
-/// </summary>
 public static class BotSeaCourse
 {
-    /// <summary>One course asked for. Filled in when <see cref="Done"/>.</summary>
+
     public sealed class Ask
     {
         public int From;
@@ -37,7 +19,6 @@ public static class BotSeaCourse
 
         public bool Found;
 
-        /// <summary>The turns of the course, first cell to last, as cell indices.</summary>
         public List<int> Turns;
 
         public int Tiles;
@@ -45,7 +26,6 @@ public static class BotSeaCourse
         public long Expanded;
     }
 
-    /// <summary>How long a cell a ship found blocked stays shut to new courses. Ten minutes: another ship moves on well before.</summary>
     public static int ShutMs { get; set; } = 600000;
 
     private static readonly Queue<Ask> _asks = new();
@@ -86,7 +66,6 @@ public static class BotSeaCourse
         }
     }
 
-    /// <summary>Shuts a cell to new courses for <see cref="ShutMs"/>. Courses already drawn are not redrawn by this.</summary>
     public static void Shut(int cell)
     {
         if (cell >= 0)
@@ -112,7 +91,6 @@ public static class BotSeaCourse
         return false;
     }
 
-    /// <summary>Works on the courses asked for until the deadline (a <see cref="Stopwatch"/> timestamp).</summary>
     public static void Step(long deadline)
     {
         if (!BotSeaChart.Ready)
@@ -170,7 +148,6 @@ public static class BotSeaCourse
         _heap.Enqueue(ask.From, Heuristic(ask.From, ask.To));
     }
 
-    /// <summary>True when the search in hand ended, false when it ran out of slice.</summary>
     private static bool Search(long deadline)
     {
         var ask = _current;
@@ -236,7 +213,6 @@ public static class BotSeaCourse
         return true;
     }
 
-    /// <summary>Octile distance in tenths of a cell, a hair over so that straight courses win ties.</summary>
     private static int Heuristic(int a, int b)
     {
         var h = BotSeaChart.Height;
@@ -275,7 +251,6 @@ public static class BotSeaCourse
 
         Found++;
 
-        // Walked back from the goal, then turned round; only the cells where the heading changes are kept.
         List<int> cells = [];
 
         for (var c = ask.To; c >= 0; c = _came[c])
@@ -294,7 +269,6 @@ public static class BotSeaCourse
         ask.Turns = Turns(cells);
     }
 
-    /// <summary>The first cell, every cell where the heading changes, and the last.</summary>
     public static List<int> Turns(List<int> cells)
     {
         List<int> turns = [];

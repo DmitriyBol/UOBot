@@ -2,12 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers the bot carrying a relic for its guild the walk home to hang it in the hall (07.10.2026, relics20). The road home is the
-/// relic's dangerous hour: a thief may take it from the pack (<see cref="BotRelicSnatch"/>). Unpaid on purpose — what it brings is
-/// the guild's, not the carrier's — so the appraisal must not refuse it for paying nothing (<see cref="BotDeed.Unpaid"/>); and a
-/// relic left in a pack <see cref="BotRelics.CarryMostMs"/> is fetched home by the guild itself.
-/// </summary>
 public sealed class BotRelicBearer : IBotProposer
 {
     public string Name => "RelicHome";
@@ -42,7 +36,6 @@ public sealed class BotRelicBearer : IBotProposer
     }
 }
 
-/// <summary>Walking a relic home and setting it up in the guild's hall.</summary>
 public sealed class BotRelicHomeward : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRelicHomeward));
@@ -51,10 +44,8 @@ public sealed class BotRelicHomeward : BotDeed
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>What the walk home is reckoned at per minute: the guild's errand, unpaid, priced to be taken.</summary>
     public static double Prior { get; set; } = 50.0;
 
-    /// <summary>How near the hall's door counts as home.</summary>
     public static int Reach { get; set; } = 8;
 
     public static long Offered { get; private set; }

@@ -3,13 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps every bot's timetable across restarts. See <see cref="BotTimetable"/>: drawn from the name, the class and the nature once
-/// and then kept, so a dial change to the drawing never rewrites who anybody already is — the rule <see cref="BotCharacterStore"/>
-/// set for the natures. By name, never by serial, for the same reason: a bot is raised afresh at every boot. A shape this build
-/// cannot read is dropped whole, and every timetable is drawn again from the names, which gives the same timetables under the
-/// same dials.
-/// </summary>
 public sealed class BotDayStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDayStore));
@@ -66,8 +59,7 @@ public sealed class BotDayStore : GenericPersistence
                 Bed = reader.ReadDouble(),
                 Meal = reader.ReadDouble(),
                 Supper = reader.ReadDouble(),
-                // Held inside the enums: the Day: line indexes stack arrays by them, and a damaged save must not throw every five
-                // minutes and on every snapshot (review A of 13.10.2026, §3.7).
+
                 Habit = (BotHabit)Math.Clamp(reader.ReadEncodedInt(), (int)BotHabit.Tavern, (int)BotHabit.Prowl),
                 Owl = reader.ReadBool(),
                 Place = (BotBedPlace)Math.Clamp(reader.ReadEncodedInt(), (int)BotBedPlace.Home, (int)BotBedPlace.Ground)

@@ -2,14 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The market as a module: reads its numbers, starts the wants' beat and the city's clock, and offers the carrier's walk.
-///
-/// <para>
-/// <see cref="BotPhase.World"/> and requires only the will, whose proposers it adds to. Registered where the auction was, before
-/// the population, so a reload clears the wants while their buyers still exist.
-/// </para>
-/// </summary>
 public sealed class BotMarketModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMarketModule));
@@ -26,13 +18,10 @@ public sealed class BotMarketModule : BotModule
 
         BotMarket.Start();
 
-        // The city's treasury: the mint, the bounties, and its standing orders — served now at the bots' shops by Britain's
-        // bank, where the keepers stand, instead of off stalls. See BotCity.
         BotCity.Start();
 
         BotWill.Offer(new BotCourier());
 
-        // The buyer's half of hand to hand: it comes to meet the carrier (02.10.2026, Patrick's order). See BotRendezvous.
         BotWill.Offer(new BotMeeter());
 
         logger.Information(
@@ -59,7 +48,6 @@ public sealed class BotMarketModule : BotModule
             BotHandover.MeetTiles
         );
 
-        // The reservation, the dead buyer's want, and the lines' clocks (02.10.2026, build 391). See BotMarket.Reserved and BotLines.
         logger.Information(
             "Wants reserve their buyer's money: a want is said only if what the buyer's other wants hold leaves enough for it, and everything else a bot spends is read off what is left; a dead buyer keeps its wants, asked again {Grace} minutes after it rises; a raise the buyer cannot reserve leaves the want at its price for up to {Age} minutes; a line is met if every unit arrives within {Window} minutes, and taken back or unpaid inside its first {Kept} minutes it is kept out; the board is {Restored}",
             BotMarket.RisenGraceMs / 60000,
@@ -70,7 +58,6 @@ public sealed class BotMarketModule : BotModule
         );
     }
 
-    /// <summary>A world reload is a different world: every want goes with the buyers that said it.</summary>
     public override void Reset()
     {
         logger.Information("The market, before the reload: {State}", BotMarket.Describe());

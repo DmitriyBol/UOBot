@@ -3,16 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What a bot says back to a mood it heard: a word for each of the seven, and the line that goes with an offer — a bandage,
-/// a fire, a hunt, a place in a company — and the thanks that may come back. <c>{other}</c> is the one spoken to; an offer of a
-/// hunt names its <c>{quarry}</c>, a fire pointed at its <c>{x}</c>, <c>{y}</c>.
-///
-/// <para>
-/// Put into the voice's bank only where the bank has nothing for the occasion, the way the camp's words are, so
-/// <c>bot-voice.json</c> may replace any of them.
-/// </para>
-/// </summary>
 public static class BotSocialTalk
 {
     public static Dictionary<string, string[]> Defaults() =>
@@ -34,7 +24,6 @@ public static class BotSocialTalk
             ["answer:thanks"] = ["Thank you, {other}.", "Kind of you, {other}.", "Aye. Thanks, {other}.", "I'll remember that, {other}."]
         };
 
-    /// <summary>Puts the defaults into the voice's bank, each only where the bank has nothing for that occasion. Returns how many were added.</summary>
     public static int Phrases()
     {
         var added = 0;

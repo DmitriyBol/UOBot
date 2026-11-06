@@ -5,46 +5,14 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The posts the island is never left without: a floor of each kept in the world at every hour, whoever is past their hours.
-///
-/// <para>
-/// <b>Patrick's order of 02.10.2026, with the prime time:</b> "only make sure the world is never left without critically
-/// important bots." A post is a class by name — the healers, the crafters, the gatherers, the mages for scrolls and reagents,
-/// the traders, the Captains and the Baron — or a trade a producer holds by its best skill: a smith, a tailor and a fletcher
-/// among the crafters, a miner and a woodsman among the gatherers (<see cref="Trade"/>). Every bot fills its class's post and,
-/// if it is a producer, one trade's. The floors are one number per post, configured in <c>bot-rest.json</c> under
-/// <c>Critical.Floors</c>; a post with no floor named is not critical.
-/// </para>
-///
-/// <para>
-/// <b>Three gates, all in the rest clock.</b> A bot past its hours whose post would fall under its floor if it left plays on
-/// and is counted (<see cref="Holds"/>), as the island's own floor keeps bots on. A post under its floor — a restart that found
-/// its smiths resting, a call's bots gone back to bed — brings its own back from rest, soonest due first, up to
-/// <see cref="EarlyMinutes"/> into the rest, which by default is the whole of one. And a post with fewer on the whole island,
-/// resting counted, than its floor gets the next newcomer in its class (<see cref="Wanting"/>, read by <c>BotGrowth</c>): the
-/// class, not the trade, because which trade a crafter is born to is drawn by its name (<c>BotBirth</c>).
-/// </para>
-///
-/// <para>
-/// The traders keep their own rule beside this — no more than <c>BotTrading.RestShare</c> of them resting at once (build 388) —
-/// and the floor here is the count under which that share may never fall.
-/// </para>
-/// </summary>
 public static class BotCritical
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCritical));
 
-    /// <summary>Whether the floors are kept at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>
-    /// How far into its rest a bot of a post under its floor may be brought back. Eight hours, the longest rest there is: a
-    /// critical post is filled from whoever is resting, however little they have slept.
-    /// </summary>
     public static int EarlyMinutes { get; set; } = 480;
 
-    /// <summary>The trades a producer may hold, each by the class that holds it and the skill it is judged by.</summary>
     private static readonly (string Word, string Class, SkillName Skill)[] Trades =
     [
         ("Smith", "Crafter", SkillName.Blacksmith),
@@ -58,26 +26,16 @@ public static class BotCritical
 
     private static readonly Dictionary<string, int> _floors = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>In the world and not tired, by post, as of the last look.</summary>
     private static readonly Dictionary<string, int> _present = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>On the whole island, resting counted, by post.</summary>
     private static readonly Dictionary<string, int> _island = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Bots past their hours kept in the world for a post this session.</summary>
     public static long Held { get; internal set; }
 
-    /// <summary>Bots brought back from rest for a post this session.</summary>
     public static long Brought { get; internal set; }
 
-    /// <summary>Newcomers born into a post the island had too few of.</summary>
     public static long ByPost { get; internal set; }
 
-    /// <summary>
-    /// The floors as written: three healers, four crafters and four gatherers, three mages, three traders, a Captain, the
-    /// Baron, and one of each trade. Laid in without looking the classes up, because this runs the first time anything
-    /// touches the type and the classes need not exist yet; <see cref="Set"/> checks what the file says.
-    /// </summary>
     static BotCritical()
     {
         (string Post, int Floor)[] written =
@@ -93,7 +51,6 @@ public static class BotCritical
         }
     }
 
-    /// <summary>The posts with a floor, in the order they were named.</summary>
     public static IReadOnlyList<string> Posts => _posts;
 
     public static int Floor(string post) => post != null && _floors.TryGetValue(post, out var floor) ? floor : 0;
@@ -102,10 +59,8 @@ public static class BotCritical
 
     public static int OnIsland(string post) => post != null && _island.TryGetValue(post, out var n) ? n : 0;
 
-    /// <summary>How many a post is under its floor, in the world and not tired; nought when it is held.</summary>
     public static int Short(string post) => Math.Max(0, Floor(post) - Present(post));
 
-    /// <summary>Whether this word names a trade rather than a class.</summary>
     private static int TradeIndex(string word)
     {
         for (var i = 0; i < Trades.Length; i++)
@@ -119,11 +74,6 @@ public static class BotCritical
         return -1;
     }
 
-    /// <summary>
-    /// Replaces the floors with the ones configured: a count per post, each post a class's name or a trade's word. A post
-    /// that is neither, or a floor at or under nought, is dropped and named; the classes must exist by then, which they do
-    /// (the population module requires them). Returns how many were kept.
-    /// </summary>
     public static int Set(IReadOnlyDictionary<string, int> floors)
     {
         if (floors == null)
@@ -159,10 +109,6 @@ public static class BotCritical
         return _posts.Count;
     }
 
-    /// <summary>
-    /// The trade a producer holds: the one of its class's trades its skill stands highest in, ties to the first listed, so a
-    /// crafter born even is a smith. Null for a bot of any other class.
-    /// </summary>
     public static string Trade(BotMobile bot)
     {
         var klass = bot?.Class?.Name;
@@ -197,7 +143,6 @@ public static class BotCritical
 
     private static readonly string[] _fill = new string[2];
 
-    /// <summary>The posts this bot fills, into <see cref="_fill"/>: its class, and its trade if it has one. Returns how many.</summary>
     private static int Fill(BotMobile bot)
     {
         var n = 0;
@@ -220,7 +165,6 @@ public static class BotCritical
         return n;
     }
 
-    /// <summary>Whether this bot fills the post.</summary>
     public static bool Fills(BotMobile bot, string post)
     {
         var n = Fill(bot);
@@ -244,11 +188,6 @@ public static class BotCritical
         }
     }
 
-    /// <summary>
-    /// Counts who fills what: in the world and not tired (<see cref="_present"/>), and on the whole island
-    /// (<see cref="_island"/>). Once a look, before anybody is tired that look; the rest of the look keeps the counts current
-    /// through <see cref="Tired"/>, <see cref="Back"/> and <see cref="Born"/>.
-    /// </summary>
     public static void Count()
     {
         _present.Clear();
@@ -294,10 +233,6 @@ public static class BotCritical
         }
     }
 
-    /// <summary>
-    /// Whether this bot, past its hours, must play on because one of its posts would fall under its floor without it. The
-    /// post is named for the log. Counts nothing: the rest clock counts what it holds.
-    /// </summary>
     public static bool Holds(BotMobile bot, out string post)
     {
         post = null;
@@ -324,7 +259,6 @@ public static class BotCritical
         return false;
     }
 
-    /// <summary>A bot tired this look leaves its posts' present counts.</summary>
     public static void Tired(BotMobile bot)
     {
         var n = Fill(bot);
@@ -335,7 +269,6 @@ public static class BotCritical
         }
     }
 
-    /// <summary>A bot back from rest this look joins them.</summary>
     public static void Back(BotMobile bot)
     {
         var n = Fill(bot);
@@ -346,7 +279,6 @@ public static class BotCritical
         }
     }
 
-    /// <summary>A newcomer raised this look joins both counts.</summary>
     public static void Born(BotMobile bot)
     {
         var n = Fill(bot);
@@ -358,19 +290,6 @@ public static class BotCritical
         }
     }
 
-    /// <summary>
-    /// The class the next newcomer should be, for the first post with fewer on the whole island than its floor; null when
-    /// every post has enough. A trade's post asks for its class.
-    ///
-    /// <para>
-    /// <b>A post whose class the caller may not raise is passed over, and the next short post asked instead (07.10.2026).</b>
-    /// <c>BotGrowth</c> passes over an office that is held (<see cref="BotClass.Office"/>). Before, it refused the first short
-    /// post and skipped the whole branch, so a Captain floor written as 2 would have left every post listed after it — the
-    /// Baron, the smith, the tailor, the fletcher, the miner, the woodsman — unserved for good: a veto nobody could see.
-    /// </para>
-    /// </summary>
-    /// <param name="post">The post asked for, or null.</param>
-    /// <param name="passOver">A class the caller will not raise, or null to take the first short post.</param>
     public static BotClass Wanting(out string post, Func<BotClass, bool> passOver = null)
     {
         post = null;
@@ -405,7 +324,6 @@ public static class BotCritical
         return null;
     }
 
-    /// <summary>For the <c>Rest:</c> line: every post as present/floor, which are short and why, and the session's counts.</summary>
     public static string Describe()
     {
         if (!Running)

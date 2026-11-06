@@ -6,28 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The duke: what two guilds' envoys say before the witness, the facts the duke is given, the answers he may give, the rule
-/// that answers when the model cannot, and what each answer does.
-///
-/// <para>
-/// <b>Patrick's words of 29.09.2026: the envoys state their claims, and the one who decides is prompted "you are the duke of
-/// this land; your vassals quarrel over land: one says the other attacks it too often, the other that the first crosses its
-/// borders; the first takes the reward from the second's fighters but does it on its own land" — nothing grand, but so the
-/// world comes alive.</b> The model is the duke and is asked through a hook the thinking assembly fills
-/// (<see cref="BotParley.Judge"/>); what it is told is written here, from what the shard actually knows — each side's book of
-/// grievances (<see cref="BotGrievances"/>), their opinions, their strength, their ground, their agreements and wars — and what
-/// it may answer is an enumeration narrowed per topic (<see cref="Allowed"/>), so a duke cannot give an alliance to a pair that
-/// came to declare war, nor a war to a pair that came to trade. DECISIONS N2: narrow the enumeration instead of persuading.
-/// </para>
-///
-/// <para>
-/// <b>The rule is not a lesser duke, it is the same judgement in arithmetic.</b> Ollama may be off, the one slot may be held
-/// by a reflection for seven minutes, or the answer may be unreadable; the meeting must still end, and end the same way the
-/// facts point. So <see cref="Rule"/> reads the same book the model is shown: blood, a claim on the hall's own ground or a
-/// grievance both ways is war; a quarrel of trespass and borders between guilds that trade is trade terms; the rest is peace.
-/// </para>
-/// </summary>
 public static class BotDuke
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDuke));
@@ -44,21 +22,14 @@ public static class BotDuke
 
     public const string Nothing = "nothing";
 
-    /// <summary>Every outcome a meeting between two guilds can have, in the order they are offered.</summary>
     public static readonly string[] Outcomes = [War, Peace, Trade, Orders, Alliance, Nothing];
 
-    /// <summary>
-    /// How many trades between the two (both books together) make a quarrel the rule settles with trade terms rather than a
-    /// bare peace. Three: a pair that has bought off each other's stalls three times since the last settlement is trading.
-    /// </summary>
     public static int TradesForTerms { get; set; } = 3;
 
-    /// <summary>Verdicts, by who gave them.</summary>
     public static long ByModel { get; private set; }
 
     public static long ByRule { get; private set; }
 
-    /// <summary>Verdicts by outcome.</summary>
     private static readonly Dictionary<string, long> _outcomes = new(StringComparer.Ordinal);
 
     public static string Word(BotTopic topic) =>
@@ -71,11 +42,6 @@ public static class BotDuke
             _ => "the town's favour"
         };
 
-    /// <summary>
-    /// What the duke may answer on this topic, between these two, now. An alliance only when both have room for one
-    /// (<c>BotRegard.MostAllies</c>); nothing on a grievance, because a pair at the war line that the duke sends home unsettled
-    /// is back at his door at the next drift.
-    /// </summary>
     public static string[] Allowed(BotTopic topic, Guild guest, Guild host)
     {
         var room = guest != null && host != null
@@ -91,7 +57,6 @@ public static class BotDuke
         };
     }
 
-    /// <summary>What an outcome does, in the duke's brief: the mechanism, in words, so the choice is made knowing its price.</summary>
     public static string Means(string outcome) =>
         outcome switch
         {
@@ -103,13 +68,6 @@ public static class BotDuke
             _ => $"nothing: no agreement; they may come before you again in {BotParley.RetryMs / 60000} minutes"
         };
 
-    // ---- the hearing -------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// The lines of the hearing, in order: the witness opens, the envoy states its case from its book, the host answers from
-    /// its own (or the witness says the host sent nobody), and the witness says the duke will weigh it. Every line comes out
-    /// of the phrase bank (<c>bot-voice.json</c>, keys <c>parley:*</c>), so the words can be changed without the code.
-    /// </summary>
     public static void Hearing(BotHearing m)
     {
         m.Lines.Clear();
@@ -152,7 +110,7 @@ public static class BotDuke
         }
         else if (m.Topic is BotTopic.Grievance or BotTopic.Safety)
         {
-            // What the host holds against the guest, from its own book: the other half of the quarrel.
+
             Causes(m, BotSpeaker.Host, m.Host, m.Guest, "parley:deny", fill, false);
         }
         else
@@ -163,10 +121,6 @@ public static class BotDuke
         m.Lines.Add((BotSpeaker.Witness, Phrase("parley:await", m.Witness, fill)));
     }
 
-    /// <summary>
-    /// Up to two lines from one side's book: its worst causes (or its best, for a proposal), each in its own phrase; the
-    /// fallback line when the book is empty.
-    /// </summary>
     private static void Causes(BotHearing m, BotSpeaker who, string of, string about, string fallback, Dictionary<string, string> fill, bool best)
     {
         var book = BotGrievances.Of(of, about);
@@ -209,7 +163,6 @@ public static class BotDuke
         }
     }
 
-    /// <summary>The placeholders every meeting line may use.</summary>
     public static Dictionary<string, string> Fill(BotHearing m) =>
         new()
         {
@@ -222,16 +175,9 @@ public static class BotDuke
             ["envoy"] = m.Envoy?.Name ?? "the envoy"
         };
 
-    /// <summary>A line of the phrase bank, or the key's own fallback text when the bank has none.</summary>
     public static string Phrase(string key, Mobile who, Dictionary<string, string> fill) =>
         BotVoice.Phrase(key, null, who, fill) ?? key;
 
-    // ---- the brief ---------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// What the duke is told, from the shard's own records, in plain lines. Bounded by what it holds: two guilds, two books,
-    /// two opinions, their strength and ground, what stands between them, and what was said.
-    /// </summary>
     public static string Brief(BotHearing m)
     {
         var guest = BotGuilds.Named(m.Guest);
@@ -264,7 +210,6 @@ public static class BotDuke
         return b.ToString();
     }
 
-    /// <summary>One guild as the duke is told of it: its size, its might, its town, its land, its hall, its wars and its ally.</summary>
     private static string Side(string name, Guild guild)
     {
         var members = 0;
@@ -311,7 +256,6 @@ public static class BotDuke
         return said.Count == 0 ? "none" : string.Join(", ", said);
     }
 
-    /// <summary>What one speaker said at the hearing, joined.</summary>
     public static string Said(BotHearing m, BotSpeaker who)
     {
         List<string> said = [];
@@ -327,11 +271,6 @@ public static class BotDuke
         return said.Count == 0 ? "nothing" : string.Join(" ", said);
     }
 
-    // ---- the rule ------------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// The verdict the facts point to, when the model cannot give one. See the class: the same book, read as arithmetic.
-    /// </summary>
     public static BotVerdict Rule(BotHearing m, string because)
     {
         var fill = Fill(m);
@@ -419,12 +358,6 @@ public static class BotDuke
         };
     }
 
-    // ---- the word carried out -------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// Carries the verdict out, and says in <see cref="BotHearing.Ending"/> what came of it. War is asked of the war's own rules
-    /// once more: they may have changed since the grievance called the meeting, and a duke's word does not overrule them.
-    /// </summary>
     public static void Apply(BotHearing m)
     {
         var v = m.Verdict;
@@ -461,8 +394,6 @@ public static class BotDuke
                         return;
                     }
 
-                    // <b>An ultimatum before the war (07.10.2026).</b> A guest twice the host's might or more demands tribute instead,
-                    // and a host whose chest can pay it pays: the meeting ends in tribute, not war. See BotTribute.Demand.
                     if (BotTribute.Demand(guest, host, m.Why, out var terms))
                     {
                         m.Ending = terms;
@@ -527,7 +458,6 @@ public static class BotDuke
         }
     }
 
-    /// <summary>Counts a verdict by who gave it.</summary>
     public static void Given(bool byModel)
     {
         if (byModel)
@@ -560,10 +490,6 @@ public static class BotDuke
         _outcomes.Clear();
     }
 
-    /// <summary>
-    /// The lines of the meetings, written into the phrase bank for every key the file does not already carry — so a word
-    /// changed in <c>bot-voice.json</c> wins, and a key it lacks still speaks.
-    /// </summary>
     public static void Phrases()
     {
         Dictionary<string, string[]> bank = new(StringComparer.OrdinalIgnoreCase)

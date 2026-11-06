@@ -12,34 +12,12 @@ using System.Threading;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The pictures the live window draws its scene with, decoded from the client's own files on the listener's threads and
-/// kept (02.10.2026: "the picture straight from the game").
-///
-/// <para>
-/// <b>Never on the game loop.</b> Every route here runs on the thread that took the request; it reads the client's files
-/// through <see cref="BotArtFiles"/> and the server's tiledata table, which is loaded at boot and never written again. The
-/// world is not touched. A decoded picture is kept as PNG bytes in a bounded cache (the oldest asked-for goes first), and
-/// the browser is told to keep it for a week: the page puts the files' fingerprint in every address, so a patched client
-/// gets new addresses rather than stale pictures.
-/// </para>
-///
-/// <para>
-/// The routes: <c>/api/art/land/ID.png</c> (the 44 by 44 diamond), <c>/api/art/tex/ID.png</c> (the land's texture, for
-/// slopes), <c>/api/art/static/ID.png?hue=H</c> (a static or item through its hue), <c>/api/art/tiledata</c> (heights and the
-/// flags the draw order needs), <c>/api/anim/BODY/DIR.png?hue=H&amp;a=stand|war|war2|ride|die</c> (one frame of a body),
-/// <c>/api/anim/item/ITEM/DIR.png?body=B&amp;hue=H&amp;a=…</c> (what a worn or ridden item looks like on that body) and
-/// <c>/api/anim/BODY/meta</c>. Every picture says where it stands in <c>X-Anchor: x,y</c>.
-/// </para>
-/// </summary>
 public static class BotWebArt
 {
-    /// <summary>Most pictures kept, and most bytes.</summary>
+
     public static int MostKept { get; set; } = 4096;
 
     public static long MostKeptBytes { get; set; } = 96L * 1024 * 1024;
-
-    // ---- the counts /api/health prints ------------------------------------------------------------------------
 
     public static long Decoded => Interlocked.Read(ref _decoded);
 
@@ -53,8 +31,6 @@ public static class BotWebArt
     private static long _hits;
     private static long _missing;
     private static long _evicted;
-
-    // ---- the cache ----------------------------------------------------------------------------------------------
 
     private sealed class Kept
     {
@@ -71,7 +47,6 @@ public static class BotWebArt
     private static readonly LinkedList<Kept> _order = [];
     private static long _bytes;
 
-    /// <summary>The fingerprint the page puts in its addresses: the files' and this code's.</summary>
     public static string Version => "1" + (BotArtFiles.Instance?.Stamp ?? "none");
 
     private static Kept Get(string key, Func<BotSprite> decode)
@@ -88,8 +63,6 @@ public static class BotWebArt
             }
         }
 
-        // Decoded outside the lock: two threads asking for the same new picture at once both decode it, which is cheaper
-        // than making every other picture wait behind one.
         var started = Stopwatch.GetTimestamp();
         BotSprite sprite = null;
 
@@ -99,7 +72,7 @@ public static class BotWebArt
         }
         catch
         {
-            // A damaged entry is a missing picture, not a broken page.
+
         }
 
         var kept = new Kept { Key = key };
@@ -152,9 +125,6 @@ public static class BotWebArt
         return kept;
     }
 
-    // ---- the routes ---------------------------------------------------------------------------------------------
-
-    /// <summary>Answers anything under <c>/api/art/</c> and <c>/api/anim/</c>. The listener's thread; files only.</summary>
     public static void Serve(HttpListenerRequest request, HttpListenerResponse response, string path)
     {
         if (!BotWebLive.Enabled || !BotWebLive.Picture)
@@ -175,7 +145,7 @@ public static class BotWebArt
 
         var query = request.QueryString;
         var hue = Number(query["hue"]);
-        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries); // api, art|anim, ...
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
         if (parts.Length == 3 && parts[1] == "art" && parts[2] == "tiledata")
         {
@@ -211,7 +181,6 @@ public static class BotWebArt
         {
             var pose = Pose(query["a"]);
 
-            // /api/anim/BODY/meta: the eight directions' sizes and anchors, for a reader that cannot see headers.
             if (parts.Length == 4 && Id(parts[2], out var metaBody) && parts[3] == "meta")
             {
                 Text(response, 200, Meta(files, metaBody, hue, pose), "public, max-age=604800");
@@ -219,7 +188,6 @@ public static class BotWebArt
                 return;
             }
 
-            // /api/anim/BODY/DIR.png
             if (parts.Length == 4 && Id(parts[2], out var body) && Id(parts[3], out var dir))
             {
                 Picture(response, Get($"a{body}:{dir & 7}:{hue}:{(int)pose}", () => files.Anim(body, dir & 7, hue, pose)));
@@ -227,7 +195,6 @@ public static class BotWebArt
                 return;
             }
 
-            // /api/anim/item/ITEM/DIR.png?body=B: a worn or ridden item drawn as the client draws it on that body.
             if (parts.Length == 5 && parts[2] == "item" && Id(parts[3], out var item) && Id(parts[4], out var itemDir))
             {
                 var wearer = Number(query["body"]);
@@ -241,7 +208,6 @@ public static class BotWebArt
                     return;
                 }
 
-                // A partial hue by tiledata is asked for with the top bit, as the client's own hue numbers do.
                 if (item < 0x10000 && Server.TileData.ItemTable[item][TileFlag.PartialHue] && drawHue != 0)
                 {
                     drawHue |= 0x8000;
@@ -277,7 +243,6 @@ public static class BotWebArt
         var dot = part.IndexOf('.');
         var text = dot >= 0 ? part[..dot] : part;
 
-        // ASCII digits only, and a number that parses: "99999999999" or "1abc" is no picture, not picture 0.
         if (text.Length == 0 || !char.IsAsciiDigit(text[0]))
         {
             id = 0;
@@ -320,11 +285,6 @@ public static class BotWebArt
         return buffer.Append("]}").ToString();
     }
 
-    /// <summary>
-    /// The server's tiledata as the page needs it for the draw order and the roofs: for each item a height and a flags byte
-    /// (1 background, 2 surface, 4 foliage, 8 roof, 16 transparent, 32 wall, 64 bridge, 128 partial hue), and for each land
-    /// tile whether it has a texture to stretch. Whole, as base64, or for <c>?ids=</c> as readable JSON.
-    /// </summary>
     private static string TileData(string ids)
     {
         var files = BotArtFiles.Instance;
@@ -470,10 +430,6 @@ public static class BotWebArt
 
     private static readonly JsonWriterOptions Relaxed = new() { Indented = false, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-    /// <summary>
-    /// An object written without escaping '+', so base64 stays base64 rather than growing by a sixth in <c>+</c>s. For
-    /// JSON read by a script, never pasted into HTML.
-    /// </summary>
     internal static string PlainObject(Action<Utf8JsonWriter> write)
     {
         var buffer = new System.Buffers.ArrayBufferWriter<byte>(4096);
@@ -488,9 +444,6 @@ public static class BotWebArt
         return Encoding.UTF8.GetString(buffer.WrittenSpan);
     }
 
-    // ---- PNG --------------------------------------------------------------------------------------------------
-
-    /// <summary>An 8-bit RGBA PNG, rows filtered by their left neighbour, which suits pictures with long runs of one colour.</summary>
     public static byte[] Png(int width, int height, uint[] argb)
     {
         using var png = new MemoryStream(width * height + 128);
@@ -512,7 +465,7 @@ public static class BotWebArt
 
                 for (var y = 0; y < height; y++)
                 {
-                    row[0] = 1; // Sub
+                    row[0] = 1;
                     uint left = 0;
 
                     for (var x = 0; x < width; x++)
@@ -583,8 +536,6 @@ public static class BotWebArt
     }
 
     private static byte[] Big(uint value) => [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
-
-    // ---- what it costs ------------------------------------------------------------------------------------------
 
     public static void Health(Utf8JsonWriter w)
     {

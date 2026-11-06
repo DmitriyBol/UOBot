@@ -2,21 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Making things, as a module.
-///
-/// <para>
-/// <see cref="BotPhase.World"/> and requires <c>Classes</c>, <c>Will</c> and <c>Shops</c> — the last because
-/// the chain begins at a counter: a crafter with no way to buy cloth is a crafter with an opinion about
-/// cloth.
-/// </para>
-///
-/// <para>
-/// <b>This is the module that makes the market a market.</b> Mining puts metal out; nothing bought it,
-/// because nothing needed it. Sewing is the first trade that <em>buys</em> — and the moment a smith's chain
-/// exists, the same shape turns a miner's ingots into somebody's input rather than somebody's pile.
-/// </para>
-/// </summary>
 public sealed class BotCraftModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCraftModule));
@@ -31,49 +16,28 @@ public sealed class BotCraftModule : BotModule
     {
         BotCraftConfig.Load();
 
-        // What the craft system says to a bot that has no client to read it. See BotCraftEar.
         BotCraftEar.Listen();
 
         BotWill.Offer(new BotTailor());
 
-        // Iron into things, and the board's orders before anything speculative. Until this the whole mining
-        // chain ended at a bank box: nothing on the shard could turn an ingot into an object.
         BotWill.Offer(new BotSmith());
 
-        // Iron into tools: the pickaxes, hatchets, hammers and kits every other trade wears out, which until
-        // 28.09.2026 were the one thing on this shard no bot ever made. See BotTinkering.
         BotWill.Offer(new BotTinkerer());
 
-        // Bows out of the island's own logs: the last weapon nobody made. Patrick's sixth point of 29.09.2026. See BotBowyer.
         BotWill.Offer(new BotBowyer());
 
-        // Cloth and bandages out of the island's sheep: the tailors' cloth and everybody's bandages were the two things most
-        // bought over counters (334 of 435 in twenty-five minutes of build 282). See BotWeave.
         BotWill.Offer(new BotWeaver());
 
-        // Wood and feathers into arrows. Until this, arrows were the one consumable on this shard with no
-        // source at all: the population was born with about nineteen hundred between thirteen shooters, the
-        // provisioner keeps twenty at a time, and the rest of the supply was archers picking their own spent
-        // shafts up off the ground one and two at a time. See BotFletching.
         BotWill.Offer(new BotFletcher());
 
-        // The fletcher's feathers go out at a gold. See BotMarket.Staple.
         BotMarket.Staple(typeof(Server.Items.Feather));
 
-        // Herbs and glass into bottles. Three classes have asked for Alchemy at a hundred since the day they
-        // were written, every one of them carries a mortar and pestle issued on the strength of it, and until
-        // now nothing anywhere could brew a thing. See BotFlask.
         BotWill.Offer(new BotAlchemist());
 
-        // The shortest chain on the shard: a carcass, a skillet, a supper. No place, no fire, no walk.
-        // See BotOven, and BotMeal for what eating one does.
         BotWill.Offer(new BotCook());
 
-        // The first steps of a trade, bought from a shopkeeper who knows it. See BotTutor: nobody could start cooking.
         BotWill.Offer(new BotTutor());
 
-        // A crafter's own material out of its own bank box for an order it passed over, before it digs (03.10.2026, econ13; Patrick:
-        // "a crafter makes the order first, then goes to mine"). The auction's half of the rule is in BotWill. See BotCraftFirst.
         BotWill.Offer(new BotCraftFirst());
 
         logger.Information(
@@ -119,7 +83,7 @@ public sealed class BotCraftModule : BotModule
 
     public override void Reset()
     {
-        // The looms and the pastures hold references into the world that was just unloaded; the weaver's counters are its own.
+
         BotLooms.Forget();
         BotPastures.Forget();
         BotWeaver.Forget();

@@ -4,23 +4,10 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A rune-mage buying blank runes where the engine sells them — a mage's shop, at fifteen gold — with its guild's money when
-/// its own will not stretch to it.
-///
-/// <para>
-/// <b>The blank is the currency of the whole mechanism.</b> A mark spends one, and so does every copy the library lends
-/// (<see cref="BotRuneLibrary"/>), so a guild whose mages carry none marks nothing and spreads nothing. The purchase is
-/// funded as a delve's supplies are (<see cref="BotProvision.Fund"/>): the mage's own purse, then the guild's chest, then
-/// its guildmates. The runes bought are the mage's own — kept through death, weightless, never sold — or the unloading
-/// would put them back on the market on the walk home.
-/// </para>
-/// </summary>
 public sealed class BotRuneBuy : BotDeed
 {
     public const string Trade = "blanks";
 
-    /// <summary>What a trip for blanks is reckoned at a minute. Twelve, a restock's: an errand, not a trade.</summary>
     public static double Prior { get; set; } = 12.0;
 
     public static long Undertaken { get; private set; }
@@ -107,7 +94,6 @@ public sealed class BotRuneBuy : BotDeed
 
         Bought += got;
 
-        // The runes just bought are the mage's own, before the unloading can reach them.
         foreach (var rune in body.Backpack.FindItemsByType<RecallRune>())
         {
             if (rune is { Deleted: false, Marked: false } && !BotBinding.IsBound(rune, body.Bond))
@@ -128,10 +114,9 @@ public sealed class BotRuneBuy : BotDeed
     }
 }
 
-/// <summary>Offers a rune-mage short of blanks a trip to the nearest shop that sells them. See <see cref="BotRuneBuy"/>.</summary>
 public sealed class BotRuneBuyer : IBotProposer
 {
-    /// <summary>How long a mage that failed to buy blanks is left alone before it is offered the trip again. Ten minutes.</summary>
+
     public static int RestMs { get; set; } = 600000;
 
     public static long Asked { get; private set; }
@@ -152,7 +137,6 @@ public sealed class BotRuneBuyer : IBotProposer
 
     public BotStanding Rung => BotStanding.Free;
 
-    /// <summary>A trip that failed rests the offer for <see cref="RestMs"/>: an empty purse or an empty shelf is not mended by asking again.</summary>
     public static void Rest(Mobile body)
     {
         if (body != null)
@@ -182,7 +166,6 @@ public sealed class BotRuneBuyer : IBotProposer
             return null;
         }
 
-        // A rune is for marking and for copies; a mage that can cast none of the three has no use for one yet.
         if (!BotRunes.Knows(body, BotRunes.Mark) && !BotRunes.Knows(body, BotRunes.Recall) && !BotRunes.Knows(body, BotRunes.Gate))
         {
             NoSpell++;

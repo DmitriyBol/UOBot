@@ -4,34 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Friendships and feuds between two bots, as one number each way: what this bot thinks of that one, from −100 to +100.
-///
-/// <para>
-/// <b>Patrick's idea of 07.10.2026: "personal friendships and feuds between bots — the one who saved you is a friend who
-/// answers your cry first; the one who killed you in a war is a personal enemy you seek out for a duel".</b> Fed only by
-/// things that happened between the two, each from the hook where it happens: saved from a creature (+<see cref="Saved"/>,
-/// and the rescuer +<see cref="Saver"/> back), raised where it fell (+<see cref="RaisedBy"/>), healed (+<see cref="Healed"/>),
-/// a kill side by side in one company (+<see cref="Beside"/> each way), a fair sale hand to hand (+<see cref="Traded"/> each
-/// way); killed in a war (<see cref="WarKilled"/>), murdered or robbed (<see cref="Murdered"/>), made to pay under threat
-/// (<see cref="Extorted"/>). A duel fought out settles a feud (+<see cref="Settled"/> each way).
-/// </para>
-///
-/// <para>
-/// <b>Everything decays, slowly, in the shard's running time</b>: every <see cref="DecayEveryMs"/> each regard moves
-/// <see cref="DecayShare"/> of the way to nought (at least <see cref="DecayLeast"/>); a grudge decays at half that pace in a
-/// vindictive bot and twice it in a forgiving one. A regard under one is forgotten. At most <see cref="MostTies"/> ties a bot,
-/// the strongest kept: a new one that is weaker than all twelve is not written.
-/// </para>
-///
-/// <para>
-/// <b>What the ties change, each counted.</b> A friend (either way at <see cref="FriendAt"/> or more) is ranked before
-/// everybody else when a dire cry picks who goes (<c>BotCry.Summon</c>) and when a mood line picks who answers
-/// (<c>BotSocial.Heard</c>). An enemy (this bot's regard at <see cref="DuelAt"/> or less) may be sought out and challenged to a
-/// duel (<see cref="BotGrudge"/>), and a bot that thinks <see cref="SpurnAt"/> or less of a speaker does not answer its mood.
-/// Public <see cref="Regard(Mobile, Mobile)"/> is what the guild elections read.
-/// </para>
-/// </summary>
 public static class BotTies
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTies));
@@ -42,10 +14,8 @@ public static class BotTies
 
     public static double FriendAt { get; set; } = 40.0;
 
-    /// <summary>This bot's regard at which another is a personal enemy it may challenge. −60.</summary>
     public static double DuelAt { get; set; } = -60.0;
 
-    /// <summary>This bot's regard at which it will not answer the other's mood line. −30.</summary>
     public static double SpurnAt { get; set; } = -30.0;
 
     public static double Saved { get; set; } = 45.0;
@@ -76,7 +46,6 @@ public static class BotTies
 
     public static double DecayLeast { get; set; } = 0.2;
 
-    /// <summary>How many tiles a friend is moved up the list of who goes to a cry: every friend in reach before anybody else.</summary>
     public static int FriendPull { get; set; } = 1000;
 
     public static long Formed { get; private set; }
@@ -101,28 +70,20 @@ public static class BotTies
 
     private static bool _decaySeen;
 
-    /// <summary>What <paramref name="a"/> thinks of <paramref name="b"/>, rounded; nought when it does not know it. Public for BotPolitics.</summary>
     public static int Regard(Mobile a, Mobile b) =>
         a == null || b == null || ReferenceEquals(a, b) ? 0 : Regard(a.Name, b.Name);
 
-    /// <summary>What the bot named <paramref name="a"/> thinks of the one named <paramref name="b"/>.</summary>
     public static int Regard(string a, string b) =>
         (int)Math.Round(BotLives.Find(a)?.Tie(b)?.Regard ?? 0.0);
 
     private static double Exact(Mobile a, Mobile b) =>
         a == null || b == null ? 0.0 : BotLives.Find(a.Name)?.Tie(b.Name)?.Regard ?? 0.0;
 
-    /// <summary>Whether the two are friends: either thinks <see cref="FriendAt"/> or more of the other.</summary>
     public static bool Friends(Mobile a, Mobile b) =>
         On && a is BotMobile && b is BotMobile && !ReferenceEquals(a, b) && (Exact(a, b) >= FriendAt || Exact(b, a) >= FriendAt);
 
-    /// <summary>Whether <paramref name="a"/> counts <paramref name="b"/> a personal enemy.</summary>
     public static bool Enemy(Mobile a, Mobile b) => On && Exact(a, b) <= DuelAt;
 
-    /// <summary>
-    /// Moves what <paramref name="a"/> thinks of <paramref name="b"/> by <paramref name="by"/>, writing the tie if there is none
-    /// and room for it, and saying so when a friend or an enemy is made.
-    /// </summary>
     public static BotTie Move(Mobile a, Mobile b, double by, string why)
     {
         if (!On || a is not BotMobile || b is not BotMobile || ReferenceEquals(a, b) || by == 0.0)
@@ -143,7 +104,7 @@ public static class BotTies
         {
             if (life.Ties.Count >= Math.Max(1, MostTies))
             {
-                // The weakest goes, if the new one is stronger than it; otherwise the new one is not written.
+
                 var weakest = 0;
 
                 for (var i = 1; i < life.Ties.Count; i++)
@@ -192,20 +153,14 @@ public static class BotTies
         return tie;
     }
 
-    /// <summary>Both ways at once, for what both chose: a sale, a fight side by side, a duel fought out.</summary>
     public static void Mutual(Mobile a, Mobile b, double by, string why)
     {
         Move(a, b, by, why);
         Move(b, a, by, why);
     }
 
-    /// <summary>
-    /// Where a helper stands in the order a dire cry is answered: its distance, less <see cref="FriendPull"/> for a friend of the
-    /// crier, so every friend in reach goes before anybody else and the nearest friend first. See <c>BotCry.Summon</c>.
-    /// </summary>
     public static int CryRank(Mobile helper, Mobile crier, int off) => Friends(helper, crier) ? off - FriendPull : off;
 
-    /// <summary>A bot pressed to a dire cry: counted, and counted again when it went as a friend.</summary>
     public static void Answered(Mobile helper, Mobile crier)
     {
         CriesAnswered++;
@@ -220,7 +175,6 @@ public static class BotTies
         logger.Information("{Helper} answers its friend {Crier}'s cry first: regard {Regard} and {Back} back", helper?.Name, crier?.Name, Regard(helper, crier), Regard(crier, helper));
     }
 
-    /// <summary>The same order for who answers a mood line, in the social layer's units (tiles as a double). See <c>BotSocial.Heard</c>.</summary>
     public static double SocialRank(Mobile speaker, Mobile near, double distance, bool count = true)
     {
         if (!Friends(speaker, near))
@@ -236,7 +190,6 @@ public static class BotTies
         return distance - FriendPull;
     }
 
-    /// <summary>Whether <paramref name="near"/> thinks too little of <paramref name="speaker"/> to answer its mood. Counted.</summary>
     public static bool Spurns(Mobile near, Mobile speaker)
     {
         if (!On || Exact(near, speaker) > SpurnAt)
@@ -249,7 +202,6 @@ public static class BotTies
         return true;
     }
 
-    /// <summary>The strongest friend and the worst enemy of a bot, by name, for a tale and for the page.</summary>
     public static (BotTie Friend, BotTie Enemy) Strongest(BotLife life)
     {
         BotTie friend = null;
@@ -278,10 +230,6 @@ public static class BotTies
         return (friend, enemy);
     }
 
-    /// <summary>
-    /// Every regard a little nearer nought, on the module's clock, every <see cref="DecayEveryMs"/>; a grudge at half pace in a
-    /// vindictive bot and twice it in a forgiving one. Returns how many were forgotten.
-    /// </summary>
     public static int Decay(long now)
     {
         if (!_decaySeen)
@@ -335,7 +283,6 @@ public static class BotTies
         return forgotten;
     }
 
-    /// <summary>Pairs standing as friends and as enemies across the population, one way each.</summary>
     public static (int Friends, int Enemies, int Ties) Census()
     {
         var friends = 0;

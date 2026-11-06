@@ -2,20 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Squads as a module: reads its numbers, starts the squads' own beat, and clears the board on a world reload.
-///
-/// <para>
-/// <see cref="BotPhase.World"/>, because a station is a point on the map and there is no map before the world
-/// loads. Requires <c>Classes</c> — a formation is an ordering of roles, and a role is a fact about a class.
-/// </para>
-///
-/// <para>
-/// Its switch is worth having for the same reason movement's is. Half the first version's investigations were
-/// the question "is this the group system or is the group system covering for something else", and the honest
-/// answer took an evening of watching. Turned off, every bot acts alone and everything else runs.
-/// </para>
-/// </summary>
 public sealed class BotSquadModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSquadModule));
@@ -31,19 +17,12 @@ public sealed class BotSquadModule : BotModule
         BotSquadConfig.Load();
         BotSquads.Start();
 
-        // The captain's offer. Registered here rather than with the hunt's proposers because a patrol is a
-        // company before it is a fight: without squads running it can never be taken up, and this is the
-        // module that knows whether they are.
         BotWill.Offer(new BotPatrol());
 
-        // And the way into a company that is already fighting. Until this, a squad could only be joined in
-        // the second it was formed — see BotEnlist.
         BotWill.Offer(new BotEnlister());
 
-        // Any fighter's company for a square where bots lately died (02.10.2026, Patrick's order). See BotClearer.
         BotWill.Offer(new BotClearer());
 
-        // The resurrection scroll a caster carries for the one of its company that falls (02.10.2026). See BotRaise.
         BotWill.Offer(new BotLifeline());
 
         logger.Information(
@@ -89,10 +68,6 @@ public sealed class BotSquadModule : BotModule
         );
     }
 
-    /// <summary>
-    /// A world reload is a different world, and every squad in the old one was made of bots that no longer
-    /// exist.
-    /// </summary>
     public override void Reset()
     {
         logger.Information("Squads, before the reload: {State}", BotSquads.Describe());

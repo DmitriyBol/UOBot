@@ -4,99 +4,39 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Work one bot keeps failing for the same reason is not offered to that bot for a while.
-///
-/// <para>
-/// <b>The defect this project has met more often than any other, closed once rather than one instance at a time.</b>
-/// A deed fails and the same deed is offered to the same bot at the next review, because nothing between the failure
-/// and the choice remembers it: the proposer does not ask the question the deed fails on, the note is written where no
-/// chooser reads it, or the work is unpaid and learns nothing. <c>DECISIONS.md</c> C1 records thirty-five of them since
-/// 15.08.2026 - the guild's hire failed 4,365 times in 43 minutes on the night of 14.09.2026 and Hale's restock 8,719
-/// times in half an hour that evening - each found by its symptom and each mended inside its own proposer.
-/// </para>
-///
-/// <para>
-/// <b>Keyed on the reason as well as the kind.</b> A hunter that loses one skeleton and then another has failed twice
-/// for two reasons and is not in a loop; a bot told "the pack would not hold the 32gp it drew to pay with" six times in
-/// five minutes is. Reasons are compared with their numbers taken out, so "could not raise 1252gp" and "could not raise
-/// 1260gp" are one reason. Replayed over every session log of 14.09.2026 before this was written, six in five minutes
-/// stopped every loop of that day - 48,287 of the 54,409 failures of the afternoon session, 9,559 of the 9,937 of the
-/// night's hire session - and tripped at most once in a session with no loop in it.
-/// </para>
-///
-/// <para>
-/// <b>Only failures that produced nothing, which is the test the ledger already takes.</b> <c>BotWill.Settle</c> writes
-/// <c>Beware</c> only when a failure's takings are nought or less, because a great many endings called failures did the
-/// work - a tool worn through, a seam emptied, a shelf run out. Counted here regardless, the breaker would rest the one
-/// trade a scribe is paid for: Ilsa ended eight inscriptions "nothing to write with" in build 41's first half hour, seven
-/// of them carrying scrolls worth up to 449. Replayed over the twenty-four session logs of 14.09.2026 both ways, the loops
-/// stopped are the same ones - 48,280 failures prevented against 48,287 in the afternoon, 9,548 against 9,559 in the hire
-/// session - and the seven trips that go were on errands that earned something on the way.
-/// </para>
-///
-/// <para>
-/// <b>A backstop, not a repair, so it speaks every time it trips.</b> A rule that quietly rests a failing kind of work
-/// is a rule that hides the defect under it. Each trip is a log line naming the bot, the work and the reason, and the
-/// counts are in the Will line; the loop it stopped still has to be found and mended where it starts.
-/// </para>
-/// </summary>
 public static class BotBreaker
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBreaker));
 
-    /// <summary>Whether the breaker trips at all. Off, work is offered exactly as it was before this existed.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>Failures of one kind of work, for one reason, that trip the breaker when they fall inside <see cref="WindowMs"/>.</summary>
     public static int Failures { get; set; } = 6;
 
-    /// <summary>How close together those failures have to fall. Five minutes.</summary>
     public static int WindowMs { get; set; } = 300000;
 
-    /// <summary>How long a tripped kind is rested the first time. Doubled at every trip until the bot finishes that work once.</summary>
     public static int RestMs { get; set; } = 300000;
 
-    /// <summary>The longest rest, however many times the breaker has tripped. Forty minutes.</summary>
     public static int LongestRestMs { get; set; } = 2400000;
 
-    /// <summary>Times the breaker tripped.</summary>
     public static long Trips { get; private set; }
 
-    /// <summary>
-    /// Failures that trip the breaker for a reason of the "no way / no room" family (<see cref="Hard"/>) when they fall inside
-    /// <see cref="HardWindowMs"/>. Two (06.10.2026, work17): such a reason is a fact about the place or the pack, and the next
-    /// offer in the same second meets it again. On build 410 16 bursts of three or more failures in two seconds held 78 of the
-    /// 598 bad endings (13 %): unload "no way" out of the Orc Caves 19, restock "no room in the pack" 17, scout "only 1 would
-    /// come" 12, restock "would not hold the coin" 9. The six the breaker allowed were paid in full each time.
-    /// </summary>
     public static int HardFailures { get; set; } = 2;
 
-    /// <summary>How close together the hard failures must fall. One minute: a burst, not a day's bad luck.</summary>
     public static int HardWindowMs { get; set; } = 60000;
 
-    /// <summary>Of <see cref="Trips"/>, those tripped at <see cref="HardFailures"/> for a reason of the hard family.</summary>
     public static long HardTrips { get; private set; }
 
-    /// <summary>Whether a failure's reason says the place or the pack refuses: no way, no room, a pack that would not take or hold, an offer nobody came to.</summary>
     public static bool Hard(string why) =>
         !string.IsNullOrEmpty(why)
         && (why.Contains("no way", StringComparison.Ordinal) || why.Contains("no room", StringComparison.Ordinal)
             || why.Contains("pack would not", StringComparison.Ordinal) || why.Contains("would come", StringComparison.Ordinal));
 
-    /// <summary>Flights that tripped the breaker and were not rested, because running away never is.</summary>
     public static long Spared { get; private set; }
 
-    /// <summary>Offers refused because their kind was resting for that bot. Counts appraisals, not decisions.</summary>
     public static long Refused { get; private set; }
 
-    /// <summary>Rests lifted early because the bot finished that kind of work after all.</summary>
     public static long Forgiven { get; private set; }
 
-    /// <summary>
-    /// Failures kept from the breaker because the work had made goods or skill before it failed. Counted by the
-    /// caller, <c>BotWill</c>, which is where the takings are; here so that the two numbers print side by side.
-    /// </summary>
     public static long Excused { get; set; }
 
     private sealed class Trail
@@ -127,10 +67,8 @@ public static class BotBreaker
 
     private static readonly Dictionary<(Serial Bot, string Kind), Record> _records = [];
 
-    /// <summary>Failures since the alarm last asked, by bot, kind and reason, with a name and a sentence for each. See <see cref="Loudest"/>.</summary>
     private static readonly Dictionary<(Serial Bot, string Kind, ulong Reason), (string Name, string Why, int Count)> _tally = [];
 
-    /// <summary>Every failure counted into the tally since the alarm last asked.</summary>
     private static int _tallied;
 
     private static readonly List<(Serial Bot, string Kind, ulong Reason)> _staleTrails = [];
@@ -141,41 +79,16 @@ public static class BotBreaker
 
     private static long _sweptTick;
 
-    /// <summary>
-    /// A deed of this kind has just failed for this bot, for this reason. Trips the breaker on the failure that makes
-    /// <see cref="Failures"/> inside <see cref="WindowMs"/> since the bot last finished the same work.
-    /// </summary>
-    /// <summary>Deaths at one kind of work that rest it, inside <see cref="DeathWindowMs"/>. See <see cref="Fell"/>.</summary>
     public static int DeathsToRest { get; set; } = 2;
 
-    /// <summary>How close together those deaths have to fall. Thirty minutes.</summary>
     public static int DeathWindowMs { get; set; } = 1800000;
 
-    /// <summary>
-    /// How long work a bot died at twice is rested the first time; doubled at each trip. Fifteen minutes: the five of a failure
-    /// loop let Ulaine take the same errand again at 08:11 on 350 and die at it four more times in thirteen minutes.
-    /// </summary>
     public static int DeathRestMs { get; set; } = 900000;
 
-    /// <summary>Times a kind of work was rested for a bot that kept dying at it.</summary>
     public static long DeathTrips { get; private set; }
 
     private static readonly Dictionary<(Serial Bot, string Kind), Queue<long>> _falls = [];
 
-    /// <summary>
-    /// <b>Work a bot keeps dying at is rested as work it keeps failing at is (30.09.2026, build 348).</b> A death is not a
-    /// failure here — the breaker counted only failures, six in five minutes — so a bot sent to the same errand across the
-    /// same ground died at it again and again: Sylvaris the Healer, 11gp in its purse, took "restock: after 1 Scissors" at
-    /// 60–93/min, walked eight minutes and was killed at (1163, 1859) by a troll, at (1283, 1791) by a giant spider, at
-    /// (755, 1734) by an orc and at (926, 1064) by a troll, four times in sixteen minutes on 345; Mardred and Liftrasa six
-    /// times each at the same errand over 344–346. Two deaths at one kind inside DeathWindowMs rest it for that bot as a
-    /// tripped failure does, and the rest doubles at each trip until the bot finishes that work once. Never the work that
-    /// keeps a bot alive or with its company: running, mending, hitting back, waiting for a healer, a company's own work.
-    /// </summary>
-    /// <summary>
-    /// The work that keeps a bot alive or with its company, which no rest of the breaker's ever touches: running, mending,
-    /// hitting back, waiting for a healer, a company's own work. Shared by <see cref="Fell"/> and the ground rests below.
-    /// </summary>
     public static bool Spares(string kind) =>
         kind is "flee" or "mend" or "rescue" or "await" or "enlist" or "band" or "sweep" or "delve";
 
@@ -246,42 +159,20 @@ public static class BotBreaker
         );
     }
 
-    // ------------------------------------------------------------------------------------------------ ground a bot keeps dying on
-
-    /// <summary>
-    /// <b>A bot that keeps dying on one stretch of ground is not sent across it again for a while, whatever the work
-    /// (01.10.2026, build 388; Opus dossier of 386, row 8).</b> The rests above are per kind of work: Maud died 42 times on
-    /// 386, Thalion 37, Kaelthas 35 — the ten bots that died most carried 44 % of the shard's 701 deaths, one every six to
-    /// eight minutes each, all residents of Trinsic — because a prowl rested for dying twice left the restock, the herbs and
-    /// the mine to walk the same jungle. The ground is the thing they have in common. Two deaths of one bot inside
-    /// <see cref="GroundWindowMs"/> within <see cref="GroundHalf"/> × 2 tiles of each other close the box round them, a
-    /// <see cref="GroundHalf"/> each way, to that bot for <see cref="GroundRestMs"/>: nothing whose goal lies in the box, and
-    /// nothing whose straight road crosses it, is offered to it alone. A company may still take it there (the appraisal asks
-    /// only of work that brings the bot by itself: <see cref="GroundCompany"/>), the town inside the box stays open (guarded
-    /// ground never counts), and so does the ground within <see cref="GroundHome"/> tiles of where the bot lives. Said every
-    /// time, like every trip of the breaker: a backstop, not a repair.
-    /// </summary>
     public static int GroundDeaths { get; set; } = 2;
 
-    /// <summary>How close together those deaths have to fall. Thirty minutes.</summary>
     public static int GroundWindowMs { get; set; } = 1800000;
 
-    /// <summary>Half the side of the box closed round the deaths, in tiles. Sixty-four: two quadrants, and the deaths of one bot on 386 fell 30–150 tiles apart.</summary>
     public static int GroundHalf { get; set; } = 64;
 
-    /// <summary>How long the ground is closed to the bot. Thirty minutes; a death inside a standing box extends it.</summary>
     public static int GroundRestMs { get; set; } = 1800000;
 
-    /// <summary>Tiles between two looks at a road for a closed box. Sixteen: a box is at least 128 across, so no road crosses one unseen.</summary>
     public static int GroundStep { get; set; } = 16;
 
-    /// <summary>Ground this near the bot's home is never closed to it, or the bot has nowhere to work from.</summary>
     public static int GroundHome { get; set; } = 24;
 
-    /// <summary>Work that brings more than this many times the bot's own strength brings a company, and is not kept off its closed ground.</summary>
     public static double GroundCompany { get; set; } = 1.5;
 
-    /// <summary>Boxes closed to a bot, offers refused for lying in or across one, and boxes extended by a further death inside them.</summary>
     public static long GroundTrips { get; private set; }
 
     public static long GroundRefused { get; private set; }
@@ -324,7 +215,6 @@ public static class BotBreaker
 
     private static readonly Dictionary<Serial, List<Ground>> _grounds = [];
 
-    /// <summary>This bot has just died here. See <see cref="GroundDeaths"/>.</summary>
     public static void FellAt(Mobile bot, Map map, Point3D where, Mobile killer)
     {
         if (!Running || bot == null || map == null || map == Map.Internal || GroundDeaths <= 0 || GroundHalf <= 0 || GroundRestMs <= 0)
@@ -334,7 +224,6 @@ public static class BotBreaker
 
         var now = Core.TickCount;
 
-        // A death inside a box already closed to this bot keeps it closed longer, and that is all.
         if (_grounds.TryGetValue(bot.Serial, out var grounds))
         {
             for (var i = 0; i < grounds.Count; i++)
@@ -402,7 +291,6 @@ public static class BotBreaker
             return;
         }
 
-        // The deaths that closed the box are spent: the next closure wants fresh ones.
         for (var i = falls.Count - 1; i >= 0; i--)
         {
             var f = falls[i];
@@ -454,11 +342,6 @@ public static class BotBreaker
         );
     }
 
-    /// <summary>
-    /// Whether work at <paramref name="to"/>, walked from <paramref name="from"/>, lies in or crosses ground closed to this bot:
-    /// the goal, then the straight road every <see cref="GroundStep"/> tiles. Guarded ground and the ground round the bot's home
-    /// never count. Counted when it refuses.
-    /// </summary>
     public static bool GroundResting(Mobile bot, Map map, Point3D from, Point3D to, out string why, out long leftMs)
     {
         why = null;
@@ -534,12 +417,6 @@ public static class BotBreaker
         return false;
     }
 
-    /// <summary>
-    /// <b>Boxes lifted by a company that cleared the ground (02.10.2026).</b> A box is closed to one bot because it died there
-    /// twice with nobody dealing with the ground; a company has now walked the ground and emptied it, or walked it for its
-    /// whole clock. Every box, of every bot, that holds <paramref name="where"/> or whose middle lies within
-    /// <paramref name="spread"/> of it is dropped. Returns how many.
-    /// </summary>
     public static int LiftGround(Map map, Point3D where, int spread)
     {
         if (!Running || map == null || map == Map.Internal)
@@ -576,10 +453,8 @@ public static class BotBreaker
         return lifted;
     }
 
-    /// <summary>Boxes lifted by a company that cleared their ground. See <see cref="LiftGround"/>.</summary>
     public static long GroundLifted { get; private set; }
 
-    /// <summary>Whether a tile inside a closed box is really closed: not guarded ground, not the ground round the bot's home.</summary>
     private static bool Closed(Map map, Point3D at, Point3D home)
     {
         if (home != Point3D.Zero && Math.Max(Math.Abs(home.X - at.X), Math.Abs(home.Y - at.Y)) <= GroundHome)
@@ -590,7 +465,6 @@ public static class BotBreaker
         return Region.Find(at, map)?.IsPartOf<Server.Regions.GuardedRegion>() != true;
     }
 
-    /// <summary>Boxes closed to bots now. For the Will line.</summary>
     private static int GroundsStanding()
     {
         var now = Core.TickCount;
@@ -623,9 +497,6 @@ public static class BotBreaker
 
         var key = (bot.Serial, kind, Shape(why));
 
-        // Counted for the alarm before anything is trimmed: the trail below keeps only the last few failures and is emptied
-        // when it trips, so it cannot say which loop was the loudest of a five-minute window. See Loudest. Bounded, in case
-        // nothing ever asks.
         if (_tally.Count >= 4096)
         {
             _tally.Clear();
@@ -652,8 +523,6 @@ public static class BotBreaker
         var most = hard ? HardFailures : Math.Max(2, Failures);
         var window = hard ? Math.Min(WindowMs, HardWindowMs) : WindowMs;
 
-        // Only failures inside the window, and only failures since this bot last finished the same work: a finish in
-        // between proves the work can be done here, and failures on both sides of it are not one loop.
         while (trail.Ticks.Count > 0)
         {
             var oldest = trail.Ticks.Peek();
@@ -677,11 +546,6 @@ public static class BotBreaker
 
         trail.Ticks.Clear();
 
-        // <b>Running away is never rested.</b> The breaker's cure for a loop is to take the work off the bot for a
-        // while; for a bot that is losing, the work is the only thing between it and the corpse. Ilsa the Sage,
-        // 07:25 on 22.09.2026 in the Orc Caves: six refused flights in two seconds and the breaker rested "flee"
-        // for five minutes with Woghuglat still on her. The loop itself is the flight's to fix (it now bends round
-        // the threat and keeps out of the ways refused, see BotBolt.Bend); this only refuses to make it worse.
         if (kind == BotBolt.Trade)
         {
             Spared++;
@@ -722,17 +586,6 @@ public static class BotBreaker
         );
     }
 
-    /// <summary>
-    /// The bot, kind and reason with the most failures since the last time this was asked, and how many failures there were
-    /// in all; empties the count. False when nothing failed.
-    ///
-    /// <para>
-    /// <b>For the alarm, which could not tell one looping bot from the shard.</b> Every failure already passes through here
-    /// with the bot, the kind and the sentence, and only the trails were kept, which hold the last few failures of a loop
-    /// and are emptied when it trips. See <c>BotSigns.Work</c>; §5 S5, which Fable's order of the structural remedies put
-    /// first.
-    /// </para>
-    /// </summary>
     public static bool Loudest(out string name, out string kind, out string why, out int times, out int failures)
     {
         name = null;
@@ -758,9 +611,6 @@ public static class BotBreaker
         return times > 0;
     }
 
-    /// <summary>
-    /// Whether this kind of work is resting for this bot, and if so after what failure and for how much longer.
-    /// </summary>
     public static bool Resting(Mobile bot, string kind, out string why, out long leftMs)
     {
         why = null;
@@ -792,7 +642,6 @@ public static class BotBreaker
         return true;
     }
 
-    /// <summary>How much longer this kind of work rests for this bot, in milliseconds, without counting it as a refusal.</summary>
     public static long RestLeftMs(Mobile bot, string kind)
     {
         if (bot == null || string.IsNullOrEmpty(kind) || !_records.TryGetValue((bot.Serial, kind), out var record) || !record.Resting)
@@ -803,7 +652,6 @@ public static class BotBreaker
         return Math.Max(0, record.Until - Core.TickCount);
     }
 
-    /// <summary>This bot has just finished a deed of this kind: whatever the breaker held against it is lifted.</summary>
     public static void Finished(Mobile bot, string kind)
     {
         if (bot == null || string.IsNullOrEmpty(kind))
@@ -828,7 +676,6 @@ public static class BotBreaker
         record.FinishedTick = Core.TickCount;
     }
 
-    /// <summary>A bot that is gone takes its records with it, or the tables grow for the life of the shard.</summary>
     public static void Forget(Mobile bot)
     {
         if (bot == null)
@@ -870,7 +717,6 @@ public static class BotBreaker
         _grounds.Remove(serial);
     }
 
-    /// <summary>Trails whose last failure has left the window are dropped, at most once a minute.</summary>
     private static void Sweep(long now)
     {
         if (_swept && now - _sweptTick < 60000)
@@ -897,10 +743,6 @@ public static class BotBreaker
         _staleTrails.Clear();
     }
 
-    /// <summary>
-    /// A reason with its numbers taken out, as a hash: "could not raise 1252gp" and "could not raise 1260gp" are one
-    /// reason, and so are two walks that stopped short of two different coordinates for the same cause.
-    /// </summary>
     private static ulong Shape(string why)
     {
         const ulong prime = 1099511628211UL;
@@ -937,7 +779,6 @@ public static class BotBreaker
         return hash;
     }
 
-    /// <summary>The breaker's counts, for the Will line.</summary>
     public static string Describe()
     {
         var now = Core.TickCount;
@@ -955,7 +796,6 @@ public static class BotBreaker
             + $"{GroundTrips} stretches of ground closed to one bot for {GroundRestMs / 60000} minutes after it died on them {Math.Max(2, GroundDeaths)} times in {GroundWindowMs / 60000} ({GroundExtended} closures extended by another death inside, {GroundsStanding()} standing now, {GroundLifted} lifted by a company that cleared the ground), {GroundRefused} offers refused for a goal or a road inside one";
     }
 
-    /// <summary>Every rest standing now, with the bot, the work, the time left and the failure that tripped it. For the door.</summary>
     public static string List()
     {
         var now = Core.TickCount;

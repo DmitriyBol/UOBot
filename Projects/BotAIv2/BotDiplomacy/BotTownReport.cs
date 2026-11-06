@@ -5,23 +5,9 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// How a town stands, from the shard's own numbers: what its shops are out of, what the market wants, how dangerous the ground
-/// round it reads, who lives there. What the town's voice tells a guild's envoy, and what the tasks are chosen from.
-///
-/// <para>
-/// <b>Patrick's order of 29.09.2026, point 3: "the debugger is summoned, and feedback on the town's situation — economic,
-/// hostile, trade — is taken from him."</b> Nothing here is the model's: every figure is read off a record the shard already
-/// keeps — the shopkeepers <c>BotShops</c> knows inside the town's box, the island's shortages (<c>BotShops.Dry</c>) that none
-/// of them sells now, the market's board (<c>BotMarket.Board</c>), the squares of <c>BotQuad</c> within
-/// <see cref="Reach"/> of the town's hall, and the residents (<c>BotResidence</c>). The model is handed this and phrases it; the
-/// rule says it plainly. Built once per audience, so a pass over a thousand shopkeepers and fifty squares costs nothing that
-/// matters.
-/// </para>
-/// </summary>
 public sealed class BotTownReport
 {
-    /// <summary>How far round the town's hall its ground is read, in tiles. Ninety: three squares each way.</summary>
+
     public static int Reach { get; set; } = 90;
 
     public string Town { get; init; }
@@ -30,10 +16,8 @@ public sealed class BotTownReport
 
     public int Residents { get; init; }
 
-    /// <summary>What the island is short of and no shop in this town has on its shelf now, commonest shortage first.</summary>
     public List<Type> Out { get; } = [];
 
-    /// <summary>The squares within <see cref="Reach"/> reading unsafe or worse, how many of the population died in them, and the worst.</summary>
     public int Unsafe { get; init; }
 
     public int Dead { get; init; }
@@ -44,13 +28,10 @@ public sealed class BotTownReport
 
     public bool Quarantined { get; init; }
 
-    /// <summary>The market's board in one phrase.</summary>
     public string Market { get; init; }
 
-    /// <summary>The whole of it for the model.</summary>
     public string Facts { get; set; }
 
-    /// <summary>The rule's report, one or two plain sentences.</summary>
     public string Said { get; set; }
 
     public static BotTownReport Of(BotTowns.Town town, Point3D hall, Guild guild)
@@ -119,7 +100,6 @@ public sealed class BotTownReport
             Market = BotMarket.Board(4)
         };
 
-        // The island's shortages that this town's shelves cannot answer either: the ones the town would be glad of.
         var dry = BotShops.Dry();
 
         for (var i = 0; i < dry.Count && report.Out.Count < 3; i++)
@@ -161,7 +141,6 @@ public sealed class BotTownReport
         return string.Join(", ", names);
     }
 
-    /// <summary>The rule's words for the town: its shelves and its ground, in two sentences at most.</summary>
     private static string Plain(BotTownReport r)
     {
         var shelves = r.Out.Count > 0

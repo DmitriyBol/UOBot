@@ -6,11 +6,6 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a guild's captain an expedition: the member holding the guild's ship, or its head when the guild has none and can
-/// adopt or buy one; to found a colony on the first free island, or to take the ship and fresh hands back to the colony it has.
-/// One guild weighed every <see cref="BotColonies.ConsiderMs"/>, one expedition at a time (<see cref="BotOffice"/>).
-/// </summary>
 public sealed class BotExpeditioner : IBotProposer
 {
     public const string Office = "expedition";
@@ -36,13 +31,11 @@ public sealed class BotExpeditioner : IBotProposer
             return null;
         }
 
-        // Asked of the guild's clock before any pack is searched: a guild is weighed once every ConsiderMs.
         if (!BotColonies.Ripe(guild))
         {
             return null;
         }
 
-        // One member of the guild is asked: whoever holds its ship, else its head.
         var holder = BotColonies.ShipHolder(guild, body);
 
         if (holder != null ? holder != body : !BotGuilds.IsHead(body))
@@ -68,12 +61,6 @@ public sealed class BotExpeditioner : IBotProposer
         return deed;
     }
 
-    /// <summary>
-    /// The expedition this captain can fit out now, or null with why. Founding when the guild has no colony; a relief when it has
-    /// one and the ship is here on the mainland with the captain (the ship belongs at the colony: the run home is sailed from
-    /// there). The money is asked here and paid later: the stores out of the chest when the ship puts to sea, a ship at the
-    /// shipwright's counter.
-    /// </summary>
     public static BotExpedition Fit(BotMobile captain, Guild guild, bool byHand, out string why)
     {
         why = null;
@@ -118,7 +105,6 @@ public sealed class BotExpeditioner : IBotProposer
                 return null;
             }
 
-            // A relief sails the ship back. With the ship elsewhere, or a colony manned and the ship already there, nothing to do.
             if (BotHelm.ShipOf(captain) == null && BotColonies.ShipHolder(guild) != null)
             {
                 why = "the guild's ship is in another member's hands";
@@ -170,7 +156,6 @@ public sealed class BotExpeditioner : IBotProposer
             return null;
         }
 
-        // A ship comes out of the captain's purse and what the guild can stand after the stores: the chest's spare and the members'.
         if (price > 0 && BotYield.Spendable(captain) + BotEstate.Fund(guild) - stores < price)
         {
             BotColonies.Count("poor");
@@ -188,12 +173,6 @@ public sealed class BotExpeditioner : IBotProposer
     }
 }
 
-/// <summary>
-/// The captain's expedition: the ship in the pack (held, adopted at anchor, or bought at the shipwright), the walk to the dock,
-/// the muster of the party at its side, the stores paid out of the chest as the ship puts to sea, the voyage with the party
-/// aboard as the helm's company, and on the island the colony set down and its square claimed — or, for a relief, the ship
-/// and its hands brought back to the colony.
-/// </summary>
 public sealed class BotExpedition : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotExpedition));
@@ -202,7 +181,6 @@ public sealed class BotExpedition : BotDeed
 
     public const string ReliefTrade = "relief";
 
-    /// <summary>What an expedition is reckoned at a minute: high, because it is the guild's errand and pays nothing to the captain.</summary>
     public static double Prior { get; set; } = 150.0;
 
     private enum Step
@@ -314,7 +292,6 @@ public sealed class BotExpedition : BotDeed
 
     public override double Coin => 0.0;
 
-    /// <summary>The guild's errand: what it is worth is the colony, not the captain's purse.</summary>
     public override bool Unpaid => true;
 
     public override bool Steadfast => true;
@@ -323,10 +300,8 @@ public sealed class BotExpedition : BotDeed
 
     public override double HoldsFor => _minutes;
 
-    /// <summary>From the first step to the dock: the party is called to it, and a captain taken off for a bolt of cloth strands it.</summary>
     public override bool Committed => _step >= Step.ToDock;
 
-    /// <summary>Waiting at the berth and at sea the labour clock is not asked: the muster's and the helm's clocks keep it.</summary>
     public override bool Still => _step == Step.Muster || _voyage is { Still: true };
 
     public override string Stage =>
@@ -340,7 +315,6 @@ public sealed class BotExpedition : BotDeed
             _ => _founding ? $"setting down {_guild?.Name}'s colony at ({_site.X}, {_site.Y})" : $"bringing the ship back to the colony at ({_site.X}, {_site.Y})"
         };
 
-    /// <summary>For the door's answer.</summary>
     public string Describe() =>
         $"{(_founding ? "an expedition to found a colony on" : "a relief to")} {_to?.Name} at ({_site.X}, {_site.Y}) from {_from?.Name}, up to {_passage.Wanted} hands"
         + $"{(_buy ? ", a ship to be bought" : _adopt ? ", a ship to be adopted from anchor" : "")}, {_stores}gp of stores";
@@ -433,11 +407,6 @@ public sealed class BotExpedition : BotDeed
         return BotDoing.Failed("no ship of its own and none to adopt, and buying is off");
     }
 
-    /// <summary>
-    /// A small ship from the nearest shopkeeper selling one, paid from the captain's purse and, short of it, the guild's
-    /// (<see cref="BotProvision.Fund"/>) — the shipwright's counter, as every ship on this shard is bought (<see cref="BotVoyage"/>).
-    /// Booked aside: the ship sails every run after this one, and one expedition is not its cost.
-    /// </summary>
     private BotDoing Buy(IBotWilful bot, BotMobile body)
     {
         var wanted = typeof(SmallBoatDeed);
@@ -601,8 +570,6 @@ public sealed class BotExpedition : BotDeed
     {
         var doing = _voyage.Advance(bot);
 
-        // The stores are paid the moment the ship is in the water with the party aboard: out of the chest, into the city's purse.
-        // Until then the muster stands, so a member who walked after the captain to another berth is still taken aboard.
         if (!_paid && BotHelm.Of(body) != null)
         {
             _paid = true;

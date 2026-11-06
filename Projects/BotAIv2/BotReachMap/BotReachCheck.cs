@@ -6,7 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>What the check found, published whole for the dashboard through one volatile reference.</summary>
 public sealed record BotReachCheckReport(
     int Version,
     int Asked,
@@ -20,61 +19,32 @@ public sealed record BotReachCheckReport(
     int Stood
 );
 
-/// <summary>
-/// The reach map examined where it is most likely wrong: on its borders, tile by tile, by the walker's own means rather than
-/// the map's.
-///
-/// <para>
-/// <b>Patrick's order of 30.09.2026, night: "Argus and the debuggers must help."</b> The map is drawn by the navigation graph's
-/// probe (<see cref="BotReachBuilder"/>); the check asks the questions a bot's walker asks, through code that shares none of
-/// the map's own path: the walker's search (<see cref="BotPath.Find"/>, over the engine's step cache and the items on the
-/// ground), a flood of the walker's own steps (<see cref="BotStep.Mask"/>), and the walker's footing test. A free debugger is
-/// carried to each tile as it is examined, so a client standing with Argus sees where the map is being proved.
-/// </para>
-///
-/// <para>
-/// <b>What each class is asked.</b> Open ground: can the walker's search get onto the tile from open ground a few tiles off?
-/// Isle and pocket: can it — and if the search runs out of clock, does a flood of the walker's steps from the tile close
-/// within <see cref="FloodCells"/> (a pocket walked to its edges)? Water and blocked: can a walker standing on open ground
-/// beside it step onto it? An answer the walker's means cannot give (the clock ran out, the flood reached the world) is
-/// counted as unsure, never as agreement.
-/// </para>
-/// </summary>
 public static class BotReachCheck
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotReachCheck));
 
-    /// <summary>Whether the check runs by itself once the first map of a session is solved.</summary>
     public static bool OnBoot { get; set; } = true;
 
-    /// <summary>Border tiles examined by a check.</summary>
     public static int Samples { get; set; } = 240;
 
-    /// <summary>The loop's milliseconds a beat may spend examining, and how often a beat runs.</summary>
     public static double BudgetMs { get; set; } = 10.0;
 
     public static int TickMs { get; set; } = 400;
 
-    /// <summary>The walker's search's clock for one tile, in milliseconds.</summary>
     public static double CeilingMs { get; set; } = 30.0;
 
-    /// <summary>How far off the tile the open ground a search starts from may lie.</summary>
     public static int AnchorReach { get; set; } = 8;
 
-    /// <summary>Cells a flood from a tile may count before it is ground that goes on: the world, not a pocket.</summary>
     public static int FloodCells { get; set; } = 3000;
 
-    /// <summary>Whether a free debugger is carried to each tile as it is examined.</summary>
     public static bool Carry { get; set; } = true;
 
-    /// <summary>The watchers free to walk, and their teleport: filled by the debugger (BotDebugModule), as for the zones tour.</summary>
     public static Func<IReadOnlyList<(string Name, Mobile Body)>> Walkers { get; set; }
 
     public static Func<Mobile, Map, Point3D, bool> Move { get; set; }
 
     private static volatile BotReachCheckReport _report = new(0, 0, 0, new int[6], new int[6], new int[6], [], "not run", 0, 0);
 
-    /// <summary>The last report, safe from any thread.</summary>
     public static BotReachCheckReport Report => _report;
 
     private sealed class Sample
@@ -114,7 +84,6 @@ public static class BotReachCheck
 
     private static System.Random _random = new(1102026);
 
-    /// <summary>A map was solved: the first of the session is examined by itself.</summary>
     public static void Solved(BotReachSnapshot snap)
     {
         if (!OnBoot || _ranOnce || snap == null || !snap.Homed)
@@ -125,7 +94,6 @@ public static class BotReachCheck
         Start(Samples, "the boot");
     }
 
-    /// <summary>Starts a check of <paramref name="n"/> border tiles. <c>reach check [n]</c> at the door.</summary>
     public static string Start(int n, string who)
     {
         var snap = BotReachMap.Snapshot;
@@ -154,7 +122,6 @@ public static class BotReachCheck
 
         n = Math.Clamp(n, 1, 5000);
 
-        // Half the tiles on the open side of a border, half on the other: both mistakes matter.
         for (var tries = 0; _queue.Count < n && tries < n * 20; tries++)
         {
             var c = snap.Mixed[_random.Next(snap.Mixed.Length)];
@@ -187,7 +154,6 @@ public static class BotReachCheck
         _state = "not run";
     }
 
-    /// <summary>A tile on a border in cluster <paramref name="c"/>: on its open side, or on the other.</summary>
     private static bool Border(BotReachSnapshot snap, int c, bool openSide, out Point3D at, out BotReachClass k)
     {
         at = Point3D.Zero;
@@ -313,8 +279,6 @@ public static class BotReachCheck
         var at = sample.At;
         var k = (int)sample.Class;
 
-        // A walker the zones tour does not hold: the tour takes the first of the squad (BotZoneTour.MostWalkers), so the last
-        // one past them is free; with the tour off, any.
         if (Carry && Move != null && Walkers?.Invoke() is { } walkers
             && walkers.Count > (BotZoneTour.Running ? Math.Max(0, BotZoneTour.MostWalkers) : 0))
         {
@@ -364,9 +328,6 @@ public static class BotReachCheck
         }
     }
 
-    /// <summary>
-    /// One tile examined now, by the door: the walker's own answer set beside the map's. Not counted in the check's tally.
-    /// </summary>
     public static string Probe(int x, int y)
     {
         var snap = BotReachMap.Snapshot;
@@ -400,7 +361,6 @@ public static class BotReachCheck
         return $"The walker's own means: the map says {k} {verdict} — {(agrees == true ? "they agree" : agrees == false ? "they DISAGREE" : "they cannot tell")}.";
     }
 
-    /// <summary>Open ground: the walker's search from open ground a few tiles off, onto the tile itself.</summary>
     private static (bool?, string) AskOpen(BotReachSnapshot snap, Map map, Point3D at)
     {
         if (!Stand(snap, map, at.X, at.Y, BotReachClass.Open, out var z))
@@ -425,7 +385,6 @@ public static class BotReachCheck
         };
     }
 
-    /// <summary>Ground no walk reaches: the walker's search from open ground beside it, then a flood of the walker's steps from the tile.</summary>
     private static (bool?, string) AskShut(BotReachSnapshot snap, Map map, Point3D at)
     {
         if (!Stand(snap, map, at.X, at.Y, snap.ClassAt(at.X, at.Y), out var z))
@@ -455,9 +414,6 @@ public static class BotReachCheck
             return (true, $"and a flood of the walker's steps from it closes after {cells} cells");
         }
 
-        // Ground too wide to walk to its edges: an island, a dungeon no gate opens. The navigation graph is a second opinion
-        // drawn another way (gates on the cluster edges, lands joined over the teleporters); its "no land of home's" is
-        // counted as agreement, its "joined" left unsure — it joins a ledge to the ground below it, the map does not.
         if (BotGates.Ready && !BotGates.Joined(map, BotPopulation.Where, goal))
         {
             return (true, "and the navigation graph finds no land joined to home's there (the walker's steps from it go on past the flood's count)");
@@ -466,7 +422,6 @@ public static class BotReachCheck
         return (null, "and the walker's steps from it go on past the flood's count");
     }
 
-    /// <summary>Nowhere to stand: can a walker on open ground beside it step onto it?</summary>
     private static (bool?, string) AskGround(BotReachSnapshot snap, Map map, Point3D at, BotReachClass k)
     {
         var wet = BotStep.Wet(map, at.X, at.Y);
@@ -502,7 +457,6 @@ public static class BotReachCheck
             }
         }
 
-        // Nobody steps onto it. Whether it is wet is the other half of the class, and counted as a miss of its own kind.
         if (k == BotReachClass.Water && !wet || k == BotReachClass.Blocked && wet)
         {
             return (false, $"and nobody can step onto it, but it is {(wet ? "water" : "dry")}");
@@ -515,11 +469,6 @@ public static class BotReachCheck
 
     private static int Dy(int d) => d switch { 7 or 0 or 1 => -1, 3 or 4 or 5 => 1, _ => 0 };
 
-    /// <summary>
-    /// A height a body fits at on a tile, by the walker's footing test, of the standing place the map calls
-    /// <paramref name="kind"/>: a tile's floors may differ — a room under a roof, a road under a bridge — and the map's word on
-    /// the tile is its best one, so the one examined is the one the word is about.
-    /// </summary>
     private static bool Stand(BotReachSnapshot snap, Map map, int x, int y, BotReachClass kind, out sbyte z)
     {
         z = 0;
@@ -559,7 +508,6 @@ public static class BotReachCheck
         return found;
     }
 
-    /// <summary>Open ground between three and <see cref="AnchorReach"/> tiles from the tile, that a body fits on.</summary>
     private static bool Anchor(BotReachSnapshot snap, Map map, Point3D at, out Point3D from)
     {
         for (var r = 3; r <= AnchorReach; r++)
@@ -571,7 +519,6 @@ public static class BotReachCheck
                 var i = (d0 + j) % (8 * r);
                 int dx, dy;
 
-                // The ring of radius r, walked from a random place on it.
                 if (i < 2 * r)
                 {
                     dx = -r + i;
@@ -614,10 +561,6 @@ public static class BotReachCheck
 
     private static readonly Queue<Point3D> _frontier = new();
 
-    /// <summary>
-    /// A flood of the walker's own steps from a tile: true when it closes within <see cref="FloodCells"/> — the tile's ground
-    /// is walked to its edges — with the cells it counted.
-    /// </summary>
     private static bool Flood(Map map, Point3D start, out int cells)
     {
         _seen.Clear();

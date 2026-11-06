@@ -11,115 +11,51 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The empty buildings of the towns: walls round a floor, a roof over it, a doorway with no door in it — read once from the
-/// map's own statics, the way the engine's door generator reads them, and kept on disk.
-///
-/// <para>
-/// <b>Patrick's idea of 29.09.2026, evening: "one or two guilds may settle in each of the other towns, but only in an empty
-/// and suitable building; when a guild settles there, a door is put in and a sign hung on the wall."</b> A building in a UO
-/// town is not an object anywhere — it is statics on the map, and its doors and shop signs are items the world was decorated
-/// with. So a building has to be found the way the engine itself finds one: <c>DoorGenerator</c> (the <c>[DoorGen</c>
-/// command) recognises a doorway as a west door-frame static with an east one two or three tiles along the same row, or a
-/// north frame with a south one two or three tiles down the same column, and puts a door (or a linked pair) between them.
-/// This survey reads the same frames with the same public tests (<c>DoorGenerator.IsWestFrame</c> and the rest) and asks,
-/// for each doorway, what lies on its two sides.
-/// </para>
-///
-/// <para>
-/// <b>A side is a room when a flood from it stops by itself.</b> The flood walks the floor with the planner's own step model
-/// (<see cref="BotStep.Mask"/>, land and statics), four ways, inside a band of a storey round the doorway's height, and treats
-/// every doorway it knows as shut; a side that runs past <see cref="MaxArea"/> tiles is the street. A doorway with a room on
-/// one side and the street on the other is a way in; one with rooms on both sides joins them into one building. A building
-/// is kept when its floor is at least <see cref="MinArea"/> and at most <see cref="MaxArea"/> tiles, at least
-/// <see cref="RoofShare"/> of it is under a roof or an upper floor, it has at most <see cref="MostEntrances"/> ways in, and
-/// no forge, anvil, oven or hearth stands in its statics — those are workshops the bots already use
-/// (<c>BotGround</c>). What the world has put in it since — a door, a spawner, a shopkeeper living there, a house, an inn's
-/// region — is asked every boot and before every settling by <see cref="Occupied"/>, because the world changes and the map
-/// files do not.
-/// </para>
-///
-/// <para>
-/// <b>Why a floor of sixty-four tiles.</b> The small one-room cottages every town is built of have a floor of 42 to 49 tiles
-/// (7 by 7 walls, measured from the client's own map on 29.09.2026); they are 40 of Britain's 97 buildings with a way out,
-/// 10 of Minoc's 26, 19 of Yew's 56 and 46 of Nujel'm's 63, and they are private homes by the world's design. Sixty-four —
-/// eight by eight — is the first size past them: the two-room houses and the halls of 90 to 350 tiles, room for a guild of
-/// five to fifteen to be born and rise in (<c>BotGuildHouses.Spread</c> puts a body down within three tiles of the heart)
-/// without spilling into the street. This survey, run on 29.09.2026 through the engine itself against the client's
-/// Felucca files with the world decorated and the spawn files' spawners laid down (a scratch test host, not the shard),
-/// kept 287 buildings of 64 to 400 tiles and found free, after the live checks: 20 in Britain, 2 in Minoc, 9 in Trinsic,
-/// 4 in Vesper, 19 in Yew and none in Cove — 127 had a spawner in them (a shop, a bank, a healer), 30 a hearth or forge
-/// set down as an item, 18 a door already, and 23 lay in an inn's rooms. 1.7 seconds of the loop in 204 slices, the
-/// worst 29ms. The boot line says what the shard itself finds.
-/// </para>
-///
-/// <para>
-/// <b>Read once, kept on disk, sliced on the loop.</b> Scanning every tile of eighteen town regions for frames and flooding
-/// both sides of some thousand doorways is a few seconds of the loop, so it runs a slice of <see cref="SliceMs"/> a tick
-/// and writes what it found to <see cref="CachePath"/> under <c>Distribution</c>, keyed by the engine's fingerprint of the
-/// map files (<c>TileMatrix.MapFilesFingerprint</c>) and the numbers above — as <c>BotSeaChart</c> does. Never under
-/// <c>Saves</c>, which the engine moves into <c>Backups</c> at every save.
-/// </para>
-/// </summary>
 public static class BotHouseSurvey
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotHouseSurvey));
 
-    /// <summary>The least floor a guild's house may have, in tiles. See the class: past the 7 × 7 cottages.</summary>
     public static int MinArea { get; set; } = 64;
 
-    /// <summary>The most floor, in tiles; also how far a flood runs before its side is called the street.</summary>
     public static int MaxArea { get; set; } = 400;
 
-    /// <summary>The least share of the floor under a roof or an upper storey. Three quarters: a walled yard is not a house.</summary>
     public static double RoofShare { get; set; } = 0.75;
 
-    /// <summary>The most ways in a house may have; every one of them is given a door.</summary>
     public static int MostEntrances { get; set; } = 2;
 
-    /// <summary>How much of the loop one slice of surveying may take, in milliseconds.</summary>
     public static double SliceMs { get; set; } = 6.0;
 
-    /// <summary>Whether the survey is kept on disk between boots.</summary>
     public static bool Cache { get; set; } = true;
 
     public const string CachePath = "Data/bot-guild-houses.bin";
 
-    private const uint Magic = 0x31534847; // "GHS1"
+    private const uint Magic = 0x31534847;
 
     private const int Version = 1;
 
-    /// <summary>How far below and above the doorway's height the flood walks: a step down to the street, not a storey up.</summary>
     private const int Below = 6;
 
     private const int Above = 12;
 
-    /// <summary>A way in: the doorway's one or two door tiles at the frame's height, which way its frames run, and the street outside.</summary>
     public sealed class Entrance
     {
         public Point3D[] Doors;
 
-        /// <summary>Frames along the row (a wall running east–west, the generator's west/east pair); false for a column.</summary>
         public bool AlongX;
 
-        /// <summary>A standing tile on the street side, next to the doorway.</summary>
         public Point3D Outside;
 
-        /// <summary>The unit step from the doorway to <see cref="Outside"/>: (0, ±1) when <see cref="AlongX"/>, (±1, 0) otherwise.</summary>
         public int OutX;
 
         public int OutY;
     }
 
-    /// <summary>One building the survey found and kept.</summary>
     public sealed class Building
     {
         public int Id;
 
-        /// <summary>The town whose region box holds it, by the region's name (<see cref="BotTowns.Town.Name"/>).</summary>
         public string Town;
 
-        /// <summary>A floor tile near its middle: where the guild's seat is, and where members are born and rise.</summary>
         public Point3D Heart;
 
         public int Area;
@@ -128,17 +64,14 @@ public static class BotHouseSurvey
 
         public Rectangle2D Box;
 
-        /// <summary>Its floor, as <see cref="Key"/>s.</summary>
         public HashSet<int> Tiles;
 
         public Entrance[] Entrances;
 
-        /// <summary>The first door tile of its first way in: what a guild's record names it by, across restarts.</summary>
         public Point3D Door => Entrances[0].Doors[0];
 
         public bool Holds(int x, int y) => Tiles.Contains(Key(x, y));
 
-        /// <summary>Whether a point lies on its floor or on one of its door tiles.</summary>
         public bool Covers(int x, int y)
         {
             if (Holds(x, y))
@@ -165,7 +98,6 @@ public static class BotHouseSurvey
         public override string ToString() => $"{Town} ({Door.X}, {Door.Y}): {Area} tiles, {Entrances.Length} way{(Entrances.Length == 1 ? "" : "s")} in";
     }
 
-    /// <summary>What the survey counted in one town, for the boot line.</summary>
     public sealed class Tally
     {
         public int Doorways;
@@ -205,28 +137,19 @@ public static class BotHouseSurvey
 
     public static IReadOnlyDictionary<string, Tally> Tallies => _tallies;
 
-    /// <summary>A tile as one integer: x in the high half, y in the low. The map is under 65536 both ways.</summary>
     public static int Key(int x, int y) => (x << 16) | (y & 0xFFFF);
 
     private static int KeyX(int key) => key >> 16;
 
     private static int KeyY(int key) => key & 0xFFFF;
 
-    /// <summary>
-    /// A standing cell as the flood keys it: the tile and the storey, the planner's own cell (<see cref="BotStep.Cell"/>). By
-    /// tile alone a ground floor and the room above it are one room, and the first run against the real map filed a door at
-    /// fifteen under a room at thirty-five.
-    /// </summary>
     private static int Cell(int x, int y, sbyte z) => BotStep.Cell(x, y, z);
 
     private static int CellX(int cell) => (cell >> 13) & 0x1FFF;
 
     private static int CellY(int cell) => cell & 0x1FFF;
 
-    /// <summary>The building whose first door stands on this tile, or null.</summary>
     public static Building ByDoor(Point3D door) => _byDoor.GetValueOrDefault(Key(door.X, door.Y));
-
-    // ---- the survey's working state, dropped when it is ready ----
 
     private sealed class Doorway
     {
@@ -266,21 +189,12 @@ public static class BotHouseSurvey
 
     private static Dictionary<int, int> _roomOf;
 
-    /// <summary>
-    /// Tiles a flood has already proved to be the street: any later flood that steps onto one is the street too, and stops
-    /// there. Without it the street side of every doorway is walked out to <see cref="MaxArea"/> tiles again, which is most of
-    /// the survey's cost.
-    /// </summary>
     private static HashSet<int> _street;
 
     private static readonly Queue<(int X, int Y, sbyte Z)> _queue = new();
 
     private static readonly Dictionary<int, sbyte> _seen = [];
 
-    /// <summary>
-    /// One slice of surveying. True once the survey is ready. Asked of the module's clock on the loop, and only once the towns
-    /// have been read (<see cref="BotTowns.Surveyed"/>), whose boxes it walks.
-    /// </summary>
     public static bool Step(Map map)
     {
         if (Ready)
@@ -328,8 +242,7 @@ public static class BotHouseSurvey
         }
         catch (Exception e)
         {
-            // A survey that throws is a survey that never finishes and a module that never settles anybody; said once, and
-            // the guild houses stay off for this boot rather than the loop throwing every tick.
+
             logger.Error(e, "Guild houses: the survey of the towns failed at stage {Stage}; no guild will be housed this boot", _stage);
             Ready = true;
             Drop();
@@ -376,7 +289,6 @@ public static class BotHouseSurvey
         _stage = 1;
     }
 
-    /// <summary>Walks the towns' boxes a column at a time, finding doorways by the engine's frame pairs.</summary>
     private static void Scan(long deadline)
     {
         var towns = BotTowns.All;
@@ -419,12 +331,6 @@ public static class BotHouseSurvey
         _next = 0;
     }
 
-    /// <summary>
-    /// The doorways starting at one tile, read exactly as <c>DoorGenerator.Generate</c> reads them: a west frame with an east
-    /// frame two tiles on (one door) or three (a pair), else a north frame with a south one two or three tiles down; the
-    /// frames within one of each other's height, the door at the lower. A doorway whose tiles hold no floor at that height is
-    /// a frame round a window or a wall, and is passed over.
-    /// </summary>
     private static void Frames(int x, int y, string town)
     {
         foreach (var tile in _map.Tiles.GetStaticTiles(x, y))
@@ -457,7 +363,6 @@ public static class BotHouseSurvey
         }
     }
 
-    /// <summary>The closing frame of a pair, east (along a row) or south (down a column), within one of the opening frame's height.</summary>
     private static bool Frame(int x, int y, int z, bool east, out int newZ)
     {
         foreach (var tile in _map.Tiles.GetStaticTiles(x, y))
@@ -493,10 +398,6 @@ public static class BotHouseSurvey
             return;
         }
 
-        // A floor at the frame's height on every door tile, by the land and the statics alone: the engine's generator asks
-        // CanFit of the same tile, which reads items as well, and a door the world was decorated with would make that answer
-        // no — this survey is of the map, and what stands in a doorway is asked live (Occupied). The door itself goes in at
-        // the frames' height, where the generator puts it.
         for (var i = 0; i < doors.Length; i++)
         {
             if (!BotStep.Ground(_map, doors[i].X, doors[i].Y, z, 3, out _))
@@ -516,7 +417,6 @@ public static class BotHouseSurvey
         TallyOf(town).Doorways++;
     }
 
-    /// <summary>Floods the two sides of each doorway in turn, a doorway at a time, and files what it finds as rooms.</summary>
     private static void Flood(long deadline)
     {
         while (_next < _doorways.Count)
@@ -524,7 +424,6 @@ public static class BotHouseSurvey
             var way = _doorways[_next++];
             var d = way.Doors[0];
 
-            // The two sides are across the frame line: north and south of a door in a row, west and east of one in a column.
             var ax = way.AlongX ? d.X : d.X - 1;
             var ay = way.AlongX ? d.Y - 1 : d.Y;
             var bx = way.AlongX ? d.X : d.X + 1;
@@ -543,7 +442,7 @@ public static class BotHouseSurvey
             }
             else if (a >= 0 && b >= 0)
             {
-                // Rooms on both sides: one building, joined through this doorway.
+
                 Union(a, b);
             }
 
@@ -557,10 +456,6 @@ public static class BotHouseSurvey
         _next = 0;
     }
 
-    /// <summary>
-    /// One side of a doorway: the room it opens into (its index), or −1 with <paramref name="open"/> saying whether that was
-    /// because the flood ran out into the street (true) or because there was no floor there at all (false).
-    /// </summary>
     private static int Side(int x, int y, int z0, out bool open, out Point3D at)
     {
         open = false;
@@ -575,7 +470,6 @@ public static class BotHouseSurvey
 
         var key = Cell(x, y, sz);
 
-        // A side already known to be a room is that room, and one already known to be the street is the street.
         if (_roomOf.TryGetValue(key, out var known))
         {
             return Find(known);
@@ -634,7 +528,6 @@ public static class BotHouseSurvey
                     return -1;
                 }
 
-                // Into a room already filed: this side is that room, and there is nothing new to learn by walking it again.
                 if (_roomOf.TryGetValue(nkey, out var into))
                 {
                     Absorb(into);
@@ -664,7 +557,6 @@ public static class BotHouseSurvey
         return room.Parent;
     }
 
-    /// <summary>Files the tiles walked so far as the street.</summary>
     private static void Street()
     {
         foreach (var key in _seen.Keys)
@@ -676,7 +568,6 @@ public static class BotHouseSurvey
         _queue.Clear();
     }
 
-    /// <summary>Files the tiles walked so far under a room.</summary>
     private static void Absorb(int index)
     {
         var room = _rooms[Find(index)];
@@ -729,7 +620,6 @@ public static class BotHouseSurvey
         from.Parent = ra;
     }
 
-    /// <summary>Turns the rooms into buildings, keeps the fit ones, and writes the file — a room at a time, to the deadline.</summary>
     private static void Build(long deadline)
     {
         for (; _next < _rooms.Count; _next++)
@@ -837,9 +727,6 @@ public static class BotHouseSurvey
                 continue;
             }
 
-            // The heart: the floor tile nearest the middle, so the seat is inside and away from the walls where it can be — and on
-            // the storey the door opens onto. Rooms joined through an inner doorway can lie a storey apart, and the first run of
-            // the survey against the real map put one heart twenty above its door (Britain, 1543,1742 at 35 over a door at 15).
             var mx = (int)(sx / room.Floor.Count);
             var my = (int)(sy / room.Floor.Count);
             var doorZ = room.Ways[0].Way.Z;
@@ -850,7 +737,6 @@ public static class BotHouseSurvey
             {
                 var gap = Math.Max(Math.Abs(CellX(key) - mx), Math.Abs(CellY(key) - my));
 
-                // A tile off the door's storey counts as far away as the map is wide: taken only when there is no other.
                 if (z < doorZ - 4 || z > doorZ + 8)
                 {
                     gap += 1 << 16;
@@ -896,7 +782,6 @@ public static class BotHouseSurvey
         Finish();
     }
 
-    /// <summary>A floor's cells as tiles: what a building holds, whatever the storey. See <see cref="Building.Holds"/>.</summary>
     private static HashSet<int> Flat(IEnumerable<int> cells)
     {
         var tiles = new HashSet<int>();
@@ -971,18 +856,6 @@ public static class BotHouseSurvey
         return tally;
     }
 
-    /// <summary>
-    /// Why this building cannot be a guild's house now, or null when it can. Everything the map files cannot say, asked of the
-    /// world with spatial queries round the building's own box:
-    /// <list type="bullet">
-    ///   <item>a region of its own over any of its floor — an inn's room (<c>NoLogoutDelay</c>), a house's, anything other
-    ///   than the town's own region;</item>
-    ///   <item>a spawner on its floor or beside it, or a creature whose home is on it — a shopkeeper, a banker, a healer;</item>
-    ///   <item>a door already in one of its doorways that is not this guild's, or a house over it;</item>
-    ///   <item>a forge, anvil or hearth set down in it as an item;</item>
-    ///   <item>its street side not joined to home by the gates, so a member could not walk there.</item>
-    /// </list>
-    /// </summary>
     public static string Occupied(Building b, string guild = null)
     {
         var map = _map ?? BotPopulation.Home;
@@ -1077,13 +950,11 @@ public static class BotHouseSurvey
             _                                   => $"a {region.GetType().Name}"
         };
 
-    /// <summary>What a spawner keeps, for the reason given: its first entry's name when it has one.</summary>
     private static string Kept(Item spawner) =>
         spawner is BaseSpawner { Entries.Count: > 0 } kept && !string.IsNullOrEmpty(kept.Entries[0].SpawnedName)
             ? kept.Entries[0].SpawnedName
             : spawner.GetType().Name;
 
-    /// <summary>Whether a point is on the building's floor or within a tile of it.</summary>
     private static bool Near(Building b, int x, int y)
     {
         for (var dx = -1; dx <= 1; dx++)
@@ -1100,7 +971,6 @@ public static class BotHouseSurvey
         return false;
     }
 
-    /// <summary>Whether a door stands in one of the building's doorways, closed or swung open beside it.</summary>
     private static bool InDoorway(Building b, BaseDoor door)
     {
         var at = door.Open ? new Point3D(door.X - door.Offset.X, door.Y - door.Offset.Y, door.Z) : door.Location;

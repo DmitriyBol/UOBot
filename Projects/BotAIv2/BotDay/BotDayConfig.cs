@@ -4,17 +4,11 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-day.json</c> may say. Its own file rather than a block of <c>bot-will.json</c>: the will's file is
-/// the auction's numbers, and a reader opening it for <c>GoldPerSkillPoint</c> should not find the hours of the day there. A
-/// missing key keeps the code's value; keys are PascalCase. See <see cref="BotDay"/>.
-/// </summary>
 public sealed class BotDaySettings
 {
-    /// <summary>The switch. Off, every hour is one and the rest clock orders by hours over, as before.</summary>
+
     public bool? Running { get; set; }
 
-    /// <summary>The hours, local time, each part of the day begins; they must stand in order inside the day.</summary>
     public double? DawnAt { get; set; }
 
     public double? MorningAt { get; set; }
@@ -27,32 +21,24 @@ public sealed class BotDaySettings
 
     public double? NightAt { get; set; }
 
-    /// <summary>How far the hour leans a price that fits it: ×Lift up, ×(1/Lift) down.</summary>
     public double? Lift { get; set; }
 
-    /// <summary>The range the whole factor is held in.</summary>
     public double? Least { get; set; }
 
     public double? Most { get; set; }
 
-    /// <summary>Spendable gold under which no markdown touches a bot's paid work.</summary>
     public int? BrokeUnder { get; set; }
 
-    /// <summary>How far either side of a meal hour supper is raised.</summary>
     public double? MealWindowHours { get; set; }
 
-    /// <summary>A walk this long or longer is a journey whatever the work.</summary>
     public int? JourneyTiles { get; set; }
 
-    /// <summary>How many hours later a night owl lives its day.</summary>
     public double? OwlShift { get; set; }
 
-    /// <summary>The share of fighters, and of everybody else, drawn as night owls.</summary>
     public double? OwlShareFighters { get; set; }
 
     public double? OwlShareOthers { get; set; }
 
-    /// <summary>The hour a bedtime is drawn from and the hours the draw spans, for day bots and for owls.</summary>
     public double? BedFrom { get; set; }
 
     public double? BedSpan { get; set; }
@@ -61,27 +47,21 @@ public sealed class BotDaySettings
 
     public double? OwlBedSpan { get; set; }
 
-    /// <summary>Whether a bot at its bedtime may tire before its hours are up.</summary>
     public bool? BedtimeTires { get; set; }
 
-    /// <summary>How long after its bed hour a bot counts as at its bedtime.</summary>
     public double? BedWindowHours { get; set; }
 
-    /// <summary>The share of its hours a bot must have played before its bedtime may tire it.</summary>
     public double? BedPlayedShare { get; set; }
 
-    /// <summary>How long after its wake hour a resting bot goes first under the floor.</summary>
     public double? WakeWindowHours { get; set; }
 }
 
-/// <summary>Reads the day's file, or writes one with the hours in it.</summary>
 public static class BotDayConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotDayConfig));
 
     private const string ConfigPath = "Configuration/bot-day.json";
 
-    /// <summary>The starter carries every number written out, because the hours are what a reader opens this file for.</summary>
     private static BotDaySettings Starter() =>
         new()
         {
@@ -127,7 +107,6 @@ public static class BotDayConfig
 
         BotDay.Running = settings.Running ?? BotDay.Running;
 
-        // The six hours together or not at all: one of them out of order would fold a part of the day into nothing.
         var dawn = BotDay.DawnAt;
         var morning = BotDay.MorningAt;
         var noon = BotDay.NoonAt;
@@ -157,7 +136,6 @@ public static class BotDayConfig
         BotDay.Lift = settings.Lift ?? BotDay.Lift;
         BotDay.Most = settings.Most ?? BotDay.Most;
 
-        // A factor without a floor is a veto: whatever the file says, the least the hour may do is a tenth (review A, §3.8).
         var least = settings.Least ?? BotDay.Least;
 
         if (least < 0.1)

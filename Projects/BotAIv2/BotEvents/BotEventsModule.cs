@@ -4,11 +4,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The events of the world as a module (07.10.2026): registers itself from its own <c>Configure</c> (no line in <c>BotCore</c>),
-/// reads <c>Configuration/bot-events.json</c>, offers the five pieces of work the events make (the militia, the fair, the caravan's
-/// lead and its guards, the rumour), settles what the store read back, and starts the events' clock and the <c>Events:</c> line.
-/// </summary>
 public sealed class BotEventsModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEventsModule));
@@ -66,7 +61,6 @@ public sealed class BotEventsModule : BotModule
 
         BotSeasons.Stop();
 
-        // Whatever an event holds goes back before its counters are forgotten: the purse's coin, the creatures, the tickets.
         BotInvasion.Stand();
         BotCaravans.Stand();
         BotFair.Stand();
@@ -80,12 +74,10 @@ public sealed class BotEventsModule : BotModule
     }
 }
 
-/// <summary>The events' way in: the module and the store registered from outside <c>BotCore</c>, after it has read its own switch.</summary>
 public static class BotEventsCore
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotEventsCore));
 
-    /// <summary>After <c>BotCore.Configure</c> (40), which sets <c>BotCore.Enabled</c>; before the world is read, which the store needs.</summary>
     [CallPriority(45)]
     public static void Configure()
     {
@@ -99,7 +91,6 @@ public static class BotEventsCore
     }
 }
 
-/// <summary><c>Configuration/bot-events.json</c>: every key optional, PascalCase, nothing written means the code's own number.</summary>
 public sealed class BotEventsSettings
 {
     public bool? Running { get; set; }
@@ -138,7 +129,6 @@ public sealed class BotEventsSettings
 
     public int? CaravanGuards { get; set; }
 
-    /// <summary>How far a guard may drop back before its trader stands for it, and the most it stands a run (12.10.2026, w7). See <see cref="BotCaravans.GuardSpread"/>.</summary>
     public int? CaravanGuardSpread { get; set; }
 
     public int? CaravanGuardWaitMs { get; set; }

@@ -5,88 +5,60 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-camp.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotCampSettings
 {
-    /// <summary>Whether bots light fires, join them and meet on the road at all. See BotCamp.Running.</summary>
+
     public bool? Running { get; set; }
 
-    /// <summary>The share of the population that lights fires. See BotCamp.LighterShare.</summary>
     public double? LighterShare { get; set; }
 
-    /// <summary>Minutes one bot waits between camps. See BotCamper.EveryMs.</summary>
     public double? CampEveryMinutes { get; set; }
 
-    /// <summary>Minutes one bot waits between fires it joins. See BotBeckon.EveryMs.</summary>
     public double? JoinEveryMinutes { get; set; }
 
-    /// <summary>How far a free bot may be from a fire and be asked to it. See BotCamp.JoinReach.</summary>
     public int? JoinReach { get; set; }
 
-    /// <summary>The most fires at once. See BotCamp.MostFires.</summary>
     public int? MostFires { get; set; }
 
-    /// <summary>The most seats round a fire. See BotCamp.MostAtFire.</summary>
     public int? MostAtFire { get; set; }
 
-    /// <summary>Minutes a keeper keeps its fire. See BotCamp.SitMinutes.</summary>
     public double? SitMinutes { get; set; }
 
-    /// <summary>Minutes a guest sits. See BotFireside.GuestMinutes.</summary>
     public double? GuestMinutes { get; set; }
 
-    /// <summary>What making camp is worth a minute. See BotKindle.Prior.</summary>
     public double? CampPrior { get; set; }
 
-    /// <summary>What a seat at a fire is worth a minute. See BotFireside.Prior.</summary>
     public double? JoinPrior { get; set; }
 
-    /// <summary>The share of the inn's rate an hour by a fire gives back. See BotCamp.RestShare.</summary>
     public double? RestShare { get; set; }
 
-    /// <summary>The share of a night by a fire that comes back as regeneration. See BotCamp.FireBuffShare.</summary>
     public double? FireBuffShare { get; set; }
 
-    /// <summary>Whether a tired bot may leave the world by a fire. See BotCamp.SleepByFire.</summary>
     public bool? SleepByFire { get; set; }
 
-    /// <summary>Whether bots stop to talk on the road. See BotMeetings.Running.</summary>
     public bool? Meetings { get; set; }
 
-    /// <summary>The chance two passing bots stop. See BotMeetings.Chance.</summary>
     public double? MeetChance { get; set; }
 
-    /// <summary>How near two bots must pass. See BotMeetings.Reach.</summary>
     public int? MeetReach { get; set; }
 
-    /// <summary>Seconds between looks at one bot for a meeting. See BotMeetings.EveryMs.</summary>
     public double? MeetEverySeconds { get; set; }
 
-    /// <summary>Minutes a bot goes after a word on the road before another. See BotMeetings.RestMs.</summary>
     public double? MeetRestMinutes { get; set; }
 
-    /// <summary>Whether bots stop to talk inside towns too. See BotMeetings.InTowns.</summary>
     public bool? MeetInTowns { get; set; }
 
-    /// <summary>Seconds between lines round a fire. See BotCampTalk.LineMs.</summary>
     public double? LineSeconds { get; set; }
 
-    /// <summary>The most lines one bot says at one fire. See BotCampTalk.MostLinesEach.</summary>
     public int? MostLinesEach { get; set; }
 }
 
-/// <summary>
-/// Fires in the woods, company round them, and a word on the road, as a module: reads its numbers, puts its words into the
-/// voice's bank, offers the camp and the seat to the auction, and runs the camp's clock — the fires fed and talked at, and
-/// a slice of the population looked at for meetings — once a second. Patrick's point 6 of 29.09.2026. See <see cref="BotCamp"/>.
-/// </summary>
 public sealed class BotCampModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCampModule));
 
     private const string ConfigPath = "Configuration/bot-camp.json";
 
-    /// <summary>The camp's clock. A second: a fire's flame is checked, fed and talked at on it, and a slice of the meetings.</summary>
     public static int TickMs { get; set; } = 1000;
 
     private static CampTimer _timer;

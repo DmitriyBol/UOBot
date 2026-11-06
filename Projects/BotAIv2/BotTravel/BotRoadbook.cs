@@ -8,30 +8,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The roads between the towns: how long each is, how dangerous the ground along it reads, and how often the population
-/// has walked it.
-///
-/// <para>
-/// <b>The road is the navigation graph's, and the knowledge is the population's.</b> A road from one town to another is
-/// drawn by the long tier (<see cref="NavigationService.Route"/>), square to square, a pair a slice on the module's
-/// clock; its length is the steps along its waypoints. That much is a fact about the map, and since 29.09.2026 it is kept
-/// in the store with the walks and only ever shortened (<see cref="Offer"/>): the boot's draw and every traveller's walk are
-/// offered against it, and the shorter wins.
-/// What the population knows is the rest: how many times somebody walked the road (<see cref="Road.Walked"/>), which is
-/// what makes a road "built" — a traveller prefers a road nobody has walked, and the dashboard draws a road once somebody
-/// has — and what the ground along it reads on the quadrant map, which is the same map every bot reads
-/// (<see cref="BotQuad.Safety"/>), averaged along the waypoints when asked. The walks are kept in
-/// <c>Saves/BotRoadbook</c>, so what the island has learned of its roads outlives a restart and is wiped with the rest.
-/// </para>
-///
-/// <para>
-/// <b>What "the ways round" are.</b> The long tier is the way round: it routes over the whole graph and finds the bridge
-/// a thousand steps off, and the walker follows it a leg at a time (BotJourney). A road's danger is shared aloud by the
-/// traveller that walked it, to its guild (BotTravel) — the sharing Patrick asked for — and it is written nowhere else,
-/// because the danger map is one map already.
-/// </para>
-/// </summary>
 public static class BotRoadbook
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRoadbook));
@@ -42,20 +18,16 @@ public static class BotRoadbook
 
         public string To;
 
-        /// <summary>Steps along the waypoints, square to square. Nought while undrawn; -1 when the graph found no way.</summary>
         public int Steps;
 
         public readonly List<Point3D> Points = [];
 
-        /// <summary>Times a traveller walked it end to end.</summary>
         public int Walked;
 
         public DateTime LastWalked;
 
-        /// <summary>Asked of the graph this boot. A road read from the store is drawn again all the same, and kept if no longer.</summary>
         public bool Asked;
 
-        /// <summary>Whether the road held is a traveller's walk rather than the graph's draw.</summary>
         public bool ByWalk;
 
         public bool Drawn => Steps != 0;
@@ -63,7 +35,6 @@ public static class BotRoadbook
         public override string ToString() => $"{From}–{To}: {(Steps > 0 ? $"{Steps} steps" : Steps < 0 ? "no way" : "undrawn")}, walked {Walked}";
     }
 
-    /// <summary>Every fourth waypoint is enough for a line on the map.</summary>
     public static int Thin { get; set; } = 4;
 
     private static readonly Dictionary<(string, string), Road> _roads = new();
@@ -76,7 +47,6 @@ public static class BotRoadbook
 
     public static bool Listed { get; private set; }
 
-    /// <summary>Whether every pair of reachable towns has been asked of the graph.</summary>
     public static bool Drawn { get; private set; }
 
     public static int Roads => _list.Count;
@@ -87,7 +57,6 @@ public static class BotRoadbook
 
     public static long Walks { get; private set; }
 
-    /// <summary>Walks and draws that were shorter than the road held, and took its place; and those that were not.</summary>
     public static long WalksShorter { get; private set; }
 
     public static long WalksNoShorter { get; private set; }
@@ -96,21 +65,12 @@ public static class BotRoadbook
 
     public static long DrawsNoShorter { get; private set; }
 
-    /// <summary>
-    /// How far apart a traveller's footprints are kept, in tiles: sixteen, the graph's own cluster, so a walk is measured on the
-    /// same scale as a drawn road's one point a cluster and neither wins by being sampled finer.
-    /// </summary>
     public static int TrackStep { get; set; } = 16;
 
-    /// <summary>
-    /// More than this between two footprints is not a walk — a gate, a death carried home, a resurrection — and the track is
-    /// not offered. Forty-eight tiles.
-    /// </summary>
     public static int TrackJump { get; set; } = 48;
 
     private static readonly List<Point3D> _offered = [];
 
-    /// <summary>The roads as JSON for the dashboard's <c>/api/roads</c>. Written on the loop, read by the listener's thread.</summary>
     public static volatile string Json = "{\"roads\":[]}";
 
     public static IReadOnlyList<Road> All => _list;
@@ -118,11 +78,9 @@ public static class BotRoadbook
     private static (string, string) Key(string a, string b) =>
         string.CompareOrdinal(a, b) <= 0 ? (a, b) : (b, a);
 
-    /// <summary>The road between two towns, or null when none is listed.</summary>
     public static Road Between(string a, string b) =>
         a != null && b != null && _roads.TryGetValue(Key(a, b), out var road) ? road : null;
 
-    /// <summary>Lists every pair of reachable towns once the towns are known. Returns whether the list stands.</summary>
     public static bool List(Map map)
     {
         if (Listed)
@@ -158,7 +116,6 @@ public static class BotRoadbook
 
                 var road = new Road { From = key.Item1, To = key.Item2 };
 
-                // What the store read before the towns were known is laid over the fresh list.
                 if (_walkedRead.TryGetValue(key, out var read))
                 {
                     road.Walked = read.Walked;
@@ -182,7 +139,6 @@ public static class BotRoadbook
         return true;
     }
 
-    /// <summary>Draws one undrawn road. Returns whether anything is left to draw.</summary>
     public static bool Slice(Map map)
     {
         if (!List(map))
@@ -233,12 +189,12 @@ public static class BotRoadbook
                     }
                 case NavStatus.Pending:
                     {
-                        // The graph is not whole there yet; asked again next slice.
+
                         return true;
                     }
                 default:
                     {
-                        // A road held from the store stands: the graph finding none now is not a shorter one.
+
                         road.Asked = true;
                         road.Steps = road.Steps > 0 ? road.Steps : -1;
                         NoWay++;
@@ -285,7 +241,6 @@ public static class BotRoadbook
         return steps;
     }
 
-    /// <summary>The safety of the ground along a road, averaged over its waypoints: the quadrant map's reading, -1 to 1.</summary>
     public static double Safety(Road road)
     {
         if (road == null || _map == null || road.Points.Count == 0)
@@ -303,10 +258,6 @@ public static class BotRoadbook
         return total / road.Points.Count;
     }
 
-    /// <summary>
-    /// The strongest thing the ground along a road asks of a walker: the quadrant map's <c>Muscle</c> at the worst of its
-    /// waypoints — what lives and has killed there — so a traveller can be measured against the road before it sets out.
-    /// </summary>
     public static double Asks(Road road)
     {
         if (road == null || _map == null || road.Points.Count == 0)
@@ -324,11 +275,6 @@ public static class BotRoadbook
         return worst;
     }
 
-    /// <summary>
-    /// A traveller walked from one town to another, leaving <paramref name="track"/> (its footprints every
-    /// <see cref="TrackStep"/> tiles, from where it set out to where it arrived; null when the walk was broken). Returns the
-    /// road, or null when none is listed between them.
-    /// </summary>
     public static Road Walked(string from, string to, IReadOnlyList<Point3D> track = null)
     {
         var road = Between(from, to);
@@ -347,7 +293,7 @@ public static class BotRoadbook
 
         if (track is { Count: > 1 } && a != null && b != null)
         {
-            // Measured as the road is: square to square, in the road's own direction.
+
             _offered.Clear();
             _offered.Add(a.Square);
 
@@ -375,12 +321,6 @@ public static class BotRoadbook
         return road;
     }
 
-    /// <summary>
-    /// <b>A road is replaced only by a shorter one (Patrick, 29.09.2026: "paths and graphs must be remembered; they can only
-    /// be optimised").</b> The boot's draw and every traveller's walk are measured the same way — the steps along points one
-    /// cluster apart, square to square — and take the road's place only when they come out shorter; a road with no length
-    /// yet takes whatever is offered. Returns whether it took the place.
-    /// </summary>
     private static bool Offer(Road road, List<Point3D> points, bool walked)
     {
         var steps = Math.Max(1, Length(points));
@@ -421,7 +361,6 @@ public static class BotRoadbook
         return true;
     }
 
-    /// <summary>The dashboard's JSON again, for the danger readings that change under it. Once a minute, from the module.</summary>
     public static void Refresh()
     {
         if (Drawn)
@@ -430,7 +369,6 @@ public static class BotRoadbook
         }
     }
 
-    /// <summary>Rewrites the dashboard's JSON. A few kilobytes; on the loop, after a draw or a walk.</summary>
     private static void Write()
     {
         var buffer = new MemoryStream();
@@ -508,11 +446,8 @@ public static class BotRoadbook
                + $"kept from the store and {DrawsNoShorter} not";
     }
 
-    // ---- the store: what was walked, by town names, read before the towns are known and laid over the list ----
-
     private static readonly Dictionary<(string, string), (int Walked, DateTime LastWalked, int Steps, List<Point3D> Points, bool ByWalk)> _walkedRead = new();
 
-    /// <summary>Shape 2: every road walked or with a length, and the road itself, so it is only ever shortened across boots.</summary>
     internal static void Save(IGenericWriter writer)
     {
         var many = 0;
@@ -614,7 +549,6 @@ public static class BotRoadbook
     }
 }
 
-/// <summary>The walks along the roads and the roads themselves, kept between boots. Shape 2 (1: walks only). See <see cref="BotRoadbook"/>.</summary>
 public sealed class BotRoadbookStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRoadbookStore));

@@ -3,29 +3,9 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The outline of a patch of cells as a few smooth rings: marching squares round the cells, Douglas–Peucker to drop the
-/// staircase, Chaikin to round the corners.
-///
-/// <para>
-/// <b>Pure arithmetic on arrays it is handed, and nothing else.</b> No map, no mobile, no static state of the shard: it may run
-/// on the loop or off it (<see cref="BotZoneBuild"/>) and gives the same answer either way. The rings are for the eye and for
-/// the JSON; nothing that routes or hunts reads them — the raster is the answer to "what is here", and a smoothed corner that
-/// cuts two tiles off a patrol must never make a planner believe the two tiles are safe.
-/// </para>
-///
-/// <para>
-/// <b>Holes are filled before tracing.</b> The contract allows outer rings only, and a hole inside a patrol area — a pond, a
-/// house — is not a place a bot can stand safe in the middle of a pack anyway.
-/// </para>
-/// </summary>
 public static class BotZoneShapes
 {
-    /// <summary>
-    /// The marching-squares segments per case, as the proven table of d3-contour: corners bottom-left 1, bottom-right 2,
-    /// top-right 4, top-left 8; points in half-units of the sample grid, relative to the square's top-left sample, each segment
-    /// directed so the filled side lies to its left in screen coordinates.
-    /// </summary>
+
     private static readonly int[][] Cases =
     [
         [],
@@ -55,11 +35,6 @@ public static class BotZoneShapes
         public List<int> Points;
     }
 
-    /// <summary>
-    /// Rings round the filled cells of a mask, in map tiles. Cell (i, j) of the mask is map cell (<paramref name="ox"/> + i,
-    /// <paramref name="oy"/> + j), four tiles to a side. Each ring comes back as x0, y0, x1, y1, …, not repeating its first
-    /// point; at most <paramref name="mostRings"/> of them, largest first, each of at most <paramref name="mostPoints"/> points.
-    /// </summary>
     public static List<int[]> Rings(
         byte[] mask, int w, int h, int ox, int oy, double epsilon, int mostPoints, int mostRings, int passes
     )
@@ -71,7 +46,6 @@ public static class BotZoneShapes
             return rings;
         }
 
-        // Padded by one on every side, so every blob is closed by the grid's own border.
         var pw = w + 2;
         var ph = h + 2;
         var grid = new byte[pw * ph];
@@ -96,7 +70,6 @@ public static class BotZoneShapes
             return rings;
         }
 
-        // Largest first, so a cap on rings drops the specks rather than the body.
         List<(double Area, List<(double X, double Y)> Points)> sized = new(traced.Count);
 
         for (var r = 0; r < traced.Count; r++)
@@ -106,7 +79,7 @@ public static class BotZoneShapes
 
             for (var k = 0; k + 1 < half.Count; k += 2)
             {
-                // Half-units of the padded sample grid to tiles: see the note on the class for the arithmetic.
+
                 points.Add(((ox - 1 + half[k] / 2.0) * BotZoneState.Cell, (oy - 1 + half[k + 1] / 2.0) * BotZoneState.Cell));
             }
 
@@ -136,7 +109,6 @@ public static class BotZoneShapes
         return rings;
     }
 
-    /// <summary>Every empty sample the border cannot reach, four ways, becomes filled.</summary>
     private static void FillHoles(byte[] grid, int pw, int ph)
     {
         var outside = new bool[grid.Length];
@@ -198,7 +170,6 @@ public static class BotZoneShapes
         }
     }
 
-    /// <summary>Marching squares with d3's stitching: closed rings in half-units, each ending on its own first point.</summary>
     private static List<List<int>> Trace(byte[] grid, int pw, int ph)
     {
         List<List<int>> done = [];
@@ -307,7 +278,6 @@ public static class BotZoneShapes
         }
     }
 
-    /// <summary>Douglas–Peucker until the ring fits the point cap after smoothing, then Chaikin; rounded to tiles.</summary>
     private static int[] Smooth(List<(double X, double Y)> ring, double epsilon, int mostPoints, int passes)
     {
         passes = Math.Clamp(passes, 0, 4);
@@ -325,7 +295,7 @@ public static class BotZoneShapes
 
         if (kept.Count > cap)
         {
-            // Still too many: every n-th point, which keeps the shape's extent if not its detail.
+
             var thinned = new List<(double X, double Y)>(cap);
             var step = kept.Count / (double)cap;
 
@@ -380,7 +350,6 @@ public static class BotZoneShapes
         return result.ToArray();
     }
 
-    /// <summary>Douglas–Peucker on a closed ring: split at the first point and the point farthest from it, each half simplified.</summary>
     private static List<(double X, double Y)> Simplify(List<(double X, double Y)> ring, double eps)
     {
         var n = ring.Count;
@@ -428,7 +397,6 @@ public static class BotZoneShapes
         return kept;
     }
 
-    /// <summary>Keeps the points between two kept ones that stand off the chord by more than epsilon, without recursion.</summary>
     private static void Mark(List<(double X, double Y)> ring, int from, int to, double eps, bool[] keep)
     {
         var n = ring.Count;

@@ -8,34 +8,14 @@ using Server.Spells.Sixth;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A rune-mage marking a rune for a place its guild holds none for: walk to a tile the engine will let a rune be marked
-/// on, cast Mark, aim it at a blank, and keep the rune.
-///
-/// <para>
-/// <b>The pathfinder is simply the first mage of its guild to stand there.</b> Nothing sends a mage to mark anything: a
-/// mage that arrives in a town (a journey, a boat, a gate), comes home to its seat, or walks out of a cave mouth with its
-/// party is offered the mark by <see cref="BotMarker"/> when its guild holds no rune there and it carries a blank. The
-/// rune goes into the mage's own book (<see cref="BotRunes.Satchel"/>) and the place into the guild's knowledge
-/// (<see cref="BotRuneShelf"/>), from which the library is written and the other mages are lent copies.
-/// </para>
-///
-/// <para>
-/// <b>A fizzle is the engine's, and so is the cost of one.</b> <c>Spell.CheckSequence</c> takes the reagents before the
-/// skill check, so every failed try spends a set of herbs; <see cref="BotRunes.Tries"/> bounds how many, and a mark given
-/// up rests its place for this mage for <see cref="BotMarker.RestMs"/>.
-/// </para>
-/// </summary>
 public sealed class BotMark : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMark));
 
     public const string Trade = "mark";
 
-    /// <summary>What a mark is reckoned at a minute. Thirty: above a walk home and a journey, below any real work nearby.</summary>
     public static double Prior { get; set; } = 30.0;
 
-    /// <summary>How long a mage may take to walk to the spot and mark it. Three minutes: the place is within a town's box or forty tiles.</summary>
     public static int CapMs { get; set; } = 180000;
 
     public static long Undertaken { get; private set; }
@@ -92,12 +72,10 @@ public sealed class BotMark : BotDeed
 
     public override double Minutes => 1.0;
 
-    /// <summary>It pays nothing and is not for money: the guild's knowledge of a place. See <see cref="BotDeed.Unpaid"/>.</summary>
     public override bool Unpaid => true;
 
     public override double Coin => 0.0;
 
-    /// <summary>A minute's work with reagents spent in the middle of it: not bid away by the first better offer.</summary>
     public override bool Steadfast => true;
 
     public override string Stage => _spell != null ? $"casting Mark for {_name}" : $"to mark a rune for {_name}";
@@ -136,7 +114,6 @@ public sealed class BotMark : BotDeed
             return GiveUp(body, $"could not mark a rune for {_name} in {CapMs / 60000} minutes");
         }
 
-        // Beaten to it: another of the guild's mages marked this place while this one walked.
         if (BotRuneShelf.Held(_guild, _map, _anchor, BotRunes.Near * 2) != null)
         {
             Beaten++;
@@ -144,7 +121,6 @@ public sealed class BotMark : BotDeed
             return BotDoing.Done($"{_guild} already holds a rune for {_name}");
         }
 
-        // On the spot, or on any tile beside it the engine would let a rune be marked on.
         if (!body.InRange(_spot, 1) || !BotRunes.Landable(_map, body.Location) && body.Location != _spot)
         {
             return BotDoing.Walk(_map, _spot, body.InRange(_spot, 1) ? BotArrival.Exactly : BotArrival.Within(1), $"to mark a rune for {_name}");
@@ -157,7 +133,7 @@ public sealed class BotMark : BotDeed
 
         if (!BotRunes.Ready(body, BotRunes.Mark, out var scroll, out _, out var why))
         {
-            // Mana and the engine's recovery come back by themselves; anything else will not while the mage stands here.
+
             if (why is "too little mana" or "not recovered" or "already casting")
             {
                 _nextTick = now + BotRunes.RetryMs;
@@ -188,7 +164,6 @@ public sealed class BotMark : BotDeed
         return BotDoing.Work($"casting Mark for {_name}");
     }
 
-    /// <summary>The cast in the air, its target, and what came of it.</summary>
     private BotDoing Casting(BotMobile body, long now)
     {
         if (_spell.IsCasting)
@@ -196,7 +171,6 @@ public sealed class BotMark : BotDeed
             return BotDoing.Work($"casting Mark for {_name}");
         }
 
-        // The engine has put a target on the mage: the click a bot has no client for. See BotMend.Aim.
         if (body.Target is SpellTarget<Item> aim && ReferenceEquals(aim.Spell, _spell))
         {
             if (_blank is not { Deleted: false } || !_blank.IsChildOf(body.Backpack) || _blank.Marked)
@@ -255,7 +229,6 @@ public sealed class BotMark : BotDeed
         return BotDoing.Failed(why);
     }
 
-    /// <summary>Marked: the place into the guild's knowledge, the rune into the mage's own book.</summary>
     private BotDoing Filed(BotMobile body)
     {
         var rune = _blank;
@@ -269,7 +242,6 @@ public sealed class BotMark : BotDeed
 
         var own = BotRunes.Satchel(body, true);
 
-        // The engine's own way into a book: an entry is written and the rune is gone.
         if (own == null || own.Entries.Count >= 16 || !own.OnDragDrop(body, rune))
         {
             BotRunes.Bind(body, rune);
@@ -292,7 +264,7 @@ public sealed class BotMark : BotDeed
 
     public override void Drop(IBotWilful bot)
     {
-        // A cast still in the air when the work is taken off the mage: its target is let go, or it hangs on the body.
+
         if (_spell != null && bot?.Self is { Target: SpellTarget<Item> aim } body && ReferenceEquals(aim.Spell, _spell))
         {
             body.Target.Cancel(body, Server.Targeting.TargetCancelType.Canceled);
@@ -314,21 +286,14 @@ public sealed class BotMark : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a rune-mage with a blank the mark of a place its guild holds no rune for, where it stands: its seat, a cave
-/// mouth, or the town it is in. See <see cref="BotMark"/>.
-/// </summary>
 public sealed class BotMarker : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotMarker));
 
-    /// <summary>How near its seat a mage stands to be offered the seat's rune. Forty.</summary>
     public static int SeatReach { get; set; } = 40;
 
-    /// <summary>How near a cave mouth a mage stands to be offered the mouth's rune. Forty: a party walking out stands within it.</summary>
     public static int MouthReach { get; set; } = 40;
 
-    /// <summary>How long a mark given up rests its place for that mage. Twenty minutes.</summary>
     public static int RestMs { get; set; } = 1200000;
 
     public static long Asked { get; private set; }
@@ -345,7 +310,6 @@ public sealed class BotMarker : IBotProposer
 
     public static long Forbidden { get; private set; }
 
-    /// <summary>Mages at an unmarked place with a blank that the engine would not let cast Mark; the reasons are in the recall's list, prefixed "mark:".</summary>
     public static long Unable { get; private set; }
 
     public static long Offered { get; private set; }
@@ -432,11 +396,9 @@ public sealed class BotMarker : IBotProposer
             return null;
         }
 
-        // Asked of the engine before the offer, not after the walk: a book Mark below 50 Magery never lands in this era,
-        // and a mark offered to fail would teach the ledger that marking fails. Mana comes back and is not a refusal.
         if (!BotRunes.Ready(body, BotRunes.Mark, out _, out _, out var why) && why is not ("too little mana" or "not recovered" or "already casting"))
         {
-            // Rested like a failed mark: Magery grows by tenths, and the engine's answer will not change by the next beat.
+
             Unable++;
             BotRunes.Unready($"mark: {why}");
             Rest(mage, name);
@@ -456,10 +418,6 @@ public sealed class BotMarker : IBotProposer
         return new BotMark(map, guild.Name, name, kind, anchor, spot);
     }
 
-    /// <summary>
-    /// The place here the guild holds no rune for: its seat first — every recall home is made on it — then a cave mouth,
-    /// which a company is gated to, then the town the mage stands in.
-    /// </summary>
     private static bool Candidate(BotMobile mage, Guild guild, Map map, out string name, out string kind, out Point3D anchor)
     {
         var at = mage.Location;
@@ -507,7 +465,6 @@ public sealed class BotMarker : IBotProposer
             {
                 name = $"the mouth of {into.Name}";
 
-                // A second mouth into the same dungeon is its own place, not the first one moved.
                 if (BotRuneShelf.Named(guild.Name, name) is { } same && BotRunes.Apart(same.Spot, best.From) > near)
                 {
                     name = $"the mouth of {into.Name} at ({best.From.X}, {best.From.Y})";
@@ -536,7 +493,6 @@ public sealed class BotMarker : IBotProposer
         return false;
     }
 
-    /// <summary>The tile a place's rune is marked on, found once per place and kept: the anchor, or the nearest tile the engine allows.</summary>
     private static bool SpotFor(Map map, string name, Point3D anchor, out Point3D spot)
     {
         if (_spots.TryGetValue(name, out var kept) && kept.Anchor == anchor)

@@ -7,73 +7,46 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The numbers of <c>Configuration/bot-character.json</c>. A missing key keeps the code's value; keys are PascalCase.</summary>
 public sealed class BotCharacterSettings
 {
-    /// <summary>Whether natures move the auction and the fight. See BotTraits.On.</summary>
+
     public bool? Traits { get; set; }
 
-    /// <summary>How far one trait leans a price. See BotTraits.Lean.</summary>
     public double? Lean { get; set; }
 
-    /// <summary>The range the whole nature is held in. See BotTraits.Least and BotTraits.Most.</summary>
     public double? Least { get; set; }
 
     public double? Most { get; set; }
 
-    /// <summary>Kills that make a veteran. See BotTraits.VeteranKills.</summary>
     public int? VeteranKills { get; set; }
 
-    /// <summary>Whether lives are written and told. See BotBiography.On.</summary>
     public bool? Biography { get; set; }
 
-    /// <summary>The share of a fire's lines that are tales. See BotBiography.TaleChance.</summary>
     public double? TaleChance { get; set; }
 
-    /// <summary>How many heard stories one bot carries. See BotBiography.MostHeard.</summary>
     public int? MostHeard { get; set; }
 
-    /// <summary>The share of tale-lines that retell a heard story. See BotBiography.RetellShare.</summary>
     public double? RetellShare { get; set; }
 
-    /// <summary>Hours before a bot tells the same tale of its own again. See BotBiography.TaleRestHours.</summary>
     public double? TaleRestHours { get; set; }
 
-    /// <summary>A sociable bot's multiplier on the tale chance. See BotBiography.SociableTaleBoost.</summary>
     public double? SociableTaleBoost { get; set; }
 
-    /// <summary>Whether bots form friendships and feuds. See BotTies.On.</summary>
     public bool? Ties { get; set; }
 
-    /// <summary>The regard at which another bot is an enemy to be challenged. See BotTies.DuelAt.</summary>
     public double? DuelAt { get; set; }
 
-    /// <summary>The regard at which another bot is a friend. See BotTies.FriendAt.</summary>
     public double? FriendAt { get; set; }
 
-    /// <summary>Whether feuds are fought out in duels. See BotGrudges.On.</summary>
     public bool? Duels { get; set; }
 }
 
-/// <summary>
-/// A bot's character as a module: reads its numbers, puts its words into the voice's bank, offers the seeking out of an enemy
-/// to the auction, runs the clock that challenges, judges duels, lets ties fade and writes the <c>Character:</c> line, and says at
-/// boot how the population's natures fall. Patrick's idea of 07.10.2026 (night 17, "a livelier world"). See <see cref="BotTraits"/>,
-/// <see cref="BotBiography"/>, <see cref="BotTies"/> and <see cref="BotGrudges"/>.
-///
-/// <para>
-/// <b>Registers itself</b> from its own <c>Configure</c>, after <c>BotCore.Configure</c> (priority 41 against 40), rather than from
-/// the list in <c>BotCore</c>: four agents built new modules on the same night and each one line in the same list would have been
-/// four patches colliding in one hunk. A World-phase module needs nothing from the Settings phase, so the order is harmless.
-/// </para>
-/// </summary>
 public sealed class BotCharacterModule : BotModule
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCharacterModule));
 
     private const string ConfigPath = "Configuration/bot-character.json";
 
-    /// <summary>The clock: challenges queued are made and duels read on it. Two seconds.</summary>
     public static int TickMs { get; set; } = 2000;
 
     private static CharacterTimer _timer;
@@ -82,7 +55,6 @@ public sealed class BotCharacterModule : BotModule
 
     private static long _refreshTick;
 
-    /// <summary>Whether the world has started and the boot's raising is over: births after it are newcomers. See BotTraits.Born.</summary>
     public static bool Started { get; private set; }
 
     [CallPriority(41)]
@@ -102,7 +74,7 @@ public sealed class BotCharacterModule : BotModule
 
     public override void Start()
     {
-        // The seams BotPolitics leaves for this folder (07.10.2026, wired at the merge of traits17 and politics17).
+
         BotPolitics.TiesRegard = static (a, b) => BotTies.Regard(a, b);
         BotPolitics.Veteran = static bot => BotTraits.Veteran(bot);
 
@@ -157,7 +129,6 @@ public sealed class BotCharacterModule : BotModule
         );
     }
 
-    /// <summary>The clock's work, every <see cref="TickMs"/>.</summary>
     public static void Tick(long now)
     {
         if (now - _refreshTick >= Math.Max(5000, BotGrudges.LookEveryMs))
@@ -183,7 +154,6 @@ public sealed class BotCharacterModule : BotModule
         }
     }
 
-    /// <summary>The words, written into the voice's bank for every occasion <c>bot-voice.json</c> does not already name.</summary>
     public static Dictionary<string, string[]> Defaults() =>
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -261,7 +231,6 @@ public sealed class BotCharacterModule : BotModule
         _timer?.Stop();
         _timer = null;
 
-        // The lives themselves are kept: they are what the save holds, and a reload reads the world, not the characters.
         BotTraits.Forget();
         BotBiography.Forget();
         BotTies.Forget();
@@ -278,10 +247,9 @@ public sealed class BotCharacterModule : BotModule
     }
 }
 
-/// <summary>A bot's character on its page: <c>/api/bot/&lt;name&gt;</c> and the snapshot. Called by <c>BotWebSnapshot</c>.</summary>
 public static class BotCharacterWeb
 {
-    /// <summary>The most ties written on a bot's page, and the least regard worth writing.</summary>
+
     public static int MostTies { get; set; } = 6;
 
     public static double LeastRegard { get; set; } = 10.0;
@@ -340,7 +308,6 @@ public static class BotCharacterWeb
         w.WritePropertyName("ties");
         w.WriteStartArray();
 
-        // The strongest few, strongest first: written for every bot every two seconds, so the page's object stays small.
         Span<bool> written = stackalloc bool[life.Ties.Count];
 
         for (var n = 0; n < MostTies; n++)

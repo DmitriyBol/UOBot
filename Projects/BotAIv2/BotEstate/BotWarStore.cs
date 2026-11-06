@@ -3,25 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps the war ledger across restarts: the wars standing, with their clocks, kills and plunder; the truces
-/// and the once-a-day declaration clocks; and the halls a lost war still owes a move.
-///
-/// <para>
-/// <b>Until 14.09.2026 a restart was an amnesty.</b> <c>BotWar.Reconcile</c> ended every engine war left
-/// standing at boot because the ledger had no score or clock for it, and the truces and declaration clocks
-/// were in memory, so the Crown, beaten at 02:41, was free to declare on the Blade again at 02:49: the
-/// day's truce lasted eight minutes. On a night of hourly builds the rules Patrick asked for ("once a day")
-/// meant nothing.
-/// </para>
-///
-/// <para>
-/// <b>Clocks are saved as durations, not as ticks.</b> <c>Core.TickCount</c> is the process's own uptime and
-/// means nothing to the next process; what is written is how long a war has run, how long a truce has left,
-/// how long ago a guild last declared, and each is rebased against the new clock on load. The minutes the
-/// shard was down are not counted against anybody: a truce of a day is a day of the shard running.
-/// </para>
-/// </summary>
 public sealed class BotWarStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWarStore));
@@ -131,7 +112,6 @@ public sealed class BotWarStore : GenericPersistence
             writer.Write(owed[i].Winner);
         }
 
-        // Shape 2: the opinions, so a restart is not a reconciliation. See BotRegard.Restore.
         List<(string Of, string For, double Held)> opinions = [];
 
         foreach (var (pair, held) in BotRegard.Opinions)

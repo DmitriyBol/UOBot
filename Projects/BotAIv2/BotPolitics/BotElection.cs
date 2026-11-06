@@ -8,124 +8,60 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Who leads each guild, by the members' vote: elections of the head every few hours or when the head is gone or has fallen,
-/// and the plot that can depose a head the members have lost faith in.
-///
-/// <para>
-/// <b>Patrick's order of 07.10.2026, night: "elections of the guild head (members vote by the candidate's appeal: kills,
-/// generosity, victories); a conspiracy: the discontented can depose the head".</b> Until now a guild's head was whoever the
-/// engine had put there — the founder, or, when a head was deleted, the member the engine's getter drew by fealty
-/// (<c>Guild.CalculateGuildmaster</c>) — and nothing the members did or thought ever changed it.
-/// </para>
-///
-/// <para>
-/// <b>The vote.</b> Every <see cref="EveryMs"/> of running time, at once when the head has left or been deleted, and when the
-/// head falls (<see cref="OnFall"/>, not inside <see cref="GapMs"/> of the last vote), the guild's <see cref="Candidates"/> best
-/// members by their record stand, with the head. A candidate's appeal is its renown (the engine's fame, which kills earn,
-/// times <see cref="FameWeight"/>), its kills of other guilds' members (<see cref="KillWeight"/>), the wars its guild won while
-/// it was a member (<see cref="WinWeight"/>), and the coin it gave the chest as dues (one point per <see cref="GiftPer"/>gp);
-/// each voter weighs that by its own needs — a poor voter counts gifts <see cref="PoorGifts"/> times, a fighter counts kills
-/// <see cref="FighterKills"/> times — and adds its own regard of the candidate and the candidate's being a veteran when those
-/// are wired (<see cref="BotPolitics.TiesRegard"/>, <see cref="BotPolitics.Veteran"/>). Every member votes for the candidate
-/// that appeals to it most (a candidate for itself); the most votes win, the better record breaks a tie. The winner becomes the
-/// engine's leader with every member's fealty sworn to it (<see cref="BotGuilds.Crown"/>), so the engine's own daily count
-/// agrees, and the "head never leaves" rule holds for it as for any head.
-/// </para>
-///
-/// <para>
-/// <b>The plot.</b> Every <see cref="PlotLookMs"/>, not while the guild is at war and not inside <see cref="GapMs"/> of a vote,
-/// the members are asked whether they are discontented: the guild lost <see cref="LostInRow"/> wars in a row, or the member
-/// stands under the keep while the chest holds the rich mark and has paid for nothing in <see cref="UnpaidMs"/>, or its regard
-/// of the head is <see cref="LowRegard"/> or worse (when wired). At <see cref="DiscontentShare"/> of the members they call a
-/// vote of no confidence: the discontented vote against, and so does any content member to whom a rival appeals
-/// <see cref="RivalMargin"/> times as much as the head. Above <see cref="CarryShare"/> it carries, and an election is held at
-/// once without the deposed head, who stays a member.
-/// </para>
-/// </summary>
 public static class BotElection
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotElection));
 
-    /// <summary>Whether guilds elect their heads. Off, and the head is whoever the engine has, as before.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>A head's term, in milliseconds of running time: six hours.</summary>
     public static int EveryMs { get; set; } = 21600000;
 
-    /// <summary>A guild with no election on record holds its first within this of the module starting, spread. An hour.</summary>
     public static int FirstMs { get; set; } = 3600000;
 
-    /// <summary>The least running time between two votes of one guild when the head fell or a plot was afoot: an hour.</summary>
     public static int GapMs { get; set; } = 3600000;
 
-    /// <summary>Whether a head's fall calls a vote (outside <see cref="GapMs"/>). The fallen head stands again on its record.</summary>
     public static bool OnFall { get; set; } = true;
 
-    /// <summary>How many members stand besides the head: the best by record.</summary>
     public static int Candidates { get; set; } = 3;
 
-    /// <summary>Appeal per point of the engine's fame: a hundred fame is one point.</summary>
     public static double FameWeight { get; set; } = 0.01;
 
-    /// <summary>Appeal per kill of another guild's member.</summary>
     public static double KillWeight { get; set; } = 5.0;
 
-    /// <summary>Appeal per war the guild won while the candidate was in it.</summary>
     public static double WinWeight { get; set; } = 10.0;
 
-    /// <summary>Gold given to the chest as dues for one point of appeal.</summary>
     public static int GiftPer { get; set; } = 100;
 
-    /// <summary>Appeal per point of the voter's regard of the candidate, when <see cref="BotPolitics.TiesRegard"/> is wired.</summary>
     public static double RegardWeight { get; set; } = 0.2;
 
-    /// <summary>Appeal a veteran candidate has, when <see cref="BotPolitics.Veteran"/> is wired.</summary>
     public static double VeteranBonus { get; set; } = 15.0;
 
-    /// <summary>Appeal the sitting head has over an equal rival: the known hand.</summary>
     public static double Incumbency { get; set; } = 5.0;
 
-    /// <summary>How many times a voter under the keep counts a candidate's gifts to the chest.</summary>
     public static double PoorGifts { get; set; } = 2.0;
 
-    /// <summary>How many times a fighting voter counts a candidate's renown and kills.</summary>
     public static double FighterKills { get; set; } = 1.5;
 
-    /// <summary>Whether a candidate votes for itself.</summary>
     public static bool SelfVote { get; set; } = true;
 
-    /// <summary>Whether the discontented may depose a head.</summary>
     public static bool Plotting { get; set; } = true;
 
-    /// <summary>The share of members (the head apart) that must be discontented to call a vote of no confidence.</summary>
     public static double DiscontentShare { get; set; } = 0.4;
 
-    /// <summary>The share of members (the head apart) whose vote against carries it.</summary>
     public static double CarryShare { get; set; } = 0.5;
 
-    /// <summary>Wars lost in a row that make every member discontented.</summary>
     public static int LostInRow { get; set; } = 2;
 
-    /// <summary>How long a rich chest may have paid for nothing before a member under the keep is discontented: three hours.</summary>
     public static int UnpaidMs { get; set; } = 10800000;
 
-    /// <summary>A member whose regard of the head is this or worse is discontented, when ties are wired.</summary>
     public static double LowRegard { get; set; } = -30.0;
 
-    /// <summary>How often each guild is asked whether a plot is afoot: ten minutes.</summary>
     public static int PlotLookMs { get; set; } = 600000;
 
-    /// <summary>
-    /// How long a head elected after a vote of no confidence is spared another: three hours. Without it a reason no head can mend
-    /// in an hour — a rich chest nobody needed to draw on — would depose one head an hour.
-    /// </summary>
     public static int GraceMs { get; set; } = 10800000;
 
-    /// <summary>A content member votes against the head when a rival appeals to it this many times as much.</summary>
     public static double RivalMargin { get; set; } = 1.25;
 
-    /// <summary>Elections held, by what called them.</summary>
     public static long Held { get; private set; }
 
     public static long ByTerm { get; private set; }
@@ -136,21 +72,16 @@ public static class BotElection
 
     public static long ByVote { get; private set; }
 
-    /// <summary>Elections that changed the head, and that kept it.</summary>
     public static long NewHeads { get; private set; }
 
     public static long Kept { get; private set; }
 
-    /// <summary>Votes cast in all elections.</summary>
     public static long Votes { get; private set; }
 
-    /// <summary>Heads elected before a restart put back at the head of their guilds after it.</summary>
     public static long Restored { get; private set; }
 
-    /// <summary>Heads fallen inside <see cref="GapMs"/> of a vote, so no vote.</summary>
     public static long FellInGap { get; private set; }
 
-    /// <summary>Plot looks that found discontent at all, and the members found discontented by reason.</summary>
     public static long PlotLooks { get; private set; }
 
     public static long ForLosses { get; private set; }
@@ -159,7 +90,6 @@ public static class BotElection
 
     public static long ForDislike { get; private set; }
 
-    /// <summary>Votes of no confidence called, carried and failed; plot looks held for a war.</summary>
     public static long Called { get; private set; }
 
     public static long Carried { get; private set; }
@@ -168,20 +98,17 @@ public static class BotElection
 
     public static long AtWar { get; private set; }
 
-    /// <summary>Kills of other guilds' members, wars won and dues given, counted towards the members' records.</summary>
     public static long KillsCounted { get; private set; }
 
     public static long WinsCounted { get; private set; }
 
     public static long GiftsCounted { get; private set; }
 
-    /// <summary>One guild's office: who heads it by whose vote, and its run of lost wars.</summary>
     private sealed class Office
     {
-        /// <summary>The head's name: elected, or as found when the guild was first looked at.</summary>
+
         public string Head;
 
-        /// <summary>When the last vote was held (or the office opened), as a tick.</summary>
         public long At;
 
         public bool Elected;
@@ -198,18 +125,15 @@ public static class BotElection
 
         public long PlotAt;
 
-        /// <summary>Before this tick no vote of no confidence: one failed.</summary>
         public long PlotCool;
 
         public int Discontent;
 
         public string Why;
 
-        /// <summary>Read back from the store: the head is put back at the first look, if still a member.</summary>
         public bool Restore;
     }
 
-    /// <summary>One member's record, by name: what it is elected by.</summary>
     private sealed class Record
     {
         public int WarKills;
@@ -231,7 +155,7 @@ public static class BotElection
     {
         if (!_offices.TryGetValue(guild, out var office))
         {
-            // The first vote within FirstMs, spread, so the guilds do not all vote in one minute.
+
             var delay = Math.Max(0, FirstMs) / 2 + Utility.Random(Math.Max(1, FirstMs));
 
             _offices[guild] = office = new Office
@@ -255,9 +179,6 @@ public static class BotElection
         return rec;
     }
 
-    // ---- what feeds the records --------------------------------------------------------------------------------------------
-
-    /// <summary>A member of one guild killed a member of another. From <c>BotMobile.OnDeath</c>.</summary>
     public static void Slew(BotMobile slayer, Mobile fallen)
     {
         if (slayer?.Name == null || slayer.Guild is not Guild mine || fallen?.Guild is not Guild theirs || mine == theirs)
@@ -269,7 +190,6 @@ public static class BotElection
         KillsCounted++;
     }
 
-    /// <summary>A member paid dues into its guild's chest. From <c>BotDues.Pay</c>.</summary>
     public static void Gave(BotMobile bot, int gold)
     {
         if (bot?.Name == null || gold <= 0)
@@ -281,10 +201,6 @@ public static class BotElection
         GiftsCounted += gold;
     }
 
-    /// <summary>
-    /// A war ended: <paramref name="winner"/> null for a draw, which breaks both sides' runs. Every member of the winner has a war
-    /// won to its name; the loser's run of losses grows. From <c>BotWar.End</c>.
-    /// </summary>
     public static void WarEnded(string a, string b, string winner)
     {
         if (a == null || b == null)
@@ -320,9 +236,6 @@ public static class BotElection
         }
     }
 
-    // ---- the look ----------------------------------------------------------------------------------------------------------
-
-    /// <summary>Once a minute: heads gone or fallen, terms run out, and plots.</summary>
     public static void Look(long now)
     {
         if (!Running)
@@ -349,7 +262,6 @@ public static class BotElection
             var office = Get(guild.Name, now);
             var head = BotGuilds.Head(guild);
 
-            // The head elected before a restart is put back, if it is still a member.
             if (office.Restore)
             {
                 office.Restore = false;
@@ -363,7 +275,6 @@ public static class BotElection
                 }
             }
 
-            // A guild first looked at: its head is taken as found, and the first vote is due within FirstMs.
             if (office.Head == null)
             {
                 office.Head = head?.Name;
@@ -427,9 +338,6 @@ public static class BotElection
         return null;
     }
 
-    // ---- appeal ------------------------------------------------------------------------------------------------------------
-
-    /// <summary>Whether this bot fights for a living: its best fighting skill is fifty or more.</summary>
     public static bool Fighter(Mobile bot)
     {
         if (bot == null)
@@ -446,7 +354,6 @@ public static class BotElection
         return best >= 50.0;
     }
 
-    /// <summary>A candidate's record as anybody would read it: renown, kills, victories, gifts and veteran standing.</summary>
     private static double Record0(BotMobile cand)
     {
         var rec = _records.GetValueOrDefault(cand.Name);
@@ -460,7 +367,6 @@ public static class BotElection
         return score + (BotPolitics.IsVeteran(cand) ? VeteranBonus : 0.0);
     }
 
-    /// <summary>What a candidate is worth to this voter: the record weighed by the voter's needs, its regard, and its own name.</summary>
     private static double Appeal(BotMobile voter, BotMobile cand, BotMobile incumbent)
     {
         var rec = _records.GetValueOrDefault(cand.Name);
@@ -493,7 +399,6 @@ public static class BotElection
         return appeal;
     }
 
-    /// <summary>The candidates: the best <see cref="Candidates"/> members by record, and the head, none of them <paramref name="barred"/>.</summary>
     private static void Stand(Guild guild, BotMobile head, BotMobile barred)
     {
         _cands.Clear();
@@ -533,19 +438,12 @@ public static class BotElection
         }
     }
 
-    // ---- the vote ----------------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// Holds an election: candidates stand, every member votes, the winner is crowned. <paramref name="cause"/>: 0 a term, 1 the
-    /// head gone, 2 the head fallen, 3 no confidence (<paramref name="barred"/> the deposed head).
-    /// </summary>
     private static void Elect(Guild guild, Office office, string why, int cause, BotMobile barred, long now)
     {
         var was = BotGuilds.Head(guild);
 
         Stand(guild, was, barred);
 
-        // Whatever happens, the clock moves: a guild that cannot elect is not asked again every minute.
         office.At = now;
 
         if (_cands.Count == 0)
@@ -696,8 +594,6 @@ public static class BotElection
         BotEvents.Post("politics", winner, $"{winner.Name} {(changed ? "elected" : "re-elected")} head of {guild.Name}: {counts[win]} of {voters} votes ({why})");
     }
 
-    // ---- the plot ----------------------------------------------------------------------------------------------------------
-
     private static void Plot(Guild guild, Office office, BotMobile head, long now)
     {
         if (now - office.At < GapMs || now - office.PlotCool < 0)
@@ -712,7 +608,6 @@ public static class BotElection
             return;
         }
 
-        // Under this head: a chest that paid nothing for three hours counts against the head only for the hours it has led.
         var lost = LostInRow > 0 && office.LostRow >= LostInRow;
         var unpaid = BotChest.Holds(guild.Name) >= BotGuilds.RichChest && Math.Min(BotChest.SinceDraw(guild.Name), now - office.At) >= UnpaidMs;
         var ties = BotPolitics.TiesRegard != null;
@@ -784,7 +679,6 @@ public static class BotElection
 
         Called++;
 
-        // The vote: the discontented against; a content member against when a rival appeals to it enough more than the head.
         Stand(guild, null, head);
 
         var against = discontented;
@@ -870,9 +764,6 @@ public static class BotElection
         BotVoice.ToGuild(guild.Name, "politics:confidence", fill);
     }
 
-    // ---- telling -----------------------------------------------------------------------------------------------------------
-
-    /// <summary>The guild's office on the page: its head by vote, the votes, when, and the run of lost wars.</summary>
     public static void Write(Utf8JsonWriter w, string guild)
     {
         if (guild == null || !_offices.TryGetValue(guild, out var office))
@@ -893,7 +784,6 @@ public static class BotElection
         w.WriteNumber("discontent", office.Discontent);
     }
 
-    /// <summary>The <c>Guilds:</c> line's clause.</summary>
     public static string Describe()
     {
         if (!Running)
@@ -943,8 +833,6 @@ public static class BotElection
 
         return say.ToString();
     }
-
-    // ---- the store ---------------------------------------------------------------------------------------------------------
 
     internal static void Save(IGenericWriter writer)
     {
@@ -1015,7 +903,7 @@ public static class BotElection
 
             _offices[name] = new Office
             {
-                // A head only adopted, never elected, is adopted afresh: the population after a restart may have another.
+
                 Head = elected && !string.IsNullOrEmpty(head) ? head : null,
                 At = now - Math.Clamp(ago, 0L, (long)int.MaxValue),
                 Elected = elected,
@@ -1073,11 +961,6 @@ public static class BotElection
         GiftsCounted = 0;
     }
 
-    /// <summary>
-    /// Every guild's office and every member's record forgotten, for Patrick's reset (07.10.2026, reset26): exactly what
-    /// <see cref="Save"/> writes. Kept by the guild's name and the member's, so a new world that founds a guild under an old name
-    /// would otherwise seat the old head again by its record. See <see cref="BotPolitics.Wipe"/>. Returns the offices forgotten.
-    /// </summary>
     public static int Wipe()
     {
         var offices = _offices.Count;

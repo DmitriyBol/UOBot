@@ -6,7 +6,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>One ragman's buying post while it is open: the trader keeping it, the cave mouth it serves, where it stands, and what it bought.</summary>
 public sealed class BotRagPost
 {
     public BotRagPost(BotMobile keeper, Map map, Point3D stand, Point3D mouth, string dungeon)
@@ -37,7 +36,6 @@ public sealed class BotRagPost
 
     public int Paid { get; internal set; }
 
-    /// <summary>What the goods bought fetch at the towns' counters: the post's own production (see <see cref="BotKeepRagPost.Made"/>).</summary>
     public int Worth { get; internal set; }
 
     public int Sellers { get; internal set; }
@@ -45,92 +43,47 @@ public sealed class BotRagPost
     public string Name => $"{Keeper?.Name}'s buying post by the mouth of {Dungeon}";
 }
 
-/// <summary>
-/// The ragmen: a trader keeping a buying post on safe ground near a dungeon's mouth, buying the hunters' loot below what a town's counter
-/// pays and carrying it to the counters itself afterwards (07.10.2026, life18b).
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "a ragman buying loot from hunters at the dungeon mouth"; that morning: "let's try, but if he dies often to the
-/// mobs (there are many hostile mobs at a dungeon mouth) we take the role out, or make him stand REALLY safely, though not too far from
-/// the entrance".</b> So the post is chosen, once a mouth and remembered for <see cref="PostMemoryMs"/>, on ground <see cref="PostNear"/> to
-/// <see cref="PostFar"/> tiles from the mouth where the zones' map reads clear for <see cref="SafeSlack"/> tiles every way (outside every
-/// aggressive spawner's patrol and its fringe, <see cref="BotZones.LevelAt(Map, int, int)"/>), no blood stands on the square
-/// (<see cref="BotQuad.Muscle(Map, Point3D)"/>), and no creature that attacks on sight is alive within its own perception of it (the reach
-/// <c>BotSight</c> prices: <c>RangePerception</c>, capped at <see cref="BotZones.PerceptionMost"/>, and the margin). At the post the ragman
-/// leaves at once when its sight holds a danger it cannot beat (<c>BotJourney.Sighted</c>, the reaches <c>BotSight</c> keeps), and the post is
-/// rested for <see cref="UnsafeMs"/>; within a creature's reach the sight's own stand-down puts it off its work anyway. Its deaths are
-/// counted apart, and <c>BotTrades.Ragmen</c> switches the role off live.
-/// </para>
-///
-/// <para>
-/// <b>The money is honest on both sides.</b> The hunter is paid <see cref="Share"/> of what the nearest counter pays for each thing, hand to
-/// hand (<see cref="BotHandover.Exchange"/>), and keeps hunting instead of walking a pack across the island; the ragman pays out of its own
-/// purse, keeps <see cref="KeepPurse"/>, and sells the goods over a counter later (<see cref="BotRagHauler"/>, the peddle) — the counter is
-/// where the coin enters the world, as it always was.
-/// </para>
-/// </summary>
 public static class BotRagmen
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRagmen));
 
-    // ---- Dials ------------------------------------------------------------------------------------------------------------
-
     public static bool On => BotTrades.RagmenOn;
 
-    /// <summary>The most posts open on the island at once. Three.</summary>
     public static int MostOpen { get; set; } = 3;
 
-    /// <summary>How long a ragman keeps its post, in minutes. Twenty-five.</summary>
     public static double ShiftMinutes { get; set; } = 25.0;
 
-    /// <summary>How long after a shift the same trader may keep another. Thirty minutes.</summary>
     public static int RestMs { get; set; } = 1800000;
 
-    /// <summary>How far a trader may be from a mouth and be offered a post at it. Six hundred tiles.</summary>
     public static int KeeperReach { get; set; } = 600;
 
-    /// <summary>What a trader must have to spend to keep a post. Four hundred.</summary>
     public static int LeastPurse { get; set; } = 400;
 
-    /// <summary>What a ragman keeps whatever it buys. A hundred and fifty.</summary>
     public static int KeepPurse { get; set; } = 150;
 
-    /// <summary>What the ragman pays, of the nearest counter's price. Six tenths.</summary>
     public static double Share { get; set; } = 0.6;
 
-    /// <summary>The nearest a post stands to its mouth, and the furthest. Forty and eighty tiles.</summary>
     public static int PostNear { get; set; } = 40;
 
     public static int PostFar { get; set; } = 80;
 
-    /// <summary>How far round a post the zones' map must read clear. Sixteen tiles.</summary>
     public static int SafeSlack { get; set; } = 16;
 
-    /// <summary>The margin added to a creature's perception when a post is looked for. Four tiles.</summary>
     public static int CreatureMargin { get; set; } = 4;
 
-    /// <summary>How long a post found is kept for its mouth. Ten minutes.</summary>
     public static int PostMemoryMs { get; set; } = 600000;
 
-    /// <summary>How long a post a ragman left for a danger is not used again. Thirty minutes.</summary>
     public static int UnsafeMs { get; set; } = 1800000;
 
-    /// <summary>How far round a mouth (and inside its dungeon) the hunters are counted. Two hundred tiles.</summary>
     public static int TrafficReach { get; set; } = 200;
 
-    /// <summary>The fewest hunters about a mouth for a post to be worth keeping. Two.</summary>
     public static int LeastTraffic { get; set; } = 2;
 
-    /// <summary>How often the hunters about every mouth are counted. A minute.</summary>
     public static int TrafficMs { get; set; } = 60000;
 
-    /// <summary>The share of its carrying weight at which a ragman stops buying and shuts. Six tenths.</summary>
     public static double Heavy { get; set; } = 0.6;
 
-    /// <summary>What a post's shift is reckoned at a minute before the ledger knows better.</summary>
     public static double Prior { get; set; } = 25.0;
-
-    // ---- Counters ---------------------------------------------------------------------------------------------------------
 
     public static long Opened { get; private set; }
 
@@ -174,17 +127,10 @@ public static class BotRagmen
 
     private static long _trafficTick;
 
-    /// <summary>What each ragman bought and has not yet carried to a counter, by kind. Read by <see cref="BotRagHauler"/>.</summary>
     private static readonly Dictionary<Serial, Dictionary<Type, int>> _stock = [];
 
     public static IReadOnlyList<BotRagPost> Open => _open;
 
-    // ---- The mouths -------------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// Every mouth on the island side — a gate from the island into the dungeon block — with the hunters counted round it and inside the
-    /// dungeon it leads to. One walk of the gates and one of the population list every <see cref="TrafficMs"/>.
-    /// </summary>
     private static void Traffic(long now)
     {
         if (now - _trafficTick < TrafficMs && _mouths.Count > 0)
@@ -234,7 +180,6 @@ public static class BotRagmen
         }
     }
 
-    /// <summary>The busiest mouth within reach of a trader with no post at it, or null.</summary>
     internal static BotGates.Gate Busiest(BotMobile trader, out string dungeon, out int hunters)
     {
         dungeon = null;
@@ -274,13 +219,6 @@ public static class BotRagmen
         return null;
     }
 
-    // ---- The post ---------------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// Safe ground for a post at this mouth, or <c>Point3D.Zero</c>. Rings from <see cref="PostNear"/> out to <see cref="PostFar"/> every
-    /// eight tiles, sixteen bearings each, the first that passes every test; remembered for <see cref="PostMemoryMs"/>, so the spatial
-    /// queries run once a mouth, not once a beat.
-    /// </summary>
     internal static Point3D Post(Map map, Point3D mouth)
     {
         var now = Core.TickCount;
@@ -342,7 +280,6 @@ public static class BotRagmen
             return false;
         }
 
-        // Clear ground all round: no patrol of creatures that attack on sight, and no fringe of one.
         for (var dx = -SafeSlack; dx <= SafeSlack; dx += Math.Max(1, SafeSlack / 2))
         {
             for (var dy = -SafeSlack; dy <= SafeSlack; dy += Math.Max(1, SafeSlack / 2))
@@ -359,7 +296,6 @@ public static class BotRagmen
             return false;
         }
 
-        // And nothing alive now that would notice a body standing there.
         foreach (var c in map.GetMobilesInRange<BaseCreature>(here, BotZones.PerceptionMost + CreatureMargin))
         {
             if (c is not { Deleted: false, Alive: true } || c.Controlled || c.Summoned || c.Blessed || !BotHaunts.AttacksFirst(c.FightMode))
@@ -380,7 +316,6 @@ public static class BotRagmen
         return true;
     }
 
-    /// <summary>The ragman left this post for a danger: the post is not used again for <see cref="UnsafeMs"/>.</summary>
     internal static void Unsafe(BotRagPost post)
     {
         if (post != null)
@@ -479,9 +414,6 @@ public static class BotRagmen
         );
     }
 
-    // ---- Buying -----------------------------------------------------------------------------------------------------------
-
-    /// <summary>The nearest open post a hunter here may sell at, within <see cref="BotRagSeller.Reach"/> on joined ground; null with how far the nearest stood.</summary>
     public static BotRagPost For(BotMobile hunter, out int away)
     {
         away = int.MaxValue;
@@ -508,13 +440,8 @@ public static class BotRagmen
         return best;
     }
 
-    /// <summary>What the ragman of this post may still spend.</summary>
     public static int Purse(BotRagPost post) => post?.Keeper == null ? 0 : Math.Max(0, BotYield.Spendable(post.Keeper) - KeepPurse);
 
-    /// <summary>
-    /// One kind of a hunter's loot from its pack to the ragman's, coin the other way, at <paramref name="price"/> apiece and no more than the
-    /// ragman may spend. Returns the units bought.
-    /// </summary>
     internal static int Buy(BotRagPost post, IBotWilful hunter, Type kind, int units, int price, int counter, out int paid, out string refused)
     {
         paid = 0;
@@ -573,8 +500,6 @@ public static class BotRagmen
         Sales++;
     }
 
-    // ---- The haul ---------------------------------------------------------------------------------------------------------
-
     internal static Dictionary<Type, int> StockOf(Mobile ragman) =>
         ragman != null && _stock.TryGetValue(ragman.Serial, out var stock) ? stock : null;
 
@@ -591,8 +516,6 @@ public static class BotRagmen
         HaulsOffered++;
         HaulWorth += Math.Max(0, worth);
     }
-
-    // ---- Words ------------------------------------------------------------------------------------------------------------
 
     public static Dictionary<string, string[]> Phrases() =>
         new(StringComparer.OrdinalIgnoreCase)
@@ -642,11 +565,6 @@ public static class BotRagmen
     }
 }
 
-/// <summary>
-/// A trader's shift keeping a buying post near a dungeon's mouth: the walk to the safe ground, the post opened, the hunters' loot bought as
-/// the auction sends them, and the post shut when the shift, the purse or the pack runs out — or at once when a danger it cannot beat comes
-/// into sight (07.10.2026, life18b). Measured as coin, with the goods bought counted at what the counters pay for them.
-/// </summary>
 public sealed class BotKeepRagPost : BotDeed
 {
     public const string Trade = "ragpost";
@@ -690,7 +608,6 @@ public sealed class BotKeepRagPost : BotDeed
 
     public override double Coin => 1.0;
 
-    /// <summary>The goods bought, at what the counters pay for them: the coin paid out is the other half of the post's takings.</summary>
     public override int Made => _worth + (_post?.Worth ?? 0);
 
     public override bool Still => _post != null;
@@ -734,9 +651,6 @@ public sealed class BotKeepRagPost : BotDeed
             _post = null;
         }
 
-        // <b>Gone at once when something it cannot beat is in sight (Patrick, 07.10.2026).</b> The sight keeps the reaches of what the
-        // bot has seen within its twenty tiles and cannot beat; a ragman does not wait for one to come within its own reach.
-        // On the way the sight steers the walk round what it sees (BotSight); only near the post does a danger send it home.
         if (body.Journey?.Sighted is { Count: > 0 } && (_post != null || body.InRange(_stand, 24)))
         {
             var post = _post;
@@ -827,7 +741,6 @@ public sealed class BotKeepRagPost : BotDeed
     {
         var body = bot?.Self as BotMobile;
 
-        // Killed holding the post, or on the way to it; a death while the post was put down for something else is that work's.
         if (body is { Alive: false } && !_paused)
         {
             BotRagmen.Killed(_post != null, body, _post);
@@ -841,10 +754,6 @@ public sealed class BotKeepRagPost : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a trader with coin to spend a buying post by the busiest dungeon mouth within its reach, on safe ground (07.10.2026, life18b).
-/// Every gate counted.
-/// </summary>
 public sealed class BotRagman : IBotProposer
 {
     public string Name => "Ragman";
@@ -909,7 +818,6 @@ public sealed class BotRagman : IBotProposer
             return null;
         }
 
-        // What it bought last time goes to a counter first.
         if (BotRagmen.StockOf(body) is { Count: > 0 })
         {
             Hauling++;
@@ -967,10 +875,6 @@ public sealed class BotRagman : IBotProposer
     }
 }
 
-/// <summary>
-/// A hunter's walk to a ragman's post with its loot: each kind the ragman can pay for, sold hand to hand at <see cref="BotRagmen.Share"/> of
-/// the nearest counter's price (07.10.2026, life18b). Measured as coin.
-/// </summary>
 public sealed class BotRagSale : BotDeed
 {
     public const string Trade = "ragman sale";
@@ -1087,23 +991,16 @@ public sealed class BotRagSale : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a hunter with a laden pack outside a town, whose nearest counter for its loot is far, the ragman's post near it (07.10.2026,
-/// life18b). The pack is read at most once a minute for one hunter. Every gate counted.
-/// </summary>
 public sealed class BotRagSeller : IBotProposer
 {
     public string Name => "Ragman's customer";
 
     public BotStanding Rung => BotStanding.Free;
 
-    /// <summary>How far a hunter may be from a post and be sent to it. A hundred and twenty tiles.</summary>
     public static int Reach { get; set; } = 120;
 
-    /// <summary>What a load must fetch at the counters to be carried to a post. Forty.</summary>
     public static int LeastLoad { get; set; } = 40;
 
-    /// <summary>How much nearer than the nearest counter for the load the post must stand. Sixty tiles: the town is far.</summary>
     public static int FarGain { get; set; } = 60;
 
     public static int LookMs { get; set; } = 60000;
@@ -1209,7 +1106,6 @@ public sealed class BotRagSeller : IBotProposer
 
         _looked[who.Serial] = now;
 
-        // The loot: everything movable and unbound off its keep list that no want within a carrier's reach waits for (BotPeddler's reading).
         _loot.Clear();
 
         var keep = BotUnload.Keeps(bot);
@@ -1317,11 +1213,6 @@ public sealed class BotRagSeller : IBotProposer
     }
 }
 
-/// <summary>
-/// Offers a ragman whose post has shut the goods it bought, a kind at a time, to the counter that pays most for them once the road is paid
-/// for: the peddle (<see cref="BotPeddle"/>), as a fighter's loot goes (07.10.2026, life18b). Runs with the posts switched off too, so what
-/// was bought is never stranded.
-/// </summary>
 public sealed class BotRagHauler : IBotProposer
 {
     public string Name => "Ragman's haul";
@@ -1381,7 +1272,7 @@ public sealed class BotRagHauler : IBotProposer
 
             if (held <= 0)
             {
-                // Sold, banked or lost since: nothing of this kind left to carry.
+
                 stock.Remove(kind);
 
                 continue;
@@ -1400,7 +1291,7 @@ public sealed class BotRagHauler : IBotProposer
 
             if (shop == null || price <= 0)
             {
-                // No counter in reach buys it: left to the porter and the peddler like any other goods in the pack.
+
                 stock.Remove(kind);
 
                 continue;

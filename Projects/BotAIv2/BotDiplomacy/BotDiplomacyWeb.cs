@@ -4,11 +4,6 @@ using Server.Guilds;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The guilds' dealings on the page: what each pair of guilds thinks of the other and what stands between them, each guild's
-/// standing in each town it deals with, and the meetings standing. Written into the snapshot by one line in
-/// <c>BotWebSnapshot.Build</c>; every figure is one the log's <c>Diplomacy:</c> line already prints.
-/// </summary>
 public static class BotDiplomacyWeb
 {
     public static void Write(Utf8JsonWriter w)
@@ -34,7 +29,6 @@ public static class BotDiplomacyWeb
         w.WriteEndObject();
     }
 
-    /// <summary>Every pair of standing guilds that has an opinion, an agreement, an alliance or a war between them.</summary>
     private static void Relations(Utf8JsonWriter w)
     {
         w.WritePropertyName("relations");
@@ -98,7 +92,6 @@ public static class BotDiplomacyWeb
         w.WriteEndArray();
     }
 
-    /// <summary>Each guild's standing in each town it has dealt with: prices, failures, exile, and the task in hand.</summary>
     private static void Standing(Utf8JsonWriter w)
     {
         w.WritePropertyName("standing");

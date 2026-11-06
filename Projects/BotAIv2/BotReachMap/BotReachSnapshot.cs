@@ -2,17 +2,6 @@ using System;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The reach map as one solve left it: a class for every tile, and for a tile whose standing places differ (a bridge over a
-/// road, a roof over a room) the class of each with its height. Immutable: made on a worker, published through
-/// <see cref="BotReachMap"/>'s one volatile reference, read by the loop's walkers and the dashboard's threads alike.
-///
-/// <para>
-/// <b>A byte a tile, shared where a cluster is all one thing.</b> 7168 × 4096 tiles of Felucca are 29 million bytes if every
-/// cluster had its own array; the open sea, the solid rock and the open fields are clusters of one class, and those all point at
-/// one array per class, so the snapshot holds only the clusters with a border in them.
-/// </para>
-/// </summary>
 public sealed class BotReachSnapshot
 {
     public BotReachSnapshot(
@@ -62,7 +51,6 @@ public sealed class BotReachSnapshot
         OwnArrays = ownArrays;
     }
 
-    /// <summary>The map, for the loop's questions only (<see cref="Holds"/>); the dashboard reads <see cref="MapName"/>.</summary>
     public Map Map { get; }
 
     public string MapName { get; }
@@ -75,7 +63,6 @@ public sealed class BotReachSnapshot
 
     public int ClustersY { get; }
 
-    /// <summary>The clusters it was solved from; never changed.</summary>
     public BotReachCluster[] Clusters { get; }
 
     public Point3D Home { get; }
@@ -96,36 +83,30 @@ public sealed class BotReachSnapshot
 
     public int[] LandTiles { get; }
 
-    /// <summary>Tiles of each class, by <see cref="BotReachClass"/>.</summary>
     public long[] Tiles { get; }
 
-    /// <summary>Lands no walk from home reaches.</summary>
     public int Lands { get; }
 
     public BotReachLand[] Largest { get; }
 
-    /// <summary>Clusters where open ground borders ground of another class: where the check samples.</summary>
     public int[] Mixed { get; }
 
     public int Regions { get; }
 
     public int Edges { get; }
 
-    /// <summary>Whether home stood on the map: without it nothing is open.</summary>
     public bool Homed { get; }
 
     public double SolveMs { get; }
 
     public DateTime At { get; }
 
-    /// <summary>Clusters holding an array of their own: the ones with a border in them. The rest share one per class.</summary>
     public int OwnArrays { get; }
 
     public bool Holds(Map map) => map != null && map == Map;
 
     public bool Inside(int x, int y) => (uint)x < (uint)Width && (uint)y < (uint)Height;
 
-    /// <summary>What a tile is, by its best standing place. <see cref="BotReachClass.Blocked"/> off the map.</summary>
     public BotReachClass ClassAt(int x, int y)
     {
         if (!Inside(x, y))
@@ -136,10 +117,6 @@ public sealed class BotReachSnapshot
         return (BotReachClass)Classes[(y >> 4) * ClustersX + (x >> 4)][((y & 15) << 4) | (x & 15)];
     }
 
-    /// <summary>
-    /// What a tile is at a height: where its standing places differ, the one nearest <paramref name="z"/>; elsewhere the tile's
-    /// own class.
-    /// </summary>
     public BotReachClass ClassAt(int x, int y, int z)
     {
         if (!Inside(x, y))
@@ -195,7 +172,6 @@ public sealed class BotReachSnapshot
         return best;
     }
 
-    /// <summary>Whether any tile within <paramref name="reach"/> of (x, y) is of class <paramref name="want"/>.</summary>
     public bool Any(int x, int y, int reach, BotReachClass want)
     {
         var w = (byte)want;
@@ -226,7 +202,6 @@ public sealed class BotReachSnapshot
         return false;
     }
 
-    /// <summary>The land a tile's lowest standing place belongs to, its size in tiles and class; -1 where it has none.</summary>
     public int LandAt(int x, int y, out int tiles, out BotReachClass kind)
     {
         tiles = 0;
@@ -259,11 +234,6 @@ public sealed class BotReachSnapshot
         return root;
     }
 
-    /// <summary>
-    /// The classes of a rectangle, one byte a tile or, at a <paramref name="scale"/> above one, one byte a square of that side:
-    /// the most telling class in it — ground no walk reaches over open ground over water over rock — so a pocket two tiles
-    /// wide still shows on a map drawn four tiles a pixel. For the dashboard's picture.
-    /// </summary>
     public byte[] Picture(int x0, int y0, int columns, int rows, int scale)
     {
         var bytes = new byte[columns * rows];
@@ -299,8 +269,6 @@ public sealed class BotReachSnapshot
                     }
                 }
 
-                // Pocket and isle first, from an eighth of the square: they are what the layer is for, and a single roof tile
-                // on a picture of four tiles a pixel paints every town pink. Then open ground, water, rock.
                 var few = Math.Max(1, scale * scale / 8);
 
                 bytes[py * columns + px] = seen[(int)BotReachClass.Pocket] >= few ? (byte)BotReachClass.Pocket

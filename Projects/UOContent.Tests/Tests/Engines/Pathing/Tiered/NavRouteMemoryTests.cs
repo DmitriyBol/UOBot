@@ -7,22 +7,11 @@ using Xunit.Abstractions;
 
 namespace Server.Tests.Pathfinding.Tiered;
 
-/// <summary>
-/// The tiered planners read one static hook, <see cref="NavigationService.Danger"/>, and <c>DangerHookTests</c> sets it: run
-/// beside another class's routes it changes their costs under them (StrategicPlannerTests' river failed that way on
-/// 29.09.2026 whenever the two ran at once). The classes that set it or measure costs run in this collection, one at a
-/// time, after everything else.
-/// </summary>
 [CollectionDefinition("Tiered navigation, one at a time", DisableParallelization = true)]
 public class TieredNavigationSequential
 {
 }
 
-/// <summary>
-/// The route memory (<see cref="NavRouteMemory"/>): a road planned once is served again, from its start or from anywhere
-/// along it; a cheaper road replaces it and a dearer one does not; a change in the ground forgets it and a cluster drawn
-/// again the same does not; it survives a file; and a road through blood is not served while the blood is on it.
-/// </summary>
 [Collection("Tiered navigation, one at a time")]
 public class NavRouteMemoryTests
 {
@@ -34,11 +23,6 @@ public class NavRouteMemoryTests
 
     private static readonly Point3D Goal = new(230, 60, 0);
 
-    /// <summary>
-    /// A field of 256 tiles with a wall down x 128 and two gaps in it, a near one at y 40–42 and a far one at y 200–202; the
-    /// start stands in a walled yard (the cluster x 0–15, y 48–63) whose only way out is one tile on its east side, so that
-    /// every road from it begins at the same gate.
-    /// </summary>
     private static GridNavTerrain Field(bool nearGap = true)
     {
         var terrain = new GridNavTerrain(256, 256, '.');
@@ -69,7 +53,6 @@ public class NavRouteMemoryTests
         return graph;
     }
 
-    /// <summary>A planner that will not use the near gap: the dear road, round by the far one.</summary>
     private static HierarchicalPlanner Dear(NavGraph graph)
     {
         var planner = new HierarchicalPlanner { ShunCost = 1_000_000 };
@@ -140,21 +123,18 @@ public class NavRouteMemoryTests
         Assert.Equal(NavRecall.Served, memory.Recall(graph, null, 2, Start, Goal, recalled, null));
         Assert.Equal(planned, recalled);
 
-        // Another start in the same yard, another goal in the goal's cluster: the same road, joined at the same gate.
         var elsewhere = new Point3D(9, 60, 0);
         var near = new Point3D(236, 52, 0);
 
         Assert.Equal(NavRecall.Served, memory.Recall(graph, null, 2, elsewhere, near, recalled, null));
         AssertWalkable(terrain, elsewhere, recalled, near);
 
-        // From the middle of the road: a suffix of it, without a search.
         var middle = planned[planned.Count / 2];
 
         Assert.Equal(NavRecall.Served, memory.Recall(graph, null, 2, middle, Goal, recalled, null));
         Assert.True(IsSuffix(planned, recalled), $"from {middle}: {string.Join(" ", recalled)} is not the tail of {string.Join(" ", planned)}");
         Assert.Equal(1, memory.Middles);
 
-        // Too near to be worth remembering: the planner's.
         Assert.Equal(NavRecall.Skipped, memory.Recall(graph, null, 2, new Point3D(20, 56, 0), new Point3D(40, 56, 0), recalled, null));
 
         _output.WriteLine($"{planned.Count} points; {memory.Describe()}");
@@ -180,7 +160,6 @@ public class NavRouteMemoryTests
         Assert.Equal(NavRecall.Served, memory.Recall(graph, null, 2, Start, Goal, recalled, null));
         Assert.Equal(cheap, recalled);
 
-        // The dear road again: nowhere cheaper than what is held, so nothing changes.
         var count = memory.Count;
 
         Planned(Dear(graph), graph, memory, out offer);
@@ -190,7 +169,6 @@ public class NavRouteMemoryTests
         Assert.Equal(NavRecall.Served, memory.Recall(graph, null, 2, Start, Goal, recalled, null));
         Assert.Equal(cheap, recalled);
 
-        // The cheap one again: the same road, kept as it was.
         Planned(new HierarchicalPlanner(), graph, memory, out offer);
 
         Assert.Equal(NavOffer.Kept, offer);
@@ -208,7 +186,6 @@ public class NavRouteMemoryTests
         var planned = Planned(new HierarchicalPlanner(), graph, memory, out _);
         var recalled = new List<Point3D>();
 
-        // Drawn again from the same ground — a house raised and taken down, a boot: the versions change, the signatures do not.
         graph.MarkDirty(128, 40, 128, 42);
         graph.Slice(new NavWindow(), long.MaxValue);
 
@@ -217,7 +194,6 @@ public class NavRouteMemoryTests
         Assert.True(memory.Rejoined > 0);
         Assert.Equal(0, memory.Invalidated);
 
-        // The near gap is walled up: the road through it is forgotten, not served.
         terrain.Fill(128, 40, 128, 42, '#');
         graph.MarkDirty(128, 40, 128, 42);
         graph.Slice(new NavWindow(), long.MaxValue);
@@ -226,7 +202,6 @@ public class NavRouteMemoryTests
         Assert.Equal(1, memory.Invalidated);
         Assert.Equal(0, memory.Count);
 
-        // Planned afresh round by the far gap, and that is what is remembered now.
         var round = Planned(new HierarchicalPlanner(), graph, memory, out var offer);
 
         Assert.Equal(NavOffer.Stored, offer);
@@ -256,7 +231,6 @@ public class NavRouteMemoryTests
             Assert.NotNull(read);
             Assert.Single(read);
 
-            // A new boot: the same ground drawn again, every node id and version its own.
             var again = Build(terrain);
             var restored = new NavRouteMemory();
 
@@ -268,7 +242,6 @@ public class NavRouteMemoryTests
             Assert.Equal(planned, recalled);
             Assert.True(restored.Rejoined > 0);
 
-            // Another boot on other ground: the near gap walled up. The road is read, and forgotten the first time it is asked.
             var walled = Build(Field(nearGap: false));
             var stale = new NavRouteMemory();
 
@@ -292,7 +265,6 @@ public class NavRouteMemoryTests
         var cheap = Planned(new HierarchicalPlanner(), graph, memory, out _);
         var recalled = new List<Point3D>();
 
-        // Blood round the near gap: the ground road crosses it.
         Func<int, int, int> nearBlood = (x, y) => x is >= 112 and <= 143 && y is >= 32 and <= 50 ? 60 * NavCost.Step : 0;
 
         Assert.Equal(NavRecall.Bloodied, memory.Recall(graph, null, 2, Start, Goal, recalled, nearBlood));
@@ -302,13 +274,11 @@ public class NavRouteMemoryTests
 
         Assert.True(ground > 0);
 
-        // The ground road is kept at hand for a walker whose way round cannot be found.
         var fallback = new List<Point3D>();
 
         Assert.True(memory.LastGround(fallback));
         Assert.Equal(cheap, fallback);
 
-        // The way round, as the danger-aware planner would find it, kept as a detour.
         var dear = Dear(graph);
         var round = new List<Point3D>();
 
@@ -318,17 +288,14 @@ public class NavRouteMemoryTests
         Assert.Equal(NavRecall.Detoured, memory.Recall(graph, null, 2, Start, Goal, recalled, nearBlood));
         Assert.Equal(round, recalled);
 
-        // The blood dries: the ground road again.
         Assert.Equal(NavRecall.Served, memory.Recall(graph, null, 2, Start, Goal, recalled, null));
         Assert.Equal(cheap, recalled);
 
-        // Blood on the way round too: it is no longer the better road, and it is dropped.
         Func<int, int, int> both = (x, y) => nearBlood(x, y) + (x is >= 112 and <= 143 && y is >= 190 and <= 210 ? 60 * NavCost.Step : 0);
 
         Assert.Equal(NavRecall.Bloodied, memory.Recall(graph, null, 2, Start, Goal, recalled, both));
         Assert.Equal(0, memory.Detours);
 
-        // Kept again, then past its time.
         Assert.True(memory.OfferDetour(graph, null, dear.Anchorage, Start, dear.LastGoal, dear.LastPath, ground, nearBlood));
         Assert.Equal(NavRecall.Detoured, memory.Recall(graph, null, 2, Start, Goal, recalled, nearBlood));
 
@@ -356,7 +323,6 @@ public class NavRouteMemoryTests
         Assert.Equal(NavRecall.Served, memory.Recall(graph, null, 2, Start, Goal, recalled, null));
         Assert.Equal(points, recalled);
 
-        // Not kept past a boot: the shuns are not.
         Assert.Empty(memory.Records(graph));
 
         now += 60000;
@@ -366,10 +332,6 @@ public class NavRouteMemoryTests
         Assert.Equal(0, memory.Count);
     }
 
-    /// <summary>
-    /// The price, measured: routes across a river with one far ford, planned by the tiers as the shard plans them and
-    /// offered, then asked again. Every one comes back from memory, the same, and for a fraction of the planning.
-    /// </summary>
     [Fact]
     public void Recalling_CostsAFractionOfPlanning()
     {
@@ -413,7 +375,6 @@ public class NavRouteMemoryTests
             Assert.Equal(points, recalled);
         }
 
-        // Timed on the second asking, the code warm, as it is on the shard.
         watch.Restart();
 
         foreach (var (from, to, _) in pairs)
@@ -448,7 +409,6 @@ public class NavRouteMemoryTests
 
         Planned(planner, graph, memory, out _);
 
-        // Another pair of clusters entirely: from the south-west to the north-east.
         Assert.Equal(NavStatus.Ok, planner.Route(graph, 20, 240, 0, 240, 20, 0, points));
         Assert.Equal(NavOffer.Stored, memory.Offer(graph, null, planner.Anchorage, new Point3D(20, 240, 0), planner.LastGoal, planner.LastPath));
 

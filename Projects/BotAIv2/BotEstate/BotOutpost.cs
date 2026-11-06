@@ -8,34 +8,14 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A guild's second house, out on the far edge of its land: where its members rise when they fall nearer to it than to the
-/// hall, and a yard of the guild's own out there — land the toll can be charged on.
-///
-/// <para>
-/// <b>Patrick's order of 26.09.2026 ("different houses for a guild, expansions"), the outposts he chose among its three
-/// parts:</b> a second house on the guild's far squares — a place to rise and a store nearer the hunting, and something to
-/// hold the hunting toll up by. One to a guild, a small house, raised on the guild's held square farthest from its hall once
-/// that square is at least <see cref="Far"/> out and the guild can pay <see cref="Price"/>.
-/// </para>
-///
-/// <para>
-/// <b>Its own register, and its own sign.</b> The halls are found by the guild's name on the sign and there is one to a
-/// guild (<c>BotEstate</c>); an outpost carries "The Blade outpost", which no guild is called, so the halls' adoption passes it
-/// over and this one takes it (<see cref="Adopt"/>). It makes a yard exactly as a hall does (<c>BotLand.Holder</c>), and a
-/// fallen member of its guild rises there when it fell nearer to it than to the hall (<c>BotSeat.Home</c>).
-/// </para>
-/// </summary>
 public static class BotOutpost
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOutpost));
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>What an outpost costs its guild.</summary>
     public static int Price { get; set; } = 8000;
 
-    /// <summary>How far from the hall the held square must lie for an outpost to be worth raising there.</summary>
     public static int Far { get; set; } = 90;
 
     public const string Suffix = " outpost";
@@ -52,7 +32,6 @@ public static class BotOutpost
 
     public static IEnumerable<BaseHouse> Houses => _posts.Values;
 
-    /// <summary>This guild's outpost, or null.</summary>
     public static BaseHouse Of(string guild)
     {
         if (guild == null || !_posts.TryGetValue(guild, out var house))
@@ -70,10 +49,6 @@ public static class BotOutpost
         return null;
     }
 
-    /// <summary>
-    /// Where a fallen member of this guild rises, if its outpost is nearer to where it fell than the hall is; otherwise
-    /// <c>Point3D.Zero</c>. See <c>BotSeat.Home</c>.
-    /// </summary>
     public static Point3D Nearer(Guild guild, BaseHouse hall, Mobile fallen)
     {
         if (!Running || fallen == null || Of(guild?.Name) is not { } post || post.Map != fallen.Map)
@@ -94,7 +69,6 @@ public static class BotOutpost
         return post.BanLocation;
     }
 
-    /// <summary>The middle of this guild's held square farthest from its hall, at least <see cref="Far"/> out, or Zero.</summary>
     public static Point3D FarSquare(Guild guild, BaseHouse hall)
     {
         if (guild == null || hall is not { Deleted: false } || hall.Map == null)
@@ -126,7 +100,6 @@ public static class BotOutpost
         return best;
     }
 
-    /// <summary>Gives the house its guild: the leader its owner, every member a co-owner, doors unlocked, decay refreshed.</summary>
     public static void Keep(Guild guild, BaseHouse house)
     {
         if (guild == null || house is not { Deleted: false })
@@ -164,7 +137,6 @@ public static class BotOutpost
         }
     }
 
-    /// <summary>Finds every outpost by its sign at boot and gives it back to its guild.</summary>
     public static void Adopt()
     {
         if (!Running)
@@ -199,7 +171,6 @@ public static class BotOutpost
         }
     }
 
-    /// <summary>Every outpost off the island. For <c>do raze</c> and a wipe.</summary>
     public static int Raze()
     {
         var gone = 0;
@@ -246,15 +217,10 @@ public static class BotOutpost
     }
 }
 
-/// <summary>
-/// Offers a member of a guild with a hall, far-flung held land and the price the raising of its outpost there. See
-/// <see cref="BotOutpost"/>.
-/// </summary>
 public sealed class BotOutposter : IBotProposer
 {
     public const string Office = "outposter";
 
-    /// <summary>How often one guild is looked at for an outpost.</summary>
     public static int LookMs { get; set; } = 120000;
 
     public static long Asked { get; private set; }
@@ -307,7 +273,6 @@ public sealed class BotOutposter : IBotProposer
             return null;
         }
 
-        // Fund counts the chest since 29.09.2026; it was added here by hand before that, and would now count twice.
         if (BotEstate.Fund(ours) < BotOutpost.Price)
         {
             Poor++;
@@ -345,7 +310,6 @@ public sealed class BotOutposter : IBotProposer
     }
 }
 
-/// <summary>A member raises its guild's outpost: the ground proved, the price levied, a small house with the outpost's sign.</summary>
 public sealed class BotOutpostRaise : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOutpostRaise));
@@ -424,7 +388,6 @@ public sealed class BotOutpostRaise : BotDeed
 
         var kind = BotHallKind.First;
 
-        // Ground that changed hands while the bot walked: not raised on another guild's. See BotBounds.
         if (BotBounds.Refuse(BotBounds.Placing.Outpost, _guild.Name, _map, _plot, kind.Multi, out var foreign))
         {
             BotPlot.Spend();

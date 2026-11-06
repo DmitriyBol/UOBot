@@ -3,19 +3,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a bot the errand on the board that fits it best: a kill to a fighter who is no novice and dares the
-/// ground, a delivery to a bot already carrying the goods, a scouting to anybody. Reckoned by the reward against
-/// the walk and the work, so a rich errand far away and a poor one close by are weighed rather than ranked — by
-/// <see cref="BotQuestDeed.Claim"/>, the very number the errand is then claimed at: until build 95 the proposer reckoned
-/// a delivery or a look at one minute and the deed at two, and every errand was claimed at a flat sixty whatever it
-/// paid.
-///
-/// <para>
-/// A kill anywhere is offered with the nearest lair of the creature to the bot as its place (<see cref="BotLairs"/>),
-/// and not at all when the island keeps none that a road reaches.
-/// </para>
-/// </summary>
 public sealed class BotQuester : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotQuester));
@@ -28,27 +15,18 @@ public sealed class BotQuester : IBotProposer
 
     public static long Asked { get; private set; }
 
-    /// <summary>Asked while the board was empty.</summary>
     public static long Empty { get; private set; }
 
-    /// <summary>Asked while in a company.</summary>
     public static long Held { get; private set; }
 
-    /// <summary>Askings refused because the bot was a thief of The Shadow.</summary>
     public static long Banded { get; private set; }
 
-    /// <summary>Asked and fit for nothing on the board.</summary>
     public static long Unfit { get; private set; }
 
-    /// <summary>
-    /// Kills anywhere passed over because no lair of the creature a road reaches holds a living one now. Counted per errand
-    /// weighed.
-    /// </summary>
     public static long Lairless { get; private set; }
 
     public static long Offered { get; private set; }
 
-    /// <summary>Errands passed over for having just been let go by the bot asking. See <see cref="BotQuests.RetakeMs"/>.</summary>
     public static long Retakes { get; private set; }
 
     public BotDeed Propose(IBotWilful bot)
@@ -79,10 +57,6 @@ public sealed class BotQuester : IBotProposer
             return null;
         }
 
-        // <b>The board is the city's, and a thief of The Shadow has no business at it.</b> Patrick's order of
-        // 17.09.2026, night: "bandit bots may take part in championships, but the island's common doings are dangerous
-        // to them." An errand ends at a paymaster in a guarded town, which is the one place a red cannot go; the fence
-        // is not a thief and takes them as anybody does.
         if (BotUnderworld.Member(body) && !BotFence.Is(body))
         {
             Banded++;

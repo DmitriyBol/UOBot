@@ -2,11 +2,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps the guilds' chests across restarts. See <see cref="BotChest"/>: the tithes are the claims' income, and
-/// the claims survive a restart (<see cref="BotClaimStore"/>), so their income must too. Written as the guild's name
-/// and what the chest holds; a shape this build cannot read is dropped whole rather than guessed at.
-/// </summary>
 public sealed class BotChestStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotChestStore));
@@ -21,7 +16,6 @@ public sealed class BotChestStore : GenericPersistence
     {
     }
 
-    /// <summary>Chests read back at the last load. For the summary.</summary>
     public static int Restored { get; private set; }
 
     public override void Serialize(IGenericWriter writer)

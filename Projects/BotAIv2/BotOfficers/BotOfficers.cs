@@ -7,7 +7,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>The three posts a guild's head gives out: the store, the stand by the bank, and the road.</summary>
 public enum BotOfficerPost
 {
     Quartermaster,
@@ -15,68 +14,33 @@ public enum BotOfficerPost
     Scout
 }
 
-/// <summary>
-/// A guild's officers: who holds which post, how they are chosen, and what the guild hears of them.
-///
-/// <para>
-/// <b>Patrick's approval of 07.10.2026 (night 17, "a livelier world"): three officers appointed by the head, each with real
-/// actions and its own log signature.</b> The quartermaster keeps the guild's store at the hall (<see cref="BotGuildStore"/>,
-/// <see cref="BotQuartermaster"/>), the herald keeps a recruiting stand by the bank, reads the guild's news and challenges a rival
-/// to a bout (<see cref="BotHeraldStand"/>, <see cref="BotGuildBout"/>), and the scout walks the dangerous ground by a plan, reaches
-/// rumoured chests first and shadows another guild's company (<see cref="BotGuildScout"/>).
-/// </para>
-///
-/// <para>
-/// <b>The head appoints, by a rule anybody can read.</b> Every <see cref="TermMs"/> of running time (six hours) the head reviews
-/// each post and gives it to the member who fits it best — a quartermaster from the makers, a herald from whoever has the most
-/// renown, a scout from the shooters and the strong — a veteran first among equals (<see cref="BotTraits.Veteran"/>). A post
-/// whose holder died for good, left, or became the head is filled at once. The holder keeps it unless the best fits a fifth
-/// better (<see cref="Margin"/>), so a post does not change hands on noise. Nobody holds two posts and the head holds none.
-/// </para>
-///
-/// <para>
-/// <b>Kept across restarts</b> by <see cref="BotOfficersStore"/>: the holders by name with the age of their appointment.
-/// </para>
-/// </summary>
 public static class BotOfficers
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOfficers));
 
-    /// <summary>Whether guilds have officers at all. Off: nobody is appointed and no officer's work is offered.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>Each post, its own switch.</summary>
     public static bool Quartermasters { get; set; } = true;
 
     public static bool Heralds { get; set; } = true;
 
     public static bool Scouts { get; set; } = true;
 
-    /// <summary>How often the head reviews a post. Six hours, by Patrick's order.</summary>
     public static int TermMs { get; set; } = 21600000;
 
-    /// <summary>How often a post nobody fitted is looked at again.</summary>
     public static int EmptyRetryMs { get; set; } = 1800000;
 
-    /// <summary>How much better the best must fit than the holder before a review gives the post away.</summary>
     public static double Margin { get; set; } = 1.2;
 
-    /// <summary>The fewest members a guild must have before it has officers: below it the guild is its head and a friend.</summary>
     public static int LeastMembers { get; set; } = 4;
 
-    /// <summary>What a veteran's fit is multiplied by.</summary>
     public static double VeteranLean { get; set; } = 1.4;
 
-    /// <summary>How long a member counts as a newcomer after the officers first see it in the guild. Two hours.</summary>
     public static int NewcomerMs { get; set; } = 7200000;
 
-    /// <summary>How long a piece of guild news is worth reading aloud. Two hours.</summary>
     public static int NewsMs { get; set; } = 7200000;
 
-    /// <summary>The most pieces of news a guild keeps waiting for its herald.</summary>
     public static int MostNews { get; set; } = 8;
-
-    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long Appointed { get; private set; }
 
@@ -91,8 +55,6 @@ public static class BotOfficers
     public static long NoneFit { get; private set; }
 
     public static long NewsPosted { get; private set; }
-
-    // ---- the posts ---------------------------------------------------------------------------------------------------------
 
     private sealed class Post
     {
@@ -117,7 +79,6 @@ public static class BotOfficers
 
     private static long _lastLook;
 
-    /// <summary>Every post there is, in the order they are spoken of.</summary>
     public static readonly BotOfficerPost[] Offices = [BotOfficerPost.Quartermaster, BotOfficerPost.Herald, BotOfficerPost.Scout];
 
     public static string Word(BotOfficerPost office) =>
@@ -153,7 +114,6 @@ public static class BotOfficers
         }
     }
 
-    /// <summary>Whether this post is switched on.</summary>
     public static bool On(BotOfficerPost office) =>
         Running && office switch
         {
@@ -162,10 +122,8 @@ public static class BotOfficers
             _ => Scouts
         };
 
-    /// <summary>Whether a guild may have officers at all: not The Shadow, not disbanded.</summary>
     public static bool Keeps(Guild guild) => guild is { Disbanded: false, Name: not null } && !BotUnderworld.Band(guild);
 
-    /// <summary>The bot holding this post in this guild, if it is one of ours and still in the guild; else null.</summary>
     public static BotMobile Of(Guild guild, BotOfficerPost office)
     {
         if (!On(office) || guild?.Name == null || !_posts.TryGetValue((guild.Name, office), out var post) || post.Holder == null)
@@ -176,11 +134,9 @@ public static class BotOfficers
         return _byName.TryGetValue(post.Holder, out var bot) && bot is { Deleted: false } && ReferenceEquals(bot.Guild, guild) ? bot : null;
     }
 
-    /// <summary>Whether this bot holds this post in its own guild now.</summary>
     public static bool Holds(BotMobile bot, BotOfficerPost office) =>
         bot?.Guild is Guild guild && ReferenceEquals(Of(guild, office), bot);
 
-    /// <summary>The post this bot holds, if any.</summary>
     public static BotOfficerPost? OfficeOf(BotMobile bot)
     {
         if (bot?.Guild is not Guild guild || bot.Name == null)
@@ -199,20 +155,12 @@ public static class BotOfficers
         return null;
     }
 
-    /// <summary>Whether the officers first saw this member in its guild less than <see cref="NewcomerMs"/> ago (not counting the boot's first look).</summary>
     public static bool Newcomer(BotMobile bot) =>
         bot?.Guild is Guild guild && _firstSeen.TryGetValue(bot.Serial, out var seen) && seen.Guild == guild.Name && seen.Tick != long.MinValue
         && Core.TickCount - seen.Tick < NewcomerMs;
 
-    /// <summary>A bot by name among the living population, as of the last look. Null when unknown.</summary>
     public static BotMobile Named(string name) => name != null && _byName.TryGetValue(name, out var bot) && bot is { Deleted: false } ? bot : null;
 
-    // ---- news ----------------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// A piece of news for the guild's herald to read aloud in town. Open to any folder: wars, elections, births and relics are
-    /// news from wherever they happen. Kept at most <see cref="MostNews"/> pieces and <see cref="NewsMs"/> old.
-    /// </summary>
     public static void News(string guild, string text)
     {
         if (!Running || string.IsNullOrEmpty(guild) || string.IsNullOrWhiteSpace(text))
@@ -234,10 +182,8 @@ public static class BotOfficers
         }
     }
 
-    /// <summary>Pieces of news waiting for this guild's herald.</summary>
     public static int Pending(string guild) => guild != null && _news.TryGetValue(guild, out var list) ? list.Count : 0;
 
-    /// <summary>The oldest fresh piece of news, taken off the list; null when there is none.</summary>
     public static string NextNews(string guild)
     {
         if (guild == null || !_news.TryGetValue(guild, out var list))
@@ -261,9 +207,6 @@ public static class BotOfficers
         return null;
     }
 
-    // ---- appointment ----------------------------------------------------------------------------------------------------
-
-    /// <summary>The officers' look, once a minute from the module's clock: names, newcomers, and every post due a review.</summary>
     public static void Look(long now)
     {
         if (now - _lastLook < 60000)
@@ -287,7 +230,7 @@ public static class BotOfficers
 
             if (bot.Guild is Guild g && g.Name != null && (!_firstSeen.TryGetValue(bot.Serial, out var seen) || seen.Guild != g.Name))
             {
-                // The boot's first look sees every member for the first time; none of them is a newcomer.
+
                 _firstSeen[bot.Serial] = (g.Name, _seenOnce ? now : long.MinValue);
             }
         }
@@ -325,7 +268,7 @@ public static class BotOfficers
 
         if (post?.Holder == null)
         {
-            // An empty post nobody fitted is looked at again on its own clock, not every minute.
+
             if (post != null && now - post.Reviewed < EmptyRetryMs)
             {
                 return;
@@ -335,7 +278,7 @@ public static class BotOfficers
         }
         else if (holder == null)
         {
-            // Resting bots are not in the list but still exist: their post waits for them.
+
             if (BotRest.Records.ContainsKey(post.Holder))
             {
                 return;
@@ -406,7 +349,7 @@ public static class BotOfficers
 
     private static void Set(Guild guild, BotOfficerPost office, BotMobile bot, BotMobile head, string cause, long now, double fit)
     {
-        // Nobody holds two posts: whatever this bot held before is left empty, and filled at the next look.
+
         for (var i = 0; i < Offices.Length; i++)
         {
             if (Offices[i] != office && _posts.TryGetValue((guild.Name, Offices[i]), out var other) && other.Holder == bot.Name)
@@ -448,7 +391,6 @@ public static class BotOfficers
         News(guild.Name, $"{bot.Name} is {guild.Name}'s {Word(office)} now.");
     }
 
-    /// <summary>The best-fitting member for a post, never the head and never one holding another post (except <paramref name="holder"/>).</summary>
     private static BotMobile Best(Guild guild, BotOfficerPost office, BotMobile holder, out double fit)
     {
         BotMobile best = null;
@@ -478,10 +420,6 @@ public static class BotOfficers
         return best;
     }
 
-    /// <summary>
-    /// How well this member fits a post, nought for not at all. A quartermaster from the makers, the gatherers and the healers;
-    /// a herald from anybody, by renown; a scout from the shooters, the tamers and the blades, by strength. A veteran first.
-    /// </summary>
     public static double Fit(BotMobile bot, BotOfficerPost office)
     {
         if (bot?.Class is not { } klass)
@@ -521,9 +459,6 @@ public static class BotOfficers
         return fit <= 0.0 ? 0.0 : BotTraits.Veteran(bot) ? fit * VeteranLean : fit;
     }
 
-    /// <summary>
-    /// Argus's <c>appoint &lt;guild&gt; &lt;quartermaster|herald|scout&gt; &lt;bot&gt;</c>: the post given by hand, whatever the fit.
-    /// </summary>
     public static string Appoint(string tail)
     {
         var words = (tail ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -588,9 +523,6 @@ public static class BotOfficers
         return $"{bot.Name} the {bot.Class?.Name} is {guild.Name}'s {Word(office)} now. {Tell(guild.Name)}";
     }
 
-    // ---- telling ----------------------------------------------------------------------------------------------------------
-
-    /// <summary>Argus's <c>officers [&lt;guild&gt;]</c>: who holds what, and their counts.</summary>
     public static string Tell(string tail)
     {
         var name = (tail ?? "").Trim();
@@ -658,7 +590,6 @@ public static class BotOfficers
         return say.ToString();
     }
 
-    /// <summary>The <c>officers:</c> clause at the end of the <c>Guilds:</c> line.</summary>
     public static string Clause()
     {
         if (!Running)
@@ -681,7 +612,6 @@ public static class BotOfficers
                + $"store: {BotGuildStore.Describe()}; quartermasters: {BotQuartermaster.Describe()}; heralds: {BotHeraldStand.Describe()}; bouts: {BotGuildBout.Describe()}; scouts: {BotGuildScout.Describe()}";
     }
 
-    /// <summary>The guild's officers on the page, inside its object in <c>/api/state</c>'s <c>guilds</c>. From <c>BotWebSnapshot</c>.</summary>
     public static void Write(Utf8JsonWriter w, Guild guild)
     {
         if (guild?.Name == null)
@@ -718,8 +648,6 @@ public static class BotOfficers
         BotGuildScout.Write(w, guild.Name);
         w.WriteEndObject();
     }
-
-    // ---- store ------------------------------------------------------------------------------------------------------------
 
     internal static void Save(IGenericWriter writer)
     {
@@ -777,7 +705,6 @@ public static class BotOfficers
         return _posts.Count;
     }
 
-    /// <summary>A world reload: the counters and the session's memory, not the posts (the store reads them back).</summary>
     public static void Forget()
     {
         Appointed = 0;
@@ -794,14 +721,6 @@ public static class BotOfficers
         _lastLook = 0;
     }
 
-    /// <summary>
-    /// <b>Patrick's reset (07.10.2026, reset26): every post vacated and every guild's store emptied, so the save writes the officers
-    /// empty.</b> The reset of 20:56 that night left <c>Saves/BotOfficers</c> whole: the posts are kept by the holder's name and the
-    /// guild's, so a newcomer born under an old name into a guild founded again under an old name would have woken up its
-    /// quartermaster. This empties exactly what <see cref="BotOfficersStore"/> writes — the posts here and the stores and kit debts
-    /// in <see cref="BotGuildStore.Wipe"/> — and forgets what the module's own reload forgets: the quartermasters, the kit draws,
-    /// the herald's stand, the bouts and the scouts. No coin is held by a post. Returns the posts vacated.
-    /// </summary>
     public static int Wipe()
     {
         var posts = 0;
@@ -826,7 +745,6 @@ public static class BotOfficers
         return posts;
     }
 
-    /// <summary>The words, written into the voice's bank for every occasion <c>bot-voice.json</c> does not already name.</summary>
     public static Dictionary<string, string[]> Phrases() =>
         new(StringComparer.OrdinalIgnoreCase)
         {

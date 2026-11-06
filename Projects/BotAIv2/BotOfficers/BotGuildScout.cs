@@ -8,33 +8,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The scout's work, in the order it is offered: a rumoured chest reached first, another guild's company shadowed and reported,
-/// and a patrol of the dangerous ground by a plan.
-///
-/// <para>
-/// <b>The rumour.</b> A chest Argus has spread word of (<see cref="BotRumour"/>) within its reach and not a lair: the scout is offered
-/// the same seeking any bot is (<see cref="BotRumourSeek"/>, at most <see cref="BotRumour.MostSeekers"/> at once), reckoned
-/// <see cref="RumourLean"/> times higher — it is the scout's trade to get there first. Counted apart, and who found the chest.
-/// </para>
-///
-/// <para>
-/// <b>The shadow.</b> Another guild's company of <see cref="ShadowLeast"/> or more within <see cref="ShadowReach"/> of the scout's
-/// guild's seat is followed at <see cref="ShadowKeep"/> tiles for <see cref="ShadowMs"/>, then reported in the guild's channel and
-/// as news ("The Wolf gathers 12 at Cove"). When the two guilds are at war and the company is within <see cref="WarnReach"/> of the
-/// seat, the report is a warning: the company's leader becomes the threat the guild's war company musters against
-/// (<see cref="BotFeud.Warn"/>), before it is on the guild's ground.
-/// </para>
-///
-/// <para>
-/// <b>The patrol.</b> The hostile zone (<see cref="BotZones"/>, never a deadly one, nor the sea) within <see cref="PatrolReach"/> of
-/// the seat that scouts watched longest ago, then least awake, then nearest; the scout stands at a lookout outside its aggro range on
-/// the side of home, and for <see cref="HoldMs"/> passes the zone's box to the scan every <see cref="FocusMs"/>
-/// (<see cref="BotZoneScan.Focus"/>, the debuggers' tour's own feed), so the patrols the paths and the danger records read are fresh.
-/// It counts what it saw and says it. A square of the death map in the zone that reads high while nothing attacking lives there now
-/// is knocked down (<see cref="BotPeril.Scouted"/>), so work is not refused for a field that has gone quiet.
-/// </para>
-/// </summary>
 public sealed class BotGuildScout : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuildScout));
@@ -45,7 +18,6 @@ public sealed class BotGuildScout : IBotProposer
 
     public static double Prior { get; set; } = 28.0;
 
-    /// <summary>How long a scout rests between outings.</summary>
     public static int RestMs { get; set; } = 900000;
 
     public static bool Rumours { get; set; } = true;
@@ -62,10 +34,8 @@ public sealed class BotGuildScout : IBotProposer
 
     public static int ShadowMs { get; set; } = 90000;
 
-    /// <summary>How near the seat an enemy company must be for the report to be a warning.</summary>
     public static int WarnReach { get; set; } = 90;
 
-    /// <summary>How often one guild's scout reports the same company.</summary>
     public static int ShadowRestMs { get; set; } = 1200000;
 
     public static bool Patrols { get; set; } = true;
@@ -76,16 +46,11 @@ public sealed class BotGuildScout : IBotProposer
 
     public static int FocusMs { get; set; } = 3000;
 
-    /// <summary>Tiles kept beyond a zone's aggro range at the lookout.</summary>
     public static int Margin { get; set; } = 4;
 
-    /// <summary>The zone's fight against the median bot above which a scout does not go near it.</summary>
     public static double MostVsBot { get; set; } = 3.0;
 
-    /// <summary>How long a scout may walk to its outing before it is given up.</summary>
     public static int WalkMs { get; set; } = 300000;
-
-    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long RumourOffers { get; private set; }
 
@@ -183,8 +148,6 @@ public sealed class BotGuildScout : IBotProposer
         return Patrols ? Plan(body, map, home) : null;
     }
 
-    // ---- the rumour --------------------------------------------------------------------------------------------------------
-
     private static BotDeed Seek(BotMobile body, Map map)
     {
         if (!BotSeasons.Running || !BotRumour.Running || BotRumour.Now is not { } tale || tale.Map != map || tale.Lair)
@@ -211,7 +174,6 @@ public sealed class BotGuildScout : IBotProposer
         return new Rumour(new BotRumourSeek(tale));
     }
 
-    /// <summary>The seeking of a rumoured chest, as the scout's own work: the same walk and the same chest, reckoned higher.</summary>
     public sealed class Rumour : BotDeed
     {
         public const string Trade = "scout-rumour";
@@ -257,8 +219,6 @@ public sealed class BotGuildScout : IBotProposer
         }
     }
 
-    // ---- the shadow --------------------------------------------------------------------------------------------------------
-
     private static BotDeed Follow(BotMobile body, Guild guild, Map map, Point3D home, long now)
     {
         var squads = BotSquads.All;
@@ -284,7 +244,6 @@ public sealed class BotGuildScout : IBotProposer
                 continue;
             }
 
-            // A war first, then the biggest.
             var count = squad.Count + (BotWar.Of(guild.Name, theirs.Name) != null ? 1000 : 0);
 
             if (count > bestCount)
@@ -457,8 +416,6 @@ public sealed class BotGuildScout : IBotProposer
         }
     }
 
-    // ---- the patrol --------------------------------------------------------------------------------------------------------
-
     private static BotDeed Plan(BotMobile body, Map map, Point3D home)
     {
         var state = BotZones.State;
@@ -470,7 +427,6 @@ public sealed class BotGuildScout : IBotProposer
             return null;
         }
 
-        // The three best by the plan, tried in order: a road too dangerous to one is a reason to look at the next.
         Span<int> picks = stackalloc int[3];
         picks.Fill(-1);
 
@@ -557,7 +513,6 @@ public sealed class BotGuildScout : IBotProposer
 
     private static (int, int) Key(BotZone zone) => (zone.CenterX >> 4, zone.CenterY >> 4);
 
-    /// <summary>A tile outside the zone's reach on the side of home, standable and not itself in a patrol.</summary>
     private static bool Lookout(Map map, BotZone zone, Point3D home, out Point3D at)
     {
         at = Point3D.Zero;
@@ -787,8 +742,6 @@ public sealed class BotGuildScout : IBotProposer
             return BotDoing.Done($"watched {Label} for {(now - _since) / 1000}s: {what}");
         }
     }
-
-    // ---- telling -----------------------------------------------------------------------------------------------------------
 
     private static void Tally(string guild, int stops, int reports, int rumours)
     {

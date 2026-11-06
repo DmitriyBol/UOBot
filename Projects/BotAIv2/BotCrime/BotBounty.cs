@@ -4,42 +4,22 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a free fighter of any guild a head on a town's wanted list, priced at the bounty.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026: "a wanted list: the town sets a bounty on a head, bounty hunters from any guild, trial and jail when
-/// caught".</b> The hunt is the manhunt the shard already has (<see cref="BotBrawl.Manhunt"/>): close, fight, and stop when the
-/// quarry is down, caught or no longer wanted. A wanted thief beaten to a quarter yields and is taken alive
-/// (<see cref="BotCrime.Yield"/>); a kill is a catch all the same (<c>BotOutlaw.Fell</c> reads <see cref="BotCrime.Hunts"/>), and
-/// either way the bounty is paid out of the town's purse to whoever took it (<see cref="BotCrime.Caught"/>). A hunter must be
-/// <see cref="Odds"/> times as strong as its quarry, as fit as a company's choosing rule wants, and no more than
-/// <see cref="HuntersPer"/> hunt one head at once. Traders are neutral and take no part; neither does anybody of The Shadow.
-/// </para>
-/// </summary>
 public sealed class BotBountyBoard : IBotProposer
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBountyBoard));
 
-    /// <summary>Whether bounties are hunted at all. The list and the payment stand either way: the law-abiding still take what they see.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>How far a hunter will go after a head.</summary>
     public static int Reach { get; set; } = 400;
 
-    /// <summary>How much stronger than its quarry a hunter must be.</summary>
     public static double Odds { get; set; } = 1.2;
 
-    /// <summary>The share of its health a hunter must have to take a bounty.</summary>
     public static double Healthy { get; set; } = 0.8;
 
-    /// <summary>Hunters on one head at once.</summary>
     public static int HuntersPer { get; set; } = 2;
 
-    /// <summary>The minutes a hunt is reckoned at, for the price a minute: a bounty over the walk and the fight.</summary>
     public static double Minutes { get; set; } = 6.0;
 
-    /// <summary>How long the board's list of heads is kept between reads.</summary>
     public static int ListMs { get; set; } = 10000;
 
     public static long Looks { get; private set; }
@@ -169,7 +149,6 @@ public sealed class BotBountyBoard : IBotProposer
         }
     }
 
-    /// <summary>The rule the bounty's fight follows: over when the head is down, taken, yields, or comes off the list.</summary>
     public static string Over(IBotWilful bot, BotBrawl brawl)
     {
         var head = brawl?.Foe as BotMobile;
@@ -211,7 +190,6 @@ public sealed class BotBountyBoard : IBotProposer
     }
 }
 
-/// <summary>A bounty hunter after one head on a town's wanted list. See <see cref="BotBountyBoard"/>.</summary>
 public sealed class BotBountyHunt : BotDeed
 {
     public const string Trade = "bounty";
@@ -240,12 +218,10 @@ public sealed class BotBountyHunt : BotDeed
 
     public override Point3D Where => _fight.Where;
 
-    /// <summary>The bounty over the hunt's minutes: the town's price, reckoned as gold a minute.</summary>
     public override double Expects => Math.Max(1.0, _bounty / Math.Max(1.0, BotBountyBoard.Minutes));
 
     public override double Minutes => BotBountyBoard.Minutes;
 
-    /// <summary>A price the town posted and holds, corrected by how much of such prices is earned rather than by the trade's average.</summary>
     public override bool Posted => true;
 
     public override bool Committed => true;

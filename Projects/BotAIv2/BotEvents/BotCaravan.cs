@@ -4,10 +4,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Offers a trader near a posted caravan's source the lead (07.10.2026): a trader of the neutral class, fit, in the world, within
-/// <see cref="BotCaravans.Reach"/> of the source's counter, able to pay for the goods out of what it may spend, with a way there.
-/// </summary>
 public sealed class BotCaravanCall : IBotProposer
 {
     public string Name => "Caravan";
@@ -48,11 +44,6 @@ public sealed class BotCaravanCall : IBotProposer
     }
 }
 
-/// <summary>
-/// Leading a caravan: to the source's counter, the goods bought with the trader's own coin, a wait for the guards, the road to the
-/// town that posted it, and the town's pay on arrival (<see cref="BotCaravans.Deliver"/>). Held through ordinary offers like any
-/// work a bot sees through.
-/// </summary>
 public sealed class BotCaravan : BotDeed
 {
     public const string Trade = "caravan";
@@ -65,7 +56,6 @@ public sealed class BotCaravan : BotDeed
 
     public override string Kind => Trade;
 
-    /// <summary>What the caravan carries, for the road's bandits (<c>BotHighway</c>, life18a): null until the goods are bought.</summary>
     public Type Goods => _run.Phase is BotCaravans.Phase.Gathering or BotCaravans.Phase.Road ? _run.Kind : null;
 
     public override Map Map => _run.Source.Map;
@@ -165,8 +155,6 @@ public sealed class BotCaravan : BotDeed
             return BotDoing.Done($"delivered the caravan to {_run.To.Name} for {_paid}gp");
         }
 
-        // A caravan goes at its guards' pace: the walk is held where it stands while a guard has dropped back (12.10.2026, w7).
-        // The order is the same either way, so the Will keeps the road it has. See BotCaravans.GuardSpread.
         BotCaravans.WaitForGuards(_run, body);
 
         return BotDoing.Walk(_run.Source.Map, _run.To.Square, BotArrival.Within(BotCaravans.ArriveReach), $"leading the caravan to {_run.To.Name}");
@@ -181,10 +169,6 @@ public sealed class BotCaravan : BotDeed
     }
 }
 
-/// <summary>
-/// Offers a fighter near a caravan's trader a guard's place (07.10.2026): while the trader buys or waits, until
-/// <see cref="BotCaravans.MostGuards"/> are hired; a fighter in no company, within <see cref="BotCaravans.GuardReach"/> of the trader.
-/// </summary>
 public sealed class BotGuardCall : IBotProposer
 {
     public string Name => "Guard";
@@ -214,12 +198,6 @@ public sealed class BotGuardCall : IBotProposer
     }
 }
 
-/// <summary>
-/// Guarding a caravan: walking with its trader and setting on whatever attacks it — one creature at a time, the shard's own fight
-/// (<see cref="BotSlay"/>) — when the guards between them bring <see cref="BotCaravans.GuardOdds"/> times what it is reckoned at.
-/// Paid by the town on arrival, if still near the trader then; a guard that falls <see cref="BotCaravans.Behind"/> tiles back for
-/// <see cref="BotCaravans.BehindMs"/> has left the caravan.
-/// </summary>
 public sealed class BotGuard : BotDeed
 {
     public const string Trade = "guard";
@@ -246,7 +224,6 @@ public sealed class BotGuard : BotDeed
 
     public override Point3D Where => _run.Leader?.Location ?? _run.Source.Location;
 
-    /// <summary>life18a: the caravan's own wage over the measured trip and the wait (was the 100gp floor over fifteen minutes).</summary>
     public override double Expects =>
         Math.Max(BotCaravans.GuardPrior, Math.Max(BotCaravans.Wage, _run.GuardWage) * BotNight.Pay / Math.Max(1.0, Minutes));
 
@@ -277,7 +254,6 @@ public sealed class BotGuard : BotDeed
         {
             Release(bot);
 
-            // life18a: the trader arrived while this guard was still on the road; its wage is kept until it reaches the square.
             if (_run.Ending == null && BotCaravans.Owes(_run, body))
             {
                 if (body.Map == _run.Source.Map && body.InRange(_run.To.Square, BotCaravans.PayReach))
@@ -348,26 +324,17 @@ public sealed class BotGuard : BotDeed
             _behindTick = 0;
         }
 
-        // life18a: at the counter the trader stands still inside a shop; a guard near enough waits where it is rather than asking the
-        // walker for a tile beside it (one of the night's two guards dropped the post on "could not get one tile closer").
         var slack = _run.Phase == BotCaravans.Phase.Road ? 3 : 8;
 
         if (!body.InRange(leader.Location, slack))
         {
-            // <b>Kept up with (12.10.2026, w7).</b> 100 of the 104 guards that failed on 11–12.10 ended "could not get nearer to" their
-            // trader, four to fifteen tiles behind it on the road north through Britain (x 1466–1490, z 20–30), every plan but one
-            // reaching it; Ingram was hired and lost five times in nineteen seconds behind Ilphrin. A plan that reaches the trader is a way
-            // (BotDoing.WalkAfter); Behind and BehindMs end a guard that cannot keep up, and the trader waits for its guards (BotCaravan).
+
             return BotDoing.WalkAfter(leader.Map, leader, BotArrival.Within(slack), $"guarding {leader.Name}'s caravan to {_run.To.Name}");
         }
 
         return BotDoing.Work($"guarding {leader.Name}'s caravan to {_run.To.Name}");
     }
 
-    /// <summary>
-    /// The strongest creature attacking the trader or this guard, near, lawful, and within the guards' odds; or null. Read off the
-    /// two bodies' own lists of who has struck them, not off the map: no search round anybody on a guard's beat.
-    /// </summary>
     private BaseCreature Attacker(Mobile body, Mobile leader)
     {
         BaseCreature best = null;

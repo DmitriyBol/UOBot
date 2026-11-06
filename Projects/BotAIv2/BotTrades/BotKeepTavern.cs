@@ -3,19 +3,6 @@ using System.Collections.Generic;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A cook's shift keeping a tavern: its meals out of the bank box if the pack is short of them, the walk to the inn, the table
-/// opened, supper served to whoever the auction sends, and the kitchen shut when the meals or the shift run out (07.10.2026,
-/// trades17).
-///
-/// <para>
-/// <b>The shop's shape, at an inn.</b> Held from the first step against the next offer (<see cref="BotDeed.Steadfast"/>) because
-/// guests are walking to it; standing still is the work once it is open (<see cref="BotDeed.Still"/>), and the shift's own clock
-/// ends it; put down for what will not wait, the tavern is shut while the cook is away and opened again when it is back. Measured
-/// as coin: the meals were the cook's before the shift and the coin is what the shift turned them into (<c>BotKeepShop</c>'s
-/// arithmetic), so the ledger corrects the claim by what this cook's taverns really took.
-/// </para>
-/// </summary>
 public sealed class BotKeepTavern : BotDeed
 {
     public const string Trade = "tavern";
@@ -171,8 +158,6 @@ public sealed class BotKeepTavern : BotDeed
     {
         var pack = BotTaverns.MealsIn(body.Backpack);
 
-        // <b>The meals out of the box first.</b> A cook banks what it cooks with everything else it carries (BotUnload), and the
-        // inn has no bank to reach into: the box is opened at the bank on the way, as a keeper of a shop by the bank would.
         if (!_fetched && pack < BotTaverns.StockMeals && _bank != Point3D.Zero && (body.FindBankNoCreate()?.Items.Count ?? 0) > 0)
         {
             if (!BotMarket.AtBank(body))
@@ -276,11 +261,6 @@ public sealed class BotKeepTavern : BotDeed
     public override void Drop(IBotWilful bot) => Shut(Core.TickCount, "the shift was given up", false, false);
 }
 
-/// <summary>
-/// Offers a cook holding meals a tavern's shift at the nearest inn with none open near it (07.10.2026, trades17). The skillet
-/// decides who cooks (<c>BotOven.Kit</c>), as it does for the cooking itself; the meals in the pack and the bank box decide
-/// whether there is a supper to serve. Every gate counted.
-/// </summary>
 public sealed class BotTaverner : IBotProposer
 {
     public string Name => "Taverner";
@@ -305,7 +285,6 @@ public sealed class BotTaverner : IBotProposer
 
     private static readonly Dictionary<Serial, long> _last = [];
 
-    /// <summary>A shift was taken: this cook rests from taverns for <see cref="BotTaverns.RestMs"/>.</summary>
     internal static void Went(Mobile cook)
     {
         if (cook != null)
@@ -328,7 +307,6 @@ public sealed class BotTaverner : IBotProposer
             return null;
         }
 
-        // Keeping one already.
         if (body.Resolve?.Deed is BotKeepTavern)
         {
             return null;
@@ -369,7 +347,6 @@ public sealed class BotTaverner : IBotProposer
             return null;
         }
 
-        // A red name in a town is a fight with the guards, not a supper.
         if (body.Kills >= 5 || body.Criminal || BotUnderworld.Member(body))
         {
             Outlawed++;

@@ -10,55 +10,6 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Town charters: a monopoly on a craft in a town, sold at a sealed auction every six hours, and the levy everybody else pays
-/// its holder on each sale of that craft's goods there.
-///
-/// <para>
-/// <b>Patrick, 07.10.2026 evening, approved:</b> "every N hours a town auctions charters (the smiths' charter of Britain, the
-/// tailors' of Minoc, the woodsmen's of Yew). The charter guild sells that kind in the town's shops without a levy; everyone else
-/// pays the charter guild a levy on each sale (the guild's money, not the town's); the town's purse gets the auction price.
-/// Charters make real specialisation; losing one at the auction is a grievance; a failed town task can cost the charter."
-/// </para>
-///
-/// <para>
-/// <b>Six crafts, read off the goods.</b> A kind belongs to a craft when it is that craft's material (ingots; leather and cloth;
-/// logs, boards, shafts, arrows and bolts; potions; scrolls; food) or when the engine's own recipe book for the craft makes it
-/// (<c>DefBlacksmithy</c>, <c>DefTailoring</c>, <c>DefBowFletching</c> and <c>DefCarpentry</c>, <c>DefAlchemy</c>,
-/// <c>DefInscription</c>, <c>DefCooking</c>) — the same books the market's material ceiling reads. One charter per craft per town.
-/// </para>
-///
-/// <para>
-/// <b>The craft's sales are its practitioners' sales.</b> A hunter selling a looted kryss or a Flamestrike scroll off a corpse is
-/// not practising smithing or scribing, and the poor hunt (Patrick's standing rule): with <see cref="LootFree"/> a seller under
-/// <see cref="CraftSkill"/> in the craft's skills is neither levied nor counted in the craft's book. The book of each town's
-/// craft — the gold its practitioners took there this period, by guild — is what a guild's bid is reckoned from.
-/// </para>
-///
-/// <para>
-/// <b>The auction.</b> Every <see cref="EveryMs"/> each town's crafts that sold anything, or are held, go under the hammer. A
-/// guild bids when its practitioners took at least <see cref="LeastShare"/> of the craft's gold there: the charter's worth over a
-/// term is the levy on the whole book (<see cref="Levy"/> × the period's gold, scaled to the term), and a guild offers
-/// <see cref="Appetite"/> × (½ + ½ × its share) of it, never more than <see cref="SpareShare"/> of what its chest spares
-/// (<c>BotDues.Spare</c>, which already keeps back what the members voted to save for, <c>BotPurpose</c>); a chest voted to a war
-/// chest bids nothing while it is one. The highest sealed bid wins and its chest pays the town's purse (<c>BotCity.Tax</c>); no bid
-/// and the charter rests. The holder that lost it, and every other losing bidder at half the weight, think worse of the winner
-/// (<see cref="LostRegard"/>, written into the grievance book as "a charter lost at auction").
-/// </para>
-///
-/// <para>
-/// <b>The levy is hand to hand and makes no coin.</b> At a bot's shop (<c>BotShopkeep.Serve</c>, the city's buy) the buyer's coin is
-/// split at the till: the levy into the holder's chest, the rest to the keeper. At a shopkeeper's counter (<c>BotShops.Sell</c>) and
-/// a tavern's table the seller pays it out of what it was just paid, pack first, then account. A seller whose guild is hostile to
-/// the holder (at war, or at the war line of regard) pays the town's purse instead: nothing crosses between enemies. The holder's own sales are free and counted.
-/// </para>
-///
-/// <para>
-/// <b>Losing it early.</b> A holder that fails <see cref="FailsToLose"/> of the town's tasks in a row (<c>BotBurgh</c>), or is put out
-/// of the town, loses the town's charters at once; they go to an early auction the next minute, with that guild barred from it
-/// until the next general auction. A holder guild that no longer exists loses them too.
-/// </para>
-/// </summary>
 public static class BotCharters
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotCharters));
@@ -73,66 +24,44 @@ public static class BotCharters
         Cook
     }
 
-    /// <summary>How many crafts there are.</summary>
     public const int Crafts = 6;
 
     private static readonly string[] _words = ["smiths'", "tailors'", "woodsmen's", "alchemists'", "scribes'", "cooks'"];
 
     private static readonly string[] _keys = ["smith", "tailor", "woodsman", "alchemist", "scribe", "cook"];
 
-    /// <summary>"smiths'", as in "the smiths' charter of Britain".</summary>
     public static string Word(Craft craft) => _words[(int)craft];
 
-    /// <summary>"smith": the craft's one-word name, for the page and the door.</summary>
     public static string Key(Craft craft) => _keys[(int)craft];
 
-    // ---- Dials ---------------------------------------------------------------------------------------------------------------
-
-    /// <summary>Whether charters are auctioned and levied at all. Off: no levy is taken and no auction is held; the charters stand.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>How often every town auctions its charters: six hours of running time.</summary>
     public static int EveryMs { get; set; } = 21600000;
 
-    /// <summary>The first auction after a boot with nothing saved: an hour, so the books have a period of sales to bid by.</summary>
     public static int FirstMs { get; set; } = 3600000;
 
-    /// <summary>The levy on a sale of a charter's craft by anybody but its holder: a tenth of the sale.</summary>
     public static double Levy { get; set; } = 0.10;
 
-    /// <summary>The share of a charter's worth over a term a guild with all of the craft's sales would bid. See <see cref="Bid"/>.</summary>
     public static double Appetite { get; set; } = 0.8;
 
-    /// <summary>The most of what a chest spares (<c>BotDues.Spare</c>) one bid may take.</summary>
     public static double SpareShare { get; set; } = 0.5;
 
-    /// <summary>The least share of a town's craft sales a guild's practitioners must have taken to bid for its charter.</summary>
     public static double LeastShare { get; set; } = 0.1;
 
-    /// <summary>A bid under this is no bid.</summary>
     public static int LeastBid { get; set; } = 50;
 
-    /// <summary>The shortest period a book is reckoned over, so an hour's sales are not scaled into a fortune: half an hour.</summary>
     public static int LeastPeriodMs { get; set; } = 1800000;
 
-    /// <summary>Town tasks failed in a row that cost a holder its charters in that town.</summary>
     public static int FailsToLose { get; set; } = 2;
 
-    /// <summary>What a holder that lost its charter at auction thinks of the winner, at once; other losing bidders half of it.</summary>
     public static double LostRegard { get; set; } = -8.0;
 
-    /// <summary>The skill in the craft that makes a seller its practitioner. See <see cref="Practises"/>.</summary>
     public static double CraftSkill { get; set; } = 30.0;
 
-    /// <summary>Whether a seller who does not practise the craft — a hunter with its loot — sells free and outside the book.</summary>
     public static bool LootFree { get; set; } = true;
 
-    /// <summary>Whether a seller says aloud what its levy went to (the voice's own clock still holds it).</summary>
     public static bool SayLevy { get; set; } = true;
 
-    // ---- Counters (cumulative since the start, like every summary number) -----------------------------------------------------
-
-    /// <summary>Auctions held (one town's one craft each), charters sold at them, kept by the holder, rested for want of a bid, held early.</summary>
     public static long Auctions { get; private set; }
 
     public static long Sold { get; private set; }
@@ -143,63 +72,50 @@ public static class BotCharters
 
     public static long Early { get; private set; }
 
-    /// <summary>Sealed bids made and their gold; gold paid into the towns' purse for charters.</summary>
     public static long Bids { get; private set; }
 
     public static long BidGold { get; private set; }
 
     public static long PriceGold { get; private set; }
 
-    /// <summary>Guilds with a share that made no bid: the chest spared too little, or it was voted a war chest; bids a chest could not pay.</summary>
     public static long TooPoor { get; private set; }
 
     public static long ForWar { get; private set; }
 
     public static long Short { get; private set; }
 
-    /// <summary>Levies paid to holders' chests, and their gold.</summary>
     public static long Levies { get; private set; }
 
     public static long LevyGold { get; private set; }
 
-    /// <summary>Levies a seller at war with the holder paid into the town's purse instead, and their gold.</summary>
     public static long ToTown { get; private set; }
 
     public static long ToTownGold { get; private set; }
 
-    /// <summary>Levies owed that the seller's pack and account could not cover, and the gold short.</summary>
     public static long Unpaid { get; private set; }
 
     public static long UnpaidGold { get; private set; }
 
-    /// <summary>Sales by a charter's own guild, free of the levy, and their gold.</summary>
     public static long Spared { get; private set; }
 
     public static long SparedGold { get; private set; }
 
-    /// <summary>Sales of a craft's kind by a seller who does not practise it, free and outside the book. See <see cref="LootFree"/>.</summary>
     public static long LootSpared { get; private set; }
 
     public static long LootSparedGold { get; private set; }
 
-    /// <summary>Practitioners' sales of a craft in a town, and their gold: the books' intake, whether a charter stood or not.</summary>
     public static long Booked { get; private set; }
 
     public static long BookedGold { get; private set; }
 
-    /// <summary>Charters taken away: tasks failed in a row, the holder put out of the town, the holder gone.</summary>
     public static long LostFails { get; private set; }
 
     public static long LostExile { get; private set; }
 
     public static long LostGone { get; private set; }
 
-    /// <summary>Grievances written against a winner by a loser.</summary>
     public static long Grievances { get; private set; }
 
-    // ---- State ----------------------------------------------------------------------------------------------------------------
-
-    /// <summary>One charter: a town's craft, held by a guild, bought for a price.</summary>
     public sealed class Charter
     {
         public string Town;
@@ -210,7 +126,6 @@ public static class BotCharters
 
         public int Price;
 
-        /// <summary>When it was won, on the wall clock (UTC).</summary>
         public DateTime Since;
 
         public long Levies;
@@ -224,13 +139,10 @@ public static class BotCharters
 
     private static readonly Dictionary<(string Town, Craft Craft), Charter> _charters = [];
 
-    /// <summary>The period's book: the gold each guild's practitioners took for a craft in a town ("" for the guildless).</summary>
     private static readonly Dictionary<(string Town, Craft Craft), Dictionary<string, long>> _book = [];
 
-    /// <summary>Charters taken away and waiting for the next minute's early auction.</summary>
     private static readonly List<(string Town, Craft Craft)> _early = [];
 
-    /// <summary>The guild a charter was taken from, barred from bidding for it until the next general auction.</summary>
     private static readonly Dictionary<(string Town, Craft Craft), string> _barred = [];
 
     private static bool _opened;
@@ -239,23 +151,18 @@ public static class BotCharters
 
     private static long _periodStart;
 
-    /// <summary>What the store read back, used when the clock first opens: ms to the next auction, ms into the period.</summary>
     private static bool _restored;
 
     private static long _restoredNext;
 
     private static long _restoredElapsed;
 
-    /// <summary>The charters standing.</summary>
     public static IEnumerable<Charter> All => _charters.Values;
 
     public static int Held => _charters.Count;
 
-    // ---- What a kind is ---------------------------------------------------------------------------------------------------------
-
     private static readonly Dictionary<Type, sbyte> _kinds = [];
 
-    /// <summary>The craft whose charter covers this kind, if any. Cached per type once the craft books are read.</summary>
     public static bool Of(Type kind, out Craft craft)
     {
         craft = Craft.Smith;
@@ -323,7 +230,7 @@ public static class BotCharters
 
         try
         {
-            // Before content initialisation the books are null; nothing is cached until they can answer.
+
             if (DefBlacksmithy.CraftSystem == null)
             {
                 sure = false;
@@ -371,7 +278,6 @@ public static class BotCharters
 
     private static bool Made(CraftSystem system, Type kind) => system?.CraftItems != null && system.CraftItems.SearchFor(kind) != null;
 
-    /// <summary>Whether this seller practises the craft: <see cref="CraftSkill"/> or more in one of its skills.</summary>
     public static bool Practises(Mobile seller, Craft craft)
     {
         var skills = seller?.Skills;
@@ -395,7 +301,6 @@ public static class BotCharters
         };
     }
 
-    /// <summary>The craft named by a word at the door: smith(s), tailor(s), woodsman/woodsmen/carpenter/bowyer/fletcher, alchemist(s), scribe(s), cook(s).</summary>
     public static bool Parse(string word, out Craft craft)
     {
         craft = Craft.Smith;
@@ -464,11 +369,9 @@ public static class BotCharters
         }
     }
 
-    /// <summary>The guild holding this town's charter for this craft, or null. For other folders (politics, officers).</summary>
     public static string Holder(string town, Craft craft) =>
         town != null && _charters.TryGetValue((town, craft), out var charter) ? charter.Holder : null;
 
-    /// <summary>How many charters this guild holds.</summary>
     public static int HeldBy(string guild)
     {
         if (guild == null)
@@ -489,13 +392,6 @@ public static class BotCharters
         return n;
     }
 
-    // ---- The levy ---------------------------------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// A sale at a bot's shop or to the city there, split at the till: returns the levy, already in the holder's chest (or the town's
-    /// purse from an enemy), which the caller keeps back from what it pays the keeper. Nought when no charter applies. Called from
-    /// <c>BotShopkeep.Serve</c> and <c>BotShopkeep.CityBuy</c> before the keeper is paid.
-    /// </summary>
     public static int Split(Mobile seller, string town, Type kind, int units, int gold)
     {
         if (!Running || seller == null || town == null || gold <= 0 || !Of(kind, out var craft))
@@ -515,11 +411,6 @@ public static class BotCharters
         return levy;
     }
 
-    /// <summary>
-    /// A sale over a shopkeeper's counter: each line's share of what the counter measured paid is reckoned by craft, and the levies
-    /// taken out of the seller's pack, then account, where the coin just went. Returns what was paid in levies. Called from the end
-    /// of <c>BotShops.Sell</c>.
-    /// </summary>
     public static int Counter(Mobile seller, Point3D at, List<(Type Kind, int Amount, int Paying)> lines, int earned)
     {
         if (!Running || seller == null || lines == null || lines.Count == 0 || earned <= 0)
@@ -601,10 +492,6 @@ public static class BotCharters
         return paid;
     }
 
-    /// <summary>
-    /// A sale already paid in full to the seller (a tavern's meal): the levy taken out of its pack, then account. Returns it.
-    /// Called from <c>BotTaverns.Serve</c>.
-    /// </summary>
     public static int After(Mobile seller, Point3D at, Type kind, int units, int gold)
     {
         if (!Running || seller == null || gold <= 0 || !Of(kind, out var craft))
@@ -636,10 +523,6 @@ public static class BotCharters
         return taken;
     }
 
-    /// <summary>
-    /// Books a practitioner's sale and says what levy it owes: nought for a seller who does not practise the craft (when
-    /// <see cref="LootFree"/>), where no charter stands, and for the holder's own sale.
-    /// </summary>
     private static int Reckon(Mobile seller, string town, Craft craft, int gold, out Charter charter, out bool enemy)
     {
         charter = null;
@@ -686,7 +569,7 @@ public static class BotCharters
         }
 
         charter = held;
-        // Nothing crosses between hostile guilds (Patrick's standing rule): at war, or either at or under the war line of regard.
+
         enemy = mine != null && BaseGuild.FindByName(held.Holder) is Guild holder
                 && (BotRegard.AtWar(mine, holder) || BotRegard.Of(mine, holder) <= BotRegard.Enmity || BotRegard.Of(holder, mine) <= BotRegard.Enmity);
 
@@ -707,7 +590,6 @@ public static class BotCharters
         BookedGold += gold;
     }
 
-    /// <summary>Coin out of a seller's pack, then its account: as much of <paramref name="levy"/> as it holds. What fell short is counted.</summary>
     private static int Take(Mobile seller, int levy)
     {
         var pack = seller.Backpack;
@@ -736,7 +618,6 @@ public static class BotCharters
         return taken;
     }
 
-    /// <summary>The levy where it belongs: the holder's chest, or the town's purse when the seller's guild is hostile to the holder.</summary>
     private static void Deliver(Mobile seller, Charter charter, bool enemy, Craft craft, int units, Type kind, int gold, int levy, string where)
     {
         if (enemy)
@@ -805,12 +686,8 @@ public static class BotCharters
         }
     }
 
-    // ---- The auction ------------------------------------------------------------------------------------------------------------
-
-    /// <summary>One guild's sealed bid.</summary>
     private readonly record struct Offer(string Guild, int Bid, double Share, long Sales, int Spare);
 
-    /// <summary>The clock, once a minute from the module: the first opening, holders gone or put out, early auctions, the general one.</summary>
     public static void Look(long now)
     {
         if (!_opened)
@@ -829,7 +706,6 @@ public static class BotCharters
             }
         }
 
-        // The towns' reach is asked of the gates after the survey; a general auction before it would find no town to hold one in.
         if (!Running || !BotTowns.Ready)
         {
             return;
@@ -865,7 +741,6 @@ public static class BotCharters
         }
     }
 
-    /// <summary>Holders that no longer exist, and holders put out of the town, lose their charters there.</summary>
     private static void Police()
     {
         if (_charters.Count == 0)
@@ -912,10 +787,6 @@ public static class BotCharters
         }
     }
 
-    /// <summary>
-    /// A town task failed by a guild: at <see cref="FailsToLose"/> in a row it loses its charters in that town, to an early auction it
-    /// may not bid at. Called from <c>BotBurgh.Fail</c> after the count is raised.
-    /// </summary>
     public static void Failed(string guild, string town, int inRow)
     {
         if (!Running || guild == null || town == null || FailsToLose <= 0 || inRow < FailsToLose)
@@ -974,7 +845,6 @@ public static class BotCharters
         BotEvents.Post("charter", null, null, charter.Holder, 0, 0, $"{key.Town} took the {Word(key.Craft)} charter from {charter.Holder}: {why}", null, BotJson.Object(w => w.WriteString("outcome", "revoked")));
     }
 
-    /// <summary>Every town's crafts under the hammer, the books closed and a new period opened.</summary>
     public static int General(long now, string why)
     {
         var held = 0;
@@ -1020,11 +890,6 @@ public static class BotCharters
         return held;
     }
 
-    /// <summary>
-    /// One town's charter for one craft auctioned now: the bids reckoned from the period's book, the highest paid to the town's purse,
-    /// the losers' grievances written. Returns what happened, in one line. A general auction's charter runs a whole term; an early or
-    /// hand-called one until the next general auction.
-    /// </summary>
     public static string Auction(BotTowns.Town town, Craft craft, long now, bool general, string why)
     {
         var key = (town.Name, craft);
@@ -1072,7 +937,6 @@ public static class BotCharters
                     continue;
                 }
 
-                // The head decides by the chest's purpose: a chest the members voted a war chest bids nothing while it is one.
                 if (BotPurpose.Goal(guild, out var what, out var aim) && aim > 0 && what == BotPurpose.Word(BotPurpose.Aim.WarChest))
                 {
                     ForWar++;
@@ -1189,7 +1053,6 @@ public static class BotCharters
             prev == null ? "; nobody held it" : kept ? "; it keeps it" : $"; taken from {prev.Holder}"
         );
 
-        // The losers think worse of the winner: the old holder at the full weight, whether it bid or not, other bidders at half.
         if (prev != null && !kept)
         {
             Grieve(prev.Holder, won.Guild, LostRegard);
@@ -1226,10 +1089,6 @@ public static class BotCharters
         return $"{won.Guild} holds {town.Name}'s {Word(craft)} charter for {paid}gp ({won.Share:P0} of {total}gp of sales; bids: {said}).";
     }
 
-    /// <summary>
-    /// A guild's sealed bid: <see cref="Appetite"/> × (½ + ½ × share) of the charter's worth over its term, never more than
-    /// <see cref="SpareShare"/> of what the chest spares.
-    /// </summary>
     public static int Bid(double worth, double share, int spare)
     {
         if (worth <= 0.0 || spare <= 0)
@@ -1283,7 +1142,6 @@ public static class BotCharters
         Grievances++;
     }
 
-    /// <summary>The guild's head (or any living member) says it on the trade channel, for the whole island; the guild's channel when none can.</summary>
     private static void Speak(string guildName, string occasion, Dictionary<string, string> fill)
     {
         if (BaseGuild.FindByName(guildName) is not Guild guild)
@@ -1322,7 +1180,6 @@ public static class BotCharters
         }
     }
 
-    /// <summary>The door's <c>charter &lt;town&gt; &lt;craft&gt;</c>: that town's charter auctioned now, until the next general auction.</summary>
     public static string ByHand(string tail)
     {
         var words = (tail ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -1350,9 +1207,6 @@ public static class BotCharters
         return Auction(town, craft, now, false, "called by hand");
     }
 
-    // ---- Telling it ---------------------------------------------------------------------------------------------------------------
-
-    /// <summary>The door's <c>charters</c>: every charter standing, the next auction, and each town's book this period.</summary>
     public static string Tell()
     {
         using var say = ValueStringBuilder.Create(1024);
@@ -1458,7 +1312,6 @@ public static class BotCharters
         return say.ToString();
     }
 
-    /// <summary>The <c>Charters:</c> line, every five minutes.</summary>
     public static string Describe()
     {
         using var say = ValueStringBuilder.Create(512);
@@ -1485,7 +1338,6 @@ public static class BotCharters
         return say.ToString();
     }
 
-    /// <summary>The town's charters inside its object in <c>/api/state</c>'s <c>towns</c>. From <c>BotWebSnapshot.WriteTowns</c>.</summary>
     public static void Write(Utf8JsonWriter w, string town)
     {
         w.WritePropertyName("charters");
@@ -1531,8 +1383,6 @@ public static class BotCharters
 
         w.WriteEndArray();
     }
-
-    // ---- Keeping it ----------------------------------------------------------------------------------------------------------------
 
     internal static void Save(IGenericWriter writer)
     {
@@ -1665,7 +1515,6 @@ public static class BotCharters
         return (_charters.Count, _book.Count);
     }
 
-    /// <summary>The session's counters; the charters, the books and the clock are the store's and are kept.</summary>
     public static void Forget()
     {
         Auctions = 0;
@@ -1697,19 +1546,6 @@ public static class BotCharters
         Grievances = 0;
     }
 
-    /// <summary>
-    /// <b>Patrick's reset (07.10.2026, reset26): every charter let go, so the save writes the charters empty.</b> <see cref="Forget"/>
-    /// keeps the charters, the period's books and the clock on purpose, for a reload; a reset that kept them left the old guilds'
-    /// names holding the towns' crafts in <c>Saves/BotCharters</c>, levying a population that never bid for them. This empties
-    /// exactly what <see cref="Save"/> writes — the charters, the books, the guilds barred — and the early auctions waiting, and
-    /// opens the clock again as at a first start, so the first auction comes <see cref="FirstMs"/> after the next look.
-    ///
-    /// <para>
-    /// <b>No coin is held here.</b> A charter's price went into the city's purse when it was won (<c>BotCity.Tax</c>) and every
-    /// levy since went to the holder's chest and the purse at once; the charter is a right, not a purse, so letting it go moves no
-    /// gold and leaves nothing counted anywhere. Returns the charters let go.
-    /// </para>
-    /// </summary>
     public static int Wipe()
     {
         var held = _charters.Count;
@@ -1727,7 +1563,6 @@ public static class BotCharters
         return held;
     }
 
-    /// <summary>What the bots say about it, put into the voice's bank wherever the bank has nothing for the occasion.</summary>
     public static Dictionary<string, string[]> Phrases() =>
         new(StringComparer.OrdinalIgnoreCase)
         {

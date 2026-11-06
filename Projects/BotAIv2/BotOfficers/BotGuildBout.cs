@@ -7,31 +7,12 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A bout between two guilds, called by a herald: each guild's champion against the other's at the herald's stand, before Argus,
-/// for a purse paid chest to chest.
-///
-/// <para>
-/// <b>Patrick's approval of 07.10.2026: the herald "challenges a rival guild to a tournament — a guild-vs-guild bout before Argus
-/// with a purse from both chests".</b> The hourly championship (<c>BotTourney</c>, Argus's) is one bot against one for a title; this
-/// is a guild's honour and a guild's coin. Once in <see cref="EveryMs"/> a herald standing by the bank names the guild nearest its
-/// own in might (<see cref="BotWar.Might"/>) that it is not at war with; the purse is <see cref="PurseShare"/> of the poorer chest,
-/// between <see cref="PurseLeast"/> and <see cref="PurseMost"/>, and both chests must hold it. A rival under
-/// <see cref="AcceptOdds"/> of the challenger's might declines, and so does one with no champion near. Each guild's champion is its
-/// strongest member free within <see cref="Reach"/> of the stand (<see cref="BotQuad.Strength"/>); both are called to the stand
-/// (<see cref="BotWill.Press"/>, as a championship summons is) and the duel is the duel everyone fights (<see cref="BotDuel"/>:
-/// yield at a third, two minutes, no criminal flag). The loser's chest pays the purse to the winner's (<see cref="BotChest.Pay"/>):
-/// coin moves, nothing is made. Argus's herald announces it when the debugger is on (<see cref="Witness"/>, filled from
-/// <c>mindedBots/debugger/BotOfficersArgus</c>).
-/// </para>
-/// </summary>
 public static class BotGuildBout
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotGuildBout));
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>How often one guild's herald may challenge. Four hours.</summary>
     public static int EveryMs { get; set; } = 14400000;
 
     public static double PurseShare { get; set; } = 0.05;
@@ -40,22 +21,15 @@ public static class BotGuildBout
 
     public static int PurseMost { get; set; } = 800;
 
-    /// <summary>The share of the challenger's might the rival must have to accept.</summary>
     public static double AcceptOdds { get; set; } = 0.6;
 
-    /// <summary>How far from the stand a champion may be called from.</summary>
     public static int Reach { get; set; } = 150;
 
-    /// <summary>How long the champions are waited for.</summary>
     public static int WaitMs { get; set; } = 300000;
 
-    /// <summary>How near the stand both must stand for the bout to begin.</summary>
     public static int RingTiles { get; set; } = 5;
 
-    /// <summary>Argus's herald: the line called at the place. Filled by the debugger; null without one.</summary>
     public static Action<Map, Point3D, string> Witness { get; set; }
-
-    // ---- counters ----------------------------------------------------------------------------------------------------------
 
     public static long Challenges { get; private set; }
 
@@ -121,7 +95,6 @@ public static class BotGuildBout
         return false;
     }
 
-    /// <summary>A herald at its stand challenges a rival, if its guild is due one. From <see cref="BotHeraldStand.Stand"/>.</summary>
     public static void Challenge(BotMobile herald, Guild ours, Point3D at, long now)
     {
         if (!Running || herald?.Map == null || ours?.Name == null || Fighting(ours.Name))
@@ -280,7 +253,6 @@ public static class BotGuildBout
         return best;
     }
 
-    /// <summary>The clock: champions arriving, the duel begun, the duel read, the purse paid. From the module's timer.</summary>
     internal static void Beat(long now)
     {
         for (var i = _bouts.Count - 1; i >= 0; i--)
@@ -310,7 +282,6 @@ public static class BotGuildBout
                     continue;
                 }
 
-                // Both arrived and their walk ended on its own beat; then the duel.
                 if (bout.ChampA.Resolve?.Deed is Answer || bout.ChampB.Resolve?.Deed is Answer)
                 {
                     continue;
@@ -445,7 +416,6 @@ public static class BotGuildBout
 
     private static bool Standing(Bout bout) => _bouts.Contains(bout);
 
-    /// <summary>A champion's walk to the stand. Pressed, ended by arriving; the duel is pressed after it.</summary>
     private sealed class Answer : BotDeed
     {
         public const string Trade = "guild-bout";

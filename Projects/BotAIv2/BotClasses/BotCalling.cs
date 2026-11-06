@@ -5,66 +5,29 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Whether a piece of work is this bot's own trade, another class's trade, or anybody's work — what that does to
-/// its price, and how the population's working minutes actually divide between the three.
-///
-/// <para>
-/// <b>Measured before it was priced.</b> Over the first seventy minutes of 14.09.2026 gatherers spent 67% of their
-/// working minutes on their own trade and crafters 73%, while healers spent 10%, warriors 12%, mages 15% and
-/// archers 16%. Almost none of that gap is fighters doing other classes' work — the share was nought to five in a
-/// hundred — it is fighters doing anybody's work: looking for a fight for a quarter of the day, carrying loot to a
-/// counter, standing for the guild. So this is the smaller of the two repairs a role needs. It keeps a warrior away
-/// from the forge and the mortar; it cannot give a warrior something to fight.
-/// </para>
-///
-/// <para>
-/// <b>Read off what a class already says about itself, rather than a table somebody typed.</b> A class names the
-/// skills it works towards — <see cref="BotClass.Wants"/> — and a piece of work names the one skill it trains —
-/// <see cref="BotDeed.Trains"/>. Work that trains one of this class's skills is its own trade; work that trains a
-/// skill some other class is for is another trade; work that trains nothing, or a skill no class is for — carrying,
-/// selling, standing for the guild, cooking — is anybody's. That is RimWorld's split between a pawn's passions and
-/// what it is incapable of, and Crusader Kings' personality weights, without a second list that could drift from
-/// the classes it describes.
-/// </para>
-///
-/// <para>
-/// <b>Applied outside the appraisal's fifth root, and on purpose.</b> Everything inside that geometric mean is
-/// flattened by it — a fiftieth arrives as 0.46 — which suits considerations about a place and does not suit a
-/// statement about who the bot is. Own trade at 1.3 against another's at 0.6 is a ratio of a little over two: a
-/// warrior walks past a mortar paying half as much again as its hunt, and a miner with nothing else on the island
-/// still mines. Never nought; see <see cref="LeastCalling"/>.
-/// </para>
-/// </summary>
 public static class BotCalling
 {
-    /// <summary>Which of the three a piece of work is to one bot.</summary>
+
     public enum Fit
     {
-        /// <summary>Trains nothing, or a skill no class is for.</summary>
+
         Anybody,
 
-        /// <summary>Trains a skill this bot's class works towards.</summary>
         Own,
 
-        /// <summary>Trains a skill some other class is for and this one is not.</summary>
         Other
     }
 
-    /// <summary>What a bot's own trade is worth against its bare price. One switches the bonus off.</summary>
     public static double OwnTrade { get; set; } = 1.3;
 
-    /// <summary>What another class's trade is worth against its bare price. One switches the discount off.</summary>
     public static double OtherTrade { get; set; } = 0.6;
 
-    /// <summary>The floor under both, whatever they are dialled to: a multiplier that can reach nought is a veto.</summary>
     public static double LeastCalling { get; set; } = 0.1;
 
     private static readonly HashSet<SkillName> _claimed = [];
 
     private static bool _surveyed;
 
-    /// <summary>One class's working minutes, split three ways and by kind of work.</summary>
     private sealed class Book
     {
         public double Own;
@@ -78,7 +41,6 @@ public static class BotCalling
 
     private static readonly Dictionary<string, Book> _books = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Whether this work is the bot's own trade, another's, or anybody's.</summary>
     public static Fit Of(Mobile body, BotDeed deed)
     {
         if (deed?.Trains is not { } skill || body is not BotMobile { Class: { } calling })
@@ -96,7 +58,6 @@ public static class BotCalling
         return _claimed.Contains(skill) ? Fit.Other : Fit.Anybody;
     }
 
-    /// <summary>The multiplier on this work's price for this bot. See the class note for why it sits outside the root.</summary>
     public static double Worth(Mobile body, BotDeed deed) =>
         Of(body, deed) switch
         {
@@ -105,14 +66,9 @@ public static class BotCalling
             _ => 1.0
         };
 
-    /// <summary>The words for a multiplier, for the take line.</summary>
     public static string Word(double calling) =>
         calling > 1.0 ? "its own trade" : calling < 1.0 ? "another's trade" : "anybody's work";
 
-    /// <summary>
-    /// Every skill some class works towards, gathered once. Classes are read at boot and never change afterwards,
-    /// so the survey is taken the first time it is needed and kept.
-    /// </summary>
     private static void Survey()
     {
         if (_surveyed)
@@ -138,7 +94,6 @@ public static class BotCalling
         }
     }
 
-    /// <summary>A piece of work ended; its minutes go into the book of the class that did it.</summary>
     public static void Worked(Mobile body, BotDeed deed, double minutes)
     {
         if (body is not BotMobile { Class: { } calling } || deed == null || minutes <= 0.0)
@@ -174,10 +129,6 @@ public static class BotCalling
         book.Kinds[deed.Kind ?? "?"] = spent + minutes;
     }
 
-    /// <summary>
-    /// How each class spends its working minutes: its own trade, anybody's work, another class's trade, and the
-    /// four kinds of work it spent most on. The census line <c>Roles:</c> and the debugger's <c>roles</c>.
-    /// </summary>
     public static string Describe()
     {
         if (_books.Count == 0)
@@ -224,17 +175,10 @@ public static class BotCalling
         return line.ToString();
     }
 
-    /// <summary>The trades a crafter makes things at, and the digging it does instead. See <see cref="Crafters"/>.</summary>
     private static readonly string[] _making = ["forge", "sew", "tinker", "fletch", "bowyer", "weave", "brew"];
 
     private static readonly string[] _digging = ["mine", "prospect"];
 
-    /// <summary>
-    /// <b>The crafters' own clause (03.10.2026, econ13; Patrick: "a crafter makes the order first, then goes to mine").</b> Their
-    /// working minutes making things against digging, by trade, and what the auction put before a crafter's dig
-    /// (<see cref="BotCraftFirst"/>). The class list above prints four kinds a class, and on build 396 a crafter's crafting was five
-    /// kinds under mining's one, so it was never on the line.
-    /// </summary>
     private static string Crafters()
     {
         double total = 0.0, making = 0.0, digging = 0.0;
@@ -283,6 +227,5 @@ public static class BotCalling
                + BotCraftFirst.Describe();
     }
 
-    /// <summary>A world reload is a different population; its minutes are not this one's.</summary>
     public static void Forget() => _books.Clear();
 }

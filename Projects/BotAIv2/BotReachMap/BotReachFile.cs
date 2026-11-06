@@ -4,27 +4,9 @@ using System.IO.Compression;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The reach map's clusters kept on disk between boots, so a restart reads a few megabytes on a worker instead of drawing
-/// every tile of the map again on the loop.
-///
-/// <para>
-/// <b>Keyed by the map files, checked by the world (01.10.2026).</b> The file carries the engine's fingerprint of the map's own
-/// files (<c>TileMatrix.MapFilesFingerprint</c>) and is refused when the client's map changes. What the map files cannot say —
-/// a house raised, a decoration moved — each cluster carries as its <see cref="BotReachCluster.Signature"/>, and a boot draws
-/// again only the clusters whose houses and items no longer match. Under <c>Data/</c>, never under <c>Saves/</c>: the saves folder
-/// is moved into the backups at every save.
-/// </para>
-///
-/// <para>
-/// Layout (little-endian, the whole of it deflated): magic, format, map id, fingerprint, width, height, clusters across and
-/// down; then per cluster a flag byte (drawn, housed, one class for all its tiles, layers, shore), its signature, its tiles
-/// (one byte when all alike), its regions and standing tiles, its layers, its shore bits and its links.
-/// </para>
-/// </summary>
 public static class BotReachFile
 {
-    private const uint Magic = 0x31484352; // "RCH1"
+    private const uint Magic = 0x31484352;
 
     private const int Format = 1;
 
@@ -41,7 +23,6 @@ public static class BotReachFile
     public static string PathFor(Map map) =>
         Path.Combine(Core.BaseDirectory, "Data", $"bot-reach-{map.Name.ToLowerInvariant()}.bin");
 
-    /// <summary>Writes the clusters. Off the loop: the clusters are never changed once made, and nothing here reads the world.</summary>
     public static long Write(string path, int mapId, ulong fingerprint, int width, int height, int clustersX, int clustersY, BotReachCluster[] clusters)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -132,10 +113,6 @@ public static class BotReachFile
         return new FileInfo(path).Length;
     }
 
-    /// <summary>
-    /// Reads the clusters, or null with the reason when the file is missing, of another format, of another map, or of map files
-    /// that have changed since. Off the loop.
-    /// </summary>
     public static BotReachCluster[] Read(string path, int mapId, ulong fingerprint, int width, int height, out string why)
     {
         why = null;

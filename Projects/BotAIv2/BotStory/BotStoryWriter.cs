@@ -6,23 +6,10 @@ using Server.Text;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The chapters by template, and the check that throws away a retelling which names anything the facts do not.
-/// A bot's chapters come out of its book (<see cref="BotStoryBook"/>), its biography's tales and counts (<see cref="BotLife"/>)
-/// and its ties, in English, with the real names, places and numbers and nothing else.
-///
-/// <para>
-/// <b>The template is the story; the model is a voice laid over it.</b> Every chapter is written here, always, with or without
-/// a model on the machine: one sentence a fact, dated, in the order things happened, the bot's own tales quoted in its own
-/// words. The model is given the same dated lines and may only say them again more gracefully; anything it says that is not
-/// in them — a name, a number — throws its paragraph away and the template stands (<see cref="Check"/>).
-/// </para>
-/// </summary>
 public static class BotStoryWriter
 {
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
-    /// <summary>Which stage a biography tale belongs to. The veteran's tale is told by the walk's own note, so it is left out.</summary>
     public static BotStage? StageOf(BotTale tale) =>
         tale?.Kind switch
         {
@@ -51,10 +38,6 @@ public static class BotStoryWriter
 
     private static readonly List<Line> _lines = new(16);
 
-    /// <summary>
-    /// Fills <paramref name="into"/> (one slot a stage) for this book and returns how many chapters are present. Game loop only:
-    /// it reads the life's tales and ties and the body's state.
-    /// </summary>
     public static int Build(BotStoryBook book, BotLife life, BotMobile body, DateTime now, BotStoryChapter[] into)
     {
         var present = 0;
@@ -142,7 +125,6 @@ public static class BotStoryWriter
         return present;
     }
 
-    /// <summary>The friend and the enemy, in buckets of counts so a chapter is not made new by every kill side by side.</summary>
     private static void Friends(BotStoryBook book, BotLife life)
     {
         if (life == null)
@@ -173,7 +155,6 @@ public static class BotStoryWriter
         }
     }
 
-    /// <summary>The deeds' counts in one sentence, or null when there are none worth saying.</summary>
     private static string Tally(BotStoryBook book, BotLife life)
     {
         if (life == null)
@@ -228,7 +209,6 @@ public static class BotStoryWriter
         return sb.ToString();
     }
 
-    /// <summary>Old age: the days lived since the chronicle found the bot, once there are enough of them, and where it stands now.</summary>
     private static string Age(BotStoryBook book, BotMobile body, DateTime now)
     {
         var days = (int)Math.Floor((now - book.FirstSeen).TotalDays);
@@ -270,7 +250,7 @@ public static class BotStoryWriter
 
     private static void Sort(List<Line> lines)
     {
-        // Undated lines (the ties) stay last, in the order written; the rest by when they happened.
+
         for (var i = 1; i < lines.Count; i++)
         {
             var line = lines[i];
@@ -289,7 +269,6 @@ public static class BotStoryWriter
     private static bool Later(Line a, Line b) =>
         b.Kind != LineKind.Plain && (a.Kind == LineKind.Plain || a.At > b.At);
 
-    /// <summary>One fact as the model is told it and the page lists it: dated, plain, one line.</summary>
     private static string Fact(BotStoryBook book, Line line) =>
         line.Kind switch
         {
@@ -299,7 +278,6 @@ public static class BotStoryWriter
             _                 => $"{Day(line.At)}: {Sentence(line.Text)}"
         };
 
-    /// <summary>The template's paragraph: one sentence a fact, joined by the dates.</summary>
     private static string Prose(BotStoryBook book, List<Line> lines)
     {
         using var sb = ValueStringBuilder.Create(512);
@@ -330,8 +308,7 @@ public static class BotStoryWriter
                     }
                 case LineKind.Tale:
                     {
-                        // Dated like any other line: a tale is the bot's own account of a day, and without the day the chapter
-                        // read "Caelith was born in Yew. Caelith would say of it: 'The first time I died…'" as if both were one day.
+
                         var who = named ? given : full;
                         var when = When(line.At, last, seed + (uint)i);
                         var said = ((seed + (uint)i) % 3) switch
@@ -367,10 +344,6 @@ public static class BotStoryWriter
         return sb.ToString();
     }
 
-    /// <summary>
-    /// "That same day, ", "The next day, " or "On 3 October, ": the day of a line against the day of the one before it. The same
-    /// day is said three ways, picked by <paramref name="pick"/>, so a busy day is not "That same day" three times running.
-    /// </summary>
     private static string When(DateTime at, DateTime last, uint pick)
     {
         var local = at.ToLocalTime().Date;
@@ -388,10 +361,6 @@ public static class BotStoryWriter
         return last != DateTime.MinValue && local == last.AddDays(1) ? "The next day, " : $"On {Day(at)}, ";
     }
 
-    /// <summary>
-    /// The full name the first time a paragraph says it, the given name after: "Brokk Ironfoot joined… Brokk was elected…". The
-    /// facts keep the full name throughout; this is the template's prose only.
-    /// </summary>
     private static string Shorten(string text, string full, string given, ref bool named)
     {
         var at = text.IndexOf(full, StringComparison.Ordinal);
@@ -420,12 +389,8 @@ public static class BotStoryWriter
         return string.Concat(text.AsSpan(0, after), text[after..].Replace(full, given, StringComparison.Ordinal));
     }
 
-    // ------------------------------------------------------------------ words
-
-    /// <summary>"3 October", local time: what the page and the model are told.</summary>
     public static string Day(DateTime utc) => utc.ToLocalTime().ToString("d MMMM", Invariant);
 
-    /// <summary>A sentence: capital first, a full stop last unless it ends with one already (or a quotation).</summary>
     public static string Sentence(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -450,7 +415,6 @@ public static class BotStoryWriter
         return end is '.' or '!' or '?' or '"' ? text : text + ".";
     }
 
-    /// <summary>"WarriorMage" → "warrior mage": a class as a word.</summary>
     public static string Words(string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -475,7 +439,6 @@ public static class BotStoryWriter
         return sb.ToString();
     }
 
-    /// <summary>With its article: "an apprentice tailor", "a dwarf warrior".</summary>
     public static string A(string phrase) =>
         string.IsNullOrEmpty(phrase) ? "" : ("aeiouAEIOU".IndexOf(phrase[0]) >= 0 ? "an " : "a ") + phrase;
 
@@ -491,7 +454,6 @@ public static class BotStoryWriter
             _ => $"{n} times"
         };
 
-    /// <summary>A count said loosely, so a chapter is not new for each one more.</summary>
     public static string Often(int n) =>
         n switch
         {
@@ -501,7 +463,6 @@ public static class BotStoryWriter
             _      => "more times than either could count"
         };
 
-    /// <summary>A number from the name, so a bot's story picks the same turns of phrase every time it is built.</summary>
     public static uint Seed(string name)
     {
         var hash = 2166136261u;
@@ -514,7 +475,6 @@ public static class BotStoryWriter
         return hash;
     }
 
-    /// <summary>The facts' fingerprint: the model's prose is kept against it and shown only while it matches.</summary>
     public static ulong Hash(List<string> facts)
     {
         var hash = 14695981039346656037ul;
@@ -534,13 +494,6 @@ public static class BotStoryWriter
         return hash == 0 ? 1 : hash;
     }
 
-    // ------------------------------------------------------------------ the check
-
-    /// <summary>
-    /// Words a sentence may begin with that name nobody. A capitalised word the facts do not hold is a name the model made up —
-    /// unless it opens a sentence and is one of these. Kept short on purpose: a retelling thrown away costs one call and the
-    /// template still stands; an invented name kept is a lie on the page.
-    /// </summary>
     private static readonly HashSet<string> Starters = new(StringComparer.Ordinal)
     {
         "a", "an", "the", "he", "she", "it", "they", "his", "her", "its", "their", "this", "that", "these", "those", "there",
@@ -558,12 +511,6 @@ public static class BotStoryWriter
         "towards", "ever", "always", "often", "rarely", "seldom", "already", "eventually", "ultimately", "shortly"
     };
 
-    /// <summary>
-    /// The model's paragraph made fit to show, or null with the reason: <c>empty</c>, <c>length</c> (no whole sentence within
-    /// the bound), <c>names</c> (a capitalised word the facts do not hold, outside the starters), <c>numbers</c> (a number the
-    /// facts do not hold), <c>subject</c> (a chapter that does not name its bot). Runs on the loop on a paragraph of a few
-    /// hundred characters, a dozen times an hour at most.
-    /// </summary>
     public static string Check(string text, string facts, string subject, int mostChars, out string why, out string word)
     {
         word = null;
@@ -634,8 +581,6 @@ public static class BotStoryWriter
 
                 var token = Bare(text.AsSpan(from, i - from));
 
-                // A month or a weekday must be in the facts like any name: the dates are written there in full ("4 October", "Monday,
-                // 12 October 2026"), and one the facts do not hold is a day the model made up (a3 review B, 3.4e).
                 if (char.IsUpper(c) && token.Length > 0 && !known.Contains(token) && !(start && Starters.Contains(token)))
                 {
                     why = "names";
@@ -686,7 +631,6 @@ public static class BotStoryWriter
         return text;
     }
 
-    /// <summary>A run of digits without its leading zeros: "02:37" and "2:37" are the same time.</summary>
     private static string Number(ReadOnlySpan<char> digits)
     {
         var trimmed = digits.TrimStart('0');
@@ -694,7 +638,6 @@ public static class BotStoryWriter
         return trimmed.Length == 0 ? "0" : trimmed.ToString();
     }
 
-    /// <summary>The first word of a name: "Brokk" of "Brokk Ironfoot", which is what a retelling is sure to use.</summary>
     private static string First(string name)
     {
         var space = name.IndexOf(' ');
@@ -752,7 +695,6 @@ public static class BotStoryWriter
         }
     }
 
-    /// <summary>A word lower-cased, with its possessive or a trailing apostrophe taken off: "Serpent's" → "serpent".</summary>
     private static string Bare(ReadOnlySpan<char> word)
     {
         if (word.EndsWith("'s", StringComparison.OrdinalIgnoreCase) || word.EndsWith("’s", StringComparison.OrdinalIgnoreCase))
@@ -765,7 +707,6 @@ public static class BotStoryWriter
         return word.Length == 0 ? "" : word.ToString().ToLowerInvariant();
     }
 
-    /// <summary>Whitespace runs to one space, so a paragraph is one line on the page and in the store.</summary>
     private static string Squeeze(string text)
     {
         using var sb = ValueStringBuilder.Create(text.Length);

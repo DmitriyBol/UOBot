@@ -6,23 +6,6 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A trader's order book: a blue book in its pack, written by the trader and read by anybody who opens it.
-///
-/// <para>
-/// <b>Plan v2 of 01.10.2026, point 3: "give them a fun feature — write the orders into a book, and strike them out when
-/// delivered" (build 385).</b> The cover counts the orders written, delivered and struck; one page each for the orders open
-/// now — for whom, what, how many, at what, when and where it was taken, where it is being bought; and below them the closed
-/// orders, newest first, each marked X with how it ended: delivered and for how much, or struck and why.
-/// </para>
-///
-/// <para>
-/// <b>An ordinary engine book</b>, a <see cref="BlueBook"/> that the trader writes and nobody else can: not writable, not
-/// movable, blessed so it stays with its trader through a death. A player or a GM who opens it reads it like any book; the
-/// pages are the book's own and are saved with it, so a restart keeps the history and strikes whatever was open ("the island
-/// slept"). Era-appropriate: the blue book is the classic one.
-/// </para>
-/// </summary>
 [SerializationGenerator(0, false)]
 public partial class BotOrderBook : BlueBook
 {
@@ -33,7 +16,6 @@ public partial class BotOrderBook : BlueBook
         LootType = LootType.Blessed;
     }
 
-    /// <summary>The pages, written whole. A book's page count is what its pages array holds.</summary>
     internal void Rewrite(string title, string author, BookPageInfo[] pages)
     {
         Title = title;
@@ -42,7 +24,6 @@ public partial class BotOrderBook : BlueBook
     }
 }
 
-/// <summary>One order in a trader's book: a want it took, the price agreed, and how it ended.</summary>
 public sealed class BotTradeOrder
 {
     public int Number { get; init; }
@@ -57,13 +38,10 @@ public sealed class BotTradeOrder
 
     public string Item { get; init; }
 
-    /// <summary>Units promised; brought down if the purchase came up short.</summary>
     public int Units { get; set; }
 
-    /// <summary>The price agreed for one: the buyer's own offer, or the carriage it agreed to.</summary>
     public int Price { get; init; }
 
-    /// <summary>The buyer's own offer when the order was taken.</summary>
     public int Offered { get; init; }
 
     public DateTime Taken { get; init; }
@@ -78,21 +56,15 @@ public sealed class BotTradeOrder
 
     public bool Closed { get; set; }
 
-    /// <summary>Whether the buyer has been seen lying dead, and since when: the tick means nothing until the flag is set.</summary>
     public bool DeadSeen { get; set; }
 
     public long DeadSince { get; set; }
 }
 
-/// <summary>
-/// The book's contents for one trader, held in memory and written into its <see cref="BotOrderBook"/> at every change. Read
-/// back from the book's own pages the first time a trader writes after a boot, so the counts and the history survive.
-/// </summary>
 public sealed class BotOrders
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotOrders));
 
-    /// <summary>The widest line a book page shows comfortably.</summary>
     public const int Width = 20;
 
     private const int LinesPerPage = 8;
@@ -100,8 +72,6 @@ public sealed class BotOrders
     private static readonly Dictionary<Serial, BotOrders> _books = [];
 
     private static readonly Dictionary<string, long> _struckWhy = [];
-
-    // ---- Island-wide, this session ----------------------------------------------------------------------------------------
 
     public static long LinesWritten { get; private set; }
 
@@ -112,8 +82,6 @@ public sealed class BotOrders
     public static long Restarted { get; private set; }
 
     public static long BooksMade { get; private set; }
-
-    // ---- This trader's --------------------------------------------------------------------------------------------------------
 
     private readonly List<BotTradeOrder> _open = [];
 
@@ -149,7 +117,6 @@ public sealed class BotOrders
         return orders;
     }
 
-    /// <summary>A line written: the trader has taken this want at this price.</summary>
     public BotTradeOrder Write(Mobile trader, BotWant want, int units, int price, string from)
     {
         ReadBack(trader);
@@ -193,7 +160,6 @@ public sealed class BotOrders
         return order;
     }
 
-    /// <summary>The line struck as delivered: handed over, paid for.</summary>
     public void Deliver(Mobile trader, BotTradeOrder order, int units, int paid, int cost)
     {
         if (order == null || order.Closed)
@@ -221,7 +187,6 @@ public sealed class BotOrders
         Render(trader);
     }
 
-    /// <summary>The line struck unfulfilled, with the reason.</summary>
     public void Strike(Mobile trader, BotTradeOrder order, string why)
     {
         if (order == null || order.Closed)
@@ -237,8 +202,6 @@ public sealed class BotOrders
 
         var reason = why ?? "given up";
 
-        // Counted by reason for the summary; a reason with a name or a number in it would grow the table without end, so past
-        // a few dozen kinds of reason the rest are counted together.
         var bucket = _struckWhy.ContainsKey(reason) || _struckWhy.Count < 48 ? reason : "other reasons";
 
         _struckWhy[bucket] = _struckWhy.GetValueOrDefault(bucket) + 1;
@@ -258,7 +221,6 @@ public sealed class BotOrders
         );
     }
 
-    /// <summary>The open order's "where it is bought" line, changed when the trader goes to another counter.</summary>
     public void Rebought(Mobile trader, BotTradeOrder order, string from)
     {
         if (order is { Closed: false })
@@ -287,10 +249,6 @@ public sealed class BotOrders
         }
     }
 
-    /// <summary>
-    /// The book's own pages read back, once per boot: its counts from the cover, its closed orders, and whatever it showed as
-    /// open — the orders of a world that has since restarted, which nobody is bringing any more, struck as such.
-    /// </summary>
     private void ReadBack(Mobile trader)
     {
         if (_read)
@@ -332,7 +290,7 @@ public sealed class BotOrders
 
             if (lines[0].StartsWith('#') && lines[0].EndsWith(" OPEN", StringComparison.Ordinal))
             {
-                // An order open when the world stopped: struck, since the want it answered went with the world.
+
                 var number = lines[0][1..^5].Trim();
                 var buyer = lines.Length > 1 ? lines[1].Replace("for ", "") : "somebody";
                 var what = lines.Length > 2 ? lines[2] : "";
@@ -412,7 +370,6 @@ public sealed class BotOrders
         return 0;
     }
 
-    /// <summary>The whole book written again from what is held here. Cheap: it happens when an order is taken or ends.</summary>
     private void Render(Mobile trader)
     {
         var pack = trader?.Backpack;
@@ -474,7 +431,6 @@ public sealed class BotOrders
         {
             var entry = _history[i];
 
-            // An entry is never split across two pages: it starts a new page when it would not fit.
             var used = lines.Count % LinesPerPage;
 
             if (used > 0 && used + entry.Length > LinesPerPage)
@@ -500,7 +456,6 @@ public sealed class BotOrders
 
     private static string Cut(string line) => line == null ? "" : line.Length <= Width ? line : line[..Width];
 
-    /// <summary>A line folded at <see cref="Width"/>, the folds and every line after the first indented by <paramref name="indent"/>.</summary>
     private static void Wrap(string text, string indent, List<string> into)
     {
         var rest = (indent + (text ?? "")).TrimEnd();

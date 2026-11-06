@@ -3,43 +3,22 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The fence's chase after a witness it could not buy: kill it before it gets away, or it tells.
-///
-/// <para>
-/// <b>Patrick's word of 17.09.2026, night.</b> "They may buy the witness off, or kill it. A killed witness tells
-/// nobody; a witness that gets away tells." So this is a race and not a fight: the fence has <see cref="GivesUpMs"/>
-/// and <see cref="LosesAt"/> tiles, and the moment either runs out the witness is over the hill and the Baron knows.
-/// </para>
-///
-/// <para>
-/// The killing is a murder like any other and is entered on the fence's own rap sheet by the ordinary machinery: a
-/// keeper of stolen goods who cuts a witness down has stopped being the quiet one, and the island will hunt it as it
-/// hunts the rest of the band.
-/// </para>
-/// </summary>
 public sealed class BotSilence : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotSilence));
 
     public const string Trade = "silence";
 
-    /// <summary>How long the fence chases before the witness is counted away.</summary>
     public static int GivesUpMs { get; set; } = 30000;
 
-    /// <summary>How far the witness must get to be away.</summary>
     public static int LosesAt { get; set; } = 20;
 
-    /// <summary>What the chase is held at against other work, a minute: above everything, because the alternative is a price on its head.</summary>
     public static double Prior { get; set; } = 600.0;
 
-    /// <summary>Chases begun.</summary>
     public static long Chases { get; private set; }
 
-    /// <summary>Witnesses cut down before they could tell.</summary>
     public static long Silenced { get; private set; }
 
-    /// <summary>Witnesses that got away and told.</summary>
     public static long Away { get; private set; }
 
     private readonly Mobile _witness;
@@ -59,7 +38,6 @@ public sealed class BotSilence : BotDeed
         _fight = new BotBrawl(witness, BotBrawl.Robbery, SkillName.Tactics, Ends);
     }
 
-    /// <summary>The chase's rule: over when the witness is down or away. Losing nerve is not a way out of this one.</summary>
     private static string Ends(IBotWilful bot, BotBrawl brawl)
     {
         var witness = brawl?.Foe;
@@ -148,23 +126,12 @@ public sealed class BotSilence : BotDeed
     {
         _fight.Drop(bot);
 
-        // Dropped rather than seen through: the witness is as good as away, and the Baron hears of it.
         if (_witness is { Deleted: false, Alive: true })
         {
             Tell(bot?.Self as BotMobile);
         }
     }
 
-    /// <summary>
-    /// The witness told, once and once only.
-    ///
-    /// <para>
-    /// <b>Both doors out of this deed lead here</b> — the clock running out inside <c>Advance</c>, and the drop that
-    /// settles it afterwards — and on the night of 17.09.2026 Hale's chase after Alaric went through both: "Alaric told
-    /// the Baron of Hale the fence, and the city puts 5000gp on its head", printed twice at 00:08:53, counted twice,
-    /// and a second price put on the same head.
-    /// </para>
-    /// </summary>
     private void Tell(BotMobile fence)
     {
         if (_told)

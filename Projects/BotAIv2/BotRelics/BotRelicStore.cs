@@ -5,17 +5,6 @@ using Server.Mobiles;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// Keeps the relics' registry across restarts (07.10.2026, relics20): every relic with its holder, its place, the guild a stolen
-/// relic or a captured banner came from, when it changed hands, when its holder last called the Great Fair, and the serial of the
-/// item that is it — the world save keeps the item itself. Also the warden standing, so a restart takes it off the island.
-///
-/// <para>
-/// <b>Settled at the module's start, not resumed</b> (<see cref="Apply"/>): a relic in a lair goes back into hiding and its chest
-/// goes, because the lair's companies and clock are not kept; every other relic stays where it was — a banner on its hall's floor,
-/// a relic in a carrier's or a thief's pack — and the registry's next look puts right whatever moved.
-/// </para>
-/// </summary>
 public sealed class BotRelicStore : GenericPersistence
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRelicStore));
@@ -111,7 +100,6 @@ public sealed class BotRelicStore : GenericPersistence
         _read = count;
     }
 
-    /// <summary>What was read back, settled: the town relics seeded, the items linked, a lair's relic hidden, the warden away.</summary>
     public static void Apply()
     {
         BotRelics.Seed();

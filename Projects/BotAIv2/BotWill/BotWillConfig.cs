@@ -4,157 +4,88 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// What <c>Configuration/bot-will.json</c> is allowed to say. Everything optional; absent means the number
-/// the code chose.
-///
-/// <para>
-/// Its own file, like every other subsystem's. In the first version every knob on the shard lived in one
-/// <c>bots.json</c>, so changing how readily a bot changes its mind was an edit to the file that also sets
-/// the size of the population, and a typo in either half put the whole thing out.
-/// </para>
-///
-/// <para>
-/// <b>The one to look at first is <see cref="GoldPerSkillPoint"/>.</b> It is the exchange rate between the
-/// two things this population is for, and every comparison between a smith's afternoon and a miner's goes
-/// through it. Nothing else here changes behaviour as much.
-/// </para>
-/// </summary>
 public sealed class BotWillSettings
 {
-    // ---- What work is worth. ---------------------------------------------------------------------
 
-    /// <summary>Gold that one full point of skill is worth. The exchange rate; retune by watching.</summary>
     public double? GoldPerSkillPoint { get; set; }
 
-    /// <summary>What dying costs, as minutes of the bot's life added to the work that killed it.</summary>
     public double? DeathMinutes { get; set; }
 
-    /// <summary>What a point of skill is worth when it is not one this bot's class is for.</summary>
     public double? StrayFactor { get; set; }
 
-    /// <summary>The shortest a piece of work may claim to have taken. Guards against instant successes.</summary>
     public double? LeastMinutes { get; set; }
 
-    /// <summary>The most one settlement may claim per minute, either way.</summary>
     public double? MostPerMinute { get; set; }
 
-    // ---- Holding on. -----------------------------------------------------------------------------
-
-    /// <summary>How often a busy bot looks up to see whether anything better has appeared.</summary>
     public int? ReviewMs { get; set; }
 
-    /// <summary>How soon a bot with nothing on looks again.</summary>
     public int? IdleMs { get; set; }
 
-    /// <summary>How long fresh work is safe from being swapped out whatever the numbers say.</summary>
     public int? DwellMs { get; set; }
 
-    /// <summary>The most fresh work may be safe for, however long it reckons itself.</summary>
     public int? DwellCapMs { get; set; }
 
-    /// <summary>How long work may sit set aside before its reason is presumed stale.</summary>
     public int? AsideCapMs { get; set; }
 
-    /// <summary>Whether work put down for a company's call is timed from the company letting the bot go, not from the put-down.</summary>
     public bool? Keep { get; set; }
 
-    /// <summary>The longest work is kept for a company all told, whatever the company's length.</summary>
     public int? KeptCapMs { get; set; }
 
-    /// <summary>How much better a new want must be to win.</summary>
     public double? SwitchMargin { get; set; }
 
-    /// <summary>What the work in hand is worth for being underway.</summary>
     public double? Inertia { get; set; }
 
-    /// <summary>How many times its own reckoning steadfast work is held against better offers. Nought switches the hold off.</summary>
     public double? CommitStretch { get; set; }
 
-    /// <summary>The longest any work is held, however long it reckons itself.</summary>
     public int? CommitCapMs { get; set; }
 
-    /// <summary>The share of the walk watchdog a walk may spend not closing before its hold is lifted.</summary>
     public double? TroubleShare { get; set; }
 
-    /// <summary>Whether steadfast work put down for something that would not wait is taken up again afterwards.</summary>
     public bool? Resume { get; set; }
 
-    /// <summary>The share of health below which a bot does not go back to what it put down.</summary>
     public double? ResumeHealth { get; set; }
 
-    /// <summary>How soon taking a dropped kind of work up again counts as coming back to it.</summary>
     public int? ReturnMs { get; set; }
 
-    /// <summary>What a bot's own trade is worth against its bare price. One switches it off. See BotCalling.</summary>
     public double? OwnTrade { get; set; }
 
-    /// <summary>What another class's trade is worth against its bare price. One switches it off.</summary>
     public double? OtherTrade { get; set; }
 
-    // ---- What bends an estimate. -----------------------------------------------------------------
-
-    /// <summary>How hard a crowd already doing this puts a bot off.</summary>
     public double? CrowdBite { get; set; }
 
-    /// <summary>The least a crowded piece of work may be discounted to.</summary>
     public double? LeastRoom { get; set; }
 
-    /// <summary>How hard having done this here lately puts a bot off.</summary>
     public double? RepetitionBite { get; set; }
 
-    /// <summary>What is left of work in a place where it lately went badly.</summary>
     public double? Suspicion { get; set; }
 
-    // ---- Feelings. -------------------------------------------------------------------------------
-
-    /// <summary>How much boredom an idle minute adds.</summary>
     public double? BoredomPerMinute { get; set; }
 
-    /// <summary>How much boredom a hundred gold-equivalent of takings lifts.</summary>
     public double? ReliefPerHundred { get; set; }
 
-    /// <summary>Where boredom starts changing what a bot picks rather than only being reported.</summary>
     public double? Restless { get; set; }
 
-    // ---- Memory. ---------------------------------------------------------------------------------
-
-    /// <summary>How many tiles across a remembered patch of ground is.</summary>
     public int? BandSize { get; set; }
 
-    /// <summary>How many places one bot remembers.</summary>
     public int? MaxPlaces { get; set; }
 
-    /// <summary>How much a proposer's own claim is worth, measured in settlements.</summary>
     public double? PriorWeight { get; set; }
 
-    /// <summary>How many settlements a row may count for before the claim stops being heard.</summary>
     public int? Confidence { get; set; }
 
-    /// <summary>How much of a fresh outcome replaces what was known.</summary>
     public double? Smoothing { get; set; }
 
-    /// <summary>How long until half of "I have done this a lot here lately" wears off.</summary>
     public int? SpinHalfLifeMs { get; set; }
 
-    /// <summary>How long a place stays under suspicion after work there ended badly.</summary>
     public int? CautionMs { get; set; }
 
-    // ---- The ladder, and the log. ----------------------------------------------------------------
-
-    /// <summary>The share of maximum health below which nothing else matters.</summary>
     public double? FailingFraction { get; set; }
 
-    /// <summary>How long after being hit a bot still counts as under attack.</summary>
     public int? HuntedMs { get; set; }
 
-    /// <summary>How often the population's decisions are summarised in the log.</summary>
     public int? CensusMs { get; set; }
 
-    /// <summary>Whether every commitment and every settlement is logged as it happens.</summary>
     public bool? Chatty { get; set; }
-
-    // ---- The breaker's ground rests (01.10.2026, build 388). See BotBreaker.GroundDeaths. ----
 
     public int? GroundDeaths { get; set; }
 
@@ -171,7 +102,6 @@ public sealed class BotWillSettings
     public double? GroundCompany { get; set; }
 }
 
-/// <summary>Reads the decision file and moves the numbers it names.</summary>
 public static class BotWillConfig
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWillConfig));

@@ -3,38 +3,20 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The Baron's raid on The Shadow's hideout, once a caught thief has given it away: the Baron and a posse march there, search
-/// it with Detect Hidden, and set on every member of The Shadow they find; then the hideout is burned and The Shadow finds
-/// another.
-///
-/// <para>
-/// <b>Patrick's order of 17.09.2026: the price of The Shadow's trade is prison and pursuit, and if the Baron learns where the
-/// hideout is — a caught thief gives it away — he raids it.</b> A member found there is made wanted on the Baron's word
-/// (<see cref="BotOutlaw.Want"/>), which is what makes setting on it lawful in the engine's reckoning, and a member that falls
-/// to the raid falls to a patrol and is caught (<see cref="BotOutlaw.Fell"/>). A hidden member is found only by a search, or
-/// by stepping out.
-/// </para>
-/// </summary>
 public sealed class BotRaid : BotDeed
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotRaid));
 
     public const string Trade = "raid";
 
-    /// <summary>How long the raid searches the hideout once it is there. Two minutes: a dozen searches.</summary>
     public static int SearchMs { get; set; } = 120000;
 
-    /// <summary>How far round the hideout the raid looks for members of The Shadow.</summary>
     public static int Around { get; set; } = 14;
 
-    /// <summary>Raids raised by the Baron.</summary>
     public static long Raised { get; private set; }
 
-    /// <summary>Fighters pressed into raids.</summary>
     public static long Hands { get; private set; }
 
-    /// <summary>Members of The Shadow found at a hideout by a raid.</summary>
     public static long Found { get; private set; }
 
     private readonly Map _map;
@@ -53,10 +35,6 @@ public sealed class BotRaid : BotDeed
 
     private int _found;
 
-    /// <param name="map">Where.</param>
-    /// <param name="at">The hideout.</param>
-    /// <param name="trains">The skill the fighting trains.</param>
-    /// <param name="leads">Whether this is the Baron's own raid, which presses the posse and ends the raid for the hideout.</param>
     public BotRaid(Map map, Point3D at, SkillName trains, bool leads)
     {
         _map = map;
@@ -94,7 +72,6 @@ public sealed class BotRaid : BotDeed
     public override string Stage =>
         _fight != null ? $"raid: {_fight.Stage}" : _arrived ? "searching The Shadow's hideout" : "marching on The Shadow's hideout";
 
-    /// <summary>The Baron's raid presses the nearest fit fighters into it, as a patrol does.</summary>
     public override void Taken(IBotWilful bot)
     {
         var body = bot?.Self;
