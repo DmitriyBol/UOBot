@@ -107,7 +107,7 @@ public static class BotFurnish
         }
     }
 
-    private static bool HasBed(BaseHouse house)
+    public static bool HasBed(BaseHouse house)
     {
         if (house.Addons == null)
         {
@@ -125,10 +125,33 @@ public static class BotFurnish
         return false;
     }
 
-    public static string Describe() =>
-        !Running
-            ? "furnishing is off"
-            : $"furnishing: {Bought} beds bought for {Spent}gp, {NoRoom} houses with nowhere a bed fits, {NotHome} looks with the owner out, {Short} short of the price";
+    public static string Describe()
+    {
+        if (!Running)
+        {
+            return "furnishing is off";
+        }
+
+        var bedded = 0;
+        var standing = 0;
+
+        foreach (var house in BotAbode.Houses)
+        {
+            if (house is not { Deleted: false })
+            {
+                continue;
+            }
+
+            standing++;
+
+            if (HasBed(house))
+            {
+                bedded++;
+            }
+        }
+
+        return $"furnishing: {Bought} beds bought for {Spent}gp, {bedded} of {standing} houses have a bed, {NoRoom} houses with nowhere a bed fits, {NotHome} looks with the owner out, {Short} short of the price";
+    }
 
     public static void Forget()
     {

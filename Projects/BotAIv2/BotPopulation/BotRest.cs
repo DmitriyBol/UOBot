@@ -187,6 +187,10 @@ public static class BotRest
 
     public static long ReturnedHome { get; private set; }
 
+    public static long HomeSleep { get; private set; }
+
+    public static long NoBedFallback { get; private set; }
+
     private static int _tired;
     private static int _heldWorking;
     private static int _heldCompany;
@@ -966,22 +970,45 @@ public static class BotRest
         bot.LogoutLocation = where;
         bot.LogoutMap = map;
 
-        var inn = BotInns.Settle(bot, out var paid);
+        var house = BotAbode.Of(bot);
+        var inItsBed = house is { Deleted: false } && house.Map == map && house.IsInside(bot) && BotFurnish.HasBed(house);
 
-        var from = BotTaverns.Supped(bot, inn?.Name);
+        string from;
+        BotInns.Inn inn = null;
+        string fire = null;
+        var paid = 0;
 
-        if (inn == null && BotAbode.Of(bot) is { Deleted: false } house && house.Map == map && house.IsInside(bot))
+        if (inItsBed)
         {
+            HomeSleep++;
+
             from = "its own house";
             paid = 1;
             BotInns.NotedAtHome();
         }
-
-        var fire = inn == null && from == null ? BotCamp.Settle(bot) : null;
-
-        if (fire != null)
+        else
         {
-            from = fire;
+
+            inn = BotInns.Settle(bot, out paid);
+
+            from = BotTaverns.Supped(bot, inn?.Name);
+
+            if (inn == null && house is { Deleted: false } && house.Map == map && house.IsInside(bot))
+            {
+
+                NoBedFallback++;
+
+                from = "its own house";
+                paid = 1;
+                BotInns.NotedAtHome();
+            }
+
+            fire = inn == null && from == null ? BotCamp.Settle(bot) : null;
+
+            if (fire != null)
+            {
+                from = fire;
+            }
         }
 
         record.Inn = from;
@@ -1218,7 +1245,8 @@ public static class BotRest
                + $"({_heldWorking} finishing work, {_heldCompany} in a company, {_heldFight} in a fight, {_heldUnder} underground, "
                + $"{_heldCell} in a cell, {_heldDead} dead); this session {Left} left to rest ({LetGo} let go of what held them after "
                + $"{GraceMs / 60000} minutes) and {Returned} came back ({ReturnedHome} at home); {Called} called back from rest to fight "
-               + $"and {Dismissed} gone back to it{(Calls ? "" : " (calls OFF)")}; {Early} back up to {EarlyMinutes} minutes early to hold the floor";
+               + $"and {Dismissed} gone back to it{(Calls ? "" : " (calls OFF)")}; {Early} back up to {EarlyMinutes} minutes early to hold the floor; "
+               + $"{HomeSleep} nights at home in a bed of its own, {NoBedFallback} in a bedless house for want of an inn";
     }
 
     internal static void Save(IGenericWriter writer)
