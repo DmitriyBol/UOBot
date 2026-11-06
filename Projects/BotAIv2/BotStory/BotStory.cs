@@ -359,6 +359,13 @@ public static class BotStory
 
                     break;
                 }
+            case "abode":
+                {
+
+                    Note(bot, BotStage.Home, "abode", $"{bot} {text}", 25.0, key: text);
+
+                    break;
+                }
             case "infirmary":
             case "library":
             case "tavern":
@@ -1177,6 +1184,29 @@ public static class BotStory
                 }
 
                 w.WriteEndArray();
+
+                if (life?.HeardTales is { Count: > 0 } heard)
+                {
+                    w.WritePropertyName("heard");
+                    w.WriteStartArray();
+
+                    for (var i = 0; i < heard.Count; i++)
+                    {
+                        var tale = heard[i];
+
+                        w.WriteStartObject();
+                        BotJson.StringOrNull(w, "kind", tale.Kind);
+                        BotJson.StringOrNull(w, "about", tale.About);
+                        BotJson.StringOrNull(w, "text", tale.Text);
+                        BotJson.StringOrNull(w, "teller", tale.Teller);
+                        BotJson.StringOrNull(w, "place", tale.Place);
+                        w.WriteString("at", tale.At.ToLocalTime().ToString("yyyy-MM-dd HH:mm", Invariant));
+                        w.WriteNumber("hops", tale.Hops);
+                        w.WriteEndObject();
+                    }
+
+                    w.WriteEndArray();
+                }
             }
         );
 
@@ -1831,7 +1861,7 @@ public static class BotStory
         w.WriteEndObject();
     }
 
-    internal const int Shape = 1;
+    internal const int Shape = 2;
 
     public static void Save(IGenericWriter writer)
     {
@@ -1865,6 +1895,7 @@ public static class BotStory
                 writer.Write(note.Text);
                 writer.Write(note.At);
                 writer.Write(note.Weight);
+                writer.Write(note.Key ?? "");
             }
 
             var voiced = 0;
@@ -1897,7 +1928,7 @@ public static class BotStory
     {
         var shape = reader.ReadEncodedInt();
 
-        if (shape != Shape)
+        if (shape is not (1 or 2))
         {
 
             logger.Error("The saved stories are shape {Found} and this build reads {Wanted}, past the store's own check", shape, Shape);
@@ -1932,17 +1963,26 @@ public static class BotStory
             for (var i = 0; i < noteCount; i++)
             {
                 var stage = reader.ReadEncodedInt();
+                var note = new BotStoryNote
+                {
+                    Stage = (BotStage)Math.Clamp(stage, 0, BotStages.Count - 1),
+                    Kind = reader.ReadString(),
+                    Text = reader.ReadString(),
+                    At = reader.ReadDateTime(),
+                    Weight = reader.ReadDouble()
+                };
 
-                book.Notes.Add(
-                    new BotStoryNote
+                if (shape >= 2)
+                {
+                    note.Key = reader.ReadString();
+
+                    if (note.Key?.Length == 0)
                     {
-                        Stage = (BotStage)Math.Clamp(stage, 0, BotStages.Count - 1),
-                        Kind = reader.ReadString(),
-                        Text = reader.ReadString(),
-                        At = reader.ReadDateTime(),
-                        Weight = reader.ReadDouble()
+                        note.Key = null;
                     }
-                );
+                }
+
+                book.Notes.Add(note);
             }
 
             var voicedCount = reader.ReadEncodedInt();
@@ -1966,7 +2006,7 @@ public static class BotStory
             }
         }
 
-        var days = BotChronicle.Load(reader);
+        var days = BotChronicle.Load(reader, shape);
 
         logger.Information(
             "Stories read back: {Count} books with {Notes} notes and {Voiced} chapters in the model's words; the Chronicle's {Days} days",

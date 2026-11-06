@@ -661,8 +661,10 @@ public static class BotBiography
 
         for (var i = 0; i < life.HeardTales.Count; i++)
         {
+
             if (string.Equals(life.HeardTales[i].Kind, tale.Kind, StringComparison.Ordinal)
-                && string.Equals(life.HeardTales[i].About, tale.Other, StringComparison.Ordinal))
+                && string.Equals(life.HeardTales[i].About, tale.Other, StringComparison.Ordinal)
+                && string.Equals(life.HeardTales[i].Text, tale.Text, StringComparison.Ordinal))
             {
                 HeardReplies++;
 

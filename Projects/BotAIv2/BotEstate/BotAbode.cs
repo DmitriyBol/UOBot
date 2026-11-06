@@ -252,6 +252,7 @@ public static class BotAbode
 
 public sealed class BotAbodeBuyer : IBotProposer
 {
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotAbodeBuyer));
 
     public static int LookMs { get; set; } = 600000;
 
@@ -268,6 +269,14 @@ public sealed class BotAbodeBuyer : IBotProposer
     public static long Groundless { get; private set; }
 
     public static long Downsized { get; private set; }
+
+    public static long TownsTried { get; private set; }
+
+    public static long AbroadOffered { get; private set; }
+
+    public static long NoReachableTown { get; private set; }
+
+    public static long FindHomeCalls { get; private set; }
 
     private static readonly Dictionary<Serial, long> _looked = [];
 
@@ -332,6 +341,8 @@ public sealed class BotAbodeBuyer : IBotProposer
 
         var from = BotPopulation.HomeOf(body);
 
+        var abroad = false;
+
         if (!BotPlot.FindHome(body, from, kind.Multi, out var plot))
         {
 
@@ -350,6 +361,11 @@ public sealed class BotAbodeBuyer : IBotProposer
 
             if (plot == Point3D.Zero)
             {
+                abroad = TryAbroad(body, from, kind, out plot);
+            }
+
+            if (plot == Point3D.Zero)
+            {
                 Groundless++;
 
                 return null;
@@ -358,13 +374,65 @@ public sealed class BotAbodeBuyer : IBotProposer
 
         Offered++;
 
-        return new BotAbodeBuy(body.Map, kind, plot);
+        return new BotAbodeBuy(body.Map, kind, plot, abroad);
+    }
+
+    private static bool TryAbroad(BotMobile body, Point3D from, BotHallKind kind, out Point3D plot)
+    {
+        plot = Point3D.Zero;
+
+        if (!BotSettle.Reckoned || !BotTowns.Ensure(BotPopulation.Home))
+        {
+            NoReachableTown++;
+
+            return false;
+        }
+
+        var own = BotTowns.Of(from) ?? BotTowns.Nearest(from);
+
+        if (own == null)
+        {
+            NoReachableTown++;
+
+            return false;
+        }
+
+        var town = BotSettle.Choose(body, own, true, own, null, out _);
+
+        if (town == null)
+        {
+            NoReachableTown++;
+
+            return false;
+        }
+
+        TownsTried++;
+        FindHomeCalls++;
+
+        if (!BotPlot.FindHome(body, BotSettle.Hearth(town), kind.Multi, out plot))
+        {
+            return false;
+        }
+
+        AbroadOffered++;
+
+        logger.Information(
+            "{Name} the {Class} is offered ground abroad, in {Town}, for {Kind} at {X},{Y}",
+            body.Name,
+            body.Class?.Name,
+            town.Name,
+            kind,
+            plot.X,
+            plot.Y
+        );
+
+        return true;
     }
 
     public static string Describe() =>
         Asked == 0
             ? "no bot has been looked at for a house"
-            : $"{Asked} bots looked at for a house of their own: {Offered} offered one, {Poor} could not afford even a small house with {BotAbode.Keep}gp to spare, {Full} found the island's quota full, {Groundless} found no ground ({Downsized} took a smaller one instead); {BotAbodeBuy.Describe()}";
+            : $"{Asked} bots looked at for a house of their own: {Offered} offered one, {Poor} could not afford even a small house with {BotAbode.Keep}gp to spare, {Full} found the island's quota full, {Groundless} found no ground ({Downsized} took a smaller one instead), {TownsTried} looks abroad in another town ({AbroadOffered} offered ground there, {FindHomeCalls} searches begun, {NoReachableTown} with no town to try); {BotAbodeBuy.Describe()}";
 
     public static void Forget()
     {
@@ -374,6 +442,10 @@ public sealed class BotAbodeBuyer : IBotProposer
         Full = 0;
         Groundless = 0;
         Downsized = 0;
+        TownsTried = 0;
+        AbroadOffered = 0;
+        NoReachableTown = 0;
+        FindHomeCalls = 0;
         _looked.Clear();
         _searched = false;
         BotAbodeBuy.Forget();
@@ -394,6 +466,8 @@ public sealed class BotAbodeBuy : BotDeed
 
     public static long Done { get; private set; }
 
+    public static long AbroadBought { get; private set; }
+
     public static long Refused { get; private set; }
 
     public static long Short { get; private set; }
@@ -404,11 +478,14 @@ public sealed class BotAbodeBuy : BotDeed
 
     private readonly Point3D _plot;
 
-    public BotAbodeBuy(Map map, BotHallKind kind, Point3D plot)
+    private readonly bool _abroad;
+
+    public BotAbodeBuy(Map map, BotHallKind kind, Point3D plot, bool abroad = false)
     {
         _map = map;
         _kind = kind;
         _plot = plot;
+        _abroad = abroad;
     }
 
     public override string Kind => Trade;
@@ -534,6 +611,11 @@ public sealed class BotAbodeBuy : BotDeed
         BotAbode.Register(body, house);
         Done++;
 
+        if (_abroad)
+        {
+            AbroadBought++;
+        }
+
         logger.Information(
             "{Name} the {Class} has bought {Kind} of its own at {X},{Y} for {Price}gp — {Wealth}gp free before, {Left}gp left",
             body.Name,
@@ -585,11 +667,12 @@ public sealed class BotAbodeBuy : BotDeed
     public static string Describe() =>
         Done + Refused + Short == 0
             ? "no house bought"
-            : $"{Done} houses bought, {Refused} refused by the ground, {Short} short of the price at the last moment";
+            : $"{Done} houses bought, {AbroadBought} of them abroad, {Refused} refused by the ground, {Short} short of the price at the last moment";
 
     public static void Forget()
     {
         Done = 0;
+        AbroadBought = 0;
         Refused = 0;
         Short = 0;
     }

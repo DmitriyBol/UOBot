@@ -43,6 +43,14 @@ public sealed class BotSocialSettings
     public double? ProudMinutes { get; set; }
 
     public double? ProudPerMinute { get; set; }
+
+    public bool? PlayerEar { get; set; }
+
+    public int? PlayerEarRange { get; set; }
+
+    public double? PlayerEarAnswerSeconds { get; set; }
+
+    public double? PlayerEarMetWorth { get; set; }
 }
 
 public sealed class BotSocialModule : BotModule
@@ -85,6 +93,15 @@ public sealed class BotSocialModule : BotModule
         _timer?.Stop();
         _timer = new SocialTimer(TimeSpan.FromMilliseconds(Math.Max(100, TickMs)));
         _timer.Start();
+
+        if (BotPlayerEar.Running)
+        {
+            BotPlayerEar.Listen();
+        }
+        else
+        {
+            BotPlayerEar.Forget();
+        }
 
         logger.Information(
             "Society is {State}: a mood line waits up to {Hold} min for somebody within {Earshot} tiles, and the nearest {Most} not of a hostile guild answer it {Reply}s later, each once in {Every} min and a pair once in {Pair} min; "
@@ -142,17 +159,23 @@ public sealed class BotSocialModule : BotModule
         BotMoods.GrieveMs = settings.GrieveMinutes is { } grieve ? (int)(grieve * 60000) : BotMoods.GrieveMs;
         BotMoods.ProudMs = settings.ProudMinutes is { } proud ? (int)(proud * 60000) : BotMoods.ProudMs;
         BotMoods.ProudPerMinute = settings.ProudPerMinute ?? BotMoods.ProudPerMinute;
+        BotPlayerEar.Running = settings.PlayerEar ?? BotPlayerEar.Running;
+        BotPlayerEar.EarRange = settings.PlayerEarRange ?? BotPlayerEar.EarRange;
+        BotPlayerEar.AnswerEveryMs = settings.PlayerEarAnswerSeconds is { } ear ? (int)(ear * 1000) : BotPlayerEar.AnswerEveryMs;
+        BotPlayerEar.MetWorth = settings.PlayerEarMetWorth ?? BotPlayerEar.MetWorth;
     }
 
     public override void Reset()
     {
         logger.Information("Society, before the reload: {What}", BotSocial.Describe());
+        logger.Information("The bots' ear for a person, before the reload: {What}", BotPlayerEar.Describe());
 
         _timer?.Stop();
         _timer = null;
 
         BotSocial.Forget();
         BotMoods.Forget();
+        BotPlayerEar.ResetCounters();
     }
 
     private sealed class SocialTimer : Timer
