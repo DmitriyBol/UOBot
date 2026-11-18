@@ -1,0 +1,458 @@
+using System;
+using System.Collections.Generic;
+using Server.Items;
+using Server.Logging;
+
+namespace Server.BotAI.V2;
+
+/// <summary>
+/// A person buying out of a bot's pack by voice (the night queue's P6, 18.11.2026): "buy &lt;units&gt; &lt;thing&gt; &lt;offer&gt;"
+/// asks the bot it named, or the nearest in earshot; the bot answers with what it truly carries and the price it will
+/// take — the island's own price for the thing when one is standing (<c>BotMarket.Wants</c>), else the offer made. An
+/// "accept" inside the window, standing beside the bot, hands the goods over and takes the gold out of the buyer's
+/// pack, coin by coin, the engine's own stacks. No credit, no secure trade: what the packs hold is what changes hands,
+/// and both sides are told what happened.
+///
+/// <para>
+/// <b>Only what the bot is carrying.</b> The thing asked for is matched against the listening bot's own pack by the
+/// names of the types it holds (<c>IronIngot</c>, <c>Arrow</c>, <c>Bandage</c>), so a bot never promises a thing it
+/// has not got, and a buyer standing before a miner and a lumberjack is answered by whichever carries the thing. The
+/// bot does not walk to fetch: this is a market stall of the moment, not an errand.
+/// </para>
+/// </summary>
+public static class BotPlayerTrade
+{
+    private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPlayerTrade));
+
+    public static bool Running { get; set; } = true;
+
+    /// <summary>How long a quote stands before it lapses, unaccepted.</summary>
+    public static int WindowMs { get; set; } = 30000;
+
+    /// <summary>The most of one thing handed over in a single ask.</summary>
+    public static int MostUnits { get; set; } = 100;
+
+    /// <summary>How near the buyer must stand at the accept, for the hand to hand. The island's hand-overs meet at two.</summary>
+    public static int MeetTiles { get; set; } = 3;
+
+    public static long Asked { get; private set; }
+
+    public static long Unfollowed { get; private set; }
+
+    public static long Quoted { get; private set; }
+
+    public static long Countered { get; private set; }
+
+    public static long Accepted { get; private set; }
+
+    public static long SoldUnits { get; private set; }
+
+    public static long GoldMoved { get; private set; }
+
+    public static long RefusedPoor { get; private set; }
+
+    public static long RefusedStock { get; private set; }
+
+    public static long PackFull { get; private set; }
+
+    public static long Cancelled { get; private set; }
+
+    private static readonly string[] BuyWords = ["buy", "куплю", "купить"];
+
+    private static readonly string[] AcceptWords = ["accept", "deal", "согласен", "беру"];
+
+    private sealed class Quote
+    {
+        public BotMobile Bot;
+
+        public Mobile Buyer;
+
+        public Type Kind;
+
+        public string Label;
+
+        public int Units;
+
+        public int Price;
+
+        public long At;
+    }
+
+    private static readonly Dictionary<string, Quote> _standing = new(StringComparer.Ordinal);
+
+    /// <summary>Whether the line opens a buy. "buyer" must not answer to "buy" said alone.</summary>
+    public static bool AsksBuy(string said)
+    {
+        for (var i = 0; i < BuyWords.Length; i++)
+        {
+            if (said.StartsWith(BuyWords[i] + " ", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Whether the line is a plain acceptance of a standing quote.</summary>
+    public static bool SaysAccept(string said)
+    {
+        for (var i = 0; i < AcceptWords.Length; i++)
+        {
+            if (string.Equals(said, AcceptWords[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The ask itself, from the ear: parse, look in the pack, answer with a quote or the honest refusal.</summary>
+    public static void Buy(BotMobile bot, Mobile player, string said)
+    {
+        if (!Running || bot is not { Deleted: false, Alive: true } || player == null)
+        {
+            return;
+        }
+
+        Asked++;
+
+        var parts = said.Split(' ');
+
+        // buy <units> <thing> <offer>: four words, or it is not an ask the bot can follow.
+        if (parts.Length < 4
+            || !int.TryParse(parts[1], out var units) || units <= 0
+            || !int.TryParse(parts[^1], out var offer) || offer <= 0)
+        {
+            Unfollowed++;
+
+            BotVoice.Aloud(bot, "Name a number, a thing and a price: buy 20 arrow 3.");
+
+            return;
+        }
+
+        var label = parts[2].Trim('s');
+        var kind = CarriedType(bot, label);
+
+        if (kind == null)
+        {
+            RefusedStock++;
+
+            BotVoice.Aloud(bot, $"I carry no {parts[2]} to sell you.");
+
+            return;
+        }
+
+        var carried = Carried(bot, kind);
+        var selling = Math.Min(Math.Min(units, carried), MostUnits);
+
+        if (selling < units)
+        {
+            RefusedStock++;
+
+            BotVoice.Aloud(bot, carried <= 0
+                ? $"My {parts[2]} are all spent, I am afraid."
+                : $"I have {carried} {parts[2]} left, not {units}. Say accept and they are yours.");
+
+            if (carried <= 0)
+            {
+                return;
+            }
+        }
+
+        // The island's own price for the thing, when somebody is paying one: a bot does not undercut its own market.
+        var island = IslandPrice(kind);
+        var price = Math.Max(offer, island);
+
+        _standing[player.Name] = new Quote { Bot = bot, Buyer = player, Kind = kind, Label = parts[2], Units = selling, Price = price, At = Core.TickCount };
+
+        if (price > offer)
+        {
+            Countered++;
+
+            BotVoice.Aloud(bot, $"The island pays {price} for a {parts[2]}. {price} apiece, or nothing. Say accept.");
+        }
+        else
+        {
+            Quoted++;
+
+            BotVoice.Aloud(bot, $"{selling} {parts[2]} at {price} apiece, {selling * price} gold in all. Say accept.");
+        }
+
+        logger.Information("{Bot} quoted {Player}: {Units} {Thing} at {Price} (asked {Offer}, island {Island})", bot.Name, player.Name, selling, parts[2], price, offer, island);
+    }
+
+    /// <summary>The buyer's word on a standing quote. False when nothing stands for this buyer, so the ear may answer on.</summary>
+    public static bool Accept(Mobile player)
+    {
+        if (!Running || player == null || !_standing.TryGetValue(player.Name, out var quote))
+        {
+            return false;
+        }
+
+        _standing.Remove(player.Name);
+
+        if (quote.Bot is not { Deleted: false, Alive: true } || quote.Buyer is not { Deleted: false, Alive: true })
+        {
+            Cancelled++;
+
+            return true;
+        }
+
+        if (Core.TickCount - quote.At > Math.Max(5000, WindowMs))
+        {
+            Cancelled++;
+
+            BotVoice.Aloud(quote.Bot, "The moment has passed. Ask me again.");
+
+            return true;
+        }
+
+        var bot = quote.Bot;
+
+        if (bot.Map != player.Map || !bot.InRange(player.Location, MeetTiles))
+        {
+            Cancelled++;
+
+            BotVoice.Aloud(bot, $"Come closer, {player.Name}. I sell hand to hand, not across the field.");
+
+            return true;
+        }
+
+        var bill = quote.Units * quote.Price;
+
+        if (GoldIn(player.Backpack) < bill)
+        {
+            RefusedPoor++;
+
+            BotVoice.Aloud(bot, $"You are short of the {bill} gold we said, {player.Name}.");
+
+            return true;
+        }
+
+        var given = Hand(bot, player, quote.Kind, quote.Units);
+
+        if (given <= 0)
+        {
+            RefusedStock++;
+
+            BotVoice.Aloud(bot, $"My {quote.Label} are gone from my pack since we spoke. Forgive me.");
+
+            return true;
+        }
+
+        if (!TakeGold(player.Backpack, given * quote.Price))
+        {
+            // The gold was counted, and the goods are already in the buyer's pack: this cannot honestly stand. The
+            // round number of the bill was checked a breath ago, so this is the pack losing a stack between two
+            // lines — logged, and the sale stands at what was taken.
+            logger.Error("{Bot} could not take {Bill} gold from {Player} after handing {Units} {Thing}", bot.Name, given * quote.Price, player.Name, given, quote.Label);
+        }
+        else
+        {
+            BotMarket.Pay(bot, given * quote.Price);
+        }
+
+        Accepted++;
+        SoldUnits += given;
+        GoldMoved += given * quote.Price;
+
+        BotTies.MoveToward(bot, player.Name, 3.0, "sold to them hand to hand");
+
+        if (BotLives.Of(bot) is { } life)
+        {
+            BotBiography.Keep(
+                life,
+                "sale",
+                player.Name,
+                $"A person bought {given} {quote.Label} off me for {given * quote.Price}gp, hand to hand.",
+                15.0 + Math.Min(25.0, given * quote.Price / 40.0),
+                given * quote.Price
+            );
+        }
+
+        BotVoice.Aloud(bot, $"There: {given} {quote.Label}, and glad of the custom, {player.Name}.");
+
+        logger.Information("{Bot} sold {Units} {Thing} to {Player} for {Gold} gold", bot.Name, given, quote.Label, player.Name, given * quote.Price);
+
+        return true;
+    }
+
+    public static string Describe() =>
+        !Running
+            ? "the bots do not sell to a person by voice"
+            : $"{Asked} asks ({Unfollowed} not followed, {RefusedStock} nothing carried), {Quoted} quoted, {Countered} countered, "
+              + $"{Accepted} taken ({SoldUnits} things, {GoldMoved} gold), {RefusedPoor} short of gold, {PackFull} packs too full, {Cancelled} lapsed or afar";
+
+    public static void Forget()
+    {
+        Asked = 0;
+        Unfollowed = 0;
+        Quoted = 0;
+        Countered = 0;
+        Accepted = 0;
+        SoldUnits = 0;
+        GoldMoved = 0;
+        RefusedPoor = 0;
+        RefusedStock = 0;
+        PackFull = 0;
+        Cancelled = 0;
+        _standing.Clear();
+    }
+
+    /// <summary>The one type in the bot's pack whose name matches the word said, plural's s taken off. Not a search of the world: the stall is what it carries.</summary>
+    private static Type CarriedType(BotMobile bot, string word)
+    {
+        var pack = bot.Backpack;
+
+        if (pack == null || word.Length == 0)
+        {
+            return null;
+        }
+
+        foreach (var item in pack.EnumerateItems())
+        {
+            if (item.Deleted)
+            {
+                continue;
+            }
+
+            var name = item.GetType().Name;
+
+            if (name.Equals(word, StringComparison.OrdinalIgnoreCase) || name.Equals(word + "s", StringComparison.OrdinalIgnoreCase))
+            {
+                return item.GetType();
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>How many of the thing the bot's pack holds.</summary>
+    private static int Carried(BotMobile bot, Type kind)
+    {
+        var pack = bot.Backpack;
+
+        if (pack == null)
+        {
+            return 0;
+        }
+
+        var total = 0;
+
+        foreach (var item in pack.EnumerateItems())
+        {
+            if (!item.Deleted && item.GetType() == kind)
+            {
+                total += Math.Max(1, item.Amount);
+            }
+        }
+
+        return total;
+    }
+
+    /// <summary>The island's own price for the thing: the best open want's offer, else nothing.</summary>
+    private static int IslandPrice(Type kind)
+    {
+        var wants = BotMarket.Wants;
+        var best = 0;
+
+        for (var i = 0; i < wants.Count; i++)
+        {
+            if (wants[i] is { IsOpen: true } want && want.Kind == kind && want.Offer > best)
+            {
+                best = want.Offer;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>Hands up to the units from the bot's pack into the buyer's, the engine's own stack splitting. How many moved.</summary>
+    private static int Hand(BotMobile bot, Mobile player, Type kind, int units)
+    {
+        var from = bot.Backpack;
+        var into = player.Backpack;
+
+        if (from == null || into == null)
+        {
+            return 0;
+        }
+
+        var given = 0;
+
+        foreach (var item in from.EnumerateItems())
+        {
+            if (given >= units)
+            {
+                break;
+            }
+
+            if (item.Deleted || item.GetType() != kind)
+            {
+                continue;
+            }
+
+            var take = Math.Min(units - given, Math.Max(1, item.Amount));
+
+            if (take < Math.Max(1, item.Amount) && (!item.Stackable || Mobile.LiftItemDupe(item, take) == null))
+            {
+                continue;
+            }
+
+            if (!into.TryDropItem(player, item, false))
+            {
+                PackFull++;
+
+                break;
+            }
+
+            given += Math.Max(1, item.Amount);
+        }
+
+        return given;
+    }
+
+    /// <summary>All the gold in a pack, counted.</summary>
+    private static int GoldIn(Container pack)
+    {
+        if (pack == null)
+        {
+            return 0;
+        }
+
+        var total = 0;
+
+        foreach (var gold in pack.FindItemsByType<Gold>())
+        {
+            total += gold.Amount;
+        }
+
+        return total;
+    }
+
+    /// <summary>Takes the gold out of a pack, stack by stack, coin by coin. False only if the pack came up short on the way.</summary>
+    private static bool TakeGold(Container pack, int bill)
+    {
+        foreach (var gold in pack.FindItemsByType<Gold>())
+        {
+            if (bill <= 0)
+            {
+                break;
+            }
+
+            var take = Math.Min(bill, gold.Amount);
+
+            gold.Amount -= take;
+            bill -= take;
+
+            if (gold.Amount <= 0)
+            {
+                gold.Delete();
+            }
+        }
+
+        return bill <= 0;
+    }
+}
