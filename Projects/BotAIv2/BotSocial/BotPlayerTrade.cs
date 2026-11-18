@@ -5,34 +5,16 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A person buying out of a bot's pack by voice (the night queue's P6, 18.11.2026): "buy &lt;units&gt; &lt;thing&gt; &lt;offer&gt;"
-/// asks the bot it named, or the nearest in earshot; the bot answers with what it truly carries and the price it will
-/// take — the island's own price for the thing when one is standing (<c>BotMarket.Wants</c>), else the offer made. An
-/// "accept" inside the window, standing beside the bot, hands the goods over and takes the gold out of the buyer's
-/// pack, coin by coin, the engine's own stacks. No credit, no secure trade: what the packs hold is what changes hands,
-/// and both sides are told what happened.
-///
-/// <para>
-/// <b>Only what the bot is carrying.</b> The thing asked for is matched against the listening bot's own pack by the
-/// names of the types it holds (<c>IronIngot</c>, <c>Arrow</c>, <c>Bandage</c>), so a bot never promises a thing it
-/// has not got, and a buyer standing before a miner and a lumberjack is answered by whichever carries the thing. The
-/// bot does not walk to fetch: this is a market stall of the moment, not an errand.
-/// </para>
-/// </summary>
 public static class BotPlayerTrade
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPlayerTrade));
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>How long a quote stands before it lapses, unaccepted.</summary>
     public static int WindowMs { get; set; } = 30000;
 
-    /// <summary>The most of one thing handed over in a single ask.</summary>
     public static int MostUnits { get; set; } = 100;
 
-    /// <summary>How near the buyer must stand at the accept, for the hand to hand. The island's hand-overs meet at two.</summary>
     public static int MeetTiles { get; set; } = 3;
 
     public static long Asked { get; private set; }
@@ -80,7 +62,6 @@ public static class BotPlayerTrade
 
     private static readonly Dictionary<string, Quote> _standing = new(StringComparer.Ordinal);
 
-    /// <summary>Whether the line opens a buy. "buyer" must not answer to "buy" said alone.</summary>
     public static bool AsksBuy(string said)
     {
         for (var i = 0; i < BuyWords.Length; i++)
@@ -94,7 +75,6 @@ public static class BotPlayerTrade
         return false;
     }
 
-    /// <summary>Whether the line is a plain acceptance of a standing quote.</summary>
     public static bool SaysAccept(string said)
     {
         for (var i = 0; i < AcceptWords.Length; i++)
@@ -108,7 +88,6 @@ public static class BotPlayerTrade
         return false;
     }
 
-    /// <summary>The ask itself, from the ear: parse, look in the pack, answer with a quote or the honest refusal.</summary>
     public static void Buy(BotMobile bot, Mobile player, string said)
     {
         if (!Running || bot is not { Deleted: false, Alive: true } || player == null)
@@ -120,7 +99,6 @@ public static class BotPlayerTrade
 
         var parts = said.Split(' ');
 
-        // buy <units> <thing> <offer>: four words, or it is not an ask the bot can follow.
         if (parts.Length < 4
             || !int.TryParse(parts[1], out var units) || units <= 0
             || !int.TryParse(parts[^1], out var offer) || offer <= 0)
@@ -161,7 +139,6 @@ public static class BotPlayerTrade
             }
         }
 
-        // The island's own price for the thing, when somebody is paying one: a bot does not undercut its own market.
         var island = IslandPrice(kind);
         var price = Math.Max(offer, island);
 
@@ -183,7 +160,6 @@ public static class BotPlayerTrade
         logger.Information("{Bot} quoted {Player}: {Units} {Thing} at {Price} (asked {Offer}, island {Island})", bot.Name, player.Name, selling, parts[2], price, offer, island);
     }
 
-    /// <summary>The buyer's word on a standing quote. False when nothing stands for this buyer, so the ear may answer on.</summary>
     public static bool Accept(Mobile player)
     {
         if (!Running || player == null || !_standing.TryGetValue(player.Name, out var quote))
@@ -244,9 +220,7 @@ public static class BotPlayerTrade
 
         if (!TakeGold(player.Backpack, given * quote.Price))
         {
-            // The gold was counted, and the goods are already in the buyer's pack: this cannot honestly stand. The
-            // round number of the bill was checked a breath ago, so this is the pack losing a stack between two
-            // lines — logged, and the sale stands at what was taken.
+
             logger.Error("{Bot} could not take {Bill} gold from {Player} after handing {Units} {Thing}", bot.Name, given * quote.Price, player.Name, given, quote.Label);
         }
         else
@@ -301,7 +275,6 @@ public static class BotPlayerTrade
         _standing.Clear();
     }
 
-    /// <summary>The one type in the bot's pack whose name matches the word said, plural's s taken off. Not a search of the world: the stall is what it carries.</summary>
     private static Type CarriedType(BotMobile bot, string word)
     {
         var pack = bot.Backpack;
@@ -329,7 +302,6 @@ public static class BotPlayerTrade
         return null;
     }
 
-    /// <summary>How many of the thing the bot's pack holds.</summary>
     private static int Carried(BotMobile bot, Type kind)
     {
         var pack = bot.Backpack;
@@ -352,7 +324,6 @@ public static class BotPlayerTrade
         return total;
     }
 
-    /// <summary>The island's own price for the thing: the best open want's offer, else nothing.</summary>
     private static int IslandPrice(Type kind)
     {
         var wants = BotMarket.Wants;
@@ -369,7 +340,6 @@ public static class BotPlayerTrade
         return best;
     }
 
-    /// <summary>Hands up to the units from the bot's pack into the buyer's, the engine's own stack splitting. How many moved.</summary>
     private static int Hand(BotMobile bot, Mobile player, Type kind, int units)
     {
         var from = bot.Backpack;
@@ -414,7 +384,6 @@ public static class BotPlayerTrade
         return given;
     }
 
-    /// <summary>All the gold in a pack, counted.</summary>
     private static int GoldIn(Container pack)
     {
         if (pack == null)
@@ -432,7 +401,6 @@ public static class BotPlayerTrade
         return total;
     }
 
-    /// <summary>Takes the gold out of a pack, stack by stack, coin by coin. False only if the pack came up short on the way.</summary>
     private static bool TakeGold(Container pack, int bill)
     {
         foreach (var gold in pack.FindItemsByType<Gold>())

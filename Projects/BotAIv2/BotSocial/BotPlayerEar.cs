@@ -5,65 +5,28 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The bots' ear for a person's voice, and the memory of having met one (the night of 06.11.2026, Patrick's night
-/// order: houses and the furnishing of them, and the bots' life among players).
-///
-/// <para>
-/// <b>Only a real voice is heard.</b> The sink takes every line said in the world and refuses almost all of them
-/// cheaply, as <c>BotHail</c> does: a bot's line, a line from anything without a connected client, an empty line —
-/// all pass by. What is left is a person standing somewhere, and only then is the earshot asked.
-/// </para>
-///
-/// <para>
-/// <b>What is answered, and by whom.</b> A line that begins with a bot's name goes to that bot; a bot named from
-/// beyond <see cref="EarRange"/> tiles is not answered by whoever is nearer — the line was not meant for it
-/// (<c>AddressedElsewhere</c>). A bare greeting, or a question about the bot's work, is answered by the nearest bot
-/// in earshot, and by one only: forty bots answering one hello is a crowd, not a greeting. Nothing else is answered
-/// — the bots do not invent replies, and what they do say is only what they factually know: their own name and the
-/// deed they are about (<c>Resolve.Deed.Stage</c>), or that they are about nothing.
-/// </para>
-///
-/// <para>
-/// <b>The meeting is remembered.</b> Each answered exchange moves the answering bot's regard for the player a little
-/// (<see cref="MetWorth"/>, <c>BotTies.MoveToward</c>) — a tie like any other, decaying and crowding by the same
-/// rule. The player's regard for the bot is not touched: that is the player's to give.
-/// </para>
-/// </summary>
 public static class BotPlayerEar
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotPlayerEar));
 
-    /// <summary>Whether bots hear a person at all.</summary>
     public static bool Running { get; set; } = true;
 
-    /// <summary>How near a person must stand to be heard, in tiles. The engine's own earshot is twelve.</summary>
     public static int EarRange { get; set; } = 12;
 
-    /// <summary>How long one bot goes between answers to the same person.</summary>
     public static int AnswerEveryMs { get; set; } = 15000;
 
-    /// <summary>What one answered exchange is worth to the answering bot's memory of the player.</summary>
     public static double MetWorth { get; set; } = 2.0;
 
-    /// <summary>
-    /// The party, the night of 06.11.2026: a <c>join me</c> asks the bot it was said to, or the nearest bot, into the
-    /// engine's own party — the human's to accept or decline, as the engine's invitation already works. One ask a bot
-    /// and a player, and only when neither side is already spoken for; what became of the ask is tracked, not assumed.
-    /// </summary>
     public static int InviteEveryMs { get; set; } = 60000;
 
-    /// <summary>How long an ask is waited for before it is given up as not answered. The engine declines its own at 30s.</summary>
     public static int InviteTimeoutMs { get; set; } = 45000;
 
-    /// <summary>What a player who really joined is worth to the bot that asked.</summary>
     public static double PartyWorth { get; set; } = 6.0;
 
     public static long PlayersHeard { get; private set; }
 
     public static long BotsAnswered { get; private set; }
 
-    /// <summary>Lines that named a bot from beyond earshot: meant for somebody, and not for the hearer.</summary>
     public static long AddressedElsewhere { get; private set; }
 
     public static long Throttled { get; private set; }
@@ -123,7 +86,6 @@ public static class BotPlayerEar
         "в группу", "пойдём со мной", "пойдем со мной", "за мной", "группа"
     ];
 
-    /// <summary>Once a process: a reload calls this again, and a hook subscribed twice would answer every line twice.</summary>
     public static void Listen()
     {
         if (_listening)
@@ -184,7 +146,6 @@ public static class BotPlayerEar
         _pending.Clear();
     }
 
-    /// <summary>Somebody spoke. Almost always no bot is near, so this must be cheap to refuse.</summary>
     private static void Said(SpeechEventArgs e)
     {
         var from = e?.Mobile;
@@ -223,7 +184,6 @@ public static class BotPlayerEar
             }
         }
 
-        // A name said from beyond earshot belongs to the bot it was said to: the nearest keeps quiet, whatever it heard.
         if (named == null)
         {
             for (var i = 0; i < bots.Count; i++)
@@ -246,8 +206,6 @@ public static class BotPlayerEar
 
         var body = named ?? nearest;
 
-        // A bare line that is neither a greeting, nor a question about the work, nor a call into a party, nor trade with
-        // the speaker, is nobody's to answer; a named bot answers even then, and honestly — it did not follow.
         if (named == null && !Greets(text) && !AsksWork(text) && !AsksJoin(text)
             && !BotPlayerTrade.AsksBuy(text) && !BotPlayerTrade.SaysAccept(text))
         {
@@ -270,8 +228,6 @@ public static class BotPlayerEar
             _answered.Clear();
         }
 
-        // A buy is trade's to answer, and an accept closes what a buy opened (the night queue's P6, 18.11.2026); an
-        // accept with nothing standing falls through to the talk below.
         if (BotPlayerTrade.AsksBuy(text))
         {
             BotPlayerTrade.Buy(body, from, text);
@@ -322,7 +278,6 @@ public static class BotPlayerEar
         logger.Information("{Bot} answers {Player}, {Tiles} tiles off: {Line}", body.Name, from.Name, nearestTiles, line);
     }
 
-    /// <summary>The work question's answer: the deed the bot is about, in its own words, or the honest nothing.</summary>
     private static string WorkLine(BotMobile body)
     {
         var stage = body.Resolve.Deed?.Stage;
@@ -330,11 +285,6 @@ public static class BotPlayerEar
         return stage == null ? "Nothing in particular at the moment." : $"I am {stage}.";
     }
 
-    /// <summary>
-    /// The bot asks the player into the engine's own party. Only when neither is spoken for — a bot already leading one,
-    /// a player invited or in one — and once in <see cref="InviteEveryMs"/> for the pair. What becomes of the ask is the
-    /// tracker's, not the asker's word: joined is read off the party itself.
-    /// </summary>
     private static void TryInvite(BotMobile bot, Mobile player, long now)
     {
         if (_invited.TryGetValue((bot.Serial, player.Name), out var last) && now - last < Math.Max(5000, InviteEveryMs))
@@ -367,7 +317,6 @@ public static class BotPlayerEar
         logger.Information("{Bot} asks {Player} into its party", bot.Name, player.Name);
     }
 
-    /// <summary>What came of the asks, read off the party and the invitation's own timer, never assumed.</summary>
     private static void Track(long now)
     {
         foreach (var (name, pending) in _pending)
@@ -386,7 +335,7 @@ public static class BotPlayerEar
             }
             else if (pending.Player.Party == null || now - pending.At > Math.Max(10000, InviteTimeoutMs))
             {
-                // Declined, lapsed by the engine's own timer, or gone: the ask was not taken up, and nothing is claimed.
+
                 PartyExpired++;
 
                 _settled.Add(name);
@@ -410,7 +359,6 @@ public static class BotPlayerEar
         protected override void OnTick() => Track(Core.TickCount);
     }
 
-    /// <summary>Whether the line opens with this name, and the name ends there — "Lorelei" does not answer to "Loreleison".</summary>
     private static bool Named(string said, string name)
     {
         if (string.IsNullOrEmpty(name) || said.Length < name.Length
