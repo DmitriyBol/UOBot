@@ -5,31 +5,18 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// The town cry (the ideas ledger's first, 18.11.2026): once in a while, a bot standing in a guarded town calls the
-/// day's chief news out loud — the Chronicle's own heaviest entry of today, in the local channel, where any player
-/// about hears the island's history being made. Nobody walks anywhere and nobody is stopped: the crier is whoever
-/// happens to be in town, the way a cry goes up.
-///
-/// <para>
-/// <b>Only what the Chronicle truly holds.</b> The entry is picked by weight from today's page — not composed, not
-/// imagined — and a day with nothing on its page is a day the cry keeps quiet, which is itself the truth.
-/// </para>
-/// </summary>
 public static class BotTownCry
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotTownCry));
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>How often the cry goes up. Forty-five minutes: news stays news, and a cry every minute is noise.</summary>
     public static int EveryMs { get; set; } = 2700000;
 
     public static long Cries { get; private set; }
 
     private static long _next;
 
-    /// <summary>The society's second: called often, acting rarely.</summary>
     public static void Tick(long now)
     {
         if (!Running || _next != 0 && now - _next < 0)

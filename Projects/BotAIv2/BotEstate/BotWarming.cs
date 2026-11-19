@@ -5,50 +5,26 @@ using Server.Multis;
 
 namespace Server.BotAI.V2;
 
-/// <summary>
-/// A house-warming (the queue's F6, 18.11.2026): a bot with a house of its own, standing home and free, now and then
-/// calls the acquaintances of its life to the yard — no more than <see cref="MostGuests"/> of them, and only those it
-/// has deeds with (<see cref="BotTies"/>: saved or fought beside). The guests are pressed into a visit
-/// (<see cref="BotVisit"/>) and walk; what they find when they arrive is three lines of welcome and one real tale out
-/// of the host's own life (<see cref="BotCampTalk.Topic"/>), said in the local channel, so only those who came hear
-/// it — and each of them remembers it (<see cref="BotBiography.Heard"/>), which is how a house's story begins to
-/// travel the island.
-///
-/// <para>
-/// <b>The host owns the evening.</b> It is called on the host's own ground, ended by the host's own leaving, and
-/// nothing is claimed that did not happen: a guest that never arrived hears nothing, a host that walked off cancels
-/// the evening for everybody, and a house with nobody to call leaves the evening uncalled. One warming per host in
-/// <see cref="EveryMs"/>, one look per host in <see cref="RestMs"/> so the population's beat is not spent on refusals.
-/// </para>
-/// </summary>
 public static class BotWarming
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotWarming));
 
     public static bool Running { get; set; } = true;
 
-    /// <summary>How far about its house the host looks for acquaintances to call. A short walk, not a journey.</summary>
     public static int InviteReach { get; set; } = 400;
 
-    /// <summary>The most guests one warming calls.</summary>
     public static int MostGuests { get; set; } = 4;
 
-    /// <summary>How long the yard waits for the guests before the evening is given up as unattended.</summary>
     public static int WaitMs { get; set; } = 600000;
 
-    /// <summary>How near a guest stands to be counted as arrived.</summary>
     public static int AtDoor { get; set; } = 10;
 
-    /// <summary>How near the host must stand to its own door for the evening to be called, and to keep it standing.</summary>
     public static int HostHome { get; set; } = 60;
 
-    /// <summary>How long a host goes between warmings of its own house.</summary>
     public static int EveryMs { get; set; } = 14400000;
 
-    /// <summary>How long before the same host is even looked at again for one.</summary>
     public static int RestMs { get; set; } = 1800000;
 
-    /// <summary>The chance a looked-at host that may call a warming does.</summary>
     public static double Chance { get; set; } = 0.1;
 
     public static long WarmingsCalled { get; private set; }
@@ -75,7 +51,6 @@ public static class BotWarming
 
     private static int _beat;
 
-    /// <summary>One in ten of the society's seconds: a candidate host, then every standing evening kept honest.</summary>
     public static void Tick(long now)
     {
         if (!Running)
@@ -101,7 +76,6 @@ public static class BotWarming
         }
     }
 
-    /// <summary>One bot of the population, in turn: is it a host, at home, free, and owed a look?</summary>
     private static void Consider(long now)
     {
         var bots = BotPopulation.Bots;
@@ -164,7 +138,6 @@ public static class BotWarming
                 continue;
             }
 
-            // The tie keeps a name; the body is found among the living, and only a body within reach is called.
             for (var k = 0; k < bots.Count; k++)
             {
                 if (bots[k] is not { Deleted: false, Alive: true } guest
@@ -246,7 +219,6 @@ public static class BotWarming
         _beat = 0;
     }
 
-    /// <summary>One evening: the host, the house, who was asked, and what the talk has come to.</summary>
     public sealed class Evening
     {
         public Evening(BotMobile host, BaseHouse house)
@@ -275,10 +247,8 @@ public static class BotWarming
 
         private bool _over;
 
-        /// <summary>Whether the evening still stands for a guest standing in it. The deed reads this every beat.</summary>
         public bool Standing() => !_over && Host is { Deleted: false, Alive: true } && Host.Map == House.Map && Host.InRange(House.Location, HostHome * 2);
 
-        /// <summary>The evening's own beat: keep it honest, and give it its lines. False when it is over.</summary>
         public bool Keep(long now)
         {
             if (_over)
@@ -354,8 +324,7 @@ public static class BotWarming
                 }
                 default:
                 {
-                    // The evening's one real story, out of the host's own life, to those who came; each of them
-                    // remembers it, which is the point of the evening (18.11.2026).
+
                     var topic = BotCampTalk.Topic(Host, Host.Map, Host.Location, fill, "warming:thanks", out var told, arrived);
 
                     if (BotCampTalk.Say(Host, topic, "warming:thanks", arrived.Count > 0 ? arrived[0] : null, fill) && told != null)
@@ -379,7 +348,6 @@ public static class BotWarming
             }
         }
 
-        /// <summary>The guests standing in the yard this beat, read off the visits themselves — nobody is counted who is not there.</summary>
         private List<BotMobile> Guests()
         {
             var list = new List<BotMobile>();
@@ -400,12 +368,10 @@ public static class BotWarming
     }
 }
 
-/// <summary>A guest's walk to a house-warming and its stand in the yard, pressed by the host's call. See <see cref="BotWarming"/>.</summary>
 public sealed class BotVisit : BotDeed
 {
     public const string Trade = "visit";
 
-    /// <summary>What an evening in somebody's yard is worth to the ledger: nothing much, like a word on the road.</summary>
     public static double Prior { get; set; } = 6.0;
 
     private readonly BotWarming.Evening _evening;
@@ -448,7 +414,6 @@ public sealed class BotVisit : BotDeed
 
     public override bool Unpaid => true;
 
-    /// <summary>Half a minute at a time: the visit is kept from the next review's bidding until the evening says otherwise.</summary>
     public override bool Committed => true;
 
     public override bool Still => true;
