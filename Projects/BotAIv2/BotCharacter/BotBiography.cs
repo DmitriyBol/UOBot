@@ -5,38 +5,87 @@ using Server.Logging;
 
 namespace Server.BotAI.V2;
 
+/// <summary>
+/// A bot's life story: the three most important things that ever happened to it, in its own words with the real names and
+/// numbers, and the counts behind them; written from the hooks where those things happen, and told at the fire and now and
+/// then on the road.
+///
+/// <para>
+/// <b>Patrick's idea of 07.10.2026: "a biography — memory of its three most important events (first death, who saved it, who
+/// robbed it) that it tells at the campfire and in the trade chat".</b> Each event is a <see cref="BotTale"/> with a weight;
+/// <see cref="Keep"/> holds one tale of a kind and the three heaviest kinds. The first death weighs 50; being saved 40 and up to
+/// 20 more the nearer to death it was; being raised 38; being robbed under threat 40 and up, murdered 60, killed in a war 55;
+/// the best sale 15 and up to 25 more by its size; a war fought 30 and two a kill; a duel 35; a veteran's title 60. So a bot
+/// that has been murdered, saved at three hits and made veteran tells those, and its best sale of 40gp is let go.
+/// </para>
+///
+/// <para>
+/// <b>Written where it happens, never reconstructed.</b> <c>BotMobile.OnDeath</c> (<see cref="Died"/>), <c>BotRescue</c> on a rescue
+/// ending well (<see cref="Rescued"/>), <c>BotRaise</c> (<see cref="Raised"/>), <c>BotSalve</c> (<see cref="Healed"/>), <c>BotRob</c>'s
+/// paid demand (<see cref="Extorted"/>), <c>BotHandover</c> (<see cref="Sold"/>), <c>BotSlay</c> on a lone kill and <c>BotSquad</c> on a
+/// company's (<see cref="Slew"/>, <see cref="CompanyKill"/>), and the grudge duels (<see cref="Dueled"/>). Each also moves the ties
+/// (<see cref="BotTies"/>) and the kills that make a veteran (<see cref="BotTraits.Credit"/>).
+/// </para>
+///
+/// <para>
+/// <b>Told, counted.</b> At a fire or a meeting on the road one line in <see cref="TaleChance"/> is a tale or a word about a
+/// friend or an enemy instead of the news (<c>BotCampTalk.Topic</c>); after a mood line somebody heard, one in
+/// <see cref="VoiceChance"/> is followed by a tale in the local channel, and a tale of a sale goes to the trade room one time in
+/// <see cref="TradeChance"/> (<c>BotVoice.Mood</c>).
+/// </para>
+/// </summary>
 public static class BotBiography
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBiography));
 
     public static bool On { get; set; } = true;
 
+    /// <summary>How many tales one bot keeps. Three.</summary>
     public static int MostTales { get; set; } = 3;
 
+    /// <summary>The share of a fire's or a road's lines that are a tale or a word about a friend or an enemy. 0.3.</summary>
     public static double TaleChance { get; set; } = 0.3;
 
+    /// <summary>After a mood line somebody heard, the chance of a tale in the local channel. 0.12.</summary>
     public static double VoiceChance { get; set; } = 0.12;
 
+    /// <summary>The chance a tale of a sale told that way goes to the trade room rather than the local channel. 0.25.</summary>
     public static double TradeChance { get; set; } = 0.25;
 
+    /// <summary>How many heard stories one bot carries (PLAN-life A6). Four: a listener's memory, not a library.</summary>
     public static int MostHeard { get; set; } = 4;
 
+    /// <summary>The share of tale-lines that retell a story heard at another fire instead of the teller's own (A6). 0.35.</summary>
     public static double RetellShare { get; set; } = 0.35;
 
+    /// <summary>Hours before the same bot tells the same tale of its own again. Six: an evening's rest between tellings.</summary>
     public static double TaleRestHours { get; set; } = 6.0;
 
+    /// <summary>A sociable bot's multiplier on the tale chance (A6: the good tellers are the sociable ones). 1.5.</summary>
     public static double SociableTaleBoost { get; set; } = 1.5;
 
+    /// <summary>
+    /// The most fighting power (<see cref="BotThreat.Power"/>) a killer may bring for its kill to read as comic rather than sad or
+    /// deserved: a giant rat, a bird, a sheep. Anything stronger earned its kill. See <see cref="Died"/>.
+    /// </summary>
     public static double ComicKillerPower { get; set; } = 400.0;
 
+    /// <summary>How many times stronger than its killer the victim must have read at death for the kill to be comic. Five times: beaten by something a fifth of oneself is a story; anything closer is a bad day.</summary>
     public static double ComicGap { get; set; } = 5.0;
 
+    /// <summary>The chance a bot standing near a comic death says so out loud. See <see cref="LaughNearby"/>.</summary>
     public static double ComicWitnessChance { get; set; } = 0.5;
 
+    /// <summary>
+    /// How many tellings ask for a comic tale by name at a fire or on the road, before the friend, the enemy and the turn of
+    /// the three: the laugh is a dish of its own and should not wait its turn. See <see cref="Tale"/>.
+    /// </summary>
     public static double ComicShare { get; set; } = 0.25;
 
+    /// <summary>How often a listener answers a comic tale with a laugh rather than the plain answer. See <see cref="Answer"/>.</summary>
     public static double ComicAnswerChance { get; set; } = 0.8;
 
+    /// <summary>How many rescues out of the ground are kept as a comic tale, so the funny does not crowd out the deaths. See <see cref="Stuck"/>.</summary>
     public static double ComicCarryChance { get; set; } = 0.5;
 
     public static long Written { get; private set; }
@@ -55,16 +104,22 @@ public static class BotBiography
 
     public static long EnemyTales { get; private set; }
 
+    /// <summary>Stories a seated listener remembered (A6).</summary>
     public static long HeardRecorded { get; private set; }
 
+    /// <summary>Tellings a listener already carried and so did not write down again.</summary>
     public static long HeardKnown { get; private set; }
 
+    /// <summary>Tales answered by somebody who knew the one they are about ("I was there").</summary>
     public static long WitnessReplies { get; private set; }
 
+    /// <summary>Tales answered by somebody who had heard the story before.</summary>
     public static long HeardReplies { get; private set; }
 
+    /// <summary>Heard stories retold onward at another fire, table or meeting (A6: a story travels with its listeners).</summary>
     public static long RetoldTales { get; private set; }
 
+    /// <summary>Tellings given up because at least half the audience already carried the story.</summary>
     public static long RepeatsSuppressed { get; private set; }
 
     public static long ComicDeaths { get; private set; }
@@ -81,6 +136,10 @@ public static class BotBiography
 
     private static readonly Dictionary<string, long> _byKind = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Keeps a tale: replaces one of the same kind when at least as heavy, else takes a free place, else the lightest place when
+    /// heavier than it. Returns whether it was kept.
+    /// </summary>
     public static bool Keep(BotLife life, string kind, string other, string text, double weight, int number)
     {
         if (!On || life == null || string.IsNullOrEmpty(text))
@@ -148,6 +207,7 @@ public static class BotBiography
         return true;
     }
 
+    /// <summary>Where a thing happened, as a bot says it: the dungeon or town region's name, else near the nearest town, else the spot.</summary>
     public static string Place(Map map, Point3D at)
     {
         if (map != null && map != Map.Internal)
@@ -173,6 +233,10 @@ public static class BotBiography
     private static string Who(Mobile m) =>
         m == null ? "something" : m is BotMobile ? m.Name : BotVoice.Words(m.Name) ?? "something";
 
+    /// <summary>
+    /// It died. Its first death becomes a tale; a death at another bot's hand, out of a duel, makes that bot a personal enemy
+    /// and a tale — in a war, the slayer is credited a kill and its war goes into its own story. Called from <c>BotMobile.OnDeath</c>.
+    /// </summary>
     public static void Died(BotMobile victim, Mobile killer, Mobile slayer, Map map, Point3D at)
     {
         if (!On || BotLives.Of(victim) is not { } life)
@@ -182,6 +246,8 @@ public static class BotBiography
 
         life.Deaths++;
 
+        BotVigil.Died(victim, killer);
+
         var place = Place(map, at);
 
         if (life.Deaths == 1)
@@ -189,6 +255,8 @@ public static class BotBiography
             Keep(life, "death", killer?.Name, $"The first time I died was {place}: {Who(killer)} killed me.", 50.0, 1);
         }
 
+        // A comic death — done in by something a fifth of oneself or weaker — is the one death kept for a laugh rather than a
+        // grudge (18.11.2026). The tale travels to fires like any other; a witness may laugh on the spot.
         var comic = killer is { Deleted: false } and not BotMobile ? BotThreat.Power(killer) : 0.0;
 
         if (comic > 0.0 && comic <= ComicKillerPower && victim.PowerAtDeath >= ComicGap * comic)
@@ -244,6 +312,10 @@ public static class BotBiography
         Keep(life, "wronged", other.Name, $"{other.Name} murdered me {place}, and went through my pack after.", 60.0, 1);
     }
 
+    /// <summary>
+    /// Carried home by the ground itself after standing stuck on it — the statue in the open, kept as a comic tale one
+    /// time in <see cref="ComicCarryChance"/>. Called from <c>BotPopulation</c>'s rescue, which has just moved the bot.
+    /// </summary>
     public static void Stuck(BotMobile who, Point3D where)
     {
         if (!On || who == null || BotLives.Of(who) is not { } life)
@@ -263,6 +335,11 @@ public static class BotBiography
         );
     }
 
+    /// <summary>
+    /// Somebody standing within earshot of a comic death says so out loud — one bot of those near, and no more often than
+    /// <see cref="ComicWitnessChance"/>: a line any player about can hear, the laugh on the spot before the tale ever reaches a
+    /// fire. Called from <see cref="Died"/>.
+    /// </summary>
     public static void LaughNearby(BotMobile who, Mobile atWhat)
     {
         if (!On || who?.Map == null || who.Map == Map.Internal || atWhat == null || Utility.RandomDouble() >= ComicWitnessChance)
@@ -283,6 +360,7 @@ public static class BotBiography
         }
     }
 
+    /// <summary>Saved from a creature by another bot that came to its cry. Called by <c>BotRescue</c> when the rescue ends well.</summary>
     public static void Rescued(Mobile rescuer, Mobile saved, Mobile foe, int lowest, int most)
     {
         if (!On || rescuer is not BotMobile || saved is not BotMobile || ReferenceEquals(rescuer, saved) || BotLives.Of(saved) is not { } life)
@@ -314,6 +392,7 @@ public static class BotBiography
         );
     }
 
+    /// <summary>Raised where it fell by another bot. Called by <c>BotRaise</c>.</summary>
     public static void Raised(Mobile raiser, BotMobile ghost, Point3D where)
     {
         if (!On || raiser is not BotMobile || ghost == null || ReferenceEquals(raiser, ghost) || BotLives.Of(ghost) is not { } life)
@@ -335,6 +414,7 @@ public static class BotBiography
         Keep(life, "raised", raiser.Name, $"{raiser.Name} raised me where I fell {place}. I owe that one.", 38.0, 1);
     }
 
+    /// <summary>Mended by another bot. Called by <c>BotSalve</c> when the patient is whole.</summary>
     public static void Healed(Mobile healer, Mobile patient)
     {
         if (!On || healer is not BotMobile || patient is not BotMobile || ReferenceEquals(healer, patient))
@@ -350,6 +430,7 @@ public static class BotBiography
         }
     }
 
+    /// <summary>Made to pay under threat. Called by <c>BotRob</c> when a demand is paid.</summary>
     public static void Extorted(Mobile victim, Mobile robber, int amount)
     {
         if (!On || victim is not BotMobile || robber is not BotMobile || BotLives.Of(victim) is not { } life)
@@ -370,6 +451,7 @@ public static class BotBiography
         Keep(life, "wronged", robber.Name, $"{robber.Name} made me pay {amount}gp {place}: my purse or my life, it said.", 40.0 + Math.Min(20.0, amount / 50.0), amount);
     }
 
+    /// <summary>A sale hand to hand. Called by <c>BotHandover</c>; the best one becomes the seller's tale.</summary>
     public static void Sold(Mobile seller, Mobile buyer, int units, Type kind, int gold)
     {
         if (!On || seller is not BotMobile || buyer is not BotMobile)
@@ -391,6 +473,7 @@ public static class BotBiography
         Keep(life, "sale", buyer.Name, $"Best sale of my life: {units} {item} to {buyer.Name} for {gold}gp.", 15.0 + Math.Min(25.0, gold / 40.0), gold);
     }
 
+    /// <summary>A creature felled by this bot alone. Called by <c>BotSlay</c> when its quarry goes down in the fight.</summary>
     public static void Slew(Mobile bot, Mobile quarry)
     {
         if (!On || bot is not BotMobile slayer || (slayer as IBotSquadMember)?.Squad != null)
@@ -402,6 +485,10 @@ public static class BotBiography
         KillsCredited += 1.0;
     }
 
+    /// <summary>
+    /// A company's kill: a share of one to each member standing, and a little regard between the leader and each of them for
+    /// having fought side by side. Called by <c>BotSquad</c> when its focus is down.
+    /// </summary>
     public static void CompanyKill(BotSquad squad)
     {
         if (!On || squad?.Members is not { Count: > 0 } members)
@@ -449,6 +536,7 @@ public static class BotBiography
         }
     }
 
+    /// <summary>A grudge fought out in a duel, for both of them. Called by <see cref="BotGrudge"/>.</summary>
     public static void Dueled(BotMobile winner, BotMobile loser, string how)
     {
         if (!On || winner == null || loser == null)
@@ -469,6 +557,15 @@ public static class BotBiography
         }
     }
 
+    /// <summary>
+    /// A tale, or a word about a friend or an enemy, for a speaker at a fire or on the road, one time in <see cref="TaleChance"/>
+    /// (times <see cref="SociableTaleBoost"/> for a sociable bot): fills <c>{tale}</c>, <c>{friend}</c> or <c>{enemy}</c> and
+    /// returns the occasion, or null to let the news be said. One telling in <see cref="RetellShare"/> is a story the speaker
+    /// itself heard at another fire, carried onward (occasion <c>camp:tale-retold</c>, PLAN-life A6). When the occasion is
+    /// <c>camp:tale</c> or <c>camp:tale-retold</c>, <paramref name="told"/> is the story itself, so the listeners seated there
+    /// can remember it (<see cref="Heard"/>) and answer to it (<see cref="Answer"/>); otherwise <paramref name="told"/> is null.
+    /// A story at least half the <paramref name="audience"/> already carries is not told again (<see cref="RepeatsSuppressed"/>).
+    /// </summary>
     public static string Tale(Mobile speaker, Dictionary<string, string> fill, out BotTale told, IEnumerable<Mobile> audience = null)
     {
         told = null;
@@ -490,6 +587,8 @@ public static class BotBiography
             return null;
         }
 
+        // A comic tale asked for by name, one telling in ComicShare (18.11.2026): the laugh is a dish of its own and
+        // should not wait on the turn of the three. The speaker's own first, else one it heard and may carry on.
         if (Utility.RandomDouble() < ComicShare && ComicTale(life, fill, audience, speaker, out told) is { } occasion)
         {
             ComicChosen++;
@@ -498,6 +597,7 @@ public static class BotBiography
             return occasion;
         }
 
+        // A word about a friend or an enemy one time in four, when there is one.
         if (Utility.Random(4) == 0)
         {
             var (friend, enemy) = BotTies.Strongest(life);
@@ -522,6 +622,8 @@ public static class BotBiography
             }
         }
 
+        // A story heard at another fire, carried onward — this is how a tale travels between towns (A6). Not one about
+        // the speaker itself, and none carried too far already.
         if (Utility.RandomDouble() < RetellShare && PickRetold(life) is { } heard)
         {
             if (KnownToMost(heard.Kind, heard.About, heard.Text, audience, speaker))
@@ -562,6 +664,11 @@ public static class BotBiography
         return "camp:tale";
     }
 
+    /// <summary>
+    /// A comic tale for a speaker that asked for one: its own, else one it heard that may still be carried on (the same
+    /// <see cref="PickRetold"/> rules of the road). Returns the occasion with the tale in <paramref name="told"/>, or
+    /// null when the speaker carries nothing funny. See <see cref="Tale"/>.
+    /// </summary>
     private static string ComicTale(BotLife life, Dictionary<string, string> fill, IEnumerable<Mobile> audience, Mobile speaker, out BotTale told)
     {
         told = null;
@@ -614,6 +721,7 @@ public static class BotBiography
         return "camp:tale-retold";
     }
 
+    /// <summary>A story this bot carries that it may retell: not about itself, not yet carried on twice, one of them at random.</summary>
     private static BotHeardTale PickRetold(BotLife life)
     {
         BotHeardTale pick = null;
@@ -637,6 +745,7 @@ public static class BotBiography
         return pick;
     }
 
+    /// <summary>Whether at least half the audience already carries this story, so telling it to them again would be a repeat. The speaker is not its own audience: a reteller always carries the story it retells.</summary>
     private static bool KnownToMost(string kind, string about, string text, IEnumerable<Mobile> audience, Mobile speaker)
     {
         if (audience == null)
@@ -681,6 +790,10 @@ public static class BotBiography
         return total > 0 && carriers * 2 >= total;
     }
 
+    /// <summary>
+    /// The next tale to tell, round the three in turn so the same one is not told twice running, skipping any told aloud
+    /// within the last <see cref="TaleRestHours"/>. Null when every tale is resting.
+    /// </summary>
     private static BotTale Next(BotLife life)
     {
         if (life.Tales.Count == 0)
@@ -706,6 +819,11 @@ public static class BotBiography
         return null;
     }
 
+    /// <summary>
+    /// Records a tale a listener heard told aloud where it was seated (PLAN-life A6): the words as they were said, the teller,
+    /// the one it is about and the place. A telling the listener already carries is counted and not written again; a full
+    /// memory lets the oldest go. This is the shard's honest "heard of X" — no listener records a story it was not seated for.
+    /// </summary>
     public static void Heard(Mobile listener, Mobile teller, BotTale tale, string place)
     {
         if (!On || tale == null || listener == null || teller == null || ReferenceEquals(listener, teller))
@@ -764,6 +882,13 @@ public static class BotBiography
         HeardRecorded++;
     }
 
+    /// <summary>
+    /// What a listener answers a tale just told at its fire, when the listener honestly can: <c>camp:tale-witness</c> when it
+    /// knows the one the tale is about — the same name in its own tales or a tie of deeds together, saves or wrongs — else
+    /// <c>camp:tale-heard</c> when it carries the story already from another telling; null when it has nothing to say, and the
+    /// fire falls back to a plain answer. Must be asked before <see cref="Heard"/> records the telling, else every listener
+    /// has "heard" it. The one it is about fills <c>{about}</c>.
+    /// </summary>
     public static string Answer(Mobile listener, BotTale tale)
     {
         if (!On || tale == null || BotLives.Of(listener) is not { } life)
@@ -771,6 +896,7 @@ public static class BotBiography
             return null;
         }
 
+        // A comic tale is laughed at more often than a grave one is answered (18.11.2026).
         if (tale.Kind == "comic" && Utility.RandomDouble() < ComicAnswerChance)
         {
             ComicAnswers++;
@@ -807,7 +933,8 @@ public static class BotBiography
 
         for (var i = 0; i < life.HeardTales.Count; i++)
         {
-
+            // The very story, as the record keeps it (kind, about and words): another tale of the same one is not this
+            // one, and a listener that carries it answers honestly that it has not heard this telling before.
             if (string.Equals(life.HeardTales[i].Kind, tale.Kind, StringComparison.Ordinal)
                 && string.Equals(life.HeardTales[i].About, tale.Other, StringComparison.Ordinal)
                 && string.Equals(life.HeardTales[i].Text, tale.Text, StringComparison.Ordinal))
@@ -821,6 +948,10 @@ public static class BotBiography
         return null;
     }
 
+    /// <summary>
+    /// After a mood line somebody heard: one time in <see cref="VoiceChance"/>, a tale said in the local channel, or a tale of a
+    /// sale in the trade room. Called by <c>BotVoice.Mood</c>.
+    /// </summary>
     public static void AfterMood(BotMobile who)
     {
         if (!On || who == null || Utility.RandomDouble() >= VoiceChance || BotLives.Of(who) is not { Tales.Count: > 0 } life || Next(life) is not { } tale)

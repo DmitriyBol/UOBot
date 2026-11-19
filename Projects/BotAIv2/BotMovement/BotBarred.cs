@@ -7,12 +7,304 @@ using Server.Regions;
 
 namespace Server.BotAI.V2;
 
+/// <summary>
+/// Ground the population is never to want, however attractive whatever is standing on it.
+///
+/// <para>
+/// <b>Patrick's order of 11.09.2026, and the difference between this and <see cref="BotRefused"/> is the
+/// whole reason it is a second class.</b> The refusal ledger is a measurement: somebody tried, somebody
+/// failed, and the square rests for a while and is cleared the moment anybody arrives in it. That is right
+/// for ground whose reachability is a question. It is wrong for ground whose reachability is settled —
+/// a walled pocket with no door — because the ledger keeps letting the question be asked again, and each
+/// re-ask costs a path search, an errand and the minutes the bot spent walking at it.
+/// </para>
+///
+/// <para>
+/// <b>The evidence this was written from.</b> A cooking hearth stands at (2161, 1354) inside a pocket east
+/// of Britain that nothing can walk into. In one nine-hour session it took 70 of the shard's 2460 walk
+/// failures on its own, every one of them a cook who took the job, walked at it for minutes and gave up;
+/// the rest of the pocket — a fleeing bot choosing (2208, 1379) as a refuge, a healer hunting something
+/// shut in at (2163, 1384) — took 60 more. The shard had already <i>learned</i> the shape of it:
+/// <c>BotReach</c> logged "a pocket of 527 tiles has been walked to its edges" and "a pocket of 25 tiles",
+/// and it went on choosing destinations inside them, because knowing a journey will be refused is not the
+/// same as not wanting to go.
+/// </para>
+///
+/// <para>
+/// <b>So this is a fact stated rather than learned, and it belongs in the choice.</b> It is asked by
+/// <see cref="BotRefused.Refusing"/>, which every sampler that picks a place already calls before it picks,
+/// so a barred square is never on any shortlist: not a hearth, not a vein, not a refuge, not a corpse. It
+/// never expires and arriving does not clear it — those are both properties of a measurement, and this is
+/// not one. The only thing that lifts it is somebody editing <c>bot-movement.json</c>.
+/// </para>
+///
+/// <para>
+/// <b>Kept honest by its own counter.</b> A gate with no bucket either breaks somebody else's denominator
+/// or files its refusals under somebody else's name — this project's most repeated instrumentation defect —
+/// so what this turns away is counted here, by square, and printed beside the ledger's own numbers rather
+/// than inside them.
+/// </para>
+/// </summary>
 public static class BotBarred
 {
     private static readonly ILogger logger = LogFactory.GetLogger(typeof(BotBarred));
 
+    /// <summary>Whether the bars are enforced at all. Off makes the shard behave exactly as it did before.</summary>
     public static bool Running { get; set; } = true;
 
+    /// <summary>
+    /// How many rescues out of one small patch of ground close that patch as a bar, on the ground's own evidence and
+    /// nobody's word for it (18.11.2026). The two traps of 15.09 were barred by hand out of exactly this evidence —
+    /// twelve and thirty-two carried home — and the magnet at (5724–5741, 433–447) took five rescues in one day
+    /// without ever dying, so no quarantine ever closed it. Three rescues standing near each other are a trap the
+    /// shard can prove on its own.
+    /// </summary>
+    public static int RescueBars { get; set; } = 3;
+
+    /// <summary>How near together two rescues must stand to be one trap's evidence. Thirty tiles: a pocket and its doorstep.</summary>
+    public static int RescueNear { get; set; } = 30;
+
+    /// <summary>The margin of ground taken round the rescues' own box, so the bar holds what drew them, not only where they stood.</summary>
+    public static int RescueMargin { get; set; } = 12;
+
+    /// <summary>Rescue-born bars declared — what the ground's own evidence closed.</summary>
+    public static long RescueBarred { get; private set; }
+
+    private static readonly List<(Map Map, int X, int Y)> _rescues = [];
+
+    /// <summary>
+    /// How many roads refused to one patch of ground close that patch as a bar (18.11.2026). The day's 2,095
+    /// "no way through" lines named the same six places 26–86 times each — ground no rescue ever carried anybody out
+    /// of and no death ever quarantined, because the only proof it offered was the road that never came.
+    /// <b>Zero since the night of the same day: refused roads are too mixed a proof — a creature behind a door, a
+    /// buyer inside a house, a follower that walked on — and six of them standing near each other closed whole
+    /// towns by accident (Cove alone was turned away 623,709 times in an hour). The rescue-born bars, whose every
+    /// point is a bot the ground itself had to carry home, stay.</b>
+    /// </summary>
+    public static int RefusedBars { get; set; } = 0;
+
+    /// <summary>
+    /// The most an automatic bar may cover either way (18.11.2026). A cluster of rescues within <see cref="RescueNear"/>
+    /// cannot honestly span more than twice that and the margin; a box bigger than this is not one trap but a
+    /// district, and barring a district is barring the map. The cluster is logged and left open.
+    /// </summary>
+    public static int MostAutoBar { get; set; } = 90;
+
+    /// <summary>Refusal-born bars declared.</summary>
+    public static long RefusedBarred { get; private set; }
+
+    private static readonly List<(Map Map, int X, int Y)> _refusals = [];
+
+    /// <summary>
+    /// One road the pathfinder proved does not exist (called from <see cref="BotWill"/>'s fail word, on
+    /// <c>BotWalkResult.Refused</c> only — a chase given up and a stalled step are not facts about the ground).
+    /// </summary>
+    public static void Refused(Map map, Point3D to)
+    {
+        // <b>Zero is off, and the first reading of that was the night's second lesson (19.11.2026).</b> The test below
+        // read "near at least RefusedBars - 1", which with RefusedBars at nought is "near at least minus one" — always
+        // true, so every single refused road declared its one-point cluster a bar, and the island woke to 991 bars of
+        // 24x24 and nineteen million turnings at Cove. Off must be a guard before the counting, not a number the
+        // counting cannot fail.
+        if (!Running || RefusedBars <= 0 || map == null || map == Map.Internal)
+        {
+            return;
+        }
+
+        _refusals.Add((map, to.X, to.Y));
+
+        if (_refusals.Count > 256)
+        {
+            _refusals.RemoveRange(0, _refusals.Count - 256);
+        }
+
+        for (var i = 0; i < _refusals.Count; i++)
+        {
+            var centre = _refusals[i];
+            var near = 0;
+
+            for (var k = 0; k < _refusals.Count; k++)
+            {
+                if (k != i && _refusals[k].Map == centre.Map
+                    && Math.Abs(_refusals[k].X - centre.X) <= RescueNear
+                    && Math.Abs(_refusals[k].Y - centre.Y) <= RescueNear)
+                {
+                    near++;
+                }
+            }
+
+            if (near < RefusedBars - 1)
+            {
+                continue;
+            }
+
+            var x1 = centre.X;
+            var y1 = centre.Y;
+            var x2 = x1;
+            var y2 = y1;
+            var taken = 0;
+
+            for (var k = _refusals.Count - 1; k >= 0; k--)
+            {
+                if (_refusals[k].Map != centre.Map
+                    || Math.Abs(_refusals[k].X - centre.X) > RescueNear
+                    || Math.Abs(_refusals[k].Y - centre.Y) > RescueNear)
+                {
+                    continue;
+                }
+
+                x1 = Math.Min(x1, _refusals[k].X);
+                y1 = Math.Min(y1, _refusals[k].Y);
+                x2 = Math.Max(x2, _refusals[k].X);
+                y2 = Math.Max(y2, _refusals[k].Y);
+                taken++;
+
+                _refusals.RemoveAt(k);
+            }
+
+            RefusedBarred++;
+
+            var wideR = x2 - x1 + RescueMargin * 2;
+            var highR = y2 - y1 + RescueMargin * 2;
+
+            if (wideR > Math.Max(30, MostAutoBar) || highR > Math.Max(30, MostAutoBar))
+            {
+                logger.Error(
+                    "A cluster of {Taken} refused roads near ({X}, {Y}) spans {Wide}x{High} tiles — too big to bar honestly; left open",
+                    taken,
+                    x1,
+                    y1,
+                    wideR,
+                    highR
+                );
+
+                return;
+            }
+
+            var bar = new Bar(
+                x1 - RescueMargin,
+                y1 - RescueMargin,
+                x2 + RescueMargin,
+                y2 + RescueMargin,
+                $"{taken} roads refused to ({x1}–{x2}, {y1}–{y2}) standing within {RescueNear} tiles of each other — the pathfinder's own proof, {DateTime.UtcNow:dd.MM.yyyy}"
+            );
+
+            _bars.Add(bar);
+
+            logger.Information(
+                "The pathfinder's own proof closes it: {Why}; choices on it will be turned away from now on",
+                bar
+            );
+
+            return;
+        }
+    }
+
+    /// <summary>
+    /// One bot carried home out of the ground (called by <c>BotPopulation</c>'s rescue). The third rescue out of one
+    /// patch declares the patch a bar on the spot, with the evidence in its why — and the next sampler looking at it
+    /// is turned away before it walks in.
+    /// </summary>
+    public static void Rescued(Map map, Point3D from)
+    {
+        if (!Running || map == null || map == Map.Internal)
+        {
+            return;
+        }
+
+        _rescues.Add((map, from.X, from.Y));
+
+        if (_rescues.Count > 256)
+        {
+            _rescues.RemoveRange(0, _rescues.Count - 256);
+        }
+
+        for (var i = 0; i < _rescues.Count; i++)
+        {
+            var centre = _rescues[i];
+            var near = 0;
+
+            for (var k = 0; k < _rescues.Count; k++)
+            {
+                if (k != i && _rescues[k].Map == centre.Map
+                    && Math.Abs(_rescues[k].X - centre.X) <= RescueNear
+                    && Math.Abs(_rescues[k].Y - centre.Y) <= RescueNear)
+                {
+                    near++;
+                }
+            }
+
+            if (near < RescueBars - 1)
+            {
+                continue;
+            }
+
+            var x1 = centre.X;
+            var y1 = centre.Y;
+            var x2 = x1;
+            var y2 = y1;
+            var taken = 0;
+
+            // <b>The centre is held in a local: the sweep below removes entries, and an index into a list being
+            // shortened is how the shard died at 02:44 on 19.11.2026 (Ragnar's rescue, ArgumentOutOfRangeException at
+            // the second read of [i]). Everything downstream reads the held centre, never the moving list.</b>
+            for (var k = _rescues.Count - 1; k >= 0; k--)
+            {
+                if (_rescues[k].Map != centre.Map
+                    || Math.Abs(_rescues[k].X - centre.X) > RescueNear
+                    || Math.Abs(_rescues[k].Y - centre.Y) > RescueNear)
+                {
+                    continue;
+                }
+
+                x1 = Math.Min(x1, _rescues[k].X);
+                y1 = Math.Min(y1, _rescues[k].Y);
+                x2 = Math.Max(x2, _rescues[k].X);
+                y2 = Math.Max(y2, _rescues[k].Y);
+                taken++;
+
+                _rescues.RemoveAt(k);
+            }
+
+            RescueBarred++;
+
+            var wide = x2 - x1 + RescueMargin * 2;
+            var high = y2 - y1 + RescueMargin * 2;
+
+            if (wide > Math.Max(30, MostAutoBar) || high > Math.Max(30, MostAutoBar))
+            {
+                logger.Error(
+                    "A cluster of {Taken} rescues near ({X}, {Y}) spans {Wide}x{High} tiles — too big to bar honestly; left open",
+                    taken,
+                    x1,
+                    y1,
+                    wide,
+                    high
+                );
+
+                return;
+            }
+
+            var bar = new Bar(
+                x1 - RescueMargin,
+                y1 - RescueMargin,
+                x2 + RescueMargin,
+                y2 + RescueMargin,
+                $"{taken} bots carried home out of ({x1}–{x2}, {y1}–{y2}) standing within {RescueNear} tiles of each other — the ground's own evidence, {DateTime.UtcNow:dd.MM.yyyy}"
+            );
+
+            _bars.Add(bar);
+
+            logger.Information(
+                "The ground's own evidence closes it: {Why}; choices on it will be turned away from now on",
+                bar
+            );
+
+            return;
+        }
+    }
+
+    /// <summary>One piece of ground nobody may want, and why it is on the list.</summary>
     public sealed class Bar
     {
         public Bar(int x1, int y1, int x2, int y2, string why)
@@ -32,8 +324,10 @@ public static class BotBarred
 
         public int Y2 { get; }
 
+        /// <summary>In words, for the boot line. Never parsed.</summary>
         public string Why { get; }
 
+        /// <summary>Choices this one has turned away.</summary>
         public long Turned;
 
         public bool Holds(int x, int y) => x >= X1 && x <= X2 && y >= Y1 && y <= Y2;
@@ -41,6 +335,25 @@ public static class BotBarred
         public override string ToString() => $"({X1},{Y1})-({X2},{Y2}) {Why}";
     }
 
+    /// <summary>
+    /// The list as it stands: the box the order was written about, and the two traps added on 15.09.2026.
+    ///
+    /// <para>
+    /// <b>Sized from the failures rather than from the pocket.</b> <c>BotReach</c> measured the two pockets
+    /// inside it at 527 and 25 tiles; this box is bigger than both together, because what has to be kept out
+    /// of a shortlist is every destination a bot actually picked in there, and those spread from
+    /// (2161, 1354) to (2223, 1377). Its west edge stops short of (2142, 1350) on purpose: bots hunt there,
+    /// one of them died there, and ground somebody has stood on is ground this list has no business holding.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>The two traps are sized the same way, from where bots were carried home out of them.</b> Neither can be proved a
+    /// pocket — every rescue from either read the ground as too big to enclose — so the reach ledger never files them, and
+    /// persisting pockets would not have closed them. Fable proposed boxes a little off the evidence: its south-west box
+    /// took in ground at y 2060–2105 and missed nothing, its north box stopped at 1350,1080 and missed five of the twelve
+    /// rescues. These are the rescue origins of 14–15.09.2026 with a few tiles' margin, taken on Patrick's word.
+    /// </para>
+    /// </summary>
     private static readonly List<Bar> _bars =
     [
         new(2155, 1352, 2230, 1405, "a walled pocket east of Britain with no way in — Patrick's order, 11.09.2026"),
@@ -51,20 +364,49 @@ public static class BotBarred
 
     public static IReadOnlyList<Bar> Bars => _bars;
 
+    /// <summary>
+    /// Ground closed for a while round a death nobody could have survived: a quarantine.
+    ///
+    /// <para>
+    /// <b>The plague beast walked out of its bog to the east wall of Britain on the wiped world (29.09.2026, 02:10–02:20) and
+    /// killed fourteen newcomers in ten minutes; its spawn killed as many more.</b> The bog is barred for ever (above), but a
+    /// beast that wanders is not in its box, and a danger map wiped clean learns a square a death at a time — the newcomers
+    /// were the lesson. A death at the hands of a creature past <see cref="QuarantinePower"/>, or of anything of the plague,
+    /// closes a box of <see cref="QuarantineHalf"/> each way round it for <see cref="QuarantineMs"/> to every chooser and to
+    /// flight, as a bar does; a death inside a quarantine already standing extends it. Nothing is saved: a beast that has
+    /// wandered off by the next boot is not there to fear.
+    /// </para>
+    /// </summary>
     public static int QuarantineMs { get; set; } = 7200000;
 
     public static int QuarantineHalf { get; set; } = 45;
 
+    /// <summary>A creature this strong that kills a bot closes the ground round the death. Thirty thousand: the plague beast reads near a hundred thousand, a lich under ten.</summary>
     public static double QuarantinePower { get; set; } = 30000.0;
 
+    /// <summary>
+    /// <b>A killing field is closed on the count of its dead, not on the strength of the killer (29.09.2026).</b> The
+    /// first two hours after the wipe put 225 deaths into six fixed spawns round Britain — seven under one reaper in
+    /// the wood where the woodcutters go, twenty-four to the wraiths and spectres of the graveyard sixty tiles from the
+    /// home ground, the trolls and harpies on the Yew road, the ettins south — and every one of those grounds read
+    /// safe to the auction, because the quarantine asked only whether the killer was the plague or something of
+    /// 30000 power. A novice population is killed by ordinary things, in the same places, over and over; the place
+    /// is the evidence. This many bot deaths within <see cref="QuarantineHalf"/> tiles of each other inside
+    /// <see cref="KillingWindowMs"/> declare the square a killing field and close it for <see cref="QuarantineMs"/>,
+    /// under the same <c>Homely</c> exemption for the home ground, halls and seats. Nought turns it off.
+    /// </summary>
     public static int KillingDeaths { get; set; } = 3;
 
+    /// <summary>How far back the deaths are counted for a killing field. Half an hour.</summary>
     public static int KillingWindowMs { get; set; } = 1800000;
 
+    /// <summary>Killing fields declared on the count of the dead. See <see cref="KillingDeaths"/>.</summary>
     public static long Fields { get; private set; }
 
+    /// <summary>Every bot death this window, for the count, with what killed it (a wild creature's kind and strength). Pruned as it is read.</summary>
     private static readonly List<(Map Map, int X, int Y, long Tick, Type Kind, double Power)> _fallen = [];
 
+    /// <summary>Quarantines declared, and choices they turned away.</summary>
     public static long Quarantined { get; private set; }
 
     public static long QuarantineTurned { get; private set; }
@@ -77,11 +419,23 @@ public static class BotBarred
 
         public int Deaths;
 
+        /// <summary>
+        /// What killed inside it: the strongest seen of each wild kind (03.10.2026). The evidence a clearing is sized by when the
+        /// killers are not standing in sight at the moment it is weighed. See <see cref="Closing"/>.
+        /// </summary>
         public readonly Dictionary<Type, double> Killers = [];
 
+        /// <summary>Declared, or extended, by a death at the hands of the plague or of a creature past <see cref="QuarantinePower"/>.</summary>
         public bool Dire;
     }
 
+    /// <summary>
+    /// <b>A standing quarantine as a clearing sees it (03.10.2026, build next).</b> Patrick's order of 02.10.2026, item 4: companies
+    /// go to the squares where others died and clear them. Its box, why and how often it was closed, whether the plague or a killer
+    /// of <see cref="QuarantinePower"/> closed it (<see cref="Dire"/>: never a clearing's), and the strongest thing recorded killing
+    /// in it at its kind's company price now (<c>BotCompanyRecord.Price</c>, since 03.10.2026; the island's price before) — the
+    /// figure a company withdraws by (<c>BotSquad.Reckon</c>).
+    /// </summary>
     public readonly struct Closure
     {
         public Closure(int x1, int y1, int x2, int y2, string why, int deaths, bool dire, double worst, string worstKind, double worstRaw)
@@ -112,6 +466,7 @@ public static class BotBarred
 
         public bool Dire { get; }
 
+        /// <summary>The strongest recorded killer's strength at its kind's price now; nought when nothing wild was recorded.</summary>
         public double Worst { get; }
 
         public string WorstKind { get; }
@@ -131,7 +486,8 @@ public static class BotBarred
 
         foreach (var (type, power) in q.Killers)
         {
-
+            // At the kind's company price (03.10.2026): a clearing is a company, and the figure it is weighed by is the one a company
+            // withdraws by (BotSquad.Reckon). See BotCompanyRecord.
             var priced = power * BotCompanyRecord.Price(type);
 
             if (priced > worst)
@@ -145,6 +501,10 @@ public static class BotBarred
         return new Closure(q.Box.X1, q.Box.Y1, q.Box.X2, q.Box.Y2, q.Box.Why, q.Deaths, q.Dire, worst, kind, raw);
     }
 
+    /// <summary>
+    /// The standing quarantine holding this place, as a clearing weighs it; a pure look, nothing counted and nothing dropped. See
+    /// <see cref="Closure"/>.
+    /// </summary>
     public static bool Closing(Map map, Point3D where, out Closure closure)
     {
         closure = default;
@@ -171,6 +531,7 @@ public static class BotBarred
         return false;
     }
 
+    /// <summary>Every quarantine standing, as a clearing weighs it. See <see cref="Closing"/>.</summary>
     public static IEnumerable<Closure> Closures()
     {
         var now = Core.TickCount;
@@ -184,6 +545,7 @@ public static class BotBarred
         }
     }
 
+    /// <summary>Whether a quarantine the plague or a killer past <see cref="QuarantinePower"/> closed holds this place; a pure look.</summary>
     public static bool DireAt(Map map, Point3D where)
     {
         if (!Running || map == null || map == Map.Internal || _quarantine.Count == 0)
@@ -206,6 +568,7 @@ public static class BotBarred
         return false;
     }
 
+    /// <summary>Whether one of the standing bars (Patrick's, never lifted) holds this place; a pure look, nothing counted.</summary>
     public static bool BarredOutright(Map map, Point3D where)
     {
         if (!Running || map == null || map == Map.Internal)
@@ -224,6 +587,7 @@ public static class BotBarred
         return false;
     }
 
+    /// <summary>The kind and strength of a wild creature that killed one of ours, for the quarantine's record; null for anything else.</summary>
     private static (Type Kind, double Power) Killer(Mobile killer) =>
         killer is Server.Mobiles.BaseCreature { Controlled: false, Summoned: false } beast
             ? (beast.GetType(), BotThreat.Power(beast))
@@ -248,26 +612,39 @@ public static class BotBarred
 
     private static readonly List<Quarantined_> _quarantine = [];
 
+    /// <summary>Whether a death at this creature's hands closes the ground round it.</summary>
     public static bool Quarantines(Mobile killer) =>
         killer is Server.Mobiles.BaseCreature beast
         && (beast.GetType().Name.StartsWith("PlagueBeast", StringComparison.Ordinal) || BotThreat.Power(beast) >= QuarantinePower);
 
+    /// <summary>Quarantines that would have closed the population's home, a guild's seat or hall, and were not declared.</summary>
     public static long Spared { get; private set; }
 
+    /// <summary>
+    /// Whether a box round this place would shut the population out of its own home, a guild's seat or a hall. Between 02:33
+    /// and 02:41 on 29.09.2026 the plague's spawn, chasing bots into Britain, had the boxes round the home ground and two
+    /// halls closed — a quarantine of the town is a population with nowhere to work.
+    /// </summary>
     private static bool Homely(Map map, Point3D where)
     {
         var half = QuarantineHalf;
 
+        // <b>A guarded town is never a killing field (29.09.2026).</b> Between 05:48 and 05:52 one gazer in Britain's
+        // streets killed four bots who came to it one at a time, and the count declared the middle of the town closed —
+        // a box over the shops, the inn and every retreat into the town. What a monster inside the walls calls for is
+        // the population in numbers (BotPeril), not the population elsewhere.
         if (map != null && Region.Find(where, map)?.IsPartOf<GuardedRegion>() == true)
         {
             return true;
         }
+
 
         if (Math.Max(Math.Abs(BotPopulation.Where.X - where.X), Math.Abs(BotPopulation.Where.Y - where.Y)) <= half)
         {
             return true;
         }
 
+        // Nor over the home of a town bots live in (29.09.2026). See BotResidence.Homely.
         if (BotResidence.Homely(where, half))
         {
             return true;
@@ -292,6 +669,11 @@ public static class BotBarred
         return false;
     }
 
+    /// <summary>
+    /// Every bot death comes here. A death nobody could have survived closes the ground at once
+    /// (<see cref="Quarantines"/>); an ordinary one is counted, and the count closes a killing field
+    /// (<see cref="KillingDeaths"/>).
+    /// </summary>
     public static void Fell(Map map, Point3D where, Mobile killer, string who)
     {
         if (!Running || map == null || map == Map.Internal)
@@ -301,6 +683,8 @@ public static class BotBarred
 
         var (kind, power) = Killer(killer);
 
+        // What killed inside a quarantine already standing is written into it, whether or not this death extends it: the clearing
+        // is sized by it (03.10.2026). See Closing.
         Note(where, kind, power);
 
         if (killer != null && Quarantines(killer))
@@ -362,6 +746,7 @@ public static class BotBarred
         }
     }
 
+    /// <summary>A wild killer written into the quarantine standing where it killed, if one does. See <see cref="Quarantined_.Killers"/>.</summary>
     private static void Note(Point3D where, Type kind, double power)
     {
         if (kind == null || _quarantine.Count == 0)
@@ -382,14 +767,20 @@ public static class BotBarred
             }
         }
 
+        // Kept across a restart at once, not only at the next declaration (review of clear12, F11).
         if (written)
         {
             Save();
         }
     }
 
+    /// <summary>Closes the ground round a death for a while. See <see cref="QuarantineMs"/>.</summary>
     public static void Quarantine(Map map, Point3D where, string why) => Quarantine(map, where, why, null, dire: false);
 
+    /// <summary>
+    /// Closes the ground round a death for a while, with what killed there (<paramref name="killers"/>) and whether the plague or a
+    /// killer past <see cref="QuarantinePower"/> did (<paramref name="dire"/>). See <see cref="QuarantineMs"/>.
+    /// </summary>
     private static void Quarantine(Map map, Point3D where, string why, List<(Type Kind, double Power)> killers, bool dire)
     {
         if (!Running || map == null || map == Map.Internal || QuarantineMs <= 0)
@@ -450,6 +841,25 @@ public static class BotBarred
         );
     }
 
+    /// <summary>
+    /// <b>Quarantines lifted by a company that cleared the ground (02.10.2026).</b> A quarantine closes a killing field for two
+    /// hours to everybody; a company that has walked the box and emptied it has dealt with what the quarantine was written for.
+    /// Every quarantine whose box holds <paramref name="where"/> on <paramref name="map"/>, or whose middle lies within
+    /// <paramref name="spread"/> of it, is dropped and said so. Returns how many. The standing bars are Patrick's and never lifted
+    /// here.
+    ///
+    /// <para>
+    /// <b>Only ground the company walked, only when it is empty, and never the plague's (03.10.2026, build next).</b> Patrick's
+    /// order of 02.10.2026 (item 4): the quarantine is lifted when the square is cleared. It was lifted for any box within the
+    /// company's spread <i>plus</i> a quarantine's half-width of the square — on build 396 Cedric's harrow of (795, 465) lifted
+    /// (794,501)-(884,591), whose middle lay 81 tiles off and which overlapped the 75 tiles he walked by one row — and whatever
+    /// was still standing in it: a harrow that ran out its clock with a shunned beast unfought lifted the box round the beast
+    /// (review of march10, F4). Now the box must hold the square the company walked, or its middle lie within the company's reach
+    /// of it; nothing alive in the box may be reckoned past <see cref="EmptyOdds"/> times a lone bot (<c>BotKept.LoneBot</c>) at its kind's price
+    /// (<c>BotClearer.Strongest</c>), and a quarantine the plague or a killer past <see cref="QuarantinePower"/> declared stands
+    /// its clock. What is left closed is counted (<see cref="Unemptied"/>, <see cref="DireKept"/>) and said.
+    /// </para>
+    /// </summary>
     public static int Lift(Map map, Point3D where, int spread, string why)
     {
         if (!Running || map == null || map == Map.Internal)
@@ -491,6 +901,7 @@ public static class BotBarred
                 continue;
             }
 
+            // Read fresh, not from the summary's ten-second look (review of clear12, F5).
             var left = BotClearer.Strongest(map, middle, QuarantineHalf, out var worst, fresh: true);
             var empty = EmptyBelow;
 
@@ -540,16 +951,26 @@ public static class BotBarred
         return lifted;
     }
 
+    /// <summary>
+    /// How many times a lone bot's strength (<c>BotKept.LoneBot</c>) the strongest thing left alive in a quarantine's box may be
+    /// reckoned at, at its kind's price, for the box to count as emptied (<see cref="Lift"/>). One and a half: what a lone bot
+    /// takes on (<c>BotThreat.Tolerance</c>). Nought never lifts by a company.
+    /// </summary>
     public static double EmptyOdds { get; set; } = 1.5;
 
+    /// <summary>The strength past which a quarantine's box is not empty. See <see cref="EmptyOdds"/>.</summary>
     public static double EmptyBelow => BotKept.LoneBot * Math.Max(0.0, EmptyOdds);
 
+    /// <summary>Quarantines a company's work reached and left standing: something still in them past <see cref="EmptyBelow"/>.</summary>
     public static long Unemptied { get; private set; }
 
+    /// <summary>Quarantines a company's work reached and left standing because the plague or a killer of <see cref="QuarantinePower"/> declared them.</summary>
     public static long DireKept { get; private set; }
 
+    /// <summary>Quarantines lifted by a company that cleared their ground. See <see cref="Lift"/>.</summary>
     public static long Lifted { get; private set; }
 
+    /// <summary>Whether this place lies in a quarantine still standing; the ones run out are dropped as they are met.</summary>
     private static bool InQuarantine(Point3D where)
     {
         var now = Core.TickCount;
@@ -579,6 +1000,7 @@ public static class BotBarred
         return false;
     }
 
+    /// <summary>The quarantines in force with the minutes they have left, for the dashboard. See <see cref="Quarantines"/>.</summary>
     public static IEnumerable<(int X1, int Y1, int X2, int Y2, string Why, int Deaths, int MinutesLeft, long Turned)> Standing()
     {
         var now = Core.TickCount;
@@ -595,6 +1017,11 @@ public static class BotBarred
         }
     }
 
+    /// <summary>
+    /// Where the quarantines are kept between sessions. Not under <c>Saves</c>: the engine moves that whole folder into
+    /// <c>Backups/Automatic</c> at every world save and writes a fresh one, so a file put there by hand is gone within
+    /// five minutes — the three killing fields of 05:40–05:49 on 29.09.2026 were found in three backups and in no save.
+    /// </summary>
     public static string StorePath { get; set; } = Path.Combine("Data", "bot-quarantines.json");
 
     private sealed class Kept
@@ -607,8 +1034,10 @@ public static class BotBarred
         public int Deaths { get; set; }
         public DateTime UntilUtc { get; set; }
 
+        /// <summary>Declared or extended by the plague or a killer past <see cref="QuarantinePower"/> (03.10.2026). Absent in older files: false.</summary>
         public bool Dire { get; set; }
 
+        /// <summary>What killed inside it, by kind's type name (03.10.2026). Absent in older files: nothing recorded.</summary>
         public Dictionary<string, double> Killers { get; set; }
     }
 
@@ -645,6 +1074,12 @@ public static class BotBarred
         }
     }
 
+    /// <summary>
+    /// <b>A quarantine outlives the session (29.09.2026).</b> Until this the list lived in memory only, and every deploy
+    /// reopened every killing field the last session had learned; the ground does not get safer for a rebuild. Written
+    /// whenever one is declared, extended or lifted; read once at boot with the time left, so a two-hour closure declared
+    /// ten minutes before a restart stands for an hour and fifty after it.
+    /// </summary>
     public static void Save()
     {
         try
@@ -679,6 +1114,7 @@ public static class BotBarred
         }
     }
 
+    /// <summary>Reads the quarantines a previous session left, with the time they have left. See <see cref="Save"/>.</summary>
     public static void Load()
     {
         try
@@ -704,6 +1140,8 @@ public static class BotBarred
                     continue;
                 }
 
+                // A file written before 03.10.2026 has no Dire: every quarantine that is not a killing field was declared for the plague
+                // or a killer past QuarantinePower (Fell), and says so in its why.
                 var dire = k.Dire || k.Why != null && !k.Why.StartsWith("a killing field", StringComparison.Ordinal);
                 var back = new Quarantined_ { Box = new Bar(k.X1, k.Y1, k.X2, k.Y2, k.Why ?? "kept from the last session"), Until = now + left, Deaths = k.Deaths, Dire = dire };
 
@@ -723,6 +1161,7 @@ public static class BotBarred
         }
     }
 
+    /// <summary>The quarantines standing, for the dashboard.</summary>
     public static IEnumerable<(int X1, int Y1, int X2, int Y2, string Why, int Deaths)> Quarantines()
     {
         for (var i = 0; i < _quarantine.Count; i++)
@@ -733,8 +1172,13 @@ public static class BotBarred
         }
     }
 
+    /// <summary>Choices turned away, over every bar.</summary>
     public static long Turned { get; private set; }
 
+    /// <summary>
+    /// Replaces the list wholesale. Called by configuration and by nothing else; an empty array is a
+    /// deliberate "bar nothing" rather than a file somebody forgot to write.
+    /// </summary>
     public static void Set(IEnumerable<Bar> bars)
     {
         _bars.Clear();
@@ -753,6 +1197,14 @@ public static class BotBarred
         }
     }
 
+    /// <summary>
+    /// Whether this place is on the list.
+    ///
+    /// Asked on the choosing path of every sampler on the shard through <see cref="BotRefused.Refusing"/>,
+    /// so it is a walk of a list that holds one entry rather than anything cleverer. A list long enough for
+    /// that to matter is a list that wants a different structure and a reason for being that long.
+    /// </summary>
+    /// <summary>Whether this tile lies inside a standing bar or a quarantine in force; a pure look, nothing counted. For the roads (BotDanger).</summary>
     public static bool Holds(Map map, Point3D where)
     {
         if (!Running || map == null || map == Map.Internal)
@@ -806,6 +1258,7 @@ public static class BotBarred
         return _quarantine.Count > 0 && InQuarantine(where);
     }
 
+    /// <summary>Said once at boot, so the only proof of what is barred is in the log like every other dial.</summary>
     public static void Announce()
     {
         if (!Running)
@@ -846,7 +1299,7 @@ public static class BotBarred
 
         for (var i = 0; i < _bars.Count; i++)
         {
-            said.Add($"({_bars[i].X1},{_bars[i].Y1})-({_bars[i].X2},{_bars[i].Y2}) turned {_bars[i].Turned}");
+            said.Add($"({_bars[i].X1},{_bars[i].Y1})-({_bars[i].X2},{_bars[i].Y2}) turned {_bars[i].Turned}: {_bars[i].Why}");
         }
 
         var now = Core.TickCount;
@@ -865,13 +1318,22 @@ public static class BotBarred
             + $"{inForce} in force, {QuarantineTurned} choices turned by them, {Spared} spared for being home, {Lifted} lifted by a company that cleared the ground, {Unemptied} left standing after a company's work for something still in them past {EmptyBelow:F0} at its kind's price, {DireKept} left to their clock for the plague or a killer of {QuarantinePower:F0}";
     }
 
+    /// <summary>
+    /// A world reload clears the counters and not the bars.
+    ///
+    /// The bars are a statement about the map, and the map is the one thing a reload does not change.
+    /// </summary>
     public static void Forget()
     {
         Turned = 0;
         Fields = 0;
         Unemptied = 0;
         DireKept = 0;
+        RescueBarred = 0;
         _fallen.Clear();
+        _rescues.Clear();
+        RefusedBarred = 0;
+        _refusals.Clear();
 
         for (var i = 0; i < _bars.Count; i++)
         {

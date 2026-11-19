@@ -4,21 +4,69 @@ using Server.Guilds;
 
 namespace Server.BotAI.V2;
 
+/// <summary>
+/// What is said round a fire and on the road: a greeting and a welcome, then news of the roads, the worst ground near,
+/// trade and the speaker's guild, and small talk, with an answer now and then.
+///
+/// <para>
+/// The news is read where the shard keeps it: the roads the population has walked and how they read
+/// (<see cref="BotRoadbook"/>), the worst square near by the quadrant map (<see cref="BotQuad"/>), what the speaker is
+/// carrying that somebody wants, or after, or what the island's wants pay most for (<see cref="BotMarket"/>), how its guild's war stands
+/// (<see cref="BotWar"/>) or what it is working towards (<c>BotGuilds.Aim</c>).
+/// </para>
+///
+/// <para>
+/// <b>Every line is a fact the shard already keeps, said in the voice's own channel.</b> Nothing here is decided for the
+/// sake of talking: a road's band is <c>BotRoadbook.Safety</c>, a square's deaths are the quadrant's own count, a price is a
+/// stall's or a want's. So a bot at a fire says what the population knows, which is the only news there is — and the
+/// person watching learns it from the fire, in <c>logs/bot-speech.log</c> and on the event stream, like every other line
+/// (<see cref="BotVoice.Say"/>).
+/// </para>
+///
+/// <para>
+/// <b>Spaced by the fire, not by the bot.</b> The voice rations each bot to a line every fifteen seconds; a fire of five
+/// would then say five lines in a second and nothing for fifteen. Lines here are paced by the fire's own clock
+/// (<see cref="LineMs"/>), said with the voice's <c>force</c> — the use it names, "a line that is the whole point" — and
+/// each bot says at most <see cref="MostLinesEach"/>.
+/// </para>
+/// </summary>
 public static class BotCampTalk
 {
-
+    /// <summary>Between one line and the next round a fire. Seven seconds, and up to four more.</summary>
     public static int LineMs { get; set; } = 7000;
 
     public static int LineSpreadMs { get; set; } = 4000;
 
+    /// <summary>Between a line and its answer. Three seconds.</summary>
     public static int ReplyMs { get; set; } = 3000;
 
+    /// <summary>The most lines one bot says at one fire. Five, a greeting among them: "a few lines each".</summary>
     public static int MostLinesEach { get; set; } = 5;
 
+    /// <summary>How often a line of news is answered. A third.</summary>
     public static double ReplyChance { get; set; } = 0.35;
 
+    /// <summary>How far round the fire the worst ground is looked for. Two hundred and fifty tiles, a day's walking.</summary>
     public static int DangerReach { get; set; } = 250;
 
+    /// <summary>
+    /// How often a line of news round a fire is a toast to the day's Chronicle instead (18.11.2026): the island's own
+    /// history, said out loud where the island sits. Only entries younger than <see cref="ToastFreshHours"/>.
+    /// </summary>
+    public static double ToastChance { get; set; } = 0.15;
+
+    /// <summary>How old a Chronicle entry may be to be drunk to. Six hours: yesterday is not the day's toast.</summary>
+    public static double ToastFreshHours { get; set; } = 6.0;
+
+    /// <summary>How often the fire's toast is a vigil for one of the hour's fallen instead of the day's news (18.11.2026). A quarter of the toasts.</summary>
+    public static double VigilShare { get; set; } = 0.25;
+
+    public static long Toasts { get; private set; }
+
+    /// <summary>
+    /// Boredom a line of company takes off each listener, in the takings' own units (<c>BotUrges.Paid</c>). Twelve: a fire of
+    /// four talking for five minutes lifts about a fifth of a bot's boredom, what twenty gold of takings would.
+    /// </summary>
     public static double CheerPerLine { get; set; } = 12.0;
 
     public static long Lines { get; private set; }
@@ -39,6 +87,7 @@ public static class BotCampTalk
 
     public static long Held { get; private set; }
 
+    /// <summary>The words, written into the voice's bank for every occasion <c>bot-voice.json</c> does not already name.</summary>
     public static Dictionary<string, string[]> Defaults() =>
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -104,8 +153,32 @@ public static class BotCampTalk
             ["warming:guest"] = ["A fine door, this. And the fire in the right corner!", "I would have brought something, but you know me.", "First house of yours I have been let through the door of."],
             ["warming:guest2"] = ["It needs a bench. And a second bench.", "The neighbours will talk, and they will be right to.", "I remember when you slept by the road, {other}."],
             ["warming:thanks"] = ["To good neighbours and a dry roof.", "Well. Here is to the house.", "Thank you all for coming. Safe roads home."],
+            ["camp:toast"] =
+            [
+                "A toast, then: {tale}",
+                "{tale} — so passes the day. Drink to it.",
+                "You will have heard: {tale} To that!",
+                "Here is to the day's news: {tale}",
+                "Fill your cups. {tale}"
+            ],
+            ["crier:call"] =
+            [
+                "Hear, hear! {tale}",
+                "News of the island, for those that missed it: {tale}",
+                "Town, take note: {tale}",
+                "It went abroad today: {tale}"
+            ],
+            ["camp:vigil"] =
+            [
+                "To {name}, whom {what} took this hour. Rest well.",
+                "A cup for {name}. {what} had them, and the roads are short of them.",
+                "{name} fell to {what} not an hour past. Drink to the road they walked.",
+                "The hour took {name} — {what}'s doing. To {name}."
+            ],
             ["abode:furnished"] = ["A bed of my own, at last.", "There. A real bed, in my own house.", "Look at that. A bed, and it's mine."],
             ["meet:greet"] = ["Well met, {other}.", "{other}! Where are you off to?", "Hail, {other}. Keeping well?"],
+            ["meet:friend"] = ["{other}! Still alive, then. Good.", "{other}, you old road-rat. Well met.", "{other}! Last time I saw you, the wolves did.", "There's a face I know. {other}!"],
+            ["meet:gift"] = ["Here, {other} — {amount} {item}. For the road.", "Take these, {other}. No reason.", "{amount} {item}, {other}. Mind how you go."],
             ["meet:answer"] = ["Well met yourself.", "About my work. You?", "Can't stop long, {other}.", "Keeping well enough."],
             ["meet:small"] = ["Warm day.", "Long road, this.", "Busy, busy.", "Have you seen the market lately?"],
             ["comic:witness"] =
@@ -118,6 +191,10 @@ public static class BotCampTalk
             ]
         };
 
+    /// <summary>
+    /// Puts the defaults into the voice's bank, each only where the bank has nothing for that occasion: the file's words win
+    /// whichever module starts first, and <c>BotVoice</c>'s own files are not touched.
+    /// </summary>
     public static int Phrases()
     {
         var added = 0;
@@ -134,6 +211,7 @@ public static class BotCampTalk
         return added;
     }
 
+    /// <summary>The keeper has just got the fire going.</summary>
     public static void Lit(BotCamp.Fire fire, Mobile keeper)
     {
         if (Say(keeper, "camp:lit", null, null, null))
@@ -143,6 +221,10 @@ public static class BotCampTalk
         }
     }
 
+    /// <summary>
+    /// One line round a fire, if one is due: an answer owed, else a newcomer's greeting, else news from somebody who has not
+    /// said their share. From the camp's clock; nothing is said with fewer than two seated.
+    /// </summary>
     public static void Speak(BotCamp.Fire fire, long now)
     {
         if (!fire.Lit || now - fire.NextLineTick < 0)
@@ -169,6 +251,7 @@ public static class BotCampTalk
 
         fire.NextLineTick = now + Math.Max(1000, LineMs) + Utility.Random(Math.Max(1, LineSpreadMs));
 
+        // An answer owed comes first, and soon.
         if (fire.Owed.Who is { } owing)
         {
             var (_, to, occasion, about) = fire.Owed;
@@ -193,6 +276,7 @@ public static class BotCampTalk
             }
         }
 
+        // A newcomer greets whoever keeps the fire (or anybody there), and is welcomed back.
         for (var k = 0; k < n; k++)
         {
             var place = places[seated[k]];
@@ -221,6 +305,7 @@ public static class BotCampTalk
             }
         }
 
+        // News, from somebody who has not said their share and did not speak last.
         BotCamp.Place speaker = null;
         var tries = 0;
 
@@ -242,6 +327,7 @@ public static class BotCampTalk
         var listener = Other(fire, speaker.Bot, seated, n, preferKeeper: false);
         var fill = new Dictionary<string, string>();
 
+        // Whoever is seated to hear it: a story at least half of them already carry is not told again (A6).
         var audience = new List<Mobile>(n - 1);
 
         for (var k = 0; k < n; k++)
@@ -261,6 +347,8 @@ public static class BotCampTalk
             return;
         }
 
+        // A tale told aloud is remembered by everybody seated for it (PLAN-life A6). The answer is chosen before the
+        // recording, else the answerer would always "have heard" the tale it is just now hearing.
         if (told != null)
         {
             if (listener != null)
@@ -299,9 +387,16 @@ public static class BotCampTalk
         }
     }
 
+    /// <summary>
+    /// A line of news for a speaker at a place: a road, a danger, a trade, its guild, or small talk — one of the five at
+    /// random, falling through to the next when the shard has nothing to say about it. Fills <paramref name="fill"/> and
+    /// returns the occasion. When the occasion is <c>camp:tale</c>, <paramref name="told"/> is the tale itself, so the
+    /// listeners can remember it and answer to it; otherwise null.
+    /// </summary>
     public static string Topic(Mobile speaker, Map map, Point3D at, Dictionary<string, string> fill, string small, out BotTale told, IEnumerable<Mobile> audience = null)
     {
-
+        // Now and then a tale of the speaker's own life, or a word about a friend or an enemy, instead of the news (07.10.2026,
+        // traits17). See BotBiography.Tale.
         if (BotBiography.Tale(speaker, fill, out told, audience) is { } tale)
         {
             return tale;
@@ -325,11 +420,28 @@ public static class BotCampTalk
             }
         }
 
+        // Nothing the shard can say of roads, danger, trade or guilds: the day's own history is still news, and a
+        // toast is the fire's way of saying it (18.11.2026). One toast in VigilShare drinks to one of the hour's
+        // fallen instead — the fire remembers its people before its news.
+        if (Utility.RandomDouble() < ToastChance)
+        {
+            if (Utility.RandomDouble() < VigilShare && BotVigil.Toast(fill))
+            {
+                return "camp:vigil";
+            }
+
+            if (Toast(fill))
+            {
+                return "camp:toast";
+            }
+        }
+
         Small++;
 
         return small;
     }
 
+    /// <summary>A road somebody has walked, at random, and how it reads on the danger map.</summary>
     private static string Road(Dictionary<string, string> fill)
     {
         BotRoadbook.Road pick = null;
@@ -360,10 +472,12 @@ public static class BotCampTalk
         return safety <= BotQuad.Unsafe ? "camp:road:unsafe" : "camp:road:safe";
     }
 
+    /// <summary>The worst square the population knows of near the fire, with its dead; or the quiet, when there is none.</summary>
     private static string Danger(Map map, Point3D at, Dictionary<string, string> fill)
     {
         var worst = BotQuad.WorstNear(map, at, DangerReach);
 
+        // Nothing the population fears within reach is news too.
         if (worst == Point2D.Zero)
         {
             Dangers++;
@@ -384,6 +498,11 @@ public static class BotCampTalk
         return deaths > 0 ? "camp:danger:dead" : "camp:danger";
     }
 
+    /// <summary>
+    /// Something the speaker carries that somebody has said it wants, at that want's price; else its own want, else the best-paid
+    /// want said on the island. (The speaker's own stall came first until the auction went on 01.10.2026: goods ride in a pack now,
+    /// and what is worth saying at a fire is that one has what another is asking for.)
+    /// </summary>
     private static string Trade(Mobile speaker, Dictionary<string, string> fill)
     {
         var wants = BotMarket.Wants;
@@ -455,6 +574,7 @@ public static class BotCampTalk
         return mine != null ? "camp:buying" : "camp:market";
     }
 
+    /// <summary>The speaker's guild's war, else what it is working towards; or that it has no guild.</summary>
     private static string GuildNews(Mobile speaker, Dictionary<string, string> fill)
     {
         if (speaker?.Guild is not Guild guild)
@@ -487,6 +607,45 @@ public static class BotCampTalk
         return "camp:guild";
     }
 
+    /// <summary>
+    /// The day's freshest Chronicle entry, put in the glass: fills <c>{tale}</c> and returns true, or false when the
+    /// Chronicle holds nothing young enough to drink to. The fire's toast — the island's history said out loud where
+    /// the island sits.
+    /// </summary>
+    private static bool Toast(Dictionary<string, string> fill)
+    {
+        var fresh = DateTime.UtcNow - TimeSpan.FromHours(Math.Max(0.5, ToastFreshHours));
+        string text = null;
+        var weight = 0.0;
+
+        foreach (var (_, day) in BotChronicle.Days)
+        {
+            for (var i = day.Entries.Count - 1; i >= 0; i--)
+            {
+                var entry = day.Entries[i];
+
+                if (entry == null || entry.At < fresh || entry.Weight <= weight)
+                {
+                    continue;
+                }
+
+                text = entry.Text;
+                weight = entry.Weight;
+            }
+        }
+
+        if (text == null)
+        {
+            return false;
+        }
+
+        fill["tale"] = text;
+        Toasts++;
+
+        return true;
+    }
+
+    /// <summary>Somebody else seated: the keeper when asked for and there, else anybody.</summary>
     private static Mobile Other(BotCamp.Fire fire, Mobile not, Span<int> seated, int n, bool preferKeeper)
     {
         if (preferKeeper && fire.Keeper is { } keeper && !ReferenceEquals(keeper, not) && fire.PlaceOf(keeper) is { Seated: true })
@@ -509,6 +668,7 @@ public static class BotCampTalk
         return null;
     }
 
+    /// <summary>A line said at a fire, counted against the speaker's share, and a little company for everybody listening.</summary>
     private static bool Said(BotCamp.Fire fire, BotCamp.Place place, Mobile to, string occasion, string fallback, Dictionary<string, string> fill)
     {
         if (!Say(place.Bot, occasion, fallback, to, fill))
@@ -534,6 +694,7 @@ public static class BotCampTalk
         return true;
     }
 
+    /// <summary>A line said aloud, in the local channel, with the listener's name for <c>{other}</c>. Counted either way.</summary>
     public static bool Say(Mobile speaker, string occasion, string fallback, Mobile to, Dictionary<string, string> fill)
     {
         if (speaker == null || occasion == null)
@@ -560,7 +721,7 @@ public static class BotCampTalk
 
     public static string Describe() =>
         $"{Lines} lines said by a fire or on the road ({Greetings} greetings, {Roads} of a road, {Dangers} of danger, {Trades} of trade, {GuildTalk} of a guild, "
-        + $"{Small} small talk, {Replies} answers), {Held} not said (the voice was off or had no words)";
+        + $"{Small} small talk, {Toasts} toasts to the day's Chronicle, {Replies} answers), {Held} not said (the voice was off or had no words)";
 
     public static void Forget()
     {
@@ -571,6 +732,7 @@ public static class BotCampTalk
         Trades = 0;
         GuildTalk = 0;
         Small = 0;
+        Toasts = 0;
         Replies = 0;
         Held = 0;
     }
