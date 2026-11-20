@@ -681,6 +681,7 @@ public static class BotChronicle
                 writer.Write(entry.Kind);
                 writer.Write(entry.Text);
                 writer.Write(entry.Weight);
+                writer.Write(entry.Key ?? "");
             }
 
             writer.Write(day.Voiced != null);
@@ -694,7 +695,7 @@ public static class BotChronicle
         }
     }
 
-    public static int Load(IGenericReader reader)
+    public static int Load(IGenericReader reader, int shape)
     {
         var count = reader.ReadEncodedInt();
 
@@ -706,15 +707,25 @@ public static class BotChronicle
 
             for (var i = 0; i < entries; i++)
             {
-                day.Entries.Add(
-                    new BotChronicleEntry
+                var entry = new BotChronicleEntry
+                {
+                    At = reader.ReadDateTime().ToLocalTime(),
+                    Kind = reader.ReadString(),
+                    Text = reader.ReadString(),
+                    Weight = reader.ReadDouble()
+                };
+
+                if (shape >= 2)
+                {
+                    entry.Key = reader.ReadString();
+
+                    if (entry.Key?.Length == 0)
                     {
-                        At = reader.ReadDateTime().ToLocalTime(),
-                        Kind = reader.ReadString(),
-                        Text = reader.ReadString(),
-                        Weight = reader.ReadDouble()
+                        entry.Key = null;
                     }
-                );
+                }
+
+                day.Entries.Add(entry);
             }
 
             if (reader.ReadBool())

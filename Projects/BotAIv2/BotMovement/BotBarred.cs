@@ -13,6 +13,217 @@ public static class BotBarred
 
     public static bool Running { get; set; } = true;
 
+    public static int RescueBars { get; set; } = 3;
+
+    public static int RescueNear { get; set; } = 30;
+
+    public static int RescueMargin { get; set; } = 12;
+
+    public static long RescueBarred { get; private set; }
+
+    private static readonly List<(Map Map, int X, int Y)> _rescues = [];
+
+    public static int RefusedBars { get; set; } = 0;
+
+    public static int MostAutoBar { get; set; } = 90;
+
+    public static long RefusedBarred { get; private set; }
+
+    private static readonly List<(Map Map, int X, int Y)> _refusals = [];
+
+    public static void Refused(Map map, Point3D to)
+    {
+
+        if (!Running || RefusedBars <= 0 || map == null || map == Map.Internal)
+        {
+            return;
+        }
+
+        _refusals.Add((map, to.X, to.Y));
+
+        if (_refusals.Count > 256)
+        {
+            _refusals.RemoveRange(0, _refusals.Count - 256);
+        }
+
+        for (var i = 0; i < _refusals.Count; i++)
+        {
+            var centre = _refusals[i];
+            var near = 0;
+
+            for (var k = 0; k < _refusals.Count; k++)
+            {
+                if (k != i && _refusals[k].Map == centre.Map
+                    && Math.Abs(_refusals[k].X - centre.X) <= RescueNear
+                    && Math.Abs(_refusals[k].Y - centre.Y) <= RescueNear)
+                {
+                    near++;
+                }
+            }
+
+            if (near < RefusedBars - 1)
+            {
+                continue;
+            }
+
+            var x1 = centre.X;
+            var y1 = centre.Y;
+            var x2 = x1;
+            var y2 = y1;
+            var taken = 0;
+
+            for (var k = _refusals.Count - 1; k >= 0; k--)
+            {
+                if (_refusals[k].Map != centre.Map
+                    || Math.Abs(_refusals[k].X - centre.X) > RescueNear
+                    || Math.Abs(_refusals[k].Y - centre.Y) > RescueNear)
+                {
+                    continue;
+                }
+
+                x1 = Math.Min(x1, _refusals[k].X);
+                y1 = Math.Min(y1, _refusals[k].Y);
+                x2 = Math.Max(x2, _refusals[k].X);
+                y2 = Math.Max(y2, _refusals[k].Y);
+                taken++;
+
+                _refusals.RemoveAt(k);
+            }
+
+            RefusedBarred++;
+
+            var wideR = x2 - x1 + RescueMargin * 2;
+            var highR = y2 - y1 + RescueMargin * 2;
+
+            if (wideR > Math.Max(30, MostAutoBar) || highR > Math.Max(30, MostAutoBar))
+            {
+                logger.Error(
+                    "A cluster of {Taken} refused roads near ({X}, {Y}) spans {Wide}x{High} tiles — too big to bar honestly; left open",
+                    taken,
+                    x1,
+                    y1,
+                    wideR,
+                    highR
+                );
+
+                return;
+            }
+
+            var bar = new Bar(
+                x1 - RescueMargin,
+                y1 - RescueMargin,
+                x2 + RescueMargin,
+                y2 + RescueMargin,
+                $"{taken} roads refused to ({x1}–{x2}, {y1}–{y2}) standing within {RescueNear} tiles of each other — the pathfinder's own proof, {DateTime.UtcNow:dd.MM.yyyy}"
+            );
+
+            _bars.Add(bar);
+
+            logger.Information(
+                "The pathfinder's own proof closes it: {Why}; choices on it will be turned away from now on",
+                bar
+            );
+
+            return;
+        }
+    }
+
+    public static void Rescued(Map map, Point3D from)
+    {
+        if (!Running || map == null || map == Map.Internal)
+        {
+            return;
+        }
+
+        _rescues.Add((map, from.X, from.Y));
+
+        if (_rescues.Count > 256)
+        {
+            _rescues.RemoveRange(0, _rescues.Count - 256);
+        }
+
+        for (var i = 0; i < _rescues.Count; i++)
+        {
+            var centre = _rescues[i];
+            var near = 0;
+
+            for (var k = 0; k < _rescues.Count; k++)
+            {
+                if (k != i && _rescues[k].Map == centre.Map
+                    && Math.Abs(_rescues[k].X - centre.X) <= RescueNear
+                    && Math.Abs(_rescues[k].Y - centre.Y) <= RescueNear)
+                {
+                    near++;
+                }
+            }
+
+            if (near < RescueBars - 1)
+            {
+                continue;
+            }
+
+            var x1 = centre.X;
+            var y1 = centre.Y;
+            var x2 = x1;
+            var y2 = y1;
+            var taken = 0;
+
+            for (var k = _rescues.Count - 1; k >= 0; k--)
+            {
+                if (_rescues[k].Map != centre.Map
+                    || Math.Abs(_rescues[k].X - centre.X) > RescueNear
+                    || Math.Abs(_rescues[k].Y - centre.Y) > RescueNear)
+                {
+                    continue;
+                }
+
+                x1 = Math.Min(x1, _rescues[k].X);
+                y1 = Math.Min(y1, _rescues[k].Y);
+                x2 = Math.Max(x2, _rescues[k].X);
+                y2 = Math.Max(y2, _rescues[k].Y);
+                taken++;
+
+                _rescues.RemoveAt(k);
+            }
+
+            RescueBarred++;
+
+            var wide = x2 - x1 + RescueMargin * 2;
+            var high = y2 - y1 + RescueMargin * 2;
+
+            if (wide > Math.Max(30, MostAutoBar) || high > Math.Max(30, MostAutoBar))
+            {
+                logger.Error(
+                    "A cluster of {Taken} rescues near ({X}, {Y}) spans {Wide}x{High} tiles — too big to bar honestly; left open",
+                    taken,
+                    x1,
+                    y1,
+                    wide,
+                    high
+                );
+
+                return;
+            }
+
+            var bar = new Bar(
+                x1 - RescueMargin,
+                y1 - RescueMargin,
+                x2 + RescueMargin,
+                y2 + RescueMargin,
+                $"{taken} bots carried home out of ({x1}–{x2}, {y1}–{y2}) standing within {RescueNear} tiles of each other — the ground's own evidence, {DateTime.UtcNow:dd.MM.yyyy}"
+            );
+
+            _bars.Add(bar);
+
+            logger.Information(
+                "The ground's own evidence closes it: {Why}; choices on it will be turned away from now on",
+                bar
+            );
+
+            return;
+        }
+    }
+
     public sealed class Bar
     {
         public Bar(int x1, int y1, int x2, int y2, string why)
@@ -846,7 +1057,7 @@ public static class BotBarred
 
         for (var i = 0; i < _bars.Count; i++)
         {
-            said.Add($"({_bars[i].X1},{_bars[i].Y1})-({_bars[i].X2},{_bars[i].Y2}) turned {_bars[i].Turned}");
+            said.Add($"({_bars[i].X1},{_bars[i].Y1})-({_bars[i].X2},{_bars[i].Y2}) turned {_bars[i].Turned}: {_bars[i].Why}");
         }
 
         var now = Core.TickCount;
@@ -871,7 +1082,11 @@ public static class BotBarred
         Fields = 0;
         Unemptied = 0;
         DireKept = 0;
+        RescueBarred = 0;
         _fallen.Clear();
+        _rescues.Clear();
+        RefusedBarred = 0;
+        _refusals.Clear();
 
         for (var i = 0; i < _bars.Count; i++)
         {

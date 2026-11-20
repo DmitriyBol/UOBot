@@ -728,6 +728,13 @@ public static class BotPopulation
             from.Z
         );
 
+        if (Utility.RandomDouble() < BotBiography.ComicCarryChance)
+        {
+            BotBiography.Stuck(bot, from);
+        }
+
+        BotBarred.Rescued(bot.Map, from);
+
         return true;
     }
 

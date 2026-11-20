@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Server.Logging;
 using Server.Mobiles;
 
@@ -129,6 +130,26 @@ public static class BotStall
 
         watch.Looked = now;
 
+        if (BotOutlaw.InCell(bot))
+        {
+            Steady++;
+
+            if (watch.Stuck)
+            {
+                watch.Stuck = false;
+                Stuck--;
+            }
+
+            watch.Where = bot.Location;
+            watch.Doing = doing;
+            watch.Since = now;
+            watch.Anchor = bot.Location;
+            watch.AnchorSince = now;
+            watch.Swaps = 0;
+
+            return;
+        }
+
         var swapped = !ReferenceEquals(deed, watch.Deed);
 
         watch.Deed = deed;
@@ -193,6 +214,8 @@ public static class BotStall
                     BotWill.Abandon(bot, "it was swapping errands without moving");
                     Freed++;
                 }
+
+                Lighten(bot);
 
                 watch.Swaps = 0;
                 watch.AnchorSince = now;
@@ -298,10 +321,73 @@ public static class BotStall
         }
     }
 
+    public static long Lightened { get; private set; }
+
+    public static long StonesPutDown { get; private set; }
+
+    private static void Lighten(BotMobile bot)
+    {
+        var pack = bot?.Backpack;
+
+        if (pack == null || BotLadder.Load(bot) <= BotLadder.Ceiling(bot))
+        {
+            return;
+        }
+
+        var putDown = 0;
+
+        while (BotLadder.Load(bot) > BotLadder.Ceiling(bot))
+        {
+            Item heaviest = null;
+            var weight = 0.0;
+
+            foreach (var item in pack.EnumerateItems())
+            {
+                if (item.Deleted || item.LootType != LootType.Regular)
+                {
+                    continue;
+                }
+
+                var held = item.TotalWeight * Math.Max(1, item.Amount);
+
+                if (held > weight)
+                {
+                    heaviest = item;
+                    weight = held;
+                }
+            }
+
+            if (heaviest == null)
+            {
+                break;
+            }
+
+            putDown += heaviest.TotalWeight > 0 ? (int)heaviest.TotalWeight : 1;
+
+            heaviest.MoveToWorld(bot.Location, bot.Map);
+        }
+
+        if (putDown <= 0)
+        {
+            return;
+        }
+
+        Lightened++;
+        StonesPutDown += putDown;
+
+        logger.Information(
+            "{Name} put {Stones} stones down on the ground at ({X}, {Y}) to get moving again: it was swapping errands it could not take a step for",
+            bot.Name,
+            putDown,
+            bot.X,
+            bot.Y
+        );
+    }
+
     public static string Describe() =>
         Reported == 0 && Churn == 0
             ? $"nobody has stood still for {PatienceMs / 60000} minutes ({Steady} looks passed over as work that stands still on purpose)"
-            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of {_pockets.Count} known pockets, {Churn} caught swapping errands without moving a tile, {Steady} looks passed over as work that stands still on purpose, {BotPopulation.Rescued} carried home for reaching nothing at all ({BotPopulation.Delving} more were left alone for being down a dungeon and {BotPopulation.Unbound} let go of their company instead) and {BotPopulation.Boxedin} of those put down with no way off the tile; worst: {Worst}";
+            : $"{Stuck} bots are stuck right now, {Reported} stalls reported, {Freed} errands taken off them and {Carried} bots carried out of {_pockets.Count} known pockets, {Churn} caught swapping errands without moving a tile ({Lightened} of them put {StonesPutDown} stones down to get moving), {Steady} looks passed over as work that stands still on purpose, {BotPopulation.Rescued} carried home for reaching nothing at all ({BotPopulation.Delving} more were left alone for being down a dungeon and {BotPopulation.Unbound} let go of their company instead) and {BotPopulation.Boxedin} of those put down with no way off the tile; worst: {Worst}";
 
     public static void Forget()
     {
@@ -311,6 +397,8 @@ public static class BotStall
         Freed = 0;
         Carried = 0;
         Steady = 0;
+        Lightened = 0;
+        StonesPutDown = 0;
         Worst = null;
     }
 

@@ -253,6 +253,24 @@ public static class BotOutlaw
     public static bool Jailed(Mobile m) =>
         m != null && _records.TryGetValue(m.Serial, out var r) && r.Cell >= 0 && r.JailedUntil - Core.TickCount > 0;
 
+    public static bool InCell(Mobile m)
+    {
+        if (m is not { Deleted: false, Map: { } map } || map != (BotPopulation.Home ?? Map.Felucca))
+        {
+            return false;
+        }
+
+        for (var i = 0; i < Cells.Length; i++)
+        {
+            if (Utility.InRange(m.Location, Cells[i], 4))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static Point3D CellOf(Mobile m) =>
         m != null && _records.TryGetValue(m.Serial, out var r) && r.Cell >= 0 ? Cells[r.Cell] : Point3D.Zero;
 
@@ -1134,15 +1152,75 @@ public static class BotOutlaw
 
         var home = BotPopulation.HomeOf(bot);
 
+        bot.MoveToWorld(home, map);
+
         if (bot.Alive)
         {
-            bot.MoveToWorld(home, map);
             bot.Journey?.Discard();
         }
 
         logger.Information("{Name} is let out of cell {Cell} after {Minutes} minutes and put down at ({X}, {Y})", bot.Name, r.Cell, JailMs / 60000, home.X, home.Y);
 
         BotCrime.Freed(bot);
+    }
+
+    public static string Jail(string what)
+    {
+        var map = BotPopulation.Home ?? Map.Felucca;
+
+        if (what?.StartsWith("free", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var freed = 0;
+            var ghosts = 0;
+
+            for (var c = 0; c < Cells.Length; c++)
+            {
+                foreach (var near in map.GetMobilesInRange<BotMobile>(Cells[c], 3))
+                {
+                    if (near is not { Deleted: false })
+                    {
+                        continue;
+                    }
+
+                    if (!near.Alive)
+                    {
+                        ghosts++;
+                    }
+
+                    near.Kills = 0;
+                    near.MoveToWorld(BotPopulation.HomeOf(near), map);
+                    near.Journey?.Discard();
+
+                    if (_records.TryGetValue(near.Serial, out var r))
+                    {
+                        r.Cell = -1;
+                        r.JailedUntil = Core.TickCount;
+                    }
+
+                    freed++;
+                }
+            }
+
+            logger.Information("The jail is emptied by hand: {Freed} let out ({Ghosts} of them ghosts)", freed, ghosts);
+
+            return freed == 0
+                ? "every cell stands empty"
+                : $"{freed} let out of the cells by hand ({ghosts} of them ghosts), each put down where it lives";
+        }
+
+        var sitting = 0;
+        var said = "";
+
+        foreach (var pair in _records)
+        {
+            if (pair.Value.Cell >= 0)
+            {
+                sitting++;
+                said += $"{pair.Value.Bot?.Name} ({Math.Max(0, (pair.Value.JailedUntil - Core.TickCount) / 60000)} min), ";
+            }
+        }
+
+        return sitting == 0 ? "nobody sits in a cell" : $"{sitting} in cells: {said}";
     }
 
     public static string Describe() =>

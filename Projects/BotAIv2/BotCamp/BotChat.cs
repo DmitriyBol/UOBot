@@ -142,6 +142,12 @@ public static class BotMeetings
 
     public static int MissRestMs { get; set; } = 120000;
 
+    public static double GiftChance { get; set; } = 0.05;
+
+    public static int GiftUnits { get; set; } = 5;
+
+    public static long Gifts { get; private set; }
+
     public static bool InTowns { get; set; }
 
     public static int LineMs { get; set; } = 3500;
@@ -320,6 +326,68 @@ public static class BotMeetings
         Met++;
 
         BotEvents.Post("meet", first, $"stopped to talk with {second.Name} at ({first.X}, {first.Y})");
+
+        Give(first, second);
+    }
+
+    private static void Give(BotMobile from, BotMobile to)
+    {
+        if (Utility.RandomDouble() >= GiftChance)
+        {
+            return;
+        }
+
+        var tie = BotLives.Of(from)?.Tie(to?.Name);
+
+        if (tie is not { Saved: > 0 } && tie is not { Beside: > 0 })
+        {
+            return;
+        }
+
+        var pack = from?.Backpack;
+        var into = to?.Backpack;
+
+        if (pack == null || into == null)
+        {
+            return;
+        }
+
+        Item best = null;
+        var most = 0;
+
+        foreach (var item in pack.EnumerateItems())
+        {
+            if (item.Deleted || !item.Stackable || item.Amount < GiftUnits * 2 || item.LootType != LootType.Regular)
+            {
+                continue;
+            }
+
+            if (item.Amount > most)
+            {
+                best = item;
+                most = item.Amount;
+            }
+        }
+
+        if (best == null || Mobile.LiftItemDupe(best, GiftUnits) == null)
+        {
+            return;
+        }
+
+        if (!into.TryDropItem(to, best, false))
+        {
+            return;
+        }
+
+        Gifts++;
+
+        BotCampTalk.Say(
+            from,
+            "meet:gift",
+            null,
+            to,
+            new Dictionary<string, string> { ["item"] = BotVoice.Words(best.GetType().Name) ?? best.GetType().Name, ["amount"] = GiftUnits.ToString() }
+        );
     }
 
     private static void Talk(long now)
@@ -349,7 +417,7 @@ public static class BotMeetings
 
             var said = meeting.Step switch
             {
-                0 => BotCampTalk.Say(meeting.First, "meet:greet", null, meeting.Second, null),
+                0 => BotCampTalk.Say(meeting.First, Friends(meeting) ? "meet:friend" : "meet:greet", null, meeting.Second, null),
                 1 => BotCampTalk.Say(meeting.Second, "meet:answer", null, meeting.First, null),
                 2 when Utility.RandomDouble() < NewsChance => News(meeting),
                 _ => false
@@ -369,6 +437,13 @@ public static class BotMeetings
                 meeting.Why = "had their word";
             }
         }
+    }
+
+    private static bool Friends(BotMeeting meeting)
+    {
+        var tie = BotLives.Of(meeting.First)?.Tie(meeting.Second?.Name);
+
+        return tie is { Saved: > 0 } || tie is { Beside: > 0 };
     }
 
     private static bool News(BotMeeting meeting)

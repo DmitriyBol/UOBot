@@ -27,6 +27,18 @@ public static class BotBiography
 
     public static double SociableTaleBoost { get; set; } = 1.5;
 
+    public static double ComicKillerPower { get; set; } = 400.0;
+
+    public static double ComicGap { get; set; } = 5.0;
+
+    public static double ComicWitnessChance { get; set; } = 0.5;
+
+    public static double ComicShare { get; set; } = 0.25;
+
+    public static double ComicAnswerChance { get; set; } = 0.8;
+
+    public static double ComicCarryChance { get; set; } = 0.5;
+
     public static long Written { get; private set; }
 
     public static long PushedOut { get; private set; }
@@ -54,6 +66,16 @@ public static class BotBiography
     public static long RetoldTales { get; private set; }
 
     public static long RepeatsSuppressed { get; private set; }
+
+    public static long ComicDeaths { get; private set; }
+
+    public static long ComicWitnesses { get; private set; }
+
+    public static long ComicChosen { get; private set; }
+
+    public static long ComicAnswers { get; private set; }
+
+    public static long ComicCarried { get; private set; }
 
     public static double KillsCredited { get; private set; }
 
@@ -160,11 +182,31 @@ public static class BotBiography
 
         life.Deaths++;
 
+        BotVigil.Died(victim, killer);
+
         var place = Place(map, at);
 
         if (life.Deaths == 1)
         {
             Keep(life, "death", killer?.Name, $"The first time I died was {place}: {Who(killer)} killed me.", 50.0, 1);
+        }
+
+        var comic = killer is { Deleted: false } and not BotMobile ? BotThreat.Power(killer) : 0.0;
+
+        if (comic > 0.0 && comic <= ComicKillerPower && victim.PowerAtDeath >= ComicGap * comic)
+        {
+            ComicDeaths++;
+
+            Keep(
+                life,
+                "comic",
+                Who(killer),
+                $"{Who(killer)} did for me {place} — me, of all people! I shall never live it down.",
+                22.0 + Math.Min(18.0, life.Deaths * 2.0),
+                life.Deaths
+            );
+
+            LaughNearby(victim, killer);
         }
 
         if (slayer is not BotMobile other || ReferenceEquals(other, victim) || BotDuel.Between(victim, other))
@@ -202,6 +244,45 @@ public static class BotBiography
         life.Robbed++;
         BotTies.Move(victim, other, BotTies.Murdered, $"{other.Name} murdered it {place}");
         Keep(life, "wronged", other.Name, $"{other.Name} murdered me {place}, and went through my pack after.", 60.0, 1);
+    }
+
+    public static void Stuck(BotMobile who, Point3D where)
+    {
+        if (!On || who == null || BotLives.Of(who) is not { } life)
+        {
+            return;
+        }
+
+        ComicCarried++;
+
+        Keep(
+            life,
+            "comic",
+            null,
+            $"I stood at ({where.X}, {where.Y}) like a statue until the island gave up and carried me home. Don't ask.",
+            20.0,
+            life.Deaths
+        );
+    }
+
+    public static void LaughNearby(BotMobile who, Mobile atWhat)
+    {
+        if (!On || who?.Map == null || who.Map == Map.Internal || atWhat == null || Utility.RandomDouble() >= ComicWitnessChance)
+        {
+            return;
+        }
+
+        foreach (var near in who.Map.GetMobilesInRange<BotMobile>(who.Location, 12))
+        {
+            if (near is { Deleted: false, Alive: true } && !ReferenceEquals(near, who))
+            {
+                ComicWitnesses++;
+
+                BotCampTalk.Say(near, "comic:witness", null, who, new Dictionary<string, string> { ["what"] = Who(atWhat) });
+
+                return;
+            }
+        }
     }
 
     public static void Rescued(Mobile rescuer, Mobile saved, Mobile foe, int lowest, int most)
@@ -411,6 +492,14 @@ public static class BotBiography
             return null;
         }
 
+        if (Utility.RandomDouble() < ComicShare && ComicTale(life, fill, audience, speaker, out told) is { } occasion)
+        {
+            ComicChosen++;
+            ToldAtFire++;
+
+            return occasion;
+        }
+
         if (Utility.Random(4) == 0)
         {
             var (friend, enemy) = BotTies.Strongest(life);
@@ -473,6 +562,58 @@ public static class BotBiography
         told = tale;
 
         return "camp:tale";
+    }
+
+    private static string ComicTale(BotLife life, Dictionary<string, string> fill, IEnumerable<Mobile> audience, Mobile speaker, out BotTale told)
+    {
+        told = null;
+
+        for (var i = 0; i < life.Tales.Count; i++)
+        {
+            var own = life.Tales[i];
+
+            if (own.Kind != "comic" || KnownToMost(own.Kind, own.Other, own.Text, audience, speaker))
+            {
+                continue;
+            }
+
+            own.ToldAt = DateTime.UtcNow;
+            fill["tale"] = own.Text;
+            told = own;
+
+            return "camp:tale";
+        }
+
+        BotHeardTale pick = null;
+        var seen = 0;
+
+        for (var i = 0; i < life.HeardTales.Count; i++)
+        {
+            var heard = life.HeardTales[i];
+
+            if (heard.Kind != "comic" || heard.Hops >= 2 || string.IsNullOrEmpty(heard.Text) || KnownToMost(heard.Kind, heard.About, heard.Text, audience, speaker))
+            {
+                continue;
+            }
+
+            if (Utility.Random(++seen) == 0)
+            {
+                pick = heard;
+            }
+        }
+
+        if (pick == null)
+        {
+            return null;
+        }
+
+        pick.Hops++;
+        fill["tale"] = pick.Text;
+        fill["teller"] = pick.Teller ?? "a traveller";
+        fill["place"] = pick.Place ?? "a far fire";
+        told = new BotTale { Kind = pick.Kind, Other = pick.About, Text = pick.Text, At = pick.At };
+
+        return "camp:tale-retold";
     }
 
     private static BotHeardTale PickRetold(BotLife life)
@@ -632,6 +773,13 @@ public static class BotBiography
             return null;
         }
 
+        if (tale.Kind == "comic" && Utility.RandomDouble() < ComicAnswerChance)
+        {
+            ComicAnswers++;
+
+            return "camp:comic-answer";
+        }
+
         if (!string.IsNullOrEmpty(tale.Other) && !string.Equals(tale.Other, life.Name, StringComparison.Ordinal))
         {
             var knows = false;
@@ -661,8 +809,10 @@ public static class BotBiography
 
         for (var i = 0; i < life.HeardTales.Count; i++)
         {
+
             if (string.Equals(life.HeardTales[i].Kind, tale.Kind, StringComparison.Ordinal)
-                && string.Equals(life.HeardTales[i].About, tale.Other, StringComparison.Ordinal))
+                && string.Equals(life.HeardTales[i].About, tale.Other, StringComparison.Ordinal)
+                && string.Equals(life.HeardTales[i].Text, tale.Text, StringComparison.Ordinal))
             {
                 HeardReplies++;
 
@@ -712,7 +862,8 @@ public static class BotBiography
             : $"{Written} events written into a life ({(kinds.Length == 0 ? "none" : kinds)}), {PushedOut} pushed a lighter one out, {TooLight} too light to keep; "
               + $"tales told: {ToldAtFire} at a fire or on the road ({FriendTales} of a friend, {EnemyTales} of an enemy), {ToldLocal} after a mood in the local channel, {ToldTrade} in the trade room; {KillsCredited:F0} kills credited; "
               + $"heard: {HeardRecorded} stories remembered by listeners ({HeardKnown} tellings already carried), {WitnessReplies} answered by somebody who knew the one in it, {HeardReplies} by somebody who had heard it, "
-              + $"{RetoldTales} carried on to another fire, {RepeatsSuppressed} tellings given up as already known";
+              + $"{RetoldTales} carried on to another fire, {RepeatsSuppressed} tellings given up as already known; "
+              + $"{ComicDeaths} comic deaths, {ComicWitnesses} laughed at out loud, {ComicChosen} comic tellings asked for by name, {ComicAnswers} answered with a laugh, {ComicCarried} rescues kept as a statue's tale";
     }
 
     public static void Forget()
@@ -731,6 +882,11 @@ public static class BotBiography
         HeardReplies = 0;
         RetoldTales = 0;
         RepeatsSuppressed = 0;
+        ComicDeaths = 0;
+        ComicWitnesses = 0;
+        ComicChosen = 0;
+        ComicAnswers = 0;
+        ComicCarried = 0;
         KillsCredited = 0;
         _byKind.Clear();
     }

@@ -81,7 +81,7 @@ public static class BotHand
         + "a tile (open to a walker from home, an isle only a ship reaches, a sealed pocket, water a ship sails, nowhere to "
         + "stand) and what the walker's own search finds there; reach — the map, and how its check of the borders came out.";
 
-    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "rearm", "census", "tourney", "arena", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench", "go", "gates", "parley", "meet", "zones", "zone", "zonewatch", "charters", "charter", "relics", "relic", "steward", "decree", "officers", "appoint"];
+    public static readonly string[] HandVerbs = ["halls", "raze", "revel", "wars", "guilds", "seats", "seat", "save", "road", "roads", "peril", "resolves", "jam", "breaks", "trip", "arm", "arms", "rearm", "census", "tourney", "arena", "band", "reset", "forgive", "prove", "proof", "proofs", "awake", "chart", "nav", "navcells", "navbench", "go", "gates", "parley", "meet", "zones", "zone", "zonewatch", "charters", "charter", "relics", "relic", "steward", "decree", "officers", "appoint", "jail"];
 
     public const string ByHand =
         "halls — what the guilds own and where it stands. raze — take every guild hall off the island, "
@@ -455,6 +455,9 @@ public static class BotHand
 
             case "colony":
                 return string.IsNullOrWhiteSpace(tail) ? "colony wants a guild: colony The Hammer." : BotColonies.Launch(tail.Trim());
+
+            case "jail":
+                return BotOutlaw.Jail(tail.Trim());
 
             case "save":
                 {

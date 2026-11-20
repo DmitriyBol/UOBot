@@ -19,6 +19,10 @@ public static class BotClaim
 
     public static int Step { get; set; } = 1000;
 
+    public static double Dearer { get; set; } = 1.25;
+
+    public static int Most { get; set; } = 16;
+
     public static int Ousting { get; set; } = 5000;
 
     public static int Stripping { get; set; } = 2500;
@@ -502,7 +506,12 @@ public static class BotClaim
                 return Price;
             }
 
-            return nth <= Cheap ? Price : Price + (nth - Cheap) * Step;
+            if (nth <= Cheap)
+            {
+                return Price;
+            }
+
+            return (int)Math.Round(Price * Math.Pow(Math.Max(1.0, Dearer), nth - Cheap));
         }
 
         if (!held.Bought)
@@ -523,6 +532,11 @@ public static class BotClaim
         var key = BotQuad.Key(map, middle);
 
         if (_bids.ContainsKey(key) || _byGuild.ContainsKey(guild.Name))
+        {
+            return null;
+        }
+
+        if (Holds(guild.Name) >= Math.Max(Cheap, Most))
         {
             return null;
         }

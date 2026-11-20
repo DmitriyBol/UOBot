@@ -295,6 +295,11 @@ public static class BotSquads
             return false;
         }
 
+        if (deed is BotSkulk)
+        {
+            return false;
+        }
+
         if (Fighting(bot))
         {
             return false;

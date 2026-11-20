@@ -19,6 +19,14 @@ public static class BotCampTalk
 
     public static int DangerReach { get; set; } = 250;
 
+    public static double ToastChance { get; set; } = 0.15;
+
+    public static double ToastFreshHours { get; set; } = 6.0;
+
+    public static double VigilShare { get; set; } = 0.25;
+
+    public static long Toasts { get; private set; }
+
     public static double CheerPerLine { get; set; } = 12.0;
 
     public static long Lines { get; private set; }
@@ -99,10 +107,47 @@ public static class BotCampTalk
             ["camp:tale-witness"] = ["Aye, {about}. I know them well.", "I have a tale of {about} myself, another evening.", "So that's what became of {about}."],
             ["camp:tale-heard"] = ["I've heard this one — told well all the same.", "Aye, {about}'s name travels.", "This one's reached my ears before."],
             ["camp:tale-retold"] = ["A story I picked up in {place}, from {teller}: {tale}", "{teller} told it in {place}, and I tell it again: {tale}", "Word travels. In {place} I heard {teller} tell it: {tale}"],
+            ["camp:comic-answer"] = ["Hah! That one never gets old.", "He shall never live it down.", "Small things, big laughs.", "Every fire loves that tale.", "Ha! Mind it doesn't happen to me."],
+            ["warming:welcome"] = ["Welcome under my roof, {other}! Not much yet, but it is mine.", "Come in, come in. Mind the dust — the house is young.", "A door of my own at last, {other}. Stand anywhere you like."],
+            ["warming:guest"] = ["A fine door, this. And the fire in the right corner!", "I would have brought something, but you know me.", "First house of yours I have been let through the door of."],
+            ["warming:guest2"] = ["It needs a bench. And a second bench.", "The neighbours will talk, and they will be right to.", "I remember when you slept by the road, {other}."],
+            ["warming:thanks"] = ["To good neighbours and a dry roof.", "Well. Here is to the house.", "Thank you all for coming. Safe roads home."],
+            ["camp:toast"] =
+            [
+                "A toast, then: {tale}",
+                "{tale} — so passes the day. Drink to it.",
+                "You will have heard: {tale} To that!",
+                "Here is to the day's news: {tale}",
+                "Fill your cups. {tale}"
+            ],
+            ["crier:call"] =
+            [
+                "Hear, hear! {tale}",
+                "News of the island, for those that missed it: {tale}",
+                "Town, take note: {tale}",
+                "It went abroad today: {tale}"
+            ],
+            ["camp:vigil"] =
+            [
+                "To {name}, whom {what} took this hour. Rest well.",
+                "A cup for {name}. {what} had them, and the roads are short of them.",
+                "{name} fell to {what} not an hour past. Drink to the road they walked.",
+                "The hour took {name} — {what}'s doing. To {name}."
+            ],
             ["abode:furnished"] = ["A bed of my own, at last.", "There. A real bed, in my own house.", "Look at that. A bed, and it's mine."],
             ["meet:greet"] = ["Well met, {other}.", "{other}! Where are you off to?", "Hail, {other}. Keeping well?"],
+            ["meet:friend"] = ["{other}! Still alive, then. Good.", "{other}, you old road-rat. Well met.", "{other}! Last time I saw you, the wolves did.", "There's a face I know. {other}!"],
+            ["meet:gift"] = ["Here, {other} — {amount} {item}. For the road.", "Take these, {other}. No reason.", "{amount} {item}, {other}. Mind how you go."],
             ["meet:answer"] = ["Well met yourself.", "About my work. You?", "Can't stop long, {other}.", "Keeping well enough."],
-            ["meet:small"] = ["Warm day.", "Long road, this.", "Busy, busy.", "Have you seen the market lately?"]
+            ["meet:small"] = ["Warm day.", "Long road, this.", "Busy, busy.", "Have you seen the market lately?"],
+            ["comic:witness"] =
+            [
+                "Ha! {other}, done in by {what}!",
+                "Did you see it? {what} did for {other}!",
+                "{other} — beaten by {what}. That one will travel.",
+                "Careful, all: {what} eats the strong too, it seems.",
+                "A {what}... and {other} was doing so well."
+            ]
         };
 
     public static int Phrases()
@@ -312,6 +357,19 @@ public static class BotCampTalk
             }
         }
 
+        if (Utility.RandomDouble() < ToastChance)
+        {
+            if (Utility.RandomDouble() < VigilShare && BotVigil.Toast(fill))
+            {
+                return "camp:vigil";
+            }
+
+            if (Toast(fill))
+            {
+                return "camp:toast";
+            }
+        }
+
         Small++;
 
         return small;
@@ -474,6 +532,39 @@ public static class BotCampTalk
         return "camp:guild";
     }
 
+    private static bool Toast(Dictionary<string, string> fill)
+    {
+        var fresh = DateTime.UtcNow - TimeSpan.FromHours(Math.Max(0.5, ToastFreshHours));
+        string text = null;
+        var weight = 0.0;
+
+        foreach (var (_, day) in BotChronicle.Days)
+        {
+            for (var i = day.Entries.Count - 1; i >= 0; i--)
+            {
+                var entry = day.Entries[i];
+
+                if (entry == null || entry.At < fresh || entry.Weight <= weight)
+                {
+                    continue;
+                }
+
+                text = entry.Text;
+                weight = entry.Weight;
+            }
+        }
+
+        if (text == null)
+        {
+            return false;
+        }
+
+        fill["tale"] = text;
+        Toasts++;
+
+        return true;
+    }
+
     private static Mobile Other(BotCamp.Fire fire, Mobile not, Span<int> seated, int n, bool preferKeeper)
     {
         if (preferKeeper && fire.Keeper is { } keeper && !ReferenceEquals(keeper, not) && fire.PlaceOf(keeper) is { Seated: true })
@@ -547,7 +638,7 @@ public static class BotCampTalk
 
     public static string Describe() =>
         $"{Lines} lines said by a fire or on the road ({Greetings} greetings, {Roads} of a road, {Dangers} of danger, {Trades} of trade, {GuildTalk} of a guild, "
-        + $"{Small} small talk, {Replies} answers), {Held} not said (the voice was off or had no words)";
+        + $"{Small} small talk, {Toasts} toasts to the day's Chronicle, {Replies} answers), {Held} not said (the voice was off or had no words)";
 
     public static void Forget()
     {
@@ -558,6 +649,7 @@ public static class BotCampTalk
         Trades = 0;
         GuildTalk = 0;
         Small = 0;
+        Toasts = 0;
         Replies = 0;
         Held = 0;
     }

@@ -101,7 +101,7 @@ public sealed class BotStoryStore : GenericPersistence
     {
         var path = Path.GetFullPath(SaveFilePath, savePath);
 
-        if (Peek(path) is { } shape && shape != BotStory.Shape)
+        if (Peek(path) is { } shape && shape is not (1 or 2))
         {
             logger.Warning(
                 "The saved stories ({Path}) are shape {Found} and this build reads {Wanted}: not read, every book opens again at the start and the next save writes the new shape",

@@ -86,7 +86,7 @@ public static class BotTies
 
     public static BotTie Move(Mobile a, Mobile b, double by, string why)
     {
-        if (!On || a is not BotMobile || b is not BotMobile || ReferenceEquals(a, b) || by == 0.0)
+        if (!On || a is not BotMobile bot || b is not BotMobile || ReferenceEquals(a, b) || by == 0.0)
         {
             return null;
         }
@@ -98,7 +98,24 @@ public static class BotTies
             return null;
         }
 
-        var tie = life.Tie(b.Name);
+        return Write(bot, life, b.Name, by, why, true);
+    }
+
+    public static BotTie MoveToward(BotMobile bot, string other, double by, string why)
+    {
+        if (!On || bot is not { Deleted: false } || by == 0.0 || string.IsNullOrEmpty(other))
+        {
+            return null;
+        }
+
+        var life = BotLives.Of(bot);
+
+        return life == null ? null : Write(bot, life, other, by, why, false);
+    }
+
+    private static BotTie Write(BotMobile bot, BotLife life, string other, double by, string why, bool announce)
+    {
+        var tie = life.Tie(other);
 
         if (tie == null)
         {
@@ -126,7 +143,7 @@ public static class BotTies
                 Forgotten++;
             }
 
-            tie = new BotTie { Name = b.Name };
+            tie = new BotTie { Name = other };
             life.Ties.Add(tie);
             Formed++;
         }
@@ -135,17 +152,20 @@ public static class BotTies
 
         tie.Regard = Math.Clamp(was + by, -100.0, 100.0);
 
-        if (was < FriendAt && tie.Regard >= FriendAt)
+        if (announce)
         {
-            FriendsMade++;
+            if (was < FriendAt && tie.Regard >= FriendAt)
+            {
+                FriendsMade++;
 
-            logger.Information("{Name} counts {Other} a friend now: regard {Was:F0} to {Now:F0} — {Why}", a.Name, b.Name, was, tie.Regard, why);
-        }
-        else if (was > DuelAt && tie.Regard <= DuelAt)
-        {
-            EnemiesMade++;
+                logger.Information("{Name} counts {Other} a friend now: regard {Was:F0} to {Now:F0} — {Why}", bot.Name, other, was, tie.Regard, why);
+            }
+            else if (was > DuelAt && tie.Regard <= DuelAt)
+            {
+                EnemiesMade++;
 
-            logger.Information("{Name} counts {Other} a personal enemy now: regard {Was:F0} to {Now:F0} — {Why}", a.Name, b.Name, was, tie.Regard, why);
+                logger.Information("{Name} counts {Other} a personal enemy now: regard {Was:F0} to {Now:F0} — {Why}", bot.Name, other, was, tie.Regard, why);
+            }
         }
 
         life.Rewound();

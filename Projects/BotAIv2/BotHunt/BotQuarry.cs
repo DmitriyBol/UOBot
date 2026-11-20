@@ -78,7 +78,13 @@ public static class BotQuarry
 
     public static long Reshunned { get; private set; }
 
+    public static int PlacedShunMs { get; set; } = 7200000;
+
+    public static long PlaceShunned { get; private set; }
+
     private static readonly Dictionary<Serial, (int Times, Point3D At)> _unreached = [];
+
+    private static readonly Dictionary<(string Kind, int X, int Y), (int Times, long Tick)> _places = [];
 
     private static int Sentence(Mobile quarry)
     {
@@ -100,12 +106,38 @@ public static class BotQuarry
 
         if (times == 1)
         {
-            return ShunMs;
+            return PlaceSentence(quarry);
         }
 
         Reshunned++;
 
         return (int)System.Math.Min((long)ShunMs << System.Math.Min(times - 1, 8), HopelessMs);
+    }
+
+    private static int PlaceSentence(Mobile quarry)
+    {
+        var key = (quarry.GetType().Name, quarry.X >> 3, quarry.Y >> 3);
+        var now = Core.TickCount;
+
+        if (_places.Count >= 1024)
+        {
+            _places.Clear();
+        }
+
+        var placeTimes = _places.TryGetValue(key, out var place) && now - place.Tick < Math.Max(60000, PlacedShunMs)
+            ? place.Times + 1
+            : 1;
+
+        _places[key] = (placeTimes, now);
+
+        if (placeTimes == 1)
+        {
+            return ShunMs;
+        }
+
+        PlaceShunned++;
+
+        return (int)Math.Min((long)ShunMs << Math.Min(placeTimes - 1, 8), Math.Max(HopelessMs, PlacedShunMs));
     }
 
     public static void Shun(Mobile quarry, int ms)
@@ -579,6 +611,8 @@ public static class BotQuarry
         _claims.Clear();
         _shunned.Clear();
         _unreached.Clear();
+        _places.Clear();
+        PlaceShunned = 0;
         _crowded.Clear();
         _paid.Clear();
         Sent = 0;

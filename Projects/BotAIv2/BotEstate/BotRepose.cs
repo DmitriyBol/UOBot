@@ -116,6 +116,8 @@ public sealed class BotRepose : BotDeed
 
     public static long SentToRest { get; private set; }
 
+    public static long BedWalks { get; private set; }
+
     public static long RestedAtHome { get; private set; }
 
     public static int RestRetryMs { get; set; } = 600000;
@@ -152,6 +154,11 @@ public sealed class BotRepose : BotDeed
 
         _sentHome[bot.Serial] = Core.TickCount;
         SentToRest++;
+
+        if (BotFurnish.HasBed(house))
+        {
+            BedWalks++;
+        }
 
         return true;
     }
@@ -308,7 +315,7 @@ public sealed class BotRepose : BotDeed
     public static string Describe() =>
         Arrived + SentToRest == 0
             ? "nobody has gone home yet"
-            : $"{Arrived} came home and {Stayed} stayed the whole while; {SentToRest} tired bots sent home to rest, {RestedAtHome} left the world from there";
+            : $"{Arrived} came home and {Stayed} stayed the whole while; {SentToRest} tired bots sent home to rest ({BedWalks} of them to a bed), {RestedAtHome} left the world from there";
 
     public static void Forget()
     {

@@ -642,6 +642,11 @@ public static class BotWill
                 );
             }
 
+            if (result == BotWalkResult.Refused && refused.Where != Point3D.Zero && bot.Self is { Map: { } failMap })
+            {
+                BotBarred.Refused(failMap, refused.Where);
+            }
+
             return;
         }
 
